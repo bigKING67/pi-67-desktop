@@ -41,6 +41,11 @@ describe("Host runtime diagnostics", () => {
           poisoned: false,
           heartbeat: { active: true, lastActivityAt: 1_000, quietForMs: 9_000 }
         })
+      },
+      initialization: {
+        outcome: "completed",
+        stages: [{ stage: "load-session-resources", outcome: "completed", durationMs: 321 }],
+        stagesTruncated: false
       }
     }];
 
@@ -77,6 +82,18 @@ describe("Host runtime diagnostics", () => {
         poisonedCount: 0,
         heartbeatTrackedCount: 1,
         maxQuietForMs: 9_000
+      },
+      initializationReceipts: {
+        receipts: [{
+          outcome: "completed",
+          stages: [{
+            stage: "load-session-resources",
+            outcome: "completed",
+            durationMs: 321
+          }],
+          stagesTruncated: false
+        }],
+        receiptsTruncated: false
       }
     });
     expect(JSON.stringify(diagnostics)).not.toContain("task-");

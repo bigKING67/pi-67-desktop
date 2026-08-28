@@ -21,7 +21,11 @@ import { LazySurfaceBoundary } from "./LazySurfaceBoundary.js";
 import { applyRendererAgentEvent } from "./renderer-agent-event-controller.js";
 import styles from "./App.module.css";
 import { initializeUpdateProjection } from "../updates/update-store.js";
-import { dismissConversationFind } from "../search/conversation-find-events.js";
+import {
+  dismissConversationFind,
+  subscribeConversationFind,
+  subscribeConversationFindDismiss
+} from "../search/conversation-find-events.js";
 import { refreshConversationSnoozeClock } from "../navigation/conversation-snooze-clock.js";
 import { closeKeyboardShortcutsDialog } from "../help/keyboard-shortcuts-dialog-controller.js";
 import { CONTEXT_DRAWER_MEDIA_QUERY } from "../shell/context-panel-controller.js";
@@ -54,12 +58,23 @@ export function App() {
   const commandPaletteOpen = useShellStore((state) => state.commandPaletteOpen);
   const sessionTreeDialogOpen = useShellStore((state) => state.sessionTreeDialogOpen);
   const keyboardShortcutsDialogOpen = useShellStore((state) => state.keyboardShortcutsDialogOpen);
+  const workspaceConversationSearchDialogOpen = useShellStore(
+    (state) => state.workspaceConversationSearchDialogOpen
+  );
+  const setWorkspaceConversationSearchDialogOpen = useShellStore(
+    (state) => state.setWorkspaceConversationSearchDialogOpen
+  );
+  const workspaceContentSearchDialogOpen = useShellStore(
+    (state) => state.workspaceContentSearchDialogOpen
+  );
   const blockingOverlayOpen = approvalDialogOpen || extensionDialogOpen;
   const selectedSurface = useWorkbenchStore((state) => state.selectedSurface);
   const workbenchWorkspaceCount = useWorkbenchStore((state) => state.workspaceOrder.length);
   const [navigationIsDrawer, setNavigationIsDrawer] = useState(() => window.matchMedia("(max-width: 760px)").matches);
   const [contextIsDrawer, setContextIsDrawer] = useState(() => window.matchMedia(CONTEXT_DRAWER_MEDIA_QUERY).matches);
   const freshnessInstallationRef = useRef<ReturnType<typeof createOperationFreshnessInstallation> | undefined>(undefined);
+  const workspaceConversationSearchRestoreFocusRef = useRef<HTMLElement | undefined>(undefined);
+  const workspaceConversationSearchWasOpenRef = useRef(false);
   if (!freshnessInstallationRef.current) {
     freshnessInstallationRef.current = createOperationFreshnessInstallation({
       onLoadFailed: () => publishNotification({
@@ -126,6 +141,31 @@ export function App() {
   useEffect(() => initializeUpdateProjection(), []);
 
   useEffect(() => () => useTaskDraftStore.getState().dispose(), []);
+
+  useEffect(() => subscribeConversationFind((scope) => {
+    if (scope !== "workspace") return;
+    const activeElement = document.activeElement;
+    workspaceConversationSearchRestoreFocusRef.current = activeElement instanceof HTMLElement
+      ? activeElement
+      : undefined;
+    setWorkspaceConversationSearchDialogOpen(true);
+  }), [setWorkspaceConversationSearchDialogOpen]);
+
+  useEffect(() => subscribeConversationFindDismiss(() => {
+    setWorkspaceConversationSearchDialogOpen(false);
+  }), [setWorkspaceConversationSearchDialogOpen]);
+
+  useEffect(() => {
+    if (workspaceConversationSearchDialogOpen) {
+      workspaceConversationSearchWasOpenRef.current = true;
+      return;
+    }
+    if (!workspaceConversationSearchWasOpenRef.current) return;
+    workspaceConversationSearchWasOpenRef.current = false;
+    const target = workspaceConversationSearchRestoreFocusRef.current;
+    workspaceConversationSearchRestoreFocusRef.current = undefined;
+    if (target?.isConnected) requestAnimationFrame(() => target.focus());
+  }, [workspaceConversationSearchDialogOpen]);
 
   useEffect(() => {
     document.title = extensionTitle ? `${extensionTitle} - ${DEFAULT_APPLICATION_TITLE}` : DEFAULT_APPLICATION_TITLE;
@@ -209,8 +249,12 @@ export function App() {
         </LazySurfaceBoundary>
       )}
       <NotificationToasts />
-      <Suspense fallback={null}><WorkspaceConversationSearchDialog /></Suspense>
-      <Suspense fallback={null}><WorkspaceContentSearchDialog /></Suspense>
+      {workspaceConversationSearchDialogOpen && !blockingOverlayOpen ? (
+        <Suspense fallback={null}><WorkspaceConversationSearchDialog /></Suspense>
+      ) : null}
+      {workspaceContentSearchDialogOpen && !blockingOverlayOpen ? (
+        <Suspense fallback={null}><WorkspaceContentSearchDialog /></Suspense>
+      ) : null}
       {keyboardShortcutsDialogOpen && !blockingOverlayOpen ? (
         <LazySurfaceBoundary
           description="关闭后可通过 Cmd/Ctrl+/ 或帮助菜单重新打开。"

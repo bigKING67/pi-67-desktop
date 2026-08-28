@@ -1,11 +1,21 @@
 import { Bot, FilePenLine, Files, Gauge, MessagesSquare } from "lucide-react";
+import { lazy, Suspense } from "react";
 import { Tab, TabList, TabPanel, Tabs } from "react-aria-components";
-import { ChangesPanel } from "../changes/ChangesPanel.js";
 import { useShellStore } from "../shell/shell-store.js";
 import { FilesPanel } from "./FilesPanel.js";
-import { MessagesPanel } from "./MessagesPanel.js";
-import { RuntimeContextPanel } from "./RuntimeContextPanel.js";
-import { SubagentsPanel } from "../subagents/SubagentsPanel.js";
+
+const ChangesPanel = lazy(() => import("../changes/ChangesPanel.js").then((module) => ({
+  default: module.ChangesPanel
+})));
+const MessagesPanel = lazy(() => import("./MessagesPanel.js").then((module) => ({
+  default: module.MessagesPanel
+})));
+const RuntimeContextPanel = lazy(() => import("./RuntimeContextPanel.js").then((module) => ({
+  default: module.RuntimeContextPanel
+})));
+const SubagentsPanel = lazy(() => import("../subagents/SubagentsPanel.js").then((module) => ({
+  default: module.SubagentsPanel
+})));
 
 export function ContextPane() {
   const selectedTab = useShellStore((state) => state.contextTab);
@@ -25,18 +35,30 @@ export function ContextPane() {
           <FilesPanel />
         </TabPanel>
         <TabPanel id="changes" className="context-panel inspector-changes-panel">
-          <ChangesPanel active={selectedTab === "changes"} />
+          {selectedTab === "changes" ? (
+            <Suspense fallback={<ContextPanelLoadingState />}><ChangesPanel active /></Suspense>
+          ) : null}
         </TabPanel>
         <TabPanel id="messages" className="context-panel inspector-messages-panel">
-          <MessagesPanel />
+          {selectedTab === "messages" ? (
+            <Suspense fallback={<ContextPanelLoadingState />}><MessagesPanel /></Suspense>
+          ) : null}
         </TabPanel>
         <TabPanel id="agents" className="context-panel inspector-agents-panel">
-          <SubagentsPanel />
+          {selectedTab === "agents" ? (
+            <Suspense fallback={<ContextPanelLoadingState />}><SubagentsPanel /></Suspense>
+          ) : null}
         </TabPanel>
         <TabPanel id="context" className="context-panel">
-          <RuntimeContextPanel />
+          {selectedTab === "context" ? (
+            <Suspense fallback={<ContextPanelLoadingState />}><RuntimeContextPanel /></Suspense>
+          ) : null}
         </TabPanel>
       </Tabs>
     </aside>
   );
+}
+
+function ContextPanelLoadingState() {
+  return <p aria-busy="true" className="context-empty" role="status">正在加载检查器…</p>;
 }

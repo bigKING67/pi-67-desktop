@@ -25,6 +25,7 @@ describe("release performance workflow gates", () => {
       "corepack pnpm run build && corepack pnpm run prepare:toolchain && corepack pnpm run prepare:capabilities && node eng/performance/prepare-packaged-app.mjs"
     );
     expect(packageJson.scripts["performance:measure"]).toContain("measure-session-catalog.mjs");
+    expect(packageJson.scripts["performance:measure"]).toContain("measure-session-open.mjs");
   });
 
   it("keeps 500 MiB large-Session work explicit and outside ordinary CI", async () => {
@@ -36,6 +37,7 @@ describe("release performance workflow gates", () => {
     const ordinaryCi = await readFile(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
 
     expect(packageJson.scripts["performance:large-session"]).toContain("measure-large-session-jsonl.mjs");
+    expect(packageJson.scripts["performance:session-open"]).toContain("measure-session-open.mjs");
     expect(certification).toContain("large_session_profile:");
     expect(certification).toContain("- standard");
     expect(certification).toContain("- extended");

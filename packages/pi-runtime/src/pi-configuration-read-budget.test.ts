@@ -13,7 +13,10 @@ vi.mock("node:fs/promises", async (importOriginal) => ({
 
 import { SettingsManager } from "@earendil-works/pi-coding-agent";
 import { PiAuthCredentialStore } from "./pi-auth-credential-store.js";
-import { readWorkspaceConfigurationBundle } from "./pi-configuration-file-state.js";
+import {
+  readModelConfigurationBundle,
+  readWorkspaceConfigurationBundle
+} from "./pi-configuration-file-state.js";
 import { resolvePiConfigurationServiceOptions } from "./pi-configuration-service-options.js";
 
 describe("Pi configuration read budgets", () => {
@@ -51,6 +54,25 @@ describe("Pi configuration read budgets", () => {
     });
     expect(String((failure as Error).message)).not.toContain(privateRoot);
     expect(fileSystem.readFile).not.toHaveBeenCalled();
+  });
+
+  it("reads only models and credentials when preparing a Task model runtime", async () => {
+    fileSystem.stat.mockResolvedValue({ mtimeMs: 1 });
+    fileSystem.readFile.mockImplementation(async (path) => `${String(path)}\n`);
+    const paths = {
+      modelsPath: "/private/pi67-agent/models.json",
+      authPath: "/private/pi67-agent/auth.json",
+      globalSettingsPath: "/private/pi67-agent/settings.json"
+    };
+
+    const bundle = await readModelConfigurationBundle(paths, 20);
+
+    expect(bundle.models.path).toBe(paths.modelsPath);
+    expect(bundle.auth.path).toBe(paths.authPath);
+    expect(fileSystem.stat).toHaveBeenCalledTimes(2);
+    expect(fileSystem.readFile).toHaveBeenCalledTimes(2);
+    expect(fileSystem.stat).not.toHaveBeenCalledWith(paths.globalSettingsPath);
+    expect(fileSystem.readFile).not.toHaveBeenCalledWith(paths.globalSettingsPath, "utf8");
   });
 
   it("turns a stalled auth.json read into a bounded diagnostic without exposing its path", async () => {

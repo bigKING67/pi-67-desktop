@@ -45,6 +45,8 @@ import {
 } from "./native-subagent-coordinator.js";
 import { createNativeSubagentTools } from "./native-subagent-tools.js";
 
+const DESKTOP_EXCLUDED_SDK_TOOLS = ["powershell"];
+
 interface RuntimeSessionBindingsOptions {
   cancelInteractiveRequests: (reason: ExtensionUiCancellationReason) => void;
   emit: (event: AgentEvent) => void;
@@ -119,36 +121,44 @@ export class RuntimeSessionBindings {
     observeStage?: RuntimeInitializationObserver
   ): Promise<void> {
     const services = await this.createServices(cwd, observeStage);
-    const toolAliases = createDesktopToolAliasBinding();
-    const customTools = [
-      ...createFirstPartyWebTools(),
-      ...this.planMode.createTools(),
-      ...createNativeSubagentTools(this.options.subagents),
-      ...toolAliases.tools
-    ];
-    const result = sessionManager
-      ? await createAgentSessionFromServices({ services, sessionManager, customTools })
-      : await createAgentSession({
-        cwd,
-        agentDir: this.options.getAgentDir(),
-        modelRuntime: services.modelRuntime,
-        settingsManager: services.settingsManager,
-        resourceLoader: services.resourceLoader,
-        customTools
-      });
-    toolAliases.bind(result.session);
-    this.activeToolAliases = toolAliases;
-    const runtime = new AgentSessionRuntime(
-      result.session,
-      services,
-      this.createRuntimeFactory(),
-      services.diagnostics,
-      result.modelFallbackMessage
-    );
-    this.activeRuntime = runtime;
-    runtime.setBeforeSessionInvalidate(() => this.detachSessionBindings());
-    runtime.setRebindSession((session) => this.bindSession(session));
-    await this.bindSession(result.session);
+    await runRuntimeInitializationStage(observeStage, "activate-session", async () => {
+      const toolAliases = createDesktopToolAliasBinding();
+      const customTools = [
+        ...createFirstPartyWebTools(),
+        ...this.planMode.createTools(),
+        ...createNativeSubagentTools(this.options.subagents),
+        ...toolAliases.tools
+      ];
+      const result = sessionManager
+        ? await createAgentSessionFromServices({
+            services,
+            sessionManager,
+            customTools,
+            excludeTools: DESKTOP_EXCLUDED_SDK_TOOLS
+          })
+        : await createAgentSession({
+          cwd,
+          agentDir: this.options.getAgentDir(),
+          modelRuntime: services.modelRuntime,
+          settingsManager: services.settingsManager,
+          resourceLoader: services.resourceLoader,
+          customTools,
+          excludeTools: DESKTOP_EXCLUDED_SDK_TOOLS
+        });
+      toolAliases.bind(result.session);
+      this.activeToolAliases = toolAliases;
+      const runtime = new AgentSessionRuntime(
+        result.session,
+        services,
+        this.createRuntimeFactory(),
+        services.diagnostics,
+        result.modelFallbackMessage
+      );
+      this.activeRuntime = runtime;
+      runtime.setBeforeSessionInvalidate(() => this.detachSessionBindings());
+      runtime.setRebindSession((session) => this.bindSession(session));
+      await this.bindSession(result.session);
+    });
   }
 
   async settleAndDispose(): Promise<void> {
@@ -215,6 +225,7 @@ export class RuntimeSessionBindings {
         services,
         sessionManager,
         customTools,
+        excludeTools: DESKTOP_EXCLUDED_SDK_TOOLS,
         ...(sessionStartEvent ? { sessionStartEvent } : {})
       });
       toolAliases.bind(result.session);
@@ -232,36 +243,48 @@ export class RuntimeSessionBindings {
     const promptAttachmentAccess = this.options.getPromptAttachmentAccess();
     workspaceServices?.assertCompatible(cwd, this.options.getAgentDir());
     const configurationService = workspaceServices?.configurationService;
-    const modelRuntime = configurationService
-      ? await runRuntimeInitializationStage(
+    const modelRuntimeLoad = configurationService
+      ? runRuntimeInitializationStage(
           observeStage,
           "load-model-runtime",
           () => configurationService.createModelRuntime()
         )
-      : undefined;
-    return createDesktopSessionServices({
-      cwd,
-      agentDir: this.options.getAgentDir(),
-      runtimeCredentialOverrides: this.options.getRuntimeCredentialOverrides(),
-      ...(workspaceServices === undefined
-        ? {}
-        : {
-            settingsManager: workspaceServices.settingsManager,
-            packageTrustRegistry: workspaceServices.packageTrustRegistry
-          }),
-      ...(modelRuntime === undefined ? {} : { modelRuntime }),
-      getSafety: this.options.getSafety,
-      requestApproval: subagent === undefined
-        ? this.options.requestApproval
-        : (request, approvalOptions) => this.options.requestApproval(
-            { ...request, subagent },
-            approvalOptions
-          ),
-      recordToolAuthorization: this.options.recordToolAuthorization,
-      getInteractionMode: () => this.planMode.interactionMode,
-      ...(promptAttachmentAccess === undefined ? {} : { promptAttachmentAccess }),
-      ...(subagent === undefined ? {} : { noThirdPartyExtensions: true })
-    });
+      : Promise.resolve(undefined);
+    const packageTrustRefresh = workspaceServices?.packageTrustRegistry.refresh();
+    const packageTrustLoad = packageTrustRefresh
+      ? runRuntimeInitializationStage(
+          observeStage,
+          "validate-packages",
+          () => packageTrustRefresh
+        )
+      : Promise.resolve();
+    const [modelRuntime] = await Promise.all([modelRuntimeLoad, packageTrustLoad]);
+    return runRuntimeInitializationStage(observeStage, "load-session-resources", () => (
+      createDesktopSessionServices({
+        cwd,
+        agentDir: this.options.getAgentDir(),
+        runtimeCredentialOverrides: this.options.getRuntimeCredentialOverrides(),
+        ...(workspaceServices === undefined
+          ? {}
+          : {
+              settingsManager: workspaceServices.settingsManager,
+              packageTrustRegistry: workspaceServices.packageTrustRegistry
+            }),
+        ...(packageTrustRefresh === undefined ? {} : { packageTrustRefresh }),
+        ...(modelRuntime === undefined ? {} : { modelRuntime }),
+        getSafety: this.options.getSafety,
+        requestApproval: subagent === undefined
+          ? this.options.requestApproval
+          : (request, approvalOptions) => this.options.requestApproval(
+              { ...request, subagent },
+              approvalOptions
+            ),
+        recordToolAuthorization: this.options.recordToolAuthorization,
+        getInteractionMode: () => this.planMode.interactionMode,
+        ...(promptAttachmentAccess === undefined ? {} : { promptAttachmentAccess }),
+        ...(subagent === undefined ? {} : { noThirdPartyExtensions: true })
+      })
+    ));
   }
 
   async createSubagentSession(
@@ -292,6 +315,7 @@ export class RuntimeSessionBindings {
       services,
       sessionManager: input.sessionManager,
       customTools,
+      excludeTools: DESKTOP_EXCLUDED_SDK_TOOLS,
       ...(selectedModel === undefined ? {} : { model: selectedModel }),
       thinkingLevel: input.thinkingLevel
     });

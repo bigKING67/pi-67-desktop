@@ -20,8 +20,6 @@ import { workspaceRemovalDisposition } from "../workbench/workspace-registration
 import { openRendererWorkspace } from "../workspace/workspace-open-controller.js";
 import styles from "./NavigationRail.module.css";
 import { WorkspaceConversationList } from "./WorkspaceConversationList.js";
-import { ConversationRenameDialog } from "./ConversationRenameDialog.js";
-import { ArchivedConversationsDialog } from "./ArchivedConversationsDialog.js";
 import { useConversationDialogStore } from "./conversation-dialog-store.js";
 import {
   SessionCatalogSearch,
@@ -33,6 +31,12 @@ const WorkspaceRemovalDialog = lazy(async () => {
   const module = await import("./WorkspaceRemovalDialog.js");
   return { default: module.WorkspaceRemovalDialog };
 });
+const ConversationRenameDialog = lazy(() => import("./ConversationRenameDialog.js").then((module) => ({
+  default: module.ConversationRenameDialog
+})));
+const ArchivedConversationsDialog = lazy(() => import("./ArchivedConversationsDialog.js").then((module) => ({
+  default: module.ArchivedConversationsDialog
+})));
 
 export function NavigationRail({
   containerRef
@@ -61,6 +65,7 @@ export function NavigationRail({
   const acknowledgeSessionSearchFocus = useShellStore((state) => state.acknowledgeSessionSearchFocus);
   const removalWorkspace = removalWorkspaceId ? workspaces[removalWorkspaceId] : undefined;
   const archivedWorkspaceId = useConversationDialogStore((state) => state.archivedWorkspaceId);
+  const renameTarget = useConversationDialogStore((state) => state.renameTarget);
   const archivedWorkspace = archivedWorkspaceId ? workspaces[archivedWorkspaceId] : undefined;
 
   return (
@@ -121,8 +126,16 @@ export function NavigationRail({
           />
         </Suspense>
       ) : null}
-      <ConversationRenameDialog />
-      {archivedWorkspace ? <ArchivedConversationsDialog workspace={archivedWorkspace} /> : null}
+      {renameTarget ? (
+        <Suspense fallback={<span className="sr-only" role="status">正在打开重命名对话框</span>}>
+          <ConversationRenameDialog />
+        </Suspense>
+      ) : null}
+      {archivedWorkspace ? (
+        <Suspense fallback={<span className="sr-only" role="status">正在打开归档对话</span>}>
+          <ArchivedConversationsDialog workspace={archivedWorkspace} />
+        </Suspense>
+      ) : null}
     </aside>
   );
 }

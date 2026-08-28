@@ -51,7 +51,11 @@ describe("RuntimeSessionBindings", () => {
     ));
     const bindings = createBindings(() => ({
       assertCompatible: vi.fn(),
-      configurationService: { createModelRuntime }
+      configurationService: { createModelRuntime },
+      packageTrustRegistry: {
+        refresh: vi.fn(async () => undefined),
+        runtimePackageAllowed: vi.fn(() => false)
+      }
     } as unknown as PiWorkspaceRuntimeServices));
 
     await expect(bindings.createInitial("/tmp/pi67-workspace")).rejects.toMatchObject({
@@ -60,6 +64,36 @@ describe("RuntimeSessionBindings", () => {
       details: { stage: "session-model-runtime", waitMs: 10 }
     });
     expect(createModelRuntime).toHaveBeenCalledOnce();
+  });
+
+  it("starts Task model runtime and Package trust preparation concurrently", async () => {
+    let rejectModelRuntime!: (reason: Error) => void;
+    let releasePackageTrust!: () => void;
+    const createModelRuntime = vi.fn(() => new Promise<never>((_resolve, reject) => {
+      rejectModelRuntime = reject;
+    }));
+    const refresh = vi.fn(() => new Promise<void>((resolve) => {
+      releasePackageTrust = resolve;
+    }));
+    const bindings = createBindings(() => ({
+      assertCompatible: vi.fn(),
+      configurationService: { createModelRuntime },
+      packageTrustRegistry: {
+        refresh,
+        runtimePackageAllowed: vi.fn(() => false)
+      }
+    } as unknown as PiWorkspaceRuntimeServices));
+
+    const creation = bindings.createInitial("/tmp/pi67-workspace");
+    await vi.waitFor(() => {
+      expect(createModelRuntime).toHaveBeenCalledOnce();
+      expect(refresh).toHaveBeenCalledOnce();
+    });
+    const failure = new Error("model runtime stopped after concurrent preparation");
+    rejectModelRuntime(failure);
+    releasePackageTrust();
+
+    await expect(creation).rejects.toBe(failure);
   });
 
   it("fails closed when Plan lineage no longer matches the bound Session identity", async () => {

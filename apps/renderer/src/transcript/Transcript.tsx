@@ -32,9 +32,9 @@ import {
   useWorkbenchStore
 } from "../workbench/workbench-store.js";
 import { DeferredMessageCard, DeferredTranscriptProcessGroup } from "./DeferredTranscriptRows.js";
+import { DeferredPlanProposalCard } from "./DeferredPlanProposalCard.js";
 import { DeferredTranscriptList } from "./DeferredTranscriptList.js";
 import { editableUserMessageText } from "./message-actions.js";
-import { PlanProposalCard } from "./PlanProposalCard.js";
 import { useTranscriptMessageFocus } from "./transcript-message-focus.js";
 import { subscribeTranscriptMessageJump } from "./transcript-navigation.js";
 import {
@@ -325,7 +325,7 @@ export function Transcript() {
         }}
         itemContent={(_index, row) => {
           if (row.kind === "plan-proposal") {
-            return <PlanProposalCard plan={row.plan} />;
+            return <DeferredPlanProposalCard plan={row.plan} />;
           }
           if (row.kind === "process-group") {
             const current = row.key === currentProcessGroupKey;

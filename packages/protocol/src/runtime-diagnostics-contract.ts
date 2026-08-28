@@ -57,6 +57,27 @@ export interface SessionCreationJournalDiagnostics {
   truncated: boolean;
 }
 
+export type RuntimeInitializationStageDiagnostics =
+  | "resolve-session"
+  | "dispose-current"
+  | "create-session"
+  | "load-model-runtime"
+  | "validate-packages"
+  | "load-session-resources"
+  | "activate-session"
+  | "reload-configuration"
+  | "project-snapshot";
+
+export interface RuntimeInitializationReceiptDiagnostics {
+  outcome: "in-progress" | "completed" | "failed";
+  stages: Array<{
+    stage: RuntimeInitializationStageDiagnostics;
+    outcome: "started" | "completed" | "failed";
+    durationMs: number;
+  }>;
+  stagesTruncated: boolean;
+}
+
 export interface RuntimeHostDiagnostics {
   hostEpoch: number;
   taskCount: number;
@@ -82,6 +103,10 @@ export interface RuntimeHostDiagnostics {
     maxQuietForMs: number;
   };
   writerLeases: { activeCount: number; pendingCount: number; compromised: boolean };
+  initializationReceipts?: {
+    receipts: RuntimeInitializationReceiptDiagnostics[];
+    receiptsTruncated: boolean;
+  };
   workspaces: Array<{
     workspaceIdHash: string;
     sessionCatalog: SessionCatalogStatus;

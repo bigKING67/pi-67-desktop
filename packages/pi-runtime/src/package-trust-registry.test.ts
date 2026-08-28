@@ -292,6 +292,67 @@ describe("PackageTrustRegistry", () => {
       trustReason: "package-identity-changed"
     });
   });
+
+  it("deduplicates inherited package paths and bounds independent inspections", async () => {
+    const fixture = await trustFixture();
+    const sources = Array.from({ length: 6 }, (_, index) => `npm:@example/package-${index}`);
+    const installedPaths = sources.map((_, index) => join(fixture.root, `installed-${index}`));
+    const calls: string[] = [];
+    let active = 0;
+    let maximumActive = 0;
+    const registry = new PackageTrustRegistry({
+      packageManager: {
+        listConfiguredPackages: () => [
+          ...sources.map((source, index) => ({
+            source,
+            scope: "user" as const,
+            filtered: false,
+            installedPath: installedPaths[index]!
+          })),
+          {
+            source: sources[0]!,
+            scope: "project" as const,
+            filtered: true
+          }
+        ]
+      },
+      settingsManager: {
+        getGlobalSettings: () => ({ packages: sources }),
+        getProjectSettings: () => ({
+          packages: [{ source: sources[0]!, autoload: false, extensions: ["**/*"] }]
+        })
+      },
+      receipts: fixture.receipts,
+      inspectInstallation: async (path) => {
+        calls.push(path);
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        await Promise.resolve();
+        active -= 1;
+        const index = installedPaths.indexOf(path);
+        return {
+          status: "observed" as const,
+          observation: {
+            packageName: `@example/package-${index}`,
+            packageVersion: "1.0.0",
+            manifestSha256: "a".repeat(64),
+            contentSha256: "b".repeat(64),
+            directoryIdentityDigest: "c".repeat(64),
+            observedAt: index + 1
+          },
+          baselineContentSha256: "d".repeat(64)
+        };
+      }
+    });
+
+    await registry.refresh();
+
+    expect(calls).toHaveLength(installedPaths.length);
+    expect(new Set(calls)).toEqual(new Set(installedPaths));
+    expect(maximumActive).toBe(4);
+    expect(registry.observationFor(sources[0]!, "project"))
+      .toEqual(registry.observationFor(sources[0]!, "global"));
+  });
 });
 
 async function trustedFixture() {

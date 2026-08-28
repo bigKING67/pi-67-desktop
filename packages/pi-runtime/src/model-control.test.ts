@@ -41,6 +41,6 @@ describe("model control", () => {
     expect(getModel).toHaveBeenCalledOnce();
     expect(getModel).toHaveBeenCalledWith("anthropic", "claude-sonnet");
     expect(setModel).toHaveBeenCalledOnce();
-    expect(setModel).toHaveBeenCalledWith(model);
+    expect(setModel).toHaveBeenCalledWith(model, { persist: true });
   });
 });

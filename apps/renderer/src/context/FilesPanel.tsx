@@ -5,7 +5,7 @@ import type {
   WorkspaceFilePage,
   WorkspaceFileSearchResult
 } from "@pi67/domain";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { selectedWorkbenchTask, useWorkbenchStore } from "../workbench/workbench-store.js";
@@ -19,7 +19,6 @@ import {
   trashWorkspaceEntry
 } from "../workspace-files/workspace-file-controller.js";
 import { workspaceHasDirtyPath } from "../workspace-files/workspace-file-store.js";
-import { WorkspaceFileNameDialog } from "../workspace-files/WorkspaceFileNameDialog.js";
 import {
   WorkspaceFileTree,
   type WorkspaceDirectoryProjection,
@@ -32,6 +31,9 @@ type NameDialogState =
   | { kind: "rename"; selected: WorkspaceFileSelection };
 
 const ROOT_KEY = "__workspace_root__";
+const WorkspaceFileNameDialog = lazy(() => import("../workspace-files/WorkspaceFileNameDialog.js").then((module) => ({
+  default: module.WorkspaceFileNameDialog
+})));
 
 export function FilesPanel() {
   const workspace = useWorkbenchStore(selectedFilesWorkspaceState);
@@ -123,17 +125,19 @@ export function FilesPanel() {
       />
 
       {nameDialog ? (
-        <WorkspaceFileNameDialog
-          confirmLabel={nameDialog.kind === "create" ? "创建" : "重命名"}
-          detail={dialogDetail(nameDialog, selected)}
-          initialName={nameDialog.kind === "rename" ? nameDialog.selected.entry.name : ""}
-          mode={dialogMode(nameDialog)}
-          title={dialogTitle(nameDialog)}
-          onDismiss={() => setNameDialog(undefined)}
-          onConfirm={(name) => nameDialog.kind === "create"
-            ? createFromSelection(nameDialog.entryKind, name)
-            : renameSelected(nameDialog.selected, name)}
-        />
+        <Suspense fallback={null}>
+          <WorkspaceFileNameDialog
+            confirmLabel={nameDialog.kind === "create" ? "创建" : "重命名"}
+            detail={dialogDetail(nameDialog, selected)}
+            initialName={nameDialog.kind === "rename" ? nameDialog.selected.entry.name : ""}
+            mode={dialogMode(nameDialog)}
+            title={dialogTitle(nameDialog)}
+            onDismiss={() => setNameDialog(undefined)}
+            onConfirm={(name) => nameDialog.kind === "create"
+              ? createFromSelection(nameDialog.entryKind, name)
+              : renameSelected(nameDialog.selected, name)}
+          />
+        </Suspense>
       ) : null}
     </div>
   );

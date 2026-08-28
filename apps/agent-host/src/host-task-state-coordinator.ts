@@ -1,5 +1,5 @@
 import type { RuntimeStatus } from "@pi67/domain";
-import type { AgentRuntime } from "@pi67/pi-runtime";
+import type { AgentRuntime, RuntimeInitializationObservation } from "@pi67/pi-runtime";
 import {
   APP_PROTOCOL_CONTEXT,
   COMMAND_CONTEXT_SCOPE_REQUIREMENTS,
@@ -26,6 +26,11 @@ export interface TaskHostState {
   operations?: OperationRegistry;
   scheduler?: CommandScheduler;
   controlMutations?: ControlMutationLedger;
+  initialization?: {
+    outcome: "in-progress" | "completed" | "failed";
+    stages: RuntimeInitializationObservation[];
+    stagesTruncated: boolean;
+  };
 }
 
 export interface HostTaskStateCoordinatorOptions {

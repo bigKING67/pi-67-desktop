@@ -13,7 +13,7 @@ export async function selectSessionModel(
       details: { provider, modelId: id }
     });
   }
-  await session.setModel(model);
+  await session.setModel(model, { persist: true });
 }
 
 export function setSessionThinkingLevel(session: AgentSession, level: string): void {

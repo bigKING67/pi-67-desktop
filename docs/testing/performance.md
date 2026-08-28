@@ -62,6 +62,9 @@ batching 默认 50 ms，禁止 token-level React commit。
   generation/dispose race；
 - 100,000-message in-memory shared projection；weekly/native certification 的 100 MiB / 100,000-record
   real-file JSONL；手动 extended certification 的 500 MiB / 100,000-record real-file JSONL；
+- SDK `SessionManager.open()` 的 10/100 MiB standard real-file profile，以及显式 500 MiB extended
+  profile；记录同步 open、event-loop delay、projection bind、首个 Conversation page、最新 100 条
+  user-message index page 和 retained RSS/heap；
 - Windows 10/11 x64 与 macOS Apple Silicon 分开测量。
 
 ## Evidence levels
@@ -86,17 +89,19 @@ PI67_PERF_SAMPLES=10 corepack pnpm run performance:measure
 
 1. 构建 production renderer、Main、Preload 和 Agent Host；
 2. 为当前受支持平台生成 unsigned unpacked application；
-3. 对 1k/10k/100k in-memory Pi Session 运行共享 entry projection、最近/更早消息页、bounded tree 和
+3. 对 10/100 MiB generated Pi JSONL 运行发布版 `SessionManager.open()`，记录同步 event-loop delay、
+   shared projection bind、首个 Conversation page、最新 user-message index page 和 retained memory；
+4. 对 1k/10k/100k in-memory Pi Session 运行共享 entry projection、最近/更早消息页、bounded tree 和
    full `getEntries()` read-count 门禁；100k 时延保持 informational，但 full read 必须仍为一次；
-4. 对真实 `createSessionCatalog` 与临时 SQLite 运行 1k/10k cold rebuild、warm query/search/reopen，
+5. 对真实 `createSessionCatalog` 与临时 SQLite 运行 1k/10k cold rebuild、warm query/search/reopen，
    并在 background discovery 被阻塞时验证既有分页与新 Session metadata upsert 仍可用；
-5. 对真实临时 JSONL 文件运行 active-Session tail/watcher 基准，记录 append drain、bounded pass、
+6. 对真实临时 JSONL 文件运行 active-Session tail/watcher 基准，记录 append drain、bounded pass、
    peak pending line、event-loop yield 和外部变更分类；
-6. 对 production renderer bundle 运行 browser-tier 1000-message、composer、scroll、
+7. 对 production renderer bundle 运行 browser-tier 1000-message、composer、scroll、
    streaming、older-page/session-switch 显式 GC retained heap、DOM counters，以及
    Shiki/WASM/TypeScript grammar 延迟加载与长代码测量；Renderer E2E 另外验证可见图片才触发
    `asset.read`、单 chunk 不超过 1 MiB、Blob URL 不使用 data URL 且 Host replacement 会 revoke；
-7. 对 packaged Electron 运行 clean-profile launch、warm-profile launch、Welcome working
+8. 对 packaged Electron 运行 clean-profile launch、warm-profile launch、Welcome working
    set、平台原生 owned/effective memory、按需连接但未加载 Pi SDK 的 Agent Host memory、隔离
    目录中的真实 Pi SDK session 初始化、官方 `SessionManager.appendMessage()` 生成的
    1,000-message JSONL restore，以及 active-session Agent Host crash recovery 和
@@ -104,7 +109,32 @@ PI67_PERF_SAMPLES=10 corepack pnpm run performance:measure
    restore 阶段新增的同源 production resource；每个样本还运行一个无 Provider 的受控
    Extension command 和 child process，测量关闭并验证 `session_shutdown(reason="quit")`、child 与
    Agent Host 退出；
-8. 将报告写入 ignored 的 `artifacts/performance/`。
+9. 将报告写入 ignored 的 `artifacts/performance/`。
+
+权威 Session-open Node 基准可独立运行：
+
+```bash
+PI67_PERF_SESSION_OPEN_SAMPLES=10 \
+  corepack pnpm run performance:session-open
+```
+
+standard profile 生成约 10 MiB 和 100 MiB 的有效 Pi JSONL，逐样本在带 `--expose-gc` 的独立
+child process 中调用发布版 SDK `SessionManager.open(path, undefined, cwdOverride)`，避免前一样本
+对象存活污染 retained-memory 结果。报告分别记录 open、零延迟 `setImmediate` 观测到的 event-loop
+delay、`SessionProjectionIndex.bind`、最近 Conversation page、最新 100 条 user-message index page、
+fixture bytes/messages 和保留的 RSS/heap。生成与 fsync 时间单列，不计入 open。
+
+500 MiB 只由显式 extended profile 启用，默认一个样本：
+
+```bash
+PI67_PERF_SESSION_OPEN_PROFILE=extended \
+PI67_PERF_SESSION_OPEN_SAMPLES=1 \
+  corepack pnpm run performance:session-open
+```
+
+这一级是 synthetic `node-real-file` 证据，不读取用户 Session；它不能证明 packaged Utility Process、
+Renderer paint、冷缓存、Windows Defender/EDR、OneDrive、redirected profile 或慢磁盘。时间指标在
+分平台 baseline 充足前保持 informational；macOS 结果不得外推 Windows。
 
 共享 Session entry projection 的 Node 基准可独立运行：
 

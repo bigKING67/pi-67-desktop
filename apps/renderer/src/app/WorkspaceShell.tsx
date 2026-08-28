@@ -1,15 +1,9 @@
 import { lazy, Suspense, useLayoutEffect, useRef, useState } from "react";
 import type { WorkspaceDescriptor } from "@pi67/domain";
-import {
-  rendererWorkbenchStore,
-  selectedWorkbenchTask,
-  type RendererWorkbenchTask
-} from "../workbench/workbench-store.js";
+import { rendererWorkbenchStore, selectedWorkbenchTask, type RendererWorkbenchTask } from "../workbench/workbench-store.js";
 import { useAppStore } from "./app-store.js";
-import { Composer } from "../composer/Composer.js";
 import { ContextPane } from "../context/ContextPane.js";
 import { NavigationRail } from "../navigation/NavigationRail.js";
-import { StreamingAnnouncer } from "../live-turn/StreamingAnnouncer.js";
 import {
   dismissUnconfirmedRendererSession,
   recheckUnconfirmedRendererSession
@@ -24,24 +18,25 @@ import {
   selectSessionGeneration,
   selectSessionId
 } from "../session/session-projection-selectors.js";
-import { Transcript } from "../transcript/Transcript.js";
-import { TrustBanner } from "../workspace/TrustBanner.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
-import {
-  activateRendererTask,
-  resumeRendererTask
-} from "../workbench/task-activation-controller.js";
+import { activateRendererTask, resumeRendererTask } from "../workbench/task-activation-controller.js";
 import { repairAndOpenRendererWorkspace } from "../workbench/workspace-registration-controller.js";
 import { canRenderLiveTask } from "../workbench/live-task-authority.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import { beginRendererSessionIntentInWorkspace } from "../workspace/workspace-session-controller.js";
-import { WorkspaceFileSurface } from "../workspace-files/WorkspaceFileSurface.js";
+import { useWorkspaceFileStore } from "../workspace-files/workspace-file-store.js";
 import { LazySurfaceBoundary } from "./LazySurfaceBoundary.js";
 import { NewSessionIntentSurface } from "./NewSessionIntentSurface.js";
 import styles from "./WorkspaceShell.module.css";
 
 const SettingsWorkbench = lazy(() => import("../settings/SettingsWorkbench.js").then((module) => ({
   default: module.SettingsWorkbench
+})));
+const LiveConversationSurface = lazy(() => import("./LiveConversationSurface.js").then((module) => ({
+  default: module.LiveConversationSurface
+})));
+const WorkspaceFileSurface = lazy(() => import("../workspace-files/WorkspaceFileSurface.js").then((module) => ({
+  default: module.WorkspaceFileSurface
 })));
 
 interface WorkspaceShellProps {
@@ -75,6 +70,9 @@ export function WorkspaceShell({
       : undefined;
     return selectConversationSessionSummary(state, conversation);
   });
+  const selectedWorkspaceHasFileTabs = useWorkspaceFileStore((state) => Boolean(
+    selectedWorkspace && (state.workspaces[selectedWorkspace.id]?.tabs.length ?? 0) > 0
+  ));
   const liveSessionId = useSessionProjectionStore(selectSessionId);
   const liveSessionFileIdentity = useSessionProjectionStore(selectSessionFileIdentity);
   const liveSessionGeneration = useSessionProjectionStore(selectSessionGeneration);
@@ -99,12 +97,16 @@ export function WorkspaceShell({
   const centralSurface = taskRecoveryPending ? (
     <TaskRecoveryState detail={liveRuntime.detail} />
   ) : liveTaskSelected ? (
-    <section className="conversation-region" aria-label="Pi conversation">
-      <TrustBanner />
-      <StreamingAnnouncer />
-      <Transcript />
-      <Composer />
-    </section>
+    <LazySurfaceBoundary
+      description="Pi 任务仍保持运行；重新加载界面后会从权威 Session 投影恢复。"
+      kind="workspace"
+      surface="live-conversation"
+      title="对话界面未能加载"
+    >
+      <Suspense fallback={<ConversationLoadingState />}>
+        <LiveConversationSurface showTrustBanner={selectedWorkspace?.trust !== "trusted"} />
+      </Suspense>
+    </LazySurfaceBoundary>
   ) : selectedWorkspace && selectedWorkspace.availability !== "available" ? (
     <WorkspaceRecoveryState workspace={selectedWorkspace} />
   ) : selectedTask?.conversation.kind === "provisional"
@@ -198,8 +200,17 @@ export function WorkspaceShell({
           type="button"
         />
       ) : null}
-      {selectedWorkspace ? (
-        <WorkspaceFileSurface workspace={selectedWorkspace}>{centralSurface}</WorkspaceFileSurface>
+      {selectedWorkspace && selectedWorkspaceHasFileTabs ? (
+        <LazySurfaceBoundary
+          description="对话仍保持可用；可重新打开文件标签以恢复编辑器。"
+          kind="workspace"
+          surface="workspace-files"
+          title="文件标签界面未能加载"
+        >
+          <Suspense fallback={<WorkspaceFilesLoadingState />}>
+            <WorkspaceFileSurface workspace={selectedWorkspace}>{centralSurface}</WorkspaceFileSurface>
+          </Suspense>
+        </LazySurfaceBoundary>
       ) : centralSurface}
       {effectiveContextVisible ? (
         <>
@@ -253,6 +264,28 @@ function SettingsLoadingState() {
         </div>
       </section>
     </main>
+  );
+}
+
+function ConversationLoadingState() {
+  return (
+    <section aria-busy="true" className={styles.emptyWorkspace} role="status">
+      <div>
+        <span className="loading-line" />
+        <h2>正在加载对话界面</h2>
+      </div>
+    </section>
+  );
+}
+
+function WorkspaceFilesLoadingState() {
+  return (
+    <section aria-busy="true" className={styles.emptyWorkspace} role="status">
+      <div>
+        <span className="loading-line" />
+        <h2>正在加载文件标签</h2>
+      </div>
+    </section>
   );
 }
 

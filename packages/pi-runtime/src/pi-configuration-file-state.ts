@@ -36,6 +36,11 @@ export interface WorkspaceBundle {
   revision: string;
 }
 
+export interface ModelConfigurationBundle {
+  models: ConfigurationPathState;
+  auth: ConfigurationPathState;
+}
+
 export interface WorkspaceConfigurationState {
   cwd: string;
   settingsManager: PiSettingsManager;
@@ -115,6 +120,17 @@ export async function readWorkspaceConfigurationBundle(
   const hash = createHash("sha256");
   for (const entry of entries) hash.update(entry.kind).update("\0").update(entry.revision).update("\0");
   return { paths: entries, byKind, revision: hash.digest("hex") };
+}
+
+export async function readModelConfigurationBundle(
+  paths: PiConfigurationPaths,
+  fileAccessWaitMs: number
+): Promise<ModelConfigurationBundle> {
+  const [models, auth] = await Promise.all([
+    readConfigurationPath("models", paths.modelsPath, true, fileAccessWaitMs),
+    readConfigurationPath("auth", paths.authPath, true, fileAccessWaitMs)
+  ]);
+  return { models, auth };
 }
 
 export function configurationPath(

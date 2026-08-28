@@ -17,6 +17,8 @@ describe("shell store", () => {
       contextTab: "files",
       sessionTreeDialogOpen: false,
       commandPaletteOpen: false,
+      workspaceConversationSearchDialogOpen: false,
+      workspaceContentSearchDialogOpen: false,
       doctorDialogOpen: false,
       credentialDialogOpen: false,
       credentialDialogProviderId: undefined,
@@ -115,6 +117,8 @@ describe("shell store", () => {
     const shell = useShellStore.getState();
     shell.setCommandPaletteOpen(true);
     shell.setKeyboardShortcutsDialogOpen(true);
+    shell.setWorkspaceConversationSearchDialogOpen(true);
+    shell.setWorkspaceContentSearchDialogOpen(true);
     shell.setDoctorDialogOpen(true);
     shell.setCredentialDialogOpen(true, "openai");
     shell.setUpdateDialogOpen(true);
@@ -125,6 +129,8 @@ describe("shell store", () => {
     expect(useShellStore.getState()).toMatchObject({
       commandPaletteOpen: false,
       keyboardShortcutsDialogOpen: false,
+      workspaceConversationSearchDialogOpen: false,
+      workspaceContentSearchDialogOpen: false,
       doctorDialogOpen: false,
       credentialDialogOpen: false,
       credentialDialogProviderId: undefined,

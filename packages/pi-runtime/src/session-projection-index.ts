@@ -13,8 +13,7 @@ import type {
   UserMessageIndexItem
 } from "@pi67/domain";
 import {
-  appendProjectedUserMessage,
-  projectUserMessageIndex,
+  projectUserMessageIndexItem,
   searchProjectedMessages
 } from "./session-message-projection.js";
 import { projectSessionCompatibility } from "./session-compatibility-projection.js";
@@ -42,7 +41,7 @@ interface ProjectionState {
   branch: SessionEntry[];
   branchIndex: Map<string, number>;
   revision: number;
-  userMessages: UserMessageIndexItem[];
+  userMessageEntryIndexes: number[];
   leafId: string | null;
   metadata: SessionProjectionMetadata;
   usage: UsageTotals;
@@ -92,8 +91,26 @@ export class SessionProjectionIndex {
     return this.synchronizeState().revision;
   }
 
-  getUserMessages(): UserMessageIndexItem[] {
-    return this.synchronizeState().userMessages;
+  getUserMessageCount(): number {
+    return this.synchronizeState().userMessageEntryIndexes.length;
+  }
+
+  getUserMessages(offset = 0, limit = Number.MAX_SAFE_INTEGER): UserMessageIndexItem[] {
+    const state = this.synchronizeState();
+    const start = Math.min(state.userMessageEntryIndexes.length, Math.max(0, Math.trunc(offset)));
+    const end = Math.min(
+      state.userMessageEntryIndexes.length,
+      start + Math.max(0, Math.trunc(limit))
+    );
+    const items: UserMessageIndexItem[] = [];
+    for (let ordinalIndex = start; ordinalIndex < end; ordinalIndex += 1) {
+      const branchIndex = state.userMessageEntryIndexes[ordinalIndex];
+      if (branchIndex === undefined) continue;
+      const entry = state.branch[branchIndex];
+      if (entry?.type !== "message" || entry.message.role !== "user") continue;
+      items.push(projectUserMessageIndexItem(entry, ordinalIndex + 1, state.branch[branchIndex - 1]));
+    }
+    return items;
   }
 
   searchMessages(query: string, limit: number): { total: number; items: MessageSearchItem[] } {
@@ -177,7 +194,7 @@ function buildState(manager: SessionManager, entries: SessionEntry[]): Projectio
     branch: [],
     branchIndex: new Map(),
     revision: 1,
-    userMessages: [],
+    userMessageEntryIndexes: [],
     leafId: manager.getLeafId(),
     metadata: {
       sessionId,
@@ -213,7 +230,9 @@ function appendEntry(state: ProjectionState, entry: SessionEntry, nextLeafId: st
     state.branchIndex.set(entry.id, state.branch.length);
     state.branch.push(entry);
     state.toolExecutions.observe(entry);
-    appendProjectedUserMessage(state.userMessages, entry, state.branch.at(-2));
+    if (entry.type === "message" && entry.message.role === "user") {
+      state.userMessageEntryIndexes.push(state.branch.length - 1);
+    }
   } else {
     rebuildBranch(state);
   }
@@ -238,7 +257,13 @@ function rebuildBranch(state: ProjectionState): void {
   }
   state.branch = reverse.reverse();
   state.branchIndex = new Map(state.branch.map((entry, index) => [entry.id, index]));
-  state.userMessages = projectUserMessageIndex(state.branch);
+  state.userMessageEntryIndexes = [];
+  for (let index = 0; index < state.branch.length; index += 1) {
+    const entry = state.branch[index];
+    if (entry?.type === "message" && entry.message.role === "user") {
+      state.userMessageEntryIndexes.push(index);
+    }
+  }
   state.toolExecutions.rebuild(state.branch, state.manager.getCwd());
 }
 

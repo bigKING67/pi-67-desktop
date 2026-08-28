@@ -16,6 +16,14 @@ export async function collectHostRuntimeDiagnostics(options: {
   const taskStates = options.taskStates.filter((state) => !state.record.closed);
   const schedulers = taskStates.flatMap((state) => state.scheduler ? [state.scheduler.diagnostics()] : []);
   const operations = taskStates.flatMap((state) => state.operations ? [state.operations.diagnostics()] : []);
+  const allInitializationReceipts = taskStates.flatMap((state) => state.initialization
+    ? [{
+        outcome: state.initialization.outcome,
+        stages: state.initialization.stages.map((stage) => ({ ...stage })),
+        stagesTruncated: state.initialization.stagesTruncated
+      }]
+    : []);
+  const initializationReceipts = allInitializationReceipts.slice(0, 64);
   const workspaces = await Promise.all(options.workspaceRecords.slice(0, 64).map(async (workspace) => ({
     workspaceIdHash: createHash("sha256").update(workspace.workspaceId).digest("hex"),
     sessionCatalog: workspace.sessionCatalog.status(),
@@ -51,6 +59,10 @@ export async function collectHostRuntimeDiagnostics(options: {
         )
       },
       writerLeases: options.writerLeases.diagnostics(),
+      initializationReceipts: {
+        receipts: initializationReceipts,
+        receiptsTruncated: allInitializationReceipts.length > initializationReceipts.length
+      },
       workspaces,
       workspacesTruncated: options.workspaceRecords.length > workspaces.length
     }

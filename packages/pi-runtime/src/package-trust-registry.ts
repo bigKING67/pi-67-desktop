@@ -43,17 +43,25 @@ export interface PackageTrustRegistryOptions {
   receipts: PackageMutationReceiptStore;
   environment?: NodeJS.ProcessEnv;
   now?: () => number;
+  inspectInstallation?: (
+    installedPath: string,
+    now?: () => number
+  ) => Promise<PackageObservationResult>;
 }
+
+const MAX_CONCURRENT_PACKAGE_INSPECTIONS = 4;
 
 /** Revalidates installed package content and projects durable receipt trust. */
 export class PackageTrustRegistry {
   readonly #options: PackageTrustRegistryOptions;
   readonly #projections = new Map<string, TrustProjection>();
   readonly #observations = new Map<string, PackageObservationResult>();
+  readonly #inspectInstallation: NonNullable<PackageTrustRegistryOptions["inspectInstallation"]>;
   #refreshPromise: Promise<void> | undefined;
 
   constructor(options: PackageTrustRegistryOptions) {
     this.#options = options;
+    this.#inspectInstallation = options.inspectInstallation ?? inspectPackageInstallation;
   }
 
   refresh(): Promise<void> {
@@ -91,6 +99,23 @@ export class PackageTrustRegistry {
       this.#options.settingsManager,
       environment
     );
+    const inspectionTargets = new Map<string, string>();
+    for (const entry of configured) {
+      if (
+        entry.installedPath !== undefined
+        && !verifiedBuiltins.has(normalizePackageAbsolutePath(entry.source))
+      ) {
+        inspectionTargets.set(
+          normalizePackageAbsolutePath(entry.installedPath),
+          entry.installedPath
+        );
+      }
+    }
+    const inspections = await inspectPackageInstallations(
+      [...inspectionTargets].map(([key, path]) => ({ key, path })),
+      this.#inspectInstallation,
+      this.#options.now
+    );
     const projections = new Map<string, TrustProjection>();
     const observations = new Map<string, PackageObservationResult>();
     for (const entry of configured) {
@@ -108,7 +133,8 @@ export class PackageTrustRegistry {
         });
         continue;
       }
-      const observation = await inspectPackageInstallation(entry.installedPath, this.#options.now);
+      const observation = inspections.get(normalizePackageAbsolutePath(entry.installedPath));
+      if (!observation) throw new Error("Package trust inspection result is missing.");
       observations.set(key, observation);
       if (observation.status !== "observed") {
         projections.set(key, unavailableProjection(observation.reason));
@@ -134,6 +160,30 @@ export class PackageTrustRegistry {
     for (const [key, projection] of projections) this.#projections.set(key, projection);
     for (const [key, observation] of observations) this.#observations.set(key, observation);
   }
+}
+
+interface PackageInspectionTarget {
+  key: string;
+  path: string;
+}
+
+async function inspectPackageInstallations(
+  targets: PackageInspectionTarget[],
+  inspectInstallation: NonNullable<PackageTrustRegistryOptions["inspectInstallation"]>,
+  now: (() => number) | undefined
+): Promise<Map<string, PackageObservationResult>> {
+  const results = new Map<string, PackageObservationResult>();
+  let nextIndex = 0;
+  const workerCount = Math.min(MAX_CONCURRENT_PACKAGE_INSPECTIONS, targets.length);
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < targets.length) {
+      const target = targets[nextIndex];
+      nextIndex += 1;
+      if (!target) return;
+      results.set(target.key, await inspectInstallation(target.path, now));
+    }
+  }));
+  return results;
 }
 
 interface ConfiguredInstallation {

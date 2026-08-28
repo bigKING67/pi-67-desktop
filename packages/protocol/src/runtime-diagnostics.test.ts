@@ -46,6 +46,18 @@ const diagnostics = {
       maxQuietForMs: 0
     },
     writerLeases: { activeCount: 1, pendingCount: 0, compromised: false },
+    initializationReceipts: {
+      receipts: [{
+        outcome: "completed",
+        stages: [{
+          stage: "load-session-resources",
+          outcome: "completed",
+          durationMs: 123
+        }],
+        stagesTruncated: false
+      }],
+      receiptsTruncated: false
+    },
     workspaces: [],
     workspacesTruncated: false
   }

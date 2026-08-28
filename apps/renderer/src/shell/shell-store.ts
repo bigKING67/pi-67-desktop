@@ -13,6 +13,7 @@ interface ShellState {
   sessionTreeDialogOpen: boolean;
   commandPaletteOpen: boolean;
   keyboardShortcutsDialogOpen: boolean;
+  workspaceConversationSearchDialogOpen: boolean;
   workspaceContentSearchDialogOpen: boolean;
   doctorDialogOpen: boolean;
   credentialDialogOpen: boolean;
@@ -28,6 +29,7 @@ interface ShellState {
   setSessionTreeDialogOpen: (open: boolean) => void;
   setCommandPaletteOpen: (open: boolean) => void;
   setKeyboardShortcutsDialogOpen: (open: boolean) => void;
+  setWorkspaceConversationSearchDialogOpen: (open: boolean) => void;
   setWorkspaceContentSearchDialogOpen: (open: boolean) => void;
   setDoctorDialogOpen: (open: boolean) => void;
   setCredentialDialogOpen: (open: boolean, providerId?: string) => void;
@@ -47,6 +49,7 @@ export const useShellStore = create<ShellState>((set) => ({
   sessionTreeDialogOpen: false,
   commandPaletteOpen: false,
   keyboardShortcutsDialogOpen: false,
+  workspaceConversationSearchDialogOpen: false,
   workspaceContentSearchDialogOpen: false,
   doctorDialogOpen: false,
   credentialDialogOpen: false,
@@ -77,6 +80,9 @@ export const useShellStore = create<ShellState>((set) => ({
   setSessionTreeDialogOpen(sessionTreeDialogOpen) { set({ sessionTreeDialogOpen }); },
   setCommandPaletteOpen(commandPaletteOpen) { set({ commandPaletteOpen }); },
   setKeyboardShortcutsDialogOpen(keyboardShortcutsDialogOpen) { set({ keyboardShortcutsDialogOpen }); },
+  setWorkspaceConversationSearchDialogOpen(workspaceConversationSearchDialogOpen) {
+    set({ workspaceConversationSearchDialogOpen });
+  },
   setWorkspaceContentSearchDialogOpen(workspaceContentSearchDialogOpen) {
     set({ workspaceContentSearchDialogOpen });
   },
@@ -92,6 +98,7 @@ export const useShellStore = create<ShellState>((set) => ({
     set({
       commandPaletteOpen: false,
       keyboardShortcutsDialogOpen: false,
+      workspaceConversationSearchDialogOpen: false,
       workspaceContentSearchDialogOpen: false,
       doctorDialogOpen: false,
       credentialDialogOpen: false,

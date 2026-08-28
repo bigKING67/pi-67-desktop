@@ -15,6 +15,25 @@ describe("AgentHostInitializationOutputForwarder", () => {
     );
   });
 
+  it.each([
+    "validate-packages",
+    "load-session-resources",
+    "activate-session"
+  ])("forwards the truthful restore stage %s", (stage) => {
+    const emit = vi.fn<(line: string) => void>();
+    const forwarder = new AgentHostInitializationOutputForwarder(emit);
+
+    forwarder.write(`[agent-host:init] ${JSON.stringify({
+      stage,
+      outcome: "completed",
+      durationMs: 17.4
+    })}\n`);
+
+    expect(emit).toHaveBeenCalledWith(
+      `[agent-host:init] ${JSON.stringify({ stage, outcome: "completed", durationMs: 17 })}`
+    );
+  });
+
   it("drops malformed, unknown and overlong utility output", () => {
     const emit = vi.fn<(line: string) => void>();
     const forwarder = new AgentHostInitializationOutputForwarder(emit);

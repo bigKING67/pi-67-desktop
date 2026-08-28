@@ -57,11 +57,7 @@ describe("controlled Provider runtime fixture", () => {
       const prompt = runtime.submitPrompt(CONTROLLED_PROMPT_TEXT);
       childPid = await readPositiveProcessId(childPidPath);
       expect(runtime.getSnapshot().selectedModel).toEqual({ provider, id: modelId });
-      expect(JSON.parse(await readFile(settingsPath, "utf8"))).toMatchObject({
-        defaultProvider: provider,
-        defaultModel: modelId,
-        steeringMode: "one-at-a-time"
-      });
+      await expect(readFile(settingsPath, "utf8")).resolves.toBe(originalSettings);
       await runtime.abort();
       await expect(prompt).resolves.toBeUndefined();
       await expect(waitForProcessExit(childPid)).resolves.toBeUndefined();

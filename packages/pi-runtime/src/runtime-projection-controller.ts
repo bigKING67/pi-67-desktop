@@ -154,20 +154,20 @@ export class RuntimeProjectionController {
   }
 
   getUserMessageIndex(options: { offset?: number; limit?: number }): UserMessageIndexPage {
-    const items = this.session.getUserMessages();
+    const total = this.session.getUserMessageCount();
     const limit = Math.min(
       MAX_USER_MESSAGE_INDEX_PAGE_ITEMS,
       Math.max(1, options.limit ?? DEFAULT_USER_MESSAGE_INDEX_PAGE_ITEMS)
     );
     const offset = options.offset === undefined
-      ? Math.max(0, items.length - limit)
-      : Math.min(items.length, Math.max(0, options.offset));
+      ? Math.max(0, total - limit)
+      : Math.min(total, Math.max(0, options.offset));
     return {
       sessionId: this.session.getSessionId(),
       revision: this.session.getRevision(),
-      total: items.length,
+      total,
       offset,
-      items: items.slice(offset, offset + limit)
+      items: this.session.getUserMessages(offset, limit)
     };
   }
 

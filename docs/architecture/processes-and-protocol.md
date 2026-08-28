@@ -159,7 +159,7 @@ Package 不会被 Pi ResourceLoader 隐式安装或加载。第三方 bounded co
 `node_modules`，限制 10,000 files、128 MiB、depth 32 和五秒；它不是 registry integrity、签名、provenance、
 完整依赖树证明或不可变文件系统 snapshot。
 
-当前 Pi SDK 0.84.2 没有 Extension executor、module-loader transport、Hook/Tool RPC 或 MCP supervisor
+当前 Pi SDK 0.84.3 没有 Extension executor、module-loader transport、Hook/Tool RPC 或 MCP supervisor
 injection point。`DefaultResourceLoader -> jiti.import -> factory(pi) -> ExtensionRunner` 仍在 Agent Host
 utility process 内运行。Package worker 也不拥有第三方 Extension 自行启动的 MCP child。真正的 runtime
 isolation 需要上游 executor/proxy port、经审计的 loader/runner fork，或明确禁用 unsupported third-party
@@ -416,7 +416,9 @@ Agent Host 在 Session bind 时对 `SessionManager.getEntries()` 执行一次全
 Conversation page 和 Recorded Changes 共用该索引；`entry_appended` 增量维护，leaf 导航只从已有
 entry map 重建活动 branch。Bootstrap、`usage.changed`、`session.tree` 和 Catalog upsert 不得各自
 重新复制并扫描完整 entries。索引只持有 SDK entry 引用和派生 metadata，不写入数据库，也不改变
-Pi JSONL 或 `SessionManager` 的所有权。
+Pi JSONL 或 `SessionManager` 的所有权。用户消息导航只缓存活动 branch 中的 entry position；
+`message.index` 按请求的 100/200 项窗口投影 bounded preview 和附件计数，不在 Session bind 时
+对全部历史消息做脱敏和字符串归一化。
 
 Session tree 是 flat projection，最多 512 nodes / 128 KiB JSON；活动节点优先，`truncated`
 和 `total` 明确表达裁剪。Renderer 使用 Virtuoso，不递归挂载完整树。Tree 不进入宽 App Store：
@@ -522,7 +524,7 @@ rebuilding 并调度 bounded discovery。Retry 重新打开 SQLite 后，在完�
 single-owner lock；文件替换、恶意重写 version cookie、多 utility-process 和 Windows lock timing 仍需独立证据。
 Catalog 当前继续使用 DELETE journal。WAL 的 main/`-wal`/`-shm` private-file 校验、checkpoint、整组隔离、
 外部 writer detection 和 Windows Defender/同步盘锁定尚未形成同等证据，因此不与 schema v3 同时切换。
-当前 Pi SDK `0.84.2` 的 cold discovery 内部仍会临时构造 `allMessagesText`，但该值在适配边界立即
+当前 Pi SDK `0.84.3` 的 cold discovery 内部仍会临时构造 `allMessagesText`，但该值在适配边界立即
 丢弃，不进入 SQLite、Protocol、Renderer、日志或 diagnostics。当前不实现 FTS 或 transcript index；
 活动 Session watcher 与 Catalog metadata discovery 保持独立，前者不会把 JSONL entry 写入 SQLite。
 
@@ -662,7 +664,7 @@ Notification history 已迁移到独立 `notificationStore`，App Store 不再�
   Approval 绑定 `hostEpoch + sessionId + sessionGeneration + operationId + requestId + toolCallId`；
   Port 不可投递、session/operation 过期、requester 异常、等待期间 abort 或 target/cwd 无法完整
   展示时立即拒绝，不能等待超时后继续执行。
-- Pi `0.84.2` 中用户 Extension 先运行，Desktop inline Safety Extension 后运行；Safety 因而检查
+- Pi `0.84.3` 中用户 Extension 先运行，Desktop inline Safety Extension 后运行；Safety 因而检查
   其他 Extension 修改后的最终 Tool 输入。真实 Pi ordering contract test 固定该属性，SDK
   升级若改变顺序必须失败。
 - Project trust only enables project resources. It does not replace per-action

@@ -642,6 +642,8 @@ loading error where the operation can produce those states
 - Messages shows only user-authored messages on the current active branch. The
   index is paged at 100 by default and 200 maximum, previews are capped at 120
   grapheme-scale characters, and image/attachment counts contain metadata only.
+  Agent Host caches branch positions and projects only the requested page; opening a
+  large Session does not eagerly build previews for the complete user-message history.
   Clicking a loaded message scrolls and focuses its virtualized Transcript row;
   clicking an unloaded message installs one bounded historical window, disables
   edit/continue actions, highlights the target with Reduced Motion support, and
@@ -1822,7 +1824,7 @@ loading error where the operation can produce those states
 ### Extension UI and approval
 
 - Dialogs identify the extension or tool only when the runtime supplies an
-  authoritative identity. Pi SDK `0.84.2` does not identify the caller for
+  authoritative identity. Pi SDK `0.84.3` does not identify the caller for
   shared `ctx.ui` primitives, so those dialogs use the truthful generic label
   `Pi extension` instead of guessing a package.
 - Safety Approval is a dedicated dialog and protocol, not an Extension `confirm`.
@@ -2098,6 +2100,10 @@ loading error where the operation can produce those states
   on-demand Agent Host exists and does not expose SDK/process marketing copy as
   the primary user message.
 - Loading copy names the operation, such as `正在加载 Pi 资源`.
+- Opening a Catalog-backed conversation advances through truthful bounded stages:
+  Provider preparation, installed-extension verification, Pi Extension and work-rule
+  loading, and conversation restoration. A completed Provider stage never remains as
+  the visible label while Task-local resources or Session bindings are still loading.
 - The first on-demand Agent Host connection has one initialization owner. The
   trust action stays disabled until a session snapshot exists, remains disabled
   while resources reload, and never stacks duplicate trust commands.

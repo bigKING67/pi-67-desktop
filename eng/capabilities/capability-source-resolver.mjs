@@ -17,6 +17,10 @@ export async function resolveExactCapabilitySource({
   const local = resolve(repositoryRoot, source.localSibling);
   if (await isExactCleanRepository(local, source.commit, git)) return local;
   const destination = join(sourceCacheRoot, source.id);
+  if (
+    await isExactCleanRepository(destination, source.commit, git)
+    && await repositoryRemoteMatches(destination, source.repository, git)
+  ) return destination;
   await removeSourceTree(destination);
   await mkdir(dirname(destination), { recursive: true });
   let lastError;
@@ -83,6 +87,14 @@ async function isExactCleanRepository(path, commit, git) {
     const head = await capture(git, ["-C", path, "rev-parse", "HEAD"]);
     if (head !== commit) return false;
     return (await capture(git, ["-C", path, "status", "--porcelain=v1", "--untracked-files=all"])) === "";
+  } catch {
+    return false;
+  }
+}
+
+async function repositoryRemoteMatches(path, repository, git) {
+  try {
+    return await capture(git, ["-C", path, "remote", "get-url", "origin"]) === repository;
   } catch {
     return false;
   }

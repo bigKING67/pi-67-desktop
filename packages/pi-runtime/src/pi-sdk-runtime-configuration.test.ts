@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ModelRuntime, type AgentSession } from "@earendil-works/pi-coding-agent";
@@ -177,6 +177,10 @@ describe("PiSdkRuntime configuration reload", () => {
       expect(runtime.getSnapshot().selectedModel).toEqual({
         provider: replacement.provider,
         id: replacement.id
+      });
+      expect(JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8"))).toMatchObject({
+        defaultProvider: replacement.provider,
+        defaultModel: replacement.id
       });
     } finally {
       await runtime.dispose();

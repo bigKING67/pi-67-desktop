@@ -106,6 +106,22 @@ describe("Desktop tool routing Extension integration", () => {
       session.dispose();
     }
   }, 15_000);
+
+  it("does not expose the optional SDK PowerShell Tool without a Desktop safety contract", async () => {
+    const fixture = await createFixture("powershell-tool-policy");
+    await writeFile(join(fixture.agentDir, "settings.json"), `${JSON.stringify({
+      defaultTools: ["read", "powershell"]
+    }, null, 2)}\n`, "utf8");
+
+    const { session, bridge } = await createSession(fixture);
+    try {
+      expect(session.getActiveToolNames()).not.toContain("powershell");
+      expect(session.getAllTools().map((tool) => tool.name)).not.toContain("powershell");
+    } finally {
+      bridge.dispose();
+      session.dispose();
+    }
+  }, 15_000);
 });
 
 async function createFixture(name: string): Promise<{ cwd: string; agentDir: string }> {
@@ -135,7 +151,8 @@ async function createSession(fixture: { cwd: string; agentDir: string }) {
   const { session } = await createAgentSessionFromServices({
     services,
     sessionManager: SessionManager.inMemory(fixture.cwd),
-    customTools: aliases.tools
+    customTools: aliases.tools,
+    excludeTools: ["powershell"]
   });
   aliases.bind(session);
   const bridge = new DesktopExtensionUiBridge(() => undefined);

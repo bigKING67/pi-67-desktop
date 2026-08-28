@@ -1,6 +1,7 @@
 import babel from "@rolldown/plugin-babel";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { resolveRendererModulePreloadDependencies } from "./module-preload-policy.js";
 
 export default defineConfig(({ command }) => ({
   base: "/",
@@ -35,6 +36,9 @@ export default defineConfig(({ command }) => ({
     outDir: "dist",
     emptyOutDir: true,
     sourcemap: false,
+    modulePreload: {
+      resolveDependencies: resolveRendererModulePreloadDependencies
+    },
     rolldownOptions: {
       treeshake: {
         moduleSideEffects: (id) => !id.includes("/node_modules/typebox/")

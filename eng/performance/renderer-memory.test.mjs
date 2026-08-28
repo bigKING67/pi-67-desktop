@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRendererMemoryMetrics } from "./renderer-memory.mjs";
+import { createRendererMemoryMetrics, excludeDocumentHeadNodes } from "./renderer-memory.mjs";
 
 describe("renderer memory performance contract", () => {
   it("keeps retained heap and DOM budgets explicit", () => {
@@ -16,6 +16,11 @@ describe("renderer memory performance contract", () => {
 
     expect(metrics.find((metric) => metric.id === "rendererLoaded1kHeapDelta")?.samples).toEqual([3, 4]);
     expect(metrics.find((metric) => metric.id === "rendererAfter10SwitchesHeapDelta")?.samples).toEqual([2, 3]);
+  });
+
+  it("excludes invariant document-head nodes without hiding detached body nodes", () => {
+    expect(excludeDocumentHeadNodes(832, 32)).toBe(800);
+    expect(excludeDocumentHeadNodes(12, 20)).toBe(0);
   });
 });
 

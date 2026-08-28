@@ -50,6 +50,36 @@ export const RuntimeDiagnosticsSchema = strictObject({
       pendingCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
       compromised: Type.Boolean()
     }),
+    initializationReceipts: Type.Optional(strictObject({
+      receipts: Type.Array(strictObject({
+        outcome: Type.Union([
+          Type.Literal("in-progress"),
+          Type.Literal("completed"),
+          Type.Literal("failed")
+        ]),
+        stages: Type.Array(strictObject({
+          stage: Type.Union([
+            Type.Literal("resolve-session"),
+            Type.Literal("dispose-current"),
+            Type.Literal("create-session"),
+            Type.Literal("load-model-runtime"),
+            Type.Literal("validate-packages"),
+            Type.Literal("load-session-resources"),
+            Type.Literal("activate-session"),
+            Type.Literal("reload-configuration"),
+            Type.Literal("project-snapshot")
+          ]),
+          outcome: Type.Union([
+            Type.Literal("started"),
+            Type.Literal("completed"),
+            Type.Literal("failed")
+          ]),
+          durationMs: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })
+        }), { maxItems: 32 }),
+        stagesTruncated: Type.Boolean()
+      }), { maxItems: 64 }),
+      receiptsTruncated: Type.Boolean()
+    })),
     workspaces: Type.Array(strictObject({
       workspaceIdHash: Type.String({ minLength: 64, maxLength: 64, pattern: "^[0-9a-f]+$" }),
       sessionCatalog: SessionCatalogStatusSchema,

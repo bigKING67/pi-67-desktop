@@ -6,6 +6,9 @@ const INITIALIZATION_STAGES = new Set([
   "dispose-current",
   "create-session",
   "load-model-runtime",
+  "validate-packages",
+  "load-session-resources",
+  "activate-session",
   "reload-configuration",
   "project-snapshot"
 ]);

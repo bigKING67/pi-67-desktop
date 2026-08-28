@@ -44,7 +44,7 @@ import { ComposerSurface } from "./ComposerSurface.js";
 import { prepareComposerReviewSubmission } from "../changes/change-review-controller.js";
 import { clearAcceptedComposerDraft, submitComposerDraft } from "./composer-submission-controller.js";
 import { composerDraftActions } from "./composer-draft-actions.js";
-import { ActivePlanActionBar } from "../transcript/PlanProposalCard.js";
+import { ActivePlanActionBar } from "../transcript/ActivePlanActionBar.js";
 
 export function Composer() {
   const sessionId = useSessionProjectionStore(selectSessionId);

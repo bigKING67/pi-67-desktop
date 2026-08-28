@@ -54,21 +54,21 @@ export function createRendererMemoryMetrics(input, summarizeMetric) {
     }),
     summarizeMetric({
       id: "rendererLoaded1kDomNodes",
-      label: "DOM nodes with 1,000 settled messages loaded",
+      label: "Non-head DOM nodes with 1,000 settled messages loaded",
       unit: "nodes",
       samples: input.loadedNodes,
       budget: 1_000,
       evidenceLevel: "browser",
-      method: "CDP Memory.getDOMCounters after Virtuoso prepends and explicit GC"
+      method: "CDP Memory.getDOMCounters after Virtuoso prepends and explicit GC, excluding the current document head tree"
     }),
     summarizeMetric({
       id: "rendererAfter10SwitchesDomNodes",
-      label: "DOM nodes after 10 Session switches",
+      label: "Non-head DOM nodes after 10 Session switches",
       unit: "nodes",
       samples: input.switchedNodes,
       budget: 800,
       evidenceLevel: "browser",
-      method: "CDP Memory.getDOMCounters after ten settled bootstrap replacements and explicit GC"
+      method: "CDP Memory.getDOMCounters after ten settled bootstrap replacements and explicit GC, excluding the current document head tree"
     })
   ];
 }
@@ -84,10 +84,17 @@ export async function createRendererMemoryProbe(context, page) {
         session.send("Runtime.getHeapUsage"),
         session.send("Memory.getDOMCounters")
       ]);
+      const documentHeadNodes = await page.evaluate(() => {
+        if (!document.head) return 0;
+        const walker = document.createTreeWalker(document.head, NodeFilter.SHOW_ALL);
+        let count = 1;
+        while (walker.nextNode()) count += 1;
+        return count;
+      });
       return {
         usedHeapMiB: heap.usedSize / MIB,
         documents: dom.documents,
-        nodes: dom.nodes,
+        nodes: excludeDocumentHeadNodes(dom.nodes, documentHeadNodes),
         listeners: dom.jsEventListeners
       };
     },
@@ -95,6 +102,10 @@ export async function createRendererMemoryProbe(context, page) {
       await session.detach();
     }
   };
+}
+
+export function excludeDocumentHeadNodes(totalNodes, documentHeadNodes) {
+  return Math.max(0, totalNodes - documentHeadNodes);
 }
 
 export async function loadAllOlderMessages(page, expectedCount) {

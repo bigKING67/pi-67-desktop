@@ -5,10 +5,10 @@
 当前唯一支持版本：
 
 ```text
-@earendil-works/pi-coding-agent 0.84.2
-@earendil-works/pi-agent-core   0.84.2
-@earendil-works/pi-ai           0.84.2
-@earendil-works/pi-tui          0.84.2 (transitive override)
+@earendil-works/pi-coding-agent 0.84.3
+@earendil-works/pi-agent-core   0.84.3
+@earendil-works/pi-ai           0.84.3
+@earendil-works/pi-tui          0.84.3 (transitive override)
 ```
 
 根依赖和 `pnpm-workspace.yaml#overrides` 双重固定，避免上游内部 caret dependency 在重新
@@ -24,9 +24,13 @@ unsigned preview 共用该 contract，不维护另一份运行时版本常量。
 
 - `createAgentSession`、`SessionManager.create/open/list/listAll`，以及基于相同
   JSONL contract 的 collision-safe managed import；
+- `createAgentSessionServices` 使用 Desktop 已解析的最终 Workspace trust 执行一次
+  ResourceLoader reload，不消费 SDK 可选的 pre-trust Extension import pass；
 - accepted prompt Operation、steer、follow-up、abort；
 - 最近 100 条 bootstrap、稳定 entry cursor 分页、有界 flat session tree 和增量 projection；
-- model list/select、thinking levels；
+- model list/select、thinking levels；SDK `0.84.3` 的 `AgentSession.setModel()` 默认只更新
+  当前 Session，Desktop 用户主动选模型时显式传入 `{ persist: true }` 保留默认模型设置，
+  Extension 的临时模型切换则保持 Session-local，不能隐式改写全局默认值；
 - session tree navigation、新文件 branch、rollback、compact、name；
 - Skills、Prompts、Extensions、AGENTS/SYSTEM 上下文发现与 reload；
 - 图片输入、stream events、token/cost/context snapshot；
@@ -55,6 +59,9 @@ unsigned preview 共用该 contract，不维护另一份运行时版本常量。
 ## Explicit limitations
 
 - 不支持 `ctx.ui.custom()` 或 TUI component widget/footer/header/editor；
+- `SessionManager.open()` 仍是同步完整 JSONL 读取，SDK 尚未发布异步 open seam；Desktop 只测量
+  该权威路径，不实现第二套 Session parser。SDK `createPowerShellTool` 是可选导出，当前 Desktop
+  Session 通过 `excludeTools` 明确排除，避免用户 `defaultTools` 提前扩大安全 surface；
 - TUI autocomplete 不会替换 Desktop composer；
 - SDK 当前未向 UI bridge 提供稳定的 calling extension identity，因此 capability 明确声明
   `attribution: none`。Desktop 不猜测或伪造 extension ID；可证明的 package/path identity
@@ -81,7 +88,7 @@ unsigned preview 共用该 contract，不维护另一份运行时版本常量。
   component 注入 renderer；
 - 不支持同一 JSONL session 的并发 Desktop/TUI writer；watcher 只检测并止损，不把外部 JSONL
   entry 合并进当前 `SessionManager`、Conversation projection 或 Renderer；
-- Pi SDK `0.84.2` 的 cold Session discovery 会临时构造 `firstMessage/allMessagesText`；Desktop
+- Pi SDK `0.84.3` 的 cold Session discovery 会临时构造 `firstMessage/allMessagesText`；Desktop
   立即丢弃这些字段，既不持久化也不跨进程传输。Catalog 不做 FTS、transcript index 或 Prompt
   派生名称，cold reconcile 的时间和 RSS 仍需按平台持续测量；
 - 不实现 system Pi/RPC session import adapter。当前 agent directory 内的已

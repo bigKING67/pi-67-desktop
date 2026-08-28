@@ -32,27 +32,13 @@ export function searchProjectedMessages(
   return { total, items };
 }
 
-export function projectUserMessageIndex(branch: readonly SessionEntry[]): UserMessageIndexItem[] {
-  const items: UserMessageIndexItem[] = [];
-  for (let index = 0; index < branch.length; index += 1) {
-    const entry = branch[index];
-    if (!entry || !isUserMessageEntry(entry)) continue;
-    items.push(projectUserMessageIndexItem(entry, items.length + 1, branch[index - 1]));
-  }
-  return items;
-}
-
-export function appendProjectedUserMessage(
-  items: UserMessageIndexItem[],
-  entry: SessionEntry,
+export function projectUserMessageIndexItem(
+  entry: Extract<SessionEntry, { type: "message" }>,
+  ordinal: number,
   previous: SessionEntry | undefined
-): void {
-  if (!isUserMessageEntry(entry)) return;
-  items.push(projectUserMessageIndexItem(entry, items.length + 1, previous));
-}
-
-function isUserMessageEntry(entry: SessionEntry): entry is Extract<SessionEntry, { type: "message" }> {
-  return entry.type === "message" && entry.message.role === "user";
+): UserMessageIndexItem {
+  if (entry.message.role !== "user") throw new Error("Only user messages can be projected into the user index.");
+  return projectUserMessageIndexItemValue(entry, ordinal, previous);
 }
 
 function searchableMessage(entry: SessionEntry): {
@@ -100,7 +86,7 @@ function messageSearchSnippet(text: string, matchIndex: number, queryLength: num
   return `${prefix ? "…" : ""}${value}${end < text.length ? "…" : ""}`;
 }
 
-function projectUserMessageIndexItem(
+function projectUserMessageIndexItemValue(
   entry: Extract<SessionEntry, { type: "message" }>,
   ordinal: number,
   previous: SessionEntry | undefined

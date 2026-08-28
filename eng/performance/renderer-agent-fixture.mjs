@@ -365,12 +365,14 @@ export async function installPerformanceSystemBridge(page) {
       availability: "available"
     };
     let workbenchState = {
-      version: 4,
+      version: 5,
       workspaces: [],
       workspaceOrder: [],
       expandedWorkspaceIds: [],
       runtimeRecovery: [],
       sessionCreationRecovery: [],
+      workspaceEnvironments: [],
+      environmentMutations: [],
       settings: { section: "general", scope: "global" },
       cleanExit: false
     };
@@ -392,10 +394,23 @@ export async function installPerformanceSystemBridge(page) {
               workspaces: [workspace],
               workspaceOrder: [workspace.id],
               expandedWorkspaceIds: [workspace.id],
+              workspaceEnvironments: [{
+                workspaceId: workspace.id,
+                kind: "plain",
+                ownership: "user"
+              }],
               currentWorkspaceId: workspace.id
             };
             return structuredClone(workspace);
           },
+          inspectRepositoryEnvironment: async ({ workspaceId }) => ({
+            workspaceId,
+            status: "non-git",
+            revision: 1,
+            observedAt: Date.now(),
+            stale: false,
+            worktrees: []
+          }),
           selectWorkspace: async () => "/tmp/pi67-performance-workspace",
           selectSessionFile: async () => undefined,
           saveDiagnostics: async () => undefined,
@@ -417,6 +432,9 @@ export async function installPerformanceSystemBridge(page) {
           }),
           onUpdateStateChanged: () => () => undefined,
           onAgentHostFailed: () => () => undefined,
+          onAgentHostStartup: () => () => undefined,
+          completeShutdownCheckpoint: async () => true,
+          onShutdownCheckpointRequested: () => () => undefined,
           onPowerResume: () => () => undefined
         }
       }

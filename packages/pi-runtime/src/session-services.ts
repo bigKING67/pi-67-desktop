@@ -1,8 +1,8 @@
 import {
   createAgentSessionServices,
+  SettingsManager,
   type AgentSessionServices,
-  type ModelRuntime,
-  type SettingsManager
+  type ModelRuntime
 } from "@earendil-works/pi-coding-agent";
 import {
   createDesktopPackageSettingsView,
@@ -45,6 +45,7 @@ interface DesktopSessionServicesOptions {
   recordToolAuthorization?: DesktopToolAuthorizationRecorder;
   promptAttachmentAccess?: PromptAttachmentAccess;
   packageTrustRegistry?: Pick<PackageTrustRegistry, "refresh" | "runtimePackageAllowed">;
+  packageTrustRefresh?: Promise<void>;
   getInteractionMode?: () => SessionInteractionMode;
   noThirdPartyExtensions?: boolean;
 }
@@ -53,23 +54,28 @@ export async function createDesktopSessionServices(
   options: DesktopSessionServicesOptions
 ): Promise<AgentSessionServices> {
   const getInteractionMode = options.getInteractionMode ?? (() => "execute" as const);
-  await options.packageTrustRegistry?.refresh();
+  await (options.packageTrustRefresh ?? options.packageTrustRegistry?.refresh());
   const loadedResourceReadAccess = createLoadedResourceReadAccess();
-  const settingsManager = options.settingsManager === undefined
-    ? undefined
-    : createDesktopPackageSettingsView(
-        options.settingsManager,
-        process.env,
-        options.packageTrustRegistry
-      );
+  const projectTrusted = options.getSafety().trust === "trusted";
+  const baseSettingsManager = options.settingsManager ?? SettingsManager.create(
+    options.cwd,
+    options.agentDir,
+    { projectTrusted }
+  );
+  baseSettingsManager.setProjectTrusted(projectTrusted);
+  const settingsManager = createDesktopPackageSettingsView(
+    baseSettingsManager,
+    process.env,
+    options.packageTrustRegistry
+  );
   const configuredCapabilities = new ConfiguredCapabilityCatalog({
     agentDir: options.agentDir,
-    settingsManager: settingsManager ?? { getPackages: () => [] }
+    settingsManager
   });
   const services = await createAgentSessionServices({
     cwd: options.cwd,
     agentDir: options.agentDir,
-    ...(settingsManager === undefined ? {} : { settingsManager }),
+    settingsManager,
     ...(options.modelRuntime === undefined ? {} : { modelRuntime: options.modelRuntime }),
     resourceLoaderOptions: {
       ...(options.noThirdPartyExtensions
@@ -94,9 +100,6 @@ export async function createDesktopSessionServices(
         createDesktopPlanModeExtension(getInteractionMode),
         createDesktopEnvironmentExtension()
       ]
-    },
-    resourceLoaderReloadOptions: {
-      resolveProjectTrust: async () => options.getSafety().trust === "trusted"
     }
   });
   await installFirstPartyModelProviders(services.modelRuntime);

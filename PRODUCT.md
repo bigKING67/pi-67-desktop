@@ -144,7 +144,7 @@ the only Runtime and behavior specification source.
   already-live Task reloaded resources. A Task reload failure stays observable after
   the receipt commit; Desktop does not roll back the receipt or rerun the Package
   side effect blindly.
-- Package Worker isolation covers check/install/update/uninstall only. Pi SDK 0.84.2
+- Package Worker isolation covers check/install/update/uninstall only. Pi SDK 0.84.3
   still imports third-party Extension modules and executes their factory, hooks,
   commands, Tools, Extension UI, and any MCP child launcher inside the Agent Host
   utility process. Desktop must not describe those runtime surfaces as isolated until
@@ -760,7 +760,16 @@ the only Runtime and behavior specification source.
   offline startup budget. Agent Host keeps one revision-bound Task runtime warm while
   Desktop runs; each Task consumes one complete runtime and queues a fresh independent
   standby only while `models.json` and `auth.json` revisions still match. Provider
-  validation may reuse the current standby without consuming it. Corrupt display
+  validation may reuse the current standby without consuming it. Task startup reads
+  only those two Provider-owned files for standby validation and overlaps that work
+  with the current Package trust refresh. Package inspection keeps its full content
+  and receipt checks, deduplicates an inherited installation path within one refresh,
+  and uses at most four concurrent inspection lanes; Task-local ResourceLoader and
+  Extension construction still begin only after both checks succeed. The resolved
+  Workspace trust is applied to the final `SettingsManager` before one ResourceLoader
+  reload; Desktop does not ask the SDK to import a pre-trust Extension set that it will
+  discard. The SDK's optional PowerShell Tool remains excluded until Desktop defines a
+  separate Tool identity and safety contract. Corrupt display
   labels are never persisted or repaired in place: projections
   preserve valid UTF-8 names and fall back to the stable Provider/model identity when
   mojibake reaches the runtime boundary. If Pi configuration loading stalls, Workspace/Session
@@ -992,7 +1001,9 @@ the only Runtime and behavior specification source.
   Approval and Extension input waits remain user-owned and do not trip the watchdog.
 - Conversation and session-tree projections remain bounded and rebuildable;
   opening a long JSONL session does not require mounting or transferring its
-  complete history.
+  complete history. The active-branch user-message index retains only entry positions;
+  previews, attachment counts, and timestamps are projected for the requested 100-item
+  page instead of eagerly sanitizing every historical message during restore.
 - Every Session snapshot carries a bounded compatibility view: `compatible`,
   `partial`, or `future-format`, plus the supported/current format versions and
   counts of unknown or unrenderable entries. Known messages continue to render;

@@ -18,7 +18,7 @@ import type {
 import { PiAuthCredentialStore } from "./pi-auth-credential-store.js";
 import {
   PiConfigurationWatcher,
-  readWorkspaceConfigurationBundle,
+  readModelConfigurationBundle,
   type PiConfigurationPaths,
   type WorkspaceConfigurationState
 } from "./pi-configuration-file-state.js";
@@ -340,13 +340,12 @@ export class PiConfigurationService {
       : this.taskModelRuntimeLoad ?? this.beginTaskModelRuntimeLoad();
     return operation.then(async (candidate) => {
       this.assertActive();
-      const current = await readWorkspaceConfigurationBundle(
+      const current = await readModelConfigurationBundle(
         this.paths,
-        this.globalState,
         this.limits.fileAccessWaitMs
       );
-      const matches = candidate.modelsRevision === current.byKind.models.revision
-        && candidate.authRevision === current.byKind.auth.revision;
+      const matches = candidate.modelsRevision === current.models.revision
+        && candidate.authRevision === current.auth.revision;
       if (!matches) {
         if (this.taskModelRuntimeCandidate === candidate) this.taskModelRuntimeCandidate = undefined;
         if (this.taskModelRuntimeLoad === operation) this.taskModelRuntimeLoad = undefined;
@@ -370,12 +369,11 @@ export class PiConfigurationService {
 
   private beginTaskModelRuntimeLoad(): Promise<TaskModelRuntimeCandidate> {
     const load = (async () => {
-      const before = await readWorkspaceConfigurationBundle(
+      const before = await readModelConfigurationBundle(
         this.paths,
-        this.globalState,
         this.limits.fileAccessWaitMs
       );
-      const authError = this.credentials.loadContent(before.byKind.auth.content);
+      const authError = this.credentials.loadContent(before.auth.content);
       if (authError) {
         throw new Error(`Pi could not load auth.json: ${authError}`);
       }
@@ -383,18 +381,17 @@ export class PiConfigurationService {
       if (this.disposed) {
         return {
           runtime,
-          modelsRevision: before.byKind.models.revision,
-          authRevision: before.byKind.auth.revision
+          modelsRevision: before.models.revision,
+          authRevision: before.auth.revision
         };
       }
-      const after = await readWorkspaceConfigurationBundle(
+      const after = await readModelConfigurationBundle(
         this.paths,
-        this.globalState,
         this.limits.fileAccessWaitMs
       );
       if (
-        before.byKind.models.revision !== after.byKind.models.revision
-        || before.byKind.auth.revision !== after.byKind.auth.revision
+        before.models.revision !== after.models.revision
+        || before.auth.revision !== after.auth.revision
       ) {
         throw new RuntimeError(
           "CONFIGURATION_CHANGED_EXTERNALLY",
@@ -404,8 +401,8 @@ export class PiConfigurationService {
       }
       return {
         runtime,
-        modelsRevision: after.byKind.models.revision,
-        authRevision: after.byKind.auth.revision
+        modelsRevision: after.models.revision,
+        authRevision: after.auth.revision
       };
     })();
     this.taskModelRuntimeLoad = load;

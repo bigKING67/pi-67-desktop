@@ -5,6 +5,7 @@ import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-compone
 import { useAppStore } from "../app/app-store.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { openRendererSession } from "../session/session-lifecycle-controller.js";
+import { useShellStore } from "../shell/shell-store.js";
 import { requestTranscriptMessageJump } from "../transcript/transcript-navigation.js";
 import {
   rendererWorkbenchStore,
@@ -13,10 +14,6 @@ import {
 } from "../workbench/workbench-store.js";
 import { registerRendererWorkspaceWithHost } from "../workbench/workspace-host-registration-controller.js";
 import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
-import {
-  subscribeConversationFind,
-  subscribeConversationFindDismiss
-} from "./conversation-find-events.js";
 import styles from "./WorkspaceConversationSearchDialog.module.css";
 
 export function WorkspaceConversationSearchDialog() {
@@ -25,7 +22,7 @@ export function WorkspaceConversationSearchDialog() {
     const workspaceId = task?.workspaceId ?? state.currentWorkspaceId;
     return workspaceId ? state.workspaces[workspaceId] : undefined;
   });
-  const [open, setOpen] = useState(false);
+  const setOpen = useShellStore((state) => state.setWorkspaceConversationSearchDialogOpen);
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<WorkspaceMessageSearchResult>();
   const [loading, setLoading] = useState(false);
@@ -33,13 +30,12 @@ export function WorkspaceConversationSearchDialog() {
   const [error, setError] = useState<string>();
   const requestRevision = useRef(0);
   const activeRequest = useRef<AbortController | undefined>(undefined);
-  const openedHostEpoch = useRef<number | undefined>(undefined);
-  const openedWorkspaceId = useRef<string | undefined>(undefined);
-  const restoreFocusTarget = useRef<HTMLElement | undefined>(undefined);
   const connected = useAppStore((state) => state.connected);
   const hostEpoch = useAppStore((state) => state.hostEpoch);
+  const openedHostEpoch = useRef(hostEpoch);
+  const openedWorkspaceId = useRef(workspace?.id);
 
-  const closeDialog = useCallback((restoreFocus = true) => {
+  const closeDialog = useCallback(() => {
     requestRevision.current += 1;
     activeRequest.current?.abort();
     activeRequest.current = undefined;
@@ -50,36 +46,21 @@ export function WorkspaceConversationSearchDialog() {
     setError(undefined);
     openedHostEpoch.current = undefined;
     openedWorkspaceId.current = undefined;
-    const target = restoreFocusTarget.current;
-    restoreFocusTarget.current = undefined;
-    if (restoreFocus && target?.isConnected) requestAnimationFrame(() => target.focus());
-  }, []);
-
-  useEffect(() => subscribeConversationFind((scope) => {
-    if (scope !== "workspace") return;
-    const activeElement = document.activeElement;
-    restoreFocusTarget.current = activeElement instanceof HTMLElement ? activeElement : undefined;
-    openedHostEpoch.current = useAppStore.getState().hostEpoch;
-    openedWorkspaceId.current = workspace?.id;
-    setOpen(true);
-  }), [workspace?.id]);
-
-  useEffect(() => subscribeConversationFindDismiss(() => closeDialog()), [closeDialog]);
+  }, [setOpen]);
 
   useEffect(() => {
-    if (!open || openedHostEpoch.current === undefined) return;
+    if (openedHostEpoch.current === undefined) return;
     if (!connected || hostEpoch !== openedHostEpoch.current) closeDialog();
-  }, [closeDialog, connected, hostEpoch, open]);
+  }, [closeDialog, connected, hostEpoch]);
 
   useEffect(() => {
     requestRevision.current += 1;
     setResult(undefined);
     setError(undefined);
     setOpeningId(undefined);
-    if (open && openedWorkspaceId.current !== workspace?.id) closeDialog();
-  }, [closeDialog, open, workspace?.id]);
+    if (openedWorkspaceId.current !== workspace?.id) closeDialog();
+  }, [closeDialog, workspace?.id]);
 
-  if (!open) return null;
   return (
     <ModalOverlay
       className="modal-overlay"

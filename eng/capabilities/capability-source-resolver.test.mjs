@@ -1,15 +1,19 @@
+import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   capabilityGitTransportCandidates,
+  resolveExactCapabilitySource,
   resolveBundledNpmToolchain,
   runCapabilityGitCommand
 } from "./capability-source-resolver.mjs";
 
 const temporaryRoots = [];
+const execFileAsync = promisify(execFile);
 
 afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((path) => rm(path, {
@@ -59,6 +63,39 @@ describe("Desktop capability source resolver", () => {
       }
     })}\n`, "utf8");
     await expect(resolveBundledNpmToolchain(manifestPath)).rejects.toThrow(/escaped/u);
+  });
+
+  it("reuses an exact clean source cache with the canonical remote", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-capability-cache-"));
+    temporaryRoots.push(root);
+    const sourceCacheRoot = join(root, "cache");
+    const destination = join(sourceCacheRoot, "fixture-source");
+    const repository = "https://github.com/example/fixture-source.git";
+    await mkdir(destination, { recursive: true });
+    await execFileAsync("git", ["init", destination]);
+    await execFileAsync("git", ["-C", destination, "config", "user.name", "Pi-67 Test"]);
+    await execFileAsync("git", ["-C", destination, "config", "user.email", "pi67@example.invalid"]);
+    await writeFile(join(destination, "fixture.txt"), "fixture\n", "utf8");
+    await execFileAsync("git", ["-C", destination, "add", "fixture.txt"]);
+    await execFileAsync("git", ["-C", destination, "commit", "-m", "fixture"]);
+    await execFileAsync("git", ["-C", destination, "remote", "add", "origin", repository]);
+    const { stdout: commitOutput } = await execFileAsync("git", ["-C", destination, "rev-parse", "HEAD"]);
+    const { stdout: execPathOutput } = await execFileAsync("git", ["--exec-path"]);
+    const sentinel = join(destination, ".git", "cache-sentinel");
+    await writeFile(sentinel, "preserved\n", "utf8");
+
+    await expect(resolveExactCapabilitySource({
+      source: {
+        id: "fixture-source",
+        repository,
+        commit: commitOutput.trim(),
+        localSibling: "../missing-fixture-source"
+      },
+      repositoryRoot: root,
+      sourceCacheRoot,
+      git: { executable: "git", execPath: execPathOutput.trim() }
+    })).resolves.toBe(destination);
+    await expect(readFile(sentinel, "utf8")).resolves.toBe("preserved\n");
   });
 
   it("terminates a timed-out Git process tree before returning control", async () => {

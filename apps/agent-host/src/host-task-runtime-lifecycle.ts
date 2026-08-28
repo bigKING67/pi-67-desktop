@@ -45,9 +45,16 @@ export class HostTaskRuntimeLifecycle {
     options: Parameters<AgentRuntime["initialize"]>[0],
     commitSessionWriter: () => Promise<void> = () => this.commitWriterTransition(state, runtime)
   ): Promise<CommandResults["runtime.initialize"]> {
+    const initialization: NonNullable<TaskHostState["initialization"]> = {
+      outcome: "in-progress",
+      stages: [],
+      stagesTruncated: false
+    };
+    state.initialization = initialization;
     this.tasks.sendStatus(state, { phase: "starting", detail: "正在加载 Pi SDK", recoverable: true });
     try {
       const snapshot = await runtime.initialize(options, (observation) => {
+        recordInitializationObservation(initialization, observation);
         this.options.onRuntimeInitializationObservation?.(observation);
         if (observation.outcome === "started") {
           this.tasks.sendStatus(state, {
@@ -59,6 +66,7 @@ export class HostTaskRuntimeLifecycle {
       });
       state.record.initialized = true;
       await commitSessionWriter();
+      initialization.outcome = "completed";
       this.tasks.sendStatus(state, { phase: "ready", detail: "Pi SDK 已就绪", recoverable: true });
       this.tasks.sendEvent(state, runtimeReadyEvent(runtime, snapshot));
       return captureProjectionMutationAcknowledgement(
@@ -68,6 +76,7 @@ export class HostTaskRuntimeLifecycle {
       );
     } catch (error) {
       state.record.initialized = false;
+      initialization.outcome = "failed";
       const failure = toProtocolError(error);
       this.tasks.sendStatus(state, {
         phase: "failed",
@@ -280,12 +289,32 @@ export class HostTaskRuntimeLifecycle {
   }
 }
 
+const MAX_INITIALIZATION_STAGE_OBSERVATIONS = 32;
+
+function recordInitializationObservation(
+  receipt: NonNullable<TaskHostState["initialization"]>,
+  observation: RuntimeInitializationObservation
+): void {
+  if (receipt.stages.length >= MAX_INITIALIZATION_STAGE_OBSERVATIONS) {
+    receipt.stagesTruncated = true;
+    return;
+  }
+  receipt.stages.push({
+    stage: observation.stage,
+    outcome: observation.outcome,
+    durationMs: Math.max(0, Math.round(observation.durationMs))
+  });
+}
+
 function initializationStageDetail(stage: RuntimeInitializationStage): string {
   switch (stage) {
     case "resolve-session": return "正在解析 Pi Session";
     case "dispose-current": return "正在释放旧 Pi Runtime";
     case "create-session": return "正在创建 Pi Session";
     case "load-model-runtime": return "正在读取 Pi Provider 配置";
+    case "validate-packages": return "正在验证 Provider 与已安装扩展";
+    case "load-session-resources": return "正在加载 Pi 扩展与工作规则";
+    case "activate-session": return "正在恢复 Pi 对话";
     case "reload-configuration": return "正在加载 Pi 配置";
     case "project-snapshot": return "正在同步 Pi Session 状态";
   }
