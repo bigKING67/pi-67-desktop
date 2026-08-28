@@ -11,7 +11,6 @@ import { basename, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assertSingleShutdownQuitLifecycle,
-  CONTROLLED_MODEL_VALUE,
   resetControlledShutdownLifecycle,
   writeControlledShutdownExtension,
   writeShutdownLifecycleExtension
@@ -50,7 +49,6 @@ import {
   inspectCleanWindowsRealUserProfile,
   prepareFreshWindowsRealUserProfile,
   prepareWindowsRealUserProfile,
-  readWindowsExistingProfileSettings,
   resolveWindowsRealUserProfilePaths,
   snapshotWindowsExistingProfile,
   WINDOWS_REAL_USER_CONFIGURED_PROVIDER
@@ -75,8 +73,6 @@ export {
   WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS,
   waitForPathState
 } from "./windows-installer-process.mjs";
-const [controlledProvider, controlledModelId] = CONTROLLED_MODEL_VALUE.split("/");
-
 export async function verifyWindowsInstallerLifecycle(options = {}) {
   if (process.platform !== "win32" || process.arch !== "x64") {
     throw new Error(`Windows installer lifecycle verification requires win32/x64, got ${process.platform}/${process.arch}.`);
@@ -208,7 +204,6 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       lifecyclePath
     });
     const existingProfileBefore = await snapshotWindowsExistingProfile(lifecycleAgentDir);
-    const existingProfileSettingsBefore = await readWindowsExistingProfileSettings(lifecycleAgentDir);
     if (baseline) {
       await writeShutdownLifecycleExtension({ extensionPath, lifecyclePath });
     } else {
@@ -358,9 +353,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
     });
     const existingProfilePreservation = await assertWindowsExistingProfileInteractionPreserved(
       lifecycleAgentDir,
-      existingProfileBefore,
-      existingProfileSettingsBefore,
-      { provider: controlledProvider, id: controlledModelId }
+      existingProfileBefore
     );
     report.phases.push({
       name: "existing-pi-profile-lifecycle",

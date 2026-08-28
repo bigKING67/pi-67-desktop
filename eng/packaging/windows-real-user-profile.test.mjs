@@ -8,7 +8,6 @@ import {
   inspectCleanWindowsRealUserProfile,
   prepareFreshWindowsRealUserProfile,
   prepareWindowsRealUserProfile,
-  readWindowsExistingProfileSettings,
   resolveWindowsRealUserProfilePaths,
   snapshotWindowsExistingProfile,
   WINDOWS_REAL_USER_CONFIGURED_PROVIDER
@@ -196,42 +195,24 @@ describe("Windows installed real-user Pi profile", () => {
     }
   });
 
-  it("allows only the controlled model selection after exact startup preservation", async () => {
+  it("preserves existing Pi settings exactly after controlled Extension interaction", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-windows-existing-profile-interaction-"));
     try {
       const profile = resolveWindowsRealUserProfilePaths(root);
       await prepareWindowsRealUserProfile(profile);
       const before = await snapshotWindowsExistingProfile(profile.lifecycleAgentDir);
-      const beforeSettings = await readWindowsExistingProfileSettings(profile.lifecycleAgentDir);
-      await writeFile(join(profile.lifecycleAgentDir, "settings.json"), JSON.stringify({
-        ...beforeSettings,
-        defaultProvider: "pi67-controlled",
-        defaultModel: "hold-open",
-        defaultThinkingLevel: "off"
-      }, null, 2));
-
       await expect(assertWindowsExistingProfileInteractionPreserved(
         profile.lifecycleAgentDir,
-        before,
-        beforeSettings,
-        { provider: "pi67-controlled", id: "hold-open" }
+        before
       )).resolves.toMatchObject({
-        changedSettingsFields: ["defaultModel", "defaultProvider", "defaultThinkingLevel"],
-        preservationMode: "pre-interaction-exact-post-interaction-model-selection"
+        preservationMode: "pre-and-post-interaction-exact-user-files"
       });
 
-      await writeFile(join(profile.lifecycleAgentDir, "settings.json"), JSON.stringify({
-        ...beforeSettings,
-        defaultProvider: "pi67-controlled",
-        defaultModel: "hold-open",
-        steeringMode: "all"
-      }, null, 2));
+      await writeFile(join(profile.lifecycleAgentDir, "settings.json"), "{\"changed\":true}\n");
       await expect(assertWindowsExistingProfileInteractionPreserved(
         profile.lifecycleAgentDir,
-        before,
-        beforeSettings,
-        { provider: "pi67-controlled", id: "hold-open" }
-      )).rejects.toThrow("changed settings outside the controlled model selection");
+        before
+      )).rejects.toThrow("changed user files");
     } finally {
       await rm(root, { recursive: true, force: true });
     }
