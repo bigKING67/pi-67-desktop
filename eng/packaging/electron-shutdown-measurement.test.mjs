@@ -34,6 +34,8 @@ describe("Electron shutdown measurement", () => {
       const result = await closing;
 
       expect(result.driverCloseDurationMs).toBe(600);
+      expect(result.driverCloseTimedOut).toBe(false);
+      expect(result.forcedTerminationRequested).toBe(false);
       expect(result.productExitDurationMs).toBe(600);
       expect(productShutdownWithinBudget(result, 5_000)).toBe(true);
       expect(result.processes.main).toMatchObject({
@@ -85,9 +87,39 @@ describe("Electron shutdown measurement", () => {
       const result = await closing;
 
       expect(result.driverCloseDurationMs).toBe(5_600);
+      expect(result.driverCloseTimedOut).toBe(false);
       expect(result.productExitDurationMs).toBeGreaterThanOrEqual(600);
       expect(result.productExitDurationMs).toBeLessThanOrEqual(650);
       expect(productShutdownWithinBudget(result, 5_000)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("bounds a hung Playwright close and fails the shutdown gate closed", async () => {
+    vi.useFakeTimers();
+    try {
+      const alive = new Set([101, 201]);
+      const application = { close: () => new Promise(() => undefined) };
+      const closing = measureElectronApplicationShutdown({
+        application,
+        budgetMs: 5_000,
+        driverCloseTimeoutMs: 1_000,
+        forcedTerminationGraceMs: 100,
+        mainPid: 101,
+        processAlive: (pid) => alive.has(pid),
+        terminateProcess: (pid) => alive.delete(pid),
+        utilityPids: [201]
+      });
+      await vi.advanceTimersByTimeAsync(5_000);
+      const result = await closing;
+
+      expect(result.driverCloseDurationMs).toBe(1_100);
+      expect(result.driverCloseTimedOut).toBe(true);
+      expect(result.forcedTerminationRequested).toBe(true);
+      expect(result.processes.main.aliveAfterClose).toBe(false);
+      expect(result.processes.utilities.aliveAfterCloseCount).toBe(1);
+      expect(productShutdownWithinBudget(result, 5_000)).toBe(false);
     } finally {
       vi.useRealTimers();
     }

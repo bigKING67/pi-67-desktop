@@ -1,15 +1,20 @@
 import { isProcessAlive } from "./controlled-shutdown-fixture.ts";
 
 const DEFAULT_PROCESS_POLL_INTERVAL_MS = 50;
+const DEFAULT_DRIVER_CLOSE_TIMEOUT_MS = 15_000;
+const DEFAULT_FORCED_TERMINATION_GRACE_MS = 2_000;
 
 export async function measureElectronApplicationShutdown({
   application,
   budgetMs,
   childPid,
+  driverCloseTimeoutMs = DEFAULT_DRIVER_CLOSE_TIMEOUT_MS,
+  forcedTerminationGraceMs = DEFAULT_FORCED_TERMINATION_GRACE_MS,
   mainPid,
   now = () => performance.now(),
   pollIntervalMs = DEFAULT_PROCESS_POLL_INTERVAL_MS,
   processAlive = isProcessAlive,
+  terminateProcess = (pid) => process.kill(pid),
   utilityPids
 }) {
   const startedAt = now();
@@ -31,9 +36,23 @@ export async function measureElectronApplicationShutdown({
   const timer = setInterval(sample, pollIntervalMs);
   timer.unref?.();
   let driverCloseDurationMs;
+  let driverCloseError;
+  let driverCloseTimedOut = false;
+  let forcedTerminationRequested = false;
   try {
-    await application.close();
-    driverCloseDurationMs = now() - startedAt;
+    const closeResult = await closeElectronApplicationWithinTimeout({
+      application,
+      forcedTerminationGraceMs,
+      mainPid,
+      now,
+      processAlive,
+      terminateProcess,
+      timeoutMs: driverCloseTimeoutMs
+    });
+    driverCloseDurationMs = closeResult.durationMs;
+    driverCloseError = closeResult.error;
+    driverCloseTimedOut = closeResult.timedOut;
+    forcedTerminationRequested = closeResult.forcedTerminationRequested;
     sample();
     while (tracked.some((state) => state.aliveAfterClose)) {
       const remainingMs = budgetMs - (now() - startedAt);
@@ -53,6 +72,9 @@ export async function measureElectronApplicationShutdown({
   };
   return {
     driverCloseDurationMs,
+    driverCloseError,
+    driverCloseTimedOut,
+    forcedTerminationRequested,
     processes,
     productExitDurationMs: productExitDuration({
       childExpected: childPid !== undefined,
@@ -64,8 +86,61 @@ export async function measureElectronApplicationShutdown({
 }
 
 export function productShutdownWithinBudget(measurement, budgetMs) {
-  return measurement.productExitDurationMs !== null
+  return measurement.driverCloseError === undefined
+    && measurement.driverCloseTimedOut === false
+    && measurement.productExitDurationMs !== null
     && measurement.productExitDurationMs <= budgetMs;
+}
+
+export async function closeElectronApplicationWithinTimeout({
+  application,
+  forcedTerminationGraceMs = DEFAULT_FORCED_TERMINATION_GRACE_MS,
+  mainPid = application.process().pid,
+  now = () => performance.now(),
+  processAlive = isProcessAlive,
+  terminateProcess = (pid) => process.kill(pid),
+  timeoutMs = DEFAULT_DRIVER_CLOSE_TIMEOUT_MS
+}) {
+  assertPositiveTimeout(timeoutMs, "Electron driver close timeout");
+  assertPositiveTimeout(forcedTerminationGraceMs, "Electron forced-termination grace");
+  const startedAt = now();
+  const close = Promise.resolve()
+    .then(() => application.close())
+    .then(
+      () => ({ status: "closed" }),
+      (error) => ({ error: describeError(error), status: "failed" })
+    );
+  const initialResult = await settleWithin(close, timeoutMs);
+  if (initialResult.settled) {
+    return {
+      durationMs: now() - startedAt,
+      error: initialResult.value.status === "failed" ? initialResult.value.error : undefined,
+      forcedTerminationRequested: false,
+      mainAliveAfterClose: processAlive(mainPid),
+      timedOut: false
+    };
+  }
+
+  let terminationError;
+  let forcedTerminationRequested = false;
+  if (processAlive(mainPid)) {
+    forcedTerminationRequested = true;
+    try {
+      terminateProcess(mainPid);
+    } catch (error) {
+      terminationError = describeError(error);
+    }
+  }
+  const forcedResult = await settleWithin(close, forcedTerminationGraceMs);
+  return {
+    durationMs: now() - startedAt,
+    error: forcedResult.settled && forcedResult.value.status === "failed"
+      ? forcedResult.value.error
+      : terminationError,
+    forcedTerminationRequested,
+    mainAliveAfterClose: processAlive(mainPid),
+    timedOut: true
+  };
 }
 
 function productExitDuration({ childExpected, controlledChild, main, utilities }) {
@@ -125,6 +200,33 @@ function summarizeUtilityProcesses(states) {
 
 function round(value) {
   return Math.round(value * 10) / 10;
+}
+
+function settleWithin(promise, timeoutMs) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve({ settled: false });
+    }, timeoutMs);
+    promise.then((value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ settled: true, value });
+    });
+  });
+}
+
+function assertPositiveTimeout(value, label) {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new RangeError(`${label} must be a positive safe integer.`);
+  }
+}
+
+function describeError(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function delay(milliseconds) {

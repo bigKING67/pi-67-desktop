@@ -29,6 +29,7 @@ import { verifyPackagedExtensionUpdateCheck, verifyPackagedSkillUpdateCheck } fr
 import { verifyPackagedProviderSettings } from "./packaged-provider-settings-smoke.mjs";
 import { verifyPackagedSessionCreation } from "./packaged-session-creation-smoke.mjs";
 import { verifyPackagedHeicAttachment } from "./packaged-heic-attachment-smoke.mjs";
+import { closeElectronApplicationWithinTimeout } from "./electron-shutdown-measurement.mjs";
 import { assertPackagedSkillSuites } from "./smoke-packaged-skill-suites.mjs";
 import { assertNoWorkspaceChangesAuthorityWarning, verifyPackagedChangesInspector } from "./packaged-changes-inspector-smoke.mjs";
 const artifact = resolvePackagedArtifact();
@@ -307,6 +308,7 @@ try {
   console.info(`Packaged HEIC attachment: ${JSON.stringify(heicAttachment)}`);
   await capturePackagedWorkbenchVisualEvidence(application, window);
   await startControlledPrompt(window);
+  console.info("Packaged smoke stage: pre-reload controlled prompt started.");
   await window.getByRole("button", { name: "停止", exact: true }).click({ timeout: 10_000 });
   await window.getByRole("button", { name: "停止", exact: true })
     .waitFor({ state: "hidden", timeout: 10_000 });
@@ -314,6 +316,7 @@ try {
   await window.locator('[data-testid="conversation-row"][aria-current="page"]')
     .filter({ hasText: CONTROLLED_PROMPT_TEXT }).waitFor({ state: "visible", timeout: 10_000 });
   await waitForPersistedRuntimeRecovery(userDataDirectory);
+  console.info("Packaged smoke stage: pre-reload controlled prompt stopped and persisted.");
   await window.reload();
   await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
   const restoredConversation = window.getByLabel("Pi conversation");
@@ -334,8 +337,11 @@ try {
     throw new Error(`Packaged task did not resume after reload: ${JSON.stringify(await inspectRendererSurface(window))}`, { cause: error });
   }
   await window.getByLabel("当前状态：Pi SDK 已就绪").waitFor({ state: "visible", timeout: 30_000 });
-  await application.close();
+  console.info("Packaged smoke stage: warm reload restored; closing before cold restart.");
+  const warmApplication = application;
   application = undefined;
+  await assertBoundedApplicationClose(warmApplication, "warm-reload close");
+  console.info("Packaged smoke stage: warm-reload close completed; launching cold restart.");
   application = await launchPackagedApplication({
     agentDir,
     artifact,
@@ -383,23 +389,42 @@ try {
   }
   await window.locator('[data-runtime-phase="ready"]').waitFor({ state: "visible", timeout: 30_000 });
 
+  console.info("Packaged smoke stage: cold restart restored; starting controlled shutdown.");
+  const closingApplication = application;
+  application = undefined;
   const shutdown = await runControlledShutdownScenario({
-    application,
+    application: closingApplication,
     childPidPath,
     lifecyclePath,
     shutdownState,
     window
   });
   childPid = shutdownState.childPid;
-  application = undefined;
   console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, packaged-direct Agent Host startup (${startupDiagnostics.totalDurationMs}ms), private toolchain + first-party capabilities, Desktop browser67 packaged-direct dependency resolution, packaged GUI Extension/Skill update checks with bounded worker cleanup, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, Lark user-first Tabs + persisted Main layout, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt product shutdown (${shutdown.productExitDurationMs}ms; Playwright driver close ${shutdown.driverCloseDurationMs}ms).`);
 } finally {
   try {
-    if (application) await application.close();
+    if (application) {
+      const cleanupApplication = application;
+      application = undefined;
+      const cleanup = await closeElectronApplicationWithinTimeout({
+        application: cleanupApplication,
+        timeoutMs: 5_000
+      });
+      if (cleanup.timedOut || cleanup.error) {
+        console.error(`Packaged smoke cleanup close failed: ${JSON.stringify(cleanup)}`);
+      }
+    }
     childPid ??= shutdownState.childPid;
     if (childPid !== undefined && isProcessAlive(childPid)) process.kill(childPid);
   } finally {
     await cleanupPackagedTestDirectories(userDataDirectory);
+  }
+}
+
+async function assertBoundedApplicationClose(applicationToClose, stage) {
+  const close = await closeElectronApplicationWithinTimeout({ application: applicationToClose });
+  if (close.timedOut || close.error || close.mainAliveAfterClose) {
+    throw new Error(`Packaged ${stage} failed: ${JSON.stringify(close)}`);
   }
 }
 

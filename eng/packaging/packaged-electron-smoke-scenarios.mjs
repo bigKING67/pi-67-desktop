@@ -235,6 +235,9 @@ export async function runControlledShutdownScenario({
   const shutdown = {
     budgetMs: PACKAGED_SHUTDOWN_BUDGET_MS,
     driverCloseDurationMs: round(shutdownMeasurement.driverCloseDurationMs),
+    driverCloseError: shutdownMeasurement.driverCloseError,
+    driverCloseTimedOut: shutdownMeasurement.driverCloseTimedOut,
+    forcedTerminationRequested: shutdownMeasurement.forcedTerminationRequested,
     lifecycle: await inspectShutdownLifecycle(lifecyclePath),
     productExitDurationMs: round(shutdownMeasurement.productExitDurationMs),
     processes: shutdownMeasurement.processes
