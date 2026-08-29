@@ -26,7 +26,7 @@ export interface BundledCapabilityCatalog {
   catalogVersion: string;
   entries: Array<Omit<DesktopCapabilityPackageSummary, "installed"> & {
     packagePath: string;
-    bundledExtensions: Array<{ id: string; displayName: string }>;
+    bundledExtensions: Array<{ id: string; displayName: string; description: string }>;
     bundledSkills: Array<{ id: string; displayName: string; description: string }>;
   }>;
   bundledSkillSuites: Array<Omit<DesktopBundledSkillSuiteSummary, "skills"> & {
@@ -150,7 +150,7 @@ export function parseBundledCatalog(value: unknown): BundledCapabilityCatalog {
   return { catalogVersion: value.catalogVersion, entries, bundledSkillSuites, recommendedExternal };
 }
 
-function parseBundledExtensions(value: unknown): Array<{ id: string; displayName: string }> {
+function parseBundledExtensions(value: unknown): Array<{ id: string; displayName: string; description: string }> {
   if (!Array.isArray(value) || value.length > 128) {
     throw new Error("Desktop bundled extension entries are invalid.");
   }
@@ -161,8 +161,11 @@ function parseBundledExtensions(value: unknown): Array<{ id: string; displayName
       || typeof item.displayName !== "string"
       || item.displayName.length === 0
       || item.displayName.length > 200
+      || typeof item.description !== "string"
+      || item.description.length === 0
+      || item.description.length > 500
     ) throw new Error("Desktop bundled extension entry is invalid.");
-    return { id: item.id, displayName: item.displayName };
+    return { id: item.id, displayName: item.displayName, description: item.description };
   });
   if (new Set(extensions.map((entry) => entry.id)).size !== extensions.length) {
     throw new Error("Desktop bundled extension entries are duplicated.");

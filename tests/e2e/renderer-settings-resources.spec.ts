@@ -95,8 +95,23 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   await expect(extensionWorkspace.getByText("pi-rules-loader", { exact: true })).toBeHidden();
 
   await extensionTabs.getByRole("tab", { name: "内置扩展", exact: true }).click();
+  await expect(extensionWorkspace.getByText("工作规则加载器", { exact: true })).toBeVisible();
+  await expect(extensionWorkspace.getByText("根据当前任务自动匹配并加载已配置的工作规则。", { exact: true })).toBeVisible();
   await expect(extensionWorkspace.getByText("pi-rules-loader", { exact: true })).toBeVisible();
-  await expect(extensionWorkspace.getByText("随应用更新", { exact: false }).first()).toBeVisible();
+  await expect(extensionWorkspace.getByText("Pi-67 Core 0.15.8", { exact: true })).toBeVisible();
+  await expect(extensionWorkspace.getByText("已随应用提供", { exact: true })).toBeVisible();
+  if (visualArtifactDirectory) await page.screenshot({
+    animations: "disabled",
+    path: resolve(visualArtifactDirectory, "settings-bundled-extensions.png")
+  });
+  const workRulesButton = extensionWorkspace.getByRole("button", { name: "查看工作规则", exact: true });
+  await workRulesButton.focus();
+  await expect(workRulesButton).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(settings.getByRole("heading", { name: "工作规则", exact: true })).toBeVisible();
+
+  await navigation.getByRole("button", { name: "扩展", exact: true }).click();
+  await extensionTabs.getByRole("tab", { name: "内置扩展", exact: true }).click();
 
   await extensionTabs.getByRole("tab", { name: "本地扩展", exact: true }).click();
   await settings.getByRole("button", { name: `项目 · ${DEFAULT_MOCK_WORKSPACE.displayName}`, exact: true }).click();
@@ -433,7 +448,7 @@ test("refreshes an initializing capability snapshot without requiring a manual r
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "扩展", exact: true }).click();
   await settings.getByRole("tab", { name: "内置扩展", exact: true }).click();
-  const coreExtensionRow = settings.getByText("pi-rules-loader", { exact: true }).locator("..").locator("..");
-  await expect(coreExtensionRow).toContainText("已提供");
-  await expect(coreExtensionRow).not.toContainText("准备中");
+  const coreExtensionRow = settings.getByText("工作规则加载器", { exact: true }).locator("..").locator("..");
+  await expect(coreExtensionRow).toContainText("已随应用提供");
+  await expect(coreExtensionRow).not.toContainText("尚未准备");
 });

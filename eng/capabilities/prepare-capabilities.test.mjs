@@ -17,7 +17,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins four first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.08.28.1");
+    expect(lock.catalogVersion).toBe("2026.08.28.2");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi67-core",
       "browser67",
@@ -28,7 +28,11 @@ describe("Desktop first-party capability source lock", () => {
     expect(lock.sources.find((source) => source.id === "pi67-core")).toMatchObject({
       commit: "500f3f63a14d80b0297a1dcc04237b5e2cf87894",
       ref: "refs/heads/main",
-      includedExtensions: ["pi-rules-loader"]
+      includedExtensions: [{
+        id: "pi-rules-loader",
+        displayName: "工作规则加载器",
+        description: "根据当前任务自动匹配并加载已配置的工作规则。"
+      }]
     });
     expect(lock.sources.find((source) => source.id === "browser67")).toMatchObject({
       version: "0.6.0",
@@ -101,8 +105,15 @@ describe("Desktop first-party capability source lock", () => {
     expect(() => assertCapabilitySourceLock(withoutSelection)).toThrow(/bundled Extension selection/u);
 
     const unordered = structuredClone(lock);
-    unordered.sources[coreIndex].includedExtensions = ["pi-rules-loader", "pi-rules-loader"];
+    unordered.sources[coreIndex].includedExtensions = [
+      ...unordered.sources[coreIndex].includedExtensions,
+      ...unordered.sources[coreIndex].includedExtensions
+    ];
     expect(() => assertCapabilitySourceLock(unordered)).toThrow(/bundled Extension selection/u);
+
+    const incompleteMetadata = structuredClone(lock);
+    delete incompleteMetadata.sources[coreIndex].includedExtensions[0].description;
+    expect(() => assertCapabilitySourceLock(incompleteMetadata)).toThrow(/bundled Extension selection/u);
   });
 
   it("rejects a branch-tracked Skill Pack without immutable generated hashes", () => {
@@ -142,7 +153,7 @@ describe("Desktop first-party capability source lock", () => {
     const entries = lock.sources.map((source) => ({
       ...source,
       packagePath: `packages/${source.id}`,
-      bundledExtensions: (source.includedExtensions ?? []).map((id) => ({ id, displayName: id }))
+      bundledExtensions: source.includedExtensions ?? []
     }));
     const packages = lock.sources.map((source) => ({
       id: source.id,
@@ -188,7 +199,7 @@ describe("Desktop first-party capability source lock", () => {
             ...entry,
             bundledExtensions: [
               ...entry.bundledExtensions,
-              { id: "pi-hy-memory", displayName: "pi-hy-memory" }
+              { id: "pi-hy-memory", displayName: "Memory", description: "Memory fixture." }
             ]
           }
         : entry)

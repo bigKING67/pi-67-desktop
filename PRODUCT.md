@@ -641,8 +641,12 @@ the only Runtime and behavior specification source.
   resumes that copy with the current workspace as its effective cwd.
 - Common Pi extension UI primitives work; TUI-only UI is identified explicitly.
 - The Extension Catalog hides Desktop-internal policy extensions and reports
-  command, tool, shared UI, and TUI-only surfaces. Package-attributed Adapter
-  compatibility requires Pi-resolved package manifest evidence, canonical installed
+  command, tool, shared UI, and TUI-only surfaces. User-visible built-in
+  Extensions use a plain-language name and purpose while retaining their exact
+  technical identity and owning capability-Package version. `随应用提供` proves
+  only the managed Package is present; it never claims the current Session
+  loaded the Extension without a ResourceLoader receipt. Package-attributed
+  Adapter compatibility requires Pi-resolved package manifest evidence, canonical installed
   SemVer, Registry version matching, and final runtime surface ownership; it never
   implies shared `ctx.ui` caller attribution.
 - A verified Adapter may additionally declare the `delegated` presentation for a

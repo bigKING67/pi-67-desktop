@@ -89,7 +89,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
   }];
   return {
     phase: "ready",
-    catalogVersion: "2026.08.28.1",
+    catalogVersion: "2026.08.28.2",
     packages: [{
       id: "pi67-core",
       displayName: "Pi-67 Core",
@@ -131,16 +131,15 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
       resourceTypes: ["skill"],
       installed: true
     }],
-    bundledExtensions: [
-      "pi-rules-loader"
-    ].map((id) => ({
-      id,
-      displayName: id,
+    bundledExtensions: [{
+      id: "pi-rules-loader",
+      displayName: "工作规则加载器",
+      description: "根据当前任务自动匹配并加载已配置的工作规则。",
       packageId: "pi67-core",
       packageDisplayName: "Pi-67 Core",
       version: "0.15.8",
       installed: true
-    })),
+    }],
     bundledSkills,
     bundledSkillSuites: [{
       id: "lark-cli",

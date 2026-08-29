@@ -901,10 +901,16 @@ loading error where the operation can produce those states
   into `全局可用` or `项目专属`.
 - `内置扩展` lists user-visible Extension entries shipped by Pi-67 Desktop.
   The catalog exposes individual bounded identities rather than presenting an
-  entire first-party capability Package as one Extension. These entries report
-  installed readiness and application-owned versioning; they update with the
-  application and cannot be independently installed or uninstalled. Hidden
-  policy and safety Extensions remain internal system components.
+  entire first-party capability Package as one Extension. Each row leads with a
+  plain-language name and bounded purpose, keeps the exact Extension id as
+  secondary technical metadata, and attributes the version to the owning
+  capability Package. `已随应用提供` means only that the managed Package is
+  present; it does not imply that the current Session loaded the Extension.
+  A contextual action may route to the existing owning settings workspace,
+  such as `工作规则`, without creating a second configuration surface. These
+  entries update with the application and cannot be independently installed or
+  uninstalled. Hidden policy and safety Extensions remain internal system
+  components.
 - `全局可用` begins with a bounded set of user-facing `内置技能套件`, then opens one
   selected suite in an independent drill-down detail with search and a labeled
   return action. Suite rows own the repeated count, readiness, and content-owned

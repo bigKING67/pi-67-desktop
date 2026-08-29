@@ -150,10 +150,10 @@ async function preparePi67Core(sourceRoot, source, skillPackOverlays) {
   await mkdir(join(destination, "skills"), { recursive: true });
   await mkdir(join(destination, "extensions"), { recursive: true });
   await copyAllowed(sourceRoot, destination, ["prompts", "rules", "AGENTS.md", "README.md", "VERSION"]);
-  for (const extensionId of source.includedExtensions) {
+  for (const extension of source.includedExtensions) {
     await copyEntry(
-      join(sourceRoot, "extensions", extensionId),
-      join(destination, "extensions", extensionId),
+      join(sourceRoot, "extensions", extension.id),
+      join(destination, "extensions", extension.id),
       join(sourceRoot, "extensions")
     );
   }
@@ -204,7 +204,9 @@ async function preparePi67Core(sourceRoot, source, skillPackOverlays) {
     ["extension", "skill", "prompt", "rule"],
     extensions.map((extensionPath) => {
       const id = basename(extensionPath);
-      return { id, displayName: id };
+      const metadata = source.includedExtensions.find((extension) => extension.id === id);
+      if (!metadata) throw new Error(`Bundled Pi-67 Core Extension metadata is unavailable: ${id}`);
+      return metadata;
     }),
     await bundledSkillEntries(destination, skillNames.map((name) => `skills/${name}`))
   );

@@ -78,6 +78,24 @@
   background: var(--warning);
 }
 
+.bundledMeta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 1px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.bundledMeta code {
+  font-family: var(--font-code);
+  font-size: inherit;
+  font-variant-ligatures: none;
+  overflow-wrap: anywhere;
+}
+
 .scopeNotice {
   margin-top: var(--space-3);
 }

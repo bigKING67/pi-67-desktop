@@ -1,6 +1,6 @@
 {
   "schema": "pi67.capability-sources-lock.v1",
-  "catalogVersion": "2026.08.28.1",
+  "catalogVersion": "2026.08.28.2",
   "sources": [
     {
       "id": "pi67-core",
@@ -12,7 +12,11 @@
       "localSibling": "../pi-67",
       "version": "0.15.8",
       "includedExtensions": [
-        "pi-rules-loader"
+        {
+          "id": "pi-rules-loader",
+          "displayName": "工作规则加载器",
+          "description": "根据当前任务自动匹配并加载已配置的工作规则。"
+        }
       ]
     },
     {

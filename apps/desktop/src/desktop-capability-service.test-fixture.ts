@@ -30,7 +30,11 @@ export async function createDesktopCapabilityFixture() {
       commit: "1".repeat(40),
       packagePath: "packages/browser67",
       resourceTypes: ["skill", "integration"],
-      bundledExtensions: [{ id: "browser-bridge", displayName: "browser-bridge" }],
+      bundledExtensions: [{
+        id: "browser-bridge",
+        displayName: "Browser bridge",
+        description: "Connects the managed browser runtime."
+      }],
       bundledSkills: [{
         id: "browser67",
         displayName: "browser67",

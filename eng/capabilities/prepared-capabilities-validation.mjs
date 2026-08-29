@@ -76,7 +76,6 @@ export function assertCapabilitiesMetadata(lock, catalog, manifest) {
     const generatedSource = generated.get(id);
     const entry = entries.get(id);
     const packageIdentity = packages.get(id);
-    const bundledExtensionIds = entry?.bundledExtensions?.map((extension) => extension.id);
     if (
       generatedSource?.commit !== source.commit
       || generatedSource?.version !== source.version
@@ -86,7 +85,7 @@ export function assertCapabilitiesMetadata(lock, catalog, manifest) {
       || entry?.repository !== source.repository
       || typeof entry?.packagePath !== "string"
       || !/^[a-f0-9]{64}$/u.test(packageIdentity?.treeSha256 ?? "")
-      || (id === "pi67-core" && JSON.stringify(bundledExtensionIds) !== JSON.stringify(source.includedExtensions))
+      || (id === "pi67-core" && JSON.stringify(entry?.bundledExtensions) !== JSON.stringify(source.includedExtensions))
     ) throw new Error(`Prepared capability metadata is stale: ${id}`);
   }
 }
@@ -164,13 +163,24 @@ function isTrackedBranchRef(value) {
 }
 
 function assertIncludedExtensions(value) {
+  const ids = Array.isArray(value) ? value.map((entry) => entry?.id) : [];
   if (
     !Array.isArray(value)
     || value.length === 0
     || value.length > 32
-    || value.some((id) => typeof id !== "string" || !/^[a-z0-9][a-z0-9-]{0,79}$/u.test(id))
-    || new Set(value).size !== value.length
-    || JSON.stringify(value) !== JSON.stringify([...value].sort((left, right) => left.localeCompare(right)))
+    || value.some((entry) => (
+      !entry
+      || typeof entry.id !== "string"
+      || !/^[a-z0-9][a-z0-9-]{0,79}$/u.test(entry.id)
+      || typeof entry.displayName !== "string"
+      || entry.displayName.length === 0
+      || entry.displayName.length > 200
+      || typeof entry.description !== "string"
+      || entry.description.length === 0
+      || entry.description.length > 500
+    ))
+    || new Set(ids).size !== ids.length
+    || JSON.stringify(ids) !== JSON.stringify([...ids].sort((left, right) => left.localeCompare(right)))
   ) throw new Error("Pi-67 Core bundled Extension selection is invalid.");
 }
 

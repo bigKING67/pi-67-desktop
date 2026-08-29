@@ -16,6 +16,7 @@ export interface DesktopCapabilityPackageSummary {
 export interface DesktopBundledExtensionSummary {
   id: string;
   displayName: string;
+  description: string;
   packageId: string;
   packageDisplayName: string;
   version: string;

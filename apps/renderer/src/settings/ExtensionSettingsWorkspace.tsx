@@ -1,6 +1,9 @@
-import { PackageOpen, Puzzle, RefreshCw, SquareCode } from "lucide-react";
+import { FileText, PackageOpen, Puzzle, RefreshCw, SquareCode } from "lucide-react";
 import { Button, Tab, TabList, TabPanel, Tabs } from "react-aria-components";
-import { useWorkbenchStore } from "../workbench/workbench-store.js";
+import {
+  rendererWorkbenchStore,
+  useWorkbenchStore
+} from "../workbench/workbench-store.js";
 import {
   useDesktopCapabilitySnapshot
 } from "./DesktopCapabilityPanels.js";
@@ -65,7 +68,7 @@ function BundledExtensionPanel({ capability }: { capability: CapabilityState }) 
         {capability.phase === "loading" ? "刷新中…" : "刷新状态"}
       </Button>}
       title="内置扩展"
-      description="由 Pi-67 Desktop 随应用提供并跟随应用更新，不通过第三方扩展包单独安装或卸载。"
+      description="随 Pi-67 Desktop 提供并跟随应用更新；这里显示随附状态，不代表当前会话已经加载。"
     >
       {capability.error ? <SettingsNotice tone="danger">{capability.error}</SettingsNotice> : null}
       {extensions.length > 0 ? <SettingsRows>{extensions.map((extension) => (
@@ -76,9 +79,22 @@ function BundledExtensionPanel({ capability }: { capability: CapabilityState }) 
             data-status={extension.installed ? "ready" : "unavailable"}
           />}
           title={extension.displayName}
-          description={`${extension.packageDisplayName} · ${extension.version} · 随应用更新`}
-          value={extension.installed ? "已提供" : "准备中"}
-        />
+          description={extension.description}
+          value={extension.installed ? "已随应用提供" : "尚未准备"}
+          actions={extension.id === "pi-rules-loader" ? <Button
+            className="secondary-button"
+            onPress={() => rendererWorkbenchStore.getState().selectSettingsSection("rules")}
+          >
+            <FileText aria-hidden="true" size={14} />
+            查看工作规则
+          </Button> : undefined}
+        >
+          <span className={styles.bundledMeta}>
+            <code>{extension.id}</code>
+            <span aria-hidden="true">·</span>
+            <span>{extension.packageDisplayName} {extension.version}</span>
+          </span>
+        </SettingsRow>
       ))}</SettingsRows> : (
         <SettingsNotice>
           {capability.snapshot === undefined || capability.phase === "loading"
