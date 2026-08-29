@@ -12,11 +12,17 @@ import {
   type ProtocolContext,
   type ProjectionResyncInstaller,
   type RendererAcknowledgementDiagnostics,
+  type RendererConnectionTeardownReason,
   type SequenceGap
 } from "@pi67/protocol";
 import { currentWorkbenchProtocolContext } from "../workbench/workbench-protocol-context.js";
 import { requestWithBoundedTransportRetry } from "./bounded-transport-retry.js";
 import { requestReplaySafeControlMutation } from "./control-mutation-request.js";
+import {
+  AgentConnectionRecoveryDiagnostics,
+  waitForFutureConnection
+} from "./agent-connection-recovery-state.js";
+import { agentConnectionRequestContext } from "./agent-connection-request-context.js";
 
 interface ConnectionSubscriber {
   onConnected?: (identity: AgentConnectionIdentity) => void;
@@ -61,6 +67,7 @@ export class AgentConnectionController {
   private receivedPort = false;
   private disposed = false;
   private readonly now: () => number;
+  private readonly recoveryDiagnostics: AgentConnectionRecoveryDiagnostics;
   private readonly slowAcknowledgementThresholdMs: number;
   private activeRequestCount = 0;
   private sampleCount = 0;
@@ -73,6 +80,7 @@ export class AgentConnectionController {
     options: AgentConnectionControllerOptions = {}
   ) {
     this.now = options.now ?? Date.now;
+    this.recoveryDiagnostics = new AgentConnectionRecoveryDiagnostics(this.now);
     this.slowAcknowledgementThresholdMs = positiveInteger(
       options.slowAcknowledgementThresholdMs,
       DEFAULT_SLOW_ACKNOWLEDGEMENT_THRESHOLD_MS,
@@ -93,12 +101,17 @@ export class AgentConnectionController {
     return this.receivedPort;
   }
 
+  get connectionGeneration(): number {
+    return this.generation;
+  }
+
   diagnostics(): RendererAcknowledgementDiagnostics {
     return {
       activeRequestCount: this.activeRequestCount,
       sampleCount: this.sampleCount,
       slowAcknowledgementCount: this.slowAcknowledgementCount,
       slowThresholdMs: this.slowAcknowledgementThresholdMs,
+      ...this.recoveryDiagnostics.snapshot(this.generation),
       ...(this.lastAcknowledgementLatencyMs === undefined
         ? {}
         : { lastAcknowledgementLatencyMs: this.lastAcknowledgementLatencyMs }),
@@ -144,6 +157,22 @@ export class AgentConnectionController {
     });
   }
 
+  async waitForConnectionAfter(
+    generation: number,
+    timeoutMs = 15_000
+  ): Promise<AgentConnectionIdentity> {
+    return waitForFutureConnection({
+      afterGeneration: generation,
+      timeoutMs,
+      current: () => ({
+        disposed: this.disposed,
+        generation: this.generation,
+        identity: this.identityValue
+      }),
+      subscribe: (subscriber) => this.subscribe(subscriber)
+    }, this.recoveryDiagnostics);
+  }
+
   async request<T extends AgentCommandType>(
     type: T,
     payload: CommandPayloads[T],
@@ -152,7 +181,7 @@ export class AgentConnectionController {
   ): Promise<CommandResults[T]> {
     if (this.disposed) throw disposedError();
     const expectedHostEpoch = this.identityValue?.hostEpoch;
-    const context = options.context ?? requestContext(type, payload);
+    const context = options.context ?? agentConnectionRequestContext(type, payload);
     if (isReplaySafeControlMutation(type)) {
       return requestReplaySafeControlMutation(
         type,
@@ -221,7 +250,8 @@ export class AgentConnectionController {
           this.handleTeardown(
             generation,
             client,
-            error instanceof Error ? error : connectionError("Agent request failed.")
+            error instanceof Error ? error : connectionError("Agent request failed."),
+            "protocol-violation"
           );
         }
         throw error;
@@ -266,7 +296,12 @@ export class AgentConnectionController {
       }, context);
     } catch (error) {
       if (client.isClosed) {
-        this.handleTeardown(generation, client, error instanceof Error ? error : connectionError("Agent projection resync failed."));
+        this.handleTeardown(
+          generation,
+          client,
+          error instanceof Error ? error : connectionError("Agent projection resync failed."),
+          "protocol-violation"
+        );
       }
       throw error;
     }
@@ -331,51 +366,37 @@ export class AgentConnectionController {
       if (generation !== this.generation || client !== this.client) return;
       for (const subscriber of this.subscribers) subscriber.onSequenceGap?.(gap);
     });
-    const onPortClosed = () => this.handleTeardown(generation, client, connectionError("Agent connection closed."));
-    port.addEventListener("close", onPortClosed, { once: true });
-    port.addEventListener("messageerror", () => {
-      this.handleTeardown(generation, client, connectionError("Agent connection message could not be decoded."));
-    }, { once: true });
+    client.onTeardown((error, reason) => {
+      this.handleTeardown(generation, client, error, reason);
+    });
 
     void client.waitUntilReady().then((identity) => {
       if (generation !== this.generation || client !== this.client) return;
       this.identityValue = identity;
       for (const subscriber of this.subscribers) subscriber.onConnected?.(identity);
     }).catch((error: unknown) => {
-      this.handleTeardown(generation, client, error instanceof Error ? error : connectionError("Pi runtime service handshake failed."));
+      this.handleTeardown(
+        generation,
+        client,
+        error instanceof Error ? error : connectionError("Pi runtime service handshake failed."),
+        "protocol-violation"
+      );
     });
   }
 
-  private handleTeardown(generation: number, client: AgentPortClient, error: Error): void {
+  private handleTeardown(
+    generation: number,
+    client: AgentPortClient,
+    error: Error,
+    reason: RendererConnectionTeardownReason
+  ): void {
     if (generation !== this.generation || client !== this.client) return;
     this.client = undefined;
     this.identityValue = undefined;
+    this.recoveryDiagnostics.recordTeardown(error, reason);
     client.dispose();
     for (const subscriber of this.subscribers) subscriber.onTeardown?.(error);
   }
-}
-
-function requestContext<T extends AgentCommandType>(type: T, payload: CommandPayloads[T]): ProtocolContext {
-  if (
-    type === "diagnostics.collect"
-    || type === "doctor.run"
-    || type === "lark.auth.status"
-    || type === "lark.auth.login.begin"
-  ) return { scope: "app" };
-  const current = currentWorkbenchProtocolContext();
-  if (type === "session.catalog.query") {
-    const scope = (payload as CommandPayloads["session.catalog.query"]).scope;
-    if (scope === "all") return { scope: "app" };
-    return current.scope === "app"
-      ? current
-      : { scope: "workspace", workspaceId: current.workspaceId };
-  }
-  if (type === "session.creation.resolve") {
-    return current.scope === "app"
-      ? current
-      : { scope: "workspace", workspaceId: current.workspaceId };
-  }
-  return current;
 }
 
 export async function prepareSameHostTransportRetry(

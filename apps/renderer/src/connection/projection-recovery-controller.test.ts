@@ -7,9 +7,12 @@ import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { prepareRendererSessionTransaction } from "../app/renderer-session-transaction.js";
 import { agentConnectionController } from "./AgentConnectionController.js";
 import {
+  beginRendererConnectionLoss,
   invalidateProjectionRecoveryGeneration,
+  recoverAgentConnectionAfterTeardown,
   resynchronizeRendererProjection
 } from "./projection-recovery-controller.js";
+import { completeRendererConnectionRecovery } from "./projection-recovery-ledger.js";
 
 describe("projection recovery controller", () => {
   beforeEach(() => {
@@ -137,6 +140,61 @@ describe("projection recovery controller", () => {
       runtime: { phase: "recovering", detail: "Newer Session transaction" }
     });
     expect(useNotificationStore.getState().items).toEqual([]);
+  });
+
+  it("publishes one interruption notice for repeated teardowns in one recovery incident", () => {
+    vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue({
+      appInstanceId: "app",
+      hostInstanceId: "host",
+      hostEpoch: 9,
+      sdkVersion: "fixture",
+      eventSequence: 0
+    });
+    const firstRevision = beginRendererConnectionLoss(useAppStore.getState());
+    recoverAgentConnectionAfterTeardown(
+      useAppStore.getState,
+      useAppStore.setState,
+      "/work/a",
+      firstRevision,
+      new Error("first close")
+    );
+    useAppStore.setState({
+      connected: false,
+      sessionTransitionPending: true,
+      runtime: { phase: "recovering", detail: "恢复中", recoverable: true }
+    });
+    const repeatedRevision = beginRendererConnectionLoss(useAppStore.getState());
+    recoverAgentConnectionAfterTeardown(
+      useAppStore.getState,
+      useAppStore.setState,
+      "/work/a",
+      repeatedRevision,
+      new Error("repeated close")
+    );
+
+    expect(useNotificationStore.getState().items).toHaveLength(1);
+    expect(useNotificationStore.getState().items[0]).toMatchObject({
+      level: "warning",
+      message: "first close"
+    });
+
+    completeRendererConnectionRecovery();
+    useAppStore.setState({
+      connected: true,
+      sessionTransitionPending: false,
+      runtime: { phase: "ready", detail: "已恢复", recoverable: true }
+    });
+    const laterRevision = beginRendererConnectionLoss(useAppStore.getState());
+    recoverAgentConnectionAfterTeardown(
+      useAppStore.getState,
+      useAppStore.setState,
+      "/work/a",
+      laterRevision,
+      new Error("later close")
+    );
+
+    expect(useNotificationStore.getState().items).toHaveLength(2);
+    expect(useNotificationStore.getState().items[1]).toMatchObject({ message: "later close" });
   });
 });
 

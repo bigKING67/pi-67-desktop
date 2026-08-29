@@ -218,7 +218,7 @@ describe("renderer projection state", () => {
         runtime: { phase: "recovering", detail: "等待系统恢复", recoverable: true }
       });
       vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue(undefined);
-      vi.spyOn(agentConnectionController, "waitForConnection").mockResolvedValue(connectionIdentity(9));
+      vi.spyOn(agentConnectionController, "waitForConnectionAfter").mockResolvedValue(connectionIdentity(9));
 
       useAppStore.getState().handlePowerResume();
       await vi.waitFor(() => expect(connectAgentHost).toHaveBeenCalledOnce());
@@ -253,7 +253,7 @@ describe("renderer projection state", () => {
       };
       useAppStore.setState({ workspace: "/workspace", operation: running });
       vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue(undefined);
-      vi.spyOn(agentConnectionController, "waitForConnection").mockResolvedValue(connectionIdentity(9));
+      vi.spyOn(agentConnectionController, "waitForConnectionAfter").mockResolvedValue(connectionIdentity(9));
       mockProjectionResync({
         sessionId: "session-1",
         sessionFileIdentity: "session-file-session-1",
@@ -300,7 +300,7 @@ describe("renderer projection state", () => {
         hostEpoch: 9
       });
       vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue(undefined);
-      vi.spyOn(agentConnectionController, "waitForConnection").mockResolvedValue(connectionIdentity(9));
+      vi.spyOn(agentConnectionController, "waitForConnectionAfter").mockResolvedValue(connectionIdentity(9));
 
       useAppStore.getState().handleAgentTeardown(new Error("Port closed"));
       await vi.waitFor(() => expect(connectAgentHost).toHaveBeenCalledOnce());

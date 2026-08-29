@@ -131,6 +131,11 @@ describe("AgentConnectionController", () => {
       sampleCount: 1,
       slowAcknowledgementCount: 1,
       slowThresholdMs: 2_000,
+      connectionGeneration: 1,
+      teardownCount: 0,
+      futureGenerationWaitCount: 0,
+      futureGenerationWaitTimeoutCount: 0,
+      priorGenerationTeardownIgnoredCount: 0,
       lastAcknowledgementLatencyMs: 2_150,
       maxAcknowledgementLatencyMs: 2_150
     });
@@ -171,6 +176,56 @@ describe("AgentConnectionController", () => {
     await expect(controller.waitForConnection()).resolves.toMatchObject({ hostEpoch: 6, hostInstanceId: "host-6" });
     expect(controller.identity?.hostEpoch).toBe(6);
     expect(connectedEpochs).toEqual([5, 6]);
+  });
+
+  it("keeps one future-generation wait alive when the replaced Port closes first", async () => {
+    const target = new FakeHandoffTarget();
+    const controller = createController(target);
+    const oldHost = createHost(5);
+    oldHost.handoff(target);
+    await controller.waitForConnection();
+    const replacedGeneration = controller.connectionGeneration;
+
+    const replacement = controller.waitForConnectionAfter(replacedGeneration, 1_000);
+    let settled = false;
+    void replacement.finally(() => { settled = true; }).catch(() => undefined);
+    oldHost.closeControllerPort();
+    await vi.waitFor(() => expect(controller.diagnostics().teardownCount).toBe(1));
+
+    expect(settled).toBe(false);
+    expect(controller.diagnostics()).toMatchObject({
+      teardownCount: 1,
+      futureGenerationWaitCount: 1,
+      priorGenerationTeardownIgnoredCount: 1,
+      lastTeardownCode: "CONNECTION_CLOSED",
+      lastTeardownReason: "port-closed"
+    });
+
+    const newHost = createHost(5, 0, "host-5-replacement");
+    newHost.handoff(target);
+
+    await expect(replacement).resolves.toMatchObject({
+      hostEpoch: 5,
+      hostInstanceId: "host-5-replacement"
+    });
+    expect(controller.connectionGeneration).toBe(replacedGeneration + 1);
+  });
+
+  it("times out a future-generation wait before allowing a bounded retry", async () => {
+    vi.useFakeTimers();
+    const target = new FakeHandoffTarget();
+    const controller = createController(target);
+    const waiting = controller.waitForConnectionAfter(controller.connectionGeneration, 100);
+    let failure: unknown;
+    void waiting.catch((error: unknown) => { failure = error; });
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(failure).toMatchObject({ code: "CONNECTION_CLOSED" });
+    expect(controller.diagnostics()).toMatchObject({
+      futureGenerationWaitCount: 1,
+      futureGenerationWaitTimeoutCount: 1
+    });
   });
 
   it("forwards one sequence gap and resumes events only after projection resync", async () => {

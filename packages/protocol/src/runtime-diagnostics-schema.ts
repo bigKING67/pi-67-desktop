@@ -116,7 +116,26 @@ const RendererAcknowledgementDiagnosticsSchema = strictObject({
   slowAcknowledgementCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
   slowThresholdMs: Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
   lastAcknowledgementLatencyMs: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
-  maxAcknowledgementLatencyMs: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }))
+  maxAcknowledgementLatencyMs: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  connectionGeneration: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  teardownCount: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  futureGenerationWaitCount: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  futureGenerationWaitTimeoutCount: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  priorGenerationTeardownIgnoredCount: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  lastTeardownAt: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  lastTeardownCode: Type.Optional(Type.String({ minLength: 1, maxLength: 64, pattern: "^[A-Z][A-Z0-9_]*$" })),
+  lastTeardownReason: Type.Optional(Type.Union([
+    Type.Literal("port-closed"),
+    Type.Literal("message-decode-failed"),
+    Type.Literal("handshake-timeout"),
+    Type.Literal("handshake-send-failed"),
+    Type.Literal("handshake-rejected"),
+    Type.Literal("handshake-identity-mismatch"),
+    Type.Literal("protocol-violation"),
+    Type.Literal("request-send-failed"),
+    Type.Literal("request-cancellation-send-failed"),
+    Type.Literal("disposed")
+  ]))
 });
 
 export const SupportDiagnosticsExportRequestSchema = Type.Union([

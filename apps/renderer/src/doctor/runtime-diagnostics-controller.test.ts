@@ -229,7 +229,12 @@ function rendererDiagnostics() {
     activeRequestCount: 0,
     sampleCount: 0,
     slowAcknowledgementCount: 0,
-    slowThresholdMs: 2_000
+    slowThresholdMs: 2_000,
+    connectionGeneration: 0,
+    teardownCount: 0,
+    futureGenerationWaitCount: 0,
+    futureGenerationWaitTimeoutCount: 0,
+    priorGenerationTeardownIgnoredCount: 0
   };
 }
 

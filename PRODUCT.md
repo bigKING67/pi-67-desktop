@@ -924,7 +924,12 @@ the only Runtime and behavior specification source.
   the poisoned Agent Host through the supervised restart policy.
 - A same-Host MessagePort interruption renews the Port and resynchronizes the
   active projection without reinitializing Pi; only a new Host epoch restores
-  the runtime from workspace and Session authority.
+  the runtime from workspace and Session authority. That renewal is one bounded
+  flight tied to a future Renderer connection generation: teardown from the Port
+  generation being replaced cannot immediately request another replacement, while
+  failure or timeout of the candidate generation may enter the normal bounded retry.
+  Support diagnostics retain only bounded generation, wait, teardown count, reason,
+  error-code, and timestamp evidence.
 - Application quit is fenced by Main: the Agent Host stops accepting commands,
   invalidates queued work, cancels interactive requests, attempts to abort the
   active Operation, disposes the Pi Runtime, and exits before Electron continues

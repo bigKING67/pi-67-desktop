@@ -1,5 +1,17 @@
 import type { SessionCatalogStatus } from "@pi67/domain";
 
+export type RendererConnectionTeardownReason =
+  | "port-closed"
+  | "message-decode-failed"
+  | "handshake-timeout"
+  | "handshake-send-failed"
+  | "handshake-rejected"
+  | "handshake-identity-mismatch"
+  | "protocol-violation"
+  | "request-send-failed"
+  | "request-cancellation-send-failed"
+  | "disposed";
+
 export interface RuntimeDiagnostics {
   generatedAt: number;
   application: string;
@@ -31,6 +43,14 @@ export interface RendererAcknowledgementDiagnostics {
   slowThresholdMs: number;
   lastAcknowledgementLatencyMs?: number;
   maxAcknowledgementLatencyMs?: number;
+  connectionGeneration?: number;
+  teardownCount?: number;
+  futureGenerationWaitCount?: number;
+  futureGenerationWaitTimeoutCount?: number;
+  priorGenerationTeardownIgnoredCount?: number;
+  lastTeardownAt?: number;
+  lastTeardownCode?: string;
+  lastTeardownReason?: RendererConnectionTeardownReason;
 }
 
 export type SupportDiagnosticsExportRequest =

@@ -6,7 +6,6 @@ import {
   type CommandPayloads,
   type CommandResults,
   type ProjectionResyncResult,
-  type ProtocolError,
   type ProtocolRequestError as ProtocolRequestErrorType
 } from "./agent-messages.js";
 import {
@@ -31,55 +30,30 @@ import { correlateInvalidEvent } from "./event-context.js";
 import {
   bindRequestAbort,
   postRequestCancellation,
-  releaseRequestAbort,
   requestCancelled,
-  waitForRequestConnection,
-  type RequestAbortBinding
+  waitForRequestConnection
 } from "./port-request-cancellation.js";
 import { acknowledgementTimeout } from "./port-request-timeout.js";
+import type { RendererConnectionTeardownReason } from "./runtime-diagnostics-contract.js";
+import {
+  agentConnectionError as connectionError,
+  extractPortEventData as extractEventData,
+  toAgentConnectionIdentity as toConnectionIdentity,
+  type AgentConnectionIdentity,
+  type SequenceGap
+} from "./port-client-connection.js";
+import {
+  releasePendingPortRequest,
+  type PendingPortRequest,
+  type PortEventType,
+  type PortListener,
+  type ProtocolPort
+} from "./port-client-state.js";
+
+export type { AgentConnectionIdentity, SequenceGap } from "./port-client-connection.js";
+export type { ProtocolPort } from "./port-client-state.js";
 
 export { CONTROL_MUTATION_ACK_TIMEOUT_MS } from "./port-request-timeout.js";
-
-interface PortMessageEvent {
-  data: unknown;
-}
-
-type PortEventType = "message" | "messageerror" | "close";
-type PortListener = (event: unknown) => void;
-
-export interface ProtocolPort {
-  postMessage(message: unknown, transfer?: Transferable[]): void;
-  start?(): void;
-  close?(): void;
-  addEventListener?(type: PortEventType, listener: PortListener): void;
-  removeEventListener?(type: PortEventType, listener: PortListener): void;
-  on?(type: PortEventType, listener: PortListener): void;
-  off?(type: PortEventType, listener: PortListener): void;
-}
-
-interface PendingRequest {
-  type: AgentCommandType;
-  context: ProtocolContext;
-  resolve: (value: never) => void;
-  reject: (error: Error) => void;
-  timeout: ReturnType<typeof setTimeout>;
-  abort?: RequestAbortBinding;
-  sent: boolean;
-}
-
-export interface AgentConnectionIdentity {
-  appInstanceId: string;
-  hostInstanceId: string;
-  hostEpoch: number;
-  sdkVersion: string;
-  eventSequence: number;
-}
-
-export interface SequenceGap {
-  expected: number;
-  received: number;
-  hostEpoch: number;
-}
 
 export interface AgentPortClientOptions {
   rendererInstanceId?: string;
@@ -101,9 +75,13 @@ export interface AgentRequestOptions {
 export type ProjectionResyncInstaller = (result: ProjectionResyncResult) => boolean;
 
 export class AgentPortClient {
-  private readonly pending = new Map<string, PendingRequest>();
+  private readonly pending = new Map<string, PendingPortRequest>();
   private readonly eventListeners = new Set<(event: AgentEvent, envelope: EventEnvelope) => void>();
   private readonly sequenceGapListeners = new Set<(gap: SequenceGap) => void>();
+  private readonly teardownListeners = new Set<(
+    error: ProtocolRequestErrorType,
+    reason: RendererConnectionTeardownReason
+  ) => void>();
   private readonly rendererInstanceId: string;
   private readonly appInstanceId: string;
   private readonly handshakeTimeoutMs: number;
@@ -119,9 +97,21 @@ export class AgentPortClient {
   private sequenceBroken = false;
   private projectionResyncAttempt = 0;
   private closed = false;
+  private teardownReceipt: {
+    error: ProtocolRequestErrorType;
+    reason: RendererConnectionTeardownReason;
+  } | undefined;
   private readonly messageListener = (event: unknown) => this.handleMessage(extractEventData(event));
-  private readonly messageErrorListener = () => this.teardown(connectionError("Agent connection message could not be decoded."));
-  private readonly closeListener = () => this.teardown(connectionError("Agent connection closed."), false);
+  private readonly messageErrorListener = () => this.teardown(
+    connectionError("Agent connection message could not be decoded."),
+    true,
+    "message-decode-failed"
+  );
+  private readonly closeListener = () => this.teardown(
+    connectionError("Agent connection closed."),
+    false,
+    "port-closed"
+  );
 
   constructor(private readonly port: ProtocolPort, options: number | AgentPortClientOptions = {}) {
     const resolved = typeof options === "number" ? { requestTimeoutMs: options } : options;
@@ -141,13 +131,21 @@ export class AgentPortClient {
     this.addPortListener("close", this.closeListener);
     port.start?.();
     const handshakeTimeout = setTimeout(() => {
-      if (!this.welcome) this.teardown(connectionError("Pi runtime service handshake timed out."));
+      if (!this.welcome) this.teardown(
+        connectionError("Pi runtime service handshake timed out."),
+        true,
+        "handshake-timeout"
+      );
     }, this.handshakeTimeoutMs);
     void this.readyPromise.finally(() => clearTimeout(handshakeTimeout)).catch(() => undefined);
     try {
       port.postMessage(helloEnvelope(this.rendererInstanceId, this.appInstanceId, this.maxEnvelopeBytes));
     } catch {
-      this.teardown(connectionError("Pi runtime service handshake could not be sent."));
+      this.teardown(
+        connectionError("Pi runtime service handshake could not be sent."),
+        true,
+        "handshake-send-failed"
+      );
     }
   }
 
@@ -172,6 +170,19 @@ export class AgentPortClient {
   onSequenceGap(listener: (gap: SequenceGap) => void): () => void {
     this.sequenceGapListeners.add(listener);
     return () => this.sequenceGapListeners.delete(listener);
+  }
+
+  onTeardown(listener: (
+    error: ProtocolRequestErrorType,
+    reason: RendererConnectionTeardownReason
+  ) => void): () => void {
+    const receipt = this.teardownReceipt;
+    if (receipt) {
+      queueMicrotask(() => listener(receipt.error, receipt.reason));
+      return () => undefined;
+    }
+    this.teardownListeners.add(listener);
+    return () => this.teardownListeners.delete(listener);
   }
 
   async resyncProjection(
@@ -258,7 +269,7 @@ export class AgentPortClient {
           recoverable: true
         }));
       }, ackTimeoutMs);
-      const pending: PendingRequest = {
+      const pending: PendingPortRequest = {
         type,
         context: envelope.context,
         resolve: resolve as (value: never) => void,
@@ -283,13 +294,17 @@ export class AgentPortClient {
       pending.sent = true;
       this.port.postMessage(envelope, transfer);
     } catch {
-      this.teardown(connectionError(`Agent request could not be sent: ${type}`));
+      this.teardown(
+        connectionError(`Agent request could not be sent: ${type}`),
+        true,
+        "request-send-failed"
+      );
     }
     return response;
   }
 
   dispose(): void {
-    this.teardown(connectionError("Agent connection closed."));
+    this.teardown(connectionError("Agent connection closed."), true, "disposed");
   }
 
   private handleMessage(data: unknown): void {
@@ -302,7 +317,7 @@ export class AgentPortClient {
       return;
     }
     if (isHandshakeRejected(data)) {
-      this.teardown(new ProtocolRequestError(data.error));
+      this.teardown(new ProtocolRequestError(data.error), true, "handshake-rejected");
       return;
     }
     if (isHostWelcome(data)) {
@@ -363,7 +378,11 @@ export class AgentPortClient {
   private handleWelcome(welcome: HostWelcome): void {
     if (this.welcome || this.closed) return;
     if (welcome.appInstanceId !== this.appInstanceId) {
-      this.teardown(connectionError("Pi runtime service handshake used the wrong application identity."));
+      this.teardown(
+        connectionError("Pi runtime service handshake used the wrong application identity."),
+        true,
+        "handshake-identity-mismatch"
+      );
       return;
     }
     if (this.expectedHostEpoch !== undefined && welcome.hostEpoch !== this.expectedHostEpoch) {
@@ -372,7 +391,7 @@ export class AgentPortClient {
         message: "Pi runtime service handshake used an unexpected service generation.",
         recoverable: true,
         details: { expectedHostEpoch: this.expectedHostEpoch, receivedHostEpoch: welcome.hostEpoch }
-      }));
+      }), true, "handshake-identity-mismatch");
       return;
     }
     this.welcome = welcome;
@@ -387,19 +406,26 @@ export class AgentPortClient {
       && attempt === this.projectionResyncAttempt;
   }
 
-  private teardown(error: ProtocolRequestErrorType, closePort = true): void {
+  private teardown(
+    error: ProtocolRequestErrorType,
+    closePort = true,
+    reason: RendererConnectionTeardownReason = "protocol-violation"
+  ): void {
     if (this.closed) return;
     this.closed = true;
+    this.teardownReceipt = { error, reason };
     this.removePortListener("message", this.messageListener);
     this.removePortListener("messageerror", this.messageErrorListener);
     this.removePortListener("close", this.closeListener);
     if (closePort) this.port.close?.();
     if (!this.welcome) this.rejectReady(error);
     for (const pending of this.pending.values()) {
-      releasePending(pending);
+      releasePendingPortRequest(pending);
       pending.reject(error);
     }
     this.pending.clear();
+    for (const listener of this.teardownListeners) listener(error, reason);
+    this.teardownListeners.clear();
     this.eventListeners.clear();
     this.sequenceGapListeners.clear();
   }
@@ -414,44 +440,20 @@ export class AgentPortClient {
     else this.port.off?.(type, listener);
   }
 
-  private takePending(requestId: string): PendingRequest | undefined {
+  private takePending(requestId: string): PendingPortRequest | undefined {
     const pending = this.pending.get(requestId);
     if (!pending) return undefined;
     this.pending.delete(requestId);
-    releasePending(pending);
+    releasePendingPortRequest(pending);
     return pending;
   }
 
   private cancelHostRequest(requestId: string, hostEpoch: number): void {
     if (this.closed) return;
     postRequestCancellation(this.port, requestId, hostEpoch, () => this.teardown(
-      connectionError("Agent request cancellation could not be sent.")
+      connectionError("Agent request cancellation could not be sent."),
+      true,
+      "request-cancellation-send-failed"
     ));
   }
-}
-
-function extractEventData(event: unknown): unknown {
-  return typeof event === "object" && event !== null && "data" in event
-    ? (event as PortMessageEvent).data
-    : event;
-}
-
-function toConnectionIdentity(welcome: HostWelcome): AgentConnectionIdentity {
-  return {
-    appInstanceId: welcome.appInstanceId,
-    hostInstanceId: welcome.hostInstanceId,
-    hostEpoch: welcome.hostEpoch,
-    sdkVersion: welcome.sdkVersion,
-    eventSequence: welcome.eventSequence
-  };
-}
-
-function connectionError(message: string): ProtocolRequestError {
-  const error: ProtocolError = { code: "CONNECTION_CLOSED", message, recoverable: true };
-  return new ProtocolRequestError(error);
-}
-
-function releasePending(pending: PendingRequest): void {
-  clearTimeout(pending.timeout);
-  releaseRequestAbort(pending.abort);
 }

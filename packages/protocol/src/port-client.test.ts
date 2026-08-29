@@ -24,6 +24,8 @@ describe("AgentPortClient", () => {
   it("surfaces an explicit protocol mismatch handshake rejection", async () => {
     const port = new FakePort();
     const client = new AgentPortClient(port);
+    const onTeardown = vi.fn();
+    client.onTeardown(onTeardown);
     port.emit("message", handshakeRejectedEnvelope());
 
     await expect(client.waitUntilReady()).rejects.toMatchObject({
@@ -31,6 +33,25 @@ describe("AgentPortClient", () => {
       message: "Pi 运行服务版本不一致，请重启应用。"
     });
     expect(client.isClosed).toBe(true);
+    expect(onTeardown).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "PROTOCOL_MISMATCH" }),
+      "handshake-rejected"
+    );
+  });
+
+  it("replays a synchronous handshake-send teardown to a late lifecycle subscriber", async () => {
+    const port = new FakePort();
+    port.throwOnPost = true;
+    const client = new AgentPortClient(port);
+    const onTeardown = vi.fn();
+
+    client.onTeardown(onTeardown);
+
+    await expect(client.waitUntilReady()).rejects.toMatchObject({ code: "CONNECTION_CLOSED" });
+    await vi.waitFor(() => expect(onTeardown).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "CONNECTION_CLOSED" }),
+      "handshake-send-failed"
+    ));
   });
 
   it("handshakes before sending a typed request", async () => {

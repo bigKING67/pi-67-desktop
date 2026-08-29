@@ -4,6 +4,8 @@ import type { AppState } from "../app/app-store.types.js";
 export class ProjectionRecoveryLedger {
   private revision = 0;
   private interruptedOperationId: string | undefined;
+  private connectionLossIncidentActive = false;
+  private connectionLossNoticeRevision: number | undefined;
 
   invalidate(): number {
     this.revision += 1;
@@ -16,10 +18,28 @@ export class ProjectionRecoveryLedger {
 
   beginConnectionLoss(state: AppState): number {
     const revision = this.invalidate();
+    const stableBeforeLoss = state.connected
+      && !state.sessionTransitionPending
+      && state.runtime?.phase !== "recovering";
+    if (!this.connectionLossIncidentActive || stableBeforeLoss) {
+      this.connectionLossIncidentActive = true;
+      this.connectionLossNoticeRevision = revision;
+    }
     this.interruptedOperationId = state.workspace
       ? activeOperationId(state)
       : undefined;
     return revision;
+  }
+
+  claimConnectionLossNotification(revision: number): boolean {
+    if (this.connectionLossNoticeRevision !== revision) return false;
+    this.connectionLossNoticeRevision = undefined;
+    return true;
+  }
+
+  completeConnectionLoss(): void {
+    this.connectionLossIncidentActive = false;
+    this.connectionLossNoticeRevision = undefined;
   }
 
   prepareHostReplacement(): void {
@@ -51,6 +71,10 @@ export class ProjectionRecoveryLedger {
 }
 
 export const projectionRecoveryLedger = new ProjectionRecoveryLedger();
+
+export function completeRendererConnectionRecovery(): void {
+  projectionRecoveryLedger.completeConnectionLoss();
+}
 
 function activeOperationId(state: AppState): string | undefined {
   const operation = state.operation;

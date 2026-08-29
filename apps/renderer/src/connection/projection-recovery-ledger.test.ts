@@ -33,6 +33,25 @@ describe("ProjectionRecoveryLedger", () => {
     expect(ledger.matchingInterruptedTerminal(terminal("operation-completed"))).toBeUndefined();
   });
 
+  it("admits one interruption notice until recovery convergence", () => {
+    const ledger = new ProjectionRecoveryLedger();
+    const recovering = {
+      ...appState(),
+      connected: false,
+      sessionTransitionPending: true,
+      runtime: { phase: "recovering", detail: "恢复中", recoverable: true }
+    } as AppState;
+    const first = ledger.beginConnectionLoss(appState());
+    const repeated = ledger.beginConnectionLoss(recovering);
+
+    expect(ledger.claimConnectionLossNotification(first)).toBe(true);
+    expect(ledger.claimConnectionLossNotification(repeated)).toBe(false);
+
+    ledger.completeConnectionLoss();
+    const later = ledger.beginConnectionLoss(appState());
+    expect(ledger.claimConnectionLossNotification(later)).toBe(true);
+  });
+
   it("supports explicit resync ownership and clears it on Host replacement", () => {
     const ledger = new ProjectionRecoveryLedger();
     ledger.captureInterruptedOperation(appState(), "operation-explicit");

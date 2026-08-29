@@ -69,7 +69,15 @@ const renderer = {
   slowAcknowledgementCount: 0,
   slowThresholdMs: 2_000,
   lastAcknowledgementLatencyMs: 12,
-  maxAcknowledgementLatencyMs: 18
+  maxAcknowledgementLatencyMs: 18,
+  connectionGeneration: 4,
+  teardownCount: 1,
+  futureGenerationWaitCount: 1,
+  futureGenerationWaitTimeoutCount: 0,
+  priorGenerationTeardownIgnoredCount: 1,
+  lastTeardownAt: 123,
+  lastTeardownCode: "CONNECTION_CLOSED",
+  lastTeardownReason: "port-closed"
 } as const;
 
 describe("runtime diagnostics boundary", () => {
@@ -120,6 +128,13 @@ describe("runtime diagnostics boundary", () => {
         failure: "raw-message-must-not-cross"
       },
       renderer
+    })).toBe(false);
+    expect(isSupportDiagnosticsExportRequest({
+      runtimeCollection: {
+        status: "unavailable",
+        failure: "connection-unavailable"
+      },
+      renderer: { ...renderer, lastTeardownReason: "raw-private-reason" }
     })).toBe(false);
   });
 });

@@ -86,6 +86,7 @@ export function installResynchronizedProjection(
   }
   if (recoveredTerminal) recordOperationTerminal(recoveredTerminal);
   projectionRecoveryLedger.clearInterruptedOperation();
+  projectionRecoveryLedger.completeConnectionLoss();
   if (workspaceId) void queryFirstSessionCatalog(workspaceId);
   return true;
 }

@@ -28,6 +28,7 @@ import {
   recoverConnectedRendererProjection,
   resynchronizeRendererProjection
 } from "./projection-recovery-controller.js";
+import { completeRendererConnectionRecovery } from "./projection-recovery-ledger.js";
 
 type StoreGet = () => AppState;
 type StoreSet = (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
@@ -61,6 +62,7 @@ export function handleConnected(
     ...(restoredRuntime === undefined ? {} : { runtime: restoredRuntime })
   });
   if (!shouldRecoverProjection || !state.workspace) {
+    completeRendererConnectionRecovery();
     const workspaceRegistration = prepareRendererReadQueriesAfterConnection(get, identity);
     synchronizeWorkspaceScopedStateAfterConnection(workspaceRegistration);
     return;
@@ -168,7 +170,10 @@ export function handleTeardown(get: StoreGet, set: StoreSet, error: Error): void
       ? { phase: "recovering", detail: messages.runtime.connection.runtimeConnectionRecovering, recoverable: true }
       : INITIAL_RUNTIME_STATE
   });
-  if (!workspace) return;
+  if (!workspace) {
+    completeRendererConnectionRecovery();
+    return;
+  }
   recoverAgentConnectionAfterTeardown(get, set, workspace, revision, error);
 }
 

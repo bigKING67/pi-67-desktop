@@ -1443,6 +1443,10 @@ loading error where the operation can produce those states
   four are visible; info and success dismiss after six seconds, warning after ten, and
   error remains until dismissed. Timers pause while the document is hidden or the Toast
   has pointer/keyboard interaction.
+- One connection-loss incident owns at most one interruption Toast until its active
+  projection has converged again. Repeated Port teardowns during the same recovery do
+  not stack duplicate notices or restart the Workbench transition; a later independent
+  interruption after convergence remains visible as a new incident.
 - Toast copy is never itself a dismiss target. Every Toast has a separate labeled close
   button, and only that button accepts pointer input so transient feedback cannot block
   Workbench controls behind it. Keyboard focus and pointer interaction on the close button
@@ -2145,7 +2149,11 @@ loading error where the operation can produce those states
   receipt only when its Operation ID matches the task that was active before the gap;
   unrelated historical terminals are ignored. Host replacement remains visibly
   recovering until runtime initialization completes and never reuses the prior Host's
-  in-memory receipt ledger.
+  in-memory receipt ledger. A replacement request waits for a strictly newer Renderer
+  connection generation, so closure of the generation being replaced cannot collapse
+  that wait or produce a reconnect feedback loop. The existing transcript and recovery
+  shell stay mounted through the single transition rather than flashing between repeated
+  recovery attempts.
 - An active Operation receives typed Host heartbeats independently from Pi business
   activity. A quiet task remains cancellable and shows that the Host is still
   responsive; overdue heartbeats first show a warning, then trigger one authoritative

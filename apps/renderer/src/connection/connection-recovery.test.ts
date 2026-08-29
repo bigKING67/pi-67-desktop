@@ -37,16 +37,19 @@ describe("connection recovery", () => {
     const waiting = new Promise<AgentConnectionIdentity>((resolve) => {
       resolveConnection = resolve;
     });
-    const waitForConnection = vi.spyOn(agentConnectionController, "waitForConnection").mockReturnValue(waiting);
+    vi.spyOn(agentConnectionController, "connectionGeneration", "get").mockReturnValue(3);
+    const waitForConnectionAfter = vi.spyOn(agentConnectionController, "waitForConnectionAfter")
+      .mockReturnValue(waiting);
 
     const first = ensureAgentConnection();
     const second = ensureAgentConnection();
     await vi.waitFor(() => {
-      expect(waitForConnection).toHaveBeenCalledOnce();
+      expect(waitForConnectionAfter).toHaveBeenCalledOnce();
     });
 
     expect(first).toBe(second);
     expect(connectAgentHost).toHaveBeenCalledOnce();
+    expect(waitForConnectionAfter).toHaveBeenCalledWith(3, 8_000);
     resolveConnection(identity);
     await expect(first).resolves.toEqual(identity);
   });
@@ -63,7 +66,10 @@ describe("connection recovery", () => {
 
   it("retries a failed Port handoff without creating parallel reconnect loops", async () => {
     vi.useFakeTimers();
-    const waitForConnection = vi.spyOn(agentConnectionController, "waitForConnection")
+    vi.spyOn(agentConnectionController, "connectionGeneration", "get")
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(1);
+    const waitForConnectionAfter = vi.spyOn(agentConnectionController, "waitForConnectionAfter")
       .mockRejectedValueOnce(new Error("old Port closed"))
       .mockResolvedValueOnce(identity);
 
@@ -76,22 +82,25 @@ describe("connection recovery", () => {
     expect(connectAgentHost).toHaveBeenCalledTimes(2);
     expect(connectAgentHost).toHaveBeenNthCalledWith(1, { replaceCurrent: false });
     expect(connectAgentHost).toHaveBeenNthCalledWith(2, { replaceCurrent: false });
-    expect(waitForConnection).toHaveBeenCalledTimes(2);
+    expect(waitForConnectionAfter).toHaveBeenNthCalledWith(1, 0, 8_000);
+    expect(waitForConnectionAfter).toHaveBeenNthCalledWith(2, 1, 8_000);
   });
 
   it("uses a Port handed off during the retry delay without replacing it", async () => {
     vi.useFakeTimers();
     let hasOpenPort = false;
     vi.spyOn(agentConnectionController, "hasOpenPort", "get").mockImplementation(() => hasOpenPort);
+    vi.spyOn(agentConnectionController, "connectionGeneration", "get").mockReturnValue(0);
+    const waitForConnectionAfter = vi.spyOn(agentConnectionController, "waitForConnectionAfter")
+      .mockRejectedValueOnce(new Error("initial handoff timed out"));
     const waitForConnection = vi.spyOn(agentConnectionController, "waitForConnection")
-      .mockRejectedValueOnce(new Error("initial handoff timed out"))
       .mockResolvedValueOnce(identity);
 
     const connection = ensureAgentConnection();
     await vi.advanceTimersByTimeAsync(0);
 
     expect(connectAgentHost).toHaveBeenCalledOnce();
-    expect(waitForConnection).toHaveBeenCalledOnce();
+    expect(waitForConnectionAfter).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(1);
 
     hasOpenPort = true;
@@ -100,15 +109,19 @@ describe("connection recovery", () => {
     await expect(connection).resolves.toEqual(identity);
     expect(connectAgentHost).toHaveBeenCalledOnce();
     expect(connectAgentHost).toHaveBeenCalledWith({ replaceCurrent: false });
-    expect(waitForConnection).toHaveBeenCalledTimes(2);
+    expect(waitForConnectionAfter).toHaveBeenCalledOnce();
+    expect(waitForConnection).toHaveBeenCalledOnce();
   });
 
   it("forces a same-document replacement after a previous Port was observed", async () => {
     vi.spyOn(agentConnectionController, "hasReceivedPort", "get").mockReturnValue(true);
-    vi.spyOn(agentConnectionController, "waitForConnection").mockResolvedValue(identity);
+    vi.spyOn(agentConnectionController, "connectionGeneration", "get").mockReturnValue(7);
+    const waitForConnectionAfter = vi.spyOn(agentConnectionController, "waitForConnectionAfter")
+      .mockResolvedValue(identity);
 
     await expect(ensureAgentConnection()).resolves.toEqual(identity);
 
     expect(connectAgentHost).toHaveBeenCalledWith({ replaceCurrent: true });
+    expect(waitForConnectionAfter).toHaveBeenCalledWith(7, 8_000);
   });
 });

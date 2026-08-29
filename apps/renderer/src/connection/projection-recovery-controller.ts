@@ -168,6 +168,7 @@ export function recoverConnectedRendererProjection(
     if (disposition === "committed") {
       recoverySelection.restore();
       projectionRecoveryLedger.clearInterruptedOperation();
+      projectionRecoveryLedger.completeConnectionLoss();
       input.onWorkspaceReady?.();
       if (input.workspaceId) void queryFirstSessionCatalog(input.workspaceId);
       if (input.workspaceId) void reconcileUnconfirmedRendererSessions(input.workspaceId);
@@ -185,6 +186,7 @@ export function recoverConnectedRendererProjection(
     ) {
       recoverySelection.restore();
       projectionRecoveryLedger.clearInterruptedOperation();
+      projectionRecoveryLedger.completeConnectionLoss();
       input.onWorkspaceReady?.();
       if (input.workspaceId) void queryFirstSessionCatalog(input.workspaceId);
       if (input.workspaceId) void reconcileUnconfirmedRendererSessions(input.workspaceId);
@@ -241,6 +243,7 @@ function recoverCreationOnlyWorkbench(
     if (!projectionRecoveryLedger.isCurrent(get(), input.identity.hostEpoch, revision)) return;
     input.onWorkspaceReady?.();
     projectionRecoveryLedger.clearInterruptedOperation();
+    projectionRecoveryLedger.completeConnectionLoss();
     const selected = selectedWorkbenchTask(rendererWorkbenchStore.getState());
     set({
       sessionTransitionPending: false,
@@ -301,11 +304,13 @@ export function recoverAgentConnectionAfterTeardown(
   revision: number,
   sourceError: Error
 ): void {
-  publishNotification({
-    level: "warning",
-    title: messages.runtime.connection.runtimeConnectionInterrupted,
-    message: sourceError.message
-  });
+  if (projectionRecoveryLedger.claimConnectionLossNotification(revision)) {
+    publishNotification({
+      level: "warning",
+      title: messages.runtime.connection.runtimeConnectionInterrupted,
+      message: sourceError.message
+    });
+  }
   void ensureAgentConnection().catch((reconnectError: unknown) => {
     const state = get();
     if (
@@ -438,9 +443,7 @@ export function prepareRendererHostReplacement(): void {
   prepareRendererSessionTransaction("host-replaced");
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : messages.runtime.unknownError;
-}
+function errorMessage(error: unknown): string { return error instanceof Error ? error.message : messages.runtime.unknownError; }
 
 function deferProjectionRecoveryForBootstrap(
   get: StoreGet,
