@@ -70,6 +70,7 @@ close request does not settle.
 | OBSERVED | The local host held 39 PPID-1 controlled-fixture processes with the exact repository artifact command `Pi-67 Desktop Helper -e setInterval(...)`; they were enumerated, terminated as test residue, and absence was verified without touching the active preview Main. | local process table | 2026-08-29 |
 | OBSERVED | Ordinary CI run `33250170670` at `98b9266` passed Renderer E2E and macOS Native smoke, including the formerly hanging packaged-smoke boundary. Its Quality job failed only because the real-`ModelRuntime` Host routing integration inherited the product's four-second Provider validation budget under parallel coverage load; the same test had failed once locally under full coverage and passed in 3.84 seconds when isolated. | GitHub Actions log and local coverage runs | 2026-08-29 |
 | OBSERVED | Ordinary CI run `33250692871` at `66b5fc4` passed Quality and Renderer E2E, proving the real-Pi fixture budget under parallel coverage. macOS Native then failed in bounded time because the cold-restart smoke ignored its visible `打开对话` action, used the global new-conversation shortcut, and timed out waiting for an unnecessary fallback Session to materialize; the real Electron restart test independently defines `打开对话` as the required stopped-Session transition. | GitHub Actions log, live smoke source, and `tests/e2e/electron.spec.ts` | 2026-08-29 |
+| OBSERVED | Ordinary CI run `33251464479` at `6845adb` passed Quality and macOS Native, including the corrected cold-restart packaged smoke. Renderer E2E had one unrelated failure because the rename test read `selectionStart/selectionEnd` immediately after the synchronous value appeared, while the product intentionally applies the `{0,7}` stem selection in `requestAnimationFrame`. | GitHub Actions trace and live `WorkspaceFileNameDialog` source | 2026-08-29 |
 
 ## Affected boundaries
 
@@ -95,6 +96,7 @@ close request does not settle.
 | Set the owned application reference to `undefined` before a bounded close starts. | A failed close must not be retried indefinitely by the outer `finally`. | Cleanup becomes natively idempotent and bounded. |
 | Give only the real-`ModelRuntime` Host routing test a 30-second Provider validation budget through its injected configuration-service registry. | Product timeout behavior already has deterministic pi-runtime coverage; the routing integration's 60-second Host response and 120-second test deadlines show that its purpose is protocol behavior under real Pi initialization, not benchmarking the product's four-second startup guard while the full coverage suite saturates the runner. | The integration is replaced with a deterministic runtime fixture or Vitest gains a narrower isolated scheduling contract. |
 | On packaged cold restart, follow the exact visible recovery action before considering a new Session. | `恢复任务` and `打开对话` preserve the persisted task/Session authority already proven before restart; sending a second first message through a keyboard shortcut tests a different flow and creates an avoidable Provider race. | The product contract makes cold restart intentionally discard the selected persisted task/Session. |
+| Poll the exact rename selection contract after the input value appears. | Value initialization is synchronous but the product's focus and stem selection are intentionally scheduled for the next animation frame; a one-shot selection read races that documented implementation boundary. | The product exposes a synchronous readiness state for the final selection. |
 
 ## Checkpoints
 
@@ -119,7 +121,7 @@ close request does not settle.
 | Layer | Command or procedure | Required evidence | Result |
 | --- | --- | --- | --- |
 | Source | scoped diff, `git diff --check`, affected typecheck, aggregate check | only plan and test-fixture paths; all source gates pass | `PASS`: after the bounded Host fixture-budget change, `corepack pnpm run check` passed protocol revision, TypeScript, type-aware lint, architecture, dead-code, reference, structure, transport, workflow, and coverage gates; 614/614 files passed with 3200 tests passing and 3 skipped |
-| Tests | focused cases, then complete Renderer Chromium E2E with CI worker settings | no retries, page errors, or stale pending uploads | `PASS`: focused final-structure run passed 23/23; complete final-structure lane passed 204/204 with two workers and zero retries |
+| Tests | focused cases, then complete Renderer Chromium E2E with CI worker settings | no retries, page errors, or stale pending uploads | `PASS`: the rename-selection synchronization passed 10/10 repeated focused runs plus bootstrap, then the complete current Renderer lane passed 204/204 with two workers and zero retries |
 | Runtime/host | exact macOS unsigned preview | packaged smoke and real Agent Host roundtrip pass | `PASS` on the current cold-recovery smoke: HEIC, persisted Session open, cold Workspace/Provider restoration, real Agent Host roundtrip, and bounded active-prompt shutdown all passed; product exit 74.9ms and Playwright driver close 74.8ms |
 | Packaged artifact | formal exact-SHA Windows Candidate | cross-version dual-profile lifecycle passes | `PASS`: run `33248131097`, attempt 1, artifact `windows-candidate-33248131097-1`, exact source `973a0fe` |
 | Target OS/manual | operator testing on the target Windows laptop | remains separate from hosted Candidate evidence | pending |
@@ -209,6 +211,18 @@ protocol, Worker, R2, Feishu permission, or migration rollback is required.
   production transport, workflow governance, and all 614 coverage files with
   3200 tests passing and 3 skipped. Coverage remained 82.14% statements,
   76.23% branches, 85.94% functions, and 86.08% lines.
+- 2026-08-29: Exact-SHA CI `33251464479` passed Quality and macOS Native,
+  proving both the real-Pi fixture and corrected packaged cold recovery under
+  parallel CI load. Its only Renderer failure read the rename selection before
+  the component's scheduled animation-frame focus/selection effect; the test
+  now polls the unchanged `{ start: 0, end: 7 }` contract instead of sampling
+  it once after only the synchronous value precondition.
+- 2026-08-29: The rename synchronization passed 10/10 focused repeats on an
+  explicit repository-owned Vite port, plus its bootstrap prerequisite. The
+  complete current Renderer Chromium lane then passed 204/204 with two workers
+  and zero retries; the final TypeScript check also passed. An earlier local
+  attempt that reused the operator's unrelated `127.0.0.1:5173` page was
+  classified as `INVALID SAMPLE` and excluded from product evidence.
 
 ## Closeout
 

@@ -201,11 +201,10 @@ test("creates, renames, operates on, and trashes Workspace entries with an IME-s
   const renameDialog = page.getByRole("dialog", { name: "重命名“feature.ts”" });
   const renameInput = renameDialog.getByRole("textbox", { name: "文件名称" });
   await expect(renameInput).toHaveValue("feature.ts");
-  expect(await renameInput.evaluate((input) => {
+  await expect.poll(() => renameInput.evaluate((input) => {
     const field = input as HTMLInputElement;
     return { start: field.selectionStart, end: field.selectionEnd };
-  }))
-    .toEqual({ start: 0, end: 7 });
+  })).toEqual({ start: 0, end: 7 });
   await renameInput.fill("renamed.ts");
   await renameDialog.getByRole("button", { name: "重命名" }).click();
   featureRow = inspector.getByRole("treeitem", { name: "文件 renamed.ts 0 B", exact: true });
