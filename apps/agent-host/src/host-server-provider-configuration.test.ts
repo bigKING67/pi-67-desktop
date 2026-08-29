@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PiConfigurationService, PiConfigurationServiceRegistry } from "@pi67/pi-runtime";
 import {
   APP_PROTOCOL_CONTEXT,
   isEventEnvelope,
@@ -18,6 +19,11 @@ import { commandEnvelopeForContext } from "./protocol-test-fixtures.js";
 // This integration path creates and refreshes real Pi ModelRuntime instances.
 const HOST_RESPONSE_TIMEOUT_MS = 60_000;
 const PROVIDER_CONFIGURATION_TEST_TIMEOUT_MS = 120_000;
+// The product's four-second fail-closed budget has dedicated pi-runtime tests.
+// This Host routing integration refreshes multiple real Pi ModelRuntime
+// instances while the coverage suite is saturated, so keep its fixture budget
+// bounded below the Host response deadline without changing product defaults.
+const PROVIDER_VALIDATION_FIXTURE_TIMEOUT_MS = 30_000;
 const ENVIRONMENT_KEYS = [
   "PI_CODING_AGENT_DIR",
   "PI67_SESSION_CATALOG_DIR",
@@ -45,8 +51,14 @@ describe("AgentHostServer Provider configuration", () => {
   it("routes Pi file mutations without loading a Task and never returns write-only values", async () => {
     const fixture = await createFixture();
     const runtimeLoader = vi.fn(async () => { throw new Error("Task Runtime must not load."); });
+    const configurationServices = new ProviderConfigurationTestServiceRegistry(
+      new PiConfigurationService(fixture.agentDir, {
+        validationRuntimeWaitMs: PROVIDER_VALIDATION_FIXTURE_TIMEOUT_MS
+      })
+    );
     const server = new AgentHostServer(runtimeLoader, {
       agentDir: fixture.agentDir,
+      configurationServices,
       sdkVersionLoader: async () => "0.81.1"
     });
     const port = new FakePort();
@@ -224,6 +236,20 @@ describe("AgentHostServer Provider configuration", () => {
   }, PROVIDER_CONFIGURATION_TEST_TIMEOUT_MS);
 
 });
+
+class ProviderConfigurationTestServiceRegistry extends PiConfigurationServiceRegistry {
+  constructor(private readonly service: PiConfigurationService) {
+    super();
+  }
+
+  override acquire(): PiConfigurationService {
+    return this.service;
+  }
+
+  override dispose(): Promise<void> {
+    return this.service.dispose();
+  }
+}
 
 async function createFixture() {
   const root = await mkdtemp(join(tmpdir(), "pi67-host-provider-"));

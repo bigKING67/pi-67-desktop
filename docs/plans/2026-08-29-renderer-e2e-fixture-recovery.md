@@ -68,6 +68,7 @@ close request does not settle.
 | OBSERVED | Attempt 2 on the same `973a0fe` SHA again passed HEIC, then remained in the same smoke step for 104 seconds until manually cancelled to stop wasting CI resources; Runner cleanup again found packaged Main and Helper processes. | GitHub Actions log | 2026-08-29 |
 | OBSERVED | `measureElectronApplicationShutdown` awaited `application.close()` before applying its product-process budget, and the top-level cleanup repeated the same unbounded close. | live source and regression test | 2026-08-29 |
 | OBSERVED | The local host held 39 PPID-1 controlled-fixture processes with the exact repository artifact command `Pi-67 Desktop Helper -e setInterval(...)`; they were enumerated, terminated as test residue, and absence was verified without touching the active preview Main. | local process table | 2026-08-29 |
+| OBSERVED | Ordinary CI run `33250170670` at `98b9266` passed Renderer E2E and macOS Native smoke, including the formerly hanging packaged-smoke boundary. Its Quality job failed only because the real-`ModelRuntime` Host routing integration inherited the product's four-second Provider validation budget under parallel coverage load; the same test had failed once locally under full coverage and passed in 3.84 seconds when isolated. | GitHub Actions log and local coverage runs | 2026-08-29 |
 
 ## Affected boundaries
 
@@ -91,6 +92,7 @@ close request does not settle.
 | Add a 15-second Playwright close deadline separate from the existing 5-second product budget. | Driver teardown latency and product process exit are different evidence; neither may wait for the 35-minute Job deadline. | Playwright supplies a native bounded Electron close with equivalent diagnostics. |
 | Fail closed after the close deadline and terminate only the exact launched Main PID for cleanup. | Forced termination is cleanup evidence, never a successful product shutdown; exact PID targeting avoids unrelated apps. | The launched process is already absent, in which case no termination is requested. |
 | Set the owned application reference to `undefined` before a bounded close starts. | A failed close must not be retried indefinitely by the outer `finally`. | Cleanup becomes natively idempotent and bounded. |
+| Give only the real-`ModelRuntime` Host routing test a 30-second Provider validation budget through its injected configuration-service registry. | Product timeout behavior already has deterministic pi-runtime coverage; the routing integration's 60-second Host response and 120-second test deadlines show that its purpose is protocol behavior under real Pi initialization, not benchmarking the product's four-second startup guard while the full coverage suite saturates the runner. | The integration is replaced with a deterministic runtime fixture or Vitest gains a narrower isolated scheduling contract. |
 
 ## Checkpoints
 
@@ -102,16 +104,19 @@ close request does not settle.
 - [x] 6. Replace and verify the exact three Feishu candidate files.
 - [x] 7. Reproduce the independent macOS CI hang twice and stop the second run
   once repetition was proven.
-- [ ] 8. Commit and push bounded shutdown-harness diagnostics, then obtain a
+- [x] 8. Commit and push bounded shutdown-harness diagnostics, then obtain a
   terminal ordinary CI result without weakening product shutdown evidence.
-- [ ] 9. Decide whether a second exact-SHA Candidate and Feishu replacement are
+- [ ] 9. Stabilize the real-Pi Host routing integration under parallel coverage
+  without changing the product Provider validation budget, then obtain a green
+  exact-SHA ordinary CI run.
+- [ ] 10. Decide whether a second exact-SHA Candidate and Feishu replacement are
   required for the test-harness-only follow-up commit.
 
 ## Validation matrix
 
 | Layer | Command or procedure | Required evidence | Result |
 | --- | --- | --- | --- |
-| Source | scoped diff, `git diff --check`, affected typecheck, aggregate check | only plan and test-fixture paths; all source gates pass | `PASS`: diff check, tests TypeScript, lint, architecture, structure governance, and all remaining aggregate checks passed; the first coverage run had one unrelated Provider startup-budget failure, its exact isolated rerun passed, and the second complete coverage run passed 614/614 files with 3200 tests passing and 3 skipped |
+| Source | scoped diff, `git diff --check`, affected typecheck, aggregate check | only plan and test-fixture paths; all source gates pass | `PASS`: after the bounded Host fixture-budget change, `corepack pnpm run check` passed protocol revision, TypeScript, type-aware lint, architecture, dead-code, reference, structure, transport, workflow, and coverage gates; 614/614 files passed with 3200 tests passing and 3 skipped |
 | Tests | focused cases, then complete Renderer Chromium E2E with CI worker settings | no retries, page errors, or stale pending uploads | `PASS`: focused final-structure run passed 23/23; complete final-structure lane passed 204/204 with two workers and zero retries |
 | Runtime/host | exact macOS unsigned preview | packaged smoke and real Agent Host roundtrip pass | `PASS` at `973a0fe`; dirty-source harness rerun also passed with HEIC and every new stage marker, product exit 83.4ms, driver close 83.3ms, and zero controlled-child residue |
 | Packaged artifact | formal exact-SHA Windows Candidate | cross-version dual-profile lifecycle passes | `PASS`: run `33248131097`, attempt 1, artifact `windows-candidate-33248131097-1`, exact source `973a0fe` |
@@ -169,6 +174,17 @@ protocol, Worker, R2, Feishu permission, or migration rollback is required.
   one unrelated Agent Host offline Provider startup-budget failure. Its exact
   isolated rerun passed, and the second complete coverage run passed 614/614
   files with 3200 tests passing, 3 skipped, and unchanged coverage thresholds.
+- 2026-08-29: Exact-SHA ordinary CI run `33250170670` proved the bounded macOS
+  shutdown harness by passing Native smoke in 5m21s and also passed Renderer
+  E2E. Windows Native smoke also passed in 12m20s, including packaged runtime,
+  synthetic scale/IME, and NSIS lifecycle. The run ended red only because
+  Quality reproduced the same Host Provider integration failure under parallel
+  coverage; the fixture now injects a bounded 30-second real-Pi validation
+  budget while leaving the product's four-second default untouched.
+- 2026-08-29: The adjusted Host routing integration passed alone in 4.28s, then
+  the complete aggregate gate passed 614/614 files with 3200 tests passing and
+  3 skipped. Coverage remained 82.14% statements, 76.23% branches, 85.94%
+  functions, and 86.08% lines; all non-test source gates passed as well.
 
 ## Closeout
 
