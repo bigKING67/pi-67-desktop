@@ -9,6 +9,10 @@ import {
 } from "./preview-candidate-source.mjs";
 
 const temporaryDirectories = [];
+// Each fixture performs an isolated Git init plus two commits. Coverage runs
+// execute hundreds of suites concurrently, so use an integration-test bound
+// instead of Vitest's generic 5-second unit-test default.
+const GIT_FIXTURE_TEST_TIMEOUT_MS = 15_000;
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
@@ -27,7 +31,7 @@ describe("preview candidate source", () => {
       tag: "v0.1.0-alpha.10",
       version: "0.1.0-alpha.10"
     });
-  });
+  }, GIT_FIXTURE_TEST_TIMEOUT_MS);
 
   it("rejects a mismatched or non-canonical source", async () => {
     const fixture = await gitFixture();
@@ -39,7 +43,7 @@ describe("preview candidate source", () => {
       root: fixture.root,
       sourceCommit: "main"
     })).rejects.toThrow("full lowercase Git commit SHA");
-  });
+  }, GIT_FIXTURE_TEST_TIMEOUT_MS);
 
   it("allows clean main release tooling to publish an exact ancestor candidate", async () => {
     const fixture = await gitFixture();
@@ -54,7 +58,7 @@ describe("preview candidate source", () => {
       sourceCommit: fixture.candidate,
       version: "0.1.0-alpha.10"
     });
-  }, 15_000);
+  }, GIT_FIXTURE_TEST_TIMEOUT_MS);
 
   it("rejects release tooling that is not the current origin/main authority", async () => {
     const fixture = await gitFixture();
@@ -62,7 +66,7 @@ describe("preview candidate source", () => {
       root: fixture.root,
       sourceCommit: fixture.candidate
     })).rejects.toThrow("does not match origin/main");
-  });
+  }, GIT_FIXTURE_TEST_TIMEOUT_MS);
 });
 
 async function gitFixture() {

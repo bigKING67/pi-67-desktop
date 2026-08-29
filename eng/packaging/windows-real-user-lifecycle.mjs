@@ -33,6 +33,10 @@ import {
   waitForCatalogState
 } from "./windows-real-user-catalog-state.mjs";
 import { inspectRealUserSessionCatalogDiscovery } from "./windows-real-user-catalog-discovery.mjs";
+import {
+  inspectRealUserRuntimeSurface,
+  realUserLifecycleFailureKind
+} from "./windows-real-user-failure-diagnostics.mjs";
 import { inspectRealUserSessionFile } from "./windows-real-user-session-creation.mjs";
 import { resolveRealUserWorkspaceAuthority } from "./windows-real-user-workspace-authority.mjs";
 export { canonicalContainedSessionPath } from "./windows-real-user-conversation.mjs";
@@ -43,6 +47,7 @@ import {
 } from "./windows-real-user-initialization.mjs";
 
 export { REAL_USER_PROVIDER_TIMEOUT_MS } from "./windows-real-user-provider-configuration.mjs";
+export { inspectRealUserRuntimeSurface } from "./windows-real-user-failure-diagnostics.mjs";
 export { activateCatalogSession } from "./windows-real-user-catalog-activation.mjs";
 export {
   assertModelRuntimeInitialization,
@@ -146,6 +151,8 @@ async function runRealUserLaunch({
   workspace
 }) {
   let application;
+  let failureWindow;
+  let processOutput = () => "";
   try {
     const launchStartedAt = performance.now();
     application = await launchPackagedApplication({
@@ -161,9 +168,10 @@ async function runRealUserLaunch({
         process.env.PI_CODING_AGENT_DIR = driftAgentDir;
       }, environmentDriftAgentDir);
     }
-    const processOutput = captureProcessOutput(application.process());
+    processOutput = captureProcessOutput(application.process());
     const mainPid = application.process().pid;
     const window = await application.firstWindow();
+    failureWindow = window;
     await window.waitForLoadState("domcontentloaded");
     if (window.url() !== "app://pi67/index.html") {
       throw new Error(`Windows real-user renderer did not use app://pi67: ${window.url()}.`);
@@ -304,6 +312,18 @@ async function runRealUserLaunch({
       sessionPath,
       workspaceCwd
     };
+  } catch (error) {
+    const diagnostic = {
+      failure: realUserLifecycleFailureKind(error),
+      initialization: parseInitializationObservations(processOutput()),
+      lane,
+      launchIndex,
+      surface: failureWindow
+        ? await inspectRealUserRuntimeSurface(failureWindow, systemPath.dirname(agentDir))
+          .catch(() => ({ available: false }))
+        : { available: false }
+    };
+    throw new Error(`Windows real-user launch failed. Diagnostics: ${JSON.stringify(diagnostic)}`);
   } finally {
     if (application) await application.close();
   }
@@ -359,36 +379,6 @@ export async function waitForRealUserRuntimeReady(
   }, remainingTimeout(startedAt, timeoutMs),
   "Windows real-user Pi Runtime did not become ready for the activated Catalog Session");
   return performance.now() - startedAt;
-}
-
-export async function inspectRealUserRuntimeSurface(window, privateRoot) {
-  const observation = await window.evaluate(() => {
-    const bodyText = document.body.innerText;
-    const runtimeStatus = document.querySelector('[aria-label^="当前状态："]');
-    const errorNotifications = [...document.querySelectorAll('[aria-label="通知"] [role="alert"]')];
-    return {
-      acknowledgementTimedOut: bodyText.includes("Agent request acknowledgement timed out"),
-      errorNotificationCount: errorNotifications.length,
-      errorNotificationMessages: errorNotifications.slice(0, 3).map((notification) => (
-        notification.textContent?.trim().slice(0, 500) ?? ""
-      )),
-      errorNotificationTitles: errorNotifications.slice(0, 3).map((notification) => (
-        notification.querySelector("strong")?.textContent?.trim().slice(0, 160) ?? null
-      )),
-      providerConfigurationFailed: bodyText.includes("无法读取 Pi Provider 配置"),
-      runtimePhase: runtimeStatus?.getAttribute("data-runtime-phase") ?? null,
-      runtimeStatus: runtimeStatus?.getAttribute("aria-label")?.slice(0, 160) ?? null,
-      workspaceOpenFailed: bodyText.includes("无法打开工作区")
-    };
-  });
-  const sanitize = (value) => typeof value === "string"
-    ? value.replaceAll(privateRoot, "<temporary-root>")
-    : value;
-  return {
-    ...observation,
-    errorNotificationMessages: observation.errorNotificationMessages.map(sanitize),
-    runtimeStatus: sanitize(observation.runtimeStatus)
-  };
 }
 
 export async function waitForHealthyWorkbenchConvergence(

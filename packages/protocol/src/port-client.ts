@@ -53,7 +53,7 @@ import {
 export type { AgentConnectionIdentity, SequenceGap } from "./port-client-connection.js";
 export type { ProtocolPort } from "./port-client-state.js";
 
-export { CONTROL_MUTATION_ACK_TIMEOUT_MS } from "./port-request-timeout.js";
+export { CONTROL_MUTATION_ACK_TIMEOUT_MS, OPERATION_ABORT_ACK_TIMEOUT_MS } from "./port-request-timeout.js";
 
 export interface AgentPortClientOptions {
   rendererInstanceId?: string;
