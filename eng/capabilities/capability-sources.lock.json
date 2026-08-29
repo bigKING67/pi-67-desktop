@@ -1,6 +1,6 @@
 {
   "schema": "pi67.capability-sources-lock.v1",
-  "catalogVersion": "2026.08.28.2",
+  "catalogVersion": "2026.08.29.2",
   "sources": [
     {
       "id": "pi67-core",
@@ -8,7 +8,7 @@
       "origin": "first-party",
       "repository": "https://github.com/bigKING67/pi-67.git",
       "ref": "refs/heads/main",
-      "commit": "500f3f63a14d80b0297a1dcc04237b5e2cf87894",
+      "commit": "56c13da329b1d4dddc87c4d1655375156baa08e7",
       "localSibling": "../pi-67",
       "version": "0.15.8",
       "includedExtensions": [
@@ -55,95 +55,95 @@
       "adapterSourceId": "pi67-core",
       "repository": "https://github.com/xbtlin/ai-berkshire",
       "ref": "refs/heads/main",
-      "commit": "76aa42feddbb6246d5d665d99c3b6b4034b20eaf",
+      "commit": "58d09b1c825f3531ae3eace7d1216560511520b2",
       "localSibling": "../ai-berkshire",
-      "version": "1.0.7",
-      "manifestSha256": "20fe513801285771c69a8015a17d3cc3c77f542faf479763a67e74135fb40880",
-      "bundleSha256": "a1bd34ca867dd33e3dda1591cb0860b65c7cdbf35b1a47f5900dd0d5dfe29354",
+      "version": "1.0.8",
+      "manifestSha256": "6aa2ad206d352090bc08b978749e76dd79ac85b48a5a6c7c0f2feea5e64f1819",
+      "bundleSha256": "f8c16b9d8dc1837bbcb6661358b64d268821d7503df9e8cd7968386cf8749701",
       "skills": [
         {
           "name": "bottleneck-hunter",
-          "sha256": "4c2330c3abf45a7a758d4be40d59cb842dd42b07cbacbdd17ef77f7c8d09c201"
+          "sha256": "dd325931d470f37e5380dcd7a714c11a2472727eccb479d8e39fd6526747166b"
         },
         {
           "name": "deep-company-series",
-          "sha256": "49902e885411a06713fd3fd18cde65b39c748b6a28f97c1870c7031efea2eecc"
+          "sha256": "dce02333f0968cfb5de2d03455d49ce60e9e9f39229edc1acb61c1a4be81318a"
         },
         {
           "name": "dyp-ask",
-          "sha256": "4ab5c6cfa61fb75a91bd8559c7516f47f12668938db5a82c622e0c8c538f5b50"
+          "sha256": "9b934efa2e95b27cd4a786826f01c9eefc8ab01e841bc524c221d9f65cf4f727"
         },
         {
           "name": "earnings-review",
-          "sha256": "11cdb97b412dd05c98953755d0c121fbdb3bf491fe405cad20139371fbb85a74"
+          "sha256": "81de2dd41742f947bcd3f2bf2b06d4a039ea94aacb7792f4a6fa4fc0136b6c7c"
         },
         {
           "name": "earnings-team",
-          "sha256": "b8bfda407f4be79698fc2002a585d0427a1c4691ba5d330f6674312e7ae0d114"
+          "sha256": "87e1c13c7463f770bef79b1f0e426ae65dd048e4ed4858bc359a34e95d9b10b4"
         },
         {
           "name": "financial-data",
-          "sha256": "e6515bb0676ee502327f8d69f10f59e9a1a24500a6065408411e82d9597bb29e"
+          "sha256": "8696ee6fb2eef753d5ac5ae901a399cba835e941772ff7bdb34c2176ee8bdeef"
         },
         {
           "name": "income-investment",
-          "sha256": "459ce4b830fd1f5ae2bba66a55941fdd2a36126d317089c82412af3a7919146d"
+          "sha256": "226b295963f4c5595e593829f8734b875a7f58f1612c86b11cc4aa6345891782"
         },
         {
           "name": "industry-funnel",
-          "sha256": "965c17202cb0bc7af34b2896989ef8dfe183ca96b038b6fd05f8f25230c590d8"
+          "sha256": "a53c59ecc8c0cc77c870a0cb01abe090f3dc657cc6f42800075ed71101239c88"
         },
         {
           "name": "industry-research",
-          "sha256": "179c74d988503dcf2cd1b08596ed17fc6b52a3d4893a5f9c61492e9c93ac9ecb"
+          "sha256": "d69070435554dd20dbefb31e5b843c69a8a3ddb49835fe09c1a7e4ef208009f4"
         },
         {
           "name": "investment-checklist",
-          "sha256": "4b52bcb816ede47cdf2d1decfd82f3bb8114acc548d47370c498c0636ddf2db2"
+          "sha256": "6ff0ad2b8bc61261ffbdf76b0257ae3724220dc81e6841702e6dea1e9dd5740b"
         },
         {
           "name": "investment-memo-craft",
-          "sha256": "09dfbfdeb5d4b469c5e7bae2d16f7edcaf324a0a029427ae95cf55237aedafc3"
+          "sha256": "4f5ead1c58857a5c7784bb7d2fa8cd359a5cad016c2f2c1b945cd5ea615ad977"
         },
         {
           "name": "investment-research",
-          "sha256": "0cd14e4a72d7d770cfa6e794ca93392062d935c72df6cb51ead9ec58252542c9"
+          "sha256": "9c04072080d5d98468bcee922db5d84229ef887efae01fcbd924fc08db8a74ee"
         },
         {
           "name": "investment-team",
-          "sha256": "3d7e672d832e184913be019424f266175c01e7fd49a9393415b211bca3a6bd8b"
+          "sha256": "d8fcf206d5c71b52eed7e22ef0d8148e15d03526c547f14fbc34341bd07e029a"
         },
         {
           "name": "management-deep-dive",
-          "sha256": "1c508507ded2bc2e6853f998252115ccefdff91787d5b6d8a4da792b9720887a"
+          "sha256": "af6e9488d9f95715d2bb3759b237c0c8b49b69b2b787a6a0d57e67f85005384e"
         },
         {
           "name": "news-pulse",
-          "sha256": "4f27e956e9f2a1ddaab4f6a36bd25e2e01756075b70d4de1997f11fe96862cf4"
+          "sha256": "bc06aaa77bd0c75ecce9304eb9f36797cf167d64d51a798f4a837c5d0e50f307"
         },
         {
           "name": "portfolio-review",
-          "sha256": "b6ef1759f2decfe08912132a06f379ba20b308c9b114ca395cb071473793e80a"
+          "sha256": "5698a2a5c165cd7416141d379dc07c7624d8a6cb2710a55af2eb5d91b51f8d84"
         },
         {
           "name": "private-company-research",
-          "sha256": "18f5d6d744b4d037aee89364b2b6d8add3a3342449d51ecb3709eced76ea0a4a"
+          "sha256": "b56a1eb8913f12fabf297f2af6e3c60bb4ffab159b71eaf75388940018b79dc3"
         },
         {
           "name": "quality-screen",
-          "sha256": "768642fe6c2214af77ec3f5db066f94e59998d9e6dd75f2cf9e8d84e237710c5"
+          "sha256": "d13eba551a4e0392bbcc5ad663f13603dd0220a4773cfd9d86e0240b6304e7c4"
         },
         {
           "name": "thesis-drift",
-          "sha256": "8503096c2340cac1df14450bdf5fee33c16634894bdc7070aefb1a1fe04d8094"
+          "sha256": "6e0b15af3abc8924b80698e3f2df837c517ef83a6b2932e5719b30c40763894c"
         },
         {
           "name": "thesis-tracker",
-          "sha256": "d48b83b7ea0885b8f4340fcd8dfc189d543882323a876f4bb51b14af010c7874"
+          "sha256": "cd343d43b7a8ff928aca8253cdf2d7480097648217319c5735f228ea82905269"
         },
         {
           "name": "wechat-article",
-          "sha256": "6018f556fa7affc160e1cdf027ee028e87e8fffc78418340956ec9d7abbc3abf"
+          "sha256": "93330bdbb4146de117bd83c43033848c8905294b554bf2b14f62e15ed79fb0f3"
         }
       ]
     }

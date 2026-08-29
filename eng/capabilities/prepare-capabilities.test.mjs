@@ -17,7 +17,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins four first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.08.28.2");
+    expect(lock.catalogVersion).toBe("2026.08.29.2");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi67-core",
       "browser67",
@@ -26,7 +26,7 @@ describe("Desktop first-party capability source lock", () => {
     ]);
     expect(lock.sources.every((source) => /^[0-9a-f]{40}$/u.test(source.commit))).toBe(true);
     expect(lock.sources.find((source) => source.id === "pi67-core")).toMatchObject({
-      commit: "500f3f63a14d80b0297a1dcc04237b5e2cf87894",
+      commit: "56c13da329b1d4dddc87c4d1655375156baa08e7",
       ref: "refs/heads/main",
       includedExtensions: [{
         id: "pi-rules-loader",
@@ -46,11 +46,11 @@ describe("Desktop first-party capability source lock", () => {
       adapterSourceId: "pi67-core",
       repository: "https://github.com/xbtlin/ai-berkshire",
       ref: "refs/heads/main",
-      commit: "76aa42feddbb6246d5d665d99c3b6b4034b20eaf",
+      commit: "58d09b1c825f3531ae3eace7d1216560511520b2",
       localSibling: "../ai-berkshire",
-      version: "1.0.7",
-      manifestSha256: "20fe513801285771c69a8015a17d3cc3c77f542faf479763a67e74135fb40880",
-      bundleSha256: "a1bd34ca867dd33e3dda1591cb0860b65c7cdbf35b1a47f5900dd0d5dfe29354"
+      version: "1.0.8",
+      manifestSha256: "6aa2ad206d352090bc08b978749e76dd79ac85b48a5a6c7c0f2feea5e64f1819",
+      bundleSha256: "f8c16b9d8dc1837bbcb6661358b64d268821d7503df9e8cd7968386cf8749701"
     });
     expect(lock.skillPacks[0].skills).toHaveLength(21);
     expect(lock.skillPacks[0].skills.map((skill) => skill.name)).toEqual([

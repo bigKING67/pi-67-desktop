@@ -46,17 +46,26 @@
 
 - `packages/domain` owns dependency-free policy and state machines.
 - `packages/protocol` owns validated cross-process commands and events.
+- `packages/extension-compat` owns declarative Extension Adapter manifests,
+  SemVer/provenance validation, and the immutable registry. It must not load or
+  execute Extension code, import the Pi SDK, or render UI.
 - `packages/pi-runtime` owns the `AgentRuntime` port, `PiSdkRuntime`, and the
   extension UI bridge.
 - `apps/agent-host` owns the utility-process command router and recovery state.
-- `apps/desktop` owns Electron Main, Preload, windows, updates, dialogs, and
-  process lifecycle.
+- `apps/desktop` owns Electron Main, Preload, Repository/Worktree/Git policy,
+  durable Desktop state, windows, updates, dialogs, and process lifecycle.
 - `apps/renderer` owns React product UI and design-system implementation.
+- `eng/` owns development, quality, packaging, performance, capability
+  preparation, and release tooling. Generated evidence remains ignored output.
 - Do not create generic `utils`, `helpers`, `common`, `misc`, `temp`, `new`, or
   `final` directories. Shared code needs two real callers.
 
 ## Repository and worktree hygiene
 
+- This section governs developer/agent Git worktrees used to isolate changes to
+  this repository. It does not constrain or authorize Pi-67's user-facing
+  app-owned Repository/Worktree environments or their test fixtures; those
+  follow `docs/architecture/worktree-product-model.md`.
 - `/Users/gaoqian/Documents/sixseven/codeproject/pi-67-desktop` is the canonical
   local development checkout. Continue routine work directly in this root
   checkout; do not create another clone, repository, copied project directory,
@@ -143,6 +152,19 @@
   explicit current authorization. Distinct file tokens may upload in parallel;
   never write one file token concurrently. Do not remove the previous candidate
   until the replacement set is uploaded and verified, and cleanup is authorized.
+- An explicitly authorized unsigned in-app R2 update follows
+  `docs/release/internal-r2-update-distribution.md`. Feishu candidate success
+  does not authorize R2 artifact or manifest publication, retention deletion,
+  cache purge, withdrawal, promotion, Tag, or GitHub Release.
+
+## Validation routing
+
+- Start with affected-package typecheck/tests and the exact boundary gate.
+- `corepack pnpm run check` is the aggregate source-quality gate for cross-module,
+  high-risk, candidate/release, or unclear-impact changes; it is not packaged or
+  target-OS evidence.
+- Extension Adapter manifest, registry, or provenance changes additionally
+  require `corepack pnpm run verify:extension-adapters`.
 
 ## Design and quality
 
@@ -165,10 +187,12 @@
   `@narumitw/pi-plan-mode`, `pi-web-access`, or `pi-smart-fetch`; preserve existing
   user settings until an explicit uninstall. Renderer Plan implementation requests
   contain only `planId + submissionId`, never Plan Markdown.
-- `Groland` is one built-in mixed-protocol Provider with one credential. Keep its
-  five Claude models on Anthropic Messages and two GPT models on OpenAI Responses;
-  all seven support text, image, and reasoning. Native-search UI is a declaration,
-  not live verification, and a sent native request must never silently fall back.
+- `Groland` is one built-in mixed-protocol Provider with one credential. Keep
+  authoritative model membership and protocol mapping in `packages/domain`:
+  Claude-family members use Anthropic Messages and GPT-family members use OpenAI
+  Responses. All Groland members support text, image, and reasoning. Native-search
+  UI is a declaration, not live verification, and a sent native request must never
+  silently fall back.
 - Windows claims require real Windows evidence; macOS claims require real
   Apple Silicon evidence. Browser previews do not prove packaged Electron
   behavior.
