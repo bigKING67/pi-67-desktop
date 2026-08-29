@@ -20,6 +20,7 @@ test("keeps all five Inspector icon-label tabs equal, visible, and single-line",
   }
   await expect(inspectorToggle).toHaveAttribute("aria-expanded", "true");
   await expect(inspector).toBeVisible();
+  await expect(page.getByTestId("composer-region")).toBeVisible();
   const tabList = inspector.getByRole("tablist", { name: "任务检查器" });
   const tabs = tabList.getByRole("tab");
   await expect(tabs).toHaveCount(5);

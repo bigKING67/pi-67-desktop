@@ -1,5 +1,5 @@
 import type { FixtureAgentState, FixtureWindow } from "./pi67-renderer-fixture-types.js";
-import { pageMetadata } from "./pi67-renderer-command-page-fixture.js";
+import type { MockConversationCommandHandler } from "./pi67-renderer-command-page-fixture.js";
 import type { MockInspectorCommandHandler } from "./pi67-renderer-inspector-command-fixture.js";
 import type { MockSessionControlCommandHandler } from "./pi67-renderer-snapshot-fixture.js";
 import type { FixtureSessionCatalogStatus } from "./pi67-session-catalog-fixture.js";
@@ -28,6 +28,7 @@ export function installMockCommandResponseHandler({
 }: MockCommandResponseFixture): void {
   const testWindow = window as FixtureWindow & {
     __pi67ApplyMockSessionControlCommand: MockSessionControlCommandHandler;
+    __pi67ResolveMockConversationCommand: MockConversationCommandHandler;
     __pi67ResolveMockContextFileCommand: MockContextFileCommandHandler;
     __pi67ResolveMockInspectorCommand: MockInspectorCommandHandler;
     __pi67ResolveMockLarkCommand: MockLarkCommandHandler;
@@ -35,6 +36,7 @@ export function installMockCommandResponseHandler({
     __pi67ResolveMockCommand?: MockCommandResponseHandler;
   };
   const applyMockSessionControlCommand = testWindow.__pi67ApplyMockSessionControlCommand;
+  const resolveMockConversationCommand = testWindow.__pi67ResolveMockConversationCommand;
   const resolveMockContextFileCommand = testWindow.__pi67ResolveMockContextFileCommand;
   const resolveMockInspectorCommand = testWindow.__pi67ResolveMockInspectorCommand;
   const resolveMockLarkCommand = testWindow.__pi67ResolveMockLarkCommand;
@@ -136,8 +138,9 @@ export function installMockCommandResponseHandler({
       || type === "conversation.snooze"
       || type === "conversation.archive"
     ) return { revision: sessionCatalogPage.revision + 1 };
-    if (type === "message.search") return searchConversation(current, payload);
-    if (type === "message.locate") return locateConversationMessage(current, payload);
+    if (type === "message.search" || type === "message.locate" || type === "message.page") {
+      return resolveMockConversationCommand(type, payload, current);
+    }
     if (type === "session.catalog.contentSearch") return {
       workspaceId: current.workspaceId,
       query: typeof payload.query === "string" ? payload.query : "",
@@ -148,7 +151,6 @@ export function installMockCommandResponseHandler({
       incomplete: false,
       truncated: false
     };
-    if (type === "message.page") return conversationPage(current, payload);
     if (type === "session.tree") return current.snapshot.tree;
     if (type === "command.list") return fixtureExtensionCommands;
     if (type === "model.list") return [];
@@ -381,78 +383,6 @@ export function installMockCommandResponseHandler({
           : "当前使用随 Desktop 发布的不可变内置基线。"
     };
     return [lark, aiBerkshire];
-  }
-
-  function conversationPage(
-    current: FixtureAgentState,
-    payload: Record<string, unknown>
-  ): Record<string, unknown> {
-    const direction = payload.direction === "newer" ? "newer" : "older";
-    const limit = typeof payload.limit === "number" ? Math.min(200, Math.max(1, payload.limit)) : 100;
-    const cursor = typeof payload.cursor === "string" ? payload.cursor : undefined;
-    const cursorIndex = cursor === undefined
-      ? undefined
-      : current.conversationMessages.findIndex((message) => message.id === cursor);
-    const start = direction === "older"
-      ? Math.max(0, (cursorIndex ?? current.conversationMessages.length) - limit)
-      : cursorIndex === undefined ? 0 : cursorIndex + 1;
-    const end = direction === "older"
-      ? cursorIndex ?? current.conversationMessages.length
-      : Math.min(current.conversationMessages.length, start + limit);
-    const messages = current.conversationMessages.slice(start, end);
-    return {
-      sessionId: String(current.snapshot.sessionId),
-      messages,
-      ...pageMetadata(messages, start > 0, end < current.conversationMessages.length)
-    };
-  }
-
-  function searchConversation(
-    current: FixtureAgentState,
-    payload: Record<string, unknown>
-  ): Record<string, unknown> {
-    const query = typeof payload.query === "string" ? payload.query : "";
-    const normalizedQuery = query.toLocaleLowerCase();
-    const items = current.conversationMessages.flatMap((message) => {
-      if (message.role !== "user" && message.role !== "assistant") return [];
-      const text = message.parts
-        .filter((part) => part.type === "text" && typeof part.text === "string")
-        .map((part) => part.text)
-        .join("\n");
-      if (!text.toLocaleLowerCase().includes(normalizedQuery)) return [];
-      return [{
-        id: message.id,
-        role: message.role,
-        snippet: text.slice(0, 240),
-        ...(message.createdAt === undefined ? {} : { createdAt: message.createdAt })
-      }];
-    });
-    return {
-      sessionId: String(current.snapshot.sessionId),
-      revision: 1,
-      query,
-      total: items.length,
-      items,
-      truncated: false
-    };
-  }
-
-  function locateConversationMessage(
-    current: FixtureAgentState,
-    payload: Record<string, unknown>
-  ): Record<string, unknown> {
-    const anchorId = typeof payload.id === "string" ? payload.id : "";
-    const anchorIndex = current.conversationMessages.findIndex((message) => message.id === anchorId);
-    const start = Math.max(0, anchorIndex - 40);
-    const end = Math.min(current.conversationMessages.length, Math.max(anchorIndex + 41, start + 1));
-    const messages = current.conversationMessages.slice(start, end);
-    return {
-      sessionId: String(current.snapshot.sessionId),
-      revision: 1,
-      anchorId,
-      messages,
-      ...pageMetadata(messages, start > 0, end < current.conversationMessages.length)
-    };
   }
 
   testWindow.__pi67ResolveMockCommand = resolveMockCommand;

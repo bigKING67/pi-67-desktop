@@ -25,6 +25,7 @@ test("keeps support upload pending, receipt, failure, retry, and local fallback 
   await upload.click();
   await expect(upload).toBeDisabled();
   await expect(row).toContainText("正在收集 Main、Agent Host 与恢复状态并上传");
+  await expect.poll(() => uploadAttempts(page)).toBe(1);
   await finishPendingUpload(page);
 
   await expect(row).toContainText("PI67-A1B2C3D4E5F6");
