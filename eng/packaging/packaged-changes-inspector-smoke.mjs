@@ -6,7 +6,8 @@ export async function assertNoWorkspaceChangesAuthorityWarning(window) {
 
 export async function verifyPackagedChangesInspector(window, captureScreenshot) {
   let inspector = window.getByRole("complementary", { name: "任务检查器", exact: true });
-  if (!(await inspector.isVisible())) {
+  const restoreClosedState = !(await inspector.isVisible());
+  if (restoreClosedState) {
     await window.getByRole("button", { name: "显示任务检查器", exact: true }).click();
     inspector = window.getByRole("complementary", { name: "任务检查器", exact: true });
   }
@@ -19,4 +20,8 @@ export async function verifyPackagedChangesInspector(window, captureScreenshot) 
   await inspector.getByText("当前活动分支还没有 edit 或 write 修改记录。", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
   await captureScreenshot(window, "01-changes-empty.png");
+  if (restoreClosedState) {
+    await window.getByRole("button", { name: "隐藏任务检查器", exact: true }).click();
+    await inspector.waitFor({ state: "hidden", timeout: 15_000 });
+  }
 }
