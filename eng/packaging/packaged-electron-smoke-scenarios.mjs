@@ -153,7 +153,73 @@ export async function ensurePackagedNewSessionIntent(window, timeoutMs = 30_000)
   await intent.waitFor({ state: "visible", timeout: timeoutMs });
 }
 
-export async function verifyColdProviderRestoration(window) {
+export async function restorePackagedColdConversation({ packagedProcessOutput, window }) {
+  await window.getByRole("list", { name: "工作区与对话" }).waitFor({ state: "visible", timeout: 30_000 });
+  if (await window.getByLabel("当前状态：等待选择工作区").count()) {
+    throw new Error(`Packaged cold restart lost Workspace authority: ${JSON.stringify(await inspectRendererSurface(window))}`);
+  }
+  const conversation = window.getByLabel("Pi conversation");
+  const restoreTask = window.getByRole("button", { name: "恢复任务", exact: true });
+  const openConversation = window.getByRole("button", { name: "打开对话", exact: true });
+  const createConversation = window.getByRole("button", { name: "新建对话", exact: true });
+  try {
+    await conversation.or(restoreTask).or(openConversation).or(createConversation)
+      .waitFor({ state: "visible", timeout: 30_000 });
+  } catch (error) {
+    throw new Error(`Packaged Workspace did not restore after a cold restart: ${JSON.stringify(await inspectRendererSurface(window))}`, { cause: error });
+  }
+  await verifyColdProviderRestoration(window);
+  if (!(await conversation.isVisible())) {
+    if (await restoreTask.isVisible()) await restoreTask.click();
+    else if (await openConversation.isVisible()) await openConversation.click();
+    else if (await createConversation.isVisible()) {
+      await createFallbackSession({ packagedProcessOutput, window });
+    } else {
+      throw new Error(packagedColdFailure(
+        "Packaged cold restart exposed no exact recovery action",
+        await inspectRendererSurface(window),
+        packagedProcessOutput
+      ));
+    }
+  }
+  try {
+    await conversation.waitFor({ state: "visible", timeout: 30_000 });
+  } catch (error) {
+    throw new Error(packagedColdFailure(
+      "Packaged conversation did not activate after a cold restart",
+      await inspectRendererSurface(window),
+      packagedProcessOutput
+    ), { cause: error });
+  }
+}
+
+async function createFallbackSession({ packagedProcessOutput, window }) {
+  await window.getByRole("button", { name: "新建对话", exact: true }).click();
+  await window.getByRole("textbox", { name: "给 Pi 发送消息" })
+    .fill("Create the cold-start packaged smoke Session.");
+  await window.getByRole("button", { name: "发送", exact: true }).click();
+  try {
+    await window.locator(
+      '[data-testid="conversation-row"][aria-current="page"][data-conversation-id^="session:"]'
+    ).waitFor({ state: "visible", timeout: 30_000 });
+  } catch (error) {
+    throw new Error(packagedColdFailure(
+      "Packaged fallback Session did not materialize after a cold restart",
+      await inspectRendererSurface(window),
+      packagedProcessOutput
+    ), { cause: error });
+  }
+  const stop = window.getByRole("button", { name: "停止", exact: true });
+  await stop.waitFor({ state: "visible", timeout: 30_000 });
+  await stop.click();
+  await stop.waitFor({ state: "hidden", timeout: 30_000 });
+}
+
+function packagedColdFailure(message, surface, packagedProcessOutput) {
+  return `${message}: ${JSON.stringify(surface)}\n${packagedProcessOutput() || "No packaged process diagnostics were emitted."}`;
+}
+
+async function verifyColdProviderRestoration(window) {
   const settings = await openSettingsSection(window, "模型");
   const providerPanel = settings.getByTestId("provider-configuration-panel");
   const providerList = providerPanel.getByTestId("provider-configuration-list");
@@ -211,10 +277,14 @@ export async function runControlledShutdownScenario({
   await resetControlledShutdownLifecycle(lifecyclePath);
   // A prior controlled prompt can leave a dead PID in this shared probe file.
   await writeFile(childPidPath, "", "utf8");
+  const controlledMessages = window.getByLabel("Pi conversation")
+    .getByRole("article", { name: "用户消息", exact: true })
+    .filter({ hasText: CONTROLLED_PROMPT_TEXT });
+  const priorControlledMessageCount = await controlledMessages.count();
   await startControlledPrompt(window);
   await window.locator('[data-testid="conversation-row"][aria-current="page"]')
     .filter({ hasText: CONTROLLED_PROMPT_TEXT }).waitFor({ state: "visible", timeout: 10_000 });
-  await window.getByLabel("Pi conversation").getByText(CONTROLLED_PROMPT_TEXT, { exact: true })
+  await controlledMessages.nth(priorControlledMessageCount)
     .waitFor({ state: "visible", timeout: 10_000 });
   shutdownState.childPid = await readPositiveProcessId(childPidPath);
   if (!isProcessAlive(shutdownState.childPid)) {

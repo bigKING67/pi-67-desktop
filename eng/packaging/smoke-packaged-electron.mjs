@@ -15,9 +15,9 @@ import {
   captureWelcomeAndConnectAgentHost,
   inspectRendererSurface,
   openPackagedSmokeWorkspace,
+  restorePackagedColdConversation,
   runControlledShutdownScenario,
   waitForPersistedRuntimeRecovery,
-  verifyColdProviderRestoration,
   verifyPackagedWelcome,
   verifyPackagedPrivateGitWorktreeContract,
   verifyReadySessionCatalog
@@ -353,40 +353,7 @@ try {
   packagedProcessOutput = captureProcessOutput(application.process());
   window = await application.firstWindow();
   await window.waitForLoadState("domcontentloaded");
-  await window.getByRole("list", { name: "工作区与对话" }).waitFor({ state: "visible", timeout: 30_000 });
-  if (await window.getByLabel("当前状态：等待选择工作区").count()) {
-    throw new Error(`Packaged cold restart lost Workspace authority: ${JSON.stringify(await inspectRendererSurface(window))}`);
-  }
-  const coldConversation = window.getByLabel("Pi conversation");
-  const coldRestoreTask = window.getByRole("button", { name: "恢复任务", exact: true });
-  const coldOpenConversation = window.getByRole("button", { name: "打开对话", exact: true });
-  const coldCreateConversation = window.getByRole("button", { name: "新建对话", exact: true });
-  try {
-    await coldConversation.or(coldRestoreTask).or(coldOpenConversation).or(coldCreateConversation)
-      .waitFor({ state: "visible", timeout: 30_000 });
-  } catch (error) {
-    throw new Error(`Packaged Workspace did not restore after a cold restart: ${JSON.stringify(await inspectRendererSurface(window))}`, { cause: error });
-  }
-  await verifyColdProviderRestoration(window);
-  if (!(await coldConversation.isVisible())) {
-    if (await coldCreateConversation.isVisible()) await coldCreateConversation.click();
-    else await window.keyboard.press(process.platform === "darwin" ? "Meta+N" : "Control+N");
-    await window.getByRole("textbox", { name: "给 Pi 发送消息" })
-      .fill("Create the cold-start packaged smoke Session.");
-    await window.getByRole("button", { name: "发送", exact: true }).click();
-    await window.locator(
-      '[data-testid="conversation-row"][aria-current="page"][data-conversation-id^="session:"]'
-    ).waitFor({ state: "visible", timeout: 30_000 });
-    const coldStop = window.getByRole("button", { name: "停止", exact: true });
-    await coldStop.waitFor({ state: "visible", timeout: 30_000 });
-    await coldStop.click();
-    await coldStop.waitFor({ state: "hidden", timeout: 30_000 });
-  }
-  try {
-    await coldConversation.waitFor({ state: "visible", timeout: 30_000 });
-  } catch (error) {
-    throw new Error(`Packaged conversation did not activate after a cold restart: ${JSON.stringify(await inspectRendererSurface(window))}\n${packagedProcessOutput() || "No packaged process diagnostics were emitted."}`, { cause: error });
-  }
+  await restorePackagedColdConversation({ packagedProcessOutput, window });
   await window.locator('[data-runtime-phase="ready"]').waitFor({ state: "visible", timeout: 30_000 });
 
   console.info("Packaged smoke stage: cold restart restored; starting controlled shutdown.");

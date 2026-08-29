@@ -69,6 +69,7 @@ close request does not settle.
 | OBSERVED | `measureElectronApplicationShutdown` awaited `application.close()` before applying its product-process budget, and the top-level cleanup repeated the same unbounded close. | live source and regression test | 2026-08-29 |
 | OBSERVED | The local host held 39 PPID-1 controlled-fixture processes with the exact repository artifact command `Pi-67 Desktop Helper -e setInterval(...)`; they were enumerated, terminated as test residue, and absence was verified without touching the active preview Main. | local process table | 2026-08-29 |
 | OBSERVED | Ordinary CI run `33250170670` at `98b9266` passed Renderer E2E and macOS Native smoke, including the formerly hanging packaged-smoke boundary. Its Quality job failed only because the real-`ModelRuntime` Host routing integration inherited the product's four-second Provider validation budget under parallel coverage load; the same test had failed once locally under full coverage and passed in 3.84 seconds when isolated. | GitHub Actions log and local coverage runs | 2026-08-29 |
+| OBSERVED | Ordinary CI run `33250692871` at `66b5fc4` passed Quality and Renderer E2E, proving the real-Pi fixture budget under parallel coverage. macOS Native then failed in bounded time because the cold-restart smoke ignored its visible `打开对话` action, used the global new-conversation shortcut, and timed out waiting for an unnecessary fallback Session to materialize; the real Electron restart test independently defines `打开对话` as the required stopped-Session transition. | GitHub Actions log, live smoke source, and `tests/e2e/electron.spec.ts` | 2026-08-29 |
 
 ## Affected boundaries
 
@@ -93,6 +94,7 @@ close request does not settle.
 | Fail closed after the close deadline and terminate only the exact launched Main PID for cleanup. | Forced termination is cleanup evidence, never a successful product shutdown; exact PID targeting avoids unrelated apps. | The launched process is already absent, in which case no termination is requested. |
 | Set the owned application reference to `undefined` before a bounded close starts. | A failed close must not be retried indefinitely by the outer `finally`. | Cleanup becomes natively idempotent and bounded. |
 | Give only the real-`ModelRuntime` Host routing test a 30-second Provider validation budget through its injected configuration-service registry. | Product timeout behavior already has deterministic pi-runtime coverage; the routing integration's 60-second Host response and 120-second test deadlines show that its purpose is protocol behavior under real Pi initialization, not benchmarking the product's four-second startup guard while the full coverage suite saturates the runner. | The integration is replaced with a deterministic runtime fixture or Vitest gains a narrower isolated scheduling contract. |
+| On packaged cold restart, follow the exact visible recovery action before considering a new Session. | `恢复任务` and `打开对话` preserve the persisted task/Session authority already proven before restart; sending a second first message through a keyboard shortcut tests a different flow and creates an avoidable Provider race. | The product contract makes cold restart intentionally discard the selected persisted task/Session. |
 
 ## Checkpoints
 
@@ -118,7 +120,7 @@ close request does not settle.
 | --- | --- | --- | --- |
 | Source | scoped diff, `git diff --check`, affected typecheck, aggregate check | only plan and test-fixture paths; all source gates pass | `PASS`: after the bounded Host fixture-budget change, `corepack pnpm run check` passed protocol revision, TypeScript, type-aware lint, architecture, dead-code, reference, structure, transport, workflow, and coverage gates; 614/614 files passed with 3200 tests passing and 3 skipped |
 | Tests | focused cases, then complete Renderer Chromium E2E with CI worker settings | no retries, page errors, or stale pending uploads | `PASS`: focused final-structure run passed 23/23; complete final-structure lane passed 204/204 with two workers and zero retries |
-| Runtime/host | exact macOS unsigned preview | packaged smoke and real Agent Host roundtrip pass | `PASS` at `973a0fe`; dirty-source harness rerun also passed with HEIC and every new stage marker, product exit 83.4ms, driver close 83.3ms, and zero controlled-child residue |
+| Runtime/host | exact macOS unsigned preview | packaged smoke and real Agent Host roundtrip pass | `PASS` on the current cold-recovery smoke: HEIC, persisted Session open, cold Workspace/Provider restoration, real Agent Host roundtrip, and bounded active-prompt shutdown all passed; product exit 74.9ms and Playwright driver close 74.8ms |
 | Packaged artifact | formal exact-SHA Windows Candidate | cross-version dual-profile lifecycle passes | `PASS`: run `33248131097`, attempt 1, artifact `windows-candidate-33248131097-1`, exact source `973a0fe` |
 | Target OS/manual | operator testing on the target Windows laptop | remains separate from hosted Candidate evidence | pending |
 
@@ -185,6 +187,28 @@ protocol, Worker, R2, Feishu permission, or migration rollback is required.
   the complete aggregate gate passed 614/614 files with 3200 tests passing and
   3 skipped. Coverage remained 82.14% statements, 76.23% branches, 85.94%
   functions, and 86.08% lines; all non-test source gates passed as well.
+- 2026-08-29: Exact-SHA CI `33250692871` passed Quality in 3m30s and Renderer
+  E2E in 7m01s. Its bounded macOS packaged smoke then exposed a separate cold-
+  restart routing defect in the smoke itself: although the stopped Session
+  presented `打开对话`, the harness ignored it and used `Meta+N`, then timed out
+  waiting for an unnecessary replacement Session. The smoke now prioritizes
+  `恢复任务` and `打开对话`, accepts new Session creation only when that exact UI
+  action is visible, and emits renderer/process diagnostics for ambiguous or
+  failed fallback state.
+- 2026-08-29: The first local preview with exact recovery passed the original
+  cold-restart boundary and exposed a strict selector matching both historical
+  and newly submitted controlled prompts in the restored transcript. The final
+  assertion records the prior exact-message count and waits for the newly added
+  user-message article. A complete unsigned macOS preview then passed HEIC,
+  warm reload, cold recovery, real Agent Host interaction, and bounded shutdown
+  with 74.9ms product exit and 74.8ms driver close, and opened the repository
+  artifact with `app.asar` SHA-256
+  `a0d39c0e93db6592e258715de3b3ccc8702f4137aa57a4862a34723a08ec7804`.
+- 2026-08-29: The final aggregate source gate passed protocol revision,
+  typecheck, type-aware lint, architecture, dead-code, references, structure,
+  production transport, workflow governance, and all 614 coverage files with
+  3200 tests passing and 3 skipped. Coverage remained 82.14% statements,
+  76.23% branches, 85.94% functions, and 86.08% lines.
 
 ## Closeout
 
