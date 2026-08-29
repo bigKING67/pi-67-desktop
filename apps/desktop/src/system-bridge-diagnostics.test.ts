@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (...arguments_: unknown[]) => unknown>(),
   ipcHandle: vi.fn(),
+  netFetch: vi.fn(),
   showSaveDialog: vi.fn(),
   writeFile: vi.fn()
 }));
@@ -25,7 +26,7 @@ vi.mock("electron", () => ({
   },
   ipcMain: { handle: mocks.ipcHandle },
   Menu: { buildFromTemplate: vi.fn() },
-  net: { fetch: vi.fn() },
+  net: { fetch: mocks.netFetch },
   Notification: class {},
   shell: {
     openExternal: vi.fn(),
@@ -51,6 +52,7 @@ describe("system bridge recovery diagnostics", () => {
     });
     mocks.showSaveDialog.mockReset();
     mocks.showSaveDialog.mockResolvedValue({ canceled: false, filePath: "/tmp/pi67-diagnostics.json" });
+    mocks.netFetch.mockReset();
     mocks.writeFile.mockReset();
     mocks.writeFile.mockResolvedValue(undefined);
   });
@@ -129,6 +131,40 @@ describe("system bridge recovery diagnostics", () => {
     expect(document).not.toHaveProperty("runtime");
   });
 
+  it("uploads the same fixed Main-owned document and returns a verified receipt", async () => {
+    registerFixture();
+    mocks.netFetch.mockImplementation(async (_url: string, init: RequestInit) => {
+      if (typeof init.body !== "string") throw new Error("Expected a string request body.");
+      const body = init.body;
+      const submission = JSON.parse(body) as {
+        reportId: string;
+        diagnosticsSha256: string;
+        diagnostics: unknown;
+      };
+      const serializedDiagnostics = `${JSON.stringify(submission.diagnostics, null, 2)}\n`;
+      expect(submission.diagnosticsSha256).toBe(
+        createHash("sha256").update(serializedDiagnostics).digest("hex")
+      );
+      return new Response(JSON.stringify({
+        schema: "pi67-support-receipt.v1",
+        reportId: submission.reportId,
+        receivedAt: 2,
+        sizeBytes: Buffer.byteLength(body, "utf8"),
+        sha256: submission.diagnosticsSha256
+      }), { status: 201 });
+    });
+
+    await expect(invoke("pi67:upload-diagnostics", {
+      runtimeCollection: { status: "available" },
+      runtime: runtimeDiagnostics,
+      renderer: rendererDiagnostics
+    })).resolves.toMatchObject({
+      schema: "pi67-support-receipt.v1",
+      reportId: expect.stringMatching(/^PI67-[A-F0-9]{12}$/u)
+    });
+    expect(mocks.netFetch).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects Renderer-supplied raw paths before opening the save dialog", async () => {
     registerFixture();
 
@@ -143,6 +179,15 @@ describe("system bridge recovery diagnostics", () => {
 
     expect(mocks.showSaveDialog).not.toHaveBeenCalled();
     expect(mocks.writeFile).not.toHaveBeenCalled();
+    await expect(invoke("pi67:upload-diagnostics", {
+      runtimeCollection: { status: "available" },
+      runtime: {
+        ...runtimeDiagnostics,
+        cwd: "/private/workspace"
+      },
+      renderer: rendererDiagnostics
+    })).rejects.toThrow("Invalid diagnostic payload.");
+    expect(mocks.netFetch).not.toHaveBeenCalled();
   });
 });
 

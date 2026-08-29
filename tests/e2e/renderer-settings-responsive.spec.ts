@@ -146,7 +146,7 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
     window as unknown as { __pi67UpdateTest: { checks: number } }
   ).__pi67UpdateTest.checks)).toBe(1);
   await updateDialog.getByRole("button", { name: "稍后处理", exact: true }).click();
-  await expect(page.getByRole("button", { name: /^导出脱敏诊断/u })).toBeVisible();
+  await expect(page.getByRole("button", { name: "上传脱敏诊断", exact: true })).toBeVisible();
   await expect(page.getByRole("tablist", { name: "已打开的任务" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "显示对话导航" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "返回工作台" })).toBeVisible();

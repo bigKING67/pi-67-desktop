@@ -13,6 +13,7 @@
   "dependencies": {
     "@napi-rs/canvas": "1.0.3",
     "@pi67/protocol": "workspace:*",
+    "@pi67/support-contract": "workspace:*",
     "heic-decode": "2.1.0",
     "semver": "7.7.4"
   },

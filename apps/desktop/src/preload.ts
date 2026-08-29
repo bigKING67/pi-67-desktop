@@ -29,6 +29,7 @@ import type {
   RepositoryWorkingTreeSnapshot,
   SecureStorageAccess,
   SupportDiagnosticsExportRequest,
+  SupportDiagnosticsUploadReceipt,
   StagedPromptAttachmentResult,
   WorktreeCreationRequest,
   WorktreeCreationAdvanceRequest,
@@ -45,6 +46,7 @@ import type {
   WorkspaceFilePersistedState,
   WorkspaceFileStateSnapshot
 } from "@pi67/protocol";
+import { isSupportDiagnosticsUploadReceipt } from "@pi67/support-contract";
 import {
   isRepositoryChangeDetail,
   isRepositoryEnvironmentSnapshot,
@@ -238,6 +240,15 @@ const systemBridge = {
   selectWorkspace: (): Promise<string | undefined> => ipcRenderer.invoke("pi67:select-workspace"),
   selectSessionFile: (): Promise<string | undefined> => ipcRenderer.invoke("pi67:select-session-file"),
   getRecoverySnapshot: (): Promise<DesktopRecoverySnapshot> => ipcRenderer.invoke("pi67:recovery-snapshot"),
+  uploadDiagnostics: async (
+    request: SupportDiagnosticsExportRequest
+  ): Promise<SupportDiagnosticsUploadReceipt> => {
+    const value = await ipcRenderer.invoke("pi67:upload-diagnostics", request) as unknown;
+    if (!isSupportDiagnosticsUploadReceipt(value)) {
+      throw new Error("Support diagnostics upload response is invalid.");
+    }
+    return value;
+  },
   saveDiagnostics: (request: SupportDiagnosticsExportRequest): Promise<string | undefined> => (
     ipcRenderer.invoke("pi67:save-diagnostics", request)
   ),

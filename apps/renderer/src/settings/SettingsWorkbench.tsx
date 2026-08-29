@@ -2,7 +2,6 @@ import type { SettingsSection } from "@pi67/domain";
 import {
   ArrowLeft,
   DownloadCloud,
-  FileDown,
   Monitor,
   Moon,
   Search,
@@ -16,7 +15,6 @@ import {
   Input,
   SearchField
 } from "react-aria-components";
-import { saveRuntimeDiagnostics } from "../doctor/runtime-diagnostics-controller.js";
 import { useShellStore } from "../shell/shell-store.js";
 import type { UpdateState } from "../updates/update-state.js";
 import { checkForUpdatesNow, useUpdateStore } from "../updates/update-store.js";
@@ -38,6 +36,7 @@ import { RuleSettingsWorkspace } from "./RuleSettingsWorkspace.js";
 import { SessionResourcePanel } from "./SessionResourcePanel.js";
 import { SkillSettingsWorkspace } from "./SkillSettingsWorkspace.js";
 import { SettingsDiscardDialog } from "./SettingsActionDialogs.js";
+import { SupportDiagnosticsUploadRow } from "./SupportDiagnosticsUploadRow.js";
 import { SettingsCategoryNavigation } from "./SettingsCategoryNavigation.js";
 import {
   SettingsDraftGuardContext,
@@ -367,7 +366,7 @@ function UpdateSettings() {
     }
   };
   return (
-    <SettingsSectionBlock title="更新与诊断" description="更新检查不携带工作区、会话、模型服务或凭据信息；诊断导出默认脱敏。">
+    <SettingsSectionBlock title="更新与诊断" description="更新检查不携带工作区、会话、模型服务或凭据信息；诊断仅在你点击后脱敏上传。">
       <SettingsRows>
         <SettingsRow
           leading={<DownloadCloud aria-hidden="true" size={17} />}
@@ -399,12 +398,7 @@ function UpdateSettings() {
                   : "立即检查"}
           </Button>}
         />
-        <SettingsRow
-          leading={<FileDown aria-hidden="true" size={17} />}
-          title="导出脱敏诊断"
-          description="不包含提示词、源码正文、凭据或原始工具载荷。"
-          actions={<Button aria-label="导出脱敏诊断" className="secondary-button" onPress={() => void saveRuntimeDiagnostics()}>导出</Button>}
-        />
+        <SupportDiagnosticsUploadRow />
       </SettingsRows>
     </SettingsSectionBlock>
   );

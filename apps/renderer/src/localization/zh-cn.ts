@@ -79,7 +79,7 @@ export const zhCNMessages = {
       },
       updates: {
         label: "更新与诊断",
-        summary: "检查版本更新并导出脱敏运行诊断。"
+        summary: "检查版本更新并主动上传脱敏运行诊断。"
       },
       about: {
         label: "关于",

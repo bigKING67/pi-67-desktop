@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "@pi67/domain": "workspace:*",
+    "@pi67/support-contract": "workspace:*",
     "typebox": "1.3.7"
   },
   "devDependencies": {

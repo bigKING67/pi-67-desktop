@@ -5,6 +5,7 @@ export default defineConfig({
   deps: {
     alwaysBundle: [
       "@pi67/domain",
+      "@pi67/support-contract",
       "@pi67/protocol/prompt-attachment-limits",
       "@pi67/protocol/prompt-stash-images",
       "@pi67/protocol/repository-environment-action-result-validation",

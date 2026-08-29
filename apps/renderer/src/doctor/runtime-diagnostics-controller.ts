@@ -1,7 +1,8 @@
 import {
   ProtocolRequestError,
   type RuntimeDiagnosticsCollectionFailure,
-  type SupportDiagnosticsExportRequest
+  type SupportDiagnosticsExportRequest,
+  type SupportDiagnosticsUploadReceipt
 } from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
@@ -30,6 +31,11 @@ export async function saveRuntimeDiagnostics(): Promise<void> {
       message: errorMessage(error)
     });
   }
+}
+
+export async function uploadRuntimeDiagnostics(): Promise<SupportDiagnosticsUploadReceipt> {
+  const request = await collectDiagnosticsExportRequest();
+  return window.pi67.system.uploadDiagnostics(request);
 }
 
 async function collectDiagnosticsExportRequest(): Promise<SupportDiagnosticsExportRequest> {

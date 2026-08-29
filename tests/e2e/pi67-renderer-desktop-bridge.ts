@@ -33,14 +33,15 @@ import {
   installMockDesktopShutdownBridge,
   type MockDesktopShutdownBridge
 } from "./pi67-renderer-desktop-shutdown-bridge.js";
+import { installMockSupportDiagnosticsBridge, type MockSupportDiagnosticsBridge } from "./pi67-support-diagnostics-bridge.js";
 import { installComposerDraftTestControl } from "./pi67-composer-draft-test-control.js";
 import { MOCK_DESKTOP_RUNTIME_HEALTH } from "./pi67-runtime-diagnostics-fixture.js";
-
 export { DEFAULT_MOCK_WORKSPACE } from "./pi67-renderer-desktop-bridge-contract.js";
 export type { MockDesktopBridgeOptions, MockWorkspaceDescriptor } from "./pi67-renderer-desktop-bridge-contract.js";
 type MockDesktopPrimaryBridge = Omit<DesktopSystemBridge,
   keyof MockDesktopCapabilityBridge | keyof MockDesktopAttachmentBridge
-  | keyof MockDesktopRepositoryBridge | keyof MockDesktopShutdownBridge>;
+  | keyof MockDesktopRepositoryBridge | keyof MockDesktopShutdownBridge
+  | keyof MockSupportDiagnosticsBridge>;
 export async function installMockDesktopBridge(
   page: Page,
   options: MockDesktopBridgeOptions = {}
@@ -75,6 +76,7 @@ export async function installMockDesktopBridge(
   await installMockDesktopAttachmentBridge(page);
   await installMockDesktopRepositoryBridge(page, options.repositoryEnvironmentSnapshot);
   await installMockDesktopShutdownBridge(page);
+  await installMockSupportDiagnosticsBridge(page);
   await installComposerDraftTestControl(page);
   await page.addInitScript((bridgeFixture) => {
     // Dev-mode module graphs can exceed Chromium's default 250-entry buffer.

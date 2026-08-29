@@ -3,6 +3,7 @@ export {
   isWorkbenchSettingsSection,
   type SettingsSection
 } from "@pi67/domain";
+export * from "@pi67/support-contract";
 export * from "./agent-messages.js";
 export * from "./context-file-schemas.js";
 export * from "./desktop-system-contract.js";

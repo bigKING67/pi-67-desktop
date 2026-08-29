@@ -5,8 +5,13 @@ import {
   app,
   dialog,
   ipcMain,
+  net,
   type BrowserWindow
 } from "electron";
+import {
+  isSupportDiagnosticsDocument,
+  type SupportDiagnosticsDocument
+} from "@pi67/support-contract";
 import {
   isSupportDiagnosticsExportRequest,
   type DesktopRecoverySnapshot,
@@ -15,8 +20,14 @@ import {
 import type { AgentHostSupervisorDiagnostics } from "./agent-host-supervisor.js";
 import { resolveDesktopAgentDirectory } from "./desktop-agent-directory.js";
 import { redact } from "./redaction.js";
+import { uploadSupportDiagnostics } from "./support-diagnostics-upload.js";
 
 export const MAX_DIAGNOSTIC_CONFIGURATION_BYTES = 1_048_576;
+
+interface ComposedSupportDiagnostics {
+  document: SupportDiagnosticsDocument;
+  serialized: string;
+}
 
 type PiConfigurationDiagnosticFileName = "auth.json" | "settings.json" | "models.json";
 
@@ -71,6 +82,16 @@ export function registerSupportDiagnosticsBridge(options: {
   getMainWindow: () => BrowserWindow | undefined;
   recoverySnapshot: () => Promise<DesktopRecoverySnapshot>;
 }): void {
+  ipcMain.handle("pi67:upload-diagnostics", async (_event, value: unknown) => {
+    if (!isSupportDiagnosticsExportRequest(value)) throw new Error("Invalid diagnostic payload.");
+    const composed = await composeSupportDiagnostics(value, options);
+    return uploadSupportDiagnostics({
+      diagnostics: composed.document,
+      serializedDiagnostics: composed.serialized,
+      applicationVersion: app.getVersion(),
+      fetcher: (input, init) => net.fetch(input, init)
+    });
+  });
   ipcMain.handle("pi67:save-diagnostics", async (_event, value: unknown) => {
     if (!isSupportDiagnosticsExportRequest(value)) throw new Error("Invalid diagnostic payload.");
     const request: SupportDiagnosticsExportRequest = value;
@@ -80,30 +101,47 @@ export function registerSupportDiagnosticsBridge(options: {
       filters: [{ name: "JSON", extensions: ["json"] }]
     });
     if (result.canceled || !result.filePath) return undefined;
-    const piConfiguration = await collectPiConfigurationDiagnostics({
-      agentDirectory: options.agentDirectory,
-      agentDirectorySource: options.agentDirectorySource
-    });
-    const supportDiagnostics = {
-      schema: "pi67-support-diagnostics.v5" as const,
-      generatedAt: Date.now(),
-      application: {
-        version: app.getVersion(),
-        platform: process.platform,
-        architecture: process.arch,
-        packaged: app.isPackaged
-      },
-      desktop: await options.recoverySnapshot(),
-      agentHost: options.getAgentHostDiagnostics(),
-      piConfiguration,
-      renderer: request.renderer,
-      runtimeCollection: request.runtimeCollection,
-      ...("runtime" in request ? { runtime: request.runtime } : {})
-    };
-    const serialized = `${JSON.stringify(supportDiagnostics, null, 2)}\n`;
-    await writeFile(result.filePath, redact(serialized), { encoding: "utf8", mode: 0o600 });
+    const composed = await composeSupportDiagnostics(request, options);
+    await writeFile(result.filePath, composed.serialized, { encoding: "utf8", mode: 0o600 });
     return result.filePath;
   });
+}
+
+async function composeSupportDiagnostics(
+  request: SupportDiagnosticsExportRequest,
+  options: {
+    agentDirectory: string;
+    agentDirectorySource: "default" | "environment";
+    getAgentHostDiagnostics: () => AgentHostSupervisorDiagnostics;
+    recoverySnapshot: () => Promise<DesktopRecoverySnapshot>;
+  }
+): Promise<ComposedSupportDiagnostics> {
+  const piConfiguration = await collectPiConfigurationDiagnostics({
+    agentDirectory: options.agentDirectory,
+    agentDirectorySource: options.agentDirectorySource
+  });
+  const supportDiagnostics = {
+    schema: "pi67-support-diagnostics.v5" as const,
+    generatedAt: Date.now(),
+    application: {
+      version: app.getVersion(),
+      platform: process.platform,
+      architecture: process.arch,
+      packaged: app.isPackaged
+    },
+    desktop: await options.recoverySnapshot(),
+    agentHost: options.getAgentHostDiagnostics(),
+    piConfiguration,
+    renderer: request.renderer,
+    runtimeCollection: request.runtimeCollection,
+    ...("runtime" in request ? { runtime: request.runtime } : {})
+  };
+  const serialized = redact(`${JSON.stringify(supportDiagnostics, null, 2)}\n`);
+  const document = JSON.parse(serialized) as unknown;
+  if (!isSupportDiagnosticsDocument(document)) {
+    throw new Error("Composed support diagnostics failed the upload boundary.");
+  }
+  return { document, serialized };
 }
 
 export async function collectPiConfigurationDiagnostics(options: {

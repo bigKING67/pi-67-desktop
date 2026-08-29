@@ -600,10 +600,11 @@ the only Runtime and behavior specification source.
   unreadable/unknown prior state; first launch is not reported as a crash. Failure on one side
   keeps the other results visible. Running checks does not create, reopen, replay,
   delete, move, or repair a Session, Workspace, lease, Catalog, or attachment.
-- Diagnostic export accepts only a schema-validated request at the Main boundary.
+- Diagnostic collection, local export, and support upload accept only a
+  schema-validated request at the Main boundary.
   Agent Host `RuntimeDiagnostics` is optional: a three-second acknowledgement
   budget preserves it when available, while timeout, disconnection, or Host
-  replacement still exports Main-owned recovery, Supervisor lifecycle, and Pi
+  replacement still preserves Main-owned recovery, Supervisor lifecycle, and Pi
   configuration readability metadata. Main writes `pi67-support-diagnostics.v5`,
   which adds bounded Profile mode, startup ready/degraded state, total and per-stage
   startup duration, capability projection mode, startup issue, Main service health,
@@ -613,8 +614,19 @@ the only Runtime and behavior specification source.
   and bounded error classes, never raw Workspace or Agent Directory paths,
   configuration bodies, prompts, source bodies, credentials, environment values,
   stdout/stderr, or Tool payloads.
-  Alpha exposes only recheck and export actions here; it has no clear-all,
-  force-unlock, automatic replay, or unverified repair action.
+  Settings exposes an explicit `上传脱敏诊断` action that sends this fixed document
+  only through the fixed Support Worker origin, returns a copyable report ID, and
+  retains local export after failure or when offline. It never uploads on startup,
+  crash, update, recovery, or Session activity; it has no background retry or local
+  upload queue. Support objects use a separate private R2 bucket and a declared
+  30-day lifecycle. The public ingestion boundary accepts at most one report per
+  minute globally and 64 KiB per submission so its worst-case retained footprint
+  stays inside the operator's free-service budget. One global SQLite-backed Durable
+  Object is the exact per-minute admission boundary and fails closed when its Workers
+  Free allowance is exhausted; larger reports retain the local export fallback. Alpha exposes only recheck,
+  explicit upload, and local-export
+  fallback actions here; it has no clear-all, force-unlock, automatic replay, or
+  unverified repair action.
 - Provider, Download Sources/Network, and Rules/Context drafts stay
   in Renderer memory. Leaving the category, changing an applicable page scope, or
   returning to the Workbench requires an explicit discard decision while dirty.
@@ -1341,7 +1353,9 @@ the only Runtime and behavior specification source.
   visibly without replacing the current app. Artifacts upload before the mutable
   manifest; equal versions, downgrades, arbitrary URLs, and same-name byte changes
   fail closed.
-- Diagnostic export is local, bounded, and redacted by default.
+- Diagnostic collection is local, bounded, and redacted by default. Remote support
+  submission occurs only after the user's explicit upload action and has a local-export
+  fallback.
 
 ## Non-goals for v1
 

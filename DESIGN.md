@@ -2058,11 +2058,14 @@ loading error where the operation can produce those states
   from another region, and a late `doctor.completed` event cannot clear the
   recovery snapshot. Recheck and diagnostic export remain available without
   changing the active Pi Session.
-- Health observations are local, on-demand, bounded counts/timestamps only. They do
+- Health observations are local, on-demand, bounded counts/timestamps only until the
+  user explicitly invokes Support upload. They do
   not contain Task/Operation IDs, Prompt or Tool payloads, paths, credentials, or
-  stdout/stderr, and they do not create OTLP, Grafana, remote telemetry, or a
-  continuously updating dashboard. Diagnostic export uses
-  `pi67-support-diagnostics.v5` for the same redacted projection. Agent Host startup
+  stdout/stderr, and they do not create OTLP, Grafana, background telemetry, or a
+  continuously updating dashboard. The one-shot Support upload sends the same fixed
+  redacted projection through the fixed Support Worker origin; it is never scheduled,
+  retried in the background, or persisted as an outbox. Diagnostic save and upload use
+  `pi67-support-diagnostics.v5`. Agent Host startup
   adds only the bounded Profile mode, `ready | degraded` state, total/per-stage
   durations, capability projection mode, startup stage, and safe issue code; paths,
   raw errors, configuration bodies, and stack traces remain absent.
@@ -2082,15 +2085,27 @@ loading error where the operation can produce those states
   stable and the dialog cannot be dismissed into an ambiguous partial request.
   The scroll region is bounded on desktop and mobile; footer actions wrap without
   overlapping status content.
-- The export action uses an icon-plus-command label and sends only a typed
-  Runtime-available or Runtime-unavailable request to Main. Collection uses a
+- The Settings support row uses an icon-plus-command `上传` label and sends only a
+  typed Runtime-available or Runtime-unavailable request to Main. Collection uses a
   three-second acknowledgement budget. Main always composes the fixed support
   schema from its own recovery snapshot, Agent Host Supervisor lifecycle, and
   fixed-file Pi configuration readability metadata; successful Host diagnostics
-  are an optional appendix rather than an export prerequisite. A fallback export
-  confirms that Runtime state was unavailable without exposing the raw transport
-  error. No destructive repair, force unlock, replay, or clear-all action appears
-  in this surface.
+  are an optional appendix rather than an upload prerequisite. During submission the
+  row remains stable and exposes one disabled `上传中…` action. Success renders the
+  verified `PI67-XXXXXXXXXXXX` report ID, copy feedback, and an explicit repeat action;
+  failure preserves the bounded error, retry, and `导出到本地` fallback in the row.
+  The copy states that upload happens only after the click, excludes prompts, source
+  bodies, credentials, and raw Tool payloads, and discloses 30-day server retention.
+  The fixed ingestion boundary accepts at most 64 KiB and uses one global accepted
+  submission per 60-second window. One global SQLite-backed Durable Object stores
+  only the last admitted UTC minute and transactionally owns the authoritative
+  new-report admission boundary. Durable Object Free exhaustion fails closed before
+  an R2 write. Diagnostic objects retain an HTTP `If-None-Match: *` no-overwrite
+  condition. These are
+  cost-safety limits, not identity or abuse-authentication claims. An oversized or
+  rate-limited report fails visibly and preserves local export.
+  No destructive repair, force unlock, replay, or clear-all action appears in this
+  surface.
 - Settings and the update dialog disclose that automatic checks request only the
   fixed `updates.52671314.xyz` R2 manifest and send no Workspace, Session,
   model-service, or credential data. Packaged builds check 10 seconds after startup

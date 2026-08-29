@@ -18,6 +18,7 @@ import type {
   WorkspaceFilePersistedState,
   WorkspaceFileStateSnapshot
 } from "@pi67/domain";
+import type { SupportDiagnosticsUploadReceipt } from "@pi67/support-contract";
 import type { StagedPromptAttachment } from "./agent-messages.js";
 import type {
   AgentHostStartupFailedMessage,
@@ -210,6 +211,7 @@ export interface DesktopSystemBridge {
   selectWorkspace(): Promise<string | undefined>;
   selectSessionFile(): Promise<string | undefined>;
   getRecoverySnapshot(): Promise<DesktopRecoverySnapshot>;
+  uploadDiagnostics(request: SupportDiagnosticsExportRequest): Promise<SupportDiagnosticsUploadReceipt>;
   saveDiagnostics(request: SupportDiagnosticsExportRequest): Promise<string | undefined>;
   showNativeNotification(request: NativeNotificationRequest): Promise<boolean>;
   dismissNativeNotification(notificationId: string): Promise<boolean>;

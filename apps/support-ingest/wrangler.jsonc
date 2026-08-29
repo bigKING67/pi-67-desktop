@@ -1,0 +1,32 @@
+{
+  "name": "pi67-support-ingest",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-29",
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "support.52671314.xyz",
+      "custom_domain": true
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "SUPPORT_DIAGNOSTICS_BUCKET",
+      "bucket_name": "pi67-support-diagnostics"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SUPPORT_DIAGNOSTICS_ADMISSION",
+        "class_name": "SupportDiagnosticsAdmission"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["SupportDiagnosticsAdmission"]
+    }
+  ]
+}

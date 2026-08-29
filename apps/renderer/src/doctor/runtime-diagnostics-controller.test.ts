@@ -7,11 +7,13 @@ import { useShellStore } from "../shell/shell-store.js";
 import { doctorStore } from "./doctor-store.js";
 import {
   runRuntimeDoctor,
-  saveRuntimeDiagnostics
+  saveRuntimeDiagnostics,
+  uploadRuntimeDiagnostics
 } from "./runtime-diagnostics-controller.js";
 
 describe("runtime diagnostics controller", () => {
   let saveDiagnostics: ReturnType<typeof vi.fn>;
+  let uploadDiagnostics: ReturnType<typeof vi.fn>;
   let getRecoverySnapshot: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -26,12 +28,20 @@ describe("runtime diagnostics controller", () => {
       eventSequence: 0
     });
     saveDiagnostics = vi.fn().mockResolvedValue("/tmp/pi67-diagnostics.json");
+    uploadDiagnostics = vi.fn().mockResolvedValue({
+      schema: "pi67-support-receipt.v1",
+      reportId: "PI67-A1B2C3D4E5F6",
+      receivedAt: 2,
+      sizeBytes: 128,
+      sha256: "0".repeat(64)
+    });
     getRecoverySnapshot = vi.fn().mockResolvedValue(recoverySnapshot());
     vi.stubGlobal("window", {
       pi67: {
         system: {
           getRecoverySnapshot,
-          saveDiagnostics
+          saveDiagnostics,
+          uploadDiagnostics
         }
       }
     });
@@ -99,6 +109,32 @@ describe("runtime diagnostics controller", () => {
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "info",
       title: "脱敏诊断已保存"
+    });
+  });
+
+  it("uploads the same bounded runtime diagnostic request and returns its receipt", async () => {
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue({ safe: true } as never);
+
+    await expect(uploadRuntimeDiagnostics()).resolves.toMatchObject({
+      reportId: "PI67-A1B2C3D4E5F6",
+      receivedAt: 2
+    });
+
+    expect(uploadDiagnostics).toHaveBeenCalledWith({
+      runtimeCollection: { status: "available" },
+      runtime: { safe: true },
+      renderer: rendererDiagnostics()
+    });
+  });
+
+  it("keeps upload failures visible to the settings recovery state", async () => {
+    vi.spyOn(agentConnectionController, "request").mockRejectedValue(new Error("Port closed"));
+    uploadDiagnostics.mockRejectedValue(new Error("诊断上传服务暂时不可用"));
+
+    await expect(uploadRuntimeDiagnostics()).rejects.toThrow("诊断上传服务暂时不可用");
+    expect(uploadDiagnostics).toHaveBeenCalledWith({
+      runtimeCollection: { status: "unavailable", failure: "unknown" },
+      renderer: rendererDiagnostics()
     });
   });
 

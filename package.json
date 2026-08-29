@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "node eng/dev/start.mjs",
     "build": "corepack pnpm run build:packages && corepack pnpm run build:apps",
-    "build:packages": "corepack pnpm --filter @pi67/domain --filter @pi67/protocol --filter @pi67/extension-compat --filter @pi67/pi-runtime run build",
+    "build:packages": "corepack pnpm --filter @pi67/domain --filter @pi67/support-contract --filter @pi67/protocol --filter @pi67/extension-compat --filter @pi67/pi-runtime run build",
     "build:apps": "corepack pnpm --filter @pi67/renderer run build && corepack pnpm --filter @pi67/agent-host run build && corepack pnpm --filter @pi67/desktop run build",
     "typecheck": "corepack pnpm exec tsc -p tsconfig.tests.json --noEmit && corepack pnpm -r --if-present run typecheck",
     "lint": "oxlint --type-aware --type-check --deny-warnings apps packages tests eng",
