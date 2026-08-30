@@ -2,16 +2,17 @@ import { describe, expect, it } from "vitest";
 import { parseBoundedShellCommand } from "./shell-command-parser.js";
 
 describe("parseBoundedShellCommand", () => {
-  it("tokenizes the bounded conjunction and pipeline grammar", () => {
+  it("tokenizes the bounded conjunction, sequence, pipeline, and output-discard grammar", () => {
     expect(parseBoundedShellCommand(
-      "cd 'apps/renderer' && CI=1 pnpm test | head -n 20"
+      "cd 'apps/renderer' && CI=1 pnpm test 2>&1 | head -n 20; ls temp 2>/dev/null"
     )).toEqual({
       commands: [
         ["cd", "apps/renderer"],
         ["CI=1", "pnpm", "test"],
-        ["head", "-n", "20"]
+        ["head", "-n", "20"],
+        ["ls", "temp"]
       ],
-      operators: ["and", "pipe"]
+      operators: ["and", "pipe", "sequence"]
     });
   });
 
@@ -52,7 +53,6 @@ describe("parseBoundedShellCommand", () => {
       'rg "`pwd`" .',
       "cat < input",
       "cat > output",
-      "git status; git diff",
       "git status & git diff",
       "git status || git diff",
       "git status |& head",
@@ -62,6 +62,19 @@ describe("parseBoundedShellCommand", () => {
       "git status |",
       "(git status)",
       "echo $(pwd)"
+    ]) expect(parseBoundedShellCommand(command), command).toBeUndefined();
+  });
+
+  it("keeps arbitrary redirection and malformed safe-looking variants out of the bounded grammar", () => {
+    for (const command of [
+      "cat 2>error.log",
+      "cat 1>/dev/null",
+      "cat >/dev/null",
+      "cat 2> /dev/null",
+      "cat2>&1",
+      "cat 2>&10",
+      "cat 2>/dev/null.txt",
+      "git status;; git diff"
     ]) expect(parseBoundedShellCommand(command), command).toBeUndefined();
   });
 });

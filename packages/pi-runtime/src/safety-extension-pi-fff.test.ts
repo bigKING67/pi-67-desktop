@@ -164,6 +164,25 @@ describe("createDesktopSafetyExtension pi-fff classification", () => {
 
     expect(requestApproval).not.toHaveBeenCalled();
   });
+
+  it("keeps non-approvable routing corrections ahead of YOLO", async () => {
+    const workspace = await createWorkspace();
+    const requestApproval = vi.fn<DesktopApprovalRequester>();
+    const handler = safetyHandler({
+      ...autoPolicy(workspace),
+      taskToolMode: "yolo"
+    }, requestApproval, () => [piFffTool("find")]);
+
+    await expect(handler({
+      toolCallId: "yolo-opaque-cursor",
+      toolName: "find",
+      input: { pattern: "safety", cursor: "fff_cursor" }
+    }, { hasUI: true })).resolves.toEqual({
+      block: true,
+      reason: "无法验证分页游标对应的搜索根目录；请不带 cursor 重新执行搜索。"
+    });
+    expect(requestApproval).not.toHaveBeenCalled();
+  });
 });
 
 async function createWorkspace(): Promise<string> {

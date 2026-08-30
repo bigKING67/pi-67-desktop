@@ -1,6 +1,6 @@
 const MAX_AUTO_COMMAND_CHARACTERS = 4_096;
 
-type ShellOperator = "and" | "pipe";
+type ShellOperator = "and" | "pipe" | "sequence";
 
 export interface ParsedShellCommand {
   commands: string[][];
@@ -72,6 +72,11 @@ export function parseBoundedShellCommand(command: string): ParsedShellCommand | 
       index += 1;
       continue;
     }
+    const safeRedirectionLength = matchSafeOutputRedirection(command, index, tokenStarted);
+    if (safeRedirectionLength > 0) {
+      index += safeRedirectionLength - 1;
+      continue;
+    }
     if (character === "&") {
       if (command[index + 1] !== "&" || !finishCommand("and")) return undefined;
       index += 1;
@@ -81,10 +86,26 @@ export function parseBoundedShellCommand(command: string): ParsedShellCommand | 
       if (command[index + 1] === "|" || command[index + 1] === "&" || !finishCommand("pipe")) return undefined;
       continue;
     }
-    if ([";", ">", "<", "`", "$", "(", ")"].includes(character)) return undefined;
+    if (character === ";") {
+      if (!finishCommand("sequence")) return undefined;
+      continue;
+    }
+    if ([">", "<", "`", "$", "(", ")"].includes(character)) return undefined;
     token += character;
     tokenStarted = true;
   }
   if (quote || !finishCommand()) return undefined;
   return commands.length === operators.length + 1 ? { commands, operators } : undefined;
+}
+
+function matchSafeOutputRedirection(command: string, index: number, tokenStarted: boolean): number {
+  if (tokenStarted) return 0;
+  for (const candidate of ["2>/dev/null", "2>&1"] as const) {
+    if (!command.startsWith(candidate, index)) continue;
+    const next = command[index + candidate.length];
+    if (next === undefined || /\s/u.test(next) || next === ";" || next === "|" || next === "&") {
+      return candidate.length;
+    }
+  }
+  return 0;
 }

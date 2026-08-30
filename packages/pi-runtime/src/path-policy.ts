@@ -20,6 +20,18 @@ export async function canonicalizePotentialPath(value: string, workspace: string
   return resolve(candidate, ...missing);
 }
 
+export function normalizeShellPathForPlatform(
+  value: string,
+  platform: NodeJS.Platform = process.platform
+): string {
+  if (platform !== "win32") return value;
+  const gitBashDrivePath = /^\/([a-z])(?:\/(.*))?$/iu.exec(value);
+  if (!gitBashDrivePath) return value;
+  const drive = gitBashDrivePath[1]!.toUpperCase();
+  const suffix = (gitBashDrivePath[2] ?? "").replaceAll("/", "\\");
+  return `${drive}:\\${suffix}`;
+}
+
 export function isContained(candidate: string, workspace: string): boolean {
   const normalizedCandidate = process.platform === "win32" ? candidate.toLowerCase() : candidate;
   const normalizedWorkspace = process.platform === "win32" ? workspace.toLowerCase() : workspace;

@@ -1,3 +1,4 @@
+import { zhCNApprovalMessages } from "./zh-cn-approval.js";
 import { zhCNCommandPaletteMessages } from "./zh-cn-command-palette.js";
 import { zhCNComposerMessages } from "./zh-cn-composer.js";
 import { zhCNExtensionPackageMessages } from "./zh-cn-extension-packages.js";
@@ -310,77 +311,7 @@ export const zhCNMessages = {
     ephemeralNotice: "此方式不会写入 auth.json，完全退出应用后失效。",
     clearedAfterHostReplacement: "任何仅在本次运行内存中的 Provider API 密钥均已清除。"
   },
-  approval: {
-    dialogLabel: "工具单次授权",
-    eyebrow: "π 安全授权",
-    title: "需要单次授权",
-    suspiciousTitle: "检测到危险或不可见字符",
-    suspiciousDescription: (count: number) => (
-      `工具名称、来源、目标或工作目录中有 ${count} 个可疑字符。相关内容已改用安全转义视图；实际请求不会被改写。`
-    ),
-    suspiciousTypes: (labels: string) => `类型：${labels}`,
-    tool: "工具",
-    toolName: "工具名称",
-    toolSource: "工具来源",
-    risk: "风险",
-    command: "命令",
-    path: "路径",
-    target: "目标",
-    cwd: "工作目录",
-    targetTruncated: "目标内容已按安全预算截断",
-    cwdTruncated: "工作目录已按安全预算截断",
-    approvalScope: "授权范围",
-    singleToolCall: "仅此 Tool Call",
-    denialNotice: "拒绝或关闭当前会话会阻止这次工具调用，不会自动允许后续同类操作。",
-    yoloNotice: "本任务开启 YOLO 后，已等待和后续产生的工具会自动执行；任务停止或应用重启后恢复 AUTO。",
-    submitting: "正在提交…",
-    deny: "拒绝",
-    allowOnce: "仅允许本次",
-    enableTaskYolo: "本任务开启 YOLO",
-    requestTimeoutTitle: "工具授权请求已超时",
-    requestTimeoutMessage: "未收到有效响应，工具保持阻止。",
-    responseTimeout: {
-      title: "授权结果需要重新确认",
-      message: "Pi 运行服务未在同步边界内确认响应；正在重新同步。未确认的授权不会放行。",
-      recoveringDetail: "授权响应确认超时，正在重新同步 Pi 状态",
-      readyDetail: "授权状态已重新同步",
-      failureTitle: "无法确认授权结果"
-    },
-    unknownLiteral: "(未知)",
-    emptyLiteral: "(空)",
-    safeViewLabel: (label: string) => `${label}安全转义视图`,
-    suspiciousLiteral: (count: number) => `安全转义视图 · ${count} 个可疑字符`,
-    risks: {
-      "workspace-read": "读取工作区",
-      "resource-read": "读取当前会话已加载的 Pi 资源",
-      "workspace-write": "修改工作区",
-      "workspace-command": "执行工作区内的非破坏性命令",
-      "capability-read": "检查当前会话已加载的工具能力",
-      "external-path": "访问工作区之外的路径",
-      "bulk-delete": "批量删除",
-      "destructive-shell": "破坏性 Shell 命令",
-      "system-configuration": "修改系统配置",
-      "dependency-change": "修改依赖",
-      "git-external-action": "远程 Git 操作",
-      "download-and-execute": "下载并执行",
-      "network-read": "读取外部网络信息",
-      "network-side-effect": "产生网络副作用",
-      "configured-operation": "执行当前任务已配置的工具能力",
-      "persistent-state-write": "新增或更新持久化状态",
-      "persistent-state-delete": "删除持久化状态",
-      "external-submit": "向外部目标提交内容或操作",
-      "credential-or-auth": "使用或修改凭据与授权状态",
-      "unverified-tool": "工具来源或参数契约尚未验证",
-      "ambiguous-command": "无法安全分类"
-    },
-    securityCategories: {
-      bidi: "双向文本控制符",
-      "zero-width": "零宽字符",
-      ansi: "ANSI 控制序列",
-      control: "控制字符",
-      "line-separator": "非标准行分隔符"
-    }
-  },
+  approval: zhCNApprovalMessages,
   extensionUi: {
     requestDialogLabel: "Pi Extension 请求",
     defaultExtensionLabel: "Pi Extension",

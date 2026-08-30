@@ -25,11 +25,11 @@ export const zhCNComposerMessages = {
     },
     yolo: {
       label: "YOLO",
-      description: "当前任务所有已注册工具自动执行"
+      description: "普通工具全部自动，仅不可逆操作确认"
     }
   },
   yoloConfirmationTitle: "为当前任务开启 YOLO？",
-  yoloConfirmationDescription: "已等待和后续产生的所有工具将自动执行，包括工作区外访问、删除、系统和网络操作。",
+  yoloConfirmationDescription: "已等待和后续产生的普通工具将自动执行，包括工作区外、系统和网络操作；可识别的不可逆操作仍会单独确认。",
   yoloRequiresTrustedWorkspace: "仅可信工作区可开启",
   enableYolo: "开启 YOLO",
   slashCatalogUnavailable: "Pi 指令目录尚未加载，请稍后重试。草稿已保留。",

@@ -1,5 +1,10 @@
 import type { ApprovalMode, WorkspaceTrust } from "./runtime-state.js";
 import { parseBoundedShellCommand, type ParsedShellCommand } from "./shell-command-parser.js";
+import {
+  classifyCommandRisk,
+  classifyFallbackRisk,
+  isDownloadAndExecute
+} from "./shell-command-risk.js";
 
 export type RiskCategory =
   | "workspace-read"
@@ -19,6 +24,7 @@ export type RiskCategory =
   | "configured-operation"
   | "persistent-state-write"
   | "persistent-state-delete"
+  | "external-delete"
   | "external-submit"
   | "credential-or-auth"
   | "unverified-tool"
@@ -36,15 +42,16 @@ export interface ApprovalDecision {
   reason: string;
 }
 
-const FALLBACK_COMMAND_RULES: ReadonlyArray<[RiskCategory, RegExp]> = [
-  ["bulk-delete", /\b(?:rm|rmdir|del|erase|Remove-Item)\b[^\n]*(?:-r|-rf|\/s|\*)/i],
-  ["destructive-shell", /\b(?:rm|rmdir|del|erase|format|diskpart|mkfs|shutdown|reboot|Stop-Computer)\b/i],
-  ["system-configuration", /\b(?:sudo|runas|reg(?:\.exe)?\s+(?:add|delete)|sc(?:\.exe)?\s+(?:create|delete|config)|Set-ExecutionPolicy|bcdedit|netsh)\b/i],
-  ["dependency-change", /\b(?:npm|pnpm|yarn|pip|uv|cargo|dotnet)\s+(?:install|add|remove|uninstall|update|upgrade|ci|tool\s+install)\b/i],
-  ["git-external-action", /\bgit\s+(?:push|fetch|pull|clone|remote|submodule|ls-remote)\b/i],
-  ["download-and-execute", /\b(?:curl|wget|Invoke-WebRequest|irm|iwr)\b[\s\S]*(?:\||&&|;)[\s\S]*\b(?:sh|bash|pwsh|powershell|cmd|node|python)\b/i],
-  ["network-side-effect", /\b(?:curl|wget|Invoke-WebRequest|irm|iwr|ssh|scp|rsync)\b/i]
-];
+export interface ShellCommandClassificationOptions {
+  verifiedWorkspacePaths?: ReadonlySet<string>;
+}
+
+const HARD_STOP_RISK_CATEGORIES: ReadonlySet<RiskCategory> = new Set([
+  "bulk-delete",
+  "destructive-shell",
+  "persistent-state-delete",
+  "external-delete"
+]);
 
 const EXTERNAL_PATH_TOKEN_PATTERN = /^(?:file:|~|\/|\\\\|[a-z]:[\\/])|(?:^|[\\/])\.\.(?:[\\/]|$)/iu;
 const READ_ONLY_COMMANDS = new Set([
@@ -55,42 +62,44 @@ const READ_ONLY_COMMANDS = new Set([
 const READ_ONLY_GIT_COMMANDS = new Set([
   "status", "diff", "log", "show", "rev-parse", "ls-files", "grep", "describe"
 ]);
-const PROJECT_SCRIPT_PATTERN = /^(?:check|test|typecheck|lint|build)(?::[a-z0-9:_-]+)?$/iu;
+const PROJECT_SCRIPT_PATTERN = /^(?:check|test|typecheck|lint|build|dev|start|format|generate|codegen)(?::[a-z0-9:_-]+)?$/iu;
 const ENVIRONMENT_ASSIGNMENT_PATTERN = /^([a-z_][a-z0-9_]*)=(.*)$/iu;
 const SAFE_ENVIRONMENT_VARIABLES = new Set(["CI", "FORCE_COLOR", "NO_COLOR"]);
-const DEPENDENCY_ACTIONS = new Set([
-  "install", "add", "remove", "uninstall", "update", "upgrade", "ci", "link", "unlink", "rebuild",
-  "prune", "dedupe", "import", "patch", "patch-commit"
-]);
-const GIT_EXTERNAL_ACTIONS = new Set(["push", "fetch", "pull", "clone", "remote", "submodule", "ls-remote"]);
-const SYSTEM_COMMANDS = new Set([
-  "sudo", "runas", "format", "diskpart", "mkfs", "shutdown", "reboot", "stop-computer", "bcdedit", "netsh",
-  "chmod", "chown", "launchctl", "systemctl"
-]);
-const NETWORK_COMMANDS = new Set([
-  "curl", "wget", "invoke-webrequest", "irm", "iwr", "ssh", "scp", "rsync"
-]);
-const SHELL_INTERPRETERS = new Set(["sh", "bash", "pwsh", "powershell", "cmd", "node", "python", "python3"]);
-
-export function classifyShellCommand(command: string): RiskCategory {
+export function classifyShellCommand(
+  command: string,
+  options: ShellCommandClassificationOptions = {}
+): RiskCategory {
   const trimmed = command.trim();
   const parsed = parseBoundedShellCommand(trimmed);
   if (!parsed) return classifyFallbackRisk(trimmed) ?? "ambiguous-command";
   if (isDownloadAndExecute(parsed)) return "download-and-execute";
-  for (const tokens of parsed.commands) {
-    const category = classifyCommandRisk(tokens);
-    if (category) return category;
-  }
-  if (parsed.commands.some(hasExternalPathToken)) return "external-path";
+  const commandRisks = parsed.commands.map(classifyCommandRisk).filter((category) => category !== undefined);
+  const hardStopRisk = commandRisks.find(isHardStopRiskCategory);
+  if (hardStopRisk) return hardStopRisk;
+  const externalPaths = externalPathTokens(parsed.commands);
+  if (externalPaths.some((path) => !options.verifiedWorkspacePaths?.has(path))) return "external-path";
+  const commandRisk = commandRisks[0];
+  if (commandRisk) return commandRisk;
   if (parsed.commands.every((tokens, index) => isWorkspaceCommandSegment(parsed, tokens, index))) {
     return "workspace-command";
   }
+  const fallbackRisk = classifyFallbackRisk(trimmed);
+  if (fallbackRisk && isHardStopRiskCategory(fallbackRisk)) return fallbackRisk;
   return "ambiguous-command";
+}
+
+export function isHardStopRiskCategory(category: RiskCategory): boolean {
+  return HARD_STOP_RISK_CATEGORIES.has(category);
+}
+
+export function shellCommandExternalPaths(command: string): readonly string[] | undefined {
+  const parsed = parseBoundedShellCommand(command.trim());
+  return parsed ? externalPathTokens(parsed.commands) : undefined;
 }
 
 export function isPlanModeReadOnlyShellCommand(command: string): boolean {
   const parsed = parseBoundedShellCommand(command.trim());
-  if (!parsed || parsed.commands.some(hasExternalPathToken)) return false;
+  if (!parsed || externalPathTokens(parsed.commands).length > 0) return false;
   return parsed.commands.every((tokens, index) => isPlanModeReadOnlySegment(parsed, tokens, index));
 }
 
@@ -107,11 +116,23 @@ export function decideApproval(
     };
   }
 
-  if (intent.toolName.toLowerCase() === "bash" && intent.category !== "workspace-command") {
+  if (isHardStopRiskCategory(intent.category)) {
     return {
       allow: false,
       approvalRequired: true,
       reason: riskLabel(intent.category)
+    };
+  }
+
+  if (
+    mode === "balanced"
+    && intent.toolName.toLowerCase() === "bash"
+    && intent.category === "ambiguous-command"
+  ) {
+    return {
+      allow: false,
+      approvalRequired: false,
+      reason: "AUTO 无法可靠判断这条 Shell 命令的副作用；请拆成较小的原生 Tool Call 或明确切换到 YOLO。"
     };
   }
 
@@ -143,6 +164,10 @@ export function decideApproval(
     return { allow: true, approvalRequired: false, reason: "Non-destructive persistent state write in balanced mode." };
   }
 
+  if (mode === "balanced" && intent.category === "dependency-change") {
+    return { allow: true, approvalRequired: false, reason: "Workspace-local dependency change in balanced mode." };
+  }
+
   return {
     allow: false,
     approvalRequired: true,
@@ -169,6 +194,7 @@ export function riskLabel(category: RiskCategory): string {
     "configured-operation": "执行当前任务已配置的工具能力",
     "persistent-state-write": "新增或更新持久化状态",
     "persistent-state-delete": "删除持久化状态",
+    "external-delete": "删除外部持久化对象",
     "external-submit": "向外部目标提交内容或操作",
     "credential-or-auth": "使用或修改凭据与授权状态",
     "unverified-tool": "工具来源或参数契约尚未验证",
@@ -375,64 +401,12 @@ function isSafeDirectoryChange(parsed: ParsedShellCommand, tokens: readonly stri
   return parsed.operators[index] === "and" && parsed.operators[index - 1] !== "pipe";
 }
 
-function classifyCommandRisk(originalTokens: readonly string[]): RiskCategory | undefined {
-  const tokens = stripEnvironmentAssignments(originalTokens);
-  const executable = executableName(tokens[0] ?? "");
-  const args = tokens.slice(1);
-  if (["rm", "rmdir", "del", "erase", "remove-item"].includes(executable)) {
-    return args.some((arg) => /^(?:-[a-z]*r[a-z]*|\/s)$/iu.test(arg) || arg.includes("*"))
-      ? "bulk-delete"
-      : "destructive-shell";
-  }
-  if (executable === "find" && args.some((arg) => arg === "-delete")) return "destructive-shell";
-  if (SYSTEM_COMMANDS.has(executable)) return "system-configuration";
-  if (executable === "reg" || executable === "reg.exe" || executable === "sc" || executable === "sc.exe") {
-    if (args.some((arg) => ["add", "delete", "create", "config"].includes(arg.toLowerCase()))) {
-      return "system-configuration";
-    }
-  }
-  const managerTokens = executable === "corepack" ? args : tokens;
-  const manager = executableName(managerTokens[0] ?? "");
-  if (["npm", "pnpm", "yarn", "pip", "uv", "cargo", "dotnet"].includes(manager)) {
-    const managerArgs = managerTokens.slice(1).map((arg) => arg.toLowerCase());
-    if (managerArgs.some((arg) => DEPENDENCY_ACTIONS.has(arg))) return "dependency-change";
-    if (managerArgs.includes("audit") && managerArgs.includes("fix")) return "dependency-change";
-    if (managerArgs.includes("tool") && managerArgs.includes("install")) return "dependency-change";
-  }
-  if (executable === "git" && GIT_EXTERNAL_ACTIONS.has((args[0] ?? "").toLowerCase())) {
-    return "git-external-action";
-  }
-  if (NETWORK_COMMANDS.has(executable)) return "network-side-effect";
-  return undefined;
-}
-
-function isDownloadAndExecute(parsed: ParsedShellCommand): boolean {
-  const executables = parsed.commands.map((tokens) => executableName(stripEnvironmentAssignments(tokens)[0] ?? ""));
-  return executables.some((executable, index) => (
-    NETWORK_COMMANDS.has(executable)
-    && parsed.operators[index] !== undefined
-    && executables.slice(index + 1).some((candidate) => SHELL_INTERPRETERS.has(candidate))
-  ));
-}
-
-function hasExternalPathToken(tokens: readonly string[]): boolean {
-  return tokens.some((token) => {
+function externalPathTokens(commands: readonly (readonly string[])[]): string[] {
+  return [...new Set(commands.flatMap((tokens) => tokens.flatMap((token) => {
     const optionValueIndex = token.indexOf("=");
     const candidates = optionValueIndex > 0 ? [token, token.slice(optionValueIndex + 1)] : [token];
-    return candidates.some((candidate) => EXTERNAL_PATH_TOKEN_PATTERN.test(candidate));
-  });
-}
-
-function stripEnvironmentAssignments(tokens: readonly string[]): readonly string[] {
-  const index = tokens.findIndex((token) => !ENVIRONMENT_ASSIGNMENT_PATTERN.test(token));
-  return index < 0 ? [] : tokens.slice(index);
-}
-
-function classifyFallbackRisk(command: string): RiskCategory | undefined {
-  for (const [category, pattern] of FALLBACK_COMMAND_RULES) {
-    if (pattern.test(command)) return category;
-  }
-  return undefined;
+    return candidates.filter((candidate) => EXTERNAL_PATH_TOKEN_PATTERN.test(candidate));
+  })))];
 }
 
 function executableName(value: string): string {

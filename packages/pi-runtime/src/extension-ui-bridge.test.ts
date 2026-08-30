@@ -190,12 +190,17 @@ describe("DesktopExtensionUiBridge", () => {
     expect(bridge.cancelAll("connection-close")).toEqual([]);
   });
 
-  it("allows all pending safety approvals for YOLO without resolving Extension UI requests", async () => {
+  it("allows pending ordinary approvals for YOLO without resolving hard stops or Extension UI", async () => {
     const events: AgentEvent[] = [];
     const bridge = new DesktopExtensionUiBridge((event) => events.push(event));
     const extensionResult = bridge.context.input("Extension input");
     const firstApproval = bridge.requestApproval(approvalDetails("tool-call-first"));
     const secondApproval = bridge.requestApproval(approvalDetails("tool-call-second"));
+    const hardStopApproval = bridge.requestApproval({
+      ...approvalDetails("tool-call-delete"),
+      category: "bulk-delete",
+      reason: "批量删除文件或目录"
+    });
     const extensionRequest = events.find((event) => event.type === "extension.ui.requested");
     const approvals = events.filter((event) => event.type === "approval.requested");
     if (extensionRequest?.type !== "extension.ui.requested") {
@@ -212,9 +217,23 @@ describe("DesktopExtensionUiBridge", () => {
       firstRequest.payload.toolCallId,
       "enable-task-yolo-and-allow"
     )).toBe(true);
-    expect(bridge.allowAllPendingApprovals()).toEqual([secondRequest.payload.requestId]);
+    const hardStopRequest = approvals[2];
+    if (hardStopRequest?.type !== "approval.requested") {
+      throw new Error("Expected a destructive safety approval request.");
+    }
+    expect(bridge.hasPendingHardStopApproval(
+      hardStopRequest.payload.requestId,
+      hardStopRequest.payload.toolCallId
+    )).toBe(true);
+    expect(bridge.allowAllPendingOrdinaryApprovals()).toEqual([secondRequest.payload.requestId]);
     await expect(firstApproval).resolves.toEqual({ status: "allowed" });
     await expect(secondApproval).resolves.toEqual({ status: "allowed" });
+    expect(bridge.resolveApproval(
+      hardStopRequest.payload.requestId,
+      hardStopRequest.payload.toolCallId,
+      "allow-once"
+    )).toBe(true);
+    await expect(hardStopApproval).resolves.toEqual({ status: "allowed" });
 
     expect(bridge.resolve(extensionRequest.payload.requestId, "kept-separate")).toBe(true);
     await expect(extensionResult).resolves.toBe("kept-separate");
@@ -229,6 +248,12 @@ describe("DesktopExtensionUiBridge", () => {
         payload: expect.objectContaining({
           toolCallId: "tool-call-second",
           decision: "enable-task-yolo-and-allow"
+        })
+      }),
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          toolCallId: "tool-call-delete",
+          decision: "allow-once"
         })
       })
     ]);

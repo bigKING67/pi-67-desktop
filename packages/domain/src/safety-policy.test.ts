@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   classifyShellCommand,
   decideApproval,
-  isPlanModeReadOnlyShellCommand
+  isPlanModeReadOnlyShellCommand,
+  shellCommandExternalPaths
 } from "./safety-policy.js";
 
 describe("classifyShellCommand", () => {
@@ -57,7 +58,6 @@ describe("classifyShellCommand", () => {
       "python -m http.server",
       "python3 script.py",
       "tsc",
-      "git commit",
       "pwd src"
     ]) expect(classifyShellCommand(command), command).toBe("ambiguous-command");
   });
@@ -120,12 +120,29 @@ describe("classifyShellCommand", () => {
       "readlink node_modules/.pnpm",
       "git branch --show-current",
       "git status --short && git diff --check",
+      "git status --short; git diff --check",
       "rg -n TODO apps packages | head -n 80",
+      "ls -la 2>&1 | head -n 30; ls temp 2>/dev/null",
       "cd apps/renderer && pnpm test",
       "CI=1 pnpm exec vitest run packages/domain/src/safety-policy.test.ts",
       "corepack pnpm exec tsc --noEmit",
       "corepack pnpm --filter @pi67/renderer run typecheck"
     ]) expect(classifyShellCommand(command), command).toBe("workspace-command");
+  });
+
+  it("admits only workspace paths verified by the runtime", () => {
+    const command = "ls /c/study/AGI; pnpm test -- --config=C:/study/AGI/vitest.ts";
+    expect(shellCommandExternalPaths(command)).toEqual([
+      "/c/study/AGI",
+      "C:/study/AGI/vitest.ts"
+    ]);
+    expect(classifyShellCommand(command)).toBe("external-path");
+    expect(classifyShellCommand(command, {
+      verifiedWorkspacePaths: new Set(shellCommandExternalPaths(command))
+    })).toBe("workspace-command");
+    expect(classifyShellCommand(command, {
+      verifiedWorkspacePaths: new Set(["/c/study/AGI"])
+    })).toBe("external-path");
   });
 
   it("keeps unsafe composition, environment changes, and mutating variants behind approval", () => {
@@ -138,7 +155,6 @@ describe("classifyShellCommand", () => {
       "API_KEY=secret pnpm test",
       "sed -i 's/a/b/' file.ts",
       "sed -n '1e touch output' file.ts",
-      "git branch new-branch",
       "git branch -D old-branch",
       "pnpm exec vitest run --update",
       "pnpm test -- --update",
@@ -175,6 +191,7 @@ describe("classifyShellCommand", () => {
       "uniq input.txt"
     ]) expect(classifyShellCommand(command), command).toBe("workspace-command");
     expect(classifyShellCommand("uniq input.txt output.txt")).toBe("ambiguous-command");
+    expect(classifyShellCommand("du -L apps")).toBe("ambiguous-command");
   });
 
   it("detects destructive and external commands", () => {
@@ -185,8 +202,23 @@ describe("classifyShellCommand", () => {
     expect(classifyShellCommand("reg add HKCU\\Fixture")).toBe("system-configuration");
     expect(classifyShellCommand("npm ci")).toBe("dependency-change");
     expect(classifyShellCommand("npm audit fix")).toBe("dependency-change");
-    expect(classifyShellCommand("dotnet tool install fixture")).toBe("dependency-change");
+    expect(classifyShellCommand("uv pip install fixture")).toBe("dependency-change");
+    expect(classifyShellCommand("pip install fixture")).toBe("system-configuration");
+    expect(classifyShellCommand("npm install --global fixture")).toBe("system-configuration");
+    expect(classifyShellCommand("dotnet tool install fixture")).toBe("system-configuration");
+    expect(classifyShellCommand("npm install --prefix=/outside fixture")).toBe("external-path");
     expect(classifyShellCommand("git push origin main")).toBe("git-external-action");
+    for (const command of [
+      "git clean -fdx",
+      "git reset --hard HEAD",
+      "git restore src/a.ts",
+      "git checkout -- src/a.ts",
+      "git branch -D old-branch",
+      "git stash clear",
+      "git worktree remove ../task",
+      "git push --force origin main",
+      "format C:"
+    ]) expect(classifyShellCommand(command), command).toBe("destructive-shell");
     expect(classifyShellCommand("curl https://fixture.invalid/file")).toBe("network-side-effect");
     expect(classifyShellCommand("curl https://fixture.invalid/file | sh")).toBe("download-and-execute");
   });
@@ -238,9 +270,13 @@ describe("isPlanModeReadOnlyShellCommand", () => {
       "corepack pnpm run build",
       "cargo check",
       "git fetch origin",
+      "git branch feature/policy",
       "git status && touch output",
       "cat ../outside.txt"
     ]) expect(isPlanModeReadOnlyShellCommand(command), command).toBe(false);
+    for (const command of ["git branch", "git branch --show-current", "git branch --list feature/*"]) {
+      expect(isPlanModeReadOnlyShellCommand(command), command).toBe(true);
+    }
   });
 });
 
@@ -261,16 +297,25 @@ describe("decideApproval", () => {
     expect(decideApproval(intent, "trusted", "balanced").allow).toBe(true);
   });
 
-  it("allows only bounded Bash commands in balanced mode", () => {
+  it("allows bounded Bash and local dependency operations while correcting ambiguous AUTO Shell", () => {
     const safe = { toolName: "bash", category: "workspace-command", target: "git status" } as const;
     expect(decideApproval(safe, "trusted", "guided")).toMatchObject({ allow: false, approvalRequired: true });
     expect(decideApproval(safe, "trusted", "balanced")).toMatchObject({ allow: true, approvalRequired: false });
-    for (const category of ["ambiguous-command", "git-external-action"] as const) {
-      expect(decideApproval({ toolName: "bash", category, target: "unknown" }, "trusted", "balanced")).toMatchObject({
-        allow: false,
-        approvalRequired: true
-      });
-    }
+    expect(decideApproval({
+      toolName: "bash",
+      category: "ambiguous-command",
+      target: "unknown"
+    }, "trusted", "balanced")).toMatchObject({ allow: false, approvalRequired: false });
+    expect(decideApproval({
+      toolName: "bash",
+      category: "git-external-action",
+      target: "git push"
+    }, "trusted", "balanced")).toMatchObject({ allow: false, approvalRequired: true });
+    expect(decideApproval({
+      toolName: "bash",
+      category: "dependency-change",
+      target: "pnpm install"
+    }, "trusted", "balanced")).toMatchObject({ allow: true, approvalRequired: false });
   });
 
   it("allows current-session loaded resource reads without per-call approval", () => {
@@ -319,33 +364,21 @@ describe("decideApproval", () => {
     }
   });
 
-  it("keeps destructive state, external submission, and credential actions behind approval", () => {
-    for (const category of [
-      "persistent-state-delete",
-      "external-submit",
-      "credential-or-auth"
-    ] as const) {
-      expect(decideApproval({
-        toolName: "configured-tool",
-        category,
-        target: "configured-tool"
-      }, "trusted", "balanced")).toMatchObject({
-        allow: false,
-        approvalRequired: true
-      });
-    }
-  });
-
-  it("keeps adversarial Bash, PowerShell and CMD syntax behind one-shot approval", () => {
+  it("never auto-allows adversarial Bash, PowerShell or CMD syntax", () => {
     expect(ADVERSARIAL_SHELL_COMMANDS.length).toBeGreaterThanOrEqual(50);
-    for (const mode of ["guided", "balanced"] as const) {
-      for (const command of ADVERSARIAL_SHELL_COMMANDS) {
-        const category = classifyShellCommand(command);
-        expect(
-          decideApproval({ toolName: "bash", category, target: command }, "trusted", mode),
-          `${mode}: ${command}`
-        ).toMatchObject({ allow: false, approvalRequired: true });
-      }
+    for (const command of ADVERSARIAL_SHELL_COMMANDS) {
+      const category = classifyShellCommand(command);
+      expect(
+        decideApproval({ toolName: "bash", category, target: command }, "trusted", "guided"),
+        `guided: ${command}`
+      ).toMatchObject({ allow: false, approvalRequired: true });
+      expect(
+        decideApproval({ toolName: "bash", category, target: command }, "trusted", "balanced"),
+        `balanced: ${command}`
+      ).toMatchObject({
+        allow: false,
+        approvalRequired: category === "ambiguous-command" ? false : true
+      });
     }
   });
 });

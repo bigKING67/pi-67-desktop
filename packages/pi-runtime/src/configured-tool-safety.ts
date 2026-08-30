@@ -1,10 +1,11 @@
 import { realpath } from "node:fs/promises";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
-import type {
-  ApprovalTargetKind,
-  RiskCategory,
-  ToolIntent
+import {
+  isHardStopRiskCategory,
+  type ApprovalTargetKind,
+  type RiskCategory,
+  type ToolIntent
 } from "@pi67/domain";
 import type { LoadedResourceReadAccess } from "./loaded-resource-read-access.js";
 import { canonicalizePotentialPath, isContained } from "./path-policy.js";
@@ -64,6 +65,8 @@ const EXTERNAL_SUBMIT_TOOL_PATTERN = /(?:^|[_-])(?:upload|publish|send|submit)(?
 const DEPENDENCY_TOOL_PATTERN = /(?:^|[_-])(?:install|uninstall|upgrade|update_dependency|remove_dependency)(?:[_-]|$)/iu;
 const SYSTEM_TOOL_PATTERN = /(?:^|[_-])(?:system_config|system_configuration|registry|service_config)(?:[_-]|$)/iu;
 const FILE_DELETE_TOOL_PATTERN = /(?:^|[_-])(?:delete_file|delete_files|remove_file|remove_files|delete_directory|remove_directory)(?:[_-]|$)/iu;
+const EXTERNAL_DELETE_TOOL_PATTERN = /(?:^|[_-])(?:delete|purge|drop|destroy)_(?:account|database|document|message|object|record|repository|resource|table|workspace)(?:[_-]|$)/iu;
+const DELETE_ACTION_PATTERN = /^(?:delete|delete_file|delete_files|delete_directory|drop|purge|remove_file|remove_files|remove_directory)$/iu;
 
 export interface ConfiguredToolIntent extends ToolIntent {
   targetKind: ApprovalTargetKind;
@@ -101,11 +104,16 @@ function classifyConfiguredEffect(
   input: Record<string, unknown>,
   serverName?: string
 ): RiskCategory {
+  const declaredAction = actionName(input);
   if (serverName === "agent_memory") return classifyMemoryEffect(toolName);
   if (serverName === "tmwd_browser") return classifyBrowserEffect(toolName, input);
   if (serverName === "js-reverse") return "configured-operation";
   if (serverName === "tavily-bridge") return "network-read";
   if (NETWORK_READ_TOOLS.has(toolName)) return "network-read";
+  if (FILE_DELETE_TOOL_PATTERN.test(toolName) || (declaredAction && DELETE_ACTION_PATTERN.test(declaredAction))) {
+    return "bulk-delete";
+  }
+  if (EXTERNAL_DELETE_TOOL_PATTERN.test(toolName)) return "external-delete";
   if (MEMORY_READ_TOOLS.has(toolName)) return "capability-read";
   if (MEMORY_WRITE_TOOLS.has(toolName)) return "persistent-state-write";
   if (MEMORY_DELETE_PATTERN.test(toolName)) return "persistent-state-delete";
@@ -113,7 +121,6 @@ function classifyConfiguredEffect(
   if (EXTERNAL_SUBMIT_TOOL_PATTERN.test(toolName)) return "external-submit";
   if (DEPENDENCY_TOOL_PATTERN.test(toolName)) return "dependency-change";
   if (SYSTEM_TOOL_PATTERN.test(toolName)) return "system-configuration";
-  if (FILE_DELETE_TOOL_PATTERN.test(toolName)) return "bulk-delete";
   return "configured-operation";
 }
 
@@ -130,7 +137,10 @@ function classifyBrowserEffect(toolName: string, input: Record<string, unknown>)
   if (toolName === "browser_auth_ops") return "credential-or-auth";
   if (toolName === "browser_clipboard_ops") return "external-submit";
   if (toolName === "browser_file_ops") {
-    return input.action === "inspect_inputs" ? "configured-operation" : "external-submit";
+    if (input.action === "inspect_inputs") return "configured-operation";
+    return typeof input.action === "string" && DELETE_ACTION_PATTERN.test(input.action)
+      ? "bulk-delete"
+      : "external-submit";
   }
   return "configured-operation";
 }
@@ -152,11 +162,18 @@ async function classifyConfiguredPathEffect(
     ) continue;
     return {
       toolName: options.toolName,
-      category: "external-path",
+      category: isHardStopRiskCategory(effect) ? effect : "external-path",
       target: canonical,
       targetKind: "path",
       sourceLabel: options.sourceLabel
     };
+  }
+  return undefined;
+}
+
+function actionName(input: Record<string, unknown>): string | undefined {
+  for (const key of ["action", "op", "mode"] as const) {
+    if (typeof input[key] === "string") return input[key];
   }
   return undefined;
 }

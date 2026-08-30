@@ -58,11 +58,21 @@ describe("createDesktopToolRoutingExtension", () => {
     expect(result?.systemPrompt).toContain('workflow: "none"');
     expect(result?.systemPrompt).toContain("do not switch providers");
     expect(result?.systemPrompt).toContain("selected model decides whether to call its declared native search route");
+    expect(result?.systemPrompt).toContain("relative paths and bounded `bash` calls");
+    expect(result?.systemPrompt).toContain("native `read`/`grep`/`find`/`ls` Tools");
     expect(result?.systemPrompt).not.toContain("Current registered tool names");
 
     expect(routingHandlers(["subagent"]).beforeAgentStart({ systemPrompt: "base" })).toBeUndefined();
     expect(routingHandlers(["read"]).beforeAgentStart({ systemPrompt: "base" })).toBeUndefined();
     expect(routingHandlers([]).beforeAgentStart({ systemPrompt: "base" })).toBeUndefined();
+  });
+
+  it("adds bounded AUTO guidance for the native Bash Tool without requiring aliases", () => {
+    const result = routingHandlers(["bash", "read", "grep", "find"])
+      .beforeAgentStart({ systemPrompt: "base" });
+    expect(result?.systemPrompt).toContain("relative paths and bounded `bash` calls");
+    expect(result?.systemPrompt).toContain("Split variables");
+    expect(result?.systemPrompt).toContain("without broadening authorization");
   });
 
   it("explains pi-fff override and explicit naming from the live Package source", () => {

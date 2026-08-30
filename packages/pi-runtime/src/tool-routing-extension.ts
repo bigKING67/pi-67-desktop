@@ -260,13 +260,17 @@ function createToolRoutingGuidance(
     activeTools.has(spec.alias) && activeTools.has(spec.canonical)
   ));
   const piFffGuidance = createPiFffNamingGuidance(pi, activeTools);
-  if (aliases.length === 0 && piFffGuidance === undefined) return undefined;
+  const shellGuidance = activeTools.has("bash")
+    ? "For routine trusted-Workspace inspection, prefer relative paths and bounded `bash` calls composed from read-only commands, `&&`, `;`, read-only pipelines, `2>&1`, or `2>/dev/null`. Split variables, `$` expansion, loops, substitutions, arbitrary file redirection, and interpreter snippets into separate Tool Calls. Read current-Session loaded Skills and context through the native `read`/`grep`/`find`/`ls` Tools instead of a Bash loop. This keeps safe work in AUTO without broadening authorization."
+    : undefined;
+  if (aliases.length === 0 && piFffGuidance === undefined && shellGuidance === undefined) return undefined;
   const mappings = aliases.map((spec) => `\`${spec.alias}\`→\`${spec.canonical}\``).join(", ");
   return [
     "## Pi Desktop tool compatibility",
     aliases.length > 0
       ? `Prefer native Pi tool names and schemas. Desktop also accepts these deterministic aliases: ${mappings}.`
       : undefined,
+    shellGuidance,
     piFffGuidance,
     activeTools.has("WebSearch")
       ? "For current web lookups, prefer `web_search`; the `WebSearch` alias is forwarded to it with `workflow: \"none\"` by default. The selected model decides whether to call its declared native search route. If that call fails, do not switch providers, repeat the query, or inspect legacy web-search.json because it may contain credentials. Use one batched `fetch_content` call only when exact URLs are already known; otherwise report the native search failure."

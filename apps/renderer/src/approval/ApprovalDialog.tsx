@@ -1,7 +1,8 @@
-import type {
-  ApprovalResponseDecision,
-  ApprovalTargetKind,
-  RiskCategory
+import {
+  isHardStopRiskCategory,
+  type ApprovalResponseDecision,
+  type ApprovalTargetKind,
+  type RiskCategory
 } from "@pi67/domain";
 import { useEffect, useState } from "react";
 import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
@@ -33,6 +34,7 @@ export function ApprovalDialog() {
   }, [request?.requestId]);
   if (!request) return null;
 
+  const hardStop = isHardStopRiskCategory(request.category);
   const toolName = analyzeSecurityLiteral(request.toolName);
   const toolSource = analyzeSecurityLiteral(request.toolSource);
   const target = analyzeSecurityLiteral(request.target);
@@ -74,11 +76,18 @@ export function ApprovalDialog() {
   return (
     <ModalOverlay className={`modal-overlay ${styles.overlay}`} isOpen isDismissable={false}>
       <Modal className={`modal-surface ${styles.modal}`}>
-        <Dialog aria-label={messages.approval.dialogLabel} className={styles.dialog ?? ""}>
+        <Dialog
+          aria-label={hardStop ? messages.approval.destructiveDialogLabel : messages.approval.dialogLabel}
+          className={styles.dialog ?? ""}
+        >
           <div className={styles.content}>
             <header className={styles.header}>
-              <span className="dialog-eyebrow">{messages.approval.eyebrow}</span>
-              <Heading slot="title">{messages.approval.title}</Heading>
+              <span className="dialog-eyebrow">
+                {hardStop ? messages.approval.destructiveEyebrow : messages.approval.eyebrow}
+              </span>
+              <Heading slot="title">
+                {hardStop ? messages.approval.destructiveTitle : messages.approval.title}
+              </Heading>
               <p className={styles.reason}>{request.reason}</p>
             </header>
             <div className={styles.body} data-approval-scroll-region="true">
@@ -131,25 +140,35 @@ export function ApprovalDialog() {
                 </div>
                 <div><dt>{messages.approval.approvalScope}</dt><dd>{messages.approval.singleToolCall}</dd></div>
               </dl>
-              <p className={styles.denial}>{messages.approval.denialNotice}</p>
-              <p className={styles.yoloNotice}>{messages.approval.yoloNotice}</p>
+              <p className={styles.denial}>
+                {hardStop ? messages.approval.destructiveNotice : messages.approval.denialNotice}
+              </p>
+              {hardStop ? null : <p className={styles.yoloNotice}>{messages.approval.yoloNotice}</p>}
             </div>
             <div className={`dialog-actions ${styles.actions}`}>
               <Button autoFocus className="secondary-button" isDisabled={submittingDecision !== undefined || stoppingTask} onPress={() => void submit("deny")}>
                 {submittingDecision === "deny" ? messages.approval.submitting : messages.approval.deny}
               </Button>
-              <Button className="primary-button" isDisabled={submittingDecision !== undefined || stoppingTask} onPress={() => void submit("allow-once")}>
-                {submittingDecision === "allow-once" ? messages.approval.submitting : messages.approval.allowOnce}
-              </Button>
               <Button
-                className={styles.yoloButton!}
+                className={hardStop ? "danger-button" : "primary-button"}
                 isDisabled={submittingDecision !== undefined || stoppingTask}
-                onPress={() => void submit("enable-task-yolo-and-allow")}
+                onPress={() => void submit("allow-once")}
               >
-                {submittingDecision === "enable-task-yolo-and-allow"
+                {submittingDecision === "allow-once"
                   ? messages.approval.submitting
-                  : messages.approval.enableTaskYolo}
+                  : hardStop ? messages.approval.executeDestructiveOnce : messages.approval.allowOnce}
               </Button>
+              {hardStop ? null : (
+                <Button
+                  className={styles.yoloButton!}
+                  isDisabled={submittingDecision !== undefined || stoppingTask}
+                  onPress={() => void submit("enable-task-yolo-and-allow")}
+                >
+                  {submittingDecision === "enable-task-yolo-and-allow"
+                    ? messages.approval.submitting
+                    : messages.approval.enableTaskYolo}
+                </Button>
+              )}
               {stoppableTaskId ? (
                 <Button
                   className="danger-button"

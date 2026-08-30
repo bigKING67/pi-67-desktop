@@ -113,17 +113,24 @@
   approval.
 - New trusted Workspaces default to `balanced`: bounded Workspace reads/writes,
   current-Session loaded-resource reads, verified read-only web Tools, and
-  conservatively classified local checks may run without a duplicate dialog. An
+  conservatively classified local checks, common project scripts, Workspace-local
+  dependency changes, and non-destructive local Git operations may run without a duplicate dialog. An
   enabled Package or MCP capability whose installed content is admitted and whose
   effective Tool identity resolves uniquely is also an AUTO authorization grant,
-  including its destructive, system, external-path, upload, authentication,
-  publish, dependency, or remote side effects. ASK remains one-shot; PLAN remains
-  read-only. Unknown, unconfigured, duplicate, malformed, drifted, or ambiguous
-  capabilities fail closed instead of inheriting that grant.
+  including its system, external-path, upload, authentication, publish, dependency,
+  or remote side effects. Recognized file, persistent-state, external-object, Shell,
+  and destructive-Git deletion remains an exact one-shot hard confirmation before
+  both that AUTO grant and YOLO. Trusted YOLO automatically executes every other
+  valid registered Tool; it does not make an invalid identity, schema, route, or
+  target valid. ASK remains one-shot; PLAN remains read-only. Unknown, duplicate,
+  malformed, drifted, or non-approvable capabilities fail closed instead of
+  inheriting a grant. AUTO Shell syntax that cannot be classified safely returns a
+  corrective Tool Result without opening a meaningless approval dialog.
 - Extensions cannot inject HTML, JavaScript, or React components into the
   renderer. TUI-only custom UI must fail explicitly instead of hanging.
-- Destructive, external, system, or workspace-external actions outside an exact
-  installed-capability AUTO grant require an explicit one-shot approval. Loaded
+- Recognized irreversible destructive actions always require an explicit exact
+  one-shot confirmation. Other external, system, or workspace-external actions
+  outside an exact installed-capability AUTO grant require one-shot approval. Loaded
   resources alone never create that grant: the only Workspace-external read
   exception is the canonical file or Skill directory already loaded by that exact
   Session's Pi `ResourceLoader`; it never grants write or arbitrary home-directory

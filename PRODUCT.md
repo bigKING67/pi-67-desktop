@@ -456,14 +456,19 @@ the only Runtime and behavior specification source.
   resource reads, capability inspection, and verified read-only web operations;
   configured operations, persistent writes, Workspace writes and commands, and
   higher-risk effects request a one-shot decision. `AUTO` additionally permits
-  canonical Workspace writes, bounded local inspection/test/build commands,
-  non-destructive persistent-state writes, and every operation from an enabled,
+  canonical Workspace writes, bounded local inspection/test/build and common
+  project commands, Workspace-local dependency changes, non-destructive local Git
+  operations, non-destructive persistent-state writes, and every operation from an enabled,
   installed/admitted Package or MCP capability whose effective identity resolves
   uniquely. That persistent capability grant includes authentication, JavaScript,
   native input, clipboard, external paths/files, upload, external submission,
-  deletion, system, dependency, publish, remote, and network side effects.
-  `YOLO` permits every registered Tool in that trusted Task Runtime, including
-  calls which do not have an installed-capability grant.
+  system, dependency, publish, remote, and network side effects. Recognized file,
+  persistent-state, external-object, Shell, and destructive-Git deletion is the
+  narrow exception: it always requests exact one-shot confirmation before AUTO's
+  installed-capability grant or YOLO. `YOLO` permits every other valid registered
+  Tool in that trusted Task Runtime, including calls which do not have an
+  installed-capability grant. YOLO never makes an invalid Tool identity, schema,
+  route, or target valid.
 - AUTO trusts an effective configured source, not an arbitrary registered Tool
   name. At Session resource load, Desktop builds a bounded in-memory capability
   catalog from the effective Task-local Package settings plus that Task's valid
@@ -477,6 +482,18 @@ the only Runtime and behavior specification source.
   inspection/test/build commands, and exact read access to the Skills, Prompt
   files, context files, and visible Extension files already loaded by that
   Session may run according to the selected mode without duplicate dialogs.
+  Safe Shell composition admits independently safe `&&`/`;` segments, read-only
+  pipelines, file-descriptor merge `2>&1`, and exact stderr discard to
+  `/dev/null`; arbitrary file redirection, expansion, control flow, interpreters,
+  or one unsafe segment keeps the complete call behind approval. Absolute Shell
+  paths are canonicalized against the real Workspace, including Windows Git Bash
+  drive paths, before AUTO can treat them as Workspace-local. AUTO admits
+  Workspace-local dependency changes, common project scripts, and non-destructive
+  local Git operations after destructive flags, global scope, external paths, and
+  remote writes have been separated. Shell syntax whose complete effects cannot be
+  classified is blocked with a corrective Tool Result so Pi can split or restate
+  it; AUTO does not interrupt the user with an approval dialog that cannot make the
+  classification reliable.
   Loaded Skill directories grant only read/search/list access within the
   canonical directory; other loaded resources grant only exact-file read/search,
   never write or symlink escape. Pi-67 registers `web_search`, `source_check`,
@@ -491,10 +508,12 @@ the only Runtime and behavior specification source.
   results, unsafe redirects, and responses over 2 MiB. Successful search or fetch
   results receive an in-memory bounded `responseId` for `get_search_content`; the
   reference neither performs a second network request nor broadens Tool authority.
-  Outside an exact installed-capability grant, external paths, persistent-state
-  deletion, upload or external submit, authentication or credential actions,
-  dependency changes, destructive commands, publishing, remote Git, system
-  changes, and external writes retain one-shot approval in AUTO. Calls that
+  Recognized irreversible deletion and destructive commands retain exact one-shot
+  confirmation even under an installed-capability grant or YOLO. Outside an exact
+  installed-capability grant, external paths, upload or external submit,
+  authentication or credential actions, publishing, remote Git writes, system
+  changes, global dependencies, and external writes retain one-shot approval in
+  AUTO. Calls that
   approval cannot make valid -- including unregistered or
   ambiguous Tools, reserved Tool identity mismatches, malformed MCP routing, and
   unverifiable opaque cursors -- are rejected with a corrective message and no
@@ -525,8 +544,9 @@ the only Runtime and behavior specification source.
   search/describe, and current-Session UI-message inspection run in `ASK` and
   `AUTO`. In AUTO, connecting a server already present in effective `mcp.json`
   and invoking a nested Tool present in the effective cache use that resolved
-  installed-capability grant for every classified side effect, including the
-  configured target's OAuth/authentication and credential flow. ASK still requests
+  installed-capability grant for every classified non-hard-stop side effect,
+  including the configured target's OAuth/authentication and credential flow;
+  recognized deletion remains exact-confirmation only. ASK still requests
   a one-shot decision for connect and configured operations. Adding an unconfigured
   server or expanding the configured server catalog remains a separate configuration
   confirmation boundary.
@@ -543,10 +563,12 @@ the only Runtime and behavior specification source.
   remember/add/learn/propose/flush are non-destructive persistent writes and run
   in AUTO. When Memory, browser67, JS-Reverse, or another Package/MCP source is
   installed/admitted and resolves uniquely, its complete configured Tool surface
-  runs in AUTO: this includes forget/delete/purge, JavaScript execution, native
-  input, clipboard mutation, upload, authentication, external file effects, hook
-  removal, and finalization. Their effect categories remain visible for ASK,
-  PLAN, audit, and diagnostics; authorization is not inferred from Tool names.
+  runs in AUTO except for recognized irreversible effects: JavaScript execution,
+  native input, clipboard mutation, upload, authentication, external file writes,
+  hook removal, and finalization run automatically, while forget/delete/purge and
+  declared file or external-object deletion request exact confirmation. Effect
+  categories remain visible for ASK, PLAN, audit, and diagnostics; authorization
+  is not inferred from Tool names alone.
 - Restored Workspace registrations are checked against their persisted filesystem
   identity before project resources load. A missing or replaced directory stays
   inactive until the user explicitly repairs it through the native directory
@@ -1220,11 +1242,15 @@ the only Runtime and behavior specification source.
   `AUTO · 工作区命令`, or `AUTO · Workspace 内写入`. Renderer code never infers
   this reason and Pi JSONL is not rewritten to persist it; raw Tool args, results,
   prompts, source paths, URLs, and credentials never enter this projection.
-- The approval dialog names the verified Tool source and offers `拒绝`,
+- The ordinary approval dialog names the verified Tool source and offers `拒绝`,
   `仅允许本次`, and `本任务开启 YOLO`. The third action atomically allows the
-  current and other pending Safety Approval requests in the same Runtime, but it
-  never resolves ordinary Extension `ctx.ui` requests. Composer-initiated YOLO
-  selection requires a second confirmation in the same upward menu.
+  current and other pending ordinary Safety Approval requests in the same Runtime,
+  but it never resolves hard-stop deletion confirmations or ordinary Extension
+  `ctx.ui` requests. A hard-stop dialog instead offers `拒绝` and
+  `确认执行此操作`; exact confirmation never grants later destructive calls and
+  remains required when the Task is already in YOLO. Composer-initiated YOLO
+  selection requires a second confirmation in the same upward menu and describes
+  this narrow exception.
 - A blocking Safety Approval or Extension input distinguishes resolving only the
   current interaction from stopping the entire Task. `拒绝`/`取消当前输入` answers
   that one request; `停止整个任务` is available only when exactly one current Task

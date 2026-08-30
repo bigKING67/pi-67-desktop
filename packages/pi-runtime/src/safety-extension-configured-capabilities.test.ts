@@ -75,8 +75,8 @@ describe("createDesktopSafetyExtension configured capabilities", () => {
     }), expect.any(Object));
   });
 
-  it("auto-allows installed MCP Direct Tools including persistent deletion", async () => {
-    const requestApproval = vi.fn<DesktopApprovalRequester>();
+  it("auto-allows installed MCP writes but keeps persistent deletion behind hard confirmation", async () => {
+    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
     const tools = [
       packageTool("agent_memory_remember", "npm:pi-mcp-adapter@2.11.0"),
       packageTool("agent_memory_forget", "npm:pi-mcp-adapter@2.11.0")
@@ -95,9 +95,13 @@ describe("createDesktopSafetyExtension configured capabilities", () => {
       toolCallId: "memory-delete",
       toolName: "agent_memory_forget",
       input: { id: "memory-1" }
-    }, { hasUI: true })).resolves.toBeUndefined();
+    }, { hasUI: true })).resolves.toMatchObject({ block: true });
 
-    expect(requestApproval).not.toHaveBeenCalled();
+    expect(requestApproval).toHaveBeenCalledOnce();
+    expect(requestApproval).toHaveBeenCalledWith(expect.objectContaining({
+      category: "persistent-state-delete",
+      toolCallId: "memory-delete"
+    }), expect.any(Object));
   });
 
   it("auto-allows external paths from an installed Package and records the grant basis", async () => {

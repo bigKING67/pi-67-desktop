@@ -12,6 +12,7 @@ import type {
   ExtensionUiCancellationReason,
   ExtensionUiRequestView
 } from "@pi67/domain";
+import { isHardStopRiskCategory } from "@pi67/domain";
 import type { AgentEvent } from "@pi67/protocol";
 import type { DesktopApprovalDecision } from "./safety-extension.js";
 
@@ -167,6 +168,13 @@ export class DesktopExtensionUiBridge {
     return pending?.purpose === "approval" && pending.toolCallId === toolCallId;
   }
 
+  hasPendingHardStopApproval(requestId: string, toolCallId: string): boolean {
+    const pending = this.pending.get(requestId);
+    return pending?.purpose === "approval"
+      && pending.toolCallId === toolCallId
+      && isHardStopRiskCategory(pending.details.category);
+  }
+
   hasPendingSubagentApproval(requestId: string, toolCallId: string): boolean {
     const pending = this.pending.get(requestId);
     return pending?.purpose === "approval"
@@ -174,10 +182,10 @@ export class DesktopExtensionUiBridge {
       && pending.details.subagent !== undefined;
   }
 
-  allowAllPendingApprovals(): string[] {
+  allowAllPendingOrdinaryApprovals(): string[] {
     const resolved: string[] = [];
     for (const [requestId, pending] of this.pending) {
-      if (pending.purpose !== "approval") continue;
+      if (pending.purpose !== "approval" || isHardStopRiskCategory(pending.details.category)) continue;
       this.pending.delete(requestId);
       clearTimeout(pending.timer);
       pending.abort?.();

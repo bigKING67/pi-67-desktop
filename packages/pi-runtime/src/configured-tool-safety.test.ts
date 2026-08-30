@@ -37,12 +37,29 @@ describe("classifyConfiguredToolIntent", () => {
     });
   });
 
+  it("classifies declared file and external deletion as hard-stop effects", async () => {
+    const workspace = await fixtureWorkspace();
+    await expect(classify("file_ops", { action: "delete_file" }, workspace)).resolves.toMatchObject({
+      category: "bulk-delete"
+    });
+    await expect(classify("delete_repository", {}, workspace)).resolves.toMatchObject({
+      category: "external-delete"
+    });
+    await expect(classify("delete_file", {
+      path: join(workspace, "..", "outside.txt")
+    }, workspace)).resolves.toMatchObject({
+      category: "bulk-delete",
+      targetKind: "path"
+    });
+  });
+
   it("keeps passive Browser operations automatic while isolating active input, upload, and auth", async () => {
     const workspace = await fixtureWorkspace();
     for (const [toolName, input, category] of [
       ["browser_scan", { action: "snapshot" }, "configured-operation"],
       ["browser_file_ops", { action: "inspect_inputs" }, "configured-operation"],
       ["browser_file_ops", { action: "set_input_files" }, "external-submit"],
+      ["browser_file_ops", { action: "delete_file" }, "bulk-delete"],
       ["browser_execute_js", {}, "external-submit"],
       ["browser_native_input", { action: "click" }, "external-submit"],
       ["browser_clipboard_ops", { action: "write_text" }, "external-submit"],

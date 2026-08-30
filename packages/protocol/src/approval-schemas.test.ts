@@ -30,6 +30,7 @@ describe("ApprovalRequestSchema", () => {
     expect(Value.Check(ApprovalRequestSchema, { ...request, category: "configured-operation" })).toBe(true);
     expect(Value.Check(ApprovalRequestSchema, { ...request, category: "persistent-state-write" })).toBe(true);
     expect(Value.Check(ApprovalRequestSchema, { ...request, category: "persistent-state-delete" })).toBe(true);
+    expect(Value.Check(ApprovalRequestSchema, { ...request, category: "external-delete" })).toBe(true);
     expect(Value.Check(ApprovalRequestSchema, { ...request, category: "external-submit" })).toBe(true);
     expect(Value.Check(ApprovalRequestSchema, { ...request, category: "credential-or-auth" })).toBe(true);
     expect(Value.Check(ApprovalRequestSchema, { ...request, category: "unknown-risk" })).toBe(false);

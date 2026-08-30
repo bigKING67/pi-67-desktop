@@ -1510,7 +1510,9 @@ loading error where the operation can produce those states
 - `ASK` and `AUTO` switch directly after an authoritative Host acknowledgement;
   the resting control never changes optimistically. Selecting `YOLO` replaces
   the same menu content with a second confirmation naming workspace-external,
-  deletion, system, and network scope. An untrusted Workspace disables that
+  system, and network automation plus the narrow irreversible-operation
+  confirmation exception. Its short consequence reads
+  `普通工具全部自动，仅不可逆操作确认`. An untrusted Workspace disables that
   option with `仅可信工作区可开启` instead of waiting for a Host error.
 - Tool mode belongs to the exact live Task Runtime. Switching conversations
   displays that Task's independent value; session transition or missing Session
@@ -1885,28 +1887,40 @@ loading error where the operation can produce those states
 - New trusted Workspaces default to `AUTO` (`balanced`). Exact Workspace
   read/write Tools, exact current-Session loaded resource reads, first-party
   read-only web Tools, non-destructive persistent writes, conservatively classified
-  local inspection/test/build Shell commands, and every operation from an enabled,
+  local inspection/test/build and common project Shell commands, Workspace-local
+  dependency changes, non-destructive local Git operations, and every operation from an enabled,
   installed/admitted Package or MCP capability whose effective identity resolves
   uniquely proceed without repetitive approval. The installed-capability grant
   includes authentication, JavaScript, native input, clipboard, external files,
-  upload/submission, deletion, system, dependency, publish, remote, and network
-  side effects. A
-  bounded `&&` chain or read-only pipeline is admitted only when every segment is
-  independently safe; Workspace-local `cd` and the small CI environment allowlist
-  never widen a following segment's authority. Redirection, substitution, unknown
-  interpreters, unsafe environment changes, or one unsafe segment keep the complete
-  command in the one-shot flow.
+  upload/submission, system, dependency, publish, remote, and network side effects.
+  Recognized file, persistent-state, external-object, Shell, and destructive-Git
+  deletion is a hard stop before both this grant and YOLO. Every other valid
+  registered Tool runs directly in trusted YOLO; invalid identity, schema, route,
+  and target state remains corrective rather than executable. A
+  bounded `&&`/`;` chain or read-only pipeline is admitted only when every segment
+  is independently safe; Workspace-local `cd` and the small CI environment allowlist
+  never widen a following segment's authority. File-descriptor merge `2>&1` and
+  exact stderr discard `2>/dev/null` do not create a write grant. Arbitrary file
+  redirection, substitution, control flow, unknown interpreters, unsafe environment
+  changes, or one unsafe segment keep the complete command in the one-shot flow.
+  Absolute path tokens are canonicalized against the real Workspace before AUTO;
+  Windows Git Bash `/c/...` paths normalize to their native drive identity. Pi's
+  bounded Tool guidance asks the model to split variables/loops into separate calls
+  and use native `read`/`grep`/`find`/`ls` for loaded Session resources. AUTO blocks
+  unclassifiable Shell with that corrective Tool Result instead of opening a modal
+  whose approval cannot make the classification reliable.
   The effective capability catalog is rebuilt from Task-local Package settings
   and bounded `mcp.json`/`mcp-cache.json` metadata at resource load/reload; Tool
   Calls perform in-memory identity lookups and never expose command, env, URL,
   credential, args, results, or source paths. Skill directories authorize only canonical
   `read`/`grep`/`find`/`ls` targets within that directory; loaded Prompt, context,
   and visible Extension resources authorize only canonical exact-file reads.
-  Reload atomically replaces those grants. Symlink escape, arbitrary home files,
-  persistent deletion, upload or external submit, credentials/authentication,
-  dependencies, destructive or ambiguous Shell, publish, remote Git, system
-  changes, and external writes retain the dedicated one-shot flow only when they
-  do not originate from an exact installed-capability grant. PLAN remains read-only;
+  Reload atomically replaces those grants. Recognized irreversible deletion and
+  destructive Shell always retain exact one-shot confirmation. Symlink escape,
+  arbitrary home files, upload or external submit, credentials/authentication,
+  global dependencies, publish, remote Git writes, system changes, and external
+  writes retain the dedicated one-shot flow when they do not originate from an
+  exact installed-capability grant. PLAN remains read-only;
   ASK remains one-shot; unconfigured, duplicate, malformed, unverified, or drifted
   identities remain corrective failures rather than approvable shortcuts.
 - Retired `@ff-labs/pi-fff` is neither bundled nor recommended. If a user
@@ -1936,8 +1950,9 @@ loading error where the operation can produce those states
   bounded search/describe, and current-Session UI-message reads use the
   read-only capability category in `ASK` and `AUTO`. AUTO connects an already
   configured server and runs a cached nested Tool under the resolved installed-
-  capability grant for every classified side effect, including that target's
-  OAuth/authentication and credential flow; ASK requests one-shot approval for
+  capability grant for every classified non-hard-stop side effect, including that
+  target's OAuth/authentication and credential flow; recognized deletion remains
+  exact-confirmation only. ASK requests one-shot approval for
   connect and configured operations. New server setup or catalog expansion remains
   a separate configuration confirmation boundary. Missing or ambiguous servers/Tools,
   malformed args, duplicate sources, and unsupported versions are corrective
@@ -1948,18 +1963,23 @@ loading error where the operation can produce those states
 - Configured Memory read/list/recall calls remain classified as reads, and
   add/remember/learn/propose/flush remain classified as persistent writes. When
   Memory, browser67, JS-Reverse, or another Package/MCP source is installed/admitted
-  and resolves uniquely, AUTO also executes its delete/forget/purge, JavaScript,
-  native input, clipboard, upload, authentication, external-file, hook cleanup,
-  and finalization operations. Classification remains visible in ASK, PLAN, audit,
-  and diagnostics even when the installed-capability grant removes duplicate AUTO
-  approval.
+  and resolves uniquely, AUTO executes JavaScript, native input, clipboard, upload,
+  authentication, external-file writes, hook cleanup, and finalization operations.
+  Delete/forget/purge and declared file or external-object deletion remain exact
+  confirmation. Classification remains visible in ASK, PLAN, audit, and diagnostics
+  even when the installed-capability grant removes other duplicate AUTO approval.
 - Approval makes bidi, zero-width, control, and non-standard line-separator
   characters explicit in a non-mutating safe display. At constrained height,
-  details scroll independently while all three decision actions remain visible.
-- Approval actions are ordered `拒绝`, `仅允许本次`, `本任务开启 YOLO`, with
+  details scroll independently while all applicable decision actions remain visible.
+- Ordinary Approval actions are ordered `拒绝`, `仅允许本次`, `本任务开启 YOLO`, with
   default focus on `拒绝`. The YOLO action atomically permits the current and all
-  other pending Safety Approval requests owned by the same Task Runtime and
-  changes its mode; ordinary Extension `ctx.ui` requests remain pending. A stale
+  other pending ordinary Safety Approval requests owned by the same Task Runtime
+  and changes its mode; hard-stop approvals and ordinary Extension `ctx.ui`
+  requests remain pending. Hard-stop Approval uses the same Dialog, detail table,
+  safe literals, fixed action region, focus contract, and theme tokens, but changes
+  its title to `确认不可逆操作` and exposes only `拒绝` plus the destructive
+  `确认执行此操作` Tool decision. `停止整个任务` remains a separately authorized
+  lifecycle action when available. A stale
   Host, Session generation, Operation, request, or Tool call cannot enable the
   mode. The mode never changes OS permission, Electron sandbox/preload,
   credential, update/signing, or Workspace trust boundaries.

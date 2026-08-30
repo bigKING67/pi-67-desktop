@@ -5,8 +5,8 @@ import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-ag
 import {
   MAX_APPROVAL_CWD_BYTES,
   MAX_APPROVAL_TARGET_BYTES,
-  classifyShellCommand,
   decideApproval,
+  isHardStopRiskCategory,
   isPlanModeReadOnlyShellCommand,
   type ApprovalTargetKind,
   type ApprovalRequestDetails,
@@ -20,6 +20,7 @@ import {
   type WorkspaceTrust
 } from "@pi67/domain";
 import { canonicalizePotentialPath, isContained } from "./path-policy.js";
+import { classifyBuiltinShellCommand } from "./builtin-shell-safety.js";
 import {
   isVerifiedDesktopToolAlias,
   resolveDesktopToolAliasCall
@@ -74,6 +75,7 @@ const WRITE_TOOLS = new Set(["write", "edit"]);
 interface ClassifiedToolIntent extends ToolIntent {
   targetKind: ApprovalTargetKind;
   sourceLabel: string;
+  approvalReason?: string;
   nonApprovableReason?: string;
   autoAuthorizationReason?: ToolAutoAuthorizationReason;
 }
@@ -115,13 +117,15 @@ export function createDesktopSafetyExtension(
             reason: "PLAN_MODE_READ_ONLY: 当前会话处于计划模式，只允许只读检查、原生搜索和计划交互。请切换到执行模式后再修改或运行可能写入的命令。"
           };
         }
-        if (state.trust === "trusted" && state.taskToolMode === "yolo") return undefined;
         if (intent.nonApprovableReason) {
           return { block: true, reason: intent.nonApprovableReason };
         }
+        const hardStop = isHardStopRiskCategory(intent.category);
+        if (state.trust === "trusted" && state.taskToolMode === "yolo" && !hardStop) return undefined;
         if (
           state.trust === "trusted"
           && state.taskToolMode === "auto"
+          && !hardStop
           && intent.autoAuthorizationReason !== undefined
         ) {
           recordToolAuthorization?.(event.toolCallId, intent.autoAuthorizationReason);
@@ -135,9 +139,12 @@ export function createDesktopSafetyExtension(
           if (authorizationReason) recordToolAuthorization?.(event.toolCallId, authorizationReason);
           return undefined;
         }
-        if (!decision.approvalRequired) return { block: true, reason: decision.reason };
+        if (!decision.approvalRequired) {
+          return { block: true, reason: intent.approvalReason ?? decision.reason };
+        }
         if (!ctx.hasUI) return { block: true, reason: "π approval UI is unavailable." };
 
+        const approvalReason = intent.approvalReason ?? decision.reason;
         const target = boundUtf8(intent.target, MAX_APPROVAL_TARGET_BYTES);
         const cwd = boundUtf8(state.cwd, MAX_APPROVAL_CWD_BYTES);
         if (target.truncated || cwd.truncated) {
@@ -152,7 +159,7 @@ export function createDesktopSafetyExtension(
             toolName: intent.toolName,
             toolSource: intent.sourceLabel,
             category: intent.category,
-            reason: decision.reason,
+            reason: approvalReason,
             targetKind: intent.targetKind,
             target: target.value,
             targetTruncated: false,
@@ -169,7 +176,7 @@ export function createDesktopSafetyExtension(
           }
           return {
             block: true,
-            reason: `工具已注册，但用户未批准本次一次性授权：${decision.reason}。这不表示工具不可用；不要自动重试。`
+            reason: `工具已注册，但用户未批准本次一次性授权：${approvalReason}。这不表示工具不可用；不要自动重试。`
           };
         } catch {
           return { block: true, reason: "π approval was unavailable and failed closed." };
@@ -186,7 +193,7 @@ function autoAuthorizationReason(category: RiskCategory): ToolAutoAuthorizationR
     || category === "capability-read"
     || category === "network-read"
   ) return "read-only";
-  if (category === "workspace-command") return "workspace-command";
+  if (category === "workspace-command" || category === "dependency-change") return "workspace-command";
   if (category === "workspace-write") return "workspace-write";
   if (category === "configured-operation" || category === "persistent-state-write") {
     return "configured-source";
@@ -257,12 +264,14 @@ async function classifyToolIntent(
   }
   if (toolName === "bash" && profile.kind === "builtin") {
     const command = stringField(record, "command") ?? "";
+    const shell = await classifyBuiltinShellCommand(command, workspace);
     return {
       toolName,
-      category: classifyShellCommand(command),
+      category: shell.category,
       target: command,
       targetKind: "command",
-      sourceLabel: profile.sourceLabel
+      sourceLabel: profile.sourceLabel,
+      ...(shell.approvalReason === undefined ? {} : { approvalReason: shell.approvalReason })
     };
   }
 

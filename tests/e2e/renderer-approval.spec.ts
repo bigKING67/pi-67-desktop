@@ -133,6 +133,45 @@ test("renders a host-authored network-read approval when one is required", async
   await expect(page.getByRole("button", { name: "本任务开启 YOLO" })).toBeVisible();
 });
 
+test("renders destructive confirmation without offering a YOLO bypass", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
+  await clearRecordedCommands(page);
+  const operationId = "operation-destructive-confirmation";
+  await startApprovalOperation(page, operationId);
+  const request = approvalRequest(operationId, "approval-delete", "rm -rf build");
+
+  await emitMockAgentEvent(page, {
+    ...request,
+    payload: {
+      ...request.payload,
+      category: "bulk-delete",
+      reason: "批量删除文件或目录"
+    }
+  }, { operationId });
+
+  await expect(page.getByRole("dialog", { name: "不可逆操作确认" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "确认不可逆操作" })).toBeVisible();
+  await expect(page.getByText("批量删除", { exact: true })).toBeVisible();
+  await expect(page.getByText(/即使任务已开启 YOLO/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "拒绝" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "本任务开启 YOLO" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "确认执行此操作" }).click();
+  await expect.poll(async () => (
+    await recordedCommandDetails(page)
+  ).find((command) => command.type === "approval.respond")?.payload).toEqual({
+    requestId: "approval-delete",
+    toolCallId: "tool-approval-delete",
+    sessionId: "session-test",
+    sessionGeneration: 1,
+    operationId,
+    decision: "allow-once"
+  });
+});
+
 test("opens keyboard help from the shared action registry without a Web Search toggle", async ({ page }) => {
   await page.goto("/");
   await attachMockAgent(page);

@@ -26,6 +26,7 @@ const RiskCategorySchema = Type.Union([
   Type.Literal("configured-operation"),
   Type.Literal("persistent-state-write"),
   Type.Literal("persistent-state-delete"),
+  Type.Literal("external-delete"),
   Type.Literal("external-submit"),
   Type.Literal("credential-or-auth"),
   Type.Literal("unverified-tool"),
