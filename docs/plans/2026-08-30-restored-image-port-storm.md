@@ -154,6 +154,11 @@ the prior transferable call and unbounded cross-flight recovery behavior.
   wait-window miss while the other 616 files passed. The exact test then passed
   alone in 327 ms, and the unchanged full aggregate gate passed 617/617 files,
   3,212 tests, with 3 skipped.
+- 2026-08-30: The first exact-SHA macOS candidate packaging reached packaged
+  smoke and failed because its assertion still hard-coded the prior 21-member
+  AI Berkshire count. Cancelled the superseded Windows run `33287416833` and
+  changed the smoke to derive a validated member count from the immutable Pack
+  lock, preventing the same drift on later Pack additions.
 
 ## Closeout
 

@@ -17,10 +17,22 @@ export function resolveSkillPackSource(lock, packName) {
     matches.length !== 1
     || !/^[0-9a-f]{40}$/u.test(matches[0]?.commit ?? "")
     || !/^\d+\.\d+\.\d+$/u.test(matches[0]?.version ?? "")
+    || !Array.isArray(matches[0]?.skills)
+    || matches[0].skills.length === 0
+    || matches[0].skills.length > 256
+    || matches[0].skills.some((skill) => (
+      typeof skill?.name !== "string"
+      || !/^[a-z0-9][a-z0-9-]{0,79}$/u.test(skill.name)
+      || !/^[0-9a-f]{64}$/u.test(skill.sha256 ?? "")
+    ))
   ) {
     throw new Error(`Capability source lock does not uniquely pin Skill Pack ${packName}.`);
   }
-  return { commit: matches[0].commit, version: matches[0].version };
+  return {
+    commit: matches[0].commit,
+    version: matches[0].version,
+    skillCount: matches[0].skills.length
+  };
 }
 
 export async function assertPackagedSkillSuites(skillSettingsWorkspace, captureScreenshot) {
@@ -38,7 +50,10 @@ export async function assertPackagedSkillSuites(skillSettingsWorkspace, captureS
   if (await bundledRows.getByText("design-craft", { exact: true }).count()) {
     throw new Error("Packaged bundled Skill summary flattened individual Skill entries.");
   }
-  await aiBerkshireRow.getByText(new RegExp(`^21 个技能 · .*${escapeRegExp(aiBerkshireSource.version)}`, "u"))
+  await aiBerkshireRow.getByText(new RegExp(
+    `^${aiBerkshireSource.skillCount} 个技能 · .*${escapeRegExp(aiBerkshireSource.version)}`,
+    "u"
+  ))
     .waitFor({ state: "visible", timeout: 15_000 });
   await captureScreenshot("07-bundled-skill-suites.png");
   await bundledSkillPanel.getByTestId("bundled-skill-suite-row")
