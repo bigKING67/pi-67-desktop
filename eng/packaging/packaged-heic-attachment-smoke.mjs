@@ -21,7 +21,7 @@ export async function preparePackagedProjectedImage(window) {
   return { byteLength: payload.byteLength, name };
 }
 
-export async function verifyPackagedProjectedImage(window, stage) {
+export async function verifyPackagedProjectedImage(window, stage, { expectRuntimeReady = true } = {}) {
   const image = window.getByRole("img", { name: "会话图片" }).last();
   try {
     await image.waitFor({ state: "visible", timeout: 30_000 });
@@ -38,8 +38,12 @@ export async function verifyPackagedProjectedImage(window, stage) {
   }
   await window.waitForTimeout(750);
   await image.waitFor({ state: "visible", timeout: 5_000 });
-  await window.locator('[data-runtime-phase="ready"]')
+  await window.locator('[data-pending-user-turn="false"]')
     .waitFor({ state: "visible", timeout: 5_000 });
+  if (expectRuntimeReady) {
+    await window.locator('[data-runtime-phase="ready"]')
+      .waitFor({ state: "visible", timeout: 5_000 });
+  }
 }
 
 async function inspectProjectedImageState(window) {

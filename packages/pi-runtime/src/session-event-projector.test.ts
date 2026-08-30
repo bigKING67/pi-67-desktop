@@ -2,7 +2,6 @@ import {
   SessionManager,
   type AgentSession,
   type AgentSessionEvent,
-  type SessionEntry,
   type SessionStats
 } from "@earendil-works/pi-coding-agent";
 import type { AgentEvent } from "@pi67/protocol";
@@ -10,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SessionEventProjector } from "./session-event-projector.js";
 
 describe("SessionEventProjector", () => {
-  it("refreshes Conversation projection when a user entry is appended, but not for assistant entries", () => {
+  it("refreshes Conversation after Pi persists a completed user message, but not for assistant messages", async () => {
     const manager = SessionManager.inMemory("/tmp", { id: "session-event-projector" });
     const emitted: AgentEvent[] = [];
     const session = { sessionId: manager.getSessionId(), sessionManager: manager } as AgentSession;
@@ -29,19 +28,46 @@ describe("SessionEventProjector", () => {
       settleActiveToolExecutions: vi.fn()
     });
 
-    const userId = manager.appendMessage({ role: "user", content: "Run the task", timestamp: 1 });
-    projector.handle(appended(manager.getEntry(userId)!));
-    const assistantId = manager.appendMessage(assistantMessage("Working", 2));
-    projector.handle(appended(manager.getEntry(assistantId)!));
+    const user = { role: "user" as const, content: "Run the task", timestamp: 1 };
+    projector.handle(messageEnded(user));
+    expect(emitted).toEqual([]);
+    manager.appendMessage(user);
+    await Promise.resolve();
+    projector.handle(messageEnded(assistantMessage("Working", 2)));
 
     expect(emitted).toEqual([
       { type: "tree.changed", payload: { reason: "session-entry" } },
       {
         type: "conversation.changed",
         payload: { sessionId: manager.getSessionId(), reason: "user-appended" }
-      },
-      { type: "tree.changed", payload: { reason: "session-entry" } }
+      }
     ]);
+  });
+
+  it("drops a deferred user projection after the active Session is reset", async () => {
+    const manager = SessionManager.inMemory("/tmp", { id: "session-event-projector-reset" });
+    const emitted: AgentEvent[] = [];
+    const session = { sessionId: manager.getSessionId(), sessionManager: manager } as AgentSession;
+    const projector = new SessionEventProjector({
+      getSession: () => session,
+      getStats: () => ({}) as SessionStats,
+      emit: (event) => emitted.push(event),
+      emitActivity: vi.fn(),
+      emitToolExecution: vi.fn(),
+      reportToolExecutionReceiptFailure: vi.fn(),
+      pushStream: vi.fn(),
+      flushStream: vi.fn(),
+      bindToolExecutionStart: vi.fn(() => "generic" as const),
+      getToolAuthorization: vi.fn(),
+      completeToolExecution: vi.fn(),
+      settleActiveToolExecutions: vi.fn()
+    });
+
+    projector.handle(messageEnded({ role: "user", content: "stale", timestamp: 1 }));
+    projector.reset();
+    await Promise.resolve();
+
+    expect(emitted).toEqual([]);
   });
 
   it("projects a late AUTO reason before clearing it at Tool completion", () => {
@@ -111,8 +137,8 @@ function toolEvent(value: object): AgentSessionEvent {
   return value as AgentSessionEvent;
 }
 
-function appended(entry: SessionEntry): AgentSessionEvent {
-  return { type: "entry_appended", entry };
+function messageEnded(message: object): AgentSessionEvent {
+  return { type: "message_end", message } as AgentSessionEvent;
 }
 
 function assistantMessage(text: string, timestamp: number) {

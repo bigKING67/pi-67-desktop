@@ -316,7 +316,7 @@ try {
   await startControlledPrompt(window);
   console.info("Packaged smoke stage: pre-reload controlled prompt started.");
   try {
-    await verifyPackagedProjectedImage(window, "live submission");
+    await verifyPackagedProjectedImage(window, "live submission", { expectRuntimeReady: false });
   } catch (error) {
     await capturePackagedScreenshot(window, "18-projected-image-submission-failure.png");
     throw new Error(

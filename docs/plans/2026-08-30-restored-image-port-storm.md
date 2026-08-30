@@ -58,6 +58,8 @@ and preserve enough bounded diagnostics to prove convergence.
 | OBSERVED | The root checkout was clean at `69ba796` and matched `origin/main` before edits | live Git | 2026-08-30 |
 | OBSERVED | Candidate freshness initially failed because AI Berkshire advanced by one commit to `fd83d063`, adding `era-alpha`; the exact Pi-67 generator requires a minor Pack bump for a Skill-set addition | remote source audit and fixed-source generator | 2026-08-30 |
 | OBSERVED | Windows exact-source run `33287582263` accepted the Prompt and exposed Stop before its slower attachment/preflight path had appended the projected user image; the smoke stopped immediately and then timed out waiting for the image | GitHub Actions failure log and screenshot artifact | 2026-08-30 |
+| OBSERVED | After the preflight cancellation repair, the controlled Prompt and PNG were present in Pi JSONL while the live Renderer still showed only its local pending turn until shutdown; extending the smoke wait from 30 to 120 seconds did not change that state | retained packaged-smoke profile and Pi Session JSONL | 2026-08-30 |
+| OBSERVED | Pi 0.84.3 emits `message_end` immediately before persisting a normal user message, but does not emit `entry_appended` for that path; `entry_appended` covers explicit Session-entry appends such as Extension `appendEntry` | installed Pi runtime source plus projector regression | 2026-08-30 |
 
 ## Affected boundaries
 
@@ -81,6 +83,7 @@ and preserve enough bounded diagnostics to prove convergence.
 | Keep the failure truthful after the breaker opens | A stable error is safer and diagnosable; automatic infinite retries are destructive even if each handshake briefly succeeds | Product introduces an explicit user-controlled retry action with equivalent bounds |
 | Carry one AbortSignal from Host acceptance through attachment preparation and Pi preflight, and wait for execution acknowledgement before publishing cancellation | `operation.started` precedes asynchronous image/auth/Extension preflight; aborting an idle Pi Session previously returned before the accepted execution was actually stopped | Pi exposes a native accepted-operation cancellation contract with equivalent acknowledgement semantics |
 | Require the packaged image to enter the live Pi Session before stopping the controlled Provider | Restore coverage needs a durable Session fixture; immediately stopping at `operation.started` measured an unrelated preflight race and could leave no image to restore | The smoke uses a separately materialized exact image Session fixture |
+| Project a completed user turn from `message_end` after one microtask, guarded by the active-Session generation | Pi persists normal user messages synchronously after notifying listeners; the microtask reads the authoritative JSONL-backed entry without a polling delay, while the generation prevents deferred work from projecting into a replacement Session | Pi adds a documented post-persistence event for normal user messages |
 
 ## Checkpoints
 
@@ -95,6 +98,9 @@ and preserve enough bounded diagnostics to prove convergence.
   new `era-alpha` suite member and generated immutable hashes.
 - [x] 7. Repair cancel-before-Pi-preflight, require execution settlement, add
   regressions, and make the packaged image fixture durable before Stop.
+- [x] 7a. Replace the dead normal-user `entry_appended` projection trigger with
+  a post-persistence `message_end` projection, invalidate deferred work across
+  Session reset, and prove the pending turn clears while the Provider is busy.
 - [ ] 8. Push the final clean Alpha.39 source, build and verify an exact-SHA
   Windows x64 Candidate, then mirror the Windows EXE and macOS DMG/ZIP internally.
 - [ ] 9. Obtain real Windows Restore Task evidence and a v6 diagnostics receipt.
@@ -103,12 +109,12 @@ and preserve enough bounded diagnostics to prove convergence.
 
 | Layer | Command or procedure | Required evidence | Result |
 | --- | --- | --- | --- |
-| Source | affected package typechecks and `corepack pnpm run check` | strict types and all aggregate gates | PASS: repaired Alpha.39 gate passed 618 files; 3,218 passed; 3 skipped; type/lint/architecture/structure/transport/workflow/coverage gates passed |
+| Source | affected package typechecks and `corepack pnpm run check` | strict types and all aggregate gates | PASS after the live-projection repair: 618 files; 3,219 passed; 3 skipped; type/lint/architecture/structure/transport/workflow/coverage gates passed |
 | Capability provenance | remote lock verification, fixed-source preparation, freshness, adapter provenance, focused tests | all tracked sources current; Pack `1.1.0`; 22 members including `era-alpha` | PASS: remote lock (5 commits), preparation (4 packages), freshness, adapter provenance, 8 files / 60 focused tests, Renderer E2E 8/8, and final aggregate gate |
 | Tests | focused Agent Host asset and Renderer recovery tests | old transfer call fails; repeated short-lived success stops at bound | PASS: red baseline failed 4 expected tests; green run passed 6 files / 46 tests; stable five-second reset also covered |
 | Renderer E2E | `PI67_E2E_RENDERER_PORT=45174 ... renderer-assets.spec.ts` | chunked Blob image reads and replacement cleanup | PASS: 3/3 including bootstrap |
-| Runtime/host | packaged Electron restore of a Session with a projected image | image chunk arrives and Port stays stable | PASS on macOS arm64: 39,057-byte PNG loaded after submission, warm Restore Task, and cold Restore Task; each remained visible through a 750 ms ready-state stability window |
-| Packaged artifact | `corepack pnpm run preview:mac:unsigned` | rebuilt Alpha.39 app packages, smokes, launches, and uses new assets | PASS: packaged image restore smoke; opened app artifact SHA-256 `65b456718c3223f9c67aa0dbbb8b992b304d88c866c2d99ee7406a0114833903` |
+| Runtime/host | packaged Electron restore of a Session with a projected image | image projects from Pi while the controlled Provider is still busy, the local pending turn clears, and warm/cold Restore Task remain stable | PASS on a local macOS arm64 rebuild: live projection passed before Stop; prompt then stopped and persisted; warm and cold Restore Task passed; final exact-commit preview still required |
+| Packaged artifact | `corepack pnpm run preview:mac:unsigned` | rebuilt Alpha.39 app packages, smokes, launches, and uses the final committed assets | SUPERSEDED: the prior Alpha.39 preview predates the live-projection repair; exact final-commit rerun pending |
 | Target OS/manual | exact Windows x64 candidate, Restore Task on affected image Session | no flashing; one stable Port; image loads | NOT COMPLETED |
 
 ## Rollback
@@ -173,6 +179,20 @@ the prior transferable call and unbounded cross-flight recovery behavior.
 - 2026-08-30: Strengthened packaged restore setup to prove the projected image is
   live before Stop, added bounded failure screenshot/DOM/process evidence, and
   passed 6 focused files / 35 tests plus the full 618-file / 3,218-test gate.
+- 2026-08-30: The repaired preflight smoke proved a second independent defect:
+  Pi had already persisted the user image in JSONL, but the Renderer remained on
+  its local pending turn because normal user messages never emit the projector's
+  `entry_appended` trigger. A 120-second diagnostic wait reproduced the same
+  state, excluding slow Provider completion as the cause.
+- 2026-08-30: Moved normal-user projection to a one-microtask-deferred
+  `message_end` handler with Session-generation invalidation. Focused projector,
+  attachment, and preflight coverage passed 3 files / 10 tests; workspace
+  typecheck passed; a rebuilt macOS package projected the image and cleared the
+  pending turn while the controlled Provider was still busy, then passed Stop,
+  warm Restore Task, cold Restore Task, startup, creation, and shutdown smoke.
+- 2026-08-30: Repeated the aggregate source gate with the final live-projection
+  diff: all 618 test files passed, with 3,219 tests passed and 3 skipped; coverage
+  remained above every repository threshold.
 
 ## Closeout
 

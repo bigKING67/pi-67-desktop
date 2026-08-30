@@ -41,6 +41,7 @@ export class SessionEventProjector {
   private readonly liveChanges = new Map<string, WorkspaceChangeView>();
   private readonly activity: OperationActivityProjector;
   private readonly toolExecutions: ToolExecutionProjector;
+  private projectionGeneration = 0;
 
   constructor(private readonly target: SessionEventProjectionTarget) {
     this.activity = new OperationActivityProjector(target.emitActivity);
@@ -55,6 +56,7 @@ export class SessionEventProjector {
   }
 
   reset(): void {
+    this.projectionGeneration += 1;
     this.liveChanges.clear();
     this.activity.reset();
     this.toolExecutions.reset();
@@ -103,18 +105,23 @@ export class SessionEventProjector {
     if (event.type === "entry_appended") {
       this.target.emit({ type: "tree.changed", payload: { reason: "session-entry" } });
     }
+    if (event.type === "message_end" && event.message.role === "user") {
+      const generation = this.projectionGeneration;
+      const session = this.target.getSession();
+      // Pi notifies AgentSession listeners immediately before it appends the
+      // completed user message to SessionManager. Defer projection by one
+      // microtask so message.page reads the authoritative JSONL-backed entry,
+      // while reset() invalidates work queued for a replaced Session.
+      queueMicrotask(() => {
+        if (generation !== this.projectionGeneration) return;
+        this.target.emit({ type: "tree.changed", payload: { reason: "session-entry" } });
+        this.target.emit(conversationChangedEvent(session, "user-appended"));
+      });
+    }
     if (event.type === "message_end" || event.type === "agent_end" || event.type === "agent_settled") {
       this.target.flushStream();
     }
-
     const session = this.target.getSession();
-    if (
-      event.type === "entry_appended"
-      && event.entry.type === "message"
-      && event.entry.message.role === "user"
-    ) {
-      this.target.emit(conversationChangedEvent(session, "user-appended"));
-    }
     if (event.type === "queue_update") this.target.emit(queueChangedEvent(session));
     if (event.type === "thinking_level_changed") this.target.emit(sessionMetaChangedEvent(session));
     if (event.type === "agent_settled") {
