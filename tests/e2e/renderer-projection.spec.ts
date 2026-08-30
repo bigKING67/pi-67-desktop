@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   attachMockAgent,
   clearRecordedCommands,
@@ -113,9 +113,8 @@ test("follows a growing live turn until the user scrolls away and resumes after 
   await expect(latestButton).toHaveCount(0);
   await expect.poll(bottomGap).toBeLessThanOrEqual(4);
 
-  await scroller.evaluate((element) => {
-    element.scrollTop = Math.max(0, element.scrollTop - 500);
-  });
+  await scroller.hover();
+  await page.mouse.wheel(0, -500);
   await expect(latestButton).toBeVisible();
   const readingPosition = await scroller.evaluate((element) => element.scrollTop);
   await emitStreamDelta(Array.from({ length: 12 }, (_, index) => (
@@ -133,6 +132,92 @@ test("follows a growing live turn until the user scrolls away and resumes after 
   await emitStreamDelta(`\n\nFinal streamed paragraph. ${"latest output ".repeat(20)}`);
   await expect(latestButton).toHaveCount(0);
   await expect.poll(bottomGap).toBeLessThanOrEqual(4);
+});
+
+test("keeps following a live turn when a width reflow moves the scroller", async ({ page }) => {
+  await page.setViewportSize({ width: 720, height: 480 });
+  await page.goto("/");
+  await attachMockAgent(page, Array.from({ length: 24 }, (_, index) => (
+    message(`reflow-history-${index}`, `Historical response ${index}. ${"context ".repeat(18)}`)
+  )));
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
+
+  const transcript = page.locator('[data-transcript-region="true"]');
+  const scroller = transcript.getByTestId("virtuoso-scroller");
+  const latestButton = transcript.getByRole("button", { name: /^回到最新/u });
+  const bottomGap = () => scroller.evaluate((element) => (
+    element.scrollHeight - element.clientHeight - element.scrollTop
+  ));
+  const operationId = "operation-streaming-width-reflow";
+  await startStreamingOperation(page, operationId);
+  await emitStreamText(page, operationId, Array.from({ length: 32 }, (_, index) => (
+    `Streaming paragraph ${index}. ${"reflow-sensitive output ".repeat(16)}`
+  )).join("\n\n"));
+  await expect.poll(bottomGap).toBeLessThanOrEqual(4);
+
+  await page.setViewportSize({ width: 1_280, height: 480 });
+  await expect.poll(() => page.evaluate(() => window.innerWidth)).toBe(1_280);
+  await emitStreamText(page, operationId, `\n\nPost-resize paragraph. ${"newest output ".repeat(60)}`);
+
+  await expect.poll(bottomGap).toBeLessThanOrEqual(4);
+  await expect(latestButton).toHaveCount(0);
+});
+
+test("preserves the reading anchor after fine-grained upward wheel input", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page, Array.from({ length: 24 }, (_, index) => (
+    message(`fine-wheel-history-${index}`, `Historical response ${index}. ${"context ".repeat(18)}`)
+  )));
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
+
+  const transcript = page.locator('[data-transcript-region="true"]');
+  const scroller = transcript.getByTestId("virtuoso-scroller");
+  const latestButton = transcript.getByRole("button", { name: /^回到最新/u });
+  const operationId = "operation-streaming-fine-wheel";
+  await startStreamingOperation(page, operationId);
+  await emitStreamText(page, operationId, Array.from({ length: 32 }, (_, index) => (
+    `Streaming paragraph ${index}. ${"fine-wheel output ".repeat(16)}`
+  )).join("\n\n"));
+
+  await scroller.hover();
+  let previousPosition = await scroller.evaluate((element) => element.scrollTop);
+  for (let step = 0; step < 8; step += 1) {
+    await page.mouse.wheel(0, -1);
+    await expect.poll(() => scroller.evaluate((element) => element.scrollTop))
+      .toBeLessThan(previousPosition);
+    previousPosition = await scroller.evaluate((element) => element.scrollTop);
+  }
+  const readingPosition = previousPosition;
+  await expect(latestButton).toBeVisible();
+
+  await emitStreamText(page, operationId, `\n\nPost-scroll paragraph. ${"newest output ".repeat(60)}`);
+  await expect.poll(async () => Math.abs(
+    await scroller.evaluate((element) => element.scrollTop) - readingPosition
+  )).toBeLessThanOrEqual(2);
+  await expect(latestButton).toBeVisible();
+
+  await latestButton.click();
+  await expect(latestButton).toHaveCount(0);
+  const beforeKeyboardScroll = await scroller.evaluate((element) => element.scrollTop);
+  await transcript.locator('[data-render-mode="streaming"]').focus();
+  await page.keyboard.press("PageUp");
+  await expect.poll(() => scroller.evaluate((element) => element.scrollTop))
+    .toBeLessThan(beforeKeyboardScroll);
+  await expect(latestButton).toBeVisible();
+  await expect.poll(async () => {
+    const before = await scroller.evaluate((element) => element.scrollTop);
+    await page.waitForTimeout(50);
+    const after = await scroller.evaluate((element) => element.scrollTop);
+    return Math.abs(after - before);
+  }).toBeLessThanOrEqual(1);
+  const keyboardReadingPosition = await scroller.evaluate((element) => element.scrollTop);
+  await emitStreamText(page, operationId, `\n\nPost-keyboard paragraph. ${"keyboard output ".repeat(60)}`);
+  await expect.poll(async () => Math.abs(
+    await scroller.evaluate((element) => element.scrollTop) - keyboardReadingPosition
+  )).toBeLessThanOrEqual(2);
+  await expect(latestButton).toBeVisible();
 });
 
 test("keeps the committed transcript visible across a Settings round trip", async ({ page }) => {
@@ -517,6 +602,31 @@ test("returns extension input only with its authoritative session and operation 
 
 function message(id: string, text: string): FixtureMessage {
   return { id, role: "assistant", parts: [{ type: "text", text }] };
+}
+
+async function startStreamingOperation(page: Page, operationId: string): Promise<void> {
+  await emitMockAgentEvent(page, {
+    type: "operation.started",
+    payload: {
+      operation: {
+        operationId,
+        kind: "prompt",
+        lifecycle: "running",
+        cancellable: true,
+        sessionId: "session-test",
+        sessionFileIdentity: "session-file-fixture-demo",
+        sessionGeneration: 1,
+        startedAt: Date.now()
+      }
+    }
+  }, { operationId });
+}
+
+async function emitStreamText(page: Page, operationId: string, delta: string): Promise<void> {
+  await emitMockAgentEvent(page, {
+    type: "turn.streamBatch",
+    payload: { events: [{ assistantMessageEvent: { type: "text_delta", delta } }] }
+  }, { operationId });
 }
 
 function isHighlightResource(name: string): boolean {

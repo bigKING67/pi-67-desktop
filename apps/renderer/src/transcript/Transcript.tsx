@@ -168,20 +168,70 @@ export function Transcript() {
 
     transcriptScrollerRef.current = scroller;
     let previousScrollTop = scroller.scrollTop;
+    let userScrollIntentUntil = 0;
+    let pointerScrollActive = false;
+    const ownerDocument = scroller.ownerDocument;
+    const armUserScrollIntent = () => {
+      userScrollIntentUntil = performance.now() + USER_SCROLL_INTENT_WINDOW_MS;
+    };
     const observeScrollDirection = () => {
       const nextScrollTop = scroller.scrollTop;
-      if (nextScrollTop < previousScrollTop - 1) followLatestRef.current = false;
+      // Reflow and Virtuoso measurement can lower scrollTop without user input.
+      if (
+        nextScrollTop < previousScrollTop
+        && (pointerScrollActive || performance.now() <= userScrollIntentUntil)
+      ) {
+        followLatestRef.current = false;
+        userScrollIntentUntil = 0;
+      }
       previousScrollTop = nextScrollTop;
     };
+    const observeWheel = (event: WheelEvent) => {
+      if (event.deltaY < 0) armUserScrollIntent();
+    };
+    const observeKeyboard = (event: KeyboardEvent) => {
+      if (
+        !keyboardRequestsOlderContent(event)
+        || editableKeyboardTarget(event.target)
+        || (event.target instanceof HTMLElement
+          && event.target !== ownerDocument.body
+          && !scroller.contains(event.target))
+      ) return;
+      armUserScrollIntent();
+    };
+    const observePointerDown = (event: PointerEvent) => {
+      if (event.pointerType === "mouse" && event.target !== scroller) return;
+      pointerScrollActive = true;
+      armUserScrollIntent();
+    };
+    const observePointerEnd = () => {
+      if (pointerScrollActive) armUserScrollIntent();
+      pointerScrollActive = false;
+    };
     scroller.addEventListener("scroll", observeScrollDirection, { passive: true });
-    scrollerCleanupRef.current = () => scroller.removeEventListener("scroll", observeScrollDirection);
+    scroller.addEventListener("wheel", observeWheel, { passive: true });
+    scroller.addEventListener("pointerdown", observePointerDown, { passive: true });
+    ownerDocument.addEventListener("keydown", observeKeyboard, true);
+    ownerDocument.addEventListener("pointerup", observePointerEnd, true);
+    ownerDocument.addEventListener("pointercancel", observePointerEnd, true);
+    scrollerCleanupRef.current = () => {
+      scroller.removeEventListener("scroll", observeScrollDirection);
+      scroller.removeEventListener("wheel", observeWheel);
+      scroller.removeEventListener("pointerdown", observePointerDown);
+      ownerDocument.removeEventListener("keydown", observeKeyboard, true);
+      ownerDocument.removeEventListener("pointerup", observePointerEnd, true);
+      ownerDocument.removeEventListener("pointercancel", observePointerEnd, true);
+    };
   }, []);
 
   useEffect(() => subscribeTranscriptMessageJump((target) => {
+    followLatestRef.current = false;
+    setAtBottom(false);
+    if (readKey) useConversationReadPositionStore.getState().setAtBottom(readKey, false);
     if (target.window) setHistoricalWindow(target.window);
     setFocusHighlightedMessage(target.focus !== "preserve");
     setHighlightedMessageId(target.id);
-  }), []);
+  }), [readKey]);
 
   useEffect(() => {
     setHistoricalWindow(undefined);
@@ -482,3 +532,20 @@ const STARTER_PROMPTS = [
   "检查当前 Git 改动并找出风险",
   "实现一个有测试覆盖的小功能"
 ] as const;
+
+const USER_SCROLL_INTENT_WINDOW_MS = 750;
+
+function keyboardRequestsOlderContent(event: KeyboardEvent): boolean {
+  if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return false;
+  return event.key === "ArrowUp"
+    || event.key === "PageUp"
+    || event.key === "Home"
+    || (event.key === " " && event.shiftKey);
+}
+
+function editableKeyboardTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && (
+    target.isContentEditable
+    || target.closest("input, textarea, select, [contenteditable='true']") !== null
+  );
+}
