@@ -58,6 +58,7 @@
         { "packageId": "pi67-core", "skillId": "dyp-ask" },
         { "packageId": "pi67-core", "skillId": "earnings-review" },
         { "packageId": "pi67-core", "skillId": "earnings-team" },
+        { "packageId": "pi67-core", "skillId": "era-alpha" },
         { "packageId": "pi67-core", "skillId": "financial-data" },
         { "packageId": "pi67-core", "skillId": "income-investment" },
         { "packageId": "pi67-core", "skillId": "industry-funnel" },

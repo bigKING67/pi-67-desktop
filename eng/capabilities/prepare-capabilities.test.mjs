@@ -17,7 +17,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins four first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.08.29.2");
+    expect(lock.catalogVersion).toBe("2026.08.30.1");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi67-core",
       "browser67",
@@ -46,19 +46,20 @@ describe("Desktop first-party capability source lock", () => {
       adapterSourceId: "pi67-core",
       repository: "https://github.com/xbtlin/ai-berkshire",
       ref: "refs/heads/main",
-      commit: "58d09b1c825f3531ae3eace7d1216560511520b2",
+      commit: "fd83d06347c6e3ee50133cda6962f40e226b5252",
       localSibling: "../ai-berkshire",
-      version: "1.0.8",
-      manifestSha256: "6aa2ad206d352090bc08b978749e76dd79ac85b48a5a6c7c0f2feea5e64f1819",
-      bundleSha256: "f8c16b9d8dc1837bbcb6661358b64d268821d7503df9e8cd7968386cf8749701"
+      version: "1.1.0",
+      manifestSha256: "2db432f23f09146ef5ffcfdd5615ce2643637f592f3f3d90e30531fa65c87ac6",
+      bundleSha256: "0a4b7f8394b8c43ab73be0c3be4ec1e26b31fb87b0602215376e1697ccb3e7a7"
     });
-    expect(lock.skillPacks[0].skills).toHaveLength(21);
+    expect(lock.skillPacks[0].skills).toHaveLength(22);
     expect(lock.skillPacks[0].skills.map((skill) => skill.name)).toEqual([
       "bottleneck-hunter",
       "deep-company-series",
       "dyp-ask",
       "earnings-review",
       "earnings-team",
+      "era-alpha",
       "financial-data",
       "income-investment",
       "industry-funnel",
@@ -206,7 +207,7 @@ describe("Desktop first-party capability source lock", () => {
     }, manifest)).toThrow(/metadata is stale/u);
   });
 
-  it("declares five explicit suites covering all 65 bundled Skill identities", async () => {
+  it("declares five explicit suites covering all 66 bundled Skill identities", async () => {
     const definition = JSON.parse(await readFile(
       resolve(root, "eng/capabilities/bundled-skill-suites.json"),
       "utf8"
@@ -219,8 +220,8 @@ describe("Desktop first-party capability source lock", () => {
       "browser67",
       "design-output-tools"
     ]);
-    expect(definition.suites.map((suite) => suite.members.length)).toEqual([27, 21, 8, 2, 7]);
-    expect(definition.suites.flatMap((suite) => suite.members)).toHaveLength(65);
+    expect(definition.suites.map((suite) => suite.members.length)).toEqual([27, 22, 8, 2, 7]);
+    expect(definition.suites.flatMap((suite) => suite.members)).toHaveLength(66);
     expect(definition.suites.find((suite) => suite.id === "ai-berkshire-investment-suite")).toMatchObject({
       versionSource: { kind: "pi67-skill-pack", packName: "ai-berkshire-investment-suite" },
       upstream: "https://github.com/xbtlin/ai-berkshire",
@@ -228,6 +229,8 @@ describe("Desktop first-party capability source lock", () => {
       updateManager: "pi67-skill-pack-registry",
       independentUpdateState: "available"
     });
+    expect(definition.suites.find((suite) => suite.id === "ai-berkshire-investment-suite")?.members)
+      .toContainEqual({ packageId: "pi67-core", skillId: "era-alpha" });
   });
 
   it("extracts bounded single-line and folded Skill descriptions", () => {

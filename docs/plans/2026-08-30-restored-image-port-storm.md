@@ -18,7 +18,8 @@ and preserve enough bounded diagnostics to prove convergence.
   input contract.
 - Do not include prompts, image bytes, Session bodies, paths, or raw payloads in
   diagnostics.
-- Do not publish, upload, push, tag, or release this change.
+- Do not publish an R2 update, change an update manifest, delete retained R2
+  objects, promote, tag, or create a GitHub Release.
 - Do not claim Windows x64 acceptance from source tests or macOS evidence.
 
 ## Acceptance criteria
@@ -39,8 +40,9 @@ and preserve enough bounded diagnostics to prove convergence.
 
 - Local implementation: authorized
 - Scoped local commit together with the causal-diagnostics work: authorized
-- Push: not authorized
-- Candidate build/upload: not authorized
+- Push: authorized after final source gates and the capability freshness blocker pass
+- Candidate build/upload: authorized for the exact-SHA Windows x64 Candidate and
+  the three-file internal Feishu candidate mirror
 - Tag/release/promotion: not authorized
 
 ## Current evidence
@@ -54,6 +56,7 @@ and preserve enough bounded diagnostics to prove convergence.
 | OBSERVED | Electron 43 documents `MessagePortMain.postMessage` transfer entries as `MessagePortMain[]`, not `ArrayBuffer[]` | Electron `MessagePortMain` API | 2026-08-30 |
 | OBSERVED | Installed Electron 43.2.0 types independently bind `MessagePortMain.postMessage(message, transfer?)` to `MessagePortMain[]` | `node_modules/electron/electron.d.ts` | 2026-08-30 |
 | OBSERVED | The root checkout was clean at `69ba796` and matched `origin/main` before edits | live Git | 2026-08-30 |
+| OBSERVED | Candidate freshness initially failed because AI Berkshire advanced by one commit to `fd83d063`, adding `era-alpha`; the exact Pi-67 generator requires a minor Pack bump for a Skill-set addition | remote source audit and fixed-source generator | 2026-08-30 |
 
 ## Affected boundaries
 
@@ -85,12 +88,18 @@ and preserve enough bounded diagnostics to prove convergence.
   macOS unsigned packaged image-restore smoke where available.
 - [x] 5. Record Windows x64 candidate/manual acceptance as not completed unless a
   separately authorized exact candidate is built and tested.
+- [x] 6. Audit and lock AI Berkshire `fd83d063` as Pack `1.1.0`, including the
+  new `era-alpha` suite member and generated immutable hashes.
+- [ ] 7. Push the final clean Alpha.39 source, build and verify an exact-SHA
+  Windows x64 Candidate, then mirror the Windows EXE and macOS DMG/ZIP internally.
+- [ ] 8. Obtain real Windows Restore Task evidence and a v6 diagnostics receipt.
 
 ## Validation matrix
 
 | Layer | Command or procedure | Required evidence | Result |
 | --- | --- | --- | --- |
 | Source | affected package typechecks and `corepack pnpm run check` | strict types and all aggregate gates | PASS: final Alpha.39 gate passed 617 files; 3,212 passed; 3 skipped; type/lint/architecture/structure/transport/workflow/coverage gates passed |
+| Capability provenance | remote lock verification, fixed-source preparation, freshness, adapter provenance, focused tests | all tracked sources current; Pack `1.1.0`; 22 members including `era-alpha` | PASS: remote lock (5 commits), preparation (4 packages), freshness, adapter provenance, 8 files / 60 focused tests, Renderer E2E 8/8, and final aggregate gate |
 | Tests | focused Agent Host asset and Renderer recovery tests | old transfer call fails; repeated short-lived success stops at bound | PASS: red baseline failed 4 expected tests; green run passed 6 files / 46 tests; stable five-second reset also covered |
 | Renderer E2E | `PI67_E2E_RENDERER_PORT=45174 ... renderer-assets.spec.ts` | chunked Blob image reads and replacement cleanup | PASS: 3/3 including bootstrap |
 | Runtime/host | packaged Electron restore of a Session with a projected image | image chunk arrives and Port stays stable | PASS on macOS arm64: 39,057-byte PNG loaded after submission, warm Restore Task, and cold Restore Task; each remained visible through a 750 ms ready-state stability window |
@@ -136,6 +145,15 @@ the prior transferable call and unbounded cross-flight recovery behavior.
 - 2026-08-30: Upgraded the complete workspace to Alpha.39 and repeated the final
   affected tests, aggregate source gate, unsigned macOS packaging, warm/cold
   projected-image Restore Task smoke, and repository app launch successfully.
+- 2026-08-30: Candidate freshness found one new AI Berkshire upstream commit.
+  Audited the six-file change, accepted `era-alpha` as a bounded investment
+  research Skill, generated Pack `1.1.0` from exact sources, and passed the
+  capability lock, preparation, freshness, adapter, focused, and Renderer E2E
+  gates before the final aggregate gate.
+- 2026-08-30: The first aggregate run had one unrelated Host crash-recovery
+  wait-window miss while the other 616 files passed. The exact test then passed
+  alone in 327 ms, and the unchanged full aggregate gate passed 617/617 files,
+  3,212 tests, with 3 skipped.
 
 ## Closeout
 
