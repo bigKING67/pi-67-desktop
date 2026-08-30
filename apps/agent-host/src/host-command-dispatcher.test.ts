@@ -346,6 +346,44 @@ describe("operationSubmissionIdentity", () => {
     }));
   });
 
+  it("propagates the accepted Operation abort signal through Prompt preflight", async () => {
+    let acceptedOptions: AcceptOperationOptions | undefined;
+    const accept = vi.fn((options: AcceptOperationOptions) => {
+      acceptedOptions = options;
+      return { kind: "accepted", operationId: "operation_signal" } as never;
+    });
+    const submitPrompt = vi.fn().mockResolvedValue(undefined);
+    const runtime = { submitPrompt } as unknown as AgentRuntime;
+    const context = { operations: () => ({ accept }) };
+
+    await dispatchHostCommand(runtime, {
+      type: "prompt.submit",
+      payload: {
+        submissionId: "submission_signal",
+        text: "Stop safely",
+        delivery: "new-turn"
+      }
+    }, context as never);
+
+    const controller = new AbortController();
+    await acceptedOptions!.execute({
+      hostEpoch: 7,
+      operation: {
+        operationId: "operation_signal",
+        kind: "prompt",
+        lifecycle: "accepted",
+        cancellable: true,
+        sessionId: "session-a",
+        sessionFileIdentity: "session-file-a",
+        sessionGeneration: 1,
+        startedAt: 1
+      },
+      signal: controller.signal
+    });
+
+    expect(submitPrompt).toHaveBeenCalledWith("Stop safely", undefined, controller.signal);
+  });
+
   it("does not accept a prompt operation when attachment claim fails", async () => {
     const failure = new Error("staged attachment changed");
     const preparePromptAttachments = vi.fn().mockRejectedValue(failure);
@@ -379,7 +417,7 @@ describe("operationSubmissionIdentity", () => {
       startedAt: 67
     };
     const accept = vi.fn(async (options: AcceptOperationOptions) => {
-      await options.execute({ operation, hostEpoch: 9 });
+      await options.execute({ operation, hostEpoch: 9, signal: new AbortController().signal });
       return {
         kind: "accepted" as const,
         operationId: operation.operationId,

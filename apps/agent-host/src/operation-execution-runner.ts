@@ -21,10 +21,39 @@ interface OperationExecutionRunnerOptions {
 export interface OperationExecutionContext {
   operation: OperationView;
   hostEpoch: number;
+  signal: AbortSignal;
 }
 
 export class OperationExecutionRunner {
   constructor(private readonly options: OperationExecutionRunnerOptions) {}
+
+  schedule(
+    operation: ActiveOperation,
+    submissionId: string,
+    fingerprint: string,
+    execute: (context: OperationExecutionContext) => Promise<void>
+  ): void {
+    setTimeout(() => {
+      if (operation.abortController.signal.aborted) return;
+      operation.executionPromise = this.start(
+        operation,
+        submissionId,
+        fingerprint,
+        execute,
+        {
+          operation: operation.view,
+          hostEpoch: this.options.hostEpoch,
+          signal: operation.abortController.signal
+        }
+      ).catch(() => undefined);
+    }, 0);
+  }
+
+  async stop(operation: ActiveOperation): Promise<void> {
+    await operation.abort?.();
+    operation.abortController.abort();
+    await operation.executionPromise;
+  }
 
   async start(
     operation: ActiveOperation,

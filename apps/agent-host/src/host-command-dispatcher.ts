@@ -337,7 +337,7 @@ export async function dispatchHostCommand(
         submissionId: command.payload.submissionId,
         fingerprint,
         kind: "prompt",
-        execute: () => runtime.submitPrompt(command.payload.text, attachments),
+        execute: ({ signal }) => runtime.submitPrompt(command.payload.text, attachments, signal),
         abort: () => runtime.abort(),
         beforeTerminal: () => runtime.flushStream()
       });

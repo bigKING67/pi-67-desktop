@@ -112,7 +112,11 @@ export interface AgentRuntime {
     submissionId: string,
     refs: readonly PromptAttachmentRef[]
   ): Promise<PreparedPromptAttachmentSet | undefined>;
-  submitPrompt(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void>;
+  submitPrompt(
+    text: string,
+    attachments?: PreparedPromptAttachmentSet,
+    signal?: AbortSignal
+  ): Promise<void>;
   steer(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void>;
   followUp(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void>;
   clearQueue(): RuntimeQueueClearResult;

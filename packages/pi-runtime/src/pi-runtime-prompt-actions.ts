@@ -17,13 +17,20 @@ interface PiRuntimePromptActionsOptions {
 export class PiRuntimePromptActions {
   constructor(private readonly options: PiRuntimePromptActionsOptions) {}
 
-  async submit(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void> {
+  async submit(
+    text: string,
+    attachments?: PreparedPromptAttachmentSet,
+    signal?: AbortSignal
+  ): Promise<void> {
+    signal?.throwIfAborted();
     await this.options.assertWritable();
+    signal?.throwIfAborted();
     await this.options.configurationReload.assertReady();
+    signal?.throwIfAborted();
     const session = this.options.sessionBindings.requireSession();
     let completed = false;
     try {
-      await this.options.promptAttachments.submit(session, text, attachments);
+      await this.options.promptAttachments.submit(session, text, attachments, signal);
       completed = true;
     } finally {
       await this.options.sessionCatalog.upsertCurrent("session-updated");

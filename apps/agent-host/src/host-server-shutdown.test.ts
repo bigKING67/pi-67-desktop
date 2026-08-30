@@ -62,7 +62,9 @@ describe("AgentHostServer shutdown", () => {
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
       getIdentity: () => ({ sessionId: "session-1", sessionFileIdentity: "session-file-session-1", sessionGeneration: 2 }),
-      submitPrompt: () => new Promise<void>(() => undefined),
+      submitPrompt: (_text: string, _attachments: unknown, signal?: AbortSignal) => (
+        new Promise<void>((resolve) => signal?.addEventListener("abort", () => resolve(), { once: true }))
+      ),
       abort,
       flushStream,
       cancelInteractiveRequests,

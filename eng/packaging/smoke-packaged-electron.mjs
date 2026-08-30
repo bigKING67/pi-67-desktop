@@ -315,13 +315,22 @@ try {
   await capturePackagedWorkbenchVisualEvidence(application, window);
   await startControlledPrompt(window);
   console.info("Packaged smoke stage: pre-reload controlled prompt started.");
+  try {
+    await verifyPackagedProjectedImage(window, "live submission");
+  } catch (error) {
+    await capturePackagedScreenshot(window, "18-projected-image-submission-failure.png");
+    throw new Error(
+      `Packaged projected image did not enter the live Pi Session: ${JSON.stringify(await inspectRendererSurface(window))}\n${packagedProcessOutput() || "No packaged process diagnostics were emitted."}`,
+      { cause: error }
+    );
+  }
   await window.getByRole("button", { name: "停止", exact: true }).click({ timeout: 10_000 });
   await window.getByRole("button", { name: "停止", exact: true })
     .waitFor({ state: "hidden", timeout: 10_000 });
   await window.locator('[data-runtime-phase="ready"]').waitFor({ state: "visible", timeout: 10_000 });
   await window.locator('[data-testid="conversation-row"][aria-current="page"]')
     .filter({ hasText: CONTROLLED_PROMPT_TEXT }).waitFor({ state: "visible", timeout: 10_000 });
-  await verifyPackagedProjectedImage(window, "submission");
+  await verifyPackagedProjectedImage(window, "stopped submission");
   await waitForPersistedRuntimeRecovery(userDataDirectory);
   console.info("Packaged smoke stage: pre-reload controlled prompt stopped and persisted.");
   await window.reload();

@@ -350,8 +350,8 @@ export class PiSdkRuntime implements AgentRuntime {
     return this.promptAttachments.claim(submissionId, refs);
   }
 
-  async submitPrompt(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void> {
-    await this.promptActions.submit(text, attachments);
+  async submitPrompt(text: string, attachments?: PreparedPromptAttachmentSet, signal?: AbortSignal): Promise<void> {
+    await this.promptActions.submit(text, attachments, signal);
   }
 
   async steer(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void> {

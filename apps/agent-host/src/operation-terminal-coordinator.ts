@@ -9,8 +9,10 @@ import type { OperationToolExecutionController } from "./operation-tool-executio
 export interface ActiveOperation {
   view: OperationView;
   submissionId: string;
+  abortController: AbortController;
   abort?: () => Promise<void>;
   beforeTerminal?: () => void;
+  executionPromise?: Promise<void>;
   terminalPrepared?: boolean;
   terminalLifecycle?: "completed" | "failed" | "cancelled" | "lost";
   terminalPromise?: Promise<boolean>;

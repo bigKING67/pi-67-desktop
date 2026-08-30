@@ -39,18 +39,37 @@ export class RuntimePromptAttachments {
   async submit(
     session: AgentSession,
     text: string,
-    attachments?: PreparedPromptAttachmentSet
+    attachments?: PreparedPromptAttachmentSet,
+    signal?: AbortSignal
   ): Promise<void> {
+    signal?.throwIfAborted();
     const images = await this.images(attachments);
+    signal?.throwIfAborted();
     const assistance = await this.prepareVisionAssistance(session, text, attachments, images);
+    signal?.throwIfAborted();
     if (attachments) {
       await session.sendCustomMessage(promptAttachmentMessage(attachments), { triggerTurn: false });
     }
     if (assistance) await this.persistVisionAssistance(session, assistance);
-    await session.prompt(text, {
+    let lateAbort: Promise<void> | undefined;
+    const prompt = session.prompt(text, {
       images: assistance ? [] : images,
-      ...(session.isStreaming ? { streamingBehavior: "followUp" as const } : {})
+      ...(session.isStreaming ? { streamingBehavior: "followUp" as const } : {}),
+      ...(signal === undefined
+        ? {}
+        : {
+            preflightResult: (success: boolean) => {
+              if (success && signal.aborted) {
+                // Pi has completed preflight but has not returned control to the
+                // Host yet. Defer one microtask so Agent.activeRun exists before
+                // repeating the abort that may have arrived while Pi was idle.
+                lateAbort = Promise.resolve().then(() => session.abort());
+              }
+            }
+          })
     });
+    await prompt;
+    await lateAbort;
   }
 
   async steer(

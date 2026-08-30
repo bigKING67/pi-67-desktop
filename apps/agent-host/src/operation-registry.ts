@@ -197,6 +197,7 @@ export class OperationRegistry {
       const operation: ActiveOperation = {
         view,
         submissionId: options.submissionId,
+        abortController: new AbortController(),
         pendingQueues: new Set(),
         ...(options.abort === undefined ? {} : { abort: options.abort }),
         ...(options.beforeTerminal === undefined ? {} : { beforeTerminal: options.beforeTerminal })
@@ -204,19 +205,12 @@ export class OperationRegistry {
       this.active = operation;
       this.heartbeat.start(view.operationId, startedAt);
       // Start on the next task so the accepted response is posted before operation events.
-      setTimeout(() => void this.executions.start(
-        operation,
-        options.submissionId,
-        options.fingerprint,
-        options.execute,
-        { operation: operation.view, hostEpoch: this.hostEpoch }
-      ).catch(() => undefined), 0);
+      this.executions.schedule(operation, options.submissionId, options.fingerprint, options.execute);
       return remembered.result;
     } finally {
       this.accepting = false;
     }
   }
-
   async queueForActive(
     submissionId: string,
     fingerprint: string,
@@ -261,7 +255,7 @@ export class OperationRegistry {
     this.active = undefined;
     this.terminating = active;
     try {
-      await withAbortWatchdog(active.abort(), this.abortWatchdogMs);
+      await withAbortWatchdog(this.executions.stop(active), this.abortWatchdogMs);
       const cancelledAt = this.now();
       await this.terminals.finalize(
         active,
@@ -308,13 +302,17 @@ export class OperationRegistry {
     }
 
     try {
-      await withAbortWatchdog(operation.abort(), positiveInteger(timeoutMs, timeoutMs, "timeoutMs"));
+      await withAbortWatchdog(
+        this.executions.stop(operation),
+        positiveInteger(timeoutMs, timeoutMs, "timeoutMs")
+      );
       const cancelledAt = this.now();
       await this.terminals.finalize(
         operation,
         { lifecycle: "cancelled", settledAt: cancelledAt, reason }
       );
     } catch {
+      operation.abortController.abort();
       await this.terminals.lost(operation, reason, this.now());
     } finally {
       if (this.terminating?.view.operationId === operation.view.operationId) this.terminating = undefined;
@@ -331,6 +329,7 @@ export class OperationRegistry {
     this.terminating = undefined;
     this.activity.reset();
     const lost = active ?? terminating!;
+    lost.abortController.abort();
     await this.terminals.lost(lost, reason, this.now());
   }
 
@@ -405,6 +404,7 @@ export class OperationRegistry {
     if (this.terminating?.view.operationId !== operation.view.operationId) return;
     this.terminating = undefined;
     this.poisoned = true;
+    operation.abortController.abort();
     const reason = `Pi abort did not settle within ${this.abortWatchdogMs} ms; Pi runtime service recovery is required.`;
     await this.terminals.lost(operation, reason, this.now());
     this.onRuntimePoisoned?.({
@@ -433,7 +433,6 @@ export class OperationRegistry {
       throw error;
     }
   }
-
   private poisonForReceiptFailure(error: HostCommandError): void {
     this.receiptFailure ??= error;
     this.poisoned = true;
@@ -441,6 +440,7 @@ export class OperationRegistry {
     this.active = undefined;
     this.terminating = undefined;
     if (operation) {
+      operation.abortController.abort();
       this.heartbeat.stop(operation.view.operationId);
       this.terminals.prepare(operation);
     }

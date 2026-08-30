@@ -111,6 +111,52 @@ describe("PiSdkRuntime prompt attachments", () => {
       await fixture.runtime.dispose();
     }
   });
+
+  it("cancels during image preparation before mutating the Pi Session", async () => {
+    let releaseImages!: (images: ImageContent[]) => void;
+    const readImages = vi.fn(() => new Promise<ImageContent[]>((resolve) => {
+      releaseImages = resolve;
+    }));
+    const fixture = await initializedRuntime(attachmentAccess({ readImages }));
+    const customMessage = vi.spyOn(fixture.session, "sendCustomMessage").mockResolvedValue();
+    const prompt = vi.spyOn(fixture.session, "prompt").mockResolvedValue();
+    const controller = new AbortController();
+
+    try {
+      const submission = fixture.runtime.submitPrompt(
+        "Inspect",
+        attachmentSet(),
+        controller.signal
+      );
+      await vi.waitFor(() => expect(readImages).toHaveBeenCalledOnce());
+      controller.abort();
+      releaseImages(imageContents());
+
+      await expect(submission).rejects.toMatchObject({ name: "AbortError" });
+      expect(customMessage).not.toHaveBeenCalled();
+      expect(prompt).not.toHaveBeenCalled();
+    } finally {
+      await fixture.runtime.dispose();
+    }
+  });
+
+  it("repeats Pi abort after preflight when cancellation arrived while Pi was idle", async () => {
+    const fixture = await initializedRuntime(attachmentAccess());
+    const controller = new AbortController();
+    const abort = vi.spyOn(fixture.session, "abort").mockResolvedValue();
+    vi.spyOn(fixture.session, "sendCustomMessage").mockResolvedValue();
+    vi.spyOn(fixture.session, "prompt").mockImplementation(async (_text, options) => {
+      controller.abort();
+      options?.preflightResult?.(true);
+    });
+
+    try {
+      await fixture.runtime.submitPrompt("Inspect", attachmentSet(), controller.signal);
+      expect(abort).toHaveBeenCalledOnce();
+    } finally {
+      await fixture.runtime.dispose();
+    }
+  });
 });
 
 async function initializedRuntime(access: PromptAttachmentAccess): Promise<{

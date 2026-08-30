@@ -57,6 +57,7 @@ and preserve enough bounded diagnostics to prove convergence.
 | OBSERVED | Installed Electron 43.2.0 types independently bind `MessagePortMain.postMessage(message, transfer?)` to `MessagePortMain[]` | `node_modules/electron/electron.d.ts` | 2026-08-30 |
 | OBSERVED | The root checkout was clean at `69ba796` and matched `origin/main` before edits | live Git | 2026-08-30 |
 | OBSERVED | Candidate freshness initially failed because AI Berkshire advanced by one commit to `fd83d063`, adding `era-alpha`; the exact Pi-67 generator requires a minor Pack bump for a Skill-set addition | remote source audit and fixed-source generator | 2026-08-30 |
+| OBSERVED | Windows exact-source run `33287582263` accepted the Prompt and exposed Stop before its slower attachment/preflight path had appended the projected user image; the smoke stopped immediately and then timed out waiting for the image | GitHub Actions failure log and screenshot artifact | 2026-08-30 |
 
 ## Affected boundaries
 
@@ -78,6 +79,8 @@ and preserve enough bounded diagnostics to prove convergence.
 | Make the Agent Host response-side Port contract incapable of accepting arbitrary transferables | A compile-time boundary prevents the exact unsupported call from returning | A future Host response legitimately transfers a supported `MessagePortMain` and receives its own explicit API |
 | Add a cross-flight replacement circuit breaker, not a longer UI debounce | Alpha.38 already bounded retries inside one flight; the escape was a sequence of short-lived handshakes that each reset the flight | Recovery ownership gains an equivalent formally bounded state machine |
 | Keep the failure truthful after the breaker opens | A stable error is safer and diagnosable; automatic infinite retries are destructive even if each handshake briefly succeeds | Product introduces an explicit user-controlled retry action with equivalent bounds |
+| Carry one AbortSignal from Host acceptance through attachment preparation and Pi preflight, and wait for execution acknowledgement before publishing cancellation | `operation.started` precedes asynchronous image/auth/Extension preflight; aborting an idle Pi Session previously returned before the accepted execution was actually stopped | Pi exposes a native accepted-operation cancellation contract with equivalent acknowledgement semantics |
+| Require the packaged image to enter the live Pi Session before stopping the controlled Provider | Restore coverage needs a durable Session fixture; immediately stopping at `operation.started` measured an unrelated preflight race and could leave no image to restore | The smoke uses a separately materialized exact image Session fixture |
 
 ## Checkpoints
 
@@ -90,15 +93,17 @@ and preserve enough bounded diagnostics to prove convergence.
   separately authorized exact candidate is built and tested.
 - [x] 6. Audit and lock AI Berkshire `fd83d063` as Pack `1.1.0`, including the
   new `era-alpha` suite member and generated immutable hashes.
-- [ ] 7. Push the final clean Alpha.39 source, build and verify an exact-SHA
+- [x] 7. Repair cancel-before-Pi-preflight, require execution settlement, add
+  regressions, and make the packaged image fixture durable before Stop.
+- [ ] 8. Push the final clean Alpha.39 source, build and verify an exact-SHA
   Windows x64 Candidate, then mirror the Windows EXE and macOS DMG/ZIP internally.
-- [ ] 8. Obtain real Windows Restore Task evidence and a v6 diagnostics receipt.
+- [ ] 9. Obtain real Windows Restore Task evidence and a v6 diagnostics receipt.
 
 ## Validation matrix
 
 | Layer | Command or procedure | Required evidence | Result |
 | --- | --- | --- | --- |
-| Source | affected package typechecks and `corepack pnpm run check` | strict types and all aggregate gates | PASS: final Alpha.39 gate passed 617 files; 3,212 passed; 3 skipped; type/lint/architecture/structure/transport/workflow/coverage gates passed |
+| Source | affected package typechecks and `corepack pnpm run check` | strict types and all aggregate gates | PASS: repaired Alpha.39 gate passed 618 files; 3,218 passed; 3 skipped; type/lint/architecture/structure/transport/workflow/coverage gates passed |
 | Capability provenance | remote lock verification, fixed-source preparation, freshness, adapter provenance, focused tests | all tracked sources current; Pack `1.1.0`; 22 members including `era-alpha` | PASS: remote lock (5 commits), preparation (4 packages), freshness, adapter provenance, 8 files / 60 focused tests, Renderer E2E 8/8, and final aggregate gate |
 | Tests | focused Agent Host asset and Renderer recovery tests | old transfer call fails; repeated short-lived success stops at bound | PASS: red baseline failed 4 expected tests; green run passed 6 files / 46 tests; stable five-second reset also covered |
 | Renderer E2E | `PI67_E2E_RENDERER_PORT=45174 ... renderer-assets.spec.ts` | chunked Blob image reads and replacement cleanup | PASS: 3/3 including bootstrap |
@@ -159,6 +164,15 @@ the prior transferable call and unbounded cross-flight recovery behavior.
   AI Berkshire count. Cancelled the superseded Windows run `33287416833` and
   changed the smoke to derive a validated member count from the immutable Pack
   lock, preventing the same drift on later Pack additions.
+- 2026-08-30: Windows exact-source run `33287582263` exposed a second boundary:
+  Stop became available at Host `operation.started` while Pi was still preparing
+  the image Prompt, so an idle-session abort could return before the accepted
+  execution later entered Pi. Added an accepted-operation AbortSignal, repeated
+  abort at Pi preflight when needed, and withheld the cancelled terminal event
+  until the execution acknowledged cancellation.
+- 2026-08-30: Strengthened packaged restore setup to prove the projected image is
+  live before Stop, added bounded failure screenshot/DOM/process evidence, and
+  passed 6 focused files / 35 tests plus the full 618-file / 3,218-test gate.
 
 ## Closeout
 
@@ -173,4 +187,5 @@ the prior transferable call and unbounded cross-flight recovery behavior.
 - Remaining risks: target Windows x64 timing and the operator's exact private
   Session require a new exact candidate and manual receipt; source/macOS evidence
   must not be promoted into that claim
-- Push/candidate/release state: not authorized and not performed
+- Push/candidate state: authorized but not yet performed at this plan snapshot;
+  R2 publication, Tag, GitHub Release, and promotion remain unauthorized

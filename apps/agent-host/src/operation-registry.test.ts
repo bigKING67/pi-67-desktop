@@ -7,7 +7,6 @@ describe("OperationRegistry", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
-
   it("accepts immediately, deduplicates submission IDs and completes asynchronously", async () => {
     const events: AgentEvent[] = [];
     let complete!: () => void;
@@ -345,7 +344,6 @@ describe("OperationRegistry", () => {
     await registry.loseActive("connection lost");
     expect(order).toEqual(["operation.started", "stream.flush", "operation.lost"]);
   });
-
   it("cancels an active operation with shutdown-specific semantics", async () => {
     const events: AgentEvent[] = [];
     const abort = vi.fn(async () => undefined);
@@ -355,7 +353,9 @@ describe("OperationRegistry", () => {
       fingerprint: "same",
       kind: "prompt",
       abort,
-      execute: () => new Promise<void>(() => undefined)
+      execute: ({ signal }) => new Promise<void>((resolve) => {
+        signal.addEventListener("abort", () => resolve(), { once: true });
+      })
     });
     await vi.waitFor(() => expect(events[0]?.type).toBe("operation.started"));
 
@@ -428,7 +428,9 @@ describe("OperationRegistry", () => {
       fingerprint: "same",
       kind: "prompt",
       abort: () => new Promise<void>((resolve) => { finishAbort = resolve; }),
-      execute: () => new Promise<void>(() => undefined)
+      execute: ({ signal }) => new Promise<void>((resolve) => {
+        signal.addEventListener("abort", () => resolve(), { once: true });
+      })
     });
     await vi.waitFor(() => expect(events[0]?.type).toBe("operation.started"));
     const aborting = registry.abort(accepted.operationId);

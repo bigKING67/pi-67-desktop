@@ -64,7 +64,10 @@ class FakeRuntime {
     this.sessionGeneration += 1;
     return this.snapshot();
   });
-  readonly submitPrompt = vi.fn(() => this.promptCompletion);
+  readonly submitPrompt = vi.fn((_text: string, _attachments: unknown, signal?: AbortSignal) => {
+    signal?.addEventListener("abort", () => this.finishPrompt?.(), { once: true });
+    return this.promptCompletion;
+  });
   readonly abort = vi.fn(async () => undefined);
   readonly flushStream = vi.fn();
   readonly cancelInteractiveRequests = vi.fn(() => [] as string[]);

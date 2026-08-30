@@ -92,7 +92,11 @@ describe("AgentHostServer prompt routing", () => {
     const startedIndex = port.sent.findIndex((value) => isEventEnvelope(value) && value.type === "operation.started");
     expect(responseIndex).toBeGreaterThanOrEqual(0);
     expect(startedIndex).toBeGreaterThan(responseIndex);
-    expect(submitPrompt).toHaveBeenCalledWith("run a long task", undefined);
+    expect(submitPrompt).toHaveBeenCalledWith(
+      "run a long task",
+      undefined,
+      expect.any(AbortSignal)
+    );
 
     const activeResync = commandEnvelope("projection.resync", {}, 6);
     port.emit(activeResync);

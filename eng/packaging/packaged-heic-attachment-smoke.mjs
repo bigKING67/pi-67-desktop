@@ -23,7 +23,15 @@ export async function preparePackagedProjectedImage(window) {
 
 export async function verifyPackagedProjectedImage(window, stage) {
   const image = window.getByRole("img", { name: "会话图片" }).last();
-  await image.waitFor({ state: "visible", timeout: 30_000 });
+  try {
+    await image.waitFor({ state: "visible", timeout: 30_000 });
+  } catch (error) {
+    const state = await inspectProjectedImageState(window);
+    throw new Error(
+      `Packaged projected image was not visible after ${stage}: ${JSON.stringify(state)}`,
+      { cause: error }
+    );
+  }
   const source = await image.getAttribute("src");
   if (!source?.startsWith("blob:")) {
     throw new Error(`Packaged projected image did not use a Blob URL after ${stage}.`);
@@ -32,6 +40,27 @@ export async function verifyPackagedProjectedImage(window, stage) {
   await image.waitFor({ state: "visible", timeout: 5_000 });
   await window.locator('[data-runtime-phase="ready"]')
     .waitFor({ state: "visible", timeout: 5_000 });
+}
+
+async function inspectProjectedImageState(window) {
+  return window.evaluate(() => ({
+    images: [...document.querySelectorAll("img")].slice(-8).map((image) => ({
+      alt: image.alt.slice(0, 160),
+      connected: image.isConnected,
+      complete: image.complete,
+      naturalHeight: image.naturalHeight,
+      naturalWidth: image.naturalWidth,
+      source: image.currentSrc.startsWith("blob:") ? "blob" : image.currentSrc.slice(0, 80)
+    })),
+    messageCards: [...document.querySelectorAll('[data-testid="message-card"]')].slice(-6).map((card) => ({
+      delivery: card.getAttribute("data-delivery-status"),
+      id: card.getAttribute("data-message-id"),
+      text: card.textContent?.trim().slice(0, 240) ?? ""
+    })),
+    pendingUserTurn: document.querySelector('[data-pending-user-turn="true"]') !== null,
+    runtimePhase: document.querySelector("[data-runtime-phase]")?.getAttribute("data-runtime-phase") ?? null,
+    status: document.querySelector('[aria-label^="当前状态："]')?.getAttribute("aria-label") ?? null
+  }));
 }
 
 export async function verifyPackagedHeicAttachment({ artifact, userDataDirectory, window }) {
