@@ -69,6 +69,72 @@ test("keeps live turns in the Virtuoso footer and defers code highlighting until
   expect(loadedResources.some(isHighlightResource)).toBe(false);
 });
 
+test("follows a growing live turn until the user scrolls away and resumes after returning", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page, Array.from({ length: 24 }, (_, index) => (
+    message(`history-${index}`, `Historical response ${index}. ${"context ".repeat(18)}`)
+  )));
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
+
+  const transcript = page.locator('[data-transcript-region="true"]');
+  const scroller = transcript.getByTestId("virtuoso-scroller");
+  const latestButton = transcript.getByRole("button", { name: /^回到最新/u });
+  const bottomGap = () => scroller.evaluate((element) => (
+    element.scrollHeight - element.clientHeight - element.scrollTop
+  ));
+  const operationId = "operation-streaming-follow-output";
+  const emitStreamDelta = (delta: string) => emitMockAgentEvent(page, {
+    type: "turn.streamBatch",
+    payload: { events: [{ assistantMessageEvent: { type: "text_delta", delta } }] }
+  }, { operationId });
+
+  await expect.poll(bottomGap).toBeLessThanOrEqual(4);
+  await emitMockAgentEvent(page, {
+    type: "operation.started",
+    payload: {
+      operation: {
+        operationId,
+        kind: "prompt",
+        lifecycle: "running",
+        cancellable: true,
+        sessionId: "session-test",
+        sessionFileIdentity: "session-file-fixture-demo",
+        sessionGeneration: 1,
+        startedAt: Date.now()
+      }
+    }
+  }, { operationId });
+  await emitStreamDelta(Array.from({ length: 28 }, (_, index) => (
+    `Streaming paragraph ${index}. ${"new output ".repeat(16)}`
+  )).join("\n\n"));
+
+  await expect(transcript.locator('[data-render-mode="streaming"]')).toBeVisible();
+  await expect(latestButton).toHaveCount(0);
+  await expect.poll(bottomGap).toBeLessThanOrEqual(4);
+
+  await scroller.evaluate((element) => {
+    element.scrollTop = Math.max(0, element.scrollTop - 500);
+  });
+  await expect(latestButton).toBeVisible();
+  const readingPosition = await scroller.evaluate((element) => element.scrollTop);
+  await emitStreamDelta(Array.from({ length: 12 }, (_, index) => (
+    `Deferred paragraph ${index}. ${"stay anchored ".repeat(14)}`
+  )).join("\n\n"));
+
+  await expect.poll(async () => Math.abs(
+    await scroller.evaluate((element) => element.scrollTop) - readingPosition
+  )).toBeLessThanOrEqual(2);
+  await expect(latestButton).toBeVisible();
+
+  await latestButton.click();
+  await expect(latestButton).toHaveCount(0);
+  await expect.poll(bottomGap).toBeLessThanOrEqual(4);
+  await emitStreamDelta(`\n\nFinal streamed paragraph. ${"latest output ".repeat(20)}`);
+  await expect(latestButton).toHaveCount(0);
+  await expect.poll(bottomGap).toBeLessThanOrEqual(4);
+});
+
 test("keeps the committed transcript visible across a Settings round trip", async ({ page }) => {
   await page.goto("/");
   await attachMockAgent(page, [message("settings-round-trip", "Settings round-trip transcript")]);

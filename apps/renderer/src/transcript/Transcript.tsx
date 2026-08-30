@@ -1,6 +1,6 @@
 import type { LocatedMessageWindow, SessionMessageView } from "@pi67/domain";
 import { CircleAlert, MessageSquareText } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ListRange, VirtuosoHandle } from "react-virtuoso";
 import { useAppStore } from "../app/app-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
@@ -65,6 +65,10 @@ export function Transcript() {
   const [unseenRowCount, setUnseenRowCount] = useState(0);
   const transcriptRegionRef = useRef<HTMLDivElement>(null);
   const transcriptRef = useRef<VirtuosoHandle>(null);
+  const transcriptScrollerRef = useRef<HTMLElement | null>(null);
+  const followLatestRef = useRef(true);
+  const followScrollFrameRef = useRef(0);
+  const scrollerCleanupRef = useRef<(() => void) | undefined>(undefined);
   const previousRowsRef = useRef<{
     readKey: string | undefined;
     count: number;
@@ -156,6 +160,23 @@ export function Transcript() {
       ? "正在查看较早消息，请先回到最新消息。"
       : sessionForkActionBlockedReason();
 
+  const bindTranscriptScroller = useCallback((scroller: HTMLElement | Window | null) => {
+    scrollerCleanupRef.current?.();
+    scrollerCleanupRef.current = undefined;
+    transcriptScrollerRef.current = null;
+    if (!(scroller instanceof HTMLElement)) return;
+
+    transcriptScrollerRef.current = scroller;
+    let previousScrollTop = scroller.scrollTop;
+    const observeScrollDirection = () => {
+      const nextScrollTop = scroller.scrollTop;
+      if (nextScrollTop < previousScrollTop - 1) followLatestRef.current = false;
+      previousScrollTop = nextScrollTop;
+    };
+    scroller.addEventListener("scroll", observeScrollDirection, { passive: true });
+    scrollerCleanupRef.current = () => scroller.removeEventListener("scroll", observeScrollDirection);
+  }, []);
+
   useEffect(() => subscribeTranscriptMessageJump((target) => {
     if (target.window) setHistoricalWindow(target.window);
     setFocusHighlightedMessage(target.focus !== "preserve");
@@ -171,7 +192,9 @@ export function Transcript() {
     const saved = readKey
       ? useConversationReadPositionStore.getState().positions[readKey]
       : undefined;
-    setAtBottom(saved?.atBottom ?? true);
+    const nextAtBottom = saved?.atBottom ?? true;
+    followLatestRef.current = nextAtBottom;
+    setAtBottom(nextAtBottom);
     setUnseenRowCount(saved?.unseenCount ?? 0);
     previousRowsRef.current = {
       readKey,
@@ -197,20 +220,10 @@ export function Transcript() {
     previousRowsRef.current = { readKey, count: transcriptRows.length, lastKey };
   }, [atBottom, historicalWindow, readKey, transcriptRows]);
 
-  useEffect(() => {
-    const region = transcriptRegionRef.current;
-    if (!region || !atBottom || historicalWindow || typeof ResizeObserver === "undefined") return;
-    let frame = 0;
-    const observer = new ResizeObserver(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => transcriptRef.current?.scrollToIndex({ index: "LAST", align: "end" }));
-    });
-    observer.observe(region);
-    return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-    };
-  }, [atBottom, historicalWindow, readKey]);
+  useEffect(() => () => {
+    scrollerCleanupRef.current?.();
+    cancelAnimationFrame(followScrollFrameRef.current);
+  }, []);
 
   useEffect(() => {
     if (!pendingUserTurn) return;
@@ -306,7 +319,17 @@ export function Transcript() {
         firstItemIndex={transcriptFirstItemIndex}
         followOutput={!historicalWindow && (streaming || hasTurnActivity) ? "auto" : false}
         increaseViewportBy={{ top: 400, bottom: 100 }}
+        scrollerRef={bindTranscriptScroller}
         scrollSeekConfiguration={TRANSCRIPT_SCROLL_SEEK}
+        totalListHeightChanged={() => {
+          if (!followLatestRef.current || historicalWindow || followScrollFrameRef.current) return;
+          followScrollFrameRef.current = requestAnimationFrame(() => {
+            followScrollFrameRef.current = 0;
+            const scroller = transcriptScrollerRef.current;
+            if (!followLatestRef.current || historicalWindow || !scroller) return;
+            scroller.scrollTo({ top: scroller.scrollHeight });
+          });
+        }}
         initialTopMostItemIndex={historicalAnchorRowIndex === undefined
           ? restoredAnchorRowIndex >= 0
             ? { index: transcriptFirstItemIndex + restoredAnchorRowIndex, align: "start" }
@@ -314,6 +337,8 @@ export function Transcript() {
           : { index: historicalAnchorRowIndex, align: "center" }}
         atBottomStateChange={(nextAtBottom) => {
           if (historicalWindow) return;
+          if (!nextAtBottom && followLatestRef.current) return;
+          if (nextAtBottom) followLatestRef.current = true;
           setAtBottom(nextAtBottom);
           if (nextAtBottom) setUnseenRowCount(0);
           if (readKey) useConversationReadPositionStore.getState().setAtBottom(readKey, nextAtBottom);
@@ -379,6 +404,7 @@ export function Transcript() {
   function returnToLatest(): void {
     setHistoricalWindow(undefined);
     setHighlightedMessageId(undefined);
+    followLatestRef.current = true;
     setAtBottom(true);
     setUnseenRowCount(0);
     if (readKey) useConversationReadPositionStore.getState().setAtBottom(readKey, true);

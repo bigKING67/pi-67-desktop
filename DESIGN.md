@@ -1372,6 +1372,12 @@ loading error where the operation can produce those states
   rightmost main-action position and is visible only when the accepted Operation
   declares a real Host-owned abort path; Session import stays visibly running
   until it completes or fails.
+- Transcript follow intent is distinct from its measured bottom position. While
+  the user is following the latest Turn, live Assistant text, thinking, activity,
+  Markdown, and other Footer height growth keep the newest content in view without
+  exposing `回到最新`. An explicit user scroll away preserves that reading anchor
+  and exposes the recovery action; activating it returns to the current end and
+  resumes following subsequent streamed growth.
 - While a Prompt Operation is streaming, the compact delivery selector replaces
   the idle `执行 | 计划` control instead of being appended beside it. Its resting
   trigger shows the current `立即纠偏` or `完成后执行` behavior and opens an upward
