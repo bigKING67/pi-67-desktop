@@ -17,7 +17,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins four first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.08.30.1");
+    expect(lock.catalogVersion).toBe("2026.08.30.3");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi67-core",
       "browser67",
@@ -26,7 +26,7 @@ describe("Desktop first-party capability source lock", () => {
     ]);
     expect(lock.sources.every((source) => /^[0-9a-f]{40}$/u.test(source.commit))).toBe(true);
     expect(lock.sources.find((source) => source.id === "pi67-core")).toMatchObject({
-      commit: "56c13da329b1d4dddc87c4d1655375156baa08e7",
+      commit: "e7ec566d339c7dfa661cb19b1de50047cfb059e2",
       ref: "refs/heads/main",
       includedExtensions: [{
         id: "pi-rules-loader",
@@ -35,9 +35,9 @@ describe("Desktop first-party capability source lock", () => {
       }]
     });
     expect(lock.sources.find((source) => source.id === "browser67")).toMatchObject({
-      version: "0.6.0",
+      version: "0.8.0",
       ref: "refs/heads/main",
-      commit: "3c1d224bf2a4d7416aa15e3f3861dbd1c4dfb7dc"
+      commit: "c9d45ae020ca502390b4b4838d924ace0d8e60d7"
     });
     expect(lock.skillPacks).toHaveLength(1);
     expect(lock.skillPacks[0]).toMatchObject({

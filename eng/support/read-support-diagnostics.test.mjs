@@ -105,7 +105,7 @@ function fixtureSubmission() {
     schema: "pi67-support-diagnostics.v6",
     generatedAt: createdAt,
     application: {
-      version: "0.1.0-alpha.39",
+      version: "0.1.0-alpha.40",
       platform: "win32",
       architecture: "x64",
       packaged: true,

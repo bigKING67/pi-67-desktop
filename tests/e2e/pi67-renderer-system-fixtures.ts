@@ -60,7 +60,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
     description: "真实浏览器运行和自动化能力。",
     packageId: "browser67",
     packageDisplayName: "browser67",
-    version: "0.6.0",
+    version: "0.8.0",
     installed: true
   }, {
     id: "js-reverse",
@@ -68,7 +68,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
     description: "浏览器 JavaScript 逆向和证据化分析。",
     packageId: "browser67",
     packageDisplayName: "browser67",
-    version: "0.6.0",
+    version: "0.8.0",
     installed: true
   }, {
     id: "design-craft",
@@ -89,7 +89,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
   }];
   return {
     phase: "ready",
-    catalogVersion: "2026.08.30.1",
+    catalogVersion: "2026.08.30.3",
     packages: [{
       id: "pi67-core",
       displayName: "Pi-67 Core",
@@ -97,7 +97,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
       bundled: true,
       defaultEnabled: true,
       version: "0.15.8",
-      commit: "56c13da329b1d4dddc87c4d1655375156baa08e7",
+      commit: "e7ec566d339c7dfa661cb19b1de50047cfb059e2",
       resourceTypes: ["extension", "skill", "prompt", "rule"],
       installed: true
     }, {
@@ -106,8 +106,8 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
       origin: "first-party",
       bundled: true,
       defaultEnabled: true,
-      version: "0.6.0",
-      commit: "3c1d224bf2a4d7416aa15e3f3861dbd1c4dfb7dc",
+      version: "0.8.0",
+      commit: "c9d45ae020ca502390b4b4838d924ace0d8e60d7",
       resourceTypes: ["skill", "integration"],
       installed: true
     }, {
@@ -180,9 +180,9 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
       displayName: "browser67",
       description: "真实浏览器操作、诊断和 JavaScript 逆向能力。",
       versionSource: "capability-package",
-      bundledVersion: "0.6.0",
+      bundledVersion: "0.8.0",
       upstream: "https://github.com/bigKING67/browser67",
-      sourceCommit: "3c1d224bf2a4d7416aa15e3f3861dbd1c4dfb7dc",
+      sourceCommit: "c9d45ae020ca502390b4b4838d924ace0d8e60d7",
       updatePolicy: "capability-package",
       updateManager: "desktop-capability",
       independentUpdateState: "not-applicable",

@@ -137,7 +137,7 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   await expect(globalPanel.getByText("2 个技能 · 基线未独立版本化", { exact: true })).toBeVisible();
   await expect(globalPanel.getByText("1 个技能 · 内置基线 1.1.0", { exact: true })).toBeVisible();
   await expect(globalPanel.getByText("1 个技能 · 内置基线 2.2.0", { exact: true })).toBeVisible();
-  await expect(globalPanel.getByText("2 个技能 · 内置基线 0.6.0", { exact: true })).toBeVisible();
+  await expect(globalPanel.getByText("2 个技能 · 内置基线 0.8.0", { exact: true })).toBeVisible();
   await expect(globalPanel.getByText("2 个技能 · 2 个内置来源", { exact: true })).toBeVisible();
   await expect(globalPanel.getByText("design-craft", { exact: true })).toBeVisible();
   await expect(globalPanel.getByText("project-review", { exact: true })).toHaveCount(0);

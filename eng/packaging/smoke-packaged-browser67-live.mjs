@@ -83,7 +83,7 @@ try {
     "managed MCP did not migrate browser67 to the packaged capability root"
   );
   const browser67Package = await readJson(`${browser67Root}/package.json`);
-  assert(browser67Package.version === "0.6.0", "unexpected browser67 version");
+  assert(browser67Package.version === "0.8.0", "unexpected browser67 version");
   assert(/^[0-9a-f]{40}$/u.test(browser67Package.gitHead), "browser67 gitHead is missing");
 
   const managedBundleRoot = join(artifact.resourcesPath, "capabilities", "managed-packages", "bundled");
