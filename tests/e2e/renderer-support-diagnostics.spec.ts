@@ -30,7 +30,8 @@ test("keeps support upload pending, receipt, failure, retry, and local fallback 
 
   await expect(row).toContainText("PI67-A1B2C3D4E5F6");
   await expect(row).toContainText("30 天后自动删除");
-  await expect(row.getByRole("button", { name: "复制报告编号 PI67-A1B2C3D4E5F6" })).toBeVisible();
+  await expect(row).toContainText("精确对象键");
+  await expect(row.getByRole("button", { name: "复制诊断定位信息 PI67-A1B2C3D4E5F6" })).toBeVisible();
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.screenshot({ path: testInfo.outputPath("support-upload-success-dark.png"), animations: "disabled" });

@@ -1,5 +1,6 @@
 import { useAppStore } from "../app/app-store.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
+import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { resynchronizeRendererProjection } from "../connection/projection-recovery-controller.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { clearConversationAttention } from "../navigation/conversation-attention-store.js";
@@ -89,7 +90,17 @@ async function activateRendererTaskOnce(taskId: string): Promise<boolean> {
 }
 
 export function resumeRendererTask(taskId: string): Promise<boolean> {
-  return runTaskActivationFlight(taskId, () => resumeRendererTaskOnce(taskId));
+  return runTaskActivationFlight(taskId, async () => {
+    agentConnectionController.recordDiagnosticAction("task.resume", "started");
+    try {
+      const resumed = await resumeRendererTaskOnce(taskId);
+      agentConnectionController.recordDiagnosticAction("task.resume", resumed ? "completed" : "failed");
+      return resumed;
+    } catch (error) {
+      agentConnectionController.recordDiagnosticAction("task.resume", "failed");
+      throw error;
+    }
+  });
 }
 
 async function resumeRendererTaskOnce(taskId: string): Promise<boolean> {

@@ -4,6 +4,7 @@ import type { RuntimeDiagnostics } from "@pi67/protocol";
 import type { TaskHostState } from "./host-task-state-coordinator.js";
 import type { SessionWriterLeaseRegistry } from "./session-writer-lease-registry.js";
 import type { WorkspaceContextRecord } from "./workspace-context-registry.js";
+import type { HostDiagnosticEvidence } from "./host-diagnostic-evidence.js";
 
 export async function collectHostRuntimeDiagnostics(options: {
   runtime: AgentRuntime;
@@ -11,6 +12,7 @@ export async function collectHostRuntimeDiagnostics(options: {
   taskStates: readonly TaskHostState[];
   workspaceRecords: readonly WorkspaceContextRecord[];
   writerLeases: SessionWriterLeaseRegistry;
+  diagnosticEvidence?: HostDiagnosticEvidence;
 }): Promise<RuntimeDiagnostics> {
   const diagnostics = await options.runtime.collectDiagnostics();
   const taskStates = options.taskStates.filter((state) => !state.record.closed);
@@ -63,6 +65,9 @@ export async function collectHostRuntimeDiagnostics(options: {
         receipts: initializationReceipts,
         receiptsTruncated: allInitializationReceipts.length > initializationReceipts.length
       },
+      ...(options.diagnosticEvidence === undefined ? {} : {
+        causality: options.diagnosticEvidence.snapshot()
+      }),
       workspaces,
       workspacesTruncated: options.workspaceRecords.length > workspaces.length
     }

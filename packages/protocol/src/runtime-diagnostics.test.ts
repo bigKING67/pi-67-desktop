@@ -58,6 +58,22 @@ const diagnostics = {
       }],
       receiptsTruncated: false
     },
+    causality: {
+      incidents: [{
+        sequence: 1,
+        at: 100,
+        layer: "agent-host",
+        phase: "response-post",
+        outcome: "failed",
+        command: "asset.read",
+        errorClass: "DataCloneError",
+        reason: "response-post-failed",
+        connectionSequence: 2,
+        hostEpoch: 4,
+        binaryBytes: 512
+      }],
+      incidentsDroppedCount: 0
+    },
     workspaces: [],
     workspacesTruncated: false
   }
@@ -75,9 +91,28 @@ const renderer = {
   futureGenerationWaitCount: 1,
   futureGenerationWaitTimeoutCount: 0,
   priorGenerationTeardownIgnoredCount: 1,
+  consecutiveUnstableConnectionCount: 1,
+  automaticReplacementSuppressedCount: 0,
   lastTeardownAt: 123,
   lastTeardownCode: "CONNECTION_CLOSED",
-  lastTeardownReason: "port-closed"
+  lastTeardownReason: "port-closed",
+  causality: {
+    actions: [{ sequence: 1, at: 100, action: "task.resume", stage: "started" }],
+    actionsDroppedCount: 0,
+    incidents: [{
+      sequence: 2,
+      at: 101,
+      layer: "renderer",
+      phase: "request",
+      outcome: "failed",
+      command: "asset.read",
+      errorClass: "ProtocolRequestError",
+      reason: "request-failed",
+      connectionGeneration: 4,
+      hostEpoch: 4
+    }],
+    incidentsDroppedCount: 0
+  }
 } as const;
 
 describe("runtime diagnostics boundary", () => {
@@ -90,6 +125,19 @@ describe("runtime diagnostics boundary", () => {
     expect(isRuntimeDiagnostics({
       ...diagnostics,
       workspace: { pathHash: "short", pathKind: "posix" }
+    })).toBe(false);
+    expect(isRuntimeDiagnostics({
+      ...diagnostics,
+      host: {
+        ...diagnostics.host,
+        causality: {
+          incidents: [{
+            ...diagnostics.host.causality.incidents[0],
+            message: "private raw error"
+          }],
+          incidentsDroppedCount: 0
+        }
+      }
     })).toBe(false);
     expect(isRuntimeDiagnostics({
       ...diagnostics,

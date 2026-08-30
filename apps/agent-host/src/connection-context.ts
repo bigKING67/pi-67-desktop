@@ -19,6 +19,14 @@ import {
   type ProtocolPort,
   type RequestEnvelope
 } from "@pi67/protocol";
+import {
+  classifyDiagnosticError,
+  diagnosticBinaryByteEvidence,
+  diagnosticEnvelopeType,
+  hostDiagnosticReason,
+  hostIncident,
+  type HostDiagnosticIncidentInput
+} from "./host-diagnostic-evidence.js";
 
 const INVALID_HOST_RESPONSE_ERROR: ProtocolError = {
   code: "INTERNAL",
@@ -38,6 +46,9 @@ const PENDING_REQUEST_LIMIT_ERROR: ProtocolError = {
 
 type PortListener = (event: unknown) => void;
 type ResponseAuthority = Pick<RequestEnvelope, "requestId" | "type" | "context">;
+type HostResponsePort = Omit<ProtocolPort, "postMessage"> & {
+  postMessage(message: unknown): void;
+};
 
 export interface HostConnectionIdentity {
   appInstanceId?: string;
@@ -48,6 +59,11 @@ export interface HostConnectionIdentity {
 export interface HostWelcomeRuntime {
   sdkVersion: string;
   eventSequence: number;
+}
+
+export interface HostConnectionDiagnostics {
+  connectionSequence: number;
+  record: (incident: HostDiagnosticIncidentInput) => void;
 }
 
 export class HostConnectionContext {
@@ -64,15 +80,17 @@ export class HostConnectionContext {
   private readonly messageErrorListener: PortListener = () => this.retire("message-error");
   private readonly closeListener: PortListener = () => this.close(false, "peer-closed");
   private disconnectNotified = false;
+  private diagnosticCloseRecorded = false;
 
   constructor(
-    private readonly port: ProtocolPort,
+    private readonly port: HostResponsePort,
     readonly identity: HostConnectionIdentity,
     private readonly getWelcomeRuntime: () => Promise<HostWelcomeRuntime>,
     private readonly onRequest: (connection: HostConnectionContext, request: RequestEnvelope) => void,
     private readonly onDisconnect: () => void = () => undefined,
     private readonly maxSeenRequestIds = 2_048,
-    private readonly maxPendingRequests = 256
+    private readonly maxPendingRequests = 256,
+    private readonly diagnostics?: HostConnectionDiagnostics
   ) {
     this.addListener("message", this.messageListener);
     this.addListener("messageerror", this.messageErrorListener);
@@ -111,13 +129,7 @@ export class HostConnectionContext {
       this.sendSafeError(authority, OVERSIZED_HOST_RESPONSE_ERROR, true);
       return;
     }
-    this.sendResponse(
-      envelope,
-      type === "asset.read"
-        ? [(result as CommandResults["asset.read"]).data]
-        : undefined,
-      requestId
-    );
+    this.sendResponse(envelope, requestId);
   }
 
   sendError<T extends AgentCommandType>(requestId: string, type: T, error: ProtocolError): void {
@@ -133,20 +145,25 @@ export class HostConnectionContext {
       this.sendSafeError(authority, OVERSIZED_HOST_RESPONSE_ERROR, true);
       return;
     }
-    this.sendResponse(envelope, undefined, requestId);
+    this.sendResponse(envelope, requestId);
   }
 
   postEvent(envelope: unknown): boolean {
     if (!this.handshaken || this.retired || this.closed) return false;
     if (!isEventEnvelope(envelope)) return false;
     if (!isEnvelopeWithinByteLimit(envelope, this.negotiatedMaxEnvelopeBytes)) {
+      this.recordIncident(hostIncident("event-post", "failed", { reason: "event-envelope-too-large" }));
       this.retire("event-envelope-too-large");
       return false;
     }
     try {
       this.port.postMessage(envelope);
       return true;
-    } catch {
+    } catch (error) {
+      this.recordIncident(hostIncident("event-post", "failed", {
+        reason: "event-post-failed",
+        errorClass: classifyDiagnosticError(error)
+      }));
       this.retire("event-post-failed");
       return false;
     }
@@ -155,6 +172,7 @@ export class HostConnectionContext {
   retire(reason = "connection-replaced"): void {
     if (this.retired) return;
     debugConnection(reason);
+    this.recordClose(reason);
     this.retired = true;
     this.abortPendingRequests();
     this.notifyDisconnect();
@@ -166,6 +184,7 @@ export class HostConnectionContext {
   close(closePort = true, reason = "connection-closed"): void {
     if (this.closed) return;
     debugConnection(reason);
+    this.recordClose(reason);
     this.closed = true;
     this.abortPendingRequests();
     this.notifyDisconnect();
@@ -290,7 +309,11 @@ export class HostConnectionContext {
       this.negotiatedMaxEnvelopeBytes = welcome.maxEnvelopeBytes;
       this.port.postMessage(welcome);
       this.handshaken = true;
-    } catch {
+    } catch (error) {
+      this.recordIncident(hostIncident("handshake", "failed", {
+        reason: "handshake-failed",
+        errorClass: classifyDiagnosticError(error)
+      }));
       this.close(true, "handshake-failed");
     } finally {
       this.handshakePending = false;
@@ -319,12 +342,11 @@ export class HostConnectionContext {
       if (tracked) this.completeResponse(authority.requestId);
       return;
     }
-    this.sendResponse(envelope, undefined, tracked ? authority.requestId : undefined);
+    this.sendResponse(envelope, tracked ? authority.requestId : undefined);
   }
 
   private sendResponse(
     envelope: unknown,
-    transfer?: Transferable[],
     trackedRequestId?: string
   ): void {
     if (this.closed) {
@@ -332,11 +354,16 @@ export class HostConnectionContext {
       return;
     }
     try {
-      if (transfer && transfer.length > 0) this.port.postMessage(envelope, transfer);
-      else this.port.postMessage(envelope);
+      this.port.postMessage(envelope);
     } catch (error) {
+      this.recordIncident(hostIncident("response-post", "failed", {
+        command: diagnosticEnvelopeType(envelope),
+        errorClass: classifyDiagnosticError(error),
+        reason: "response-post-failed",
+        ...diagnosticBinaryByteEvidence(envelope)
+      }));
       debugConnection("response-post-failed", {
-        type: envelopeType(envelope),
+        type: diagnosticEnvelopeType(envelope),
         error: error instanceof Error ? error.name : "unknown"
       });
       this.retire("response-post-failed");
@@ -369,6 +396,23 @@ export class HostConnectionContext {
     for (const controller of this.requestAbortControllers.values()) controller.abort();
   }
 
+  private recordClose(reason: string): void {
+    if (this.diagnosticCloseRecorded) return;
+    this.diagnosticCloseRecorded = true;
+    this.recordIncident(hostIncident("port-close", "closed", {
+      reason: hostDiagnosticReason(reason)
+    }));
+  }
+
+  private recordIncident(incident: HostDiagnosticIncidentInput): void {
+    if (!this.diagnostics) return;
+    this.diagnostics.record({
+      ...incident,
+      connectionSequence: this.diagnostics.connectionSequence,
+      hostEpoch: this.identity.hostEpoch
+    });
+  }
+
   private addListener(type: "message" | "messageerror" | "close", listener: PortListener): void {
     if (this.port.addEventListener) this.port.addEventListener(type, listener);
     else this.port.on?.(type, listener);
@@ -390,12 +434,6 @@ function debugConnection(
       : "";
     console.error(`[agent-host] connection closed: ${reason}${suffix}`);
   }
-}
-
-function envelopeType(envelope: unknown): string {
-  if (typeof envelope !== "object" || envelope === null) return "unknown";
-  const type = (envelope as { type?: unknown }).type;
-  return typeof type === "string" && type.length <= 80 ? type : "unknown";
 }
 
 export function isAttachPortMessage(value: unknown): value is {

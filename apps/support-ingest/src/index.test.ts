@@ -26,7 +26,8 @@ describe("support diagnostics ingest", () => {
       schema: "pi67-support-receipt.v1",
       reportId: submission.reportId,
       sizeBytes: new TextEncoder().encode(body).byteLength,
-      sha256: submission.diagnosticsSha256
+      sha256: submission.diagnosticsSha256,
+      objectKey: "diagnostics/2026/08/29/PI67-A1B2C3D4E5F6.json"
     });
     expect([...objects.keys()]).toEqual([
       "diagnostics/2026/08/29/PI67-A1B2C3D4E5F6.json"
@@ -157,14 +158,23 @@ function fixtureSubmission(createdAt: number): SupportDiagnosticsSubmission {
       version: "0.1.0-alpha.37",
       platform: "darwin",
       architecture: "arm64",
-      packaged: true
+      packaged: true,
+      protocolRevision: "a".repeat(64)
     },
     desktop: {},
     agentHost: {},
     piConfiguration: {},
     renderer: {},
     runtimeCollection: { status: "available" },
-    runtime: {}
+    runtime: {},
+    causality: {
+      renderer: {
+        actions: [],
+        actionsDroppedCount: 0,
+        incidents: [],
+        incidentsDroppedCount: 0
+      }
+    }
   };
   return {
     schema: SUPPORT_DIAGNOSTICS_SUBMISSION_SCHEMA,

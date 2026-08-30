@@ -1,3 +1,8 @@
+import {
+  isSupportDiagnosticsCausality,
+  type SupportDiagnosticsCausality
+} from "./support-diagnostic-causality.js";
+
 export const SUPPORT_DIAGNOSTICS_UPLOAD_ORIGIN = "https://support.52671314.xyz";
 export const SUPPORT_DIAGNOSTICS_UPLOAD_PATH = "/v1/diagnostics";
 export const SUPPORT_DIAGNOSTICS_UPLOAD_URL = (
@@ -7,10 +12,12 @@ export const SUPPORT_DIAGNOSTICS_MAX_SUBMISSION_BYTES = 64 * 1024;
 export const SUPPORT_DIAGNOSTICS_RETENTION_DAYS = 30;
 export const SUPPORT_DIAGNOSTICS_SUBMISSION_SCHEMA = "pi67-support-submission.v1";
 export const SUPPORT_DIAGNOSTICS_RECEIPT_SCHEMA = "pi67-support-receipt.v1";
-export const SUPPORT_DIAGNOSTICS_DOCUMENT_SCHEMA = "pi67-support-diagnostics.v5";
+export const SUPPORT_DIAGNOSTICS_DOCUMENT_SCHEMA_V5 = "pi67-support-diagnostics.v5";
+export const SUPPORT_DIAGNOSTICS_DOCUMENT_SCHEMA = "pi67-support-diagnostics.v6";
 
 const REPORT_ID_PATTERN = /^PI67-[A-F0-9]{12}$/u;
 const SHA_256_PATTERN = /^[a-f0-9]{64}$/u;
+const OBJECT_KEY_PATTERN = /^diagnostics\/\d{4}\/\d{2}\/\d{2}\/PI67-[A-F0-9]{12}\.json$/u;
 const MAX_JSON_DEPTH = 12;
 const MAX_OBJECT_KEYS = 256;
 const MAX_ARRAY_ITEMS = 256;
@@ -42,7 +49,7 @@ const FORBIDDEN_DIAGNOSTIC_KEYS = new Set([
   "toolpayload",
   "toolpayloads"
 ]);
-const DIAGNOSTIC_KEYS = new Set([
+const V5_DIAGNOSTIC_KEYS = new Set([
   "schema",
   "generatedAt",
   "application",
@@ -53,16 +60,19 @@ const DIAGNOSTIC_KEYS = new Set([
   "runtimeCollection",
   "runtime"
 ]);
-const APPLICATION_KEYS = new Set(["version", "platform", "architecture", "packaged"]);
+const V6_DIAGNOSTIC_KEYS = new Set([...V5_DIAGNOSTIC_KEYS, "causality"]);
+const V5_APPLICATION_KEYS = new Set(["version", "platform", "architecture", "packaged"]);
+const V6_APPLICATION_KEYS = new Set([...V5_APPLICATION_KEYS, "protocolRevision"]);
 
-export interface SupportDiagnosticsDocument extends Record<string, unknown> {
-  schema: typeof SUPPORT_DIAGNOSTICS_DOCUMENT_SCHEMA;
+interface SupportDiagnosticsDocumentBase extends Record<string, unknown> {
+  schema: typeof SUPPORT_DIAGNOSTICS_DOCUMENT_SCHEMA_V5 | typeof SUPPORT_DIAGNOSTICS_DOCUMENT_SCHEMA;
   generatedAt: number;
   application: {
     version: string;
     platform: "darwin" | "linux" | "win32";
     architecture: "arm64" | "x64";
     packaged: boolean;
+    protocolRevision?: string;
   };
   desktop: Record<string, unknown>;
   agentHost: Record<string, unknown>;
@@ -74,6 +84,19 @@ export interface SupportDiagnosticsDocument extends Record<string, unknown> {
   };
   runtime?: Record<string, unknown>;
 }
+
+export interface SupportDiagnosticsDocumentV5 extends SupportDiagnosticsDocumentBase {
+  schema: typeof SUPPORT_DIAGNOSTICS_DOCUMENT_SCHEMA_V5;
+  application: Omit<SupportDiagnosticsDocumentBase["application"], "protocolRevision">;
+}
+
+export interface SupportDiagnosticsDocumentV6 extends SupportDiagnosticsDocumentBase {
+  schema: typeof SUPPORT_DIAGNOSTICS_DOCUMENT_SCHEMA;
+  application: SupportDiagnosticsDocumentBase["application"] & { protocolRevision: string };
+  causality: SupportDiagnosticsCausality;
+}
+
+export type SupportDiagnosticsDocument = SupportDiagnosticsDocumentV5 | SupportDiagnosticsDocumentV6;
 
 export interface SupportDiagnosticsSubmission {
   schema: typeof SUPPORT_DIAGNOSTICS_SUBMISSION_SCHEMA;
@@ -89,14 +112,19 @@ export interface SupportDiagnosticsUploadReceipt {
   receivedAt: number;
   sizeBytes: number;
   sha256: string;
+  objectKey?: string;
 }
 
 export function isSupportDiagnosticsDocument(value: unknown): value is SupportDiagnosticsDocument {
-  if (!isRecord(value) || !hasOnlyKeys(value, DIAGNOSTIC_KEYS)) return false;
-  if (value.schema !== SUPPORT_DIAGNOSTICS_DOCUMENT_SCHEMA || !isTimestamp(value.generatedAt)) return false;
-  if (!isApplication(value.application)) return false;
+  if (!isRecord(value) || !isTimestamp(value.generatedAt)) return false;
+  const v5 = value.schema === SUPPORT_DIAGNOSTICS_DOCUMENT_SCHEMA_V5;
+  const v6 = value.schema === SUPPORT_DIAGNOSTICS_DOCUMENT_SCHEMA;
+  if (!v5 && !v6) return false;
+  if (!hasOnlyKeys(value, v6 ? V6_DIAGNOSTIC_KEYS : V5_DIAGNOSTIC_KEYS)) return false;
+  if (!isApplication(value.application, v6)) return false;
   if (!isRecord(value.desktop) || !isRecord(value.agentHost) || !isRecord(value.piConfiguration)) return false;
   if (!isRecord(value.renderer) || !isRuntimeCollection(value.runtimeCollection)) return false;
+  if (v6 && !isSupportDiagnosticsCausality(value.causality)) return false;
   if (value.runtimeCollection.status === "available") {
     if (!isRecord(value.runtime)) return false;
   } else if ("runtime" in value) {
@@ -117,14 +145,19 @@ export function isSupportDiagnosticsSubmission(value: unknown): value is Support
 
 export function isSupportDiagnosticsUploadReceipt(value: unknown): value is SupportDiagnosticsUploadReceipt {
   return isRecord(value)
-    && hasOnlyKeys(value, new Set(["schema", "reportId", "receivedAt", "sizeBytes", "sha256"]))
+    && hasOnlyKeys(value, new Set(["schema", "reportId", "receivedAt", "sizeBytes", "sha256", "objectKey"]))
     && value.schema === SUPPORT_DIAGNOSTICS_RECEIPT_SCHEMA
     && isReportId(value.reportId)
     && isTimestamp(value.receivedAt)
     && Number.isSafeInteger(value.sizeBytes)
     && Number(value.sizeBytes) > 0
     && Number(value.sizeBytes) <= SUPPORT_DIAGNOSTICS_MAX_SUBMISSION_BYTES
-    && isSha256(value.sha256);
+    && isSha256(value.sha256)
+    && (value.objectKey === undefined || (
+      typeof value.objectKey === "string"
+      && OBJECT_KEY_PATTERN.test(value.objectKey)
+      && value.objectKey.endsWith(`/${value.reportId}.json`)
+    ));
 }
 
 export function isReportId(value: unknown): value is string {
@@ -135,15 +168,21 @@ export function isSha256(value: unknown): value is string {
   return typeof value === "string" && SHA_256_PATTERN.test(value);
 }
 
-function isApplication(value: unknown): value is SupportDiagnosticsDocument["application"] {
+function isApplication(value: unknown, v6: boolean): value is SupportDiagnosticsDocument["application"] {
   return isRecord(value)
-    && hasOnlyKeys(value, APPLICATION_KEYS)
+    && hasOnlyKeys(value, v6 ? V6_APPLICATION_KEYS : V5_APPLICATION_KEYS)
     && typeof value.version === "string"
     && value.version.length >= 1
     && value.version.length <= 64
     && (value.platform === "darwin" || value.platform === "linux" || value.platform === "win32")
     && (value.architecture === "arm64" || value.architecture === "x64")
     && typeof value.packaged === "boolean"
+    && (!v6 || (
+      typeof value.protocolRevision === "string"
+      && value.protocolRevision.length >= 1
+      && value.protocolRevision.length <= 128
+      && /^[a-f0-9]+$/u.test(value.protocolRevision)
+    ))
     && (value.platform !== "linux" || value.packaged === false);
 }
 

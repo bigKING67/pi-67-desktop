@@ -5,15 +5,14 @@ import {
   ProtocolRequestError,
   type AgentCommandType,
   type AgentConnectionIdentity,
-  type AgentEvent,
   type CommandPayloads,
   type CommandResults,
-  type EventEnvelope,
   type ProtocolContext,
   type ProjectionResyncInstaller,
   type RendererAcknowledgementDiagnostics,
   type RendererConnectionTeardownReason,
-  type SequenceGap
+  type SupportDiagnosticActionName,
+  type SupportDiagnosticActionStage
 } from "@pi67/protocol";
 import { currentWorkbenchProtocolContext } from "../workbench/workbench-protocol-context.js";
 import { requestWithBoundedTransportRetry } from "./bounded-transport-retry.js";
@@ -23,39 +22,29 @@ import {
   waitForFutureConnection
 } from "./agent-connection-recovery-state.js";
 import { agentConnectionRequestContext } from "./agent-connection-request-context.js";
+import type {
+  AgentConnectionControllerOptions,
+  AgentConnectionRequestOptions,
+  ConnectionSubscriber
+} from "./agent-connection-controller-contract.js";
+import {
+  connectionError,
+  disposedError,
+  positiveInteger,
+  prepareSameHostTransportRetry
+} from "./agent-connection-controller-utilities.js";
+import {
+  createBrowserAgentPortHandoffTarget,
+  isAgentPortHandoff,
+  type AgentPortHandoff
+} from "./agent-port-handoff.js";
+import {
+  diagnosticActionForCommand,
+  RendererDiagnosticEvidence
+} from "./renderer-diagnostic-evidence.js";
 
-interface ConnectionSubscriber {
-  onConnected?: (identity: AgentConnectionIdentity) => void;
-  onEvent?: (event: AgentEvent, envelope: EventEnvelope) => void;
-  onSequenceGap?: (gap: SequenceGap) => void;
-  onTeardown?: (error: Error) => void;
-}
-
-interface AgentPortHandoff {
-  source: "pi67-preload";
-  type: "agent-port";
-  appInstanceId: string;
-  hostEpoch: number;
-}
-
-export interface AgentPortHandoffTarget {
-  readonly source: MessageEventSource;
-  readonly origin: string;
-  addMessageListener(listener: (event: MessageEvent) => void): void;
-  removeMessageListener(listener: (event: MessageEvent) => void): void;
-}
-
-export interface AgentConnectionRequestOptions {
-  context?: ProtocolContext;
-  onAcknowledgementDelayed?: () => void;
-  ackTimeoutMs?: number;
-  signal?: AbortSignal;
-}
-
-export interface AgentConnectionControllerOptions {
-  now?: () => number;
-  slowAcknowledgementThresholdMs?: number;
-}
+export type { AgentPortHandoffTarget } from "./agent-port-handoff.js";
+export type { AgentConnectionControllerOptions, AgentConnectionRequestOptions } from "./agent-connection-controller-contract.js";
 
 const DEFAULT_SLOW_ACKNOWLEDGEMENT_THRESHOLD_MS = 2_000;
 
@@ -63,11 +52,13 @@ export class AgentConnectionController {
   private readonly subscribers = new Set<ConnectionSubscriber>();
   private client: AgentPortClient | undefined;
   private identityValue: AgentConnectionIdentity | undefined;
+  private portAttachedAt: number | undefined;
   private generation = 0;
   private receivedPort = false;
   private disposed = false;
   private readonly now: () => number;
   private readonly recoveryDiagnostics: AgentConnectionRecoveryDiagnostics;
+  private readonly diagnosticEvidence: RendererDiagnosticEvidence;
   private readonly slowAcknowledgementThresholdMs: number;
   private activeRequestCount = 0;
   private sampleCount = 0;
@@ -76,11 +67,12 @@ export class AgentConnectionController {
   private maxAcknowledgementLatencyMs: number | undefined;
 
   constructor(
-    private readonly handoffTarget = createBrowserHandoffTarget(),
+    private readonly handoffTarget = createBrowserAgentPortHandoffTarget(),
     options: AgentConnectionControllerOptions = {}
   ) {
     this.now = options.now ?? Date.now;
     this.recoveryDiagnostics = new AgentConnectionRecoveryDiagnostics(this.now);
+    this.diagnosticEvidence = new RendererDiagnosticEvidence(this.now);
     this.slowAcknowledgementThresholdMs = positiveInteger(
       options.slowAcknowledgementThresholdMs,
       DEFAULT_SLOW_ACKNOWLEDGEMENT_THRESHOLD_MS,
@@ -105,6 +97,15 @@ export class AgentConnectionController {
     return this.generation;
   }
 
+  assertAutomaticReplacementAllowed(): void {
+    try {
+      this.recoveryDiagnostics.assertAutomaticReplacementAllowed();
+    } catch (error) {
+      this.diagnosticEvidence.recordAutomaticReplacementSuppressed(error, this.generation);
+      throw error;
+    }
+  }
+
   diagnostics(): RendererAcknowledgementDiagnostics {
     return {
       activeRequestCount: this.activeRequestCount,
@@ -112,6 +113,7 @@ export class AgentConnectionController {
       slowAcknowledgementCount: this.slowAcknowledgementCount,
       slowThresholdMs: this.slowAcknowledgementThresholdMs,
       ...this.recoveryDiagnostics.snapshot(this.generation),
+      causality: this.diagnosticEvidence.snapshot(),
       ...(this.lastAcknowledgementLatencyMs === undefined
         ? {}
         : { lastAcknowledgementLatencyMs: this.lastAcknowledgementLatencyMs }),
@@ -132,6 +134,10 @@ export class AgentConnectionController {
       if (this.subscribers.has(subscriber) && this.identityValue === identity) subscriber.onConnected?.(identity);
     });
     return () => this.subscribers.delete(subscriber);
+  }
+
+  recordDiagnosticAction(action: SupportDiagnosticActionName, stage: SupportDiagnosticActionStage): void {
+    this.diagnosticEvidence.recordAction(action, stage);
   }
 
   async waitForConnection(timeoutMs = 15_000): Promise<AgentConnectionIdentity> {
@@ -180,39 +186,49 @@ export class AgentConnectionController {
     options: AgentConnectionRequestOptions = {}
   ): Promise<CommandResults[T]> {
     if (this.disposed) throw disposedError();
+    const action = diagnosticActionForCommand(type);
+    if (action) this.diagnosticEvidence.recordAction(action, "started");
     const expectedHostEpoch = this.identityValue?.hostEpoch;
     const context = options.context ?? agentConnectionRequestContext(type, payload);
-    if (isReplaySafeControlMutation(type)) {
-      return requestReplaySafeControlMutation(
-        type,
-        (idempotencyKey, attempt) => this.requestOnce(
+    try {
+      let result: CommandResults[T];
+      if (isReplaySafeControlMutation(type)) {
+        result = await requestReplaySafeControlMutation(
+          type,
+          (idempotencyKey, attempt) => this.requestOnce(
+            type,
+            payload,
+            transfer,
+            context,
+            idempotencyKey,
+            type === "session.create" ? (attempt === 0 ? 5_000 : 10_000) : undefined,
+            options.signal
+          ),
+          () => this.prepareSameHostRetry(expectedHostEpoch),
+          options.onAcknowledgementDelayed
+        ) as CommandResults[T];
+      } else if (isReplaySafeOperationAck(type)) {
+        result = await requestWithBoundedTransportRetry(
+          () => this.requestOnce(type, payload, transfer, context, undefined, undefined, options.signal),
+          () => this.prepareSameHostRetry(expectedHostEpoch)
+        ) as CommandResults[T];
+      } else {
+        result = await this.requestOnce(
           type,
           payload,
           transfer,
           context,
-          idempotencyKey,
-          type === "session.create" ? (attempt === 0 ? 5_000 : 10_000) : undefined,
+          undefined,
+          options.ackTimeoutMs,
           options.signal
-        ),
-        () => this.prepareSameHostRetry(expectedHostEpoch),
-        options.onAcknowledgementDelayed
-      ) as Promise<CommandResults[T]>;
+        );
+      }
+      if (action) this.diagnosticEvidence.recordAction(action, "completed");
+      return result;
+    } catch (error) {
+      if (action) this.diagnosticEvidence.recordAction(action, "failed");
+      throw error;
     }
-    if (isReplaySafeOperationAck(type)) {
-      return requestWithBoundedTransportRetry(
-        () => this.requestOnce(type, payload, transfer, context, undefined, undefined, options.signal),
-        () => this.prepareSameHostRetry(expectedHostEpoch)
-      ) as Promise<CommandResults[T]>;
-    }
-    return this.requestOnce(
-      type,
-      payload,
-      transfer,
-      context,
-      undefined,
-      options.ackTimeoutMs,
-      options.signal
-    );
   }
 
   private async prepareSameHostRetry(expectedHostEpoch: number | undefined): Promise<boolean> {
@@ -235,6 +251,8 @@ export class AgentConnectionController {
     const generation = this.generation;
     if (!client || client.isClosed) throw connectionError("Pi 运行服务尚未连接。");
     const startedAt = this.now();
+    const hostEpoch = this.identityValue?.hostEpoch;
+    this.diagnosticEvidence.recordRequestStarted(type, generation, hostEpoch);
     this.activeRequestCount += 1;
     try {
       let result: CommandResults[T];
@@ -264,7 +282,22 @@ export class AgentConnectionController {
         });
       }
       this.recordAcknowledgement(this.now() - startedAt);
+      this.diagnosticEvidence.recordRequestSettled({
+        command: type,
+        connectionGeneration: generation,
+        ...(hostEpoch === undefined ? {} : { hostEpoch }),
+        startedAt
+      });
       return result;
+    } catch (error) {
+      this.diagnosticEvidence.recordRequestSettled({
+        command: type,
+        connectionGeneration: generation,
+        ...(hostEpoch === undefined ? {} : { hostEpoch }),
+        startedAt,
+        error
+      });
+      throw error;
     } finally {
       this.activeRequestCount = Math.max(0, this.activeRequestCount - 1);
     }
@@ -288,6 +321,9 @@ export class AgentConnectionController {
     const client = this.client;
     const generation = this.generation;
     if (!client || client.isClosed) throw connectionError("Pi 运行服务尚未连接。");
+    const startedAt = this.now();
+    const hostEpoch = this.identityValue?.hostEpoch;
+    this.diagnosticEvidence.recordProjectionStarted(generation, hostEpoch);
     let committed: boolean;
     try {
       committed = await client.resyncProjection((result) => {
@@ -295,6 +331,12 @@ export class AgentConnectionController {
         return install(result);
       }, context);
     } catch (error) {
+      this.diagnosticEvidence.recordProjectionSettled({
+        connectionGeneration: generation,
+        ...(hostEpoch === undefined ? {} : { hostEpoch }),
+        startedAt,
+        error
+      });
       if (client.isClosed) {
         this.handleTeardown(
           generation,
@@ -312,6 +354,12 @@ export class AgentConnectionController {
         recoverable: true
       });
     }
+    this.diagnosticEvidence.recordProjectionSettled({
+      connectionGeneration: generation,
+      ...(hostEpoch === undefined ? {} : { hostEpoch }),
+      startedAt,
+      committed
+    });
     return committed;
   }
 
@@ -323,6 +371,7 @@ export class AgentConnectionController {
     const client = this.client;
     this.client = undefined;
     this.identityValue = undefined;
+    this.portAttachedAt = undefined;
     client?.dispose();
     const error = disposedError();
     for (const subscriber of this.subscribers) subscriber.onTeardown?.(error);
@@ -335,7 +384,7 @@ export class AgentConnectionController {
       || !this.handoffTarget
       || event.source !== this.handoffTarget.source
       || event.origin !== this.handoffTarget.origin
-      || !isHandoff(event.data)
+      || !isAgentPortHandoff(event.data)
     ) return;
     const port = event.ports[0];
     if (!port) return;
@@ -352,6 +401,8 @@ export class AgentConnectionController {
     this.client?.dispose();
     this.client = undefined;
     this.identityValue = undefined;
+    this.portAttachedAt = this.now();
+    this.diagnosticEvidence.recordPortAttached(generation, handoff.hostEpoch);
 
     const client = new AgentPortClient(port, {
       appInstanceId: handoff.appInstanceId,
@@ -373,6 +424,7 @@ export class AgentConnectionController {
     void client.waitUntilReady().then((identity) => {
       if (generation !== this.generation || client !== this.client) return;
       this.identityValue = identity;
+      this.diagnosticEvidence.recordHandshakeCompleted(generation, identity.hostEpoch);
       for (const subscriber of this.subscribers) subscriber.onConnected?.(identity);
     }).catch((error: unknown) => {
       this.handleTeardown(
@@ -391,59 +443,15 @@ export class AgentConnectionController {
     reason: RendererConnectionTeardownReason
   ): void {
     if (generation !== this.generation || client !== this.client) return;
+    const connectionLifetimeMs = Math.max(0, this.now() - (this.portAttachedAt ?? this.now()));
     this.client = undefined;
     this.identityValue = undefined;
-    this.recoveryDiagnostics.recordTeardown(error, reason);
+    this.portAttachedAt = undefined;
+    this.recoveryDiagnostics.recordTeardown(error, reason, connectionLifetimeMs);
+    this.diagnosticEvidence.recordPortClosed({ connectionGeneration: generation, durationMs: connectionLifetimeMs, error, reason });
     client.dispose();
     for (const subscriber of this.subscribers) subscriber.onTeardown?.(error);
   }
-}
-
-export async function prepareSameHostTransportRetry(
-  expectedHostEpoch: number | undefined,
-  waitForConnection: () => Promise<AgentConnectionIdentity>
-): Promise<boolean> {
-  if (expectedHostEpoch === undefined) return false;
-  const identity = await waitForConnection();
-  return identity.hostEpoch === expectedHostEpoch;
-}
-
-function isHandoff(value: unknown): value is AgentPortHandoff {
-  if (typeof value !== "object" || value === null) return false;
-  const handoff = value as Partial<AgentPortHandoff>;
-  return handoff.source === "pi67-preload"
-    && handoff.type === "agent-port"
-    && typeof handoff.appInstanceId === "string"
-    && handoff.appInstanceId.length > 0
-    && handoff.appInstanceId.length <= 512
-    && Number.isSafeInteger(handoff.hostEpoch)
-    && Number(handoff.hostEpoch) >= 0;
-}
-
-function connectionError(message: string): ProtocolRequestError {
-  return new ProtocolRequestError({ code: "CONNECTION_CLOSED", message, recoverable: true });
-}
-
-function disposedError(): ProtocolRequestError {
-  return connectionError("Agent connection controller has been disposed.");
-}
-
-function positiveInteger(value: number | undefined, fallback: number, name: string): number {
-  const resolved = value ?? fallback;
-  if (!Number.isSafeInteger(resolved) || resolved < 1) {
-    throw new RangeError(`${name} must be a positive integer.`);
-  }
-  return resolved;
-}
-
-function createBrowserHandoffTarget(): AgentPortHandoffTarget | undefined {
-  if (typeof window === "undefined") return undefined;
-  return {
-    source: window,
-    origin: window.location.origin,
-    addMessageListener: (listener) => window.addEventListener("message", listener),
-    removeMessageListener: (listener) => window.removeEventListener("message", listener)
-  };
 }
 
 export const agentConnectionController = new AgentConnectionController();

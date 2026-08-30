@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { prepareSameHostTransportRetry } from "./AgentConnectionController.js";
+import { prepareSameHostTransportRetry } from "./agent-connection-controller-utilities.js";
 import { connectionIdentity } from "./AgentConnectionController.test-fixture.js";
 
 describe("prepareSameHostTransportRetry", () => {

@@ -13,6 +13,27 @@ import { repositoryRoot } from "./packaged-electron-fixture.mjs";
 
 const executeFile = promisify(execFile);
 
+export async function preparePackagedProjectedImage(window) {
+  const name = "pi67-restored-image.png";
+  const payload = await readFile(join(repositoryRoot, "eng/packaging/icon.png"));
+  await dropAttachment(window, name, "image/png", payload);
+  await waitForRendererText(window, '[data-attachment-kind="image"]', name, 15_000);
+  return { byteLength: payload.byteLength, name };
+}
+
+export async function verifyPackagedProjectedImage(window, stage) {
+  const image = window.getByRole("img", { name: "会话图片" }).last();
+  await image.waitFor({ state: "visible", timeout: 30_000 });
+  const source = await image.getAttribute("src");
+  if (!source?.startsWith("blob:")) {
+    throw new Error(`Packaged projected image did not use a Blob URL after ${stage}.`);
+  }
+  await window.waitForTimeout(750);
+  await image.waitFor({ state: "visible", timeout: 5_000 });
+  await window.locator('[data-runtime-phase="ready"]')
+    .waitFor({ state: "visible", timeout: 5_000 });
+}
+
 export async function verifyPackagedHeicAttachment({ artifact, userDataDirectory, window }) {
   if (artifact.platform !== "darwin" || artifact.arch !== "arm64") {
     return { status: "skipped-target" };

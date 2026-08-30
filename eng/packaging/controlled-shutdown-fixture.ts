@@ -77,7 +77,7 @@ export async function writeControlledShutdownExtension({
           id: ${JSON.stringify(CONTROLLED_MODEL_ID)},
           name: ${JSON.stringify(CONTROLLED_MODEL_LABEL)},
           reasoning: false,
-          input: ["text"],
+          input: ["text", "image"],
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
           contextWindow: 4096,
           maxTokens: 256

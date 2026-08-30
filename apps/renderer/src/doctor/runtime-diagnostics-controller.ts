@@ -34,8 +34,16 @@ export async function saveRuntimeDiagnostics(): Promise<void> {
 }
 
 export async function uploadRuntimeDiagnostics(): Promise<SupportDiagnosticsUploadReceipt> {
-  const request = await collectDiagnosticsExportRequest();
-  return window.pi67.system.uploadDiagnostics(request);
+  agentConnectionController.recordDiagnosticAction("diagnostics.upload", "started");
+  try {
+    const request = await collectDiagnosticsExportRequest();
+    const receipt = await window.pi67.system.uploadDiagnostics(request);
+    agentConnectionController.recordDiagnosticAction("diagnostics.upload", "completed");
+    return receipt;
+  } catch (error) {
+    agentConnectionController.recordDiagnosticAction("diagnostics.upload", "failed");
+    throw error;
+  }
 }
 
 async function collectDiagnosticsExportRequest(): Promise<SupportDiagnosticsExportRequest> {

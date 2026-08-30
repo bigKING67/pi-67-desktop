@@ -1,6 +1,6 @@
 {
   "name": "pi-67-desktop",
-  "version": "0.1.0-alpha.38",
+  "version": "0.1.0-alpha.39",
   "description": "Pi-first desktop client for Windows x64 and macOS Apple Silicon.",
   "author": "bigKING67",
   "private": true,
@@ -80,6 +80,7 @@
     "release:r2:plan": "node eng/release/r2-update-release.mjs plan",
     "release:r2:publish": "node eng/release/r2-update-release.mjs publish",
     "release:r2:cleanup": "node eng/release/r2-update-release.mjs cleanup",
+    "support:diagnostics:read": "corepack pnpm --filter @pi67/support-contract run build && node eng/support/read-support-diagnostics.mjs",
     "release:preview:source:verify": "node eng/release/preview-candidate-source.mjs",
     "release:preview:version:verify": "node eng/release/preview-version-availability.mjs",
     "release:preview:candidate": "node eng/release/windows-preview-candidate.mjs",
@@ -96,6 +97,7 @@
     "@aws-sdk/client-s3": "3.1115.0",
     "@aws-sdk/lib-storage": "3.1115.0",
     "@pi67/protocol": "workspace:*",
+    "@pi67/support-contract": "workspace:*",
     "@playwright/test": "1.61.1",
     "@types/node": "24.10.1",
     "@vitest/coverage-v8": "4.1.10",

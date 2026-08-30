@@ -18,7 +18,8 @@ export async function installMockSupportDiagnosticsBridge(page: Page): Promise<v
       reportId: "PI67-A1B2C3D4E5F6",
       receivedAt: Date.UTC(2026, 7, 29, 6, 0, 0),
       sizeBytes: 4_096,
-      sha256: "0".repeat(64)
+      sha256: "0".repeat(64),
+      objectKey: "diagnostics/2026/08/29/PI67-A1B2C3D4E5F6.json"
     };
     let finishPendingUpload: (() => void) | undefined;
     const control = {

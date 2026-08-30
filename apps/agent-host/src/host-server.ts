@@ -14,6 +14,7 @@ import { commandRequiresRunAdmission, isSettledRunAdmissionResult } from "./glob
 import { dispatchHostCommand, type RuntimeLoadedCommand } from "./host-command-dispatcher.js";
 import { dispatchHostAppCommand } from "./host-app-command-dispatcher.js";
 import { HostEventChannel } from "./host-event-channel.js";
+import { HostDiagnosticEvidence } from "./host-diagnostic-evidence.js";
 import { HostRequestRouter } from "./host-request-router.js";
 import { collectHostRuntimeDiagnostics } from "./host-runtime-diagnostics.js";
 import { defaultRuntimeLoader, parseHostEpoch } from "./host-runtime-loader.js";
@@ -24,10 +25,7 @@ import { boundedMetadataCount, shutdownDeadline } from "./host-shutdown-contract
 import { HostTaskStateCoordinator, type TaskHostState } from "./host-task-state-coordinator.js";
 import { HostTaskRuntimeLifecycle, resolveAgentDirectory } from "./host-task-runtime-lifecycle.js";
 import { captureProjectionMutationAcknowledgement, captureProjectionResync } from "./host-projection.js";
-import {
-  createLarkAuthManagement,
-  type LarkAuthManagementPort
-} from "./lark-auth-management.js";
+import { createLarkAuthManagement, type LarkAuthManagementPort } from "./lark-auth-management.js";
 import { createResourceManagementRouters, type ResourceManagementRouters } from "./resource-management-routers.js";
 import type { SessionWriterLeaseRegistry, SessionWriterLeaseReservation } from "./session-writer-lease-registry.js";
 import { TaskRuntimeRegistry } from "./task-runtime-registry.js";
@@ -64,6 +62,7 @@ export class AgentHostServer {
   private readonly events: HostEventChannel;
   private readonly runtimeLoader: AgentRuntimeLoader;
   private readonly usesCompatibilityRuntime: boolean;
+  private readonly diagnosticEvidence = new HostDiagnosticEvidence();
   constructor(runtimeLoader?: AgentRuntimeLoader, private readonly options: AgentHostServerOptions = {}) {
     this.runtimeLoader = runtimeLoader ?? defaultRuntimeLoader;
     this.usesCompatibilityRuntime = runtimeLoader !== undefined && options.sdkVersionLoader === undefined;
@@ -175,7 +174,8 @@ export class AgentHostServer {
             hostEpoch: this.hostIdentity?.hostEpoch ?? 0,
             taskStates: this.tasks.values(),
             workspaceRecords: this.workspaces.values(),
-            writerLeases: this.sessionWriterLeases
+            writerLeases: this.sessionWriterLeases,
+            diagnosticEvidence: this.diagnosticEvidence
           })
         }),
         handleProjectionResync: (origin, request, state) => this.handleProjectionResync(origin, request, state),
@@ -202,6 +202,7 @@ export class AgentHostServer {
       return;
     }
     const identity = this.resolveHostIdentity(options);
+    const connectionSequence = this.diagnosticEvidence.attach(identity.hostEpoch);
     const connection = new HostConnectionContext(
       port,
       identity,
@@ -218,6 +219,12 @@ export class AgentHostServer {
           }
           this.compatibilityRuntime?.cancelInteractiveRequests("connection-close");
         }
+      },
+      2_048,
+      256,
+      {
+        connectionSequence,
+        record: (incident) => this.diagnosticEvidence.record(incident)
       }
     );
     this.currentConnection?.retire();
@@ -432,16 +439,9 @@ export class AgentHostServer {
     // Projection and sequence are captured before the synchronous response so later events stay ordered after it.
     origin.sendSuccess(request.requestId, request.type, this.captureProjectionResync(runtime, state));
   }
-  private captureProjectionResync(
-    runtime: AgentRuntime,
-    state: TaskHostState
-  ): CommandResults["projection.resync"] {
-    return captureProjectionResync(
-      runtime,
-      this.events.eventSequence,
-      this.hostIdentity?.hostEpoch ?? 1,
-      state.operations
-    );
+  private captureProjectionResync(runtime: AgentRuntime, state: TaskHostState): CommandResults["projection.resync"] {
+    const hostEpoch = this.hostIdentity?.hostEpoch ?? 1;
+    return captureProjectionResync(runtime, this.events.eventSequence, hostEpoch, state.operations);
   }
   private resolveHostIdentity(options: AttachPortOptions): HostConnectionIdentity {
     if (!this.hostIdentity) {

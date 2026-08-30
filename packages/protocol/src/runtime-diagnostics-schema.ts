@@ -1,6 +1,95 @@
 import { Type, type TProperties } from "./typebox-schema.js";
 import { SessionCatalogStatusSchema } from "./session-catalog-schemas.js";
 
+const DiagnosticActionSchema = strictObject({
+  sequence: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+  at: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+  action: Type.Union([
+    Type.Literal("application.start"),
+    Type.Literal("application.resume"),
+    Type.Literal("workspace.open"),
+    Type.Literal("task.create"),
+    Type.Literal("task.select"),
+    Type.Literal("task.resume"),
+    Type.Literal("session.open"),
+    Type.Literal("session.import"),
+    Type.Literal("prompt.submit"),
+    Type.Literal("model.select"),
+    Type.Literal("connection.recover"),
+    Type.Literal("diagnostics.upload"),
+    Type.Literal("update.check")
+  ]),
+  stage: Type.Union([Type.Literal("started"), Type.Literal("completed"), Type.Literal("failed")])
+});
+
+const DiagnosticIncidentSchema = strictObject({
+  sequence: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+  at: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+  layer: Type.Union([Type.Literal("renderer"), Type.Literal("agent-host")]),
+  phase: Type.Union([
+    Type.Literal("port-attach"),
+    Type.Literal("handshake"),
+    Type.Literal("request"),
+    Type.Literal("response-post"),
+    Type.Literal("event-post"),
+    Type.Literal("port-close"),
+    Type.Literal("projection-resync"),
+    Type.Literal("runtime-initialize"),
+    Type.Literal("host-exit")
+  ]),
+  outcome: Type.Union([
+    Type.Literal("started"),
+    Type.Literal("completed"),
+    Type.Literal("failed"),
+    Type.Literal("closed"),
+    Type.Literal("suppressed")
+  ]),
+  command: Type.Optional(Type.String({ minLength: 1, maxLength: 80, pattern: "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$" })),
+  errorClass: Type.Optional(Type.Union([
+    Type.Literal("AbortError"),
+    Type.Literal("DataCloneError"),
+    Type.Literal("ProtocolRequestError"),
+    Type.Literal("RangeError"),
+    Type.Literal("TimeoutError"),
+    Type.Literal("TypeError"),
+    Type.Literal("ValidationError"),
+    Type.Literal("UnknownError")
+  ])),
+  reason: Type.Optional(Type.Union([
+    Type.Literal("port-attached"),
+    Type.Literal("port-closed"),
+    Type.Literal("message-error"),
+    Type.Literal("message-decode-failed"),
+    Type.Literal("connection-replaced"),
+    Type.Literal("connection-closed"),
+    Type.Literal("peer-closed"),
+    Type.Literal("handshake-timeout"),
+    Type.Literal("handshake-send-failed"),
+    Type.Literal("handshake-rejected"),
+    Type.Literal("handshake-identity-mismatch"),
+    Type.Literal("handshake-failed"),
+    Type.Literal("invalid-hello"),
+    Type.Literal("wrong-app-instance"),
+    Type.Literal("protocol-violation"),
+    Type.Literal("request-send-failed"),
+    Type.Literal("request-cancellation-send-failed"),
+    Type.Literal("request-failed"),
+    Type.Literal("response-post-failed"),
+    Type.Literal("event-post-failed"),
+    Type.Literal("event-envelope-too-large"),
+    Type.Literal("request-envelope-too-large"),
+    Type.Literal("stale-response"),
+    Type.Literal("automatic-replacement-suppressed"),
+    Type.Literal("projection-resync-failed"),
+    Type.Literal("disposed")
+  ])),
+  connectionSequence: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  connectionGeneration: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  hostEpoch: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  durationMs: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  binaryBytes: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }))
+});
+
 export const RuntimeDiagnosticsSchema = strictObject({
   generatedAt: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
   application: Type.String({ minLength: 1, maxLength: 64 }),
@@ -80,6 +169,10 @@ export const RuntimeDiagnosticsSchema = strictObject({
       }), { maxItems: 64 }),
       receiptsTruncated: Type.Boolean()
     })),
+    causality: Type.Optional(strictObject({
+      incidents: Type.Array(DiagnosticIncidentSchema, { maxItems: 32 }),
+      incidentsDroppedCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })
+    })),
     workspaces: Type.Array(strictObject({
       workspaceIdHash: Type.String({ minLength: 64, maxLength: 64, pattern: "^[0-9a-f]+$" }),
       sessionCatalog: SessionCatalogStatusSchema,
@@ -122,6 +215,8 @@ const RendererAcknowledgementDiagnosticsSchema = strictObject({
   futureGenerationWaitCount: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
   futureGenerationWaitTimeoutCount: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
   priorGenerationTeardownIgnoredCount: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  consecutiveUnstableConnectionCount: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  automaticReplacementSuppressedCount: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
   lastTeardownAt: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
   lastTeardownCode: Type.Optional(Type.String({ minLength: 1, maxLength: 64, pattern: "^[A-Z][A-Z0-9_]*$" })),
   lastTeardownReason: Type.Optional(Type.Union([
@@ -135,7 +230,13 @@ const RendererAcknowledgementDiagnosticsSchema = strictObject({
     Type.Literal("request-send-failed"),
     Type.Literal("request-cancellation-send-failed"),
     Type.Literal("disposed")
-  ]))
+  ])),
+  causality: Type.Optional(strictObject({
+    actions: Type.Array(DiagnosticActionSchema, { maxItems: 16 }),
+    actionsDroppedCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+    incidents: Type.Array(DiagnosticIncidentSchema, { maxItems: 32 }),
+    incidentsDroppedCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })
+  }))
 });
 
 export const SupportDiagnosticsExportRequestSchema = Type.Union([

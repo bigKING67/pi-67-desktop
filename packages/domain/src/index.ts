@@ -12,6 +12,7 @@ export * from "./runtime-state.js";
 export * from "./operation.js";
 export * from "./package-network.js";
 export * from "./desktop-capability.js";
+export * from "./diagnostic-evidence.js";
 export * from "./projection-limits.js";
 export * from "./recovery-diagnostics.js";
 export * from "./repository-environment.js";

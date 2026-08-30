@@ -18,7 +18,7 @@ type DiagnosticsUploadState =
 
 export function SupportDiagnosticsUploadRow() {
   const [state, setState] = useState<DiagnosticsUploadState>({ phase: "idle" });
-  const { copyState, copyText } = useCopyFeedback({ failureTitle: "无法复制报告编号" });
+  const { copyState, copyText } = useCopyFeedback({ failureTitle: "无法复制诊断定位信息" });
   const upload = async (): Promise<void> => {
     if (state.phase === "uploading") return;
     setState({ phase: "uploading" });
@@ -34,7 +34,9 @@ export function SupportDiagnosticsUploadRow() {
   };
 
   const description = state.phase === "success"
-    ? "上传完成。反馈问题时请附上报告编号；服务端诊断将在 30 天后自动删除。"
+    ? state.receipt.objectKey
+      ? "上传完成。定位信息包含精确对象键、大小与校验值；服务端诊断将在 30 天后自动删除。"
+      : "上传完成。当前服务回执未含对象键；定位信息包含报告编号、接收时间、大小与校验值。"
     : state.phase === "error"
       ? <span className={styles.error}>上传未完成：{state.message}</span>
       : state.phase === "uploading"
@@ -65,12 +67,12 @@ function actions(
 ) {
   if (state.phase === "success") return <>
     <Button
-      aria-label={`复制报告编号 ${state.receipt.reportId}`}
+      aria-label={`复制诊断定位信息 ${state.receipt.reportId}`}
       className="secondary-button"
-      onPress={() => void copyText(state.receipt.reportId)}
+      onPress={() => void copyText(formatSupportDiagnosticsLocator(state.receipt))}
     >
       <Copy aria-hidden="true" size={14} />
-      {copyState === "copied" ? "已复制" : "复制编号"}
+      {copyState === "copied" ? "已复制" : "复制定位信息"}
     </Button>
     <Button className="secondary-button" onPress={() => void upload()}>再次上传</Button>
   </>;
@@ -90,4 +92,14 @@ function actions(
     <CloudUpload aria-hidden="true" size={14} />
     {state.phase === "uploading" ? "上传中…" : "上传"}
   </Button>;
+}
+
+export function formatSupportDiagnosticsLocator(receipt: SupportDiagnosticsUploadReceipt): string {
+  return [
+    `Report ID: ${receipt.reportId}`,
+    `Received UTC: ${new Date(receipt.receivedAt).toISOString()}`,
+    ...(receipt.objectKey === undefined ? [] : [`Object key: ${receipt.objectKey}`]),
+    `Size: ${receipt.sizeBytes} bytes`,
+    `SHA-256: ${receipt.sha256}`
+  ].join("\n");
 }

@@ -133,14 +133,23 @@ function document(desktop: Record<string, unknown> = {}): SupportDiagnosticsDocu
       version: "0.1.0-alpha.37",
       platform: "darwin",
       architecture: "arm64",
-      packaged: true
+      packaged: true,
+      protocolRevision: "a".repeat(64)
     },
     desktop,
     agentHost: {},
     piConfiguration: {},
     renderer: {},
     runtimeCollection: { status: "available" },
-    runtime: {}
+    runtime: {},
+    causality: {
+      renderer: {
+        actions: [],
+        actionsDroppedCount: 0,
+        incidents: [],
+        incidentsDroppedCount: 0
+      }
+    }
   };
 }
 

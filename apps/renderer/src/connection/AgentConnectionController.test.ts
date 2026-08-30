@@ -126,7 +126,7 @@ describe("AgentConnectionController", () => {
     }));
 
     await expect(pending).resolves.toEqual({ initialized: true, loaded: true });
-    expect(controller.diagnostics()).toEqual({
+    expect(controller.diagnostics()).toMatchObject({
       activeRequestCount: 0,
       sampleCount: 1,
       slowAcknowledgementCount: 1,
@@ -136,10 +136,28 @@ describe("AgentConnectionController", () => {
       futureGenerationWaitCount: 0,
       futureGenerationWaitTimeoutCount: 0,
       priorGenerationTeardownIgnoredCount: 0,
+      consecutiveUnstableConnectionCount: 0,
+      automaticReplacementSuppressedCount: 0,
       lastAcknowledgementLatencyMs: 2_150,
-      maxAcknowledgementLatencyMs: 2_150
+      maxAcknowledgementLatencyMs: 2_150,
+      causality: {
+        actions: [],
+        actionsDroppedCount: 0,
+        incidents: expect.arrayContaining([
+          expect.objectContaining({
+            layer: "renderer",
+            phase: "request",
+            outcome: "completed",
+            command: "runtime.getStatus",
+            connectionGeneration: 1,
+            hostEpoch: 3,
+            durationMs: 2_150
+          })
+        ]),
+        incidentsDroppedCount: 0
+      }
     });
-    expect(JSON.stringify(controller.diagnostics())).not.toContain("runtime.getStatus");
+    expect(JSON.stringify(controller.diagnostics())).not.toContain("initialized");
   });
 
   it("tears down once when the Port emits messageerror", async () => {
@@ -155,6 +173,59 @@ describe("AgentConnectionController", () => {
 
     await vi.waitFor(() => expect(onTeardown).toHaveBeenCalledOnce());
     expect(controller.hasOpenPort).toBe(false);
+  });
+
+  it("opens the automatic replacement circuit after four short-lived connections", async () => {
+    let now = 1_000;
+    const target = new FakeHandoffTarget();
+    const controller = createController(target, { now: () => now });
+
+    for (let index = 1; index <= 4; index += 1) {
+      const host = createHost(4, 0, `short-lived-host-${index}`);
+      host.handoff(target);
+      await controller.waitForConnection();
+      now += 250;
+      host.closeControllerPort();
+      await vi.waitFor(() => expect(controller.diagnostics().teardownCount).toBe(index));
+    }
+
+    expect(controller.diagnostics()).toMatchObject({
+      consecutiveUnstableConnectionCount: 4,
+      automaticReplacementSuppressedCount: 0
+    });
+    expect(() => controller.assertAutomaticReplacementAllowed()).toThrow(/停止自动重连/u);
+    expect(controller.diagnostics()).toMatchObject({
+      consecutiveUnstableConnectionCount: 4,
+      automaticReplacementSuppressedCount: 1
+    });
+  });
+
+  it("clears an unstable replacement streak after a long-lived connection", async () => {
+    let now = 1_000;
+    const target = new FakeHandoffTarget();
+    const controller = createController(target, { now: () => now });
+
+    for (let index = 1; index <= 3; index += 1) {
+      const host = createHost(4, 0, `unstable-host-${index}`);
+      host.handoff(target);
+      await controller.waitForConnection();
+      now += 250;
+      host.closeControllerPort();
+      await vi.waitFor(() => expect(controller.diagnostics().teardownCount).toBe(index));
+    }
+
+    const stableHost = createHost(4, 0, "stable-host");
+    stableHost.handoff(target);
+    await controller.waitForConnection();
+    now += 5_000;
+    stableHost.closeControllerPort();
+    await vi.waitFor(() => expect(controller.diagnostics().teardownCount).toBe(4));
+
+    expect(() => controller.assertAutomaticReplacementAllowed()).not.toThrow();
+    expect(controller.diagnostics()).toMatchObject({
+      consecutiveUnstableConnectionCount: 0,
+      automaticReplacementSuppressedCount: 0
+    });
   });
 
   it("replaces Host generations without allowing old pending work to survive", async () => {

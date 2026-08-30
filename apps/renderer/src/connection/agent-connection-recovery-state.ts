@@ -21,11 +21,16 @@ interface FutureConnectionWaitInput {
   subscribe: (subscriber: FutureConnectionSubscriber) => () => void;
 }
 
+const UNSTABLE_CONNECTION_LIFETIME_MS = 5_000;
+const MAX_CONSECUTIVE_UNSTABLE_CONNECTIONS = 4;
+
 export class AgentConnectionRecoveryDiagnostics {
   private teardownCount = 0;
   private futureGenerationWaitCount = 0;
   private futureGenerationWaitTimeoutCount = 0;
   private priorGenerationTeardownIgnoredCount = 0;
+  private consecutiveUnstableConnectionCount = 0;
+  private automaticReplacementSuppressedCount = 0;
   private lastTeardownAt: number | undefined;
   private lastTeardownCode: string | undefined;
   private lastTeardownReason: RendererConnectionTeardownReason | undefined;
@@ -39,6 +44,8 @@ export class AgentConnectionRecoveryDiagnostics {
       futureGenerationWaitCount: this.futureGenerationWaitCount,
       futureGenerationWaitTimeoutCount: this.futureGenerationWaitTimeoutCount,
       priorGenerationTeardownIgnoredCount: this.priorGenerationTeardownIgnoredCount,
+      consecutiveUnstableConnectionCount: this.consecutiveUnstableConnectionCount,
+      automaticReplacementSuppressedCount: this.automaticReplacementSuppressedCount,
       ...(this.lastTeardownAt === undefined ? {} : { lastTeardownAt: this.lastTeardownAt }),
       ...(this.lastTeardownCode === undefined ? {} : { lastTeardownCode: this.lastTeardownCode }),
       ...(this.lastTeardownReason === undefined ? {} : { lastTeardownReason: this.lastTeardownReason })
@@ -57,8 +64,33 @@ export class AgentConnectionRecoveryDiagnostics {
     this.priorGenerationTeardownIgnoredCount = increment(this.priorGenerationTeardownIgnoredCount);
   }
 
-  recordTeardown(error: Error, reason: RendererConnectionTeardownReason): void {
+  get canAutomaticallyReplacePort(): boolean {
+    return this.consecutiveUnstableConnectionCount < MAX_CONSECUTIVE_UNSTABLE_CONNECTIONS;
+  }
+
+  assertAutomaticReplacementAllowed(): void {
+    if (this.canAutomaticallyReplacePort) return;
+    this.recordAutomaticReplacementSuppressed();
+    throw new ProtocolRequestError({
+      code: "CONNECTION_CLOSED",
+      message: "Pi 运行服务连接反复中断，已停止自动重连以避免界面持续闪烁。请上传诊断后重启应用。",
+      recoverable: true
+    });
+  }
+
+  recordAutomaticReplacementSuppressed(): void {
+    this.automaticReplacementSuppressedCount = increment(this.automaticReplacementSuppressedCount);
+  }
+
+  recordTeardown(
+    error: Error,
+    reason: RendererConnectionTeardownReason,
+    connectionLifetimeMs: number
+  ): void {
     this.teardownCount = increment(this.teardownCount);
+    this.consecutiveUnstableConnectionCount = connectionLifetimeMs < UNSTABLE_CONNECTION_LIFETIME_MS
+      ? increment(this.consecutiveUnstableConnectionCount)
+      : 0;
     this.lastTeardownAt = Math.max(0, Math.round(this.now()));
     this.lastTeardownCode = error instanceof ProtocolRequestError ? error.code : undefined;
     this.lastTeardownReason = reason;

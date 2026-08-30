@@ -210,7 +210,8 @@ function receiptResponse(
     reportId: submission.reportId,
     receivedAt,
     sizeBytes: utf8ByteLength(body),
-    sha256: submission.diagnosticsSha256
+    sha256: submission.diagnosticsSha256,
+    objectKey: objectKey(submission)
   };
   if (!isSupportDiagnosticsUploadReceipt(receipt)) return errorResponse(500, "INVALID_RECEIPT");
   return jsonResponse(receipt, status);

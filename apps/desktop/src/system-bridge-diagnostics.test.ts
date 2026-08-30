@@ -74,8 +74,11 @@ describe("system bridge recovery diagnostics", () => {
     const serialized = mocks.writeFile.mock.calls[0]?.[1];
     expect(typeof serialized).toBe("string");
     expect(JSON.parse(serialized as string)).toEqual(expect.objectContaining({
-      schema: "pi67-support-diagnostics.v5",
-      application: expect.objectContaining({ version: "0.1.0-alpha.10" }),
+      schema: "pi67-support-diagnostics.v6",
+      application: expect.objectContaining({
+        version: "0.1.0-alpha.10",
+        protocolRevision: expect.stringMatching(/^[a-f0-9]+$/u)
+      }),
       desktop: expect.objectContaining({ previousRunExitStatus: "unclean" }),
       agentHost: expect.objectContaining({
         phase: "running",
@@ -101,7 +104,15 @@ describe("system bridge recovery diagnostics", () => {
       }),
       runtimeCollection: { status: "available" },
       runtime: runtimeDiagnostics,
-      renderer: rendererDiagnostics
+      renderer: rendererDiagnostics,
+      causality: {
+        renderer: {
+          actions: [],
+          actionsDroppedCount: 0,
+          incidents: [],
+          incidentsDroppedCount: 0
+        }
+      }
     }));
   });
 
@@ -119,7 +130,7 @@ describe("system bridge recovery diagnostics", () => {
     const serialized = mocks.writeFile.mock.calls[0]?.[1];
     const document = JSON.parse(String(serialized)) as Record<string, unknown>;
     expect(document).toMatchObject({
-      schema: "pi67-support-diagnostics.v5",
+      schema: "pi67-support-diagnostics.v6",
       runtimeCollection: {
         status: "unavailable",
         failure: "acknowledgement-timeout"

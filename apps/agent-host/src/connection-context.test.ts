@@ -25,6 +25,12 @@ class FakePort implements ProtocolPort {
   closed = false;
 
   postMessage(message: unknown, transfer?: Transferable[]): void {
+    if (transfer?.some((value) => value instanceof ArrayBuffer)) {
+      throw new DOMException(
+        "MessagePortMain transfer entries must be MessagePortMain objects.",
+        "DataCloneError"
+      );
+    }
     this.sent.push(message);
     this.transfers.push(transfer);
     this.argumentCounts.push(arguments.length);
@@ -81,7 +87,7 @@ describe("HostConnectionContext", () => {
     expect(port.closed).toBe(false);
   });
 
-  it("transfers asset chunks without copying the response through structured clone", () => {
+  it("clones asset chunks without passing an unsupported ArrayBuffer transfer to MessagePortMain", () => {
     const port = new FakePort();
     const connection = new HostConnectionContext(
       port,
@@ -111,8 +117,9 @@ describe("HostConnectionContext", () => {
       type: "asset.read",
       result: { assetId: "asset-1", data }
     });
-    expect(port.transfers.at(-1)).toEqual([data]);
-    expect(port.argumentCounts.at(-1)).toBe(2);
+    expect(port.transfers.at(-1)).toBeUndefined();
+    expect(port.argumentCounts.at(-1)).toBe(1);
+    expect(port.closed).toBe(false);
   });
 
   it("replaces a malformed success result with a valid correlated INTERNAL error", () => {

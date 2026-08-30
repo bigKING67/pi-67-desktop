@@ -605,17 +605,26 @@ the only Runtime and behavior specification source.
   Agent Host `RuntimeDiagnostics` is optional: a three-second acknowledgement
   budget preserves it when available, while timeout, disconnection, or Host
   replacement still preserves Main-owned recovery, Supervisor lifecycle, and Pi
-  configuration readability metadata. Main writes `pi67-support-diagnostics.v5`,
-  which adds bounded Profile mode, startup ready/degraded state, total and per-stage
+  configuration readability metadata. Main writes `pi67-support-diagnostics.v6`
+  while ingest remains compatible with v5 during rollout. V6 adds the exact
+  Protocol revision and launch-local bounded causal evidence: up to 16 recent
+  first-party action stages plus 32 Renderer and 32 Agent Host incidents. Safe
+  command identity, classified error, transport phase, outcome, connection/Host
+  generation, duration, and binary byte count may be retained; truncation is
+  explicit. Host evidence survives MessagePort replacement within the same Host
+  epoch so the next successful collection can explain the connection it replaces.
+  Existing bounded Profile mode, startup ready/degraded state, total and per-stage
   startup duration, capability projection mode, startup issue, Main service health,
-  and Renderer acknowledgement latency;
+  and Renderer acknowledgement latency remain present;
   Renderer cannot submit arbitrary JSON or raw error text. The support file
   contains hashes, categories, counts, revisions, states, bounded timestamps,
   and bounded error classes, never raw Workspace or Agent Directory paths,
   configuration bodies, prompts, source bodies, credentials, environment values,
   stdout/stderr, or Tool payloads.
   Settings exposes an explicit `上传脱敏诊断` action that sends this fixed document
-  only through the fixed Support Worker origin, returns a copyable report ID, and
+  only through the fixed Support Worker origin, returns copyable locator metadata
+  including the report ID and, when supplied by the rolling-compatible Worker,
+  the exact private object key, byte size, and SHA-256, and
   retains local export after failure or when offline. It never uploads on startup,
   crash, update, recovery, or Session activity; it has no background retry or local
   upload queue. Support objects use a separate private R2 bucket and a declared
@@ -940,8 +949,15 @@ the only Runtime and behavior specification source.
   flight tied to a future Renderer connection generation: teardown from the Port
   generation being replaced cannot immediately request another replacement, while
   failure or timeout of the candidate generation may enter the normal bounded retry.
-  Support diagnostics retain only bounded generation, wait, teardown count, reason,
-  error-code, and timestamp evidence.
+  Four consecutive Ports that each survive for less than five seconds open a
+  same-document circuit breaker: Desktop stops automatic replacement, preserves one
+  stable failure surface, and requires an application restart instead of entering a
+  visible reconnect loop. A Port that remains alive for at least five seconds clears
+  that streak. Support diagnostics retain only bounded generation, wait, teardown,
+  suppression count, reason, error-code, and timestamp evidence. The v6 bounded
+  causal timeline additionally correlates the initiating first-party action with
+  Renderer request/projection transitions and Agent Host response/event transport
+  failures without retaining Task, Session, request, or asset identities.
 - Application quit is fenced by Main: the Agent Host stops accepting commands,
   invalidates queued work, cancels interactive requests, attempts to abort the
   active Operation, disposes the Pi Runtime, and exits before Electron continues

@@ -270,7 +270,15 @@ function rendererDiagnostics() {
     teardownCount: 0,
     futureGenerationWaitCount: 0,
     futureGenerationWaitTimeoutCount: 0,
-    priorGenerationTeardownIgnoredCount: 0
+    priorGenerationTeardownIgnoredCount: 0,
+    consecutiveUnstableConnectionCount: 0,
+    automaticReplacementSuppressedCount: 0,
+    causality: {
+      actions: expect.any(Array),
+      actionsDroppedCount: expect.any(Number),
+      incidents: expect.any(Array),
+      incidentsDroppedCount: expect.any(Number)
+    }
   };
 }
 

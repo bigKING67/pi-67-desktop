@@ -38,6 +38,9 @@ importers:
       '@pi67/protocol':
         specifier: workspace:*
         version: link:packages/protocol
+      '@pi67/support-contract':
+        specifier: workspace:*
+        version: link:packages/support-contract
       '@playwright/test':
         specifier: 1.61.1
         version: 1.61.1

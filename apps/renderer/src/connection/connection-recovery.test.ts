@@ -124,4 +124,17 @@ describe("connection recovery", () => {
     expect(connectAgentHost).toHaveBeenCalledWith({ replaceCurrent: true });
     expect(waitForConnectionAfter).toHaveBeenCalledWith(7, 8_000);
   });
+
+  it("stops before another same-document replacement when short-lived connections opened the circuit", async () => {
+    vi.spyOn(agentConnectionController, "hasReceivedPort", "get").mockReturnValue(true);
+    const assertReplacement = vi.spyOn(agentConnectionController, "assertAutomaticReplacementAllowed")
+      .mockImplementation(() => {
+        throw new Error("Pi 运行服务连接反复中断，已停止自动重连以避免界面持续闪烁。");
+      });
+
+    await expect(ensureAgentConnection()).rejects.toThrow(/停止自动重连/u);
+
+    expect(assertReplacement).toHaveBeenCalledOnce();
+    expect(connectAgentHost).not.toHaveBeenCalled();
+  });
 });

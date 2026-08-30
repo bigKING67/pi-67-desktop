@@ -2065,10 +2065,22 @@ loading error where the operation can produce those states
   continuously updating dashboard. The one-shot Support upload sends the same fixed
   redacted projection through the fixed Support Worker origin; it is never scheduled,
   retried in the background, or persisted as an outbox. Diagnostic save and upload use
-  `pi67-support-diagnostics.v5`. Agent Host startup
+  `pi67-support-diagnostics.v6`; ingest keeps v5 compatibility during rollout.
+  V6 adds a launch-local, sequence-ordered ring of at most 16 first-party action
+  stages and 32 incidents per Renderer/Agent Host layer. Entries use fixed action,
+  phase, outcome, reason, safe command identity, classified error, bounded duration,
+  connection/Host generation, and optional binary byte count only. Host entries live
+  above an individual MessagePort so a later healthy connection can report why the
+  previous one failed. Task/Session/request/asset IDs, raw errors, paths, payloads,
+  bodies, stdout/stderr, and stack traces remain absent. Agent Host startup still
   adds only the bounded Profile mode, `ready | degraded` state, total/per-stage
-  durations, capability projection mode, startup stage, and safe issue code; paths,
-  raw errors, configuration bodies, and stack traces remain absent.
+  durations, capability projection mode, startup stage, and safe issue code.
+- A successful Support upload keeps the compact Settings-row interaction family.
+  The value remains the report ID; the adjacent secondary action copies a bounded
+  multi-line locator containing report ID, UTC receipt time, size, SHA-256, and the
+  exact private object key when the compatible Worker returns it. Absence of the
+  optional key is stated rather than deriving a potentially wrong key across a UTC
+  date boundary. Retry and local-export states retain their existing priority.
 - A degraded startup keeps the Workbench usable and produces at most one warning for
   the Host epoch: existing Pi configuration was preserved and a Desktop enhancement
   did not load. A deterministic startup failure produces one root notification and
@@ -2168,7 +2180,11 @@ loading error where the operation can produce those states
   connection generation, so closure of the generation being replaced cannot collapse
   that wait or produce a reconnect feedback loop. The existing transcript and recovery
   shell stay mounted through the single transition rather than flashing between repeated
-  recovery attempts.
+  recovery attempts. Four consecutive connections that close within five seconds open a
+  same-document recovery circuit: automatic replacement stops, one recoverable error says
+  that reconnect was stopped to prevent continued flashing and asks the user to upload
+  diagnostics and restart, and the shell remains mounted. A connection alive for at least
+  five seconds clears the unstable streak.
 - An active Operation receives typed Host heartbeats independently from Pi business
   activity. A quiet task remains cancellable and shows that the Host is still
   responsive; overdue heartbeats first show a warning, then trigger one authoritative

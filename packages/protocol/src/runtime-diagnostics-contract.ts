@@ -1,4 +1,20 @@
 import type { SessionCatalogStatus } from "@pi67/domain";
+import type {
+  SupportDiagnosticAction,
+  SupportDiagnosticIncident
+} from "@pi67/support-contract";
+
+export type {
+  SupportDiagnosticAction,
+  SupportDiagnosticActionName,
+  SupportDiagnosticActionStage,
+  SupportDiagnosticErrorClass,
+  SupportDiagnosticIncident,
+  SupportDiagnosticIncidentLayer,
+  SupportDiagnosticIncidentOutcome,
+  SupportDiagnosticIncidentPhase,
+  SupportDiagnosticIncidentReason
+} from "@pi67/support-contract";
 
 export type RendererConnectionTeardownReason =
   | "port-closed"
@@ -48,9 +64,17 @@ export interface RendererAcknowledgementDiagnostics {
   futureGenerationWaitCount?: number;
   futureGenerationWaitTimeoutCount?: number;
   priorGenerationTeardownIgnoredCount?: number;
+  consecutiveUnstableConnectionCount?: number;
+  automaticReplacementSuppressedCount?: number;
   lastTeardownAt?: number;
   lastTeardownCode?: string;
   lastTeardownReason?: RendererConnectionTeardownReason;
+  causality?: {
+    actions: SupportDiagnosticAction[];
+    actionsDroppedCount: number;
+    incidents: SupportDiagnosticIncident[];
+    incidentsDroppedCount: number;
+  };
 }
 
 export type SupportDiagnosticsExportRequest =
@@ -126,6 +150,10 @@ export interface RuntimeHostDiagnostics {
   initializationReceipts?: {
     receipts: RuntimeInitializationReceiptDiagnostics[];
     receiptsTruncated: boolean;
+  };
+  causality?: {
+    incidents: SupportDiagnosticIncident[];
+    incidentsDroppedCount: number;
   };
   workspaces: Array<{
     workspaceIdHash: string;

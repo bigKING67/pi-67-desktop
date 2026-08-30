@@ -33,11 +33,20 @@ export async function verifyPackagedMainOnlyDiagnostics(options) {
   const text = await readFile(diagnosticsPath, "utf8");
   const diagnostics = JSON.parse(text);
   if (
-    diagnostics.schema !== "pi67-support-diagnostics.v5"
+    diagnostics.schema !== "pi67-support-diagnostics.v6"
+    || typeof diagnostics.application?.protocolRevision !== "string"
+    || diagnostics.application.protocolRevision.length !== 64
     || diagnostics.runtime !== undefined
     || diagnostics.runtimeCollection?.failure !== "connection-unavailable"
     || diagnostics.renderer?.activeRequestCount !== 0
     || diagnostics.renderer?.slowThresholdMs !== 2_000
+    || !Array.isArray(diagnostics.causality?.renderer?.actions)
+    || diagnostics.causality.renderer.actions.length !== 0
+    || diagnostics.causality.renderer.actionsDroppedCount !== 0
+    || !Array.isArray(diagnostics.causality.renderer.incidents)
+    || diagnostics.causality.renderer.incidents.length !== 0
+    || diagnostics.causality.renderer.incidentsDroppedCount !== 0
+    || diagnostics.causality.agentHost !== undefined
     || diagnostics.agentHost?.phase !== "idle"
     || diagnostics.piConfiguration?.agentDirectory?.state !== "available"
     || diagnostics.piConfiguration?.files?.find((entry) => entry.file === "auth.json")?.state !== "valid-json"
@@ -74,7 +83,12 @@ export async function verifyPackagedReadyDiagnostics(options) {
   const startup = diagnostics.agentHost?.lastStartup;
   const stageTimings = startup?.stageTimings;
   if (
-    diagnostics.schema !== "pi67-support-diagnostics.v5"
+    diagnostics.schema !== "pi67-support-diagnostics.v6"
+    || typeof diagnostics.application?.protocolRevision !== "string"
+    || diagnostics.application.protocolRevision.length !== 64
+    || !Array.isArray(diagnostics.causality?.renderer?.actions)
+    || !Array.isArray(diagnostics.causality?.renderer?.incidents)
+    || diagnostics.causality.agentHost !== undefined
     || diagnostics.agentHost?.phase !== "running"
     || startup?.status !== "ready"
     || startup.capabilityProjectionMode !== "packaged-direct"

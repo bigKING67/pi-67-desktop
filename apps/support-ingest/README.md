@@ -2,7 +2,7 @@
 
 This Cloudflare Worker is the only remote write boundary for user-initiated Pi-67
 support diagnostics. It accepts the fixed `pi67-support-submission.v1` body at
-`https://support.52671314.xyz/v1/diagnostics`, validates the redacted v5 document,
+`https://support.52671314.xyz/v1/diagnostics`, validates redacted v5 and v6 documents,
 and writes to the private `pi67-support-diagnostics` R2 binding.
 
 The Desktop never receives R2 credentials, never chooses an object key, and never
@@ -55,6 +55,19 @@ private Standard, the lifecycle is unchanged, and current account-wide R2 usage 
 room under the free allowance. After deploying, repeat the fixed error, admission,
 duplicate, private-readback, and cleanup checks with one small synthetic document. Keep
 operator/API credentials outside the repository.
+
+Routine reads use a separate bucket-scoped R2 `Object Read only` token at
+`~/.config/pi67/support-r2-read.env` (mode `0600`) and the local exact-key command:
+
+```text
+corepack pnpm run support:diagnostics:read -- --object-key diagnostics/YYYY/MM/DD/PI67-XXXXXXXXXXXX.json
+```
+
+The command issues one `GetObject`, enforces the 64 KiB limit, validates the shared
+submission contract and SHA-256, and prints bounded classified evidence rather than
+the full document. It has no list, write, delete, or lifecycle operation. Creating or
+revoking its token and reading a user-supplied report still require current operator
+authorization; do not reuse update-bucket write credentials.
 
 Before a distributed Candidate enables the Desktop path, recheck the live deployment;
 do not treat this historical receipt as permanent production or billing truth.

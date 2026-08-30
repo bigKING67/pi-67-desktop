@@ -17,6 +17,12 @@ class AssetPort implements ProtocolPort {
   readonly listeners = new Map<string, Set<(event: unknown) => void>>();
 
   postMessage(message: unknown, transfer?: Transferable[]): void {
+    if (transfer?.some((value) => value instanceof ArrayBuffer)) {
+      throw new DOMException(
+        "MessagePortMain transfer entries must be MessagePortMain objects.",
+        "DataCloneError"
+      );
+    }
     this.sent.push(message);
     this.transfers.push(transfer);
   }
@@ -35,7 +41,7 @@ class AssetPort implements ProtocolPort {
 }
 
 describe("AgentHostServer assets", () => {
-  it("reads only the active session generation and transfers the chunk", async () => {
+  it("reads only the active session generation and clones the bounded chunk", async () => {
     const data = Uint8Array.from([1, 2, 3]).buffer;
     const readAsset = vi.fn(() => ({
       assetId: "asset-1",
@@ -78,7 +84,7 @@ describe("AgentHostServer assets", () => {
         isResponseEnvelope(value) && value.requestId === request.requestId
       ));
       expect(port.sent[responseIndex]).toMatchObject({ ok: true, type: "asset.read", result: { data } });
-      expect(port.transfers[responseIndex]).toEqual([data]);
+      expect(port.transfers[responseIndex]).toBeUndefined();
     });
     expect(readAsset).toHaveBeenCalledWith(request.payload);
 

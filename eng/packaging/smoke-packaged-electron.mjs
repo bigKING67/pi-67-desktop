@@ -28,7 +28,11 @@ import { verifyPackagedLarkSettings } from "./packaged-lark-settings-smoke.mjs";
 import { verifyPackagedExtensionUpdateCheck, verifyPackagedSkillUpdateCheck } from "./packaged-package-update-smoke.mjs";
 import { verifyPackagedProviderSettings } from "./packaged-provider-settings-smoke.mjs";
 import { verifyPackagedSessionCreation } from "./packaged-session-creation-smoke.mjs";
-import { verifyPackagedHeicAttachment } from "./packaged-heic-attachment-smoke.mjs";
+import {
+  preparePackagedProjectedImage,
+  verifyPackagedHeicAttachment,
+  verifyPackagedProjectedImage
+} from "./packaged-heic-attachment-smoke.mjs";
 import { closeElectronApplicationWithinTimeout } from "./electron-shutdown-measurement.mjs";
 import { assertPackagedSkillSuites } from "./smoke-packaged-skill-suites.mjs";
 import { assertNoWorkspaceChangesAuthorityWarning, verifyPackagedChangesInspector } from "./packaged-changes-inspector-smoke.mjs";
@@ -306,6 +310,8 @@ try {
   }
   const heicAttachment = await verifyPackagedHeicAttachment({ artifact, userDataDirectory, window });
   console.info(`Packaged HEIC attachment: ${JSON.stringify(heicAttachment)}`);
+  const projectedImage = await preparePackagedProjectedImage(window);
+  console.info(`Packaged projected image prepared: ${JSON.stringify(projectedImage)}`);
   await capturePackagedWorkbenchVisualEvidence(application, window);
   await startControlledPrompt(window);
   console.info("Packaged smoke stage: pre-reload controlled prompt started.");
@@ -315,6 +321,7 @@ try {
   await window.locator('[data-runtime-phase="ready"]').waitFor({ state: "visible", timeout: 10_000 });
   await window.locator('[data-testid="conversation-row"][aria-current="page"]')
     .filter({ hasText: CONTROLLED_PROMPT_TEXT }).waitFor({ state: "visible", timeout: 10_000 });
+  await verifyPackagedProjectedImage(window, "submission");
   await waitForPersistedRuntimeRecovery(userDataDirectory);
   console.info("Packaged smoke stage: pre-reload controlled prompt stopped and persisted.");
   await window.reload();
@@ -337,6 +344,7 @@ try {
     throw new Error(`Packaged task did not resume after reload: ${JSON.stringify(await inspectRendererSurface(window))}`, { cause: error });
   }
   await window.getByLabel("当前状态：Pi SDK 已就绪").waitFor({ state: "visible", timeout: 30_000 });
+  await verifyPackagedProjectedImage(window, "warm Restore Task");
   console.info("Packaged smoke stage: warm reload restored; closing before cold restart.");
   const warmApplication = application;
   application = undefined;
@@ -355,6 +363,7 @@ try {
   await window.waitForLoadState("domcontentloaded");
   await restorePackagedColdConversation({ packagedProcessOutput, window });
   await window.locator('[data-runtime-phase="ready"]').waitFor({ state: "visible", timeout: 30_000 });
+  await verifyPackagedProjectedImage(window, "cold Restore Task");
 
   console.info("Packaged smoke stage: cold restart restored; starting controlled shutdown.");
   const closingApplication = application;
@@ -367,7 +376,7 @@ try {
     window
   });
   childPid = shutdownState.childPid;
-  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, packaged-direct Agent Host startup (${startupDiagnostics.totalDurationMs}ms), private toolchain + first-party capabilities, Desktop browser67 packaged-direct dependency resolution, packaged GUI Extension/Skill update checks with bounded worker cleanup, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, Lark user-first Tabs + persisted Main layout, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt product shutdown (${shutdown.productExitDurationMs}ms; Playwright driver close ${shutdown.driverCloseDurationMs}ms).`);
+  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, packaged-direct Agent Host startup (${startupDiagnostics.totalDurationMs}ms), private toolchain + first-party capabilities, Desktop browser67 packaged-direct dependency resolution, packaged GUI Extension/Skill update checks with bounded worker cleanup, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, Lark user-first Tabs + persisted Main layout, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), projected image assets after submission plus warm/cold Restore Task, cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt product shutdown (${shutdown.productExitDurationMs}ms; Playwright driver close ${shutdown.driverCloseDurationMs}ms).`);
 } finally {
   try {
     if (application) {

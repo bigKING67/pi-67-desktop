@@ -13,8 +13,10 @@ import {
   type SupportDiagnosticsDocument
 } from "@pi67/support-contract";
 import {
+  PROTOCOL_REVISION,
   isSupportDiagnosticsExportRequest,
   type DesktopRecoverySnapshot,
+  type RuntimeDiagnostics,
   type SupportDiagnosticsExportRequest
 } from "@pi67/protocol";
 import type { AgentHostSupervisorDiagnostics } from "./agent-host-supervisor.js";
@@ -120,21 +122,30 @@ async function composeSupportDiagnostics(
     agentDirectory: options.agentDirectory,
     agentDirectorySource: options.agentDirectorySource
   });
+  const rendererCausality = request.renderer.causality ?? emptyRendererCausality();
+  const { causality: _rendererCausality, ...renderer } = request.renderer;
+  const runtime = "runtime" in request ? supportRuntime(request.runtime) : undefined;
+  const agentHostCausality = "runtime" in request ? request.runtime.host?.causality : undefined;
   const supportDiagnostics = {
-    schema: "pi67-support-diagnostics.v5" as const,
+    schema: "pi67-support-diagnostics.v6" as const,
     generatedAt: Date.now(),
     application: {
       version: app.getVersion(),
       platform: process.platform,
       architecture: process.arch,
-      packaged: app.isPackaged
+      packaged: app.isPackaged,
+      protocolRevision: PROTOCOL_REVISION
     },
     desktop: await options.recoverySnapshot(),
     agentHost: options.getAgentHostDiagnostics(),
     piConfiguration,
-    renderer: request.renderer,
+    renderer,
     runtimeCollection: request.runtimeCollection,
-    ...("runtime" in request ? { runtime: request.runtime } : {})
+    ...(runtime === undefined ? {} : { runtime }),
+    causality: {
+      renderer: rendererCausality,
+      ...(agentHostCausality === undefined ? {} : { agentHost: agentHostCausality })
+    }
   };
   const serialized = redact(`${JSON.stringify(supportDiagnostics, null, 2)}\n`);
   const document = JSON.parse(serialized) as unknown;
@@ -142,6 +153,22 @@ async function composeSupportDiagnostics(
     throw new Error("Composed support diagnostics failed the upload boundary.");
   }
   return { document, serialized };
+}
+
+function supportRuntime(runtime: RuntimeDiagnostics) {
+  const { host, ...base } = runtime;
+  if (!host) return base;
+  const { causality: _causality, ...supportHost } = host;
+  return { ...base, host: supportHost };
+}
+
+function emptyRendererCausality() {
+  return {
+    actions: [],
+    actionsDroppedCount: 0,
+    incidents: [],
+    incidentsDroppedCount: 0
+  };
 }
 
 export async function collectPiConfigurationDiagnostics(options: {
