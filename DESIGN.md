@@ -647,7 +647,8 @@ loading error where the operation can produce those states
   Clicking a loaded message scrolls and focuses its virtualized Transcript row;
   clicking an unloaded message installs one bounded historical window, disables
   edit/continue actions, highlights the target with Reduced Motion support, and
-  offers `回到最新消息`. Sending a new turn exits historical mode.
+  offers `回到最新消息`. Sending a new turn exits historical mode, returns to the
+  current end, and resumes following subsequent streamed growth.
 - Agents is a bounded roster, not another Transcript. Cards use compact semantic
   state dots plus text and show role, child identity, depth, foreground/background
   mode, model, reasoning, elapsed time, usage, parent-child lineage, bounded result,
@@ -659,6 +660,8 @@ loading error where the operation can produce those states
   A retained Worktree path may be shown only after Main created it; unsupported
   Worktree isolation must fail visibly rather than rendering invented success.
 - `Cmd/Ctrl+F` searches visible user/Assistant text in the current Pi JSONL branch;
+  a match inside a collapsed process group addresses, reveals, and highlights its
+  owning row, while a failed locate remains visible in the Find bar.
   `Cmd/Ctrl+Shift+F` performs a bounded, explicit cross-conversation body search in
   the current Workspace and opens the exact Session/message. Both are local
   navigation features. `@file` is a Workspace file-reference action. None of these

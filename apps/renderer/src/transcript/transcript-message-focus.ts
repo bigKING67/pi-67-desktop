@@ -1,6 +1,9 @@
 import { useEffect, type Dispatch, type RefObject, type SetStateAction } from "react";
 import type { VirtuosoHandle } from "react-virtuoso";
-import type { TranscriptRow } from "./transcript-rows.js";
+import {
+  findTranscriptRowIndexByMessageId,
+  type TranscriptRow
+} from "./transcript-rows.js";
 
 interface TranscriptMessageFocusOptions {
   focusMessage: boolean;
@@ -21,15 +24,17 @@ export function useTranscriptMessageFocus({
 }: TranscriptMessageFocusOptions): void {
   useEffect(() => {
     if (!highlightedMessageId) return;
-    const index = rows.findIndex((row) => (
-      row.kind === "message" && row.message.id === highlightedMessageId
-    ));
+    const index = findTranscriptRowIndexByMessageId(rows, highlightedMessageId);
     if (index < 0) return;
+    const row = rows[index]!;
     virtuosoRef.current?.scrollToIndex({ index, align: "center", behavior: "auto" });
 
     const focusTarget = () => {
+      const selector = row.kind === "process-group"
+        ? `[data-transcript-row-key="${CSS.escape(row.key)}"]`
+        : `[data-message-id="${CSS.escape(highlightedMessageId)}"]`;
       const target = regionRef.current?.querySelector<HTMLElement>(
-        `[data-message-id="${CSS.escape(highlightedMessageId)}"]`
+        selector
       );
       if (!target || target.getClientRects().length === 0) return false;
       if (focusMessage) target.focus({ preventScroll: true });

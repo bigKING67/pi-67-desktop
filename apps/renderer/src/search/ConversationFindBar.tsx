@@ -104,7 +104,17 @@ export function ConversationFindBar({ task }: { task: RendererWorkbenchTask }) {
           setActiveIndex(0);
           setLoading(false);
           const first = next.items[0];
-          if (first) void revealResult(task, first.id, revision, requestHostEpoch, requestRevision);
+          if (first) void revealResult(
+            task,
+            first.id,
+            revision,
+            requestHostEpoch,
+            requestRevision
+          ).then((revealError) => {
+            if (revealError && requestIsCurrent(revision, requestHostEpoch, task, requestRevision)) {
+              setError(revealError);
+            }
+          });
         },
         (cause: unknown) => {
           if (!requestIsCurrent(revision, requestHostEpoch, task, requestRevision)) return;
@@ -142,7 +152,7 @@ export function ConversationFindBar({ task }: { task: RendererWorkbenchTask }) {
         }}
       />
       {loading ? <LoaderCircle aria-label="正在搜索" className={styles.spin} size={13} /> : null}
-      <span aria-live="polite" className={error ? styles.error : undefined}>
+      <span aria-live="polite" className={error ? styles.error : undefined} title={error}>
         {error ?? (query.trim() ? `${current} / ${result?.total ?? 0}${result?.truncated ? "+" : ""}` : "")}
       </span>
       <button aria-label="上一个结果" disabled={count === 0} type="button" onClick={() => void move(-1)}>
@@ -158,12 +168,17 @@ export function ConversationFindBar({ task }: { task: RendererWorkbenchTask }) {
   async function move(delta: -1 | 1): Promise<void> {
     const items = result?.items ?? [];
     if (items.length === 0) return;
+    const revision = ++requestRevision.current;
     const nextIndex = (activeIndex + delta + items.length) % items.length;
     setActiveIndex(nextIndex);
+    setError(undefined);
     const item = items[nextIndex];
     const requestHostEpoch = useAppStore.getState().hostEpoch;
     if (item && requestHostEpoch !== undefined) {
-      await revealResult(task, item.id, requestRevision.current, requestHostEpoch, requestRevision);
+      const revealError = await revealResult(task, item.id, revision, requestHostEpoch, requestRevision);
+      if (revealError && requestIsCurrent(revision, requestHostEpoch, task, requestRevision)) {
+        setError(revealError);
+      }
     }
   }
 }
@@ -174,7 +189,7 @@ async function revealResult(
   revision: number,
   hostEpoch: number,
   currentRevision: { current: number }
-): Promise<void> {
+): Promise<string | undefined> {
   if (!requestIsCurrent(revision, hostEpoch, task, currentRevision)) return;
   if (document.querySelector(`[data-message-id="${CSS.escape(id)}"]`)) {
     requestTranscriptMessageJump({ focus: "preserve", id });
@@ -187,13 +202,12 @@ async function revealResult(
       [],
       { context: workbenchProtocolContextForTask(task) }
     );
-    if (
-      !requestIsCurrent(revision, hostEpoch, task, currentRevision)
-      || window.sessionId !== task.sessionId
-    ) return;
+    if (!requestIsCurrent(revision, hostEpoch, task, currentRevision)) return;
+    if (window.sessionId !== task.sessionId) return "定位结果已过期，请重新搜索。";
     requestTranscriptMessageJump({ focus: "preserve", id, window });
-  } catch {
-    // The active search request will surface stale projections on the next navigation.
+  } catch (cause: unknown) {
+    if (!requestIsCurrent(revision, hostEpoch, task, currentRevision)) return;
+    return cause instanceof Error ? cause.message : "无法定位搜索结果，请重试。";
   }
 }
 

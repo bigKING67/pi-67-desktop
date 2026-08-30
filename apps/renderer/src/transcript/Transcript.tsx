@@ -39,9 +39,11 @@ import { useTranscriptMessageFocus } from "./transcript-message-focus.js";
 import { subscribeTranscriptMessageJump } from "./transcript-navigation.js";
 import {
   createLiveProcessRow,
+  findTranscriptRowIndexByMessageId,
   hasFinalAnswerAfterLatestUser,
   hasProcessGroupAfterLatestUser,
-  projectTranscriptRows
+  projectTranscriptRows,
+  transcriptRowContainsMessage
 } from "./transcript-rows.js";
 import styles from "./Transcript.module.css";
 import { ConversationFindBar } from "../search/ConversationFindBar.js";
@@ -116,9 +118,7 @@ export function Transcript() {
     ? transcriptRows.findIndex((row) => row.key === savedReadPosition.anchorKey)
     : -1;
   const historicalAnchorRowIndex = historicalWindow
-    ? Math.max(0, transcriptRows.findIndex((row) => (
-      row.kind === "message" && row.message.id === historicalWindow.anchorId
-    )))
+    ? Math.max(0, findTranscriptRowIndexByMessageId(transcriptRows, historicalWindow.anchorId))
     : undefined;
   const hasCurrentProcessGroup = !pendingUserTurn && hasProcessGroupAfterLatestUser(transcriptRows);
   const hasCurrentFinalAnswer = !pendingUserTurn
@@ -224,6 +224,16 @@ export function Transcript() {
     };
   }, []);
 
+  const returnToLatest = useCallback(() => {
+    setHistoricalWindow(undefined);
+    setHighlightedMessageId(undefined);
+    followLatestRef.current = true;
+    setAtBottom(true);
+    setUnseenRowCount(0);
+    if (readKey) useConversationReadPositionStore.getState().setAtBottom(readKey, true);
+    requestAnimationFrame(() => transcriptRef.current?.scrollToIndex({ index: "LAST", align: "end" }));
+  }, [readKey]);
+
   useEffect(() => subscribeTranscriptMessageJump((target) => {
     followLatestRef.current = false;
     setAtBottom(false);
@@ -277,9 +287,8 @@ export function Transcript() {
 
   useEffect(() => {
     if (!pendingUserTurn) return;
-    setHistoricalWindow(undefined);
-    setHighlightedMessageId(undefined);
-  }, [pendingUserTurn]);
+    returnToLatest();
+  }, [pendingUserTurn, returnToLatest]);
 
   useTranscriptMessageFocus({
     focusMessage: focusHighlightedMessage,
@@ -337,11 +346,7 @@ export function Transcript() {
           <span>正在查看较早消息</span>
           <button
             type="button"
-            onClick={() => {
-              setHistoricalWindow(undefined);
-              setHighlightedMessageId(undefined);
-              returnToLatest();
-            }}
+            onClick={returnToLatest}
           >回到最新消息</button>
         </div>
       ) : null}
@@ -382,7 +387,7 @@ export function Transcript() {
         }}
         initialTopMostItemIndex={historicalAnchorRowIndex === undefined
           ? restoredAnchorRowIndex >= 0
-            ? { index: transcriptFirstItemIndex + restoredAnchorRowIndex, align: "start" }
+            ? { index: restoredAnchorRowIndex, align: "start" }
             : { index: "LAST", align: "end" }
           : { index: historicalAnchorRowIndex, align: "center" }}
         atBottomStateChange={(nextAtBottom) => {
@@ -407,6 +412,9 @@ export function Transcript() {
             const currentOperation = current && operationMatchesSession ? operation : undefined;
             return (
               <DeferredTranscriptProcessGroup
+                highlighted={highlightedMessageId === undefined
+                  ? false
+                  : transcriptRowContainsMessage(row, highlightedMessageId)}
                 liveThinking={current ? liveThinking : ""}
                 row={row}
                 running={current && currentProcessRunning}
@@ -450,16 +458,6 @@ export function Transcript() {
       ) : null}
     </div>
   );
-
-  function returnToLatest(): void {
-    setHistoricalWindow(undefined);
-    setHighlightedMessageId(undefined);
-    followLatestRef.current = true;
-    setAtBottom(true);
-    setUnseenRowCount(0);
-    if (readKey) useConversationReadPositionStore.getState().setAtBottom(readKey, true);
-    requestAnimationFrame(() => transcriptRef.current?.scrollToIndex({ index: "LAST", align: "end" }));
-  }
 
   function beginMessageEdit(message: SessionMessageView): void {
     const text = editableUserMessageText(message);

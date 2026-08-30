@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   hasFinalAnswerAfterLatestUser,
   hasProcessGroupAfterLatestUser,
-  projectTranscriptRows
+  projectTranscriptRows,
+  transcriptRowContainsMessage
 } from "./transcript-rows.js";
 
 describe("projectTranscriptRows", () => {
@@ -57,6 +58,7 @@ describe("projectTranscriptRows", () => {
     expect(rows[1]).toMatchObject({
       kind: "process-group",
       key: "assistant-tool:group",
+      sourceMessageIds: ["assistant-tool", "search-1"],
       stepCount: 1,
       toolCount: 1,
       unsuccessfulToolCount: 0,
@@ -70,6 +72,27 @@ describe("projectTranscriptRows", () => {
       }]
     });
     expect(hasProcessGroupAfterLatestUser(rows)).toBe(true);
+  });
+
+  it("keeps searchable Assistant narration addressable inside a process group", () => {
+    const rows = projectTranscriptRows([
+      message("assistant-process", "assistant", [
+        { type: "text", text: "Searchable progress narration" },
+        {
+          type: "tool-call",
+          id: "search-1",
+          name: "web_search",
+          status: "completed"
+        }
+      ])
+    ]);
+
+    expect(rows).toEqual([expect.objectContaining({
+      kind: "process-group",
+      sourceMessageIds: ["assistant-process"]
+    })]);
+    expect(transcriptRowContainsMessage(rows[0]!, "assistant-process")).toBe(true);
+    expect(transcriptRowContainsMessage(rows[0]!, "missing-message")).toBe(false);
   });
 
   it("keeps an empty Assistant failure visible as a result instead of process noise", () => {

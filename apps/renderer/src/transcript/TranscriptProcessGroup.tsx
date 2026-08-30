@@ -29,13 +29,15 @@ export function TranscriptProcessGroup({
   running = false,
   operation,
   timeline,
-  liveThinking = ""
+  liveThinking = "",
+  highlighted = false
 }: {
   row: ProcessGroupRow;
   running?: boolean;
   operation?: OperationView;
   timeline?: OperationActivityTimeline;
   liveThinking?: string;
+  highlighted?: boolean;
 }) {
   const supplementalThinking = uncommittedLiveThinking(row.items, liveThinking);
   const supplementalTimeline = useMemo(
@@ -57,6 +59,10 @@ export function TranscriptProcessGroup({
     if (previousOutcome.current !== outcome) setOpen(autoExpanded);
     previousOutcome.current = outcome;
   }, [autoExpanded, outcome]);
+
+  useEffect(() => {
+    if (highlighted) setOpen(true);
+  }, [highlighted]);
 
   const label = running && operation
     ? operationPresentation(
@@ -80,15 +86,18 @@ export function TranscriptProcessGroup({
 
   return (
     <details
-      className={`${styles.group} ${outcome === "failed" ? styles.failed : ""} ${isWarningOutcome(outcome) ? styles.warning : ""}`}
+      className={`${styles.group} ${outcome === "failed" ? styles.failed : ""} ${isWarningOutcome(outcome) ? styles.warning : ""} ${highlighted ? styles.highlighted : ""}`}
+      data-highlighted={highlighted || undefined}
       data-operation-lifecycle={operation?.lifecycle}
       data-process-failed={outcome === "failed" ? "true" : "false"}
       data-process-outcome={outcome}
       data-process-running={running ? "true" : "false"}
       data-testid="transcript-process-group"
+      data-transcript-row-key={row.key}
       data-turn-activity={operation ? "true" : undefined}
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
+      tabIndex={-1}
     >
       <summary>
         <span className={styles.statusIcon} aria-hidden="true">

@@ -7,6 +7,7 @@ import {
   recordedCommands,
   replaceMockAgentHost,
   setMockAgentResponseDelay,
+  setMockAgentResponseFailure,
   setMockAgentResponseResult
 } from "./pi67-renderer-fixture.js";
 import type { FixtureMessage } from "./pi67-renderer-fixture.js";
@@ -50,6 +51,79 @@ test("finds current Pi JSONL text, locates an older window, and restores focus",
   await input.press("Escape");
   await expect(find).toHaveCount(0);
   await expect(composer).toBeFocused();
+
+  const transcript = page.locator('[data-transcript-region="true"]');
+  const scroller = transcript.getByTestId("virtuoso-scroller");
+  await composer.fill("Continue from the current end");
+  await page.getByRole("button", { name: "发送", exact: true }).click();
+  await expect(transcript).toHaveAttribute("data-historical-window", "false");
+  await expect(transcript.getByRole("button", { name: /^回到最新/u })).toHaveCount(0);
+  await expect(transcript.locator('[data-message-id^="pending-user:"]'))
+    .toContainText("Continue from the current end");
+  await expect.poll(() => scroller.evaluate((element) => (
+    element.scrollHeight - element.clientHeight - element.scrollTop
+  ))).toBeLessThanOrEqual(4);
+});
+
+test("reveals Assistant narration that belongs to a process group", async ({ page }) => {
+  const messages = Array.from({ length: 150 }, (_, index): FixtureMessage => {
+    if (index === 70) {
+      return {
+        id: "process-narration-target",
+        role: "assistant",
+        createdAt: index + 1,
+        parts: [{ type: "text", text: "Unique searchable process narration" }, {
+          type: "tool-call",
+          id: "process-search-tool",
+          name: "web_search",
+          status: "completed"
+        }]
+      };
+    }
+    return message(`entry-${index}`, `Message ${index}`, index % 2 === 0 ? "user" : "assistant");
+  });
+  await page.goto("/");
+  await attachMockAgent(page, messages);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  await page.getByLabel("给 Pi 发送消息").focus();
+  await page.keyboard.press("Control+f");
+  const find = page.getByTestId("conversation-find-bar");
+  const input = page.getByLabel("在当前对话中查找");
+  await input.fill("Unique searchable process narration");
+
+  await expect(find).toContainText("1 / 1");
+  const transcript = page.locator('[data-transcript-region="true"]');
+  await expect(transcript).toHaveAttribute("data-historical-window", "true");
+  const group = transcript.locator('[data-testid="transcript-process-group"][data-highlighted="true"]');
+  await expect(group).toBeVisible();
+  await expect(group).toHaveAttribute("open", "");
+  await expect(group.getByText("Unique searchable process narration", { exact: true })).toBeVisible();
+  await expect(input).toBeFocused();
+});
+
+test("surfaces a current-conversation locate failure", async ({ page }) => {
+  const messages = Array.from({ length: 130 }, (_, index) => message(
+    `entry-${index}`,
+    index === 4 ? "Locate failure marker" : `Message ${index}`,
+    index % 2 === 0 ? "user" : "assistant"
+  ));
+  await page.goto("/");
+  await attachMockAgent(page, messages);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await setMockAgentResponseFailure(page, "message.locate", {
+    code: "RESOURCE_CHANGED_EXTERNALLY",
+    message: "Target message changed before it could be located.",
+    recoverable: true
+  });
+
+  await page.getByLabel("给 Pi 发送消息").focus();
+  await page.keyboard.press("Control+f");
+  const find = page.getByTestId("conversation-find-bar");
+  await page.getByLabel("在当前对话中查找").fill("Locate failure marker");
+
+  await expect(find).toContainText("Target message changed before it could be located.");
+  await expect(find).not.toContainText("1 / 1");
 });
 
 test("does not treat Windows IME confirmation as find navigation or dismissal", async ({ page }) => {

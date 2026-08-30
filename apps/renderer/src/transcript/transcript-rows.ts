@@ -48,6 +48,7 @@ export type TranscriptRow =
   | {
     kind: "process-group";
     key: string;
+    sourceMessageIds: string[];
     items: TranscriptProcessItem[];
     stepCount: number;
     toolCount: number;
@@ -68,6 +69,7 @@ export function projectTranscriptRows(messages: readonly SessionMessageView[]): 
     rows.push({
       kind: "process-group",
       key: `${processMessages[0]!.id}:group`,
+      sourceMessageIds: processMessages.map((message) => message.id),
       items,
       stepCount: Math.max(1, items.length),
       toolCount: items.filter((item) => item.kind === "tool" || item.kind === "orphan-tool-result").length,
@@ -184,6 +186,19 @@ export function hasProcessGroupAfterLatestUser(rows: readonly TranscriptRow[]): 
   return rows.slice(latestUserIndex + 1).some((row) => row.kind === "process-group");
 }
 
+export function transcriptRowContainsMessage(row: TranscriptRow, messageId: string): boolean {
+  return row.kind === "message"
+    ? row.message.id === messageId
+    : row.kind === "process-group" && row.sourceMessageIds.includes(messageId);
+}
+
+export function findTranscriptRowIndexByMessageId(
+  rows: readonly TranscriptRow[],
+  messageId: string
+): number {
+  return rows.findIndex((row) => transcriptRowContainsMessage(row, messageId));
+}
+
 export function hasFinalAnswerAfterLatestUser(rows: readonly TranscriptRow[]): boolean {
   const latestUserIndex = findLatestUserRowIndex(rows);
   if (latestUserIndex < 0) return false;
@@ -204,6 +219,7 @@ export function createLiveProcessRow(
   return {
     kind: "process-group",
     key: `${operation.operationId}:live-process`,
+    sourceMessageIds: [],
     items: [],
     stepCount: 1,
     toolCount: 0,

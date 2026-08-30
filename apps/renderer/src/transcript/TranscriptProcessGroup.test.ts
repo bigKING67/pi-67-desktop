@@ -53,6 +53,7 @@ function processRow(
   return {
     kind: "process-group",
     key: "process-1",
+    sourceMessageIds: [],
     items: [],
     stepCount: 1,
     toolCount: 1,

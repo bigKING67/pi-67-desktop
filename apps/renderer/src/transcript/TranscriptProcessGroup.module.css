@@ -6,6 +6,17 @@
   color: var(--text-tertiary);
 }
 
+.highlighted {
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 34%, transparent);
+  transition: background var(--motion-slow) ease, box-shadow var(--motion-slow) ease;
+}
+
+.highlighted:focus {
+  outline: none;
+}
+
 .group > summary {
   display: grid;
   width: fit-content;
@@ -239,6 +250,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .highlighted,
   .chevron,
   .spinning {
     transition: none;
