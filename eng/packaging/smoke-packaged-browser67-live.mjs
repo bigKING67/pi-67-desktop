@@ -91,7 +91,7 @@ try {
   const managedState = await readJson(`${agentDir}/desktop-capabilities/managed-packages/state.json`);
   const managedPackages = Object.fromEntries(managedManifest.packages.map((entry) => [entry.id, entry]));
   assertManagedPackage(managedPackages, managedState, "pi-mcp-adapter", "2.11.0");
-  assertManagedPackage(managedPackages, managedState, "pi-observational-memory", "3.0.3");
+  assert(!("pi-observational-memory" in managedPackages), "retired observational-memory runtime is still packaged");
 
   const tmwdBrowser = await probePackagedMcpServer({
     name: "tmwd_browser",
@@ -139,8 +139,7 @@ try {
       identityMatch: doctor.doctor.checks.tmwd_ws_runtime.identity_match
     },
     managedPackages: {
-      "pi-mcp-adapter": managedPackages["pi-mcp-adapter"].version,
-      "pi-observational-memory": managedPackages["pi-observational-memory"].version
+      "pi-mcp-adapter": managedPackages["pi-mcp-adapter"].version
     },
     mcp: {
       tmwd_browser: {

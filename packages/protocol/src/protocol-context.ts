@@ -1,6 +1,5 @@
-import { Type, Value } from "./typebox-schema.js";
+import { strictObject, Type, Value } from "./typebox-schema.js";
 import type { AgentCommandType } from "./agent-messages.js";
-import { strictObject } from "./schemas.js";
 
 export interface AppProtocolContext {
   scope: "app";
@@ -134,7 +133,33 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "skill.pack.restore": "workspace",
   "lark.auth.status": "app",
   "lark.auth.login.begin": "app",
-  "lark.app.configuration.save": "app"
+  "lark.app.configuration.save": "app",
+  "context.status.get": "app",
+  "context.config.get": "app",
+  "context.config.update": "app",
+  "context.runtime.doctor": "app",
+  "enterprise.identity.get": "app",
+  "enterprise.auth.begin": "app",
+  "enterprise.auth.poll": "app",
+  "enterprise.auth.disconnect": "app",
+  "enterprise.project.list": "app",
+  "context.session.get": "workspace",
+  "context.session.commit": "workspace",
+  "context.recall.list": "workspace",
+  "memory.search": "workspace",
+  "memory.get": "workspace",
+  "memory.forget.preview": "workspace",
+  "memory.forget.confirm": "workspace",
+  "experience.private.list": "workspace",
+  "experience.candidate.get": "workspace",
+  "experience.candidate.review": "workspace",
+  "experience.candidate.promote": "workspace",
+  "experience.candidate.reject": "workspace",
+  "experience.shared.search": "workspace",
+  "experience.shared.get": "workspace",
+  "enterprise.workspace.get": "workspace",
+  "enterprise.workspace.bind": "workspace",
+  "enterprise.workspace.unbind": "workspace"
 };
 
 export function hasValidCommandContext(

@@ -1,6 +1,24 @@
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import type { PackageSource, SettingsManager } from "@earendil-works/pi-coding-agent";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+import {
+  SettingsManager,
+  type PackageSource
+} from "@earendil-works/pi-coding-agent";
 import { nativeCapabilityReplacement, RuntimeError } from "@pi67/domain";
+import {
+  applyManagedMemoryOwnerGate,
+  applyMemoryOwnerExtensionGate,
+  applyMemoryOwnerPackageGate,
+  inspectDesktopMemoryOwners,
+  type DesktopMemoryOwnerPreflight
+} from "./desktop-memory-owner-preflight.js";
+import {
+  desktopCapabilityRoots,
+  isContainedAbsolutePath,
+  isSameAbsolutePath,
+  isSameOrContainedAbsolutePath,
+  nonEmpty,
+  projectedCapabilityPackagePaths
+} from "./desktop-capability-paths.js";
 import type { PackageTrustRegistry } from "./package-trust-registry.js";
 
 type ReloadableDesktopSettingsManager = Pick<
@@ -16,13 +34,14 @@ interface DesktopReloadHook {
 
 const desktopReloadHooks = new WeakMap<object, DesktopReloadHook>();
 
-const PI67_CORE_LEGACY_EXTENSION_EXCLUSIONS = [
+const DESKTOP_WORKSPACE_LEGACY_EXTENSION_EXCLUSIONS = [
   "-extensions/pi-rules-loader/index.ts"
 ] as const;
 
+const DESKTOP_OPENVIKING_PROJECTION_EXCLUSION = "-extensions/pi67-openviking/index.ts";
+
 const DESKTOP_MANAGED_NPM_SOURCES = new Set([
-  "npm:pi-mcp-adapter",
-  "npm:pi-observational-memory"
+  "npm:pi-mcp-adapter"
 ]);
 
 export interface DesktopPackageToolchain {
@@ -135,58 +154,100 @@ export function installDesktopPackageToolchainReloadHook(
 export function createDesktopPackageSettingsView(
   settingsManager: SettingsManager,
   environment: NodeJS.ProcessEnv = process.env,
-  trustRegistry?: Pick<PackageTrustRegistry, "runtimePackageAllowed">
+  trustRegistry?: Pick<PackageTrustRegistry, "runtimePackageAllowed">,
+  memoryOwnerPreflight?: DesktopMemoryOwnerPreflight
 ): SettingsManager {
-  if (!resolveDesktopPackageToolchain(environment).desktop) return settingsManager;
+  const desktop = resolveDesktopPackageToolchain(environment).desktop;
+  if (!desktop && memoryOwnerPreflight === undefined) return settingsManager;
   return new Proxy(settingsManager, {
     get(target, property) {
       if (property === "getGlobalSettings") {
         return () => {
           const settings = target.getGlobalSettings();
-          const packages = runtimeAdmittedPackages(
-            withoutNativeReplacedPackages(desktopCapabilityPackages(settings.packages ?? [], environment)),
+          const runtimePackages = desktop
+            ? withoutNativeReplacedPackages(desktopCapabilityPackages(settings.packages ?? [], environment))
+            : settings.packages ?? [];
+          const packages = applyMemoryOwnerPackageGate(runtimeAdmittedPackages(
+            runtimePackages,
             "global",
             trustRegistry
-          );
+          ), memoryOwnerPreflight);
+          const extensionOverrides = desktop
+            ? desktopExtensionOverrides(settings.extensions ?? [], packages, environment)
+            : settings.extensions ?? [];
           return {
             ...settings,
             packages,
-            extensions: desktopExtensionOverrides(settings.extensions ?? [], packages, environment)
+            extensions: applyMemoryOwnerExtensionGate(
+              extensionOverrides,
+              "global",
+              memoryOwnerPreflight
+            )
           };
         };
       }
       if (property === "getProjectSettings") {
         return () => {
           const settings = target.getProjectSettings();
+          const runtimePackages = desktop
+            ? withoutManagedNpmPackageSources(
+                withoutNativeReplacedPackages(settings.packages ?? []),
+                environment
+              )
+            : settings.packages ?? [];
           return {
             ...settings,
-            packages: runtimeAdmittedPackages(
-              withoutManagedNpmPackageSources(withoutNativeReplacedPackages(settings.packages ?? []), environment),
+            packages: applyMemoryOwnerPackageGate(runtimeAdmittedPackages(
+              runtimePackages,
               "project",
               trustRegistry
+            ), memoryOwnerPreflight),
+            extensions: applyMemoryOwnerExtensionGate(
+              settings.extensions ?? [],
+              "project",
+              memoryOwnerPreflight
             )
           };
         };
       }
       if (property === "getPackages") {
-        return () => withoutManagedNpmPackageSources(
-          withoutNativeReplacedPackages(target.getPackages()),
-          environment
-        ).filter((entry) => {
+        return () => applyMemoryOwnerPackageGate((desktop
+          ? withoutManagedNpmPackageSources(
+              withoutNativeReplacedPackages(target.getPackages()),
+              environment
+            )
+          : target.getPackages()).filter((entry) => {
           const source = typeof entry === "string" ? entry : entry.source;
           return trustRegistry === undefined
             || trustRegistry.runtimePackageAllowed(source, "global")
             || trustRegistry.runtimePackageAllowed(source, "project");
-        });
+        }), memoryOwnerPreflight);
       }
       if (property === "setPackages") {
         return (packages: PackageSource[]) => {
-          target.setPackages(withoutDesktopCapabilityPackages(packages, environment));
+          target.setPackages(desktop
+            ? withoutDesktopCapabilityPackages(packages, environment)
+            : packages);
         };
       }
       const value = Reflect.get(target, property, target) as unknown;
       return typeof value === "function" ? value.bind(target) : value;
     }
+  });
+}
+
+export function inspectGlobalDesktopMemoryOwners(
+  agentDir: string,
+  environment: NodeJS.ProcessEnv = process.env
+): DesktopMemoryOwnerPreflight {
+  const settingsManager = SettingsManager.create(agentDir, agentDir, {
+    projectTrusted: false
+  });
+  return inspectDesktopMemoryOwners({
+    cwd: agentDir,
+    agentDir,
+    reservedOwner: "pi67-openviking",
+    settingsManager: createDesktopPackageSettingsView(settingsManager, environment)
   });
 }
 
@@ -211,7 +272,8 @@ function withoutManagedNpmPackageSources(
 }
 
 export function managedDesktopExtensionPaths(
-  environment: NodeJS.ProcessEnv = process.env
+  environment: NodeJS.ProcessEnv = process.env,
+  memoryOwnerPreflight?: DesktopMemoryOwnerPreflight
 ): string[] {
   const capabilityRoots = desktopCapabilityRoots(environment);
   const serialized = nonEmpty(environment.PI67_MANAGED_EXTENSION_PATHS);
@@ -248,7 +310,7 @@ export function managedDesktopExtensionPaths(
       { recoverable: false }
     );
   }
-  return [...new Set(candidates)];
+  return applyManagedMemoryOwnerGate([...new Set(candidates)], memoryOwnerPreflight);
 }
 
 function runtimeAdmittedPackages(
@@ -268,15 +330,21 @@ function desktopExtensionOverrides(
   packages: PackageSource[],
   environment: NodeJS.ProcessEnv
 ): string[] {
-  const pi67CoreRoots = desktopCapabilityRoots(environment)
-    .map((root) => join(root, "packages", "pi67-core"));
-  if (pi67CoreRoots.length === 0) return configured;
-  const hasManagedPi67Core = packages.some((entry) => {
+  const workspaceResourceRoots = projectedCapabilityPackagePaths(environment)
+    .filter((root) => basename(root) === "pi-workspace-resources");
+  if (workspaceResourceRoots.length === 0) return configured;
+  const hasManagedWorkspaceResources = packages.some((entry) => {
     const source = typeof entry === "string" ? entry : entry.source;
-    return pi67CoreRoots.some((root) => isSameAbsolutePath(source, root));
+    return workspaceResourceRoots.some((root) => isSameAbsolutePath(source, root));
   });
-  if (!hasManagedPi67Core) return configured;
-  return [...new Set([...configured, ...PI67_CORE_LEGACY_EXTENSION_EXCLUSIONS])];
+  if (!hasManagedWorkspaceResources) return configured;
+  const exclusions = [
+    ...DESKTOP_WORKSPACE_LEGACY_EXTENSION_EXCLUSIONS,
+    ...(environment.PI67_OPENVIKING_SHARED_PROJECTION === "managed"
+      ? [DESKTOP_OPENVIKING_PROJECTION_EXCLUSION]
+      : [])
+  ];
+  return [...new Set([...configured, ...exclusions])];
 }
 
 function releaseDesktopReloadHook(
@@ -364,40 +432,4 @@ function withoutDesktopCapabilityPackages(
     const source = typeof entry === "string" ? entry : entry.source;
     return !capabilityRoots.some((root) => isSameOrContainedAbsolutePath(source, root));
   });
-}
-
-function desktopCapabilityRoots(environment: NodeJS.ProcessEnv): string[] {
-  return [...new Set([
-    nonEmpty(environment.PI67_BUNDLED_CAPABILITIES_ROOT),
-    nonEmpty(environment.PI67_MANAGED_CAPABILITIES_ROOT)
-  ].filter((root): root is string => root !== undefined && isAbsolute(root)).map((root) => resolve(root)))];
-}
-
-function isSameOrContainedAbsolutePath(candidate: string, root: string): boolean {
-  if (!isAbsolute(candidate)) return false;
-  return isSameAbsolutePath(candidate, root) || isContainedAbsolutePath(candidate, root);
-}
-
-function isSameAbsolutePath(candidate: string, expected: string): boolean {
-  if (!isAbsolute(candidate) || !isAbsolute(expected)) return false;
-  const normalize = process.platform === "win32"
-    ? (value: string) => resolve(value).toLowerCase()
-    : (value: string) => resolve(value);
-  return normalize(candidate) === normalize(expected);
-}
-
-function isContainedAbsolutePath(candidate: string, root: string): boolean {
-  if (!isAbsolute(candidate)) return false;
-  const normalize = process.platform === "win32"
-    ? (value: string) => resolve(value).toLowerCase()
-    : (value: string) => resolve(value);
-  const fromRoot = relative(normalize(root), normalize(candidate));
-  return fromRoot !== ""
-    && fromRoot !== ".."
-    && !fromRoot.startsWith(`..${sep}`)
-    && !isAbsolute(fromRoot);
-}
-
-function nonEmpty(value: string | undefined): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
 }

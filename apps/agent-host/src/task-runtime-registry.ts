@@ -3,7 +3,8 @@ import {
   type AgentRuntime,
   type PiSdkRuntimeOptions,
   type PiWorkspaceRuntimeServices,
-  type RuntimeCredentialOverrideStore
+  type RuntimeCredentialOverrideStore,
+  type SharedExperienceAccess
 } from "@pi67/pi-runtime";
 import type { TaskProtocolContext } from "@pi67/protocol";
 import { HostCommandError } from "./protocol-error.js";
@@ -25,6 +26,7 @@ export interface TaskRuntimeRecord {
 
 export interface TaskRuntimeRegistryOptions {
   onRuntimeLoaded?: (record: TaskRuntimeRecord, runtime: AgentRuntime) => void;
+  sharedExperienceAccessForWorkspace?: (workspaceId: string) => SharedExperienceAccess;
 }
 
 export class TaskRuntimeRegistry {
@@ -116,6 +118,13 @@ export class TaskRuntimeRegistry {
       runtimeCredentialOverrides: this.runtimeCredentialOverrides,
       subagentAdmission: this.subagentAdmission,
       subagentParentKey: record.taskKey,
+      ...(this.options.sharedExperienceAccessForWorkspace === undefined
+        ? {}
+        : {
+            sharedExperienceAccess: this.options.sharedExperienceAccessForWorkspace(
+              record.context.workspaceId
+            )
+          }),
       ...(this.promptAttachments === undefined
         ? {}
         : { promptAttachmentAccess: this.promptAttachments.forTask(record.taskKey) }),

@@ -4,10 +4,7 @@ import {
   SkillPackManagement,
   type SkillPackManagementOptions
 } from "./skill-pack-management.js";
-import {
-  createFixture,
-  currentPi67Channel
-} from "./skill-pack-management-test-support.js";
+import { createFixture } from "./skill-pack-management-test-support.js";
 
 describe("SkillPackManagement external Lark CLI update", () => {
   it("adopts an external Lark CLI through a verified Desktop-managed update", async () => {
@@ -67,8 +64,7 @@ describe("SkillPackManagement external Lark CLI update", () => {
       now: () => 1_722_400_000_000,
       resolveLarkCli,
       installLarkCli,
-      runProcess,
-      pi67Channel: currentPi67Channel()
+      runProcess
     });
 
     const transaction = await management.beginUpdate("lark-cli-global");
@@ -130,8 +126,7 @@ describe("SkillPackManagement external Lark CLI update", () => {
         commit: async () => undefined,
         rollback
       }),
-      runProcess,
-      pi67Channel: currentPi67Channel()
+      runProcess
     });
 
     await expect(management.beginUpdate("lark-cli-global")).rejects.toMatchObject({

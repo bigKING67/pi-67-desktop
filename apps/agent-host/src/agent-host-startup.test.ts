@@ -156,7 +156,7 @@ describe("Agent Host startup", () => {
       agentDir,
       environment,
       bootstrapCapabilities: async ({ environment: target }) => {
-        target.PI67_CAPABILITY_PACKAGE_PATHS = JSON.stringify(["/managed/pi67-core"]);
+        target.PI67_CAPABILITY_PACKAGE_PATHS = JSON.stringify(["/managed/pi-workspace-resources"]);
         return enabledCapabilities();
       },
       activateManagedPackages: async () => {
@@ -172,7 +172,7 @@ describe("Agent Host startup", () => {
       status: "degraded",
       issues: [{ stage: "managed-packages", code: "access-denied" }]
     });
-    expect(environment.PI67_CAPABILITY_PACKAGE_PATHS).toBe(JSON.stringify(["/managed/pi67-core"]));
+    expect(environment.PI67_CAPABILITY_PACKAGE_PATHS).toBe(JSON.stringify(["/managed/pi-workspace-resources"]));
     expect(environment.PI67_MANAGED_NPM_ROOT).toBeUndefined();
     expect(await readFile(join(agentDir, "settings.json"), "utf8")).toBe("{\"theme\":\"user\"}\n");
   });
@@ -309,7 +309,7 @@ function enabledCapabilities(): DesktopCapabilityBootstrapResult {
     enabled: true,
     catalogVersion: "test.1",
     managedRoot: "/managed",
-    packagePaths: ["/managed/pi67-core"],
+    packagePaths: ["/managed/pi-workspace-resources"],
     rules: "installed",
     agents: "user-owned"
   };
@@ -354,8 +354,8 @@ function desktopCapabilityState(): Record<string, unknown> {
     schema: "pi67.desktop-capability-state.v1",
     catalogVersion: "test.1",
     packages: [{
-      id: "pi67-core",
-      displayName: "Pi-67 Core",
+      id: "pi-workspace-resources",
+      displayName: "Pi Workspace Resources",
       resourceTypes: ["rules"],
       treeSha256: "a".repeat(64),
       installed: true,

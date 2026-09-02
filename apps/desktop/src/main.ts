@@ -48,6 +48,7 @@ import { WorktreeStartupReconcileService } from "./worktree-startup-reconcile-se
 import { PromptStashImageStore } from "./prompt-stash-image-store.js";
 import { ensureMainWindowContextRoom } from "./main-window-context-room.js";
 import { DesktopSafeStorage } from "./desktop-safe-storage.js";
+import { EnterpriseCredentialStore } from "./enterprise-credential-store.js";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const rendererDirectory = normalize(join(currentDirectory, "../../renderer/dist"));
@@ -91,6 +92,7 @@ let promptAttachments: PromptAttachmentStagingService | undefined;
 let composerDraftState: ComposerDraftStateStore | undefined;
 let promptStashImages: PromptStashImageStore | undefined;
 let workspaceFileState: WorkspaceFileStateStore | undefined;
+let enterpriseCredentialStore: EnterpriseCredentialStore | undefined;
 let systemBridgeRegistration: SystemBridgeRegistration | undefined;
 let rendererShutdownCheckpoint: RendererShutdownCheckpointRegistration | undefined;
 const appInstanceId = randomUUID();
@@ -116,6 +118,7 @@ const agentHostSupervisor = new AgentHostSupervisor({
     };
   },
   getMainWindow: () => mainWindow,
+  getEnterpriseCredentials: () => enterpriseCredentialStore,
   rendererUrl
 });
 const applicationShutdown = createApplicationShutdownController({
@@ -172,6 +175,9 @@ if (hasSingleInstanceLock) {
       console.info("Prompt attachment cleanup removed=0 errors=1 classes=UnknownError");
     });
     const desktopSafeStorage = new DesktopSafeStorage(safeStorage);
+    enterpriseCredentialStore = new EnterpriseCredentialStore(app.getPath("userData"), {
+      encryption: desktopSafeStorage
+    });
     workspaceFileState = new WorkspaceFileStateStore(app.getPath("userData"), {
       encryption: desktopSafeStorage
     });
@@ -184,7 +190,7 @@ if (hasSingleInstanceLock) {
     });
     desktopCapabilities = new DesktopCapabilityService({
       capabilitiesRoot,
-      capabilityProjectionMode: app.isPackaged ? "packaged-direct" : "legacy-copy",
+      capabilityProjectionMode: "shared-profile",
       agentDir: desktopAgentDirectory,
       toolchain: desktopToolchain,
       packageNetworkSettings

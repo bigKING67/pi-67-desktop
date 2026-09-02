@@ -12,6 +12,7 @@ import {
   runCapabilityGitCommand
 } from "./capability-source-resolver.mjs";
 
+const PROCESS_FIXTURE_TIMEOUT_MS = 15_000;
 const temporaryRoots = [];
 const execFileAsync = promisify(execFile);
 
@@ -26,10 +27,10 @@ afterEach(async () => {
 
 describe("Desktop capability source resolver", () => {
   it("uses the canonical GitHub transport before bounded mirrors", () => {
-    const canonical = "https://github.com/bigKING67/pi-67.git";
+    const canonical = "https://github.com/bigKING67/browser67.git";
     expect(capabilityGitTransportCandidates(canonical)).toEqual([
       canonical,
-      "https://gitclone.com/github.com/bigKING67/pi-67.git",
+      "https://gitclone.com/github.com/bigKING67/browser67.git",
       `https://ghproxy.net/${canonical}`
     ]);
   });
@@ -65,6 +66,28 @@ describe("Desktop capability source resolver", () => {
     await expect(resolveBundledNpmToolchain(manifestPath)).rejects.toThrow(/escaped/u);
   });
 
+  it("resolves a contained Desktop-internal capability without Git or a sibling repository", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-internal-capability-"));
+    temporaryRoots.push(root);
+    const internal = join(root, "packages", "internal-capability");
+    await mkdir(internal, { recursive: true });
+    await writeFile(join(internal, "package.json"), "{}\n", "utf8");
+
+    await expect(resolveExactCapabilitySource({
+      source: { id: "internal-capability", internalPath: "packages/internal-capability" },
+      repositoryRoot: root,
+      sourceCacheRoot: join(root, "cache"),
+      git: undefined
+    })).resolves.toBe(internal);
+
+    await expect(resolveExactCapabilitySource({
+      source: { id: "escaped", internalPath: "../outside" },
+      repositoryRoot: root,
+      sourceCacheRoot: join(root, "cache"),
+      git: undefined
+    })).rejects.toThrow(/escaped the Desktop repository/u);
+  });
+
   it("reuses an exact clean source cache with the canonical remote", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-capability-cache-"));
     temporaryRoots.push(root);
@@ -96,7 +119,7 @@ describe("Desktop capability source resolver", () => {
       git: { executable: "git", execPath: execPathOutput.trim() }
     })).resolves.toBe(destination);
     await expect(readFile(sentinel, "utf8")).resolves.toBe("preserved\n");
-  });
+  }, PROCESS_FIXTURE_TIMEOUT_MS);
 
   it("terminates a timed-out Git process tree before returning control", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-capability-source-"));
@@ -120,7 +143,7 @@ describe("Desktop capability source resolver", () => {
     await expect(runCapabilityGitCommand(
       { executable: process.execPath, execPath: root },
       [parentPath, workerPath, heartbeatPath],
-      { timeoutMs: 1_000 }
+      { timeoutMs: 5_000 }
     )).rejects.toThrow(/timed out/u);
 
     await delay(100);
@@ -128,5 +151,5 @@ describe("Desktop capability source resolver", () => {
     await delay(150);
     expect((await stat(heartbeatPath)).size).toBe(firstSize);
     expect(await readFile(heartbeatPath, "utf8")).not.toBe("");
-  });
+  }, PROCESS_FIXTURE_TIMEOUT_MS);
 });

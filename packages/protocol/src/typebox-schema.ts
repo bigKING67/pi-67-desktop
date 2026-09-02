@@ -11,6 +11,7 @@ import {
   String,
   Union
 } from "typebox";
+import type { TProperties } from "typebox";
 import { Check } from "typebox/value";
 
 // Keep protocol schemas on the small constructor surface they actually use so
@@ -30,5 +31,9 @@ export const Type = {
 } as const;
 
 export const Value = { Check } as const;
+
+export function strictObject<T extends TProperties>(properties: T) {
+  return Object(properties, { additionalProperties: false });
+}
 
 export type { Static, TProperties, TSchema } from "typebox";

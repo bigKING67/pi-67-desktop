@@ -1,6 +1,7 @@
 import type { SettingsSection } from "@pi67/domain";
 import {
   Activity,
+  BrainCircuit,
   Building2,
   ChartNoAxesCombined,
   Blocks,
@@ -44,6 +45,12 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
         ...messages.settings.sections.general,
         searchTerms: ["通用", "外观", "主题", "深色", "浅色", "跟随系统", "快捷键", "键盘", "shortcut", "keyboard", "appearance", "theme"],
         icon: SlidersHorizontal
+      },
+      {
+        id: "context-memory",
+        ...messages.settings.sections.contextMemory,
+        searchTerms: ["OpenViking", "上下文", "记忆", "经验", "隐私", "召回", "context", "memory", "experience"],
+        icon: BrainCircuit
       }
     ]
   },

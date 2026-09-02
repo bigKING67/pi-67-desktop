@@ -2,7 +2,6 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PiWorkspaceRuntimeServices } from "@pi67/pi-runtime";
-import { vi } from "vitest";
 import {
   SkillPackManagement,
   type SkillPackManagementOptions
@@ -26,8 +25,7 @@ export function createManagement(
     now: () => 1_722_400_000_000,
     resolveLarkCli: async () => "/mock/lark-cli",
     runProcess: options.runProcess,
-    ...(options.installLarkCli ? { installLarkCli: options.installLarkCli } : {}),
-    pi67Channel: currentPi67Channel()
+    ...(options.installLarkCli ? { installLarkCli: options.installLarkCli } : {})
   });
 }
 
@@ -47,8 +45,8 @@ export async function createFixture() {
       displayName: "飞书 Lark CLI",
       description: "飞书文档、消息、日历和开放平台能力。",
       members: [
-        { packageId: "pi67-core", skillId: "lark-doc" },
-        { packageId: "pi67-core", skillId: "lark-calendar" }
+        { packageId: "pi-workspace-resources", skillId: "lark-doc" },
+        { packageId: "pi-workspace-resources", skillId: "lark-calendar" }
       ]
     }, {
       id: "ai-berkshire-investment-suite",
@@ -58,8 +56,8 @@ export async function createFixture() {
       upstream: "https://github.com/xbtlin/ai-berkshire",
       sourceCommit: "6".repeat(40),
       members: [
-        { packageId: "pi67-core", skillId: "investment-research" },
-        { packageId: "pi67-core", skillId: "portfolio-review" }
+        { packageId: "pi-workspace-resources", skillId: "investment-research" },
+        { packageId: "pi-workspace-resources", skillId: "portfolio-review" }
       ]
     }]
   }), "utf8");
@@ -69,23 +67,6 @@ export async function createFixture() {
     settingsManager: { getShellPath: () => "/bin/zsh" }
   } as unknown as PiWorkspaceRuntimeServices;
   return { root, capabilitiesRoot, homeDirectory, services };
-}
-
-export function currentPi67Channel() {
-  return {
-    check: vi.fn(async () => ({
-      id: "ai-berkshire-investment-suite" as const,
-      version: "1.0.1",
-      upstream: "https://github.com/xbtlin/ai-berkshire",
-      sourceCommit: "6".repeat(40),
-      registryCommit: "7".repeat(40),
-      manifestSha256: "8".repeat(64),
-      bundleSha256: "9".repeat(64),
-      skills: [{ name: "investment-research", sha256: "a".repeat(64) }],
-      independentlyInstallable: true
-    })),
-    stage: vi.fn(async () => { throw new Error("unexpected stage"); })
-  };
 }
 
 export async function aiRelease(root: string, version: string) {

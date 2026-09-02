@@ -171,27 +171,36 @@ the only Runtime and behavior specification source.
   user resources. Desktop records `shared` origin when it first materializes its own
   namespace inside an existing Profile, so later capability upgrades do not silently
   reclassify the rest of that Profile as Desktop-owned.
-- Pi-67 Core, browser67, design-craft, and the commerce-growth-os Skill suite ship
-  as pinned first-party capability snapshots. Build and packaging verify their full
-  locked trees. A packaged Agent Host validates bounded metadata and critical
-  entrypoints, then loads the read-only snapshot directly from Electron resources;
-  it does not hash or copy the full tree into the Pi Agent Profile on every launch.
-  The Profile keeps a separate writable managed Overlay root, preserves existing
-  Package object filters, namespaces managed Rules, and never overwrites an existing
-  global `AGENTS.md`. Legacy copied built-ins are removed only after Host readiness;
-  Skill Pack overlays, state, Pi settings, credentials, and JSONL Sessions remain.
-- The default Pi Package set stays bounded. In addition to Pi-67 first-party
-  capability Packages, Desktop ships the complete locked runtime closures for
-  `pi-mcp-adapter@2.11.0` and `pi-observational-memory@3.0.3`; the client never runs
-  npm to activate them. Build and packaging verify the complete bundle; packaged
+- Pi Workspace Resources, OpenViking, browser67, design-craft, and the
+  commerce-growth-os Skill suite ship as pinned first-party capability snapshots.
+  Build and packaging verify their full locked trees. Agent Host copies one verified
+  release into the canonical Pi Agent Profile through `staging -> active`, retains
+  one validated `previous` tree and a receipt, then projects only stable `active`
+  Package paths into Pi `settings.json` with a revision fence. Pi TUI and Desktop
+  therefore use the same capability version even when Desktop is not running.
+  Existing user Package entries and filters are preserved, managed Rules remain
+  namespaced, and an existing global `AGENTS.md` is never overwritten. Credentials,
+  Pi JSONL Sessions and user-owned resources remain outside this transaction.
+- The default Pi Package set stays bounded. In addition to Desktop first-party
+  capability Packages, Desktop ships only the complete locked runtime closure for
+  `pi-mcp-adapter@2.11.0`; the client never runs npm to activate it. Build and packaging verify the complete bundle; packaged
   startup loads it directly from the read-only `bundled` resource while retaining
   only enablement state in the writable Overlay. Development and legacy recovery
-  may still use the verified `bundled -> staging -> active` projection. Observational Memory has a
-  Desktop-owned durable opt-out state, does not rewrite shared Pi settings, and keeps
-  upstream `debugLog=false`; an explicit opt-out UI is not yet a completed surface.
+  may still use the verified `bundled -> staging -> active` projection. OpenViking is
+  the sole supported third-party Context/Memory owner. Legacy observational-memory
+  and Hy-Memory identifiers remain only for pre-load blocking and migration; their
+  runtimes are not bundled and existing private data is preserved.
   Other recommended third-party Packages remain user-initiated. `pi-hy-memory`,
   `@ff-labs/pi-fff`, and `@victor-software-house/pi-curated-themes` are retired from
   the default catalog.
+- OpenViking private Memory and Experience remain usable without enterprise login.
+  Enterprise login and Workspace binding only make the current trusted project
+  eligible to create a separate redacted candidate. A candidate is assembled from
+  one exact Pi JSONL snapshot and its exact OpenViking Session Commit memory diff,
+  then requires explicit local outcome/redaction review and a separate submit
+  action. Submission means `enterprise review pending`, never `shared`; publishing
+  remains a distinct DataHub governance action and never exposes the private source
+  Session or private Memory URI.
 - Desktop provisions `tmwd_browser` and `js-reverse` as managed browser67 MCP servers
   in the Pi Agent Profile with the private packaged Node executable. `tmwd_browser`
   is admitted with `directTools=true`, so its effective browser Tools enter Pi's
@@ -245,7 +254,7 @@ the only Runtime and behavior specification source.
   A later
   Desktop-managed update may replace only members whose lock source is already
   `larksuite/cli`; any unowned or unverifiable member blocks overwrite. This makes
-  the official Skills reusable by Pi-67 and other compatible Agents that read the
+  the official Skills reusable by Pi TUI, Desktop and other compatible Agents that read the
   standard shared directory. The packaged toolchain and application resources are
   never installation targets. CLI/launcher activation and official Skill activation
   each keep their own atomic rollback boundary; a Workspace reload failure restores
@@ -271,16 +280,11 @@ the only Runtime and behavior specification source.
   managed Pack identity. An unchanged identity therefore retains its last checked
   result and timestamp across Desktop restart or upgrade; local or source drift
   invalidates only that receipt and returns the Pack to `not-checked`.
-  AI Berkshire uses the Pi-67 Skill Pack registry instead: Desktop resolves one
-  exact Pi-67 `main` commit, validates the bounded registry/lock and every declared
-  Skill hash, installs only those Skills as a separate Pi Package Overlay, activates
-  it atomically, and rolls back if any Workspace resource reload fails. The immutable
-  bundled baseline remains available through `恢复内置版本`. A legacy
-  `bundled-release-only` record with no installable upstream may prove only that an
-  older non-installable registry version exists; it can never stage an Overlay.
-  After an explicit check, Settings shows the effective version, the compatible or
-  historical registry version, and a distinct current/update/non-installable/error
-  result; the `全局可用` scope label never substitutes for update-check evidence.
+  AI Berkshire has no independent runtime channel. Its immutable, hash-verified
+  baseline updates only with a Desktop capability release. A previously installed
+  and still-valid managed Overlay remains readable and explicitly restorable during
+  migration, but Desktop never checks or downloads a new Overlay from a standalone
+  registry.
   Loose global Skills remain user-maintained, project Skills remain project-owned,
   and Package Skills update with their Package. Bundled Skills always retain an
   immutable Desktop baseline; a suite may additionally use a verified managed
@@ -293,13 +297,13 @@ the only Runtime and behavior specification source.
   lifecycle differs from a user-installed global Skill.
 - Bundled Skill suite versions come from the content owner rather than the Package
   that happens to carry them. AI Berkshire reads its version plus source commit
-  provenance from the Pi-67 Skill Pack registry/lock and records
+  provenance from the Desktop-owned Skill Pack lock and records
   `https://github.com/xbtlin/ai-berkshire` as its upstream. Desktop pins the exact
   upstream commit plus the expected Pack version, manifest hash, and bundle hash;
-  its build uses the adapter from the locked Pi-67 Core source and fails closed if
+  its build uses the Desktop-owned adapter and fails closed if
   regenerating the Pack does not reproduce those values. This lets a Desktop release
-  refresh the bundled AI Berkshire baseline without relabeling Pi-67 Core or waiting
-  for a new Core release. Commerce and browser67 use their locked capability versions.
+  refresh the bundled AI Berkshire baseline without introducing a second runtime
+  updater. Commerce and browser67 use their locked capability versions.
   Multi-source design suites have no invented aggregate version, and Lark's bundled
   copy remains explicitly unversioned until its build provenance supplies a
   verifiable suite version.
@@ -529,16 +533,17 @@ the only Runtime and behavior specification source.
   symlink-escaped roots use the installed-capability grant; ASK exposes that
   canonical path for one-shot approval. Opaque pagination cursors fail closed
   outside `YOLO` because their original root cannot be proven.
-- While the verified managed `pi67-core` Package is active, the Task-local Pi
-  settings view force-excludes the first-party legacy auto-discovered
-  `pi-rules-loader` copy under `~/.pi/agent/extensions`. The legacy file and user
-  settings are not deleted or rewritten; the managed Package becomes the single
-  runtime source. `pi-vision-bridge` and `xtalpi-pi-tools` are no longer managed,
-  bundled, or force-excluded by Desktop. If managed `pi67-core` is absent,
-  Desktop applies no exclusion. This prevents duplicate rule notifications and
-  duplicate-source ambiguity without taking ownership of unrelated user
-  Extensions. Individual Tool capabilities still follow their own Safety
-  Profile; deduplication does not grant authority by itself.
+- Desktop transactionally publishes the verified `pi-workspace-resources`
+  Package under the shared Pi Agent Profile using `staging / active / previous /
+  receipt` semantics. Desktop loads the Package's rules loader and force-excludes
+  only the exact top-level compatibility projection; Pi TUI references the same
+  active Package with its Extension surface disabled and loads that exact-hash
+  top-level projection instead. This gives both entrypoints the same resource
+  bytes without two live rule owners. The JSONC settings projection preserves
+  user Packages and comments, unknown or divergent top-level files fail closed,
+  and an absent verified Package produces no exclusion. `pi-vision-bridge` and
+  `xtalpi-pi-tools` remain unmanaged and unbundled. Deduplication never grants
+  Tool authority by itself.
 - Verified `pi-mcp-adapter@2.10.0` and `2.11.0` metadata operations remain a
   read-only capability: status, cached server Tool lists, bounded
   search/describe, and current-Session UI-message inspection run in `ASK` and
@@ -1370,14 +1375,10 @@ the only Runtime and behavior specification source.
   version and official-Skill synchronization contract. Desktop does not infer an
   upstream from a directory name, pull arbitrary Skill repositories, or run an
   updater for loose or project-owned Skills. An upstream repository alone does not
-  enable runtime updates. AI Berkshire is the first Pi-67 registry-managed Overlay:
-  it accepts only a compatible version bound to an exact Pi-67 commit and verified
-  hashed bundle, never downgrades the effective version, and rolls back atomically.
-  Commerce remains Desktop-release managed until it receives the same explicit
-  runtime channel contract.
-  Build-time AI Berkshire refreshes are a separate immutable release input: they pin
-  one upstream commit and reproduce the locked Pi-67 Pack hashes without following a
-  branch during runtime.
+  enable runtime updates. AI Berkshire and Commerce update only through a Desktop
+  capability release. Build-time AI Berkshire refreshes are immutable release inputs:
+  they pin one upstream commit and reproduce the Desktop-owned Pack hashes without
+  following a branch during runtime.
 - The small-team Unsigned Preview update channel accepts only one complete,
   canonical SemVer artifact set whose Windows x64 NSIS and macOS arm64 DMG/ZIP
   names, sizes, hashes, targets, and fixed-origin URLs match the application-owned

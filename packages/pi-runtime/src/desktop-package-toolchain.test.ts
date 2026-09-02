@@ -23,7 +23,7 @@ const environment = {
   PI67_GIT_EXEC_PATH: "/app/toolchain/git/libexec/git-core",
   PI67_MANAGED_CAPABILITIES_ROOT: "/app/agent/desktop-capabilities",
   PI67_CAPABILITY_PACKAGE_PATHS: JSON.stringify([
-    "/app/agent/desktop-capabilities/packages/pi67-core",
+    "/app/agent/desktop-capabilities/packages/pi-workspace-resources",
     "/app/agent/desktop-capabilities/packages/design-craft"
   ])
 };
@@ -48,7 +48,7 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
       ],
       packages: [
         "npm:external",
-        "/app/agent/desktop-capabilities/packages/pi67-core",
+        "/app/agent/desktop-capabilities/packages/pi-workspace-resources",
         "/app/agent/desktop-capabilities/packages/design-craft"
       ]
     });
@@ -93,7 +93,7 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
 
     expect(sessionView.getGlobalSettings().packages).toEqual([
       "npm:user-package",
-      "/app/agent/desktop-capabilities/packages/pi67-core",
+      "/app/agent/desktop-capabilities/packages/pi-workspace-resources",
       "/app/agent/desktop-capabilities/packages/design-craft"
     ]);
     expect(sessionView.getGlobalSettings().extensions).toEqual([
@@ -109,7 +109,7 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
 
     sessionView.setPackages([
       "npm:user-package",
-      "/app/agent/desktop-capabilities/packages/pi67-core",
+      "/app/agent/desktop-capabilities/packages/pi-workspace-resources",
       "/app/agent/desktop-capabilities/skill-packs/stale-overlay/package",
       { source: "/external/user-package", autoload: false }
     ]);
@@ -142,7 +142,7 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
 
     expect(sessionView.getGlobalSettings().packages).toEqual([
       "npm:observed",
-      "/app/agent/desktop-capabilities/packages/pi67-core",
+      "/app/agent/desktop-capabilities/packages/pi-workspace-resources",
       "/app/agent/desktop-capabilities/packages/design-craft"
     ]);
     expect(sessionView.getProjectSettings().packages).toEqual(["npm:project-observed"]);
@@ -161,19 +161,17 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
     const sessionView = createDesktopPackageSettingsView(settingsManager, environment);
 
     expect(sessionView.getGlobalSettings().packages).toEqual([
-      "/app/agent/desktop-capabilities/packages/pi67-core",
+      "/app/agent/desktop-capabilities/packages/pi-workspace-resources",
       "/app/agent/desktop-capabilities/packages/design-craft"
     ]);
     expect(settingsManager.getGlobalSettings().packages).toEqual(configured);
   });
 
-  it("uses verified managed adapter and memory Packages without rewriting user npm sources", () => {
+  it("uses the verified managed MCP adapter without rewriting user npm sources", () => {
     const managedRoot = "/app/agent/desktop-capabilities/managed-packages/active";
     const adapter = `${managedRoot}/packages/pi-mcp-adapter`;
-    const memory = `${managedRoot}/packages/pi-observational-memory`;
     const configured = [
       "npm:pi-mcp-adapter@2.11.0",
-      "npm:pi-observational-memory@3.0.3",
       "npm:user-package"
     ];
     const settingsManager = SettingsManager.inMemory({ packages: structuredClone(configured) });
@@ -181,23 +179,21 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
       ...environment,
       PI67_MANAGED_NPM_ROOT: managedRoot,
       PI67_CAPABILITY_PACKAGE_PATHS: JSON.stringify([
-        "/app/agent/desktop-capabilities/packages/pi67-core",
-        adapter,
-        memory
+        "/app/agent/desktop-capabilities/packages/pi-workspace-resources",
+        adapter
       ])
     });
 
     expect(sessionView.getGlobalSettings().packages).toEqual([
       "npm:user-package",
-      "/app/agent/desktop-capabilities/packages/pi67-core",
-      adapter,
-      memory
+      "/app/agent/desktop-capabilities/packages/pi-workspace-resources",
+      adapter
     ]);
     expect(settingsManager.getGlobalSettings().packages).toEqual(configured);
   });
 
-  it("keeps legacy first-party extensions when the managed Pi-67 Core Package is absent", () => {
-    const settingsManager = SettingsManager.inMemory({ extensions: ["extensions/pi-hy-memory/index.ts"] });
+  it("keeps user extensions when the managed Workspace Resources Package is absent", () => {
+    const settingsManager = SettingsManager.inMemory({ extensions: ["extensions/user-tool/index.ts"] });
     const sessionView = createDesktopPackageSettingsView(settingsManager, {
       ...environment,
       PI67_CAPABILITY_PACKAGE_PATHS: JSON.stringify([
@@ -206,17 +202,17 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
     });
 
     expect(sessionView.getGlobalSettings().extensions).toEqual([
-      "extensions/pi-hy-memory/index.ts"
+      "extensions/user-tool/index.ts"
     ]);
   });
 
-  it("loads the managed Pi-67 Core extension once instead of the identical legacy copy", async () => {
+  it("loads the managed Workspace Resources extension once instead of the identical legacy copy", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-managed-extension-"));
     temporaryDirectories.push(root);
     const cwd = join(root, "workspace");
     const agentDir = join(root, "agent");
     const managedRoot = join(agentDir, "desktop-capabilities");
-    const managedPackage = join(managedRoot, "packages", "pi67-core");
+    const managedPackage = join(managedRoot, "packages", "pi-workspace-resources");
     const legacyExtension = join(agentDir, "extensions", "pi-rules-loader");
     const managedExtension = join(managedPackage, "extensions", "pi-rules-loader");
     await Promise.all([
@@ -237,7 +233,7 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
       writeFile(join(legacyExtension, "index.ts"), extensionSource),
       writeFile(join(managedExtension, "index.ts"), extensionSource),
       writeFile(join(managedPackage, "package.json"), JSON.stringify({
-        name: "pi67-core",
+        name: "pi-workspace-resources",
         version: "0.15.8",
         pi: { extensions: ["./extensions/pi-rules-loader/index.ts"] }
       }))
@@ -252,6 +248,28 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
     expect(services.resourceLoader.getExtensions().extensions.map((extension) => extension.resolvedPath))
       .toEqual([join(managedExtension, "index.ts")]);
     expect(services.resourceLoader.getExtensions().errors).toEqual([]);
+  });
+
+  it("loads one Desktop OpenViking owner while preserving the identical Pi TUI projection on disk", () => {
+    const managedRoot = "/app/agent/desktop-capabilities";
+    const workspaceResources = `${managedRoot}/packages/pi-workspace-resources`;
+    const openViking = `${managedRoot}/packages/openviking-pi-extension`;
+    const settingsManager = SettingsManager.inMemory();
+    const sessionView = createDesktopPackageSettingsView(settingsManager, {
+      ...environment,
+      PI67_MANAGED_CAPABILITIES_ROOT: managedRoot,
+      PI67_CAPABILITY_PACKAGE_PATHS: JSON.stringify([workspaceResources, openViking]),
+      PI67_OPENVIKING_SHARED_PROJECTION: "managed"
+    });
+
+    expect(sessionView.getGlobalSettings()).toMatchObject({
+      packages: [workspaceResources, openViking],
+      extensions: [
+        "-extensions/pi-rules-loader/index.ts",
+        "-extensions/pi67-openviking/index.ts"
+      ]
+    });
+    expect(settingsManager.getGlobalSettings().extensions).toBeUndefined();
   });
 
   it("fails closed for a Desktop Host without the bundled toolchain", () => {

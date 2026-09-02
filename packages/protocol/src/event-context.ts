@@ -49,7 +49,26 @@ export const EVENT_CONTEXT_REQUIREMENTS = {
   "extension.catalog.changed": { session: true, operation: false },
   "resource.changed": { session: true, operation: false },
   "diagnostics.progress": { session: false, operation: false },
-  "doctor.completed": { session: false, operation: false }
+  "doctor.completed": { session: false, operation: false },
+  "context.healthChanged": { session: false, operation: false, requiredScope: "app" },
+  "context.ownerLocked": { session: false, operation: false, requiredScope: "workspace" },
+  "context.configChanged": { session: false, operation: false, requiredScope: "app" },
+  "context.recallStarted": { session: false, operation: false, requiredScope: "workspace" },
+  "context.recallCompleted": { session: false, operation: false, requiredScope: "workspace" },
+  "context.captureQueued": { session: false, operation: false, requiredScope: "workspace" },
+  "context.captureFailed": { session: false, operation: false, requiredScope: "workspace" },
+  "context.commitCompleted": { session: false, operation: false, requiredScope: "workspace" },
+  "context.commitFailed": { session: false, operation: false, requiredScope: "workspace" },
+  "memory.diffAvailable": { session: false, operation: false, requiredScope: "workspace" },
+  "memory.forgetCompleted": { session: false, operation: false, requiredScope: "workspace" },
+  "experience.candidateCreated": { session: false, operation: false, requiredScope: "workspace" },
+  "experience.candidateAssemblyFailed": { session: false, operation: false, requiredScope: "workspace" },
+  "experience.candidateValidated": { session: false, operation: false, requiredScope: "workspace" },
+  "experience.candidatePromoted": { session: false, operation: false, requiredScope: "workspace" },
+  "experience.candidatePromotionFailed": { session: false, operation: false, requiredScope: "workspace" },
+  "experience.candidateRejected": { session: false, operation: false, requiredScope: "workspace" },
+  "enterprise.authChanged": { session: false, operation: false, requiredScope: "app" },
+  "enterprise.workspaceBindingChanged": { session: false, operation: false, requiredScope: "workspace" }
 } as const satisfies Record<AgentEventType, EventContextRequirement>;
 
 export interface EventContextEnvelope<Type extends AgentEventType = AgentEventType> {

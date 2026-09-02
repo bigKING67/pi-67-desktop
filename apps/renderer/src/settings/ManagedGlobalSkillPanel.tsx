@@ -322,7 +322,7 @@ export function SkillPackMutationDialog({ action, pack, busy, error, onCancel, o
           <p>{syncingLarkSkills
             ? <>当前 Lark CLI 已完成更新和验证。Desktop 只会重试把官方办公 Skills 同步到 <code>~/.agents/skills</code>，不会重新下载或回退 CLI，也不会覆盖非受管同名 Skill。</>
             : action === "install"
-            ? <>Desktop 将验证并启用官方 @larksuite/cli，把办公 Skills 安装到 <code>~/.agents/skills</code>。这是当前用户全局安装，Pi-67 与其他兼容 Agent 都可复用；已有非受管同名 Skill 不会被覆盖。</>
+            ? <>Desktop 将验证并启用官方 @larksuite/cli，把办公 Skills 安装到 <code>~/.agents/skills</code>。这是当前用户全局安装，Pi TUI、Desktop 与其他兼容 Agent 都可复用；已有非受管同名 Skill 不会被覆盖。</>
             : action === "update"
               ? pack.manager === "lark-cli"
                 ? "Desktop 将通过“下载源与网络”中可用的 npm 源下载并验证上方目标版本，拒绝降级后再原子更新当前用户共享副本与受管官方 Skills。重装 Desktop 以及现有 Scoop、npm 或其他外部安装都不会修改这份用户级副本。完成后会重新加载所有 Workspace 中的 Pi 资源。"
@@ -398,7 +398,7 @@ function skillPackMeta(pack: SkillPackEntry): string {
     pack.manager === "lark-cli"
       ? "由 Lark CLI 管理"
       : pack.effectiveSource === "managed"
-        ? "Pi-67 registry Overlay"
+        ? "旧版受管 Overlay"
         : "Desktop 内置基线"
   ].filter(Boolean).join(" · ");
 }

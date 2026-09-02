@@ -35,6 +35,15 @@ export async function createCapabilityFreshnessReport({
 }) {
   assertCapabilityLock(lock);
   const sources = await Promise.all(lock.sources.map(async (source) => {
+    if (source.internalPath !== undefined) {
+      return {
+        id: source.id,
+        internalPath: source.internalPath,
+        lockedVersion: source.version,
+        lockedTreeSha256: source.treeSha256,
+        status: "current"
+      };
+    }
     const base = {
       id: source.id,
       repository: source.repository,
@@ -234,20 +243,32 @@ function assertCapabilityLock(lock) {
   ) throw new Error("Capability source lock is invalid");
   const ids = new Set();
   for (const source of lock.sources) {
-    if (
-      !isRecord(source)
-      || typeof source.id !== "string"
-      || !/^[a-z0-9][a-z0-9-]{0,79}$/u.test(source.id)
-      || ids.has(source.id)
-      || typeof source.repository !== "string"
-      || source.repository.length === 0
-      || source.repository.length > 4_096
-      || !gitObjectPattern.test(source.commit)
-      || (source.ref !== undefined && !isTrackedBranchRef(source.ref))
-    ) throw new Error("Capability source lock entry is invalid");
-    parseStableVersion(source.version);
-    const repository = new URL(source.repository);
-    if (repository.protocol !== "https:") throw new Error("Capability source repository must use HTTPS");
+    if (!isRecord(source) || typeof source.id !== "string" || !/^[a-z0-9][a-z0-9-]{0,79}$/u.test(source.id) || ids.has(source.id)) {
+      throw new Error("Capability source lock entry is invalid");
+    }
+    if (source.internalPath !== undefined) {
+      if (
+        !/^packages\/[a-z0-9][a-z0-9-]{0,79}$/u.test(source.internalPath)
+        || !/^[a-f0-9]{64}$/u.test(source.treeSha256 ?? "")
+        || typeof source.version !== "string"
+        || source.version.length === 0
+        || source.version.length > 100
+        || source.repository !== undefined
+        || source.commit !== undefined
+        || source.ref !== undefined
+      ) throw new Error("Internal capability source lock entry is invalid");
+    } else {
+      if (
+        typeof source.repository !== "string"
+        || source.repository.length === 0
+        || source.repository.length > 4_096
+        || !gitObjectPattern.test(source.commit)
+        || (source.ref !== undefined && !isTrackedBranchRef(source.ref))
+      ) throw new Error("Capability source lock entry is invalid");
+      parseStableVersion(source.version);
+      const repository = new URL(source.repository);
+      if (repository.protocol !== "https:") throw new Error("Capability source repository must use HTTPS");
+    }
     ids.add(source.id);
   }
   const packNames = new Set();
@@ -288,7 +309,7 @@ function renderSummary(report) {
     lines.push([
       escapeTable(source.id),
       escapeTable(source.lockedVersion),
-      escapeTable(source.ref ?? source.latestVersion ?? source.error ?? "unknown"),
+      escapeTable(source.internalPath ?? source.ref ?? source.latestVersion ?? source.error ?? "unknown"),
       source.status,
       source.latestCommit?.slice(0, 12) ?? "unknown"
     ].join(" | ").replace(/^/u, "| ").replace(/$/u, " |"));

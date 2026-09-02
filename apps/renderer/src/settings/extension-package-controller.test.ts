@@ -142,23 +142,23 @@ describe("Extension package controller", () => {
   it("reads and persists the prompt-once onboarding decision through Agent Host", async () => {
     const request = vi.spyOn(agentConnectionController, "request")
       .mockResolvedValueOnce({
-        source: "npm:pi-observational-memory",
+        source: "npm:example-prompt-once",
         scope: "global",
         state: "unseen"
       } as never)
       .mockResolvedValueOnce({
-        source: "npm:pi-observational-memory",
+        source: "npm:example-prompt-once",
         scope: "global",
         state: "declined"
       } as never);
 
     await expect(getExtensionPackageOnboarding(
-      "npm:pi-observational-memory",
+      "npm:example-prompt-once",
       "global",
       "workspace-a"
     )).resolves.toBe("unseen");
     await expect(declineExtensionPackageOnboarding(
-      "npm:pi-observational-memory",
+      "npm:example-prompt-once",
       "global",
       "workspace-a"
     )).resolves.toBe("declined");

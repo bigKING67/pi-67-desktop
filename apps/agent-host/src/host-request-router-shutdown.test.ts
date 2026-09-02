@@ -103,6 +103,7 @@ function createRouter(
     {} as never,
     {} as never,
     {} as never,
+    {} as never,
     workspaceCommands,
     {} as never,
     {

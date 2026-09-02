@@ -3,17 +3,17 @@
 Pi-67 Desktop bundles first-party capabilities from exact Git commits declared
 in `capability-sources.lock.json`. Runtime startup and ordinary builds never
 follow upstream branches or download a newer capability version implicitly.
-The Pi-67 Core entry also owns an explicit `includedExtensions` allowlist with
+The Pi Workspace Resources entry also owns an explicit `includedExtensions` allowlist with
 bounded user-facing names and descriptions. A new or retired upstream Extension
 cannot silently enter the Desktop baseline, and its presentation metadata stays
 content-bound to the prepared capability catalog.
 
 The same lock also records Desktop-release-managed Skill Pack inputs. AI Berkshire
-pins one exact upstream commit plus its expected Pi-67 Pack version, source-manifest
+pins one exact upstream commit plus its expected Desktop Pack version, source-manifest
 hash, bundle hash, and ordered member hashes. `prepare:capabilities` seeds the full
 Desktop baseline from that lock and regenerates the Pack with the adapter
-from the locked Pi-67 Core source and overlays only the verified Pack members onto
-the Core capability. It never advances the tracked branch implicitly and fails if
+from the Desktop-owned adapter and overlays only the verified Pack members onto
+Pi Workspace Resources. It never advances the tracked branch implicitly and fails if
 the generated provenance differs from the lock.
 
 ## Tracked source policy
@@ -21,7 +21,7 @@ the generated provenance differs from the lock.
 Each source remains pinned to an immutable `commit`. A first-party source may
 also declare a canonical branch `ref` when Desktop intentionally carries
 reviewed post-tag fixes from that branch. The freshness audit then requires the
-remote ref to resolve to the exact locked commit. `pi67-core` and `browser67`
+remote ref to resolve to the exact locked commit. `pi-workspace-resources` and `browser67`
 track `refs/heads/main`; this keeps candidate preparation current without ever
 making runtime startup, an ordinary build, or an installed Desktop follow a
 floating branch.
@@ -91,32 +91,24 @@ packaging so a local sibling repository or cache cannot hide an unpublished SHA.
 
 1. Check out the exact upstream commit from the declared tracked ref without running
    upstream code.
-2. Use the sync adapter from the locked Pi-67 Core source to generate the Pack from
-   the prior registry/lock baseline.
+2. Use the Desktop-owned sync adapter to generate the Pack from the prior lock
+   baseline.
 3. Review Skill membership and tool changes, then update the Pack `commit`, `version`,
    `manifestSha256`, `bundleSha256`, and ordered member `skills` hashes in
    `capability-sources.lock.json`. The complete Desktop lock, not a local generated
    cache, is the prior baseline for the next update.
-4. Increment `catalogVersion`; never change the Pi-67 Core version merely because a
+4. Increment `catalogVersion`; never change the Pi Workspace Resources version merely because a
    carried Skill Pack changed.
 5. Run `prepare:capabilities`, freshness, targeted tests, the full quality gate, and
    packaged Electron smoke. Runtime startup must never clone or pull the upstream.
 
-## Runtime-managed AI Berkshire Overlay
+## Desktop-release-managed AI Berkshire baseline
 
-The immutable Desktop baseline remains inside the prepared `pi67-core` Package.
-The user-initiated runtime channel does not fetch AI Berkshire directly and does
-not run repository scripts. It resolves `refs/heads/main` from the official Pi-67
-repository, binds the check to that exact commit, reads the bounded registry and
-lock from the same commit, and accepts only a non-downgrading release whose member
-and bundle hashes validate.
-
-Installation shallow-fetches that exact Pi-67 commit into managed staging, copies
-only `shared-skills/<declared-member>`, verifies every copied Skill again, and builds
-a separate Pi Package under the agent directory. The Overlay Package precedes the
-bundled `pi67-core` Package so Pi's first-winner Skill resolution selects it without
-modifying packaged resources or user/project Skill directories. Activation and
-restore use atomic directory swaps; all Workspace resources reload before the old
-state is committed, and reload failure restores the previous Overlay or bundled
-baseline. Ordinary startup only validates and reuses an already activated Overlay;
-it never performs a network check.
+The immutable Desktop baseline remains inside the prepared
+`pi-workspace-resources` Package. Runtime never fetches AI Berkshire or a standalone
+manager repository. Updating the suite is a release-time operation: pin one exact
+upstream commit, regenerate through the Desktop-owned adapter, verify every member
+and aggregate hash, increment the capability catalog, and ship the resulting bytes
+through the normal Desktop capability transaction. A valid Overlay left by an older
+release remains migration-compatible and may be restored to the bundled baseline,
+but no new runtime Overlay can be installed.

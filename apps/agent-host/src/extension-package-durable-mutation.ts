@@ -148,7 +148,6 @@ async function mutatePackage(options: DurableMutationOptions): Promise<Extension
   const { services, management, command, idempotencyKey } = options;
   const { source, scope } = command.payload;
   const tracksOnboarding = command.type === "extension.package.install"
-    && source === "npm:pi-observational-memory"
     && scope === "global";
   if (tracksOnboarding) await services.packageOnboarding.markInstalling(source, scope);
   let mutationCompleted = false;

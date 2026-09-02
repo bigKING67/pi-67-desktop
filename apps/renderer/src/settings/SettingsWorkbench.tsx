@@ -48,6 +48,7 @@ import { KeyboardShortcutSettings } from "./KeyboardShortcutSettings.js";
 import { LarkOfficeSettings } from "./LarkOfficeSettings.js";
 import { UsageSettings } from "./UsageSettings.js";
 import { VisionAssistantSettings } from "./VisionAssistantSettings.js";
+import { ContextMemorySettings } from "./ContextMemorySettings.js";
 import {
   SettingsNotice,
   SettingsPageHeader,
@@ -254,6 +255,7 @@ export function SettingsWorkbench() {
 function SettingsSectionContent({ section }: { section: SettingsSection }) {
   if (section === "account") return <AccountSettings />;
   if (section === "general") return <GeneralSettings />;
+  if (section === "context-memory") return <ContextMemorySettings />;
   if (section === "providers") return <ProviderSettings />;
   if (section === "packages" || section === "extensions") return <ExtensionSettings />;
   if (section === "skills") return <SkillSettings />;

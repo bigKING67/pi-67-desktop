@@ -38,7 +38,7 @@ export async function installMockDesktopCapabilityBridge(
           dependencyState: "prepared",
           extensionState: "reload-required",
           doctorState: "degraded",
-          detail: "浏览器中运行的扩展不是当前受管版本。请在扩展管理页核对加载目录；若仍指向旧目录，请移除旧条目后从 Pi-67 提供的目录重新“加载已解压的扩展”。"
+          detail: "浏览器中运行的扩展不是当前受管版本。请在扩展管理页核对加载目录；若仍指向旧目录，请移除旧条目后从 Desktop 管理目录重新“加载已解压的扩展”。"
         }
       : integration);
   }
@@ -147,7 +147,7 @@ export async function installMockDesktopCapabilityBridge(
           detail: bridgeFixture.capabilitySnapshot.integrations.some((integration) => (
             integration.id === "browser67" && integration.extensionState === "reload-required"
           ))
-            ? "受管扩展文件已是当前版本；浏览器仍需核对并同步 Pi-67 提供的加载来源。"
+            ? "受管扩展文件已是当前版本；浏览器仍需核对并同步 Desktop 管理的加载来源。"
             : "扩展文件已准备；请在 Chrome 或 Edge 中加载后验证连接。",
           preparedAt: 1_784_800_000_000,
           extensionPreparedAt: 1_784_800_000_000,

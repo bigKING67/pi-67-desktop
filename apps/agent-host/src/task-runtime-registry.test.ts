@@ -41,6 +41,36 @@ describe("TaskRuntimeRegistry", () => {
     expect(runtimes[1]!.disposeSpy).toHaveBeenCalledOnce();
   });
 
+  it("binds one Workspace-scoped enterprise Experience reader into every Task Runtime", async () => {
+    const loadedOptions: PiSdkRuntimeOptions[] = [];
+    const access = {
+      search: vi.fn(async () => ({ items: [], total: 0 })),
+      read: vi.fn(async () => {
+        throw new Error("not used");
+      })
+    };
+    const accessForWorkspace = vi.fn(() => access);
+    const registry = new TaskRuntimeRegistry(
+      async (options) => {
+        loadedOptions.push(options ?? {});
+        return runtime();
+      },
+      createRuntimeCredentialOverrideStore(),
+      { sharedExperienceAccessForWorkspace: accessForWorkspace }
+    );
+
+    await registry.load(context("task-a"));
+    await registry.load(context("task-b"));
+
+    expect(accessForWorkspace).toHaveBeenNthCalledWith(1, "workspace-1");
+    expect(accessForWorkspace).toHaveBeenNthCalledWith(2, "workspace-1");
+    expect(loadedOptions.map((options) => options.sharedExperienceAccess)).toEqual([
+      access,
+      access
+    ]);
+    await registry.disposeAll();
+  });
+
   it("rejects stale Task generations and a Runtime reused across Tasks", async () => {
     const shared = runtime();
     const registry = new TaskRuntimeRegistry(

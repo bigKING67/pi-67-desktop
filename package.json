@@ -56,6 +56,8 @@
     "package:win": "corepack pnpm run build && corepack pnpm run prepare:toolchain && corepack pnpm run prepare:capabilities && corepack pnpm run prepare:windows-job-controller && electron-builder --win nsis --x64",
     "package:mac": "corepack pnpm run build && corepack pnpm run prepare:toolchain && corepack pnpm run prepare:capabilities && electron-builder --mac dmg zip --arm64",
     "package:smoke": "node eng/packaging/smoke-packaged-electron.mjs",
+    "package:smoke:compaction-fallback": "node eng/packaging/verify-packaged-compaction-fallback.mjs",
+    "package:smoke:context-isolation": "node eng/packaging/verify-packaged-context-isolation.mjs",
     "package:smoke:browser67-live": "node eng/packaging/smoke-packaged-browser67-live.mjs",
     "package:smoke:windows-ui": "node eng/packaging/verify-windows-packaged-input-layout.mjs",
     "package:smoke:windows-installer": "node eng/packaging/verify-windows-installer-lifecycle.mjs",

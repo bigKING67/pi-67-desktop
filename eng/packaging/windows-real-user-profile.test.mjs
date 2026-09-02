@@ -83,7 +83,7 @@ describe("Windows installed real-user Pi profile", () => {
       await mkdir(join(agentDir, "desktop-capabilities"), { recursive: true });
       await writeFile(join(agentDir, "desktop-capabilities", "state.json"), JSON.stringify({
         schema: "pi67.desktop-capability-state.v1",
-        packages: [{ id: "pi67-core" }],
+        packages: [{ id: "pi-workspace-resources" }],
         profileOwnership: "desktop",
         rules: "installed"
       }));
@@ -224,7 +224,7 @@ async function writeCleanProvisioningState(agentDir) {
   await Promise.all([
     writeFile(join(agentDir, "desktop-capabilities", "state.json"), JSON.stringify({
       schema: "pi67.desktop-capability-state.v1",
-      packages: [{ id: "pi67-core" }],
+      packages: [{ id: "pi-workspace-resources" }],
       profileOwnership: "desktop",
       rules: "installed"
     })),

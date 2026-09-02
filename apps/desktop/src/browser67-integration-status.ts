@@ -77,5 +77,5 @@ export async function readBrowser67IntegrationStatus(options: {
 
 export function browser67PackageIdentity(catalog: BundledCapabilityCatalog): string | undefined {
   const entry = catalog.entries.find((candidate) => candidate.id === "browser67");
-  return entry === undefined ? undefined : `${entry.version}:${entry.commit}`;
+  return entry?.commit === undefined ? undefined : `${entry.version}:${entry.commit}`;
 }

@@ -8,3 +8,5 @@ export function shutdownDeadline(value: number): number {
 export function boundedMetadataCount(value: number): number {
   return Math.max(0, Math.min(10_000, Number.isSafeInteger(value) ? value : 0));
 }
+export const DEFAULT_HOST_SHUTDOWN_DEADLINE_MS = 4_000;
+export const MAX_RESYNC_INTERACTIVE_REQUESTS = 512;

@@ -87,6 +87,25 @@ export function handleAgentEvent<TState extends AppEventState>(
       return true;
     case "task.toolMode.changed":
     case "subagent.changed":
+    case "context.healthChanged":
+    case "context.ownerLocked":
+    case "context.configChanged":
+    case "context.recallStarted":
+    case "context.recallCompleted":
+    case "context.captureQueued":
+    case "context.captureFailed":
+    case "context.commitCompleted":
+    case "context.commitFailed":
+    case "memory.diffAvailable":
+    case "memory.forgetCompleted":
+    case "experience.candidateCreated":
+    case "experience.candidateAssemblyFailed":
+    case "experience.candidateValidated":
+    case "experience.candidatePromoted":
+    case "experience.candidatePromotionFailed":
+    case "experience.candidateRejected":
+    case "enterprise.authChanged":
+    case "enterprise.workspaceBindingChanged":
       return true;
     default:
       assertNever(event);

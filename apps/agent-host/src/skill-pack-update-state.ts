@@ -1,6 +1,4 @@
 import type { SkillPackEntry } from "@pi67/domain";
-import type { Pi67SkillPackRelease } from "./pi67-skill-pack-channel.js";
-import { compareSkillPackVersions } from "./pi67-skill-pack-channel.js";
 import { compareLarkCliVersions, isLarkCliVersion } from "./lark-cli-version.js";
 import { MAX_SKILL_PACK_PROCESS_OUTPUT_BYTES } from "./skill-pack-process-runner.js";
 import {
@@ -117,48 +115,5 @@ export function applyLarkUpdateCheck(
         ? `当前 CLI 与官方 Skills 均为 ${installedVersion}。`
         : "CLI 与官方技能均已同步。"
       : "当前没有可用更新。"
-  };
-}
-
-export function applyPi67UpdateCheck(
-  entry: SkillPackEntry,
-  release: Pi67SkillPackRelease
-): SkillPackEntry {
-  const effectiveVersion = entry.installedVersion ?? entry.baselineVersion;
-  if (!effectiveVersion) throw new Error("AI Berkshire baseline version is unavailable.");
-  const comparison = compareSkillPackVersions(release.version, effectiveVersion);
-  const provenance = {
-    latestVersion: release.version,
-    registryCommit: release.registryCommit
-  };
-  if (entry.localState === "modified") {
-    return { ...entry, ...provenance, updateStatus: "modified", canUpdate: false };
-  }
-  if (comparison > 0 && release.independentlyInstallable) {
-    return {
-      ...entry,
-      ...provenance,
-      updateStatus: "update-available",
-      canUpdate: true,
-      detail: `Pi-67 官方 registry 已发布兼容版本 ${release.version}，确认后将安装为独立 Overlay。`
-    };
-  }
-  if (comparison > 0) {
-    return {
-      ...entry,
-      ...provenance,
-      updateStatus: "application-managed",
-      canUpdate: false,
-      detail: `Pi-67 registry 已记录版本 ${release.version}，但尚未开放独立安装；当前继续使用 ${effectiveVersion}。`
-    };
-  }
-  return {
-    ...entry,
-    ...provenance,
-    updateStatus: "current",
-    canUpdate: false,
-    detail: entry.effectiveSource === "managed"
-      ? "当前受管 Overlay 已是 Pi-67 registry 可用的最新版本。"
-      : "当前内置基线不低于 Pi-67 registry 可用版本。"
   };
 }

@@ -154,8 +154,10 @@ async function skillPackReceiptIdentity(
   options: SkillPackReceiptIdentityOptions
 ): Promise<string> {
   const common = {
+    receiptContract: "desktop-skill-pack-v2",
     id: entry.id,
     manager: entry.manager,
+    updateOwner: entry.updateOwner,
     managerStatus: entry.managerStatus,
     localState: entry.manager === "lark-cli" ? undefined : entry.localState,
     installed: entry.installed,

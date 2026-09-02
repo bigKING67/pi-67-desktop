@@ -147,6 +147,51 @@ describe("createDesktopSafetyExtension", () => {
     expect(requestApproval).not.toHaveBeenCalled();
   });
 
+  it("auto-allows only exact bounded first-party shared Experience reads", async () => {
+    const requestApproval = vi.fn<DesktopApprovalRequester>();
+    const handler = safetyHandler(
+      { ...trustedPolicy(), taskToolMode: "auto" },
+      requestApproval,
+      () => [sdkTool("viking_shared_search"), sdkTool("viking_shared_read")]
+    );
+
+    await expect(handler({
+      toolCallId: "shared-search",
+      toolName: "viking_shared_search",
+      input: { query: "Electron Host epoch recovery", limit: 2 }
+    }, { hasUI: true })).resolves.toBeUndefined();
+    await expect(handler({
+      toolCallId: "shared-read",
+      toolName: "viking_shared_read",
+      input: { id: "exp_67" }
+    }, { hasUI: true })).resolves.toBeUndefined();
+    expect(requestApproval).not.toHaveBeenCalled();
+  });
+
+  it("fails closed for malformed or same-name third-party shared Experience tools", async () => {
+    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
+    let tools = [sdkTool("viking_shared_search")];
+    const handler = safetyHandler(
+      { ...trustedPolicy(), taskToolMode: "auto" },
+      requestApproval,
+      () => tools
+    );
+
+    await expect(handler({
+      toolCallId: "shared-search-invalid",
+      toolName: "viking_shared_search",
+      input: { query: "Electron recovery", limit: 67 }
+    }, { hasUI: true })).resolves.toMatchObject({ block: true });
+
+    tools = [packageTool("viking_shared_search", "npm:unrelated-extension@1.0.0")];
+    await expect(handler({
+      toolCallId: "shared-search-spoofed",
+      toolName: "viking_shared_search",
+      input: { query: "Electron recovery", limit: 2 }
+    }, { hasUI: true })).resolves.toMatchObject({ block: true });
+    expect(requestApproval).not.toHaveBeenCalled();
+  });
+
   it("auto-allows only the exact internal Desktop attachment Tool and its bounded input", async () => {
     const requestApproval = vi.fn<DesktopApprovalRequester>();
     const handler = safetyHandler(

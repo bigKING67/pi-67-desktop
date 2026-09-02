@@ -9,6 +9,7 @@ import {
   setDefaultModelDocument,
   setVisionAssistantDocument
 } from "./pi-configuration-documents.js";
+import { setDesktopManagedPackagesDocument } from "./desktop-managed-package-document.js";
 
 describe("Pi configuration documents", () => {
   it("parses Pi JSONC and preserves formatting, comments, and secret-only fields", () => {
@@ -167,5 +168,36 @@ describe("Pi configuration documents", () => {
       .toEqual({ mode: "disabled" });
     expect(parseSettingsDocument(setVisionAssistantDocument(selected, undefined)).visionAssistant)
       .toBeUndefined();
+  });
+
+  it("projects stable Desktop Packages while preserving user Packages and JSONC", () => {
+    const root = "/Users/test/.pi/agent/desktop-capabilities/shared-profile";
+    const source = [
+      "{",
+      "  // user packages stay authoritative",
+      "  \"theme\": \"dark\",",
+      '  "packages": [',
+      "    \"npm:user-package\",",
+      `    "${root}/previous/packages/stale"`,
+      "  ]",
+      "}",
+      ""
+    ].join("\n");
+
+    const projected = setDesktopManagedPackagesDocument(source, root, [
+      { source: `${root}/active/packages/pi-workspace-resources`, extensions: [] },
+      `${root}/active/packages/design-craft`
+    ]);
+
+    expect(projected).toContain("// user packages stay authoritative");
+    expect(parseSettingsDocument(projected).root).toMatchObject({
+      theme: "dark",
+      packages: [
+        "npm:user-package",
+        { source: `${root}/active/packages/pi-workspace-resources`, extensions: [] },
+        `${root}/active/packages/design-craft`
+      ]
+    });
+    expect(projected).not.toContain("previous/packages/stale");
   });
 });

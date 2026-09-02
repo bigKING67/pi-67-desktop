@@ -1,9 +1,13 @@
 import {
   isAgentHostShutdownRequest,
+  isEnterpriseCredentialBootstrapMessage,
+  isEnterpriseCredentialOperationResult,
   type AgentHostReadyMessage,
   type AgentHostRuntimePoisonedMessage,
   type AgentHostShutdownCompleteMessage,
   type AgentHostStartupFailedMessage,
+  type EnterpriseCredentialClearRequest,
+  type EnterpriseCredentialStoreRequest,
   type ProtocolPort
 } from "@pi67/protocol";
 import {
@@ -14,6 +18,7 @@ import { isAttachPortMessage } from "./connection-context.js";
 import { AgentHostServer } from "./host-server.js";
 import { resolveAgentDirectory } from "./host-task-runtime-lifecycle.js";
 import { createPromptAttachmentAccessOwner } from "./prompt-attachment-access.js";
+import { EnterpriseCredentialBrokerClient } from "./context/enterprise-credential-broker-client.js";
 
 interface ParentMessageEvent {
   data: unknown;
@@ -28,11 +33,14 @@ interface UtilityParentPort {
       | AgentHostRuntimePoisonedMessage
       | AgentHostShutdownCompleteMessage
       | AgentHostStartupFailedMessage
+      | EnterpriseCredentialStoreRequest
+      | EnterpriseCredentialClearRequest
   ): void;
 }
 
 const parentPort = (process as NodeJS.Process & { parentPort?: UtilityParentPort }).parentPort;
 if (!parentPort) throw new Error("Pi-67 Agent Host must run as an Electron utility process.");
+const enterpriseCredentialBroker = new EnterpriseCredentialBrokerClient(parentPort);
 
 let poisonedRuntimeExitScheduled = false;
 
@@ -55,7 +63,8 @@ async function startAgentHost(): Promise<void> {
           onRuntimePoisoned: (message) => schedulePoisonedRuntimeExit(message, () => shuttingDown),
           onRuntimeInitializationObservation: (observation) => {
             process.stderr.write(`[agent-host:init] ${JSON.stringify(observation)}\n`);
-          }
+          },
+          enterpriseCredentialBroker
         });
       }
     });
@@ -91,6 +100,14 @@ async function startAgentHost(): Promise<void> {
   };
 
   parentPort!.on("message", (event) => {
+    if (isEnterpriseCredentialBootstrapMessage(event.data)) {
+      enterpriseCredentialBroker.applyBootstrap(event.data);
+      return;
+    }
+    if (isEnterpriseCredentialOperationResult(event.data)) {
+      enterpriseCredentialBroker.handleOperationResult(event.data);
+      return;
+    }
     if (isAgentHostShutdownRequest(event.data)) {
       void shutdown(event.data.deadlineMs, true);
       return;

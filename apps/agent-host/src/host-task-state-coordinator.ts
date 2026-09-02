@@ -288,7 +288,8 @@ export class HostTaskStateCoordinator {
 }
 
 function allowsAppContext(request: RequestEnvelope): boolean {
-  return isAppConfigurationCommand(request.type)
+  return COMMAND_CONTEXT_SCOPE_REQUIREMENTS[request.type] === "app"
+    || isAppConfigurationCommand(request.type)
     || request.type === "runtime.getStatus"
     || request.type === "diagnostics.collect"
     || request.type === "doctor.run"

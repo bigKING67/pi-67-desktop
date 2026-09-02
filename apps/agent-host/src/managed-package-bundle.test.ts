@@ -23,12 +23,10 @@ describe("Desktop managed npm package activation", () => {
     });
     expect(first).toMatchObject({ enabled: true, activated: true });
     expect(first.packagePaths).toEqual([
-      join(first.activeRoot!, "packages", "pi-mcp-adapter"),
-      join(first.activeRoot!, "packages", "pi-observational-memory")
+      join(first.activeRoot!, "packages", "pi-mcp-adapter")
     ]);
     expect(first.extensionPaths).toEqual([
-      join(first.activeRoot!, "packages", "pi-mcp-adapter", "index.ts"),
-      join(first.activeRoot!, "packages", "pi-observational-memory", "src", "index.ts")
+      join(first.activeRoot!, "packages", "pi-mcp-adapter", "index.ts")
     ]);
     expect(JSON.parse(environment.PI67_CAPABILITY_PACKAGE_PATHS ?? "[]")).toEqual([
       fixture.firstPartyPackage,
@@ -60,7 +58,7 @@ describe("Desktop managed npm package activation", () => {
       .toBe("export {};\n");
   });
 
-  it("preserves the Desktop-owned observational-memory opt-out without changing the adapter", async () => {
+  it("drops retired managed-package state keys without changing the active adapter", async () => {
     const fixture = await createFixture();
     const environment: NodeJS.ProcessEnv = {
       PI67_DESKTOP: "1",
@@ -76,7 +74,7 @@ describe("Desktop managed npm package activation", () => {
       schema: "pi67.managed-package-state.v1",
       enabled: {
         "pi-mcp-adapter": true,
-        "pi-observational-memory": false
+        "pi-observational-memory": true
       }
     }), "utf8");
     environment.PI67_CAPABILITY_PACKAGE_PATHS = JSON.stringify([fixture.firstPartyPackage]);
@@ -92,6 +90,15 @@ describe("Desktop managed npm package activation", () => {
     expect(optedOut.extensionPaths).toEqual([
       join(first.activeRoot!, "packages", "pi-mcp-adapter", "index.ts")
     ]);
+    expect(JSON.parse(await readFile(join(
+      fixture.agentDir,
+      "desktop-capabilities",
+      "managed-packages",
+      "state.json"
+    ), "utf8"))).toEqual({
+      schema: "pi67.managed-package-state.v1",
+      enabled: { "pi-mcp-adapter": true }
+    });
   });
 
   it("uses the packaged bundle directly without creating an active copy", async () => {
@@ -126,10 +133,9 @@ async function createFixture() {
   const capabilitiesRoot = join(root, "capabilities");
   const bundled = join(capabilitiesRoot, "managed-packages", "bundled");
   const agentDir = join(root, "agent");
-  const firstPartyPackage = join(agentDir, "desktop-capabilities", "packages", "pi67-core");
+  const firstPartyPackage = join(agentDir, "desktop-capabilities", "packages", "pi-workspace-resources");
   await Promise.all([
     mkdir(join(bundled, "packages", "pi-mcp-adapter"), { recursive: true }),
-    mkdir(join(bundled, "packages", "pi-observational-memory", "src"), { recursive: true }),
     mkdir(join(bundled, "node_modules", "fixture"), { recursive: true }),
     mkdir(firstPartyPackage, { recursive: true })
   ]);
@@ -137,13 +143,7 @@ async function createFixture() {
     writeFile(join(bundled, "package-lock.json"), "{}\n", "utf8"),
     writeFile(join(bundled, "package.json"), "{}\n", "utf8"),
     writeFile(join(bundled, "packages", "pi-mcp-adapter", "package.json"), "{\"name\":\"pi-mcp-adapter\"}\n", "utf8"),
-    writeFile(join(bundled, "packages", "pi-observational-memory", "package.json"), "{\"name\":\"pi-observational-memory\"}\n", "utf8"),
     writeFile(join(bundled, "packages", "pi-mcp-adapter", "index.ts"), "export default () => {};\n", "utf8"),
-    writeFile(
-      join(bundled, "packages", "pi-observational-memory", "src", "index.ts"),
-      "export default () => {};\n",
-      "utf8"
-    ),
     writeFile(join(bundled, "node_modules", "fixture", "index.js"), "export {};\n", "utf8"),
     writeFile(join(bundled, "node_modules", "fixture", "cli"), "#!/usr/bin/env node\n", "utf8")
   ]);
@@ -168,15 +168,6 @@ async function createFixture() {
       packageIntegrity: `sha512-${"A".repeat(86)}==`,
       packagePath: "packages/pi-mcp-adapter",
       extensionPaths: ["index.ts"],
-      defaultEnabled: true
-    }, {
-      id: "pi-observational-memory",
-      packageName: "pi-observational-memory",
-      source: "npm:pi-observational-memory",
-      version: "3.0.3",
-      packageIntegrity: `sha512-${"B".repeat(86)}==`,
-      packagePath: "packages/pi-observational-memory",
-      extensionPaths: ["src/index.ts"],
       defaultEnabled: true
     }]
   }), "utf8");

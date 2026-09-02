@@ -36,10 +36,13 @@ for (const file of files) {
 
 const main = await readFile(join(root, "apps/desktop/src/main.ts"), "utf8");
 const agentHostSupervisor = await readFile(join(root, "apps/desktop/src/agent-host-supervisor.ts"), "utf8");
+const agentHostPortHandoff = await readFile(join(root, "apps/desktop/src/agent-host-port-handoff.ts"), "utf8");
 const mainWindow = await readFile(join(root, "apps/desktop/src/main-window.ts"), "utf8");
 const rendererSecurity = await readFile(join(root, "apps/desktop/src/renderer-security.ts"), "utf8");
 const desktopTransportInvariants = [
-  ["MessageChannelMain", agentHostSupervisor],
+  ["MessageChannelMain", agentHostPortHandoff],
+  ["webContents.postMessage", agentHostPortHandoff],
+  ["input.host.postMessage", agentHostPortHandoff],
   ["utilityProcess.fork", agentHostSupervisor],
   ["contextIsolation: true", mainWindow],
   ["sandbox: true", mainWindow],

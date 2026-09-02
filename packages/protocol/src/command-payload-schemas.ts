@@ -7,6 +7,7 @@ import {
   ContextFileReadPayloadSchema,
   ContextFileSavePayloadSchema
 } from "./context-file-schemas.js";
+import { ContextMemoryCommandPayloadSchemas } from "./context-memory-schemas.js";
 import {
   ExtensionPackageEnabledTargetSchema,
   ExtensionPackageInheritanceTargetSchema,
@@ -292,6 +293,7 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "lark.auth.status": EmptyPayloadSchema,
   "lark.auth.login.begin": EmptyPayloadSchema,
   "lark.app.configuration.save": LarkAppConfigurationInputSchema,
+  ...ContextMemoryCommandPayloadSchemas,
   "extension.ui.respond": strictObject({
     requestId: Type.String({ minLength: 1, maxLength: 512 }),
     sessionId: Type.String({ minLength: 1, maxLength: 512 }),

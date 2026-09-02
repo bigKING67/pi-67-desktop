@@ -1,5 +1,13 @@
 export type DesktopCapabilityOrigin = "first-party" | "third-party" | "external";
-export type DesktopCapabilityResourceType = "extension" | "skill" | "prompt" | "rule" | "integration";
+export type DesktopCapabilityResourceType =
+  | "extension"
+  | "skill"
+  | "prompt"
+  | "rule"
+  | "integration"
+  | "context"
+  | "memory"
+  | "experience";
 
 export interface DesktopCapabilityPackageSummary {
   id: string;
@@ -8,7 +16,9 @@ export interface DesktopCapabilityPackageSummary {
   bundled: boolean;
   defaultEnabled: boolean;
   version: string;
-  commit: string;
+  commit?: string;
+  internalPath?: string;
+  sourceTreeSha256?: string;
   resourceTypes: DesktopCapabilityResourceType[];
   installed: boolean;
 }
@@ -46,7 +56,6 @@ export type DesktopBundledSkillSuiteUpdatePolicy =
 
 export type DesktopBundledSkillSuiteUpdateManager =
   | "lark-cli"
-  | "pi67-skill-pack-registry"
   | "desktop-capability"
   | "source-specific";
 

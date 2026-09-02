@@ -75,7 +75,7 @@ export function InstallExtensionDialog({
   );
 }
 
-export function ObservationalMemoryOnboardingDialog({ entry, failed, busy, onDecline, onInstall }: {
+export function PromptOncePackageOnboardingDialog({ entry, failed, busy, onDecline, onInstall }: {
   entry: DesktopRecommendedPackage;
   failed: boolean;
   busy: boolean;
@@ -85,11 +85,11 @@ export function ObservationalMemoryOnboardingDialog({ entry, failed, busy, onDec
   return (
     <ModalOverlay className="modal-overlay" isDismissable={false} isOpen>
       <Modal className={`modal-surface ${styles.modal}`}>
-        <Dialog aria-label="安装会话观察记忆扩展" className={styles.dialog!}>
+        <Dialog aria-label={`安装可选扩展包 ${entry.id}`} className={styles.dialog!}>
           <span className="dialog-eyebrow">可选扩展包 · 仅确认一次</span>
-          <Heading slot="title">安装 pi-observational-memory？</Heading>
+          <Heading slot="title">安装 {entry.id}？</Heading>
           <p className={styles.dialogIntro}>
-            这是可选的会话观察记忆扩展。Pi-67 不会静默下载；只有确认后才会联网安装到全局配置。
+            这是目录中声明为仅确认一次的可选扩展包。Pi-67 不会静默下载；只有确认后才会联网安装到全局配置。
           </p>
           <dl className={styles.dialogFacts}>
             <div><dt>来源</dt><dd className={styles.codeValue}>{entry.source}</dd></div>

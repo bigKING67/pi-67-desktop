@@ -91,7 +91,7 @@ export async function verifyPackagedReadyDiagnostics(options) {
     || diagnostics.causality.agentHost !== undefined
     || diagnostics.agentHost?.phase !== "running"
     || startup?.status !== "ready"
-    || startup.capabilityProjectionMode !== "packaged-direct"
+    || startup.capabilityProjectionMode !== "shared-profile"
     || !Number.isSafeInteger(startup.totalDurationMs)
     || startup.totalDurationMs < 0
     || startup.totalDurationMs > PACKAGED_STARTUP_BUDGET_MS

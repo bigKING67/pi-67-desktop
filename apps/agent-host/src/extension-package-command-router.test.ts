@@ -106,12 +106,12 @@ describe("ExtensionPackageCommandRouter", () => {
 
   it("routes the persisted prompt-once status and decline without reloading Tasks", async () => {
     const status = vi.fn(async () => ({
-      source: "npm:pi-observational-memory",
+      source: "npm:example-prompt-once",
       scope: "global" as const,
       state: "unseen" as const
     }));
     const decline = vi.fn(async () => ({
-      source: "npm:pi-observational-memory",
+      source: "npm:example-prompt-once",
       scope: "global" as const,
       state: "declined" as const
     }));
@@ -122,14 +122,14 @@ describe("ExtensionPackageCommandRouter", () => {
     await expect(router.dispatch(
       WORKSPACE_A,
       command("extension.package.onboarding.get", {
-        source: "npm:pi-observational-memory",
+        source: "npm:example-prompt-once",
         scope: "global"
       })
     )).resolves.toMatchObject({ state: "unseen" });
     await expect(router.dispatch(
       WORKSPACE_A,
       command("extension.package.onboarding.decline", {
-        source: "npm:pi-observational-memory",
+        source: "npm:example-prompt-once",
         scope: "global"
       }),
       "decline-onboarding"

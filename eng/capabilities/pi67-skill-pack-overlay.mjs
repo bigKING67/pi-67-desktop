@@ -2,9 +2,9 @@ import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { spawn } from "node:child_process";
 
-const ADAPTER_ID = "pi67-ai-berkshire-v1";
-const ADAPTER_PATH = "scripts/pi67-sync-ai-berkshire-skill-pack.mjs";
-const SYNC_HELPER = "scripts/pi67-sync-ai-berkshire-skill-pack.sh";
+const ADAPTER_ID = "desktop-ai-berkshire-v1";
+const ADAPTER_PATH = "ai-berkshire-skill-pack-sync.mjs";
+const SYNC_HELPER = "eng/capabilities/ai-berkshire-skill-pack-sync.mjs";
 const REPORT_LIMIT_BYTES = 128 * 1024;
 const VERSION_PATTERN = /^\d+\.\d+\.\d+$/u;
 const GIT_OBJECT_PATTERN = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/u;
@@ -16,7 +16,7 @@ export function assertPi67SkillPackSource(definition) {
     !isRecord(definition)
     || !SKILL_NAME_PATTERN.test(definition.name ?? "")
     || definition.adapter !== ADAPTER_ID
-    || definition.adapterSourceId !== "pi67-core"
+    || definition.adapterSourceId !== "pi-workspace-resources"
     || !VERSION_PATTERN.test(definition.version ?? "")
     || !GIT_OBJECT_PATTERN.test(definition.commit ?? "")
     || !SHA256_PATTERN.test(definition.manifestSha256 ?? "")
@@ -29,9 +29,10 @@ export function assertPi67SkillPackSource(definition) {
 
 export async function preparePi67SkillPackOverlay({
   definition,
-  pi67SourceRoot,
+  workspaceResourceRoot,
   upstreamSourceRoot,
-  outputRoot
+  outputRoot,
+  adapterRoot
 }) {
   assertPi67SkillPackSource(definition);
   await rm(outputRoot, { recursive: true, force: true });
@@ -39,12 +40,12 @@ export async function preparePi67SkillPackOverlay({
   const registryPath = join(outputRoot, "shared-skill-packs.json");
   const lockPath = join(outputRoot, "shared-skill-packs.lock.json");
   await Promise.all([
-    copyFile(join(pi67SourceRoot, "shared-skill-packs.json"), registryPath),
-    copyFile(join(pi67SourceRoot, "shared-skill-packs.lock.json"), lockPath)
+    copyFile(join(workspaceResourceRoot, "shared-skill-packs.json"), registryPath),
+    copyFile(join(workspaceResourceRoot, "shared-skill-packs.lock.json"), lockPath)
   ]);
   await seedDesktopSkillPackBaseline({ definition, registryPath, lockPath });
   const report = JSON.parse(await capture(process.execPath, [
-    join(pi67SourceRoot, ADAPTER_PATH),
+    join(adapterRoot, ADAPTER_PATH),
     "--source", upstreamSourceRoot,
     "--dest-root", join(outputRoot, "shared-skills"),
     "--pack-registry", registryPath,
@@ -111,7 +112,7 @@ function replacePack(packs, next) {
 
 function validateGeneratedPack({ definition, report, registry, lock, pack, locked }) {
   if (
-    report?.schemaId !== "pi67-ai-berkshire-skill-pack-sync/v1"
+    report?.schemaId !== "desktop-ai-berkshire-skill-pack-sync/v1"
     || report.result !== "APPLIED"
     || report.packName !== definition.name
     || report.packVersion !== definition.version

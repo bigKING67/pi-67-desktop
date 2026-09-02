@@ -1,5 +1,5 @@
 import { lstatSync } from "node:fs";
-import { mkdir, readFile, rm, stat } from "node:fs/promises";
+import { lstat, mkdir, readFile, realpath, rm, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep, isAbsolute } from "node:path";
 import { spawn } from "node:child_process";
 
@@ -14,6 +14,21 @@ export async function resolveExactCapabilitySource({
   sourceCacheRoot,
   git
 }) {
+  if (source.internalPath !== undefined) {
+    const internal = resolve(repositoryRoot, source.internalPath);
+    if (!isContained(internal, repositoryRoot)) {
+      throw new Error(`Internal capability source ${source.id} escaped the Desktop repository.`);
+    }
+    const [metadata, resolvedInternal, resolvedRepositoryRoot] = await Promise.all([
+      lstat(internal),
+      realpath(internal),
+      realpath(repositoryRoot)
+    ]);
+    if (metadata.isSymbolicLink() || !metadata.isDirectory() || !isContained(resolvedInternal, resolvedRepositoryRoot)) {
+      throw new Error(`Internal capability source ${source.id} is not a contained Desktop directory.`);
+    }
+    return internal;
+  }
   const local = resolve(repositoryRoot, source.localSibling);
   if (await isExactCleanRepository(local, source.commit, git)) return local;
   const destination = join(sourceCacheRoot, source.id);

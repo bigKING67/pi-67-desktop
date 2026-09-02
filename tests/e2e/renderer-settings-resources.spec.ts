@@ -98,8 +98,9 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   await expect(extensionWorkspace.getByText("工作规则加载器", { exact: true })).toBeVisible();
   await expect(extensionWorkspace.getByText("根据当前任务自动匹配并加载已配置的工作规则。", { exact: true })).toBeVisible();
   await expect(extensionWorkspace.getByText("pi-rules-loader", { exact: true })).toBeVisible();
-  await expect(extensionWorkspace.getByText("Pi-67 Core 0.15.8", { exact: true })).toBeVisible();
-  await expect(extensionWorkspace.getByText("已随应用提供", { exact: true })).toBeVisible();
+  await expect(extensionWorkspace.getByText("Pi Workspace Resources 1.0.0", { exact: true })).toBeVisible();
+  await expect(extensionWorkspace.getByText("OpenViking 上下文与记忆", { exact: true })).toBeVisible();
+  await expect(extensionWorkspace.getByText("已随应用提供", { exact: true })).toHaveCount(2);
   if (visualArtifactDirectory) await page.screenshot({
     animations: "disabled",
     path: resolve(visualArtifactDirectory, "settings-bundled-extensions.png")
@@ -135,7 +136,7 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   await expect(globalPanel.getByText("AI Berkshire 投资研究", { exact: true })).toHaveCount(1);
   await expect(globalPanel.getByText("Commerce Growth OS", { exact: true })).toBeVisible();
   await expect(globalPanel.getByText("2 个技能 · 基线未独立版本化", { exact: true })).toBeVisible();
-  await expect(globalPanel.getByText("1 个技能 · 内置基线 1.1.0", { exact: true })).toBeVisible();
+  await expect(globalPanel.getByText("1 个技能 · 内置基线 1.1.1", { exact: true })).toBeVisible();
   await expect(globalPanel.getByText("1 个技能 · 内置基线 2.2.0", { exact: true })).toBeVisible();
   await expect(globalPanel.getByText("2 个技能 · 内置基线 0.8.0", { exact: true })).toBeVisible();
   await expect(globalPanel.getByText("2 个技能 · 2 个内置来源", { exact: true })).toBeVisible();
@@ -161,8 +162,8 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   await globalPanel.getByTestId("bundled-skill-suite-row")
     .filter({ hasText: "AI Berkshire 投资研究" }).click();
   await expect(suiteDetail.getByRole("heading", { name: "AI Berkshire 投资研究", exact: true })).toBeVisible();
-  await expect(suiteDetail.getByText("1.1.0", { exact: true })).toBeVisible();
-  await expect(suiteDetail.getByText("可独立管理", { exact: true })).toBeVisible();
+  await expect(suiteDetail.getByText("1.1.1", { exact: true })).toBeVisible();
+  await expect(suiteDetail.getByText("完整能力包", { exact: true })).toBeVisible();
   await expect(suiteDetail.getByText("https://github.com/xbtlin/ai-berkshire", { exact: true })).toBeVisible();
   await expect(suiteDetail.getByText("fd83d0634", { exact: true })).toBeVisible();
   await suiteDetail.getByRole("button", { name: "返回全局可用技能" }).click();
@@ -189,25 +190,15 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   await expect(suiteDetail.getByText("最新稳定版本", { exact: true })).toBeVisible();
   await expect(suiteDetail.getByRole("button", { name: "更新套件", exact: true })).toBeVisible();
   await expect(suiteDetail.getByText("Lark CLI 官方 Skills · 1.0.80", { exact: true })).toHaveCount(2);
-  await expect(suiteDetail.getByText("Pi-67 Core · 1.0.65", { exact: true })).toHaveCount(0);
+  await expect(suiteDetail.getByText("Pi Workspace Resources · 1.0.65", { exact: true })).toHaveCount(0);
   await suiteDetail.getByRole("button", { name: "返回全局可用技能" }).click();
   const aiSuiteRow = globalPanel.getByTestId("bundled-skill-suite-row")
     .filter({ hasText: "AI Berkshire 投资研究" });
-  await expect(aiSuiteRow).toContainText("可更新");
+  await expect(aiSuiteRow).toContainText("随 Desktop 更新");
   await aiSuiteRow.click();
-  await suiteDetail.getByRole("button", { name: "更新套件", exact: true }).click();
-  const skillUpdateDialog = page.getByRole("dialog", { name: "更新技能套件" });
-  await expect(skillUpdateDialog).toContainText("1.1.0");
-  await expect(skillUpdateDialog).toContainText("1.1.0");
-  await skillUpdateDialog.getByRole("button", { name: "确认更新", exact: true }).click();
-  await expect(suiteDetail.getByText("1.1.0 · Overlay", { exact: true })).toBeVisible();
-  await expect(suiteDetail.getByText("已是最新", { exact: true })).toBeVisible();
-  await expect(suiteDetail.getByText("1 个技能 · 当前 1.1.0 · 最新兼容 1.1.0", { exact: true })).toBeVisible();
-  await suiteDetail.getByRole("button", { name: "恢复内置版本", exact: true }).click();
-  const restoreDialog = page.getByRole("dialog", { name: "恢复内置技能套件" });
-  await expect(restoreDialog).toContainText("恢复会移除受管 Overlay");
-  await restoreDialog.getByRole("button", { name: "确认恢复", exact: true }).click();
-  await expect(suiteDetail.getByText("1.1.0 · 内置", { exact: true })).toBeVisible();
+  await expect(suiteDetail.getByRole("button", { name: "更新套件", exact: true })).toHaveCount(0);
+  await expect(suiteDetail.getByText("1.1.1 · 内置", { exact: true })).toBeVisible();
+  await expect(suiteDetail).toContainText("不依赖独立更新服务");
   await suiteDetail.getByRole("button", { name: "返回全局可用技能" }).click();
 
   await skillTabs.getByRole("tab", { name: "项目专属", exact: true }).click();
@@ -218,7 +209,7 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   await navigation.getByRole("button", { name: "提示词模板", exact: true }).click();
   await expect(settings.getByRole("heading", { name: "提示词模板", exact: true })).toBeVisible();
   await expect(settings.getByText("/review", { exact: true })).toBeVisible();
-  await expect(settings.getByText("Pi-67 Core", { exact: true })).toHaveCount(0);
+  await expect(settings.getByText("Pi Workspace Resources", { exact: true })).toHaveCount(0);
 
   await navigation.getByRole("button", { name: "工作规则", exact: true }).click();
   await expect(settings.getByRole("heading", { name: "工作规则", exact: true })).toBeVisible();

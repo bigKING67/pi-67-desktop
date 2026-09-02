@@ -1,4 +1,4 @@
-import { Type, type TProperties, type TSchema } from "./typebox-schema.js";
+import { strictObject, Type, type TSchema } from "./typebox-schema.js";
 import {
   MAX_SLASH_COMMAND_DESCRIPTION_CHARS,
   MAX_SLASH_COMMAND_ITEMS,
@@ -14,6 +14,7 @@ import {
   ContextFileReadResultSchema,
   ContextFileSaveResultSchema
 } from "./context-file-schemas.js";
+import { ContextMemoryCommandResultSchemas, ContextMemoryEventPayloadSchemas } from "./context-memory-schemas.js";
 import {
   ExtensionCompatibilitySchema,
   ExtensionUiCancelledSchema,
@@ -97,9 +98,7 @@ import {
   PiModelCatalogRefreshResultSchema,
   PiProviderConfigurationSnapshotSchema
 } from "./provider-configuration-schemas.js";
-import {
-  WorkspaceRegisterResultSchema, WorkspaceUnregisterResultSchema
-} from "./workspace-registration-schemas.js";
+import { WorkspaceRegisterResultSchema, WorkspaceUnregisterResultSchema } from "./workspace-registration-schemas.js";
 import { RuntimeDiagnosticsSchema } from "./runtime-diagnostics-schema.js";
 import { WorkspaceUsageReportSchema } from "./usage-schemas.js";
 import {
@@ -343,6 +342,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "skill.pack.update": SkillPackMutationResultSchema,
   "skill.pack.restore": SkillPackMutationResultSchema,
   ...LarkCommandResultSchemas,
+  ...ContextMemoryCommandResultSchemas,
   "extension.ui.respond": strictObject({ resolved: Type.Boolean() }),
   "approval.respond": strictObject({
     resolved: Type.Boolean(),
@@ -454,6 +454,6 @@ export const EventPayloadSchemas: Record<AgentEventType, TSchema> = {
   "extension.catalog.changed": ExtensionCatalogSchema,
   "resource.changed": strictObject({ reason: Type.String() }),
   "diagnostics.progress": strictObject({ step: Type.String(), completed: Type.Boolean() }),
-  "doctor.completed": DoctorReportSchema
+  "doctor.completed": DoctorReportSchema,
+  ...ContextMemoryEventPayloadSchemas
 };
-export function strictObject<T extends TProperties>(properties: T) { return Type.Object(properties, { additionalProperties: false }); }

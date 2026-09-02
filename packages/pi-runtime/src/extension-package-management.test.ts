@@ -234,7 +234,7 @@ describe("ExtensionPackageManagement", () => {
 
   it("allows resource filters but rejects independent update or uninstall for bundled packages", async () => {
     const managedRoot = resolve("/managed/desktop-capabilities");
-    const source = resolve(managedRoot, "packages/pi67-core");
+    const source = resolve(managedRoot, "packages/pi-workspace-resources");
     process.env.PI67_MANAGED_CAPABILITIES_ROOT = managedRoot;
     process.env.PI67_CAPABILITY_PACKAGE_PATHS = JSON.stringify([source]);
     fixture.global.push(source);

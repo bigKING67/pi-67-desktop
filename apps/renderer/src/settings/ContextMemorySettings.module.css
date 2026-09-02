@@ -1,0 +1,167 @@
+.workspace {
+  display: grid;
+  gap: 24px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.input {
+  width: min(520px, 100%);
+  min-height: 36px;
+  margin-top: 10px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  outline: 0;
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.input:focus {
+  border-color: var(--focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.bindingActions {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
+.projectSelect {
+  display: grid;
+  gap: 4px;
+  min-width: 220px;
+}
+
+.projectSelectLabel {
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.projectSelectTrigger {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+}
+
+.projectSelectTrigger[data-hovered] {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.projectSelectTrigger[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.projectSelectTrigger[data-disabled] {
+  opacity: 0.55;
+}
+
+.projectSelectPopover {
+  z-index: 80;
+  width: var(--trigger-width);
+  min-width: min(280px, calc(100vw - 24px));
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+}
+
+.projectSelectList {
+  max-height: min(320px, 48vh);
+  padding: 6px;
+  overflow-y: auto;
+  outline: none;
+}
+
+.projectSelectOption {
+  display: grid;
+  gap: 2px;
+  padding: 8px 9px;
+  border-radius: 6px;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.projectSelectOption small {
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.projectSelectOption[data-hovered],
+.projectSelectOption[data-focused] {
+  background: var(--surface-hover);
+}
+
+.projectSelectOption[data-selected] {
+  background: color-mix(in srgb, var(--focus) 9%, var(--surface-raised));
+}
+
+.privacyGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px;
+}
+
+.privacyCard {
+  display: grid;
+  min-height: 94px;
+  align-content: start;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.privacyCard strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.privacyCard span {
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.privacyCard[data-hovered] {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.privacyCard[data-selected] {
+  border-color: color-mix(in srgb, var(--focus) 68%, var(--border));
+  background: color-mix(in srgb, var(--focus) 7%, var(--surface-raised));
+  box-shadow: inset 3px 0 0 var(--focus);
+}
+
+.privacyCard[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 840px) {
+  .privacyGrid { grid-template-columns: 1fr; }
+  .actions { flex-wrap: wrap; }
+  .bindingActions { width: 100%; flex-wrap: wrap; }
+  .projectSelect { min-width: min(100%, 280px); flex: 1; }
+}

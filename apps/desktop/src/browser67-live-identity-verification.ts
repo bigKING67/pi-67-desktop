@@ -41,7 +41,7 @@ export async function verifyBrowser67LiveIdentity(options: {
     : reloadFailed
       ? "现有扩展文件是当前版本，但浏览器自动重新加载失败。请在扩展管理页点击该扩展的重新加载按钮后再次验证。"
       : reloadAttempted
-        ? "浏览器已重新加载现有扩展，但身份仍不匹配。请核对加载来源；仅当来源不是 Pi-67 提供的目录时才移除并重新加载。"
+        ? "浏览器已重新加载现有扩展，但身份仍不匹配。请核对加载来源；仅当来源不是 Desktop 管理目录时才移除并重新加载。"
         : live.detail;
   return { live, extensionState, detail };
 }

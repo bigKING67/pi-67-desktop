@@ -8,9 +8,15 @@ import {
   type RequestEnvelope
 } from "@pi67/protocol";
 import type { HostConnectionContext } from "./connection-context.js";
+import {
+  isContextMemoryWorkspaceCommand,
+  type ContextMemoryCommandRouter
+} from "./context/context-memory-command-router.js";
 import { isContextFileCommand, type ContextFileCommandRouter } from "./context-file-command-router.js";
 import { isExtensionPackageCommand, type ExtensionPackageCommandRouter } from "./extension-package-command-router.js";
 import { operationSubmissionIdentity } from "./host-command-dispatcher.js";
+import { handleContextFileRequest } from "./host-context-file-request-handler.js";
+import { handleContextMemoryWorkspaceRequest } from "./host-context-memory-request-handler.js";
 import type { HostTaskStateCoordinator, TaskHostState } from "./host-task-state-coordinator.js";
 import type { OperationRegistry } from "./operation-registry.js";
 import { HostCommandError, toProtocolError } from "./protocol-error.js";
@@ -50,6 +56,7 @@ export class HostRequestRouter {
   constructor(
     private readonly tasks: HostTaskStateCoordinator,
     private readonly contextFiles: ContextFileCommandRouter,
+    private readonly contextMemory: ContextMemoryCommandRouter,
     private readonly extensionPackages: ExtensionPackageCommandRouter,
     private readonly skillPacks: SkillPackCommandRouter,
     private readonly workspaceCommands: WorkspaceCommandRouter,
@@ -128,7 +135,11 @@ export class HostRequestRouter {
       return;
     }
     if (isContextFileCommand(request.type)) {
-      this.handleContextFileCommand(origin, request);
+      handleContextFileRequest(origin, request, this.contextFiles);
+      return;
+    }
+    if (isContextMemoryWorkspaceCommand(request.type)) {
+      handleContextMemoryWorkspaceRequest(origin, request, this.contextMemory);
       return;
     }
     if (isExtensionPackageCommand(request.type)) {
@@ -174,24 +185,6 @@ export class HostRequestRouter {
       return;
     }
     this.handleTaskCommand(origin, request, state);
-  }
-
-  private handleContextFileCommand(
-    origin: HostConnectionContext,
-    request: RequestEnvelope
-  ): void {
-    if (!isContextFileCommand(request.type) || request.context.scope !== "workspace") {
-      origin.sendError(request.requestId, request.type, toProtocolError(new HostCommandError(
-        "INVALID_PAYLOAD",
-        "Context file commands require Workspace authority.",
-        false
-      )));
-      return;
-    }
-    const command = { type: request.type, payload: request.payload } as AgentCommand<typeof request.type>;
-    void this.contextFiles.dispatch(request.context, command, request.idempotencyKey)
-      .then((result) => sendSuccess(origin, request, result))
-      .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
   }
 
   private handleWorkspaceFileCommand(

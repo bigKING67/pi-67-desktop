@@ -1,10 +1,5 @@
 import { randomUUID } from "node:crypto";
-import {
-  MessageChannelMain,
-  utilityProcess,
-  type BrowserWindow,
-  type UtilityProcess
-} from "electron";
+import { utilityProcess, type BrowserWindow, type UtilityProcess } from "electron";
 import {
   isAgentHostReadyMessage,
   isAgentHostRuntimePoisonedMessage,
@@ -21,11 +16,15 @@ import {
   type AgentHostStoragePaths
 } from "./agent-host-environment.js";
 import { planAgentHostRestart } from "./agent-host-restart.js";
+import { handoffAgentHostPort } from "./agent-host-port-handoff.js";
 import { AgentHostInitializationOutputForwarder } from "./agent-host-initialization-output.js";
 import { redact } from "./redaction.js";
-import { isExpectedRendererLocation } from "./renderer-security.js";
 import { sendAgentHostStartupFailure } from "./agent-host-startup-notification.js";
-import { emptyAgentHostStopResult, rendererDocumentHandoffKey, resolveAgentHostShutdownDeadline,
+import {
+  EnterpriseCredentialSupervisor,
+  type EnterpriseCredentialBrokerPort
+} from "./enterprise-credential-supervisor.js";
+import { completedAgentHostStopResult, emptyAgentHostStopResult, resolveAgentHostShutdownDeadline,
   type AgentHostStopResult, type AgentHostSupervisorDiagnostics, type AgentHostSupervisorPhase
 } from "./agent-host-supervisor-contract.js";
 export type { AgentHostStopResult, AgentHostSupervisorDiagnostics, AgentHostSupervisorPhase } from "./agent-host-supervisor-contract.js";
@@ -43,6 +42,7 @@ interface AgentHostSupervisorOptions {
   getMainWindow: () => BrowserWindow | undefined;
   rendererUrl: string;
   shutdownDeadlineMs?: number;
+  getEnterpriseCredentials?: () => EnterpriseCredentialBrokerPort | undefined;
 }
 
 const DEFAULT_SHUTDOWN_DEADLINE_MS = 4_000;
@@ -62,6 +62,7 @@ export class AgentHostSupervisor {
   #stopHost: UtilityProcess | undefined;
   #shutdownComplete: AgentHostShutdownCompleteMessage | undefined;
   #hostReadyReceived = false;
+  #enterpriseCredentialBootstrapState: "idle" | "loading" | "complete" = "complete";
   #lastHandoffKey: string | undefined;
   readonly #shutdownDeadlineMs: number;
   #phase: AgentHostSupervisorPhase = "idle";
@@ -84,9 +85,13 @@ export class AgentHostSupervisor {
   #portHandoffCount = 0;
   #lastPortHandoffAt: number | undefined;
   #poisonedRuntimeReplacementCount = 0;
+  readonly #enterpriseCredentials: EnterpriseCredentialSupervisor;
 
   constructor(options: AgentHostSupervisorOptions) {
     this.#options = options;
+    this.#enterpriseCredentials = new EnterpriseCredentialSupervisor(
+      () => this.#options.getEnterpriseCredentials?.()
+    );
     this.#shutdownDeadlineMs = resolveAgentHostShutdownDeadline(
       options.shutdownDeadlineMs,
       DEFAULT_SHUTDOWN_DEADLINE_MS
@@ -204,35 +209,19 @@ export class AgentHostSupervisor {
       || this.#phase !== "running"
       || !this.#agentHost
       || !this.#identity
-      || !window
-      || window.isDestroyed()
     ) return;
-    if (!isExpectedRendererLocation(window.webContents.getURL(), this.#options.rendererUrl)) return;
-    const handoffKey = rendererDocumentHandoffKey(window, this.#identity.hostEpoch);
-    if (!handoffKey || (!replaceCurrent && handoffKey === this.#lastHandoffKey)) return;
-
-    const { port1, port2 } = new MessageChannelMain();
-    this.#agentHost.postMessage({
-      type: "attach-port",
+    const handoffKey = handoffAgentHostPort({
+      host: this.#agentHost,
+      window,
+      identity: this.#identity,
       appInstanceId: this.#options.appInstanceId,
-      hostInstanceId: this.#identity.hostInstanceId,
-      hostEpoch: this.#identity.hostEpoch
-    }, [port1]);
-    window.webContents.postMessage(
-      "pi67:agent-port",
-      {
-        expectedOrigin: this.#options.expectedRendererOrigin,
-        appInstanceId: this.#options.appInstanceId,
-        hostEpoch: this.#identity.hostEpoch
-      },
-      [port2]
-    );
-    if (this.#currentStartup) {
-      window.webContents.send("pi67:agent-host-startup", {
-        hostEpoch: this.#identity.hostEpoch,
-        startup: this.#currentStartup
-      });
-    }
+      expectedRendererOrigin: this.#options.expectedRendererOrigin,
+      rendererUrl: this.#options.rendererUrl,
+      ...(this.#currentStartup === undefined ? {} : { currentStartup: this.#currentStartup }),
+      ...(this.#lastHandoffKey === undefined ? {} : { lastHandoffKey: this.#lastHandoffKey }),
+      replaceCurrent
+    });
+    if (!handoffKey) return;
     this.#lastHandoffKey = handoffKey;
     this.#portHandoffCount += 1;
     this.#lastPortHandoffAt = Date.now();
@@ -245,6 +234,9 @@ export class AgentHostSupervisor {
     this.#processStartRequestedAt = Date.now();
     this.#processStartedAt = undefined;
     this.#hostReadyReceived = false;
+    this.#enterpriseCredentialBootstrapState = this.#enterpriseCredentials.requiresBootstrap()
+      ? "idle"
+      : "complete";
     this.#currentStartup = undefined;
     this.#structuredStartupFailure = undefined;
     this.#restartScheduledAt = undefined;
@@ -348,6 +340,15 @@ export class AgentHostSupervisor {
   }
 
   #handleMessage(host: UtilityProcess, message: unknown): void {
+    if (this.#agentHost === host) {
+      const enterpriseOperation = this.#enterpriseCredentials.operation(message);
+      if (enterpriseOperation) {
+        void enterpriseOperation.then((result) => {
+          if (this.#agentHost === host && !this.#stopping) host.postMessage(result);
+        });
+        return;
+      }
+    }
     if (
       this.#agentHost === host
       && this.#stopping
@@ -375,6 +376,10 @@ export class AgentHostSupervisor {
       this.#startupBlocked = false;
       this.#hostReadyReceived = true;
       this.#promoteReadyHost(host);
+      if (this.#enterpriseCredentialBootstrapState === "idle") {
+        this.#enterpriseCredentialBootstrapState = "loading";
+        void this.#bootstrapEnterpriseCredentials(host);
+      }
       return;
     }
     if (
@@ -411,14 +416,20 @@ export class AgentHostSupervisor {
 
   #promoteReadyHost(host: UtilityProcess): void {
     if (
-      this.#agentHost !== host
-      || this.#stopping
-      || this.#phase !== "starting"
-      || this.#processStartedAt === undefined
-      || !this.#hostReadyReceived
+      this.#agentHost !== host || this.#stopping || this.#phase !== "starting"
+      || this.#processStartedAt === undefined || !this.#hostReadyReceived
     ) return;
     this.#phase = "running";
     this.attachPort();
+  }
+
+  async #bootstrapEnterpriseCredentials(host: UtilityProcess): Promise<void> {
+    const message = await this.#enterpriseCredentials.bootstrapMessage();
+    if (this.#agentHost !== host || this.#stopping
+      || (this.#phase !== "starting" && this.#phase !== "running")
+    ) return;
+    host.postMessage(message);
+    this.#enterpriseCredentialBootstrapState = "complete";
   }
 
   #sendStructuredStartupFailure(): void {
@@ -427,18 +438,13 @@ export class AgentHostSupervisor {
     this.#lastFailureNotificationKey = sendAgentHostStartupFailure({
       window: this.#options.getMainWindow(),
       rendererUrl: this.#options.rendererUrl,
-      lastNotificationKey: this.#lastFailureNotificationKey,
-      failure
+      lastNotificationKey: this.#lastFailureNotificationKey, failure
     });
   }
 
   #forceStop(host: UtilityProcess): void {
     if (this.#stopHost !== host || !this.#resolveStop) return;
-    try {
-      host.kill();
-    } finally {
-      this.#completeStop(false, true);
-    }
+    try { host.kill(); } finally { this.#completeStop(false, true); }
   }
 
   #completeStop(graceful: boolean, forced: boolean): void {
@@ -447,13 +453,6 @@ export class AgentHostSupervisor {
     if (this.#stopTimer) clearTimeout(this.#stopTimer);
     this.#stopTimer = undefined;
     this.#resolveStop = undefined;
-    const completion = this.#shutdownComplete;
-    resolve({
-      graceful,
-      forced,
-      activeOperation: completion?.activeOperation ?? "none",
-      queuedCommandsDropped: completion?.queuedCommandsDropped ?? 0,
-      extensionRequestsCancelled: completion?.extensionRequestsCancelled ?? 0
-    });
+    resolve(completedAgentHostStopResult(this.#shutdownComplete, graceful, forced));
   }
 }

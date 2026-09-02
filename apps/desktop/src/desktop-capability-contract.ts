@@ -114,8 +114,7 @@ export function parseBundledCatalog(value: unknown): BundledCapabilityCatalog {
       || item.bundled !== true
       || typeof item.defaultEnabled !== "boolean"
       || !isVersion(item.version)
-      || typeof item.commit !== "string"
-      || !/^[0-9a-f]{40}$/u.test(item.commit)
+      || !isCapabilityProvenance(item)
       || typeof item.packagePath !== "string"
       || !Array.isArray(item.resourceTypes)
     ) throw new Error("Desktop capability catalog entry is invalid.");
@@ -136,7 +135,11 @@ export function parseBundledCatalog(value: unknown): BundledCapabilityCatalog {
       bundled: true,
       defaultEnabled: item.defaultEnabled,
       version: item.version,
-      commit: item.commit,
+      ...(typeof item.commit === "string" ? { commit: item.commit } : {}),
+      ...(typeof item.internalPath === "string" ? { internalPath: item.internalPath } : {}),
+      ...(typeof item.sourceTreeSha256 === "string"
+        ? { sourceTreeSha256: item.sourceTreeSha256 }
+        : {}),
       packagePath: item.packagePath,
       resourceTypes,
       bundledExtensions,
@@ -286,7 +289,7 @@ function isBundledSkillSuiteUpdatePolicy(
 function isBundledSkillSuiteUpdateManager(
   value: unknown
 ): value is DesktopBundledSkillSuiteSummary["updateManager"] {
-  return ["lark-cli", "pi67-skill-pack-registry", "desktop-capability", "source-specific"].includes(String(value));
+  return ["lark-cli", "desktop-capability", "source-specific"].includes(String(value));
 }
 
 function isBundledSkillSuiteIndependentUpdateState(
@@ -352,7 +355,29 @@ function isOrigin(value: unknown): value is DesktopCapabilityOrigin {
 }
 
 function isResourceType(value: unknown): value is DesktopCapabilityResourceType {
-  return value === "extension" || value === "skill" || value === "prompt" || value === "rule" || value === "integration";
+  return [
+    "extension",
+    "skill",
+    "prompt",
+    "rule",
+    "integration",
+    "context",
+    "memory",
+    "experience"
+  ].includes(String(value));
+}
+
+function isCapabilityProvenance(value: Record<string, unknown>): boolean {
+  const gitSource = typeof value.commit === "string"
+    && /^[0-9a-f]{40}$/u.test(value.commit)
+    && value.internalPath === undefined
+    && value.sourceTreeSha256 === undefined;
+  const internalSource = typeof value.internalPath === "string"
+    && /^packages\/[a-z0-9][a-z0-9-]{0,79}$/u.test(value.internalPath)
+    && typeof value.sourceTreeSha256 === "string"
+    && /^[0-9a-f]{64}$/u.test(value.sourceTreeSha256)
+    && value.commit === undefined;
+  return gitSource || internalSource;
 }
 
 function isVersion(value: unknown): value is string {

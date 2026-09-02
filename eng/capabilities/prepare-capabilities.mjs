@@ -6,7 +6,7 @@ import {
   rm,
   writeFile
 } from "node:fs/promises";
-import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, delimiter, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { compileBundledSkillSuites, parseSkillMetadata, readPi67SkillPackMetadata } from "./bundled-skill-suites.mjs";
@@ -22,6 +22,12 @@ import {
 } from "./prepared-capabilities-validation.mjs";
 import { prepareManagedNpmBundles } from "./managed-npm-bundles.mjs";
 import { preparePi67SkillPackOverlay } from "./pi67-skill-pack-overlay.mjs";
+import {
+  assertRelativePath,
+  copyAllowedCapabilityEntries as copyAllowed,
+  copyCapabilityEntry as copyEntry,
+  writeCapabilityPackageManifest as writePackageManifest
+} from "./prepared-capability-files.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const lockPath = resolve(repositoryRoot, "eng/capabilities/capability-sources.lock.json");
@@ -57,12 +63,19 @@ export async function prepareDesktopCapabilities() {
 
   const sources = new Map();
   for (const source of lock.sources) {
-    sources.set(source.id, await resolveExactCapabilitySource({
+    const sourceRoot = await resolveExactCapabilitySource({
       source,
       repositoryRoot,
       sourceCacheRoot,
       git
-    }));
+    });
+    if (
+      source.internalPath !== undefined
+      && await treeSha256(sourceRoot, { includeNodeModules: false }) !== source.treeSha256
+    ) {
+      throw new Error(`Internal capability source failed integrity validation: ${source.id}`);
+    }
+    sources.set(source.id, sourceRoot);
   }
   const skillPackOverlays = [];
   for (const definition of lock.skillPacks) {
@@ -79,16 +92,21 @@ export async function prepareDesktopCapabilities() {
     });
     skillPackOverlays.push(await preparePi67SkillPackOverlay({
       definition,
-      pi67SourceRoot: sources.get(definition.adapterSourceId),
+      workspaceResourceRoot: sources.get(definition.adapterSourceId),
       upstreamSourceRoot,
-      outputRoot: join(generatedSkillPackRoot, definition.name)
+      outputRoot: join(generatedSkillPackRoot, definition.name),
+      adapterRoot: resolve(repositoryRoot, "eng/capabilities")
     }));
   }
   const entries = [];
-  entries.push(await preparePi67Core(
-    sources.get("pi67-core"),
-    lock.sources.find((item) => item.id === "pi67-core"),
+  entries.push(await prepareWorkspaceResources(
+    sources.get("pi-workspace-resources"),
+    lock.sources.find((item) => item.id === "pi-workspace-resources"),
     skillPackOverlays
+  ));
+  entries.push(await prepareOpenVikingPiExtension(
+    sources.get("openviking-pi-extension"),
+    lock.sources.find((item) => item.id === "openviking-pi-extension")
   ));
   entries.push(await prepareBrowser67(
     sources.get("browser67"),
@@ -102,7 +120,7 @@ export async function prepareDesktopCapabilities() {
   ));
   const overlayNames = new Set(skillPackOverlays.map((pack) => pack.name));
   const skillPacks = [
-    ...(await readPi67SkillPackMetadata(sources.get("pi67-core")))
+    ...(await readPi67SkillPackMetadata(sources.get("pi-workspace-resources")))
       .filter((pack) => !overlayNames.has(pack.name)),
     ...skillPackOverlays.map(({ sourceRoot: _sourceRoot, skills: _skills, ...pack }) => pack)
   ].sort((left, right) => left.name.localeCompare(right.name));
@@ -145,8 +163,13 @@ export async function prepareDesktopCapabilities() {
   return { catalog, manifest };
 }
 
-async function preparePi67Core(sourceRoot, source, skillPackOverlays) {
+async function prepareWorkspaceResources(sourceRoot, source, skillPackOverlays) {
   const destination = join(outputRoot, "packages", source.id);
+  const sourceManifest = JSON.parse(await readFile(join(sourceRoot, "package.json"), "utf8"));
+  const legacyRulesLoaderTreeSha256 = sourceManifest.desktopMigration?.legacyRulesLoaderTreeSha256;
+  if (!/^[a-f0-9]{64}$/u.test(legacyRulesLoaderTreeSha256 ?? "")) {
+    throw new Error("Pi workspace resources are missing the exact legacy Rules Loader migration identity.");
+  }
   await mkdir(join(destination, "skills"), { recursive: true });
   await mkdir(join(destination, "extensions"), { recursive: true });
   await copyAllowed(sourceRoot, destination, ["prompts", "rules", "AGENTS.md", "README.md", "VERSION"]);
@@ -166,14 +189,14 @@ async function preparePi67Core(sourceRoot, source, skillPackOverlays) {
       overlaySkillRoots.set(skillName, overlay.sourceRoot);
     }
   }
-  const sourceSkillNames = (await readdir(join(sourceRoot, "shared-skills"), { withFileTypes: true }))
+  const sourceSkillNames = (await readdir(join(sourceRoot, "skills"), { withFileTypes: true }))
     .filter((entry) => entry.isDirectory() && !COMMERCE_SKILLS.has(entry.name))
     .map((entry) => entry.name)
     .sort();
   const skillNames = [...new Set([...sourceSkillNames, ...overlaySkillRoots.keys()])]
     .sort((left, right) => left.localeCompare(right));
   for (const skillName of skillNames) {
-    const skillSourceRoot = overlaySkillRoots.get(skillName) ?? join(sourceRoot, "shared-skills");
+    const skillSourceRoot = overlaySkillRoots.get(skillName) ?? join(sourceRoot, "skills");
     await copyEntry(
       join(skillSourceRoot, skillName),
       join(destination, "skills", skillName),
@@ -189,9 +212,10 @@ async function preparePi67Core(sourceRoot, source, skillPackOverlays) {
     .map((entry) => `prompts/${entry.name}`)
     .sort();
   await writePackageManifest(destination, {
-    name: "@pi67/bundled-core",
+    name: "@pi67/bundled-workspace-resources",
     version: source.version,
     private: true,
+    desktopMigration: { legacyRulesLoaderTreeSha256 },
     pi: {
       extensions,
       skills: skillNames.map((name) => `skills/${name}`),
@@ -200,15 +224,45 @@ async function preparePi67Core(sourceRoot, source, skillPackOverlays) {
   });
   return catalogEntry(
     source,
-    "packages/pi67-core",
+    "packages/pi-workspace-resources",
     ["extension", "skill", "prompt", "rule"],
     extensions.map((extensionPath) => {
       const id = basename(extensionPath);
       const metadata = source.includedExtensions.find((extension) => extension.id === id);
-      if (!metadata) throw new Error(`Bundled Pi-67 Core Extension metadata is unavailable: ${id}`);
+      if (!metadata) throw new Error(`Bundled Pi workspace Extension metadata is unavailable: ${id}`);
       return metadata;
     }),
     await bundledSkillEntries(destination, skillNames.map((name) => `skills/${name}`))
+  );
+}
+
+async function prepareOpenVikingPiExtension(sourceRoot, source) {
+  const destination = join(outputRoot, "packages", source.id);
+  await copyAllowed(sourceRoot, destination, [
+    "UPSTREAM.md",
+    "client.ts",
+    "config.json",
+    "config.ts",
+    "diagnostics.ts",
+    "index.ts",
+    "lib",
+    "memory-owner-policy.ts",
+    "package.json",
+    "recall.ts",
+    "shared",
+    "sync.ts",
+    "takeover.ts",
+    "tools.ts"
+  ]);
+  const packageManifest = JSON.parse(await readFile(join(destination, "package.json"), "utf8"));
+  if (packageManifest.version !== source.version || packageManifest.pi?.extensions?.[0] !== "./index.ts") {
+    throw new Error("Bundled OpenViking Pi Extension does not match its Desktop source lock.");
+  }
+  return catalogEntry(
+    source,
+    "packages/openviking-pi-extension",
+    ["extension", "context", "memory", "experience"],
+    source.includedExtensions
   );
 }
 
@@ -371,72 +425,14 @@ function catalogEntry(source, packagePath, resourceTypes, bundledExtensions = []
     bundled: true,
     defaultEnabled: true,
     version: source.version,
-    repository: source.repository,
-    commit: source.commit,
+    ...(source.internalPath === undefined
+      ? { repository: source.repository, commit: source.commit }
+      : { internalPath: source.internalPath, sourceTreeSha256: source.treeSha256 }),
     packagePath,
     resourceTypes,
     bundledExtensions,
     bundledSkills
   };
-}
-
-async function copyAllowed(sourceRoot, destinationRoot, paths) {
-  for (const path of paths) {
-    assertRelativePath(path, "capability allowlist path");
-    const source = join(sourceRoot, path);
-    try {
-      await copyEntry(source, join(destinationRoot, path), sourceRoot);
-    } catch (error) {
-      if (isNodeError(error, "ENOENT")) continue;
-      throw error;
-    }
-  }
-}
-
-async function copyEntry(source, destination, sourceRoot) {
-  if (!isContained(source, sourceRoot)) throw new Error("Capability copy escaped its locked source root.");
-  const metadata = await lstatPromise(source);
-  if (metadata.isSymbolicLink()) throw new Error(`Capability sources cannot contain symlinks: ${source}`);
-  if (metadata.isDirectory()) {
-    await mkdir(destination, { recursive: true });
-    const entries = (await readdir(source, { withFileTypes: true }))
-      .filter((entry) => entry.name !== ".DS_Store")
-      .sort((left, right) => left.name.localeCompare(right.name));
-    for (const entry of entries) {
-      await copyEntry(join(source, entry.name), join(destination, entry.name), sourceRoot);
-    }
-    return;
-  }
-  if (!metadata.isFile()) throw new Error(`Unsupported capability source entry: ${source}`);
-  await mkdir(dirname(destination), { recursive: true });
-  await writeFile(destination, await readFile(source), { mode: metadata.mode & 0o111 ? 0o755 : 0o644 });
-}
-
-async function writePackageManifest(destination, manifest) {
-  await writeFile(join(destination, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-}
-
-function assertRelativePath(path, label) {
-  if (
-    typeof path !== "string"
-    || path.length === 0
-    || path.includes("\0")
-    || isAbsolute(path)
-    || path.split(/[\\/]/u).includes("..")
-  ) throw new Error(`${label} must be a contained relative path.`);
-}
-
-function isContained(candidate, root) {
-  const fromRoot = relative(resolve(root), resolve(candidate));
-  return fromRoot === "" || (fromRoot !== ".." && !fromRoot.startsWith(`..${sep}`) && !isAbsolute(fromRoot));
-}
-
-function lstatPromise(path) {
-  return import("node:fs/promises").then(({ lstat }) => lstat(path));
-}
-
-function isNodeError(error, code) {
-  return error instanceof Error && "code" in error && error.code === code;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

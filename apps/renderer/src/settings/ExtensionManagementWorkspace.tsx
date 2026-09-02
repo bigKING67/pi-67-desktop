@@ -36,7 +36,7 @@ import { useExtensionPackageStore } from "./extension-package-store.js";
 import { PackageDetails, PackageList } from "./ExtensionPackageBrowser.js";
 import {
   InstallExtensionDialog,
-  ObservationalMemoryOnboardingDialog,
+  PromptOncePackageOnboardingDialog,
   PackageActionDialog
 } from "./ExtensionManagementDialogs.js";
 import type { ConfirmedAction, PackageFilter, PackageRow } from "./extension-management-model.js";
@@ -350,7 +350,7 @@ export function ExtensionManagementWorkspace({ capability }: {
       {!installOpen && !pending && promptOncePackage && (
         onboardingState === "unseen" || onboardingState === "install-failed"
       ) ? (
-        <ObservationalMemoryOnboardingDialog
+        <PromptOncePackageOnboardingDialog
           entry={promptOncePackage}
           failed={onboardingState === "install-failed"}
           busy={phase === "mutating"}

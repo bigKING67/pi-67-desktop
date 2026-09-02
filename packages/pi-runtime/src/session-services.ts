@@ -8,6 +8,8 @@ import {
   createDesktopPackageSettingsView,
   managedDesktopExtensionPaths
 } from "./desktop-package-toolchain.js";
+import { inspectDesktopMemoryOwners } from "./desktop-memory-owner-preflight.js";
+import { recordDesktopMemoryOwnerLoadReceipt } from "./desktop-memory-owner-load-receipt.js";
 import { restoreRuntimeApiKeys } from "./model-control.js";
 import type { RuntimeCredentialOverrideStore } from "./runtime-credential-overrides.js";
 import {
@@ -63,11 +65,30 @@ export async function createDesktopSessionServices(
     { projectTrusted }
   );
   baseSettingsManager.setProjectTrusted(projectTrusted);
-  const settingsManager = createDesktopPackageSettingsView(
+  const admittedSettingsManager = createDesktopPackageSettingsView(
     baseSettingsManager,
     process.env,
     options.packageTrustRegistry
   );
+  const configuredManagedExtensions = options.noThirdPartyExtensions
+    ? managedDesktopExtensionPaths()
+    : [];
+  const memoryOwnerPreflight = inspectDesktopMemoryOwners({
+    cwd: options.cwd,
+    agentDir: options.agentDir,
+    reservedOwner: "pi67-openviking",
+    ...(options.noThirdPartyExtensions
+      ? { managedExtensionPaths: configuredManagedExtensions }
+      : { settingsManager: admittedSettingsManager })
+  });
+  const settingsManager = memoryOwnerPreflight.blockedOwners.length > 0
+    ? createDesktopPackageSettingsView(
+        baseSettingsManager,
+        process.env,
+        options.packageTrustRegistry,
+        memoryOwnerPreflight
+      )
+    : admittedSettingsManager;
   const configuredCapabilities = new ConfiguredCapabilityCatalog({
     agentDir: options.agentDir,
     settingsManager
@@ -81,7 +102,10 @@ export async function createDesktopSessionServices(
       ...(options.noThirdPartyExtensions
         ? {
             noExtensions: true,
-            additionalExtensionPaths: managedDesktopExtensionPaths()
+            additionalExtensionPaths: managedDesktopExtensionPaths(
+              process.env,
+              memoryOwnerPreflight
+            )
           }
         : {}),
       extensionFactories: [
@@ -102,6 +126,13 @@ export async function createDesktopSessionServices(
       ]
     }
   });
+  recordDesktopMemoryOwnerLoadReceipt(
+    options.agentDir,
+    memoryOwnerPreflight,
+    services.resourceLoader.getExtensions().extensions
+      .map((extension) => extension.resolvedPath)
+      .filter((path): path is string => typeof path === "string")
+  );
   await installFirstPartyModelProviders(services.modelRuntime);
   configuredCapabilities.useSettingsManager(services.settingsManager);
   await Promise.all([

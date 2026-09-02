@@ -8,7 +8,6 @@ const KNOWN_PACKAGE_PURPOSES: Readonly<Record<string, string>> = Object.freeze({
   "@victor-software-house/pi-curated-themes": "为 Pi 提供精选深色终端主题，配色改编自 iTerm2-Color-Schemes。",
   "pi-markdown-preview": "为 Pi 提供 Markdown 与 LaTeX 预览，支持终端、浏览器和 PDF 输出。",
   "pi-mcp-adapter": "让 Pi 连接并调用 Model Context Protocol（MCP）服务。",
-  "pi-observational-memory": "为 Pi 提供观察式记忆，通过观察与反思进行便于缓存的分层压缩。",
   "pi-rewind": "为 Pi 提供检查点与回退能力，支持逐工具快照、安全恢复和重做。",
   "pi-simplify": "审查近期修改的代码，帮助提升清晰度、一致性和可维护性。",
   "pi-smart-fetch": "提供智能网页抓取，使用桌面浏览器 TLS 特征并提取干净正文。",

@@ -48,7 +48,6 @@ import {
 import { NativeSubagentCoordinator } from "./native-subagent-coordinator.js";
 import { NativeSubagentAdmission } from "./native-subagent-admission.js";
 import type { PiSdkRuntimeOptions } from "./pi-sdk-runtime-options.js";
-
 export type { PiSdkRuntimeOptions } from "./pi-sdk-runtime-options.js";
 
 export class PiSdkRuntime implements AgentRuntime {
@@ -143,7 +142,8 @@ export class PiSdkRuntime implements AgentRuntime {
         if (authorization) this.projections.recordToolAuthorization(toolCallId, authorization);
       },
       setSessionCwd: (cwd) => this.toolSafety.setCwd(cwd),
-      subagents: this.subagents
+      subagents: this.subagents,
+      sharedExperienceAccess: options.sharedExperienceAccess
     });
     this.configurationReload = new PiRuntimeConfigurationReload({
       getSession: () => this.sessionBindings.session,

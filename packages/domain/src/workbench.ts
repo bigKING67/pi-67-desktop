@@ -75,6 +75,7 @@ export type WorkbenchSurface =
 export const WORKBENCH_SETTINGS_SECTIONS = [
   "account",
   "general",
+  "context-memory",
   "providers",
   "packages",
   "extensions",

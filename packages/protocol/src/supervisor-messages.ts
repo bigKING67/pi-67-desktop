@@ -1,5 +1,4 @@
-import { Type, Value, type Static } from "./typebox-schema.js";
-import { strictObject } from "./schemas.js";
+import { strictObject, Type, Value, type Static } from "./typebox-schema.js";
 
 const OperationIdSchema = Type.String({ minLength: 1, maxLength: 512 });
 
@@ -48,7 +47,8 @@ export type AgentHostStartupStageTiming = Static<typeof AgentHostStartupStageTim
 
 export const CapabilityProjectionModeSchema = Type.Union([
   Type.Literal("packaged-direct"),
-  Type.Literal("legacy-copy")
+  Type.Literal("legacy-copy"),
+  Type.Literal("shared-profile")
 ]);
 
 export type CapabilityProjectionMode = Static<typeof CapabilityProjectionModeSchema>;

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { lstat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
@@ -45,7 +46,7 @@ import type { DesktopToolchain } from "./desktop-toolchain.js";
 import type { PackageNetworkSettingsStore } from "./package-network-settings.js";
 export interface DesktopCapabilityServiceOptions extends Partial<Browser67ProcessRunners> {
   capabilitiesRoot: string;
-  capabilityProjectionMode: "packaged-direct" | "legacy-copy";
+  capabilityProjectionMode: "packaged-direct" | "legacy-copy" | "shared-profile";
   agentDir: string;
   toolchain: DesktopToolchain;
   packageNetworkSettings: PackageNetworkSettingsStore;
@@ -60,7 +61,7 @@ export class DesktopCapabilityService {
   readonly #capabilitiesRoot: string;
   readonly #managedRoot: string;
   readonly #capabilityProjectionMode: DesktopCapabilityServiceOptions["capabilityProjectionMode"];
-  readonly #browser67PackageRoot: string;
+  readonly #browser67PackageRoots: readonly string[];
   readonly #toolchain: DesktopToolchain;
   readonly #packageNetworkSettings: PackageNetworkSettingsStore;
   readonly #runNpm: NonNullable<DesktopCapabilityServiceOptions["runNpm"]>;
@@ -82,9 +83,18 @@ export class DesktopCapabilityService {
     this.#capabilitiesRoot = resolve(options.capabilitiesRoot);
     this.#managedRoot = join(resolve(options.agentDir), "desktop-capabilities");
     this.#capabilityProjectionMode = options.capabilityProjectionMode;
-    const browser67PackageContainmentRoot = options.capabilityProjectionMode === "packaged-direct" ? this.#capabilitiesRoot : this.#managedRoot;
-    this.#browser67PackageRoot = join(browser67PackageContainmentRoot, "packages", "browser67");
-    if (!isContainedManagedCapabilityPath(this.#browser67PackageRoot, browser67PackageContainmentRoot)) throw new Error("browser67 package escaped its verified capability root.");
+    const browser67PackageContainmentRoots = options.capabilityProjectionMode === "packaged-direct"
+      ? [this.#capabilitiesRoot]
+      : options.capabilityProjectionMode === "shared-profile"
+        ? [join(this.#managedRoot, "shared-profile", "active"), this.#capabilitiesRoot]
+        : [this.#managedRoot];
+    this.#browser67PackageRoots = browser67PackageContainmentRoots.map((root) => {
+      const packageRoot = join(root, "packages", "browser67");
+      if (!isContainedManagedCapabilityPath(packageRoot, root)) {
+        throw new Error("browser67 package escaped its verified capability root.");
+      }
+      return packageRoot;
+    });
     this.#toolchain = options.toolchain;
     this.#packageNetworkSettings = options.packageNetworkSettings;
     this.#runNpm = options.runNpm ?? runBrowser67NpmInstall;
@@ -145,7 +155,7 @@ export class DesktopCapabilityService {
         const browserSyncRequired = previous?.extensionState === "reload-required" || (!alreadyCurrent && previous?.extensionState === "connected");
         let detail = alreadyCurrent ? "扩展文件已是当前内置版本；请验证连接。" : "扩展文件已准备；请在 Chrome 或 Edge 中加载后验证连接。";
         if (previous?.extensionState === "reload-required") {
-          detail = alreadyCurrent ? "受管扩展文件已是当前版本；浏览器仍需核对并同步 Pi-67 提供的加载来源。" : "受管扩展文件已更新；浏览器仍需核对并同步 Pi-67 提供的加载来源。";
+          detail = alreadyCurrent ? "受管扩展文件已是当前版本；浏览器仍需核对并同步 Desktop 管理的加载来源。" : "受管扩展文件已更新；浏览器仍需核对并同步 Desktop 管理的加载来源。";
         } else if (!alreadyCurrent && previous?.extensionState === "connected") {
           try {
             await this.#runBrowserExtensionReload(packageRoot, this.#toolchain);
@@ -227,7 +237,7 @@ export class DesktopCapabilityService {
       });
       return this.#snapshotUnlocked();
     }
-    if (this.#capabilityProjectionMode === "packaged-direct") {
+    if (this.#capabilityProjectionMode !== "legacy-copy") {
       throw new Error("Bundled browser67 dependencies are unavailable; reinstall or update Pi-67 Desktop.");
     }
     const candidates = npmRegistryCandidates(await this.#packageNetworkSettings.load());
@@ -426,7 +436,8 @@ export class DesktopCapabilityService {
   }
 
   #browserPackageRoot(): string {
-    return this.#browser67PackageRoot;
+    return this.#browser67PackageRoots.find((root) => existsSync(root))
+      ?? this.#browser67PackageRoots[0]!;
   }
 
   async #writeBrowserState(state: Browser67IntegrationState): Promise<void> {

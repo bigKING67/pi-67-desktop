@@ -121,7 +121,7 @@ export async function assertPackagedRuntimeAssets(artifact, {
     access(join(artifact.resourcesPath, "toolchain/manifest.json")),
     access(join(artifact.resourcesPath, "capabilities/manifest.json")),
     access(join(artifact.resourcesPath, "capabilities/catalog.json")),
-    access(join(artifact.resourcesPath, "capabilities/packages/pi67-core/package.json")),
+    access(join(artifact.resourcesPath, "capabilities/packages/pi-workspace-resources/package.json")),
     access(join(artifact.resourcesPath, "capabilities/packages/browser67/package.json")),
     access(join(artifact.resourcesPath, "capabilities/packages/browser67/node_modules/ajv/package.json")),
     access(join(artifact.resourcesPath, "capabilities/packages/browser67/node_modules/ws/package.json")),
@@ -129,7 +129,6 @@ export async function assertPackagedRuntimeAssets(artifact, {
     access(join(artifact.resourcesPath, "capabilities/packages/commerce-growth-os/package.json")),
     access(join(artifact.resourcesPath, "capabilities/managed-packages/bundled/manifest.json")),
     access(join(artifact.resourcesPath, "capabilities/managed-packages/bundled/packages/pi-mcp-adapter/package.json")),
-    access(join(artifact.resourcesPath, "capabilities/managed-packages/bundled/packages/pi-observational-memory/package.json")),
     ...(artifact.platform === "win32" && requireWindowsPackageWorkerJob
       ? [access(join(artifact.resourcesPath, "native/pi67-package-worker-job.exe"))]
       : []),

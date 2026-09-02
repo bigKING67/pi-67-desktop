@@ -44,6 +44,10 @@ import {
   type NativeSubagentSessionHandle
 } from "./native-subagent-coordinator.js";
 import { createNativeSubagentTools } from "./native-subagent-tools.js";
+import {
+  createSharedExperienceTools,
+  type SharedExperienceAccess
+} from "./shared-experience-tools.js";
 
 const DESKTOP_EXCLUDED_SDK_TOOLS = ["powershell"];
 
@@ -63,6 +67,7 @@ interface RuntimeSessionBindingsOptions {
   recordToolAuthorization: DesktopToolAuthorizationRecorder;
   setSessionCwd: (cwd: string) => void;
   subagents: NativeSubagentCoordinator;
+  sharedExperienceAccess: SharedExperienceAccess | undefined;
 }
 
 /** Owns the mutable Pi SDK session runtime and all bindings tied to its current session. */
@@ -125,6 +130,7 @@ export class RuntimeSessionBindings {
       const toolAliases = createDesktopToolAliasBinding();
       const customTools = [
         ...createFirstPartyWebTools(),
+        ...createSharedExperienceTools(this.options.sharedExperienceAccess),
         ...this.planMode.createTools(),
         ...createNativeSubagentTools(this.options.subagents),
         ...toolAliases.tools
@@ -217,6 +223,7 @@ export class RuntimeSessionBindings {
       const toolAliases = createDesktopToolAliasBinding();
       const customTools = [
         ...createFirstPartyWebTools(),
+        ...createSharedExperienceTools(this.options.sharedExperienceAccess),
         ...this.planMode.createTools(),
         ...createNativeSubagentTools(this.options.subagents),
         ...toolAliases.tools
@@ -304,6 +311,7 @@ export class RuntimeSessionBindings {
     const toolAliases = createDesktopToolAliasBinding();
     const customTools = [
       ...createFirstPartyWebTools(),
+      ...createSharedExperienceTools(this.options.sharedExperienceAccess),
       ...createNativeSubagentTools(this.options.subagents, {
         parentChildId: input.lineage.childId,
         depth: input.lineage.depth

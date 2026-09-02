@@ -83,14 +83,9 @@ export function BundledSkillSuiteDetail({ suite, pack, query, busy, onBack, onMu
           {pack?.manager === "pi67-desktop" ? <SettingsRow
             title="当前生效"
             description={pack.effectiveSource === "managed"
-              ? "当前由 Pi-67 官方 registry 安装的独立 Overlay 提供，同名技能优先于内置 Package。"
+              ? "当前保留历史版本中已安装并验证的受管 Overlay；后续版本只随 Desktop 能力包更新。"
               : "当前直接使用随 Desktop 发布且经过完整性校验的内置 Package。"}
             value={`${pack.installedVersion ?? pack.baselineVersion ?? "未知"} · ${pack.effectiveSource === "managed" ? "Overlay" : "内置"}`}
-          /> : null}
-          {pack?.latestVersion && pack.manager !== "lark-cli" ? <SettingsRow
-            title={pi67RegistryVersionIsHistory(pack) ? "Registry 记录版本" : "最新兼容版本"}
-            description={pi67RegistryVersionDescription(pack)}
-            value={pack.latestVersion}
           /> : null}
           <SettingsRow
             title="更新方式"
@@ -124,14 +119,14 @@ export function BundledSkillSuiteDetail({ suite, pack, query, busy, onBack, onMu
           <SettingsRow
             key={skill ? `${skill.packageId}:${skill.id}` : id}
             title={skill?.displayName ?? id}
-            description={skill ? skillPurpose(skill.description) : "由当前受管 Overlay 新增的 registry 成员。"}
+            description={skill ? skillPurpose(skill.description) : "由历史受管 Overlay 保留的成员。"}
             value={skill?.installed === false ? "准备中" : undefined}
           >
             <span className={styles.skillMeta}>{skill
               ? pack?.manager === "lark-cli"
                 ? `Lark CLI 官方 Skills · ${pack.installedSkillVersion ?? "版本待检查"}`
                 : `${skill.packageDisplayName} · ${pack?.installedVersion ?? skill.version}`
-              : `Pi-67 registry Overlay · ${pack?.installedVersion ?? "当前版本"}`}</span>
+              : `旧版受管 Overlay · ${pack?.installedVersion ?? "当前版本"}`}</span>
           </SettingsRow>
         ))}</SettingsRows> : (
           <SettingsNotice className={styles.emptyResult!}>没有匹配的内置技能。</SettingsNotice>
@@ -161,7 +156,7 @@ export function suiteStatus(suite: DesktopBundledSkillSuiteSummary, pack?: Skill
   if (pack?.updateStatus === "unavailable") return { id: "unavailable", label: "检查失败" };
   if (pack?.updateStatus === "current") return { id: "ready", label: "已是最新" };
   if (pack?.updateStatus === "application-managed") {
-    return { id: "ready", label: pack.manager === "pi67-desktop" ? "暂无可安装更新" : "随应用更新" };
+    return { id: "ready", label: "随 Desktop 更新" };
   }
   if (pack?.updateStatus === "not-checked") return { id: "ready", label: "尚未检查" };
   if (pack?.manager === "pi67-desktop" && pack.effectiveSource === "managed") {
@@ -178,10 +173,6 @@ export function suiteVersionSummary(suite: DesktopBundledSkillSuiteSummary, pack
   if (pack?.manager === "lark-cli" && pack.installedVersion) return `当前 CLI ${pack.installedVersion}`;
   if (pack?.manager === "pi67-desktop") {
     const effectiveVersion = pack.installedVersion ?? pack.baselineVersion;
-    if (effectiveVersion && pack.latestVersion) {
-      const registryLabel = pi67RegistryVersionIsHistory(pack) ? "Registry 记录" : "最新兼容";
-      return `当前 ${effectiveVersion} · ${registryLabel} ${pack.latestVersion}`;
-    }
     if (pack.effectiveSource === "managed") return `当前 Overlay ${effectiveVersion ?? "未知"}`;
   }
   if (suite.bundledVersion) return `内置基线 ${suite.bundledVersion}`;
@@ -194,23 +185,6 @@ function suiteSourceSummary(suite: DesktopBundledSkillSuiteSummary): string {
   return sources.size === 1 ? [...sources][0]! : `${sources.size} 个内置来源`;
 }
 
-function pi67RegistryVersionIsHistory(pack: SkillPackEntry): boolean {
-  const effectiveVersion = pack.installedVersion ?? pack.baselineVersion;
-  return pack.manager === "pi67-desktop"
-    && Boolean(pack.latestVersion && effectiveVersion && pack.latestVersion !== effectiveVersion)
-    && pack.updateStatus !== "update-available";
-}
-
-function pi67RegistryVersionDescription(pack: SkillPackEntry): string {
-  const commit = pack.registryCommit ? `Pi-67 registry commit ${pack.registryCommit.slice(0, 9)}` : "最近一次 Pi-67 registry 检查";
-  if (pi67RegistryVersionIsHistory(pack)) {
-    return pack.updateStatus === "application-managed"
-      ? `来自 ${commit}；该版本尚未开放独立安装，当前版本不会被覆盖。`
-      : `来自 ${commit}；该记录不高于当前生效版本，仅作兼容历史，不会触发降级。`;
-  }
-  return `来自 ${commit}。`;
-}
-
 function suiteVersionValue(suite: DesktopBundledSkillSuiteSummary): string {
   if (suite.bundledVersion) return suite.bundledVersion;
   if (suite.versionSource === "multiple-sources") return suiteSourceSummary(suite);
@@ -219,7 +193,7 @@ function suiteVersionValue(suite: DesktopBundledSkillSuiteSummary): string {
 
 function suiteVersionDescription(suite: DesktopBundledSkillSuiteSummary): string {
   if (suite.versionSource === "skill-pack") {
-    return "来自 Pi-67 Skill Pack registry 与锁文件，不使用承载它的 Pi-67 Core 版本冒充套件版本。";
+    return "来自 Desktop 内建 Skill Pack 清单与完整性锁，不借用承载包版本冒充套件版本。";
   }
   if (suite.versionSource === "capability-package") {
     return "套件与其完整第一方能力包使用同一个已锁定版本。";
@@ -227,7 +201,7 @@ function suiteVersionDescription(suite: DesktopBundledSkillSuiteSummary): string
   if (suite.versionSource === "multiple-sources") {
     return "这是多来源聚合分组，没有虚构的统一版本；每个技能保留真实承载来源和版本。";
   }
-  return "当前上游内容尚未提供可验证的独立套件版本，因此只显示来源，不借用 Pi-67 Core 版本。";
+  return "当前上游内容尚未提供可验证的独立套件版本，因此只显示来源，不借用 Desktop 承载包版本。";
 }
 
 function suiteUpdateLabel(suite: DesktopBundledSkillSuiteSummary): string {
@@ -238,15 +212,10 @@ function suiteUpdateLabel(suite: DesktopBundledSkillSuiteSummary): string {
 
 function suiteUpdateDescription(suite: DesktopBundledSkillSuiteSummary): string {
   if (suite.updateManager === "lark-cli") {
-    return "内置基线随 Desktop 发布；官方 Skills 安装到 ~/.agents/skills，Pi-67 与其他兼容 Agent 可共享。";
-  }
-  if (suite.updateManager === "pi67-skill-pack-registry") {
-    return suite.independentUpdateState === "planned"
-      ? "已登记上游与版本来源；受管兼容更新通道开放前仍随 Desktop 发布，不直接对上游仓库执行 git pull。"
-      : "由 Pi-67 受管 Skill Pack registry 检查兼容版本、原子安装并支持回滚。";
+    return "内置基线随 Desktop 发布；官方 Skills 安装到 ~/.agents/skills，Pi TUI 与其他兼容 Agent 可共享。";
   }
   if (suite.updateManager === "desktop-capability") {
-    return "必须连同运行依赖、MCP、浏览器扩展和诊断合同一起更新，不能只替换其中几个技能。";
+    return "由 Desktop 按锁定来源、完整性与兼容性合同整体更新。";
   }
   return "该分组包含多个第一方来源；版本和更新按每个来源分别处理。";
 }

@@ -1,0 +1,18 @@
+{
+  "name": "@pi67/pi-workspace-resources",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Desktop-owned Pi rules, prompts, skills, and rules-loader source.",
+  "desktopMigration": {
+    "legacyRulesLoaderTreeSha256": "92f8bdb0332b8812f1844284d555ec281dcd3d00c3cf49990989b19b78707a84"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@pi67/pi-runtime": "workspace:*",
+    "@types/node": "24.10.1",
+    "typescript": "7.0.2"
+  }
+}

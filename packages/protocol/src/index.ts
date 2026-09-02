@@ -6,7 +6,10 @@ export {
 export * from "@pi67/support-contract";
 export * from "./agent-messages.js";
 export * from "./context-file-schemas.js";
+export * from "./context-memory-messages.js";
+export * from "./context-memory-schemas.js";
 export * from "./desktop-system-contract.js";
+export * from "./enterprise-credential-broker.js";
 export * from "./envelope.js";
 export * from "./extension-package-operation.js";
 export * from "./port-client.js";

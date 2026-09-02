@@ -15,6 +15,21 @@ const LIFECYCLE_TYPES = new Set<AgentCommandType>([
 ]);
 
 describe("HostTaskStateCoordinator Workspace authority", () => {
+  it("uses the Protocol scope requirement as the App authority classification", () => {
+    const fixture = coordinatorFixture();
+    const appTypes = Object.entries(COMMAND_CONTEXT_SCOPE_REQUIREMENTS)
+      .filter((entry): entry is [AgentCommandType, "app"] => entry[1] === "app")
+      .map(([type]) => type);
+
+    for (const type of appTypes) {
+      expect(fixture.coordinator.authorizeRequestContext(appRequest(type))).toBeUndefined();
+    }
+
+    expect(fixture.workspaces.require).not.toHaveBeenCalled();
+    expect(fixture.taskRuntimes.admit).not.toHaveBeenCalled();
+    expect(fixture.taskRuntimes.assertSessionAuthority).not.toHaveBeenCalled();
+  });
+
   it("uses the Protocol scope requirement as the Workspace authority classification", () => {
     const fixture = coordinatorFixture();
     const workspaceTypes = Object.entries(COMMAND_CONTEXT_SCOPE_REQUIREMENTS)
@@ -59,6 +74,18 @@ function request(type: AgentCommandType): RequestEnvelope {
     requestId: `request-${type}`,
     hostEpoch: 1,
     context: { scope: "workspace", workspaceId: WORKSPACE_ID },
+    type,
+    payload: {}
+  } as RequestEnvelope;
+}
+
+function appRequest(type: AgentCommandType): RequestEnvelope {
+  return {
+    protocolVersion: PROTOCOL_VERSION,
+    kind: "request",
+    requestId: `request-${type}`,
+    hostEpoch: 1,
+    context: { scope: "app" },
     type,
     payload: {}
   } as RequestEnvelope;

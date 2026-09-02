@@ -86,7 +86,8 @@ xattr -dr com.apple.quarantine "/Applications/Pi-67 Desktop.app"
 - Composer 非空文本和 `streamBehavior` 由 Electron Main 使用 `safeStorage` 加密持久化；附件 staging handle 不跨重启，安全存储不可用时不写明文
 - 后台/隐藏会话完成、失败或等待交互时可发原生系统通知；Main 使用固定隐私文案，点击按 opaque Workspace/Session identity 返回精确会话，不显示 Prompt、源码、Tool 结果、错误详情或绝对路径
 - 第三方 Pi Package 只有在匹配 Pi-67 已知内容基线，或 Desktop durable 安装/用户确认 receipt 与当前 bounded directory/manifest/content observation 一致时才进入 Runtime；待确认、内容变更、结果不明或检查超限都不会加载，也不会触发 Pi 的隐式安装。确认操作只绑定当前已安装 bytes，不下载、不重装
-- 默认 Package 保持有界：除第一方 capability 外，内置并离线激活完整锁定闭包的 `pi-mcp-adapter@2.11.0` 与 `pi-observational-memory@3.0.3`，客户端不运行 npm；两者默认启用，Observational Memory 预留 Desktop-owned durable opt-out（当前没有完成显式开关 UI），不改共享 Pi settings，也不删除既有 memory 数据
+- 默认 Package 保持有界：除第一方 capability 外，只内置并离线激活 `pi-mcp-adapter@2.11.0` 的完整锁定闭包，客户端不运行 npm。OpenViking 是唯一受支持的第三方 Context/Memory Owner；旧 `pi-observational-memory` 与 `pi-hy-memory` 不再打包或推荐，只保留遗留识别、禁用和迁移边界，且不删除既有 memory 数据
+- OpenViking 本机个人数据面由 Agent Host 使用显式环境变量或仓库外 `~/.openviking/ovcli.conf` 中的用户级 Bearer；不读取 Server Root Key，也不把凭据送入 Renderer、Protocol、Pi JSONL、诊断或默认日志。Runtime 状态同时验证服务健康与已认证 `viking://` 数据面；Workspace Peer 与 Pi Extension 统一为规范化根路径 SHA-256。企业登录后的短期凭据仍应由 Main/系统安全存储代理，不复用本机 Root/Admin Key
 - `tmwd_browser` 与 `js-reverse` 由 Desktop 使用私有 Node 注册到当前 Pi Agent Profile 的 `mcp.json`；同名用户自定义项不覆盖，browser67 revision/spec 更新时只定向失效这两项 `mcp-cache.json` metadata，不影响其他 MCP server cache
 - Plan Mode 与 Search 已改为 Pi SDK 第一方能力，不依赖 Extension Package。`/plan` 与 `/default` 是 Desktop-owned action；Plan Markdown 以 Pi JSONL 为真源，点击开始执行时 Renderer 只提交 `planId + submissionId`
 - `web_search`、`source_check`、`fetch_content`、`get_search_content` 由 Pi-67 原生注册：Web Search 没有用户开关或持久化偏好，由模型按任务自行决定是否调用；`web_search` 只按所选模型声明的协议原生路由执行。无路由、无凭据或 Provider 请求失败都会显式失败，不切换 Provider，也不回退 Exa、Tavily、MCP 或 Search Extension。UI 的“原生搜索 · 已声明”不是 live verification

@@ -108,17 +108,6 @@ export async function runWithNpmRegistryFallback<T>(
   );
 }
 
-export function isolatedGitEnvironment(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const environment = { ...source };
-  for (const key of Object.keys(environment)) {
-    if (key.startsWith("GIT_CONFIG_")) delete environment[key];
-  }
-  environment.GIT_CONFIG_COUNT = "0";
-  environment.GIT_CONFIG_GLOBAL = process.platform === "win32" ? "NUL" : "/dev/null";
-  environment.GIT_CONFIG_NOSYSTEM = "1";
-  return environment;
-}
-
 async function probeNpmRegistry(url: string, timeoutMs: number, resourcePath: string): Promise<boolean> {
   const response = await fetch(`${url}${resourcePath}`, {
     signal: AbortSignal.timeout(timeoutMs),

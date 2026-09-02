@@ -31,7 +31,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 export async function verifyCapabilitySourceLock({ lock, verifyCommit = fetchExactCommit }) {
   assertCapabilitySourceLock(lock);
   const sources = [
-    ...lock.sources.map((source) => ({
+    ...lock.sources.filter((source) => source.repository !== undefined).map((source) => ({
       id: source.id,
       repository: source.repository,
       commit: source.commit

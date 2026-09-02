@@ -80,3 +80,17 @@ export function emptyAgentHostStopResult(
     extensionRequestsCancelled: 0
   };
 }
+
+export function completedAgentHostStopResult(
+  completion: AgentHostShutdownCompleteMessage | undefined,
+  graceful: boolean,
+  forced: boolean
+): AgentHostStopResult {
+  return {
+    graceful,
+    forced,
+    activeOperation: completion?.activeOperation ?? "none",
+    queuedCommandsDropped: completion?.queuedCommandsDropped ?? 0,
+    extensionRequestsCancelled: completion?.extensionRequestsCancelled ?? 0
+  };
+}

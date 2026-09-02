@@ -15,6 +15,7 @@ vi.mock("electron", () => ({
 }));
 
 import { AgentHostSupervisor } from "./agent-host-supervisor.js";
+import type { EnterpriseCredentialBrokerPort } from "./enterprise-credential-supervisor.js";
 
 describe("AgentHostSupervisor readiness", () => {
   beforeEach(() => {
@@ -95,6 +96,37 @@ describe("AgentHostSupervisor readiness", () => {
     expect(window.postMessage).toHaveBeenCalledOnce();
   });
 
+  it("hands off the Agent Host before enterprise credential restoration settles", async () => {
+    let resolveLoad!: (value: { storage: "available" }) => void;
+    const loading = new Promise<{ storage: "available" }>((resolve) => {
+      resolveLoad = resolve;
+    });
+    const host = fakeUtilityProcess();
+    const window = fakeWindow();
+    electronMocks.fork.mockReturnValue(host as unknown as UtilityProcess);
+    const supervisor = createSupervisor(window.value, {
+      load: () => loading,
+      store: vi.fn().mockResolvedValue(undefined),
+      clear: vi.fn().mockResolvedValue(undefined)
+    });
+
+    supervisor.connect();
+    host.emit("spawn");
+    host.emit("message", readyMessage());
+
+    expect(supervisor.diagnostics()).toMatchObject({ phase: "running", portHandoffCount: 1 });
+    expect(window.postMessage).toHaveBeenCalledOnce();
+    expect(host.postMessage).toHaveBeenCalledOnce();
+
+    resolveLoad({ storage: "available" });
+    await vi.waitFor(() => {
+      expect(host.postMessage).toHaveBeenCalledWith({
+        type: "enterprise-credential-bootstrap",
+        storage: "available"
+      });
+    });
+  });
+
   it("ignores readiness after shutdown begins", () => {
     const host = fakeUtilityProcess();
     const window = fakeWindow();
@@ -141,7 +173,10 @@ describe("AgentHostSupervisor readiness", () => {
   });
 });
 
-function createSupervisor(window: BrowserWindow): AgentHostSupervisor {
+function createSupervisor(
+  window: BrowserWindow,
+  enterpriseCredentials?: EnterpriseCredentialBrokerPort
+): AgentHostSupervisor {
   return new AgentHostSupervisor({
     agentHostEntry: "/app/agent-host.mjs",
     appInstanceId: "app-1",
@@ -152,6 +187,9 @@ function createSupervisor(window: BrowserWindow): AgentHostSupervisor {
       sessionCatalogDirectory: "/private/user-data/projections/session-catalog"
     }),
     getMainWindow: () => window,
+    ...(enterpriseCredentials === undefined
+      ? {}
+      : { getEnterpriseCredentials: () => enterpriseCredentials }),
     rendererUrl: "app://pi67/index.html"
   });
 }

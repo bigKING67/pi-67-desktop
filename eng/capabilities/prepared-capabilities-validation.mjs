@@ -77,25 +77,38 @@ export function assertCapabilitiesMetadata(lock, catalog, manifest) {
     const entry = entries.get(id);
     const packageIdentity = packages.get(id);
     if (
-      generatedSource?.commit !== source.commit
-      || generatedSource?.version !== source.version
-      || generatedSource?.repository !== source.repository
-      || entry?.commit !== source.commit
+      generatedSource?.version !== source.version
+      || !hasMatchingSourceProvenance(generatedSource, source)
       || entry?.version !== source.version
-      || entry?.repository !== source.repository
+      || !hasMatchingSourceProvenance(entry, source)
       || typeof entry?.packagePath !== "string"
       || !/^[a-f0-9]{64}$/u.test(packageIdentity?.treeSha256 ?? "")
-      || (id === "pi67-core" && JSON.stringify(entry?.bundledExtensions) !== JSON.stringify(source.includedExtensions))
+      || (source.includedExtensions !== undefined
+        && JSON.stringify(entry?.bundledExtensions) !== JSON.stringify(source.includedExtensions))
     ) throw new Error(`Prepared capability metadata is stale: ${id}`);
   }
 }
 
-export async function treeSha256(root) {
+function hasMatchingSourceProvenance(candidate, source) {
+  if (source.internalPath !== undefined) {
+    return candidate?.internalPath === source.internalPath
+      && candidate?.sourceTreeSha256 === source.treeSha256
+      && candidate?.repository === undefined
+      && candidate?.commit === undefined;
+  }
+  return candidate?.repository === source.repository
+    && candidate?.commit === source.commit
+    && candidate?.internalPath === undefined
+    && candidate?.sourceTreeSha256 === undefined;
+}
+
+export async function treeSha256(root, { includeNodeModules = true } = {}) {
   const hash = createHash("sha256");
   const visit = async (directory) => {
     const entries = (await readdir(directory, { withFileTypes: true }))
       .sort((left, right) => left.name.localeCompare(right.name));
     for (const entry of entries) {
+      if (!includeNodeModules && entry.name === "node_modules") continue;
       const path = join(directory, entry.name);
       const relativePath = relative(root, path).split(sep).join("/");
       if (entry.isDirectory()) {
@@ -123,17 +136,31 @@ export function assertCapabilitySourceLock(lock) {
   ) throw new Error("Capability source lock is invalid.");
 
   const ids = lock.sources.map((source) => source.id);
-  if (new Set(ids).size !== ids.length || ids.length !== 4) throw new Error("Capability source ids are invalid.");
+  const expectedIds = [
+    "pi-workspace-resources",
+    "openviking-pi-extension",
+    "browser67",
+    "design-craft",
+    "commerce-growth-os"
+  ];
+  if (new Set(ids).size !== ids.length || JSON.stringify(ids) !== JSON.stringify(expectedIds)) {
+    throw new Error("Capability source ids are invalid.");
+  }
   for (const source of lock.sources) {
-    if (!/^[0-9a-f]{40}$/u.test(source.commit) || !source.repository.startsWith("https://github.com/")) {
-      throw new Error(`Capability source ${source.id} is not pinned to a canonical Git commit.`);
+    if (source.internalPath !== undefined) {
+      assertInternalSource(source);
+    } else {
+      if (!/^[0-9a-f]{40}$/u.test(source.commit) || !source.repository.startsWith("https://github.com/")) {
+        throw new Error(`Capability source ${source.id} is not pinned to a canonical Git commit.`);
+      }
+      if (source.ref !== undefined && !isTrackedBranchRef(source.ref)) {
+        throw new Error(`Capability source ${source.id} has an invalid tracked branch ref.`);
+      }
+      assertLocalSibling(source.localSibling, "capability local sibling");
     }
-    if (source.ref !== undefined && !isTrackedBranchRef(source.ref)) {
-      throw new Error(`Capability source ${source.id} has an invalid tracked branch ref.`);
-    }
-    assertLocalSibling(source.localSibling, "capability local sibling");
-    if (source.id === "pi67-core") assertIncludedExtensions(source.includedExtensions);
-    else if (source.includedExtensions !== undefined) {
+    if (["pi-workspace-resources", "openviking-pi-extension"].includes(source.id)) {
+      assertIncludedExtensions(source.includedExtensions);
+    } else if (source.includedExtensions !== undefined) {
       throw new Error(`Capability source ${source.id} cannot declare bundled Extension selection.`);
     }
   }
@@ -181,7 +208,19 @@ function assertIncludedExtensions(value) {
     ))
     || new Set(ids).size !== ids.length
     || JSON.stringify(ids) !== JSON.stringify([...ids].sort((left, right) => left.localeCompare(right)))
-  ) throw new Error("Pi-67 Core bundled Extension selection is invalid.");
+  ) throw new Error("Desktop bundled Extension selection is invalid.");
+}
+
+function assertInternalSource(source) {
+  if (
+    typeof source.internalPath !== "string"
+    || !/^packages\/[a-z0-9][a-z0-9-]{0,79}$/u.test(source.internalPath)
+    || !/^[a-f0-9]{64}$/u.test(source.treeSha256 ?? "")
+    || source.repository !== undefined
+    || source.ref !== undefined
+    || source.commit !== undefined
+    || source.localSibling !== undefined
+  ) throw new Error(`Capability source ${source.id} is not pinned to a contained Desktop tree.`);
 }
 
 function assertRecommendedPackage(entry) {

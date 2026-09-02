@@ -11,7 +11,6 @@ import type {
 import { LARK_CLI_SKILL_PACK_ID } from "@pi67/domain";
 import { HostCommandError } from "./protocol-error.js";
 import type { ResourceMutationTransaction } from "./resource-management-coordinator.js";
-import { beginAiBerkshireSkillPackUpdate } from "./ai-berkshire-skill-pack-update.js";
 import {
   beginDesktopLarkCliInstallation,
   beginDesktopLarkSkillSynchronization
@@ -31,10 +30,6 @@ import {
   removeManagedSkillPack
 } from "./managed-skill-pack-state.js";
 import {
-  createPi67SkillPackChannel,
-  type Pi67SkillPackChannelPort
-} from "./pi67-skill-pack-channel.js";
-import {
   runBoundedSkillPackProcess,
   type SkillPackProcessRunner
 } from "./skill-pack-process-runner.js";
@@ -47,11 +42,7 @@ import {
   readLarkSuite,
   readSkillSuite
 } from "./skill-pack-catalog.js";
-import {
-  applyLarkUpdateCheck,
-  applyPi67UpdateCheck,
-  parseLarkUpdateResult
-} from "./skill-pack-update-state.js";
+import { applyLarkUpdateCheck, parseLarkUpdateResult } from "./skill-pack-update-state.js";
 import { boundedError } from "./skill-pack-validation.js";
 
 const AI_BERKSHIRE_PACK_ID = "ai-berkshire-investment-suite";
@@ -74,7 +65,6 @@ export interface SkillPackManagementOptions {
   runProcess?: SkillPackProcessRunner;
   installLarkCli?: typeof beginDesktopLarkCliInstallation;
   synchronizeLarkSkills?: typeof beginDesktopLarkSkillSynchronization;
-  pi67Channel?: Pi67SkillPackChannelPort;
 }
 
 export function createSkillPackManagement(
@@ -93,7 +83,6 @@ export class SkillPackManagement implements SkillPackManagementPort {
   readonly #resolveLarkCli: () => Promise<string | undefined>;
   readonly #installLarkCli: NonNullable<SkillPackManagementOptions["installLarkCli"]>;
   readonly #synchronizeLarkSkills: NonNullable<SkillPackManagementOptions["synchronizeLarkSkills"]>;
-  readonly #pi67Channel: Pi67SkillPackChannelPort;
   readonly #checkProjection: SkillPackCheckProjector;
 
   constructor(
@@ -109,11 +98,6 @@ export class SkillPackManagement implements SkillPackManagementPort {
     this.#runProcess = options.runProcess ?? runBoundedSkillPackProcess;
     this.#installLarkCli = options.installLarkCli ?? beginDesktopLarkCliInstallation;
     this.#synchronizeLarkSkills = options.synchronizeLarkSkills ?? beginDesktopLarkSkillSynchronization;
-    this.#pi67Channel = options.pi67Channel ?? createPi67SkillPackChannel({
-      environment: this.#environment,
-      runProcess: this.#runProcess,
-      now: this.#now
-    });
     this.#resolveLarkCli = options.resolveLarkCli ?? (() => resolveLarkCli({
       environment: this.#environment,
       homeDirectory: this.#homeDirectory,
@@ -175,7 +159,6 @@ export class SkillPackManagement implements SkillPackManagementPort {
 
   async beginUpdate(id: string): Promise<ResourceMutationTransaction<SkillPackMutationResult>> {
     if (id === LARK_CLI_SKILL_PACK_ID) return this.#beginLarkUpdate();
-    if (id === AI_BERKSHIRE_PACK_ID) return this.#beginAiBerkshireUpdate();
     throw new HostCommandError("INVALID_PAYLOAD", "The managed Skill Pack is not supported.", false);
   }
 
@@ -259,18 +242,6 @@ export class SkillPackManagement implements SkillPackManagementPort {
     });
   }
 
-  async #beginAiBerkshireUpdate(): Promise<ResourceMutationTransaction<SkillPackMutationResult>> {
-    return beginAiBerkshireSkillPackUpdate({
-      agentDir: this.services.agentDir,
-      environment: this.#environment,
-      current: await this.#aiBerkshireEntry(),
-      channel: this.#pi67Channel,
-      list: () => this.list(),
-      mutationResult: (entry, changed) => this.#mutationResultWithEntry(entry, changed),
-      now: this.#now
-    });
-  }
-
   async #larkEntryForExecutable(executable: string | undefined): Promise<SkillPackEntry> {
     const suite = await readLarkSuite(this.#capabilitiesRoot);
     const roots = [
@@ -303,7 +274,7 @@ export class SkillPackManagement implements SkillPackManagementPort {
       source: "@larksuite/cli",
       detail: executable
         ? canInstall
-          ? "官方办公 Skills 尚未完整安装到 ~/.agents/skills；确认安装后可供 Pi-67 与其他兼容 Agent 共享。"
+          ? "官方办公 Skills 尚未完整安装到 ~/.agents/skills；确认安装后可供 Pi TUI、Desktop 与其他兼容 Agent 共享。"
           : "点击检查更新后，由 Lark CLI 验证版本和官方技能同步状态。"
         : "需要先安装官方 Lark CLI，才能检查技能更新、准备飞书连接和进行用户授权。"
     };
@@ -324,8 +295,8 @@ export class SkillPackManagement implements SkillPackManagementPort {
       description: suite.description,
       manager: "pi67-desktop",
       managerStatus: "ready",
-      updateOwner: "managed-pack",
-      updateStatus: "not-checked",
+      updateOwner: "desktop",
+      updateStatus: "application-managed",
       localState: managed.status === "invalid" ? "modified" : "clean",
       provenance: managed.status === "invalid" ? "unverified" : "verified",
       installed: true,
@@ -342,8 +313,8 @@ export class SkillPackManagement implements SkillPackManagementPort {
       detail: managed.status === "invalid"
         ? `${managed.detail} 当前继续使用已验证的内置版本，可恢复内置版本以清理损坏的 Overlay。`
         : valid
-          ? "当前使用 Pi-67 官方 registry 安装的受管 Overlay。"
-          : "当前使用随 Desktop 发布的不可变内置基线。"
+          ? "当前保留已验证的旧受管 Overlay；后续版本只随 Desktop capability 更新，可随时恢复内置基线。"
+          : "当前使用随 Desktop 发布的不可变内置基线；不依赖独立更新服务。"
     };
   }
 
@@ -379,12 +350,7 @@ export class SkillPackManagement implements SkillPackManagementPort {
   }
 
   async #checkAiBerkshireEntry(): Promise<SkillPackEntry> {
-    const entry = await this.#aiBerkshireEntry();
-    try {
-      return applyPi67UpdateCheck(entry, await this.#pi67Channel.check());
-    } catch (error) {
-      return { ...entry, updateStatus: "unavailable", canUpdate: false, detail: boundedError(error) };
-    }
+    return this.#aiBerkshireEntry();
   }
 
   async #mutationResultWithEntry(

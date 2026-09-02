@@ -16,7 +16,8 @@ describe("settings navigation", () => {
         label: "应用",
         items: [
           { id: "account", label: "账户" },
-          { id: "general", label: "外观" }
+          { id: "general", label: "外观" },
+          { id: "context-memory", label: "Context & Memory" }
         ]
       },
       {
@@ -56,7 +57,7 @@ describe("settings navigation", () => {
   });
 
   it("keeps every category in the shared Settings document flow", () => {
-    expect(SETTINGS_SECTIONS).toHaveLength(15);
+    expect(SETTINGS_SECTIONS).toHaveLength(16);
     expect(SETTINGS_SECTIONS.every((item) => !("layout" in item))).toBe(true);
   });
 
@@ -71,6 +72,7 @@ describe("settings navigation", () => {
     const runtime = items.find((item) => item.id === "runtime");
     const usage = items.find((item) => item.id === "usage");
     const lark = items.find((item) => item.id === "lark");
+    const contextMemory = items.find((item) => item.id === "context-memory");
 
     expect(provider && matchesSettingsQuery(provider, "provider")).toBe(true);
     expect(provider && matchesSettingsQuery(provider, "模型服务")).toBe(true);
@@ -95,6 +97,8 @@ describe("settings navigation", () => {
     expect(runtime && matchesSettingsQuery(runtime, "session")).toBe(true);
     expect(usage && matchesSettingsQuery(usage, "usage")).toBe(true);
     expect(usage && matchesSettingsQuery(usage, "token")).toBe(true);
+    expect(contextMemory && matchesSettingsQuery(contextMemory, "openviking")).toBe(true);
+    expect(contextMemory && matchesSettingsQuery(contextMemory, "经验")).toBe(true);
     expect(sectionSupportsProjectScope("prompts")).toBe(true);
     expect(sectionSupportsProjectScope("providers")).toBe(true);
     expect(sectionSupportsProjectScope("vision")).toBe(true);

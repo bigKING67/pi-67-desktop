@@ -31,6 +31,6 @@ export function LarkCliRequiredNotice({ canInstall, installing, onInstall }: {
     tone="warning"
   >
     <strong>需要先安装 Lark CLI</strong><br />
-    安装会同时启用当前用户的 Lark CLI，并将官方办公 Skills 放入 <code>~/.agents/skills</code>，供 Pi-67 与其他兼容 Agent 共享。
+    安装会同时启用当前用户的 Lark CLI，并将官方办公 Skills 放入 <code>~/.agents/skills</code>，供 Pi TUI、Desktop 与其他兼容 Agent 共享。
   </SettingsNotice>;
 }

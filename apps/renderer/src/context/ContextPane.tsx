@@ -1,4 +1,4 @@
-import { Bot, FilePenLine, Files, Gauge, MessagesSquare } from "lucide-react";
+import { Bot, BrainCircuit, FilePenLine, Files, Gauge, Lightbulb, MessagesSquare } from "lucide-react";
 import { lazy, Suspense } from "react";
 import { Tab, TabList, TabPanel, Tabs } from "react-aria-components";
 import { useShellStore } from "../shell/shell-store.js";
@@ -16,6 +16,12 @@ const RuntimeContextPanel = lazy(() => import("./RuntimeContextPanel.js").then((
 const SubagentsPanel = lazy(() => import("../subagents/SubagentsPanel.js").then((module) => ({
   default: module.SubagentsPanel
 })));
+const MemoryInspectorPanel = lazy(() => import("../context-memory/MemoryInspectorPanel.js").then((module) => ({
+  default: module.MemoryInspectorPanel
+})));
+const ExperienceInspectorPanel = lazy(() => import("../context-memory/ExperienceInspectorPanel.js").then((module) => ({
+  default: module.ExperienceInspectorPanel
+})));
 
 export function ContextPane() {
   const selectedTab = useShellStore((state) => state.contextTab);
@@ -30,6 +36,8 @@ export function ContextPane() {
           <Tab id="messages"><MessagesSquare aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>消息</span></Tab>
           <Tab id="agents"><Bot aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>代理</span></Tab>
           <Tab id="context"><Gauge aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>上下文</span></Tab>
+          <Tab id="memory"><BrainCircuit aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>记忆</span></Tab>
+          <Tab id="experience"><Lightbulb aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>经验</span></Tab>
         </TabList>
         <TabPanel id="files" className="context-panel inspector-files-panel">
           <FilesPanel />
@@ -52,6 +60,16 @@ export function ContextPane() {
         <TabPanel id="context" className="context-panel">
           {selectedTab === "context" ? (
             <Suspense fallback={<ContextPanelLoadingState />}><RuntimeContextPanel /></Suspense>
+          ) : null}
+        </TabPanel>
+        <TabPanel id="memory" className="context-panel">
+          {selectedTab === "memory" ? (
+            <Suspense fallback={<ContextPanelLoadingState />}><MemoryInspectorPanel /></Suspense>
+          ) : null}
+        </TabPanel>
+        <TabPanel id="experience" className="context-panel">
+          {selectedTab === "experience" ? (
+            <Suspense fallback={<ContextPanelLoadingState />}><ExperienceInspectorPanel /></Suspense>
           ) : null}
         </TabPanel>
       </Tabs>

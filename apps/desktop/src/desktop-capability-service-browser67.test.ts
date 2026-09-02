@@ -125,7 +125,7 @@ describe("Desktop capability service browser67 extension lifecycle", () => {
       integrations: [{
         extensionState: "reload-required",
         doctorState: "degraded",
-        detail: "受管扩展文件已是当前版本；浏览器仍需核对并同步 Pi-67 提供的加载来源。"
+        detail: "受管扩展文件已是当前版本；浏览器仍需核对并同步 Desktop 管理的加载来源。"
       }]
     });
   });
@@ -219,7 +219,7 @@ describe("Desktop capability service browser67 extension lifecycle", () => {
         ready: false,
         extensionConnected: true,
         identityMatch: false,
-        detail: "浏览器中运行的扩展不是当前受管版本。请在扩展管理页核对加载目录；若仍指向旧目录，请移除旧条目后从 Pi-67 提供的目录重新“加载已解压的扩展”。"
+        detail: "浏览器中运行的扩展不是当前受管版本。请在扩展管理页核对加载目录；若仍指向旧目录，请移除旧条目后从 Desktop 管理目录重新“加载已解压的扩展”。"
       })),
       now: () => 540,
       createToken: () => "mismatch-extension"
@@ -411,7 +411,7 @@ describe("Desktop capability service browser67 extension lifecycle", () => {
       ready: false,
       extensionConnected: true,
       identityMatch: false,
-      detail: "浏览器中运行的扩展不是当前受管版本。请在扩展管理页核对加载目录；若仍指向旧目录，请移除旧条目后从 Pi-67 提供的目录重新“加载已解压的扩展”。"
+      detail: "浏览器中运行的扩展不是当前受管版本。请在扩展管理页核对加载目录；若仍指向旧目录，请移除旧条目后从 Desktop 管理目录重新“加载已解压的扩展”。"
     });
   });
 

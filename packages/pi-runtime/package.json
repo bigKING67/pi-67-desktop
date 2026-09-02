@@ -7,6 +7,9 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./dist/index.mjs"
+    },
+    "./pi-sdk-types": {
+      "types": "./src/pi-sdk-types.ts"
     }
   },
   "scripts": {

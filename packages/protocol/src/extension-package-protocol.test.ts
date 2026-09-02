@@ -81,7 +81,7 @@ describe("Extension package management protocol", () => {
   it("validates the prompt-once onboarding query and persisted states", () => {
     expect(isRequestEnvelope(commandEnvelope(
       "extension.package.onboarding.get",
-      { source: "npm:pi-observational-memory", scope: "global" },
+      { source: "npm:example-prompt-once", scope: "global" },
       WORKSPACE_CONTEXT,
       2
     ))).toBe(true);
@@ -89,7 +89,7 @@ describe("Extension package management protocol", () => {
       ok: true,
       type: "extension.package.onboarding.get",
       result: {
-        source: "npm:pi-observational-memory",
+        source: "npm:example-prompt-once",
         scope: "global",
         state: "unseen"
       }
@@ -98,7 +98,7 @@ describe("Extension package management protocol", () => {
       ok: true,
       type: "extension.package.onboarding.get",
       result: {
-        source: "npm:pi-observational-memory",
+        source: "npm:example-prompt-once",
         scope: "global",
         state: "prompt-again" as never
       }

@@ -24,6 +24,7 @@ import type {
 } from "@pi67/domain";
 import type { ProtocolError } from "./protocol-error.js";
 import type { PiProviderConfigurationChanged } from "./provider-configuration-schemas.js";
+import type { ContextMemoryEventPayloads } from "./context-memory-messages.js";
 
 export interface StreamDelta {
   assistantMessageEvent: {
@@ -32,7 +33,7 @@ export interface StreamDelta {
   };
 }
 
-export interface EventPayloads {
+export interface EventPayloads extends ContextMemoryEventPayloads {
   "runtime.statusChanged": RuntimeStatus;
   "runtime.ready": {
     capabilities: RuntimeCapabilities;

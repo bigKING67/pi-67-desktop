@@ -101,28 +101,28 @@ export function installMockCommandResponseHandler({
     const contextFileResult = resolveMockContextFileCommand(type, payload, current);
     if (contextFileResult !== undefined) return contextFileResult;
     if (type === "skill.pack.list") return {
-      items: mockSkillPacks("not-checked", "bundled"),
+      items: mockSkillPacks("not-checked"),
       total: 2
     };
     if (type === "skill.pack.checkUpdates") return {
-      items: mockSkillPacks("update-available", "bundled"),
+      items: mockSkillPacks("update-available"),
       total: 2,
       checkedAt: Date.now()
     };
     if (type === "skill.pack.install") return {
-      items: mockSkillPacks("current", "bundled"),
+      items: mockSkillPacks("current"),
       total: 2,
       checkedAt: Date.now(),
       changed: true
     };
     if (type === "skill.pack.update") return {
-      items: mockSkillPacks("current", payload.id === "ai-berkshire-investment-suite" ? "managed" : "bundled"),
+      items: mockSkillPacks("current"),
       total: 2,
       checkedAt: Date.now(),
       changed: true
     };
     if (type === "skill.pack.restore") return {
-      items: mockSkillPacks("not-checked", "bundled"),
+      items: mockSkillPacks("not-checked"),
       total: 2,
       checkedAt: Date.now(),
       changed: true
@@ -318,8 +318,7 @@ export function installMockCommandResponseHandler({
   }
 
   function mockSkillPacks(
-    status: "not-checked" | "update-available" | "current",
-    aiSource: "bundled" | "managed"
+    status: "not-checked" | "update-available" | "current"
   ) {
     const lark = {
       id: "lark-cli-global",
@@ -358,29 +357,21 @@ export function installMockCommandResponseHandler({
       description: "公司研究、财务分析和组合管理能力。",
       manager: "pi67-desktop",
       managerStatus: "ready",
-      updateOwner: "managed-pack",
-      updateStatus: status,
+      updateOwner: "desktop",
+      updateStatus: "application-managed",
       localState: "clean",
       provenance: "verified",
       installed: true,
       installedSkillCount: 1,
       skillIds: ["investment-research"],
       canInstall: false,
-      canUpdate: status === "update-available",
-      effectiveSource: aiSource,
-      canRestore: aiSource === "managed",
-      baselineVersion: "1.1.0",
-      installedVersion: "1.1.0",
-      ...(status === "not-checked" ? {} : {
-        latestVersion: "1.1.0",
-        registryCommit: "7".repeat(40)
-      }),
+      canUpdate: false,
+      effectiveSource: "bundled",
+      canRestore: false,
+      baselineVersion: "1.1.1",
+      installedVersion: "1.1.1",
       source: "https://github.com/xbtlin/ai-berkshire",
-      detail: aiSource === "managed"
-        ? "当前使用 Pi-67 官方 registry 安装的受管 Overlay。"
-        : status === "update-available"
-          ? "Pi-67 官方 registry 已发布兼容版本 1.1.0，确认后将安装为独立 Overlay。"
-          : "当前使用随 Desktop 发布的不可变内置基线。"
+      detail: "当前使用随 Desktop 发布的不可变内置基线；不依赖独立更新服务。"
     };
     return [lark, aiBerkshire];
   }

@@ -48,6 +48,14 @@ const expectedFonts = new Set([
   "MapleMono-Regular.ttf.woff2"
 ]);
 const expectedIconSize = 1024;
+// These files intentionally stay close to the pinned Apache-2.0 OpenViking Pi
+// integration so upstream security and behavior diffs remain reviewable. Keep
+// the exceptions exact and low enough that upstream growth reopens review.
+const preservedUpstreamSourceLineLimits = new Map([
+  ["packages/openviking-pi-extension/client.ts", 560],
+  ["packages/openviking-pi-extension/shared/capture-utils.mjs", 540],
+  ["packages/openviking-pi-extension/shared/recall-core.mjs", 640]
+]);
 
 for (const path of requiredPaths) {
   try {
@@ -66,7 +74,7 @@ for (const file of files) {
   }
   if ([".ts", ".tsx", ".mjs", ".cjs", ".css"].includes(extension)) {
     const lineCount = (await readFile(file, "utf8")).split("\n").length;
-    const limit = extension === ".css" ? 1_100 : 460;
+    const limit = preservedUpstreamSourceLineLimits.get(path) ?? (extension === ".css" ? 1_100 : 460);
     if (lineCount > limit) failures.push(`${path} has ${lineCount} lines; limit is ${limit}`);
   }
 }

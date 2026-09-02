@@ -16,7 +16,7 @@ describe("Extension management view model", () => {
     const projectOverride = packageEntry("npm:overridden", "project", false);
     const inherited = packageEntry("npm:inherited", "global", true);
     const bundled: ExtensionPackageEntry = {
-      ...packageEntry("/managed/pi67-core", "global", true),
+      ...packageEntry("/managed/pi-workspace-resources", "global", true),
       origin: "first-party",
       sourceKind: "bundled"
     };

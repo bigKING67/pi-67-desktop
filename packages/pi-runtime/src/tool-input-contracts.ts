@@ -43,6 +43,25 @@ export function hasPi67PlanToolContract(
     && optionalStringArrayIsValid(record.options);
 }
 
+export function hasPi67SharedExperienceReadContract(
+  toolName: string,
+  record: Record<string, unknown>
+): boolean {
+  if (toolName === "viking_shared_search") {
+    if (!hasOnlyKeys(record, ["query", "limit"])) return false;
+    const limit = record.limit;
+    return stringField(record, "query") !== undefined
+      && (
+        limit === undefined
+        || (typeof limit === "number" && Number.isSafeInteger(limit) && limit >= 1 && limit <= 5)
+      );
+  }
+  if (toolName === "viking_shared_read") {
+    return hasOnlyKeys(record, ["id"]) && stringField(record, "id") !== undefined;
+  }
+  return false;
+}
+
 export function networkReadTarget(
   record: Record<string, unknown>,
   fallback: string
@@ -179,4 +198,9 @@ function isEditReplacement(value: unknown): boolean {
 
 function optionalPathIsValid(record: Record<string, unknown>): boolean {
   return record.path === undefined || stringField(record, "path") !== undefined;
+}
+
+function hasOnlyKeys(record: Record<string, unknown>, allowed: readonly string[]): boolean {
+  const allowedKeys = new Set(allowed);
+  return Object.keys(record).every((key) => allowedKeys.has(key));
 }

@@ -342,10 +342,12 @@ function addIssue(issues: AgentHostStartupIssue[], issue: AgentHostStartupIssue)
 function clearCapabilityProjection(environment: NodeJS.ProcessEnv): void {
   delete environment.PI67_BUNDLED_CAPABILITIES_ROOT;
   delete environment.PI67_MANAGED_CAPABILITIES_ROOT;
+  delete environment.PI67_SHARED_PROFILE_ROOT;
   delete environment.PI67_CAPABILITY_PACKAGE_PATHS;
   delete environment.PI67_KNOWN_PACKAGE_BASELINES;
   delete environment.PI67_MANAGED_NPM_ROOT;
   delete environment.PI67_MANAGED_EXTENSION_PATHS;
+  delete environment.PI67_OPENVIKING_SHARED_PROJECTION;
 }
 
 function resetManagedPackageProjection(
@@ -427,9 +429,7 @@ function stageTiming<T>(
   };
 }
 
-function skippedStageTiming(
-  stage: AgentHostStartupStageTiming["stage"]
-): AgentHostStartupStageTiming {
+function skippedStageTiming(stage: AgentHostStartupStageTiming["stage"]): AgentHostStartupStageTiming {
   return { stage, durationMs: 0, outcome: "skipped" };
 }
 

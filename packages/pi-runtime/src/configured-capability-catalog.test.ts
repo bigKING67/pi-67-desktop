@@ -15,7 +15,7 @@ describe("ConfiguredCapabilityCatalog", () => {
   it("recognizes effective configured and Desktop-managed Package sources without exposing raw sources", async () => {
     const root = await temporaryDirectory();
     const managedRoot = join(root, "managed");
-    const managedPackage = join(managedRoot, "packages", "pi67-core");
+    const managedPackage = join(managedRoot, "packages", "pi-workspace-resources");
     await mkdir(managedPackage, { recursive: true });
     const settingsManager = SettingsManager.inMemory({
       packages: ["pi-subagents", managedPackage]
@@ -33,7 +33,7 @@ describe("ConfiguredCapabilityCatalog", () => {
     });
     expect(catalog.resolvePackageSource(packageSource(managedPackage))).toEqual({
       kind: "managed-package",
-      sourceLabel: "桌面托管 Package · pi67-core"
+      sourceLabel: "桌面托管 Package · pi-workspace-resources"
     });
     expect(catalog.resolvePackageSource(packageSource("npm:not-configured"))).toEqual({
       kind: "unconfigured",

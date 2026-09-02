@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import {
   chmod,
@@ -6,22 +6,41 @@ import {
   mkdir,
   open,
   readFile,
-  readdir,
   realpath,
   rename,
-  rm,
   writeFile
 } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { join, resolve } from "node:path";
 import {
-  isContainedRelativePath,
   parseCapabilityCatalog,
   parseCapabilityManifest
 } from "./desktop-capability-catalog.js";
+import {
+  capabilityTreeSha256,
+  containedCapabilityPath,
+  isContainedPath,
+  isNodeError,
+  isRecord,
+  readBoundedCapabilityJson,
+  replaceCapabilityDirectoryIfChanged
+} from "./desktop-capability-file-integrity.js";
+import {
+  projectCompatibilityExtension,
+  projectSharedOpenVikingExtension,
+  type DesktopCompatibilityProjection,
+  type DesktopOpenVikingProjection
+} from "./desktop-compatibility-extension.js";
+import {
+  activateSharedProfile,
+  type DesktopSharedProfileProjection,
+  type SharedProfilePackage
+} from "./desktop-shared-profile.js";
 import { managedSkillPackPackagePaths } from "./managed-skill-pack-state.js";
 
 const STATE_SCHEMA = "pi67.desktop-capability-state.v1";
 const MAX_METADATA_BYTES = 1_000_000;
+
+export { capabilityTreeSha256 } from "./desktop-capability-file-integrity.js";
 
 export interface DesktopCapabilityBootstrapOptions {
   capabilitiesRoot?: string;
@@ -38,7 +57,10 @@ export interface DesktopCapabilityBootstrapResult {
   packagePaths: string[];
   rules: "installed" | "unavailable";
   agents: "installed" | "user-owned" | "unavailable";
-  projectionMode?: "packaged-direct" | "legacy-copy";
+  projectionMode?: "packaged-direct" | "legacy-copy" | "shared-profile";
+  sharedProfile?: DesktopSharedProfileProjection;
+  openVikingProjection?: DesktopOpenVikingProjection;
+  rulesLoaderProjection?: DesktopCompatibilityProjection;
 }
 
 export async function bootstrapDesktopCapabilities(
@@ -53,13 +75,14 @@ export async function bootstrapDesktopCapabilities(
   const agentDir = resolve(options.agentDir);
   const managedRoot = join(agentDir, "desktop-capabilities");
   const createToken = options.createToken ?? randomUUID;
-  const packagedDirect = environment.PI67_PACKAGED === "1";
+  const previousOpenVikingTreeSha256 = await readPreviousOpenVikingTreeSha256(managedRoot);
+  const previousRulesLoaderTreeSha256 = await readPreviousRulesLoaderTreeSha256(managedRoot);
   let manifestValue: unknown;
   let catalogValue: unknown;
   try {
     [manifestValue, catalogValue] = await Promise.all([
-      readBoundedJson(join(capabilitiesRoot, "manifest.json")),
-      readBoundedJson(join(capabilitiesRoot, "catalog.json"))
+      readBoundedCapabilityJson(join(capabilitiesRoot, "manifest.json")),
+      readBoundedCapabilityJson(join(capabilitiesRoot, "catalog.json"))
     ]);
   } catch (error) {
     if (environment.PI67_PACKAGED !== "1" && isNodeError(error, "ENOENT")) {
@@ -80,37 +103,82 @@ export async function bootstrapDesktopCapabilities(
 
   await mkdir(agentDir, { recursive: true, mode: 0o700 });
   await mkdir(managedRoot, { recursive: true, mode: 0o700 });
-  const bundledPackagePaths: string[] = [];
+  const sharedPackages: SharedProfilePackage[] = [];
   for (const entry of catalog.entries) {
     const integrity = manifestById.get(entry.id)!;
-    const source = containedPath(capabilitiesRoot, entry.packagePath, "Capability package path");
-    if (packagedDirect) {
+    const source = containedCapabilityPath(capabilitiesRoot, entry.packagePath, "Capability package path");
+    if (environment.PI67_PACKAGED === "1") {
       await validatePackagedCapabilityPackage(capabilitiesRoot, source, entry.id);
-      bundledPackagePaths.push(source);
-    } else {
-      const destination = join(managedRoot, "packages", entry.id);
-      const sourceHash = await capabilityTreeSha256(source, integrity.includeNodeModules);
-      if (sourceHash !== integrity.treeSha256) {
-        throw new Error(`Desktop capability ${entry.id} failed bundled integrity verification.`);
-      }
-      await replaceDirectoryIfChanged(
-        source,
-        destination,
-        integrity.treeSha256,
-        managedRoot,
-        createToken,
-        integrity.includeNodeModules
-      );
-      bundledPackagePaths.push(destination);
     }
+    const sourceHash = await capabilityTreeSha256(source, integrity.includeNodeModules);
+    if (sourceHash !== integrity.treeSha256) {
+      throw new Error(`Desktop capability ${entry.id} failed bundled integrity verification.`);
+    }
+    sharedPackages.push({
+      id: entry.id,
+      displayName: entry.displayName,
+      source,
+      packagePath: `packages/${entry.id}`,
+      treeSha256: integrity.treeSha256,
+      includeNodeModules: integrity.includeNodeModules === true
+    });
   }
 
-  const pi67Core = bundledPackagePaths[catalog.entries.findIndex((entry) => entry.id === "pi67-core")];
-  const rules = pi67Core && existsSync(join(pi67Core, "rules"))
-    ? await materializeRules(join(pi67Core, "rules"), join(agentDir, "rules", "pi67-desktop"), agentDir, createToken)
+  const sharedProfile = await activateSharedProfile({
+    agentDir,
+    managedRoot,
+    catalogVersion: catalog.catalogVersion,
+    packages: sharedPackages,
+    createToken
+  });
+  const bundledPackagePaths = sharedPackages.map((entry) => (
+    join(sharedProfile.root, entry.packagePath)
+  ));
+
+  const openVikingIndex = catalog.entries.findIndex((entry) => entry.id === "openviking-pi-extension");
+  const openVikingProjection = openVikingIndex < 0
+    ? { status: "unavailable" as const }
+    : await projectSharedOpenVikingExtension({
+        source: bundledPackagePaths[openVikingIndex]!,
+        destination: join(agentDir, "extensions", "pi67-openviking"),
+        expectedHash: manifestById.get("openviking-pi-extension")!.treeSha256,
+        ...(previousOpenVikingTreeSha256 === undefined
+          ? {}
+          : { previousHash: previousOpenVikingTreeSha256 }),
+        agentDir,
+        createToken
+      });
+  if (openVikingProjection.status === "unavailable") {
+    delete environment.PI67_OPENVIKING_SHARED_PROJECTION;
+  } else {
+    environment.PI67_OPENVIKING_SHARED_PROJECTION = openVikingProjection.status === "user-owned"
+      ? "conflict"
+      : "managed";
+  }
+
+  const workspaceResources = bundledPackagePaths[catalog.entries.findIndex((entry) => entry.id === "pi-workspace-resources")];
+  const legacyRulesLoaderTreeSha256 = workspaceResources
+    ? await readLegacyRulesLoaderTreeSha256(workspaceResources)
+    : undefined;
+  const rulesLoaderProjection = workspaceResources
+    ? await projectCompatibilityExtension({
+        source: join(workspaceResources, "extensions", "pi-rules-loader"),
+        destination: join(agentDir, "extensions", "pi-rules-loader"),
+        ...(previousRulesLoaderTreeSha256 === undefined
+          ? {}
+          : { previousHash: previousRulesLoaderTreeSha256 }),
+        ...(legacyRulesLoaderTreeSha256 === undefined
+          ? {}
+          : { safePriorHashes: [legacyRulesLoaderTreeSha256] }),
+        agentDir,
+        createToken
+      })
+    : { status: "unavailable" as const };
+  const rules = workspaceResources && existsSync(join(workspaceResources, "rules"))
+    ? await materializeRules(join(workspaceResources, "rules"), join(agentDir, "rules", "pi67-desktop"), agentDir, createToken)
     : "unavailable";
-  const agents = pi67Core
-    ? await materializeAgentsFile(join(pi67Core, "AGENTS.md"), join(agentDir, "AGENTS.md"))
+  const agents = workspaceResources
+    ? await materializeAgentsFile(join(workspaceResources, "AGENTS.md"), join(agentDir, "AGENTS.md"))
     : "unavailable";
   await writeState(managedRoot, {
     schema: STATE_SCHEMA,
@@ -125,6 +193,9 @@ export async function bootstrapDesktopCapabilities(
     })),
     rules,
     agents,
+    sharedProfile,
+    openVikingProjection,
+    rulesLoaderProjection,
     profileOwnership: options.profileOwnership ?? "desktop",
     preparedAt: Date.now()
   }, createToken);
@@ -136,6 +207,7 @@ export async function bootstrapDesktopCapabilities(
   ];
   environment.PI67_BUNDLED_CAPABILITIES_ROOT = capabilitiesRoot;
   environment.PI67_MANAGED_CAPABILITIES_ROOT = managedRoot;
+  environment.PI67_SHARED_PROFILE_ROOT = sharedProfile.root;
   environment.PI67_CAPABILITY_PACKAGE_PATHS = JSON.stringify(packagePaths);
   environment.PI67_KNOWN_PACKAGE_BASELINES = JSON.stringify(
     catalog.recommendedExternal
@@ -158,8 +230,48 @@ export async function bootstrapDesktopCapabilities(
     packagePaths,
     rules,
     agents,
-    projectionMode: packagedDirect ? "packaged-direct" : "legacy-copy"
+    projectionMode: "shared-profile",
+    sharedProfile,
+    openVikingProjection,
+    rulesLoaderProjection
   };
+}
+
+async function readPreviousOpenVikingTreeSha256(managedRoot: string): Promise<string | undefined> {
+  try {
+    const state = await readBoundedCapabilityJson(join(managedRoot, "state.json"));
+    if (!isRecord(state) || !Array.isArray(state.packages)) return undefined;
+    const entry = state.packages.find((candidate) => (
+      isRecord(candidate) && candidate.id === "openviking-pi-extension"
+    ));
+    if (!isRecord(entry) || typeof entry.treeSha256 !== "string") return undefined;
+    return /^[a-f0-9]{64}$/u.test(entry.treeSha256) ? entry.treeSha256 : undefined;
+  } catch (error) {
+    if (isNodeError(error, "ENOENT")) return undefined;
+    return undefined;
+  }
+}
+
+async function readPreviousRulesLoaderTreeSha256(managedRoot: string): Promise<string | undefined> {
+  try {
+    const state = await readBoundedCapabilityJson(join(managedRoot, "state.json"));
+    if (!isRecord(state) || !isRecord(state.rulesLoaderProjection)) return undefined;
+    const hash = state.rulesLoaderProjection.treeSha256;
+    return typeof hash === "string" && /^[a-f0-9]{64}$/u.test(hash) ? hash : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function readLegacyRulesLoaderTreeSha256(workspaceResources: string): Promise<string | undefined> {
+  try {
+    const manifest = await readBoundedCapabilityJson(join(workspaceResources, "package.json"));
+    if (!isRecord(manifest) || !isRecord(manifest.desktopMigration)) return undefined;
+    const hash = manifest.desktopMigration.legacyRulesLoaderTreeSha256;
+    return typeof hash === "string" && /^[a-f0-9]{64}$/u.test(hash) ? hash : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function validatePackagedCapabilityPackage(
@@ -178,7 +290,7 @@ async function validatePackagedCapabilityPackage(
     || !rootMetadata.isDirectory()
     || packageMetadata.isSymbolicLink()
     || !packageMetadata.isDirectory()
-    || !isContained(canonicalPackage, canonicalRoot)
+    || !isContainedPath(canonicalPackage, canonicalRoot)
   ) throw new Error(`Desktop capability ${packageId} has an invalid packaged root.`);
   const manifestPath = join(packageRoot, "package.json");
   const manifestMetadata = await lstat(manifestPath);
@@ -200,7 +312,13 @@ async function materializeRules(
   createToken: () => string
 ): Promise<"installed"> {
   const expected = await capabilityTreeSha256(source);
-  await replaceDirectoryIfChanged(source, destination, expected, containmentRoot, createToken);
+  await replaceCapabilityDirectoryIfChanged({
+    source,
+    destination,
+    expectedHash: expected,
+    containmentRoot,
+    createToken
+  });
   return "installed";
 }
 
@@ -229,132 +347,6 @@ async function materializeAgentsFile(
   }
 }
 
-async function replaceDirectoryIfChanged(
-  source: string,
-  destination: string,
-  expectedHash: string,
-  containmentRoot: string,
-  createToken: () => string,
-  includeNodeModules = false
-): Promise<void> {
-  if (await directoryHashMatches(destination, expectedHash, includeNodeModules)) return;
-  await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
-  const token = createToken();
-  const staging = join(dirname(destination), `.${basename(destination)}.${process.pid}.${token}.staging`);
-  const backup = join(dirname(destination), `.${basename(destination)}.${process.pid}.${token}.backup`);
-  if (!isContained(staging, containmentRoot) || !isContained(backup, containmentRoot)) {
-    throw new Error("Desktop capability staging path escaped its managed root.");
-  }
-  let staged = false;
-  let backedUp = false;
-  try {
-    await copyDirectory(source, staging, source, includeNodeModules);
-    staged = true;
-    if (await capabilityTreeSha256(staging, includeNodeModules) !== expectedHash) {
-      throw new Error("Desktop capability copy failed integrity verification.");
-    }
-    try {
-      await rename(destination, backup);
-      backedUp = true;
-    } catch (error) {
-      if (!isNodeError(error, "ENOENT")) throw error;
-    }
-    await rename(staging, destination);
-    staged = false;
-    if (backedUp) {
-      await rm(backup, { recursive: true, force: true });
-      backedUp = false;
-    }
-  } finally {
-    if (staged) await rm(staging, { recursive: true, force: true }).catch(() => undefined);
-    if (backedUp) {
-      try {
-        await rename(backup, destination);
-      } catch {
-        // Preserve the backup for manual recovery when the destination cannot be restored.
-      }
-    }
-  }
-}
-
-async function copyDirectory(
-  source: string,
-  destination: string,
-  sourceRoot: string,
-  includeNodeModules: boolean
-): Promise<void> {
-  const metadata = await lstat(source);
-  if (metadata.isSymbolicLink()) throw new Error(`Desktop capabilities cannot contain symlinks: ${source}`);
-  if (!metadata.isDirectory()) throw new Error(`Desktop capability package must be a directory: ${source}`);
-  await mkdir(destination, { recursive: true, mode: 0o700 });
-  const entries = (await readdir(source, { withFileTypes: true }))
-    .filter((entry) => entry.name !== ".DS_Store" && (includeNodeModules || entry.name !== "node_modules"))
-    .sort((left, right) => left.name.localeCompare(right.name));
-  for (const entry of entries) {
-    const input = join(source, entry.name);
-    const output = join(destination, entry.name);
-    if (!isContained(input, sourceRoot)) throw new Error("Desktop capability copy escaped its source root.");
-    const child = await lstat(input);
-    if (child.isSymbolicLink()) throw new Error(`Desktop capabilities cannot contain symlinks: ${input}`);
-    if (child.isDirectory()) {
-      await copyDirectory(input, output, sourceRoot, includeNodeModules);
-    } else if (child.isFile()) {
-      await writeFile(output, await readFile(input), { mode: child.mode & 0o111 ? 0o755 : 0o600 });
-    } else {
-      throw new Error(`Unsupported Desktop capability entry: ${input}`);
-    }
-  }
-}
-
-export async function capabilityTreeSha256(root: string, includeNodeModules = false): Promise<string> {
-  const hash = createHash("sha256");
-  const visit = async (directory: string): Promise<void> => {
-    const entries = (await readdir(directory, { withFileTypes: true }))
-      .filter((entry) => entry.name !== ".DS_Store" && (includeNodeModules || entry.name !== "node_modules"))
-      .sort((left, right) => left.name.localeCompare(right.name));
-    for (const entry of entries) {
-      const path = join(directory, entry.name);
-      const relativePath = relative(root, path).split(sep).join("/");
-      const metadata = await lstat(path);
-      if (metadata.isSymbolicLink()) throw new Error(`Desktop capabilities cannot contain symlinks: ${path}`);
-      if (metadata.isDirectory()) {
-        await visit(path);
-      } else if (metadata.isFile()) {
-        hash.update(`f\0${relativePath}\0`);
-        hash.update(await readFile(path));
-        hash.update("\0");
-      } else {
-        throw new Error(`Unsupported Desktop capability entry: ${path}`);
-      }
-    }
-  };
-  await visit(root);
-  return hash.digest("hex");
-}
-
-async function directoryHashMatches(
-  path: string,
-  expected: string,
-  includeNodeModules: boolean
-): Promise<boolean> {
-  try {
-    const metadata = await lstat(path);
-    return metadata.isDirectory() && !metadata.isSymbolicLink()
-      && await capabilityTreeSha256(path, includeNodeModules) === expected;
-  } catch (error) {
-    if (isNodeError(error, "ENOENT")) return false;
-    throw error;
-  }
-}
-
-async function readBoundedJson(path: string): Promise<unknown> {
-  const metadata = await lstat(path);
-  if (metadata.isSymbolicLink() || !metadata.isFile() || metadata.size > MAX_METADATA_BYTES) {
-    throw new Error("Desktop capability metadata must be a bounded regular file.");
-  }
-  return JSON.parse(await readFile(path, "utf8")) as unknown;
-}
-
 async function writeState(root: string, value: unknown, createToken: () => string): Promise<void> {
   const path = join(root, "state.json");
   const temporary = join(root, `.state.${process.pid}.${createToken()}.tmp`);
@@ -368,28 +360,4 @@ async function writeState(root: string, value: unknown, createToken: () => strin
   }
   await rename(temporary, path);
   if (process.platform !== "win32") await chmod(path, 0o600);
-}
-
-function containedPath(root: string, path: string, label: string): string {
-  if (!isContainedRelativePath(path)) throw new Error(`${label} is invalid.`);
-  const candidate = resolve(root, path);
-  if (!isContained(candidate, root)) throw new Error(`${label} escaped its root.`);
-  return candidate;
-}
-
-function isContained(candidate: string, root: string): boolean {
-  const fromRoot = relative(resolve(root), resolve(candidate));
-  return fromRoot === "" || (
-    fromRoot !== ".."
-    && !fromRoot.startsWith(`..${sep}`)
-    && !isAbsolute(fromRoot)
-  );
-}
-
-function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === code;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

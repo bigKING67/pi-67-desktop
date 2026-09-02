@@ -1,0 +1,331 @@
+.panel {
+  display: grid;
+  gap: 16px;
+  padding-bottom: 20px;
+}
+
+.hero {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-raised) 88%, var(--focus) 3%);
+}
+
+.hero strong { color: var(--text-primary); font-size: 14px; }
+.hero p, .boundary p { margin: 0; color: var(--text-secondary); font-size: 11px; line-height: 1.55; }
+
+.section {
+  display: grid;
+  gap: 9px;
+}
+
+.section > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.section > header strong { color: var(--text-secondary); font-size: 11px; }
+
+.search {
+  display: grid;
+  min-height: 34px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  padding-left: 9px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+}
+
+.search input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 11px;
+}
+
+.search button {
+  align-self: stretch;
+  padding: 0 10px;
+  border: 0;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.list { display: grid; gap: 7px; }
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-raised);
+}
+
+.row div { display: grid; gap: 2px; }
+.row strong { color: var(--text-primary); font-size: 11px; }
+.row small, .row > span { color: var(--text-tertiary); font-size: 10px; }
+.row p { grid-column: 1 / -1; margin: 0; color: var(--text-secondary); font-size: 10px; line-height: 1.5; }
+
+.error { margin: 0; color: var(--danger); font-size: 11px; line-height: 1.5; }
+
+.boundary {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border-left: 3px solid var(--focus);
+  background: color-mix(in srgb, var(--focus) 5%, transparent);
+}
+
+.boundary strong { color: var(--text-primary); font-size: 11px; }
+
+.sectionActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.iconButton {
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+}
+
+.iconButton:hover { background: var(--surface-hover); color: var(--text-primary); }
+.iconButton[data-disabled] { opacity: 0.45; }
+
+.spinning { animation: experience-spin 900ms linear infinite; }
+
+.experienceRow {
+  align-items: start;
+  overflow: hidden;
+}
+
+.experienceRow[data-status="candidate"] { border-color: color-mix(in srgb, var(--warning) 32%, var(--border)); }
+.experienceRow[data-status="validated"] { border-color: color-mix(in srgb, var(--success) 32%, var(--border)); }
+
+.candidateHeading { min-width: 0; }
+.candidateHeading strong { overflow-wrap: anywhere; }
+
+.statusPill {
+  align-self: start;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.statusPill[data-status="candidate"] {
+  border-color: color-mix(in srgb, var(--warning) 36%, var(--border));
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
+  color: var(--warning);
+}
+
+.statusPill[data-status="validated"],
+.statusPill[data-status="shared"] {
+  border-color: color-mix(in srgb, var(--success) 34%, var(--border));
+  background: color-mix(in srgb, var(--success) 8%, var(--surface));
+  color: var(--success);
+}
+
+.statusPill[data-status="submitted"] {
+  border-color: color-mix(in srgb, var(--focus) 34%, var(--border));
+  background: color-mix(in srgb, var(--focus) 8%, var(--surface));
+  color: var(--focus);
+}
+
+.candidateMeta {
+  display: flex !important;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 4px 9px !important;
+  color: var(--text-tertiary);
+  font-size: 9px;
+}
+
+.candidateActions {
+  display: flex !important;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px !important;
+  padding-top: 3px;
+}
+
+.candidateActions :global(.primary-button),
+.candidateActions :global(.secondary-button),
+.reviewActions :global(.primary-button),
+.reviewActions :global(.secondary-button) {
+  min-height: 28px;
+  padding: 0 9px;
+  font-size: 10px;
+}
+
+.candidateActions small { color: var(--text-tertiary); font-size: 9px; line-height: 1.45; }
+
+.privateNotice,
+.submittedNotice {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.submittedNotice {
+  background: color-mix(in srgb, var(--focus) 7%, var(--surface));
+  color: var(--focus);
+}
+
+.notice {
+  grid-column: 1 / -1;
+  padding: 7px 8px;
+  border-left: 2px solid var(--focus);
+  background: color-mix(in srgb, var(--focus) 5%, transparent);
+  color: var(--text-secondary) !important;
+}
+
+.reviewForm {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
+  margin: 5px -10px -10px;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-muted) 72%, var(--surface));
+}
+
+.reviewForm > header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.reviewForm > header > div { display: grid; gap: 2px; }
+.reviewForm > header strong { font-size: 11px; }
+.reviewForm > header small { color: var(--text-tertiary); font-size: 9px; text-align: right; }
+
+.reviewGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.field {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.field > small { color: var(--text-tertiary); font-size: 9px; font-weight: 450; }
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  outline: 0;
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 450;
+}
+
+.field input,
+.field select { height: 30px; padding: 0 8px; }
+.field textarea { min-height: 64px; resize: vertical; padding: 7px 8px; line-height: 1.5; }
+
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible { border-color: var(--focus); box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 18%, transparent); }
+
+.confirmations { display: grid; gap: 6px; }
+
+.checkbox {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.checkbox[data-disabled] { cursor: not-allowed; opacity: 0.5; }
+.checkbox > span:last-child { display: grid; gap: 2px; }
+.checkbox strong { font-size: 10px; }
+.checkbox small { color: var(--text-tertiary); font-size: 9px; font-weight: 450; line-height: 1.45; }
+
+.checkboxIndicator {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  place-items: center;
+  margin-top: 1px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: transparent;
+}
+
+.checkbox[data-selected] .checkboxIndicator {
+  border-color: var(--accent-strong);
+  background: var(--accent);
+  color: var(--canvas);
+}
+
+.reviewActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+@keyframes experience-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 420px) {
+  .reviewGrid { grid-template-columns: 1fr; }
+  .reviewForm > header { align-items: start; flex-direction: column; }
+  .reviewForm > header small { text-align: left; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning { animation: none; }
+}

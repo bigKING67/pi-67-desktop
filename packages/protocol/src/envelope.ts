@@ -1,4 +1,4 @@
-import { Type, Value, type Static } from "./typebox-schema.js";
+import { strictObject, Type, Value, type Static } from "./typebox-schema.js";
 import {
   MAX_SESSION_CATALOG_PAGE_JSON_BYTES
 } from "@pi67/domain";
@@ -16,8 +16,7 @@ import {
   CommandPayloadSchemas,
   CommandResultSchemas,
   EventPayloadSchemas,
-  ProtocolErrorSchema,
-  strictObject
+  ProtocolErrorSchema
 } from "./schemas.js";
 import { hasBoundSessionCatalogCursor } from "./session-catalog-schemas.js";
 import { hasValidEventContext } from "./event-context.js";

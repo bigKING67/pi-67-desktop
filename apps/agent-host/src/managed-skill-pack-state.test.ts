@@ -20,7 +20,7 @@ describe("managed Skill Pack state", () => {
     const agentDir = join(root, "agent");
     const stableRoot = managedSkillPackRoot(agentDir, PACK_ID);
     const parent = dirname(stableRoot);
-    const bundled = join(agentDir, "desktop-capabilities", "packages", "pi67-core");
+    const bundled = join(agentDir, "desktop-capabilities", "packages", "pi-workspace-resources");
     await mkdir(bundled, { recursive: true });
     const environment: NodeJS.ProcessEnv = {
       PI67_CAPABILITY_PACKAGE_PATHS: JSON.stringify([bundled])

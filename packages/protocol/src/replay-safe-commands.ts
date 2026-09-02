@@ -47,6 +47,15 @@ export const REPLAY_SAFE_CONTROL_MUTATION_TYPES = [
   "skill.pack.update",
   "skill.pack.install",
   "skill.pack.restore"
+  ,"context.config.update"
+  ,"context.session.commit"
+  ,"memory.forget.confirm"
+  ,"experience.candidate.review"
+  ,"experience.candidate.promote"
+  ,"experience.candidate.reject"
+  ,"enterprise.auth.disconnect"
+  ,"enterprise.workspace.bind"
+  ,"enterprise.workspace.unbind"
 ] as const satisfies readonly AgentCommandType[];
 
 export type ReplaySafeControlMutationType = typeof REPLAY_SAFE_CONTROL_MUTATION_TYPES[number];

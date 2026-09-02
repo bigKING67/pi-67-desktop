@@ -17,6 +17,7 @@ import type { PromptAttachmentAccessOwner } from "./prompt-attachment-access.js"
 import type { PackageWorkerPort } from "./package-worker-client.js";
 import type { SessionWriterLeaseRegistry } from "./session-writer-lease-registry.js";
 import type { LarkAuthManagementPort } from "./lark-auth-management.js";
+import type { EnterpriseCredentialBrokerClient } from "./context/enterprise-credential-broker-client.js";
 
 export interface AttachPortOptions {
   expectedOrigin?: string;
@@ -46,6 +47,7 @@ export interface AgentHostServerOptions {
   onRuntimeInitializationObservation?: (observation: RuntimeInitializationObservation) => void;
   sessionWriterLeaseRegistry?: SessionWriterLeaseRegistry;
   modelCatalogRefreshOnStartup?: boolean;
+  enterpriseCredentialBroker?: EnterpriseCredentialBrokerClient;
 }
 
 export type AgentHostShutdownResult = Omit<AgentHostShutdownCompleteMessage, "type">;

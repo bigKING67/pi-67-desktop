@@ -4,10 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { LarkCliInstallationError } from "./lark-cli-installation.js";
 import { desktopManagedLarkCliExecutable } from "./lark-cli-resolution.js";
 import { SkillPackManagement } from "./skill-pack-management.js";
-import {
-  createFixture,
-  currentPi67Channel
-} from "./skill-pack-management-test-support.js";
+import { createFixture } from "./skill-pack-management-test-support.js";
 
 describe("SkillPackManagement Lark CLI installation", () => {
   it("keeps a missing manager visible and installable", async () => {
@@ -56,8 +53,7 @@ describe("SkillPackManagement Lark CLI installation", () => {
       now: () => 1_722_400_000_000,
       resolveLarkCli: async () => executable,
       installLarkCli,
-      runProcess,
-      pi67Channel: currentPi67Channel()
+      runProcess
     });
 
     const listed = await management.list();
@@ -122,8 +118,7 @@ describe("SkillPackManagement Lark CLI installation", () => {
           rollback: async () => undefined
         };
       },
-      runProcess,
-      pi67Channel: currentPi67Channel()
+      runProcess
     });
 
     const listed = await management.list();
@@ -143,8 +138,7 @@ describe("SkillPackManagement Lark CLI installation", () => {
     const management = new SkillPackManagement(fixture.services, {
       capabilitiesRoot: fixture.capabilitiesRoot,
       homeDirectory: fixture.homeDirectory,
-      resolveLarkCli: async () => undefined,
-      pi67Channel: currentPi67Channel()
+      resolveLarkCli: async () => undefined
     });
 
     await expect(management.beginInstall("unknown-pack")).rejects.toMatchObject({
@@ -176,8 +170,7 @@ describe("SkillPackManagement Lark CLI installation", () => {
           skills_status: { in_sync: false }
         }),
         stderr: ""
-      })),
-      pi67Channel: currentPi67Channel()
+      }))
     });
 
     await expect(management.beginInstall("lark-cli-global")).rejects.toMatchObject({
@@ -226,8 +219,7 @@ describe("SkillPackManagement Lark CLI installation", () => {
       environment: { PI67_DESKTOP: "1" },
       resolveLarkCli: async () => executable,
       installLarkCli,
-      runProcess,
-      pi67Channel: currentPi67Channel()
+      runProcess
     });
 
     const transaction = await management.beginUpdate("lark-cli-global");
@@ -256,8 +248,7 @@ describe("SkillPackManagement Lark CLI installation", () => {
           "recovery",
           "Lark CLI 激活失败，且无法恢复之前的 Desktop 管理安装。"
         );
-      },
-      pi67Channel: currentPi67Channel()
+      }
     });
 
     await expect(management.beginInstall("lark-cli-global")).rejects.toMatchObject({

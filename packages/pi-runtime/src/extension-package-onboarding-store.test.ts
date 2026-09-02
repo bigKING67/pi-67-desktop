@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ExtensionPackageOnboardingStore } from "./extension-package-onboarding-store.js";
 
 const roots: string[] = [];
-const SOURCE = "npm:pi-observational-memory";
+const SOURCE = "npm:example-prompt-once";
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));

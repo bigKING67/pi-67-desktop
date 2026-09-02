@@ -245,7 +245,8 @@ function resolveBrowser67CapabilityRoot(agentDir: string, environment: NodeJS.Pr
   }
   const expected = [
     environment.PI67_BUNDLED_CAPABILITIES_ROOT,
-    environment.PI67_MANAGED_CAPABILITIES_ROOT
+    environment.PI67_MANAGED_CAPABILITIES_ROOT,
+    environment.PI67_SHARED_PROFILE_ROOT
   ].filter((root): root is string => typeof root === "string" && isAbsolute(root))
     .map((root) => resolve(root, "packages", "browser67"));
   if (!Array.isArray(paths) || paths.length > 32 || expected.length === 0) {

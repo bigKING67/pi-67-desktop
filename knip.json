@@ -1,6 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
+    ".": {
+      "entry": ["eng/capabilities/ai-berkshire-skill-pack-sync.mjs"]
+    },
     "apps/agent-host": {
       "project": ["src/**/*.ts"]
     },
@@ -15,6 +18,24 @@
     },
     "packages/pi-runtime": {
       "project": ["src/**/*.ts"]
+    },
+    "packages/openviking-pi-extension": {
+      "entry": ["index.ts"],
+      "project": ["**/*.{ts,mts,mjs}"],
+      "ignore": ["**/*.d.mts"],
+      "ignoreExportsUsedInFile": true,
+      "ignoreIssues": {
+        "client.ts": ["exports", "types"],
+        "config.ts": ["exports", "types"],
+        "diagnostics.ts": ["exports", "types"],
+        "memory-owner-policy.ts": ["exports", "types"],
+        "lib/**/*.mjs": ["exports", "types"],
+        "shared/**/*.mjs": ["exports", "types"]
+      }
+    },
+    "packages/pi-workspace-resources": {
+      "entry": ["extensions/pi-rules-loader/index.ts"],
+      "project": ["extensions/**/*.ts"]
     },
     "packages/protocol": {
       "project": ["src/**/*.ts"]

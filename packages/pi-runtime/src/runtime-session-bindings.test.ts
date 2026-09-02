@@ -155,6 +155,7 @@ function createBindings(
     requestApproval: vi.fn(async () => ({ status: "denied" as const })),
     recordToolAuthorization: vi.fn(),
     setSessionCwd: vi.fn(),
+    sharedExperienceAccess: undefined,
     subagents: new NativeSubagentCoordinator({
       admission: new NativeSubagentAdmission(),
       parentKey: "test-parent",

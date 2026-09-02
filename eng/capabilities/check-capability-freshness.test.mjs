@@ -182,8 +182,8 @@ function source(id, version) {
 function skillPackSource() {
   return {
     name: "ai-berkshire-investment-suite",
-    adapter: "pi67-ai-berkshire-v1",
-    adapterSourceId: "pi67-core",
+    adapter: "desktop-ai-berkshire-v1",
+    adapterSourceId: "pi-workspace-resources",
     repository: "https://github.com/example/ai-berkshire.git",
     ref: "refs/heads/main",
     commit: CURRENT_COMMIT,

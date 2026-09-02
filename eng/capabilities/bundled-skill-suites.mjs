@@ -106,7 +106,7 @@ export function compileBundledSkillSuites(definition, entries, metadata = {}) {
       || !isVersionSource(suite.versionSource)
       || (suite.upstream !== undefined && !isHttpsUrl(suite.upstream))
       || !["hybrid", "capability-package", "source-specific"].includes(suite.updatePolicy)
-      || !["lark-cli", "pi67-skill-pack-registry", "desktop-capability", "source-specific"].includes(suite.updateManager)
+      || !["lark-cli", "desktop-capability", "source-specific"].includes(suite.updateManager)
       || !["available", "planned", "not-applicable"].includes(suite.independentUpdateState)
       || !Array.isArray(suite.members)
       || suite.members.length === 0

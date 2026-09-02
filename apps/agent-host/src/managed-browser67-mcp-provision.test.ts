@@ -47,6 +47,20 @@ describe("managed browser67 MCP provision", () => {
     ]);
   });
 
+  it("resolves the exact browser67 path from the active shared Pi profile", async () => {
+    const fixture = await createFixture(false, true);
+
+    await expect(provisionManagedBrowser67Mcp(fixture)).resolves.toMatchObject({ status: "created" });
+
+    const config = JSON.parse(await readFile(fixture.mcpPath, "utf8"));
+    expect(config.mcpServers.tmwd_browser.args).toEqual([
+      join(fixture.browser67Root, "src", "mcp", "browser", "server.mjs")
+    ]);
+    expect(config.mcpServers["js-reverse"].args).toEqual([
+      join(fixture.browser67Root, "src", "mcp", "js-reverse", "server.mjs")
+    ]);
+  });
+
   it("invalidates only managed browser67 cache entries and preserves unrelated servers", async () => {
     const fixture = await createFixture();
     const unrelated = cacheEntry("linear-tool");
@@ -351,14 +365,16 @@ function cacheEntry(toolName: string) {
   };
 }
 
-async function createFixture(packagedDirect = false) {
+async function createFixture(packagedDirect = false, sharedProfile = false) {
   const root = await mkdtemp(join(tmpdir(), "pi67-browser67-mcp-"));
   const agentDir = join(root, "agent");
   const capabilitiesRoot = join(root, "capabilities");
   const managedRoot = join(agentDir, "desktop-capabilities");
   const browser67Root = packagedDirect
     ? join(capabilitiesRoot, "packages", "browser67")
-    : join(managedRoot, "packages", "browser67");
+    : sharedProfile
+      ? join(managedRoot, "shared-profile", "active", "packages", "browser67")
+      : join(managedRoot, "packages", "browser67");
   const nodeExecutable = join(root, "toolchain", "node");
   const mcpPath = join(agentDir, "mcp.json");
   const cachePath = join(agentDir, "mcp-cache.json");
@@ -386,9 +402,12 @@ async function createFixture(packagedDirect = false) {
     environment: {
       PI67_DESKTOP: "1",
       PI67_NODE_EXECUTABLE: nodeExecutable,
-      ...(packagedDirect ? {
+      ...(packagedDirect || sharedProfile ? {
         PI67_BUNDLED_CAPABILITIES_ROOT: capabilitiesRoot,
         PI67_MANAGED_CAPABILITIES_ROOT: managedRoot,
+        ...(sharedProfile
+          ? { PI67_SHARED_PROFILE_ROOT: join(managedRoot, "shared-profile", "active") }
+          : {}),
         PI67_CAPABILITY_PACKAGE_PATHS: JSON.stringify([browser67Root])
       } : {})
     }

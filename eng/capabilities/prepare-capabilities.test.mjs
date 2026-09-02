@@ -1,5 +1,6 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   compileBundledSkillSuites,
@@ -7,32 +8,61 @@ import {
 } from "./bundled-skill-suites.mjs";
 import {
   assertCapabilitiesMetadata,
-  assertCapabilitySourceLock
+  assertCapabilitySourceLock,
+  treeSha256
 } from "./prepared-capabilities-validation.mjs";
 import { assertPi67SkillPackSource } from "./pi67-skill-pack-overlay.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 
 describe("Desktop first-party capability source lock", () => {
-  it("pins four first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
+  it("excludes only reinstallable node_modules from internal source hashes", async () => {
+    const source = await mkdtemp(join(tmpdir(), "pi67-capability-source-hash-"));
+    try {
+      await writeFile(join(source, "index.ts"), "export {};\n", "utf8");
+      const before = await treeSha256(source, { includeNodeModules: false });
+      await mkdir(join(source, "node_modules", "dependency"), { recursive: true });
+      await writeFile(join(source, "node_modules", "dependency", "index.js"), "export {};\n", "utf8");
+      expect(await treeSha256(source, { includeNodeModules: false })).toBe(before);
+      expect(await treeSha256(source)).not.toBe(before);
+    } finally {
+      await rm(source, { recursive: true, force: true });
+    }
+  });
+
+  it("pins two Desktop-internal packages, three first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.08.30.3");
+    expect(lock.catalogVersion).toBe("2026.09.01.1");
     expect(lock.sources.map((source) => source.id)).toEqual([
-      "pi67-core",
+      "pi-workspace-resources",
+      "openviking-pi-extension",
       "browser67",
       "design-craft",
       "commerce-growth-os"
     ]);
-    expect(lock.sources.every((source) => /^[0-9a-f]{40}$/u.test(source.commit))).toBe(true);
-    expect(lock.sources.find((source) => source.id === "pi67-core")).toMatchObject({
-      commit: "e7ec566d339c7dfa661cb19b1de50047cfb059e2",
-      ref: "refs/heads/main",
+    expect(lock.sources.filter((source) => source.repository).every((source) => /^[0-9a-f]{40}$/u.test(source.commit))).toBe(true);
+    expect(lock.sources.find((source) => source.id === "pi-workspace-resources")).toMatchObject({
+      internalPath: "packages/pi-workspace-resources",
+      treeSha256: "ec4519c85610848e345784454763b90833bd4726939005a2d971fae2a44a9b11",
       includedExtensions: [{
         id: "pi-rules-loader",
         displayName: "工作规则加载器",
         description: "根据当前任务自动匹配并加载已配置的工作规则。"
       }]
+    });
+    const workspaceSourceManifest = JSON.parse(await readFile(
+      resolve(root, "packages/pi-workspace-resources/package.json"),
+      "utf8"
+    ));
+    expect(workspaceSourceManifest.desktopMigration).toEqual({
+      legacyRulesLoaderTreeSha256: "92f8bdb0332b8812f1844284d555ec281dcd3d00c3cf49990989b19b78707a84"
+    });
+    expect(lock.sources.find((source) => source.id === "openviking-pi-extension")).toMatchObject({
+      internalPath: "packages/openviking-pi-extension",
+      treeSha256: "373b0c4243f87236b41c343615ab771c7718b35dadc283a15eaf3d55c9c19a87",
+      version: "0.2.0-desktop.1",
+      includedExtensions: [{ id: "pi67-openviking" }]
     });
     expect(lock.sources.find((source) => source.id === "browser67")).toMatchObject({
       version: "0.8.0",
@@ -42,15 +72,15 @@ describe("Desktop first-party capability source lock", () => {
     expect(lock.skillPacks).toHaveLength(1);
     expect(lock.skillPacks[0]).toMatchObject({
       name: "ai-berkshire-investment-suite",
-      adapter: "pi67-ai-berkshire-v1",
-      adapterSourceId: "pi67-core",
+      adapter: "desktop-ai-berkshire-v1",
+      adapterSourceId: "pi-workspace-resources",
       repository: "https://github.com/xbtlin/ai-berkshire",
       ref: "refs/heads/main",
       commit: "fd83d06347c6e3ee50133cda6962f40e226b5252",
       localSibling: "../ai-berkshire",
-      version: "1.1.0",
+      version: "1.1.1",
       manifestSha256: "2db432f23f09146ef5ffcfdd5615ce2643637f592f3f3d90e30531fa65c87ac6",
-      bundleSha256: "0a4b7f8394b8c43ab73be0c3be4ec1e26b31fb87b0602215376e1697ccb3e7a7"
+      bundleSha256: "65e12e1320560fb9f707665729ff58a9941c0ebd324202ec9dbe67cdc1baa04c"
     });
     expect(lock.skillPacks[0].skills).toHaveLength(22);
     expect(lock.skillPacks[0].skills.map((skill) => skill.name)).toEqual([
@@ -84,11 +114,6 @@ describe("Desktop first-party capability source lock", () => {
       version: "2.11.0",
       extensionPaths: ["index.ts"],
       defaultEnabled: true
-    }, {
-      id: "pi-observational-memory",
-      version: "3.0.3",
-      extensionPaths: ["src/index.ts"],
-      defaultEnabled: true
     }]);
     expect(lock.managedNpmBundles.every((entry) => entry.packageIntegrity.startsWith("sha512-"))).toBe(true);
     expect(lock.recommendedExternal.map((entry) => entry.id)).toEqual(["pi-rewind"]);
@@ -98,9 +123,9 @@ describe("Desktop first-party capability source lock", () => {
     expect(() => assertCapabilitySourceLock(lock)).not.toThrow();
   });
 
-  it("rejects an implicit or unordered Pi-67 Core Extension selection", async () => {
+  it("rejects an implicit or unordered Desktop Extension selection", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
-    const coreIndex = lock.sources.findIndex((source) => source.id === "pi67-core");
+    const coreIndex = lock.sources.findIndex((source) => source.id === "pi-workspace-resources");
     const withoutSelection = structuredClone(lock);
     delete withoutSelection.sources[coreIndex].includedExtensions;
     expect(() => assertCapabilitySourceLock(withoutSelection)).toThrow(/bundled Extension selection/u);
@@ -120,8 +145,8 @@ describe("Desktop first-party capability source lock", () => {
   it("rejects a branch-tracked Skill Pack without immutable generated hashes", () => {
     expect(() => assertPi67SkillPackSource({
       name: "ai-berkshire-investment-suite",
-      adapter: "pi67-ai-berkshire-v1",
-      adapterSourceId: "pi67-core",
+      adapter: "desktop-ai-berkshire-v1",
+      adapterSourceId: "pi-workspace-resources",
       repository: "https://github.com/xbtlin/ai-berkshire",
       ref: "refs/heads/main",
       commit: "1".repeat(40),
@@ -144,15 +169,24 @@ describe("Desktop first-party capability source lock", () => {
 
   it("rejects malformed first-party tracked branch refs", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
-    lock.sources[0].ref = "refs/heads/../main";
+    lock.sources.find((source) => source.id === "browser67").ref = "refs/heads/../main";
     expect(() => assertCapabilitySourceLock(lock)).toThrow(/invalid tracked branch ref/u);
   });
 
   it("rejects prepared capability metadata that drifts from locked sources", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
-    const generatedFrom = lock.sources.map((source) => ({ ...source }));
+    const sourceProvenance = (source) => source.internalPath === undefined
+      ? { repository: source.repository, commit: source.commit }
+      : { internalPath: source.internalPath, sourceTreeSha256: source.treeSha256 };
+    const generatedFrom = lock.sources.map((source) => ({
+      id: source.id,
+      version: source.version,
+      ...sourceProvenance(source)
+    }));
     const entries = lock.sources.map((source) => ({
-      ...source,
+      id: source.id,
+      version: source.version,
+      ...sourceProvenance(source),
       packagePath: `packages/${source.id}`,
       bundledExtensions: source.includedExtensions ?? []
     }));
@@ -191,7 +225,9 @@ describe("Desktop first-party capability source lock", () => {
     expect(() => assertCapabilitiesMetadata(lock, catalog, manifest)).not.toThrow();
     expect(() => assertCapabilitiesMetadata(lock, {
       ...catalog,
-      entries: entries.map((entry, index) => index === 0 ? { ...entry, commit: "0".repeat(40) } : entry)
+      entries: entries.map((entry, index) => index === 0
+        ? { ...entry, sourceTreeSha256: "0".repeat(64) }
+        : entry)
     }, manifest)).toThrow(/metadata is stale/u);
     expect(() => assertCapabilitiesMetadata(lock, {
       ...catalog,
@@ -200,7 +236,7 @@ describe("Desktop first-party capability source lock", () => {
             ...entry,
             bundledExtensions: [
               ...entry.bundledExtensions,
-              { id: "pi-hy-memory", displayName: "Memory", description: "Memory fixture." }
+              { id: "example-extension", displayName: "Example", description: "Extension fixture." }
             ]
           }
         : entry)
@@ -225,12 +261,12 @@ describe("Desktop first-party capability source lock", () => {
     expect(definition.suites.find((suite) => suite.id === "ai-berkshire-investment-suite")).toMatchObject({
       versionSource: { kind: "pi67-skill-pack", packName: "ai-berkshire-investment-suite" },
       upstream: "https://github.com/xbtlin/ai-berkshire",
-      updatePolicy: "hybrid",
-      updateManager: "pi67-skill-pack-registry",
-      independentUpdateState: "available"
+      updatePolicy: "capability-package",
+      updateManager: "desktop-capability",
+      independentUpdateState: "not-applicable"
     });
     expect(definition.suites.find((suite) => suite.id === "ai-berkshire-investment-suite")?.members)
-      .toContainEqual({ packageId: "pi67-core", skillId: "era-alpha" });
+      .toContainEqual({ packageId: "pi-workspace-resources", skillId: "era-alpha" });
   });
 
   it("extracts bounded single-line and folded Skill descriptions", () => {
@@ -305,9 +341,9 @@ describe("Desktop first-party capability source lock", () => {
         description: "Pack skills",
         versionSource: { kind: "pi67-skill-pack", packName: "pack" },
         upstream: "https://github.com/example/pack",
-        updatePolicy: "hybrid",
-        updateManager: "pi67-skill-pack-registry",
-        independentUpdateState: "planned",
+        updatePolicy: "capability-package",
+        updateManager: "desktop-capability",
+        independentUpdateState: "not-applicable",
         members: [{ packageId: "core", skillId: "one" }]
       }, {
         id: "browser",

@@ -6,6 +6,10 @@ import type {
 } from "@pi67/protocol";
 import type { LarkAuthManagementPort } from "./lark-auth-management.js";
 import {
+  isContextMemoryAppCommand,
+  type ContextMemoryCommandRouter
+} from "./context/context-memory-command-router.js";
+import {
   isAppConfigurationCommand,
   type AppConfigurationCommandType,
   type AppConfigurationCommandRouter
@@ -16,6 +20,7 @@ export async function dispatchHostAppCommand(
   command: AgentCommand,
   options: {
     appConfiguration: AppConfigurationCommandRouter;
+    contextMemory: ContextMemoryCommandRouter;
     idempotencyKey?: string;
     larkAuth: LarkAuthManagementPort;
     loadRuntime(): Promise<AgentRuntime>;
@@ -25,6 +30,12 @@ export async function dispatchHostAppCommand(
   if (isAppConfigurationCommand(command.type)) {
     return options.appConfiguration.dispatch(
       command as AgentCommand<AppConfigurationCommandType>,
+      options.idempotencyKey
+    );
+  }
+  if (isContextMemoryAppCommand(command.type)) {
+    return options.contextMemory.dispatchApp(
+      command as AgentCommand<import("./context/context-memory-command-router.js").ContextMemoryAppCommandType>,
       options.idempotencyKey
     );
   }

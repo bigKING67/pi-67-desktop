@@ -198,8 +198,8 @@ async function writeExistingPiProfile(agentDir) {
       schema: "pi67.desktop-capability-state.v1",
       catalogVersion: "alpha.21-legacy",
       packages: [{
-        id: "pi67-core",
-        displayName: "Pi-67 Core",
+        id: "pi-workspace-resources",
+        displayName: "Pi Workspace Resources",
         resourceTypes: ["rule"],
         treeSha256: "a".repeat(64),
         installed: true,

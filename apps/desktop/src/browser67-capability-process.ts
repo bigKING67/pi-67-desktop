@@ -414,7 +414,7 @@ function browserLiveDetail(detail: string, ensureHub: boolean): string {
       : "浏览器扩展尚未连接；可从安装向导启动 Hub 并验证。";
   }
   if (detail.startsWith("extension_identity_mismatch")) {
-    return "浏览器中运行的扩展不是当前受管版本。请在扩展管理页核对加载目录；若仍指向旧目录，请移除旧条目后从 Pi-67 提供的目录重新“加载已解压的扩展”。";
+    return "浏览器中运行的扩展不是当前受管版本。请在扩展管理页核对加载目录；若仍指向旧目录，请移除旧条目后从 Desktop 管理目录重新“加载已解压的扩展”。";
   }
   if (detail.includes("tcp") || detail.includes("unreachable") || detail.includes("no_tmwd")) {
     return ensureHub

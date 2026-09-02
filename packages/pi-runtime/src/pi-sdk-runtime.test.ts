@@ -88,7 +88,7 @@ describe("PiSdkRuntime", () => {
     const cwd = join(root, "workspace");
     const agentDir = join(root, "agent");
     const managedRoot = join(agentDir, "desktop-capabilities");
-    const bundledPackage = join(managedRoot, "packages", "pi67-core");
+    const bundledPackage = join(managedRoot, "packages", "pi-workspace-resources");
     const overlayPackage = join(managedRoot, "skill-packs", "ai-berkshire-investment-suite", "package");
     const toolchainRoot = join(root, "toolchain");
     await Promise.all([

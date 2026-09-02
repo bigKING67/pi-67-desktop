@@ -921,11 +921,11 @@ loading error where the operation can produce those states
   substitute. The detail begins with `内置基线`, `更新方式`, and verified upstream
   provenance before listing members. Individual detail rows retain the real Skill identity,
   bounded purpose, owning capability Package, and version without repeating a
-  misleading loaded state. A Pi-67 Skill Pack version resolves from its registry
-  and lock. AI Berkshire is regenerated at build time from a separately pinned
-  upstream commit using the adapter from the locked Pi-67 Core source; the expected
+  misleading loaded state. A Desktop Skill Pack version resolves from its build-time
+  lock. AI Berkshire is regenerated at build time from a separately pinned
+  upstream commit using the Desktop-owned adapter; the expected
   Pack version, source-manifest hash, and bundle hash must all match before its Skills
-  may overlay the immutable Core baseline. A single capability suite resolves from the locked capability Package,
+  may enter the immutable Pi Workspace Resources baseline. A single capability suite resolves from the locked capability Package,
   a multi-source aggregation says `N 个内置来源`, and an unversioned upstream says
   `未独立版本化` rather than inventing SemVer. Suite membership is an explicit build-time manifest
   validated against every first-party Skill in the Desktop capability catalog;
@@ -1042,13 +1042,20 @@ loading error where the operation can produce those states
   Extension, global/project Skill, Prompt Template, and Context views consume the
   current Session resource projection and never repeat Package update or uninstall
   controls.
-- The Desktop-managed runtime bundle contains the complete locked closures for
-  `pi-mcp-adapter@2.11.0` and `pi-observational-memory@3.0.3`. Startup verifies the
-  packaged bundle, atomically promotes `staging` to `active`, retains one `previous`
-  rollback, and exposes only `active` to Pi ResourceLoader. Both Packages default to
-  enabled without a client-side npm call. Observational Memory may be disabled through
-  Desktop-owned durable state without changing shared Pi settings or deleting memory;
-  its explicit opt-out UI remains unimplemented and must not be implied by Settings.
+- The Desktop-managed runtime bundle contains only the complete locked closure for
+  `pi-mcp-adapter@2.11.0`. Startup verifies the packaged bundle, atomically promotes
+  `staging` to `active`, retains one `previous` rollback, and exposes only `active` to
+  Pi ResourceLoader. OpenViking is the only supported third-party Context/Memory
+  owner. Legacy observational-memory and Hy-Memory names are detection/migration
+  identifiers only; their runtimes are never bundled or presented as alternatives.
+- The `Experience` Inspector presents private records and enterprise candidates in
+  one dense governance list. A candidate expands an inline review surface rather
+  than a modal: task result starts unselected, applicable and excluded conditions
+  are both required, and outcome plus redaction use independent explicit
+  confirmations. `保存人工审核` and `提交企业审核` remain two separate actions.
+  `已提交` is visibly labeled as awaiting review and must never look equivalent to
+  `已共享`; asynchronous Gateway failure stays visible beside the list and never
+  resolves as success from the accepted operation alone.
 - Installing another Pi Package starts from one page-level action and opens a focused
   confirmation dialog that identifies npm, Git, or local-directory sources, the
   target scope, and the fact that a Package may load executable Extension code.
@@ -1939,15 +1946,16 @@ loading error where the operation can produce those states
   answer must not call them native fallbacks or report pi-fff missing. In named
   mode the same guidance points to live `fffind` and `ffgrep`. Duplicate sources
   and unsupported versions stay unverified.
-- The Desktop-only Pi settings projection gives verified managed `pi67-core`
-  runtime precedence over its legacy auto-discovered copies. It adds exact
-  force-exclusion for `pi-rules-loader` only while the managed Package path is
-  active. `pi-vision-bridge` and `xtalpi-pi-tools` are absent from the managed
-  capability catalog and are not Desktop force-exclusions. No file or persisted
-  setting is mutated, unrelated Extensions are untouched, and removing managed
-  `pi67-core` restores normal legacy discovery. The visible result is one rule
-  activation notification and no conflict diagnostic for that first-party
-  extension.
+- The shared Pi Agent Profile projects one verified
+  `pi-workspace-resources` version for Pi TUI and Desktop. Desktop loads the
+  Package Extension and applies an exact top-level `pi-rules-loader` exclusion;
+  Pi TUI keeps that Package's Extension surface disabled and loads the
+  exact-hash top-level compatibility projection. The JSONC settings update is
+  revision-fenced and preserves user Packages/comments, while activation keeps
+  `active`, one `previous`, staging cleanup, and a receipt. Unknown or divergent
+  files are not overwritten. `pi-vision-bridge` and `xtalpi-pi-tools` are absent
+  from the managed catalog and are not exclusions. The visible result is one
+  rule activation notification per entrypoint and no duplicate-owner conflict.
 - Verified `pi-mcp-adapter@2.10.0` and `2.11.0` `mcp` proxy calls distinguish
   local capability discovery from execution. Empty status, cached server lists,
   bounded search/describe, and current-Session UI-message reads use the

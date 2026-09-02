@@ -44,6 +44,7 @@ import {
   networkReadTarget,
   stringField
 } from "./tool-input-contracts.js";
+import { classifyPi67ContextToolIntent } from "./pi67-context-tool-safety.js";
 
 export interface SafetyPolicyState {
   cwd: string;
@@ -261,6 +262,9 @@ async function classifyToolIntent(
       targetKind: "tool",
       sourceLabel: profile.sourceLabel
     };
+  }
+  if (profile.kind === "pi67-context") {
+    return classifyPi67ContextToolIntent(toolName, record, profile.sourceLabel);
   }
   if (toolName === "bash" && profile.kind === "builtin") {
     const command = stringField(record, "command") ?? "";
