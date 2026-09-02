@@ -17,7 +17,7 @@ export interface ComposerRuntimeSelectOption {
   detail?: string;
 }
 
-interface ComposerRuntimeSelectOptionGroup {
+export interface ComposerRuntimeSelectOptionGroup {
   id: string;
   label: string;
   options: readonly ComposerRuntimeSelectOption[];

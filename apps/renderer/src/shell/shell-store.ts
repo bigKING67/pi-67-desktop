@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
-type ShellContextTab = "files" | "changes" | "messages" | "agents" | "context" | "memory" | "experience";
+type ShellContextTab = "files" | "changes" | "messages" | "agents" | "context";
+type ShellContextDetailTab = "session" | "memory" | "experience";
 
 interface ShellState {
   navigationVisible: boolean;
@@ -10,6 +11,7 @@ interface ShellState {
   modelPickerHandledRevision: number;
   contextVisible: boolean;
   contextTab: ShellContextTab;
+  contextDetailTab: ShellContextDetailTab;
   sessionTreeDialogOpen: boolean;
   commandPaletteOpen: boolean;
   keyboardShortcutsDialogOpen: boolean;
@@ -26,6 +28,7 @@ interface ShellState {
   acknowledgeModelPickerRequest: (revision: number) => void;
   setContextVisible: (visible: boolean) => void;
   setContextTab: (tab: ShellContextTab) => void;
+  setContextDetailTab: (tab: ShellContextDetailTab) => void;
   setSessionTreeDialogOpen: (open: boolean) => void;
   setCommandPaletteOpen: (open: boolean) => void;
   setKeyboardShortcutsDialogOpen: (open: boolean) => void;
@@ -46,6 +49,7 @@ export const useShellStore = create<ShellState>((set) => ({
   modelPickerHandledRevision: 0,
   contextVisible: true,
   contextTab: "files",
+  contextDetailTab: "session",
   sessionTreeDialogOpen: false,
   commandPaletteOpen: false,
   keyboardShortcutsDialogOpen: false,
@@ -77,6 +81,7 @@ export const useShellStore = create<ShellState>((set) => ({
   },
   setContextVisible(contextVisible) { set({ contextVisible }); },
   setContextTab(contextTab) { set({ contextTab }); },
+  setContextDetailTab(contextDetailTab) { set({ contextDetailTab }); },
   setSessionTreeDialogOpen(sessionTreeDialogOpen) { set({ sessionTreeDialogOpen }); },
   setCommandPaletteOpen(commandPaletteOpen) { set({ commandPaletteOpen }); },
   setKeyboardShortcutsDialogOpen(keyboardShortcutsDialogOpen) { set({ keyboardShortcutsDialogOpen }); },

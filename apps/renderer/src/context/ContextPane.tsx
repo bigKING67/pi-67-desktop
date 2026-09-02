@@ -25,19 +25,23 @@ const ExperienceInspectorPanel = lazy(() => import("../context-memory/Experience
 
 export function ContextPane() {
   const selectedTab = useShellStore((state) => state.contextTab);
+  const selectedDetailTab = useShellStore((state) => state.contextDetailTab);
   const setSelectedTab = useShellStore((state) => state.setContextTab);
+  const setSelectedDetailTab = useShellStore((state) => state.setContextDetailTab);
 
   return (
     <aside aria-label="任务检查器" className="context-pane" id="task-inspector">
-      <Tabs selectedKey={selectedTab} onSelectionChange={(key) => setSelectedTab(String(key) as typeof selectedTab)}>
+      <Tabs
+        className="context-pane-root-tabs"
+        selectedKey={selectedTab}
+        onSelectionChange={(key) => setSelectedTab(String(key) as typeof selectedTab)}
+      >
         <TabList aria-label="任务检查器" className="context-pane-tabs">
           <Tab id="files"><Files aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>文件</span></Tab>
           <Tab id="changes"><FilePenLine aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>修改</span></Tab>
           <Tab id="messages"><MessagesSquare aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>消息</span></Tab>
           <Tab id="agents"><Bot aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>代理</span></Tab>
           <Tab id="context"><Gauge aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>上下文</span></Tab>
-          <Tab id="memory"><BrainCircuit aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>记忆</span></Tab>
-          <Tab id="experience"><Lightbulb aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>经验</span></Tab>
         </TabList>
         <TabPanel id="files" className="context-panel inspector-files-panel">
           <FilesPanel />
@@ -57,19 +61,34 @@ export function ContextPane() {
             <Suspense fallback={<ContextPanelLoadingState />}><SubagentsPanel /></Suspense>
           ) : null}
         </TabPanel>
-        <TabPanel id="context" className="context-panel">
+        <TabPanel id="context" className="context-panel inspector-context-panel">
           {selectedTab === "context" ? (
-            <Suspense fallback={<ContextPanelLoadingState />}><RuntimeContextPanel /></Suspense>
-          ) : null}
-        </TabPanel>
-        <TabPanel id="memory" className="context-panel">
-          {selectedTab === "memory" ? (
-            <Suspense fallback={<ContextPanelLoadingState />}><MemoryInspectorPanel /></Suspense>
-          ) : null}
-        </TabPanel>
-        <TabPanel id="experience" className="context-panel">
-          {selectedTab === "experience" ? (
-            <Suspense fallback={<ContextPanelLoadingState />}><ExperienceInspectorPanel /></Suspense>
+            <Tabs
+              className="context-detail-tabs"
+              selectedKey={selectedDetailTab}
+              onSelectionChange={(key) => setSelectedDetailTab(String(key) as typeof selectedDetailTab)}
+            >
+              <TabList aria-label="上下文检查器" className="context-detail-tab-list">
+                <Tab id="session"><Gauge aria-hidden="true" size={13} /><span>会话</span></Tab>
+                <Tab id="memory"><BrainCircuit aria-hidden="true" size={13} /><span>记忆</span></Tab>
+                <Tab id="experience"><Lightbulb aria-hidden="true" size={13} /><span>经验</span></Tab>
+              </TabList>
+              <TabPanel id="session" className="context-detail-panel">
+                {selectedDetailTab === "session" ? (
+                  <Suspense fallback={<ContextPanelLoadingState />}><RuntimeContextPanel /></Suspense>
+                ) : null}
+              </TabPanel>
+              <TabPanel id="memory" className="context-detail-panel">
+                {selectedDetailTab === "memory" ? (
+                  <Suspense fallback={<ContextPanelLoadingState />}><MemoryInspectorPanel /></Suspense>
+                ) : null}
+              </TabPanel>
+              <TabPanel id="experience" className="context-detail-panel">
+                {selectedDetailTab === "experience" ? (
+                  <Suspense fallback={<ContextPanelLoadingState />}><ExperienceInspectorPanel /></Suspense>
+                ) : null}
+              </TabPanel>
+            </Tabs>
           ) : null}
         </TabPanel>
       </Tabs>

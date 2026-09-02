@@ -3,6 +3,33 @@ import { describe, expect, it } from "vitest";
 import { parseComposerDraftPersistedState } from "./composer-draft-state.js";
 
 describe("parseComposerDraftPersistedState", () => {
+  it("accepts bounded startup runtime choices only for provisional drafts", () => {
+    const provisional = {
+      version: 1 as const,
+      drafts: [{
+        conversation: { kind: "provisional" as const, workspaceId: "workspace-a", draftId: "draft-a" },
+        text: "",
+        streamBehavior: "followUp" as const,
+        updatedAt: 1,
+        startupModel: { provider: "groland", model: "deepseek-v4-flash" },
+        startupThinkingLevel: "max"
+      }]
+    };
+    expect(parseComposerDraftPersistedState(provisional)).toEqual(provisional);
+    expect(parseComposerDraftPersistedState({
+      ...provisional,
+      drafts: [{
+        ...provisional.drafts[0],
+        conversation: {
+          kind: "session",
+          workspaceId: "workspace-a",
+          sessionFileIdentity: "session-file-a",
+          sessionPath: "/sessions/a.jsonl"
+        }
+      }]
+    })).toBeUndefined();
+  });
+
   it("accepts the canonical NUL-delimited physical identity used by real Pi sessions", () => {
     const state = draftState();
     const conversation = {

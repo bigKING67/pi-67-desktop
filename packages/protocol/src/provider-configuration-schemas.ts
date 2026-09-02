@@ -41,6 +41,7 @@ export interface PiModelConfigurationView {
   reasoning: boolean;
   contextWindow?: number;
   maxTokens?: number;
+  thinkingLevels?: string[];
   headerNames: string[];
   advancedJson: string;
 }
@@ -240,6 +241,7 @@ const PiModelConfigurationViewSchema = strictObject({
   reasoning: Type.Boolean(),
   contextWindow: Type.Optional(Type.Number({ minimum: 1 })),
   maxTokens: Type.Optional(Type.Number({ minimum: 1 })),
+  thinkingLevels: Type.Optional(Type.Array(IdentifierSchema, { maxItems: 7, uniqueItems: true })),
   headerNames: Type.Array(Type.String({ minLength: 1, maxLength: 256 }), { maxItems: 128 }),
   advancedJson: Type.String({ maxLength: 262_144 })
 });

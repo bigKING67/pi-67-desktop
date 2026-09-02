@@ -5,14 +5,20 @@ import { clearRendererQueue } from "../composer/queue-controller.js";
 import { useNotificationStore } from "../notifications/notification-store.js";
 import {
   configureRuntimeProviderKey,
-  selectSessionModel
+  selectSessionModel,
+  setSessionThinkingLevel
 } from "../session/session-control-controller.js";
+import {
+  recentSessionRuntimePreference,
+  resetRecentSessionRuntimePreferencesForTests
+} from "../session/recent-session-runtime-preferences.js";
 import {
   useModelSelectionStore
 } from "../session/model-selection-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { updateWorkspaceTrust } from "../workspace/workspace-trust-controller.js";
 import { useAppStore } from "./app-store.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   deferred,
   emitMeta,
@@ -30,6 +36,8 @@ describe("App Store Session controls", () => {
     vi.restoreAllMocks();
     resetStores();
     installSession("session-1", 3);
+    rendererWorkbenchStore.getState().reset();
+    resetRecentSessionRuntimePreferencesForTests();
     vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue({
       appInstanceId: "app-1",
       hostInstanceId: "host-9",
@@ -160,6 +168,7 @@ describe("App Store Session controls", () => {
   });
 
   it("applies model controls and model-specific thinking levels without rolling back unrelated state", async () => {
+    installWorkbenchSession();
     const request = deferred<CommandResults["model.select"]>();
     vi.spyOn(agentConnectionController, "request").mockReturnValue(request.promise as never);
 
@@ -184,6 +193,31 @@ describe("App Store Session controls", () => {
     expect(useModelSelectionStore.getState()).toMatchObject({
       status: "confirmed",
       target: { provider: "anthropic", id: "claude", label: "anthropic/claude" }
+    });
+    expect(recentSessionRuntimePreference("workspace-a")).toEqual({
+      model: { provider: "anthropic", model: "claude" },
+      thinkingLevel: "high",
+      updatedAt: expect.any(Number)
+    });
+  });
+
+  it("remembers a thinking level only after Pi confirms and installs it", async () => {
+    installWorkbenchSession();
+    const response: CommandResults["thinking.set"] = {
+      sessionId: "session-1",
+      controls: {
+        selectedModel: { provider: "openai", id: "gpt" },
+        thinkingLevel: "max"
+      }
+    };
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue(response as never);
+
+    await expect(setSessionThinkingLevel("max")).resolves.toBe(true);
+
+    expect(recentSessionRuntimePreference("workspace-a")).toEqual({
+      model: { provider: "openai", model: "gpt" },
+      thinkingLevel: "max",
+      updatedAt: expect.any(Number)
     });
   });
 
@@ -387,3 +421,36 @@ describe("App Store Session controls", () => {
   });
 
 });
+
+function installWorkbenchSession(): void {
+  rendererWorkbenchStore.getState().registerWorkspace({
+    id: "workspace-a",
+    displayName: "Workspace A",
+    identity: { canonicalPath: "/workspace", assurance: "path-only" },
+    trust: "trusted",
+    trustProvenance: "native-picker",
+    availability: "available"
+  });
+  rendererWorkbenchStore.getState().restoreTask({
+    id: "task-session-1",
+    conversation: {
+      kind: "session",
+      workspaceId: "workspace-a",
+      sessionFileIdentity: "session-file-session-1",
+      sessionPath: "/sessions/session-1.jsonl"
+    },
+    workspaceId: "workspace-a",
+    sessionId: "session-1",
+    taskGeneration: 1,
+    sessionGeneration: 3,
+    sessionFileIdentity: "session-file-session-1",
+    sessionPath: "/sessions/session-1.jsonl",
+    lifecycle: "idle",
+    runtime: { phase: "ready", detail: "ready", recoverable: true },
+    title: "Session 1",
+    hasDraft: false,
+    toolMode: "auto",
+    attachmentCount: 0
+  });
+  rendererWorkbenchStore.getState().selectTask("task-session-1");
+}

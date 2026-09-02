@@ -33,10 +33,11 @@ import {
   type RendererWorkbenchState,
   type RendererWorkbenchTask
 } from "../workbench/workbench-store.js";
+import { rememberSessionRuntimePreference } from "./recent-session-runtime-preferences.js";
 
 interface ModelSelectionFlight {
   key: string;
-  promise: Promise<void>;
+  promise: Promise<boolean>;
 }
 
 let modelSelectionFlight: ModelSelectionFlight | undefined;
@@ -44,7 +45,7 @@ let modelSelectionFlight: ModelSelectionFlight | undefined;
 export function selectSessionModel(
   provider: string,
   id: string
-): Promise<void> {
+): Promise<boolean> {
   const get = useAppStore.getState;
   let authority: RendererSessionAuthority;
   let projectionTarget: SessionProjectionTarget;
@@ -55,7 +56,7 @@ export function selectSessionModel(
     modelTarget = resolveModelSelectionTarget(provider, id);
   } catch (error) {
     publishActionError(error, "无法切换模型");
-    return Promise.resolve();
+    return Promise.resolve(false);
   }
 
   const requestKey = `${authority.hostEpoch}:${authority.sessionId}:${authority.sessionGeneration}:${provider}/${id}`;
@@ -65,10 +66,13 @@ export function selectSessionModel(
     selection.status !== "pending"
     && modelSelectionTargetKey(useSessionProjectionStore.getState().controls?.selectedModel)
       === modelSelectionTargetKey(modelTarget)
-  ) return Promise.resolve();
+  ) {
+    rememberCurrentSessionRuntime(authority);
+    return Promise.resolve(true);
+  }
 
   const token = beginModelSelection(authority, modelTarget);
-  let promise!: Promise<void>;
+  let promise!: Promise<boolean>;
   promise = performModelSelection(
     get,
     authority,
@@ -131,19 +135,22 @@ export async function configureRuntimeProviderKey(
 
 export async function setSessionThinkingLevel(
   level: string
-): Promise<void> {
+): Promise<boolean> {
   const get = useAppStore.getState;
   try {
     const authority = requireSessionAuthority(get());
     const target = requireProjectionTarget(authority);
     const result = await agentConnectionController.request("thinking.set", { level });
-    applyProjectionResponse(
+    const applied = applyProjectionResponse(
       get,
       authority,
       () => useSessionProjectionStore.getState().applyControlResult(target, result)
     );
+    if (applied) rememberCurrentSessionRuntime(authority);
+    return applied;
   } catch (error) {
     publishActionError(error, "无法调整思考级别");
+    return false;
   }
 }
 
@@ -232,16 +239,16 @@ async function performModelSelection(
   projectionTarget: SessionProjectionTarget,
   modelTarget: ModelSelectionTarget,
   token: ModelSelectionToken
-): Promise<void> {
+): Promise<boolean> {
   try {
     const result = await agentConnectionController.request("model.select", {
       provider: modelTarget.provider,
       id: modelTarget.id
     });
-    if (!isPendingModelSelection(token)) return;
+    if (!isPendingModelSelection(token)) return false;
     if (!acceptRendererSessionResponse(get(), authority)) {
       resetModelSelection();
-      return;
+      return false;
     }
 
     const resultMatchesTarget = modelSelectionTargetKey(result.controls.selectedModel)
@@ -251,18 +258,20 @@ async function performModelSelection(
     }
     if (!acceptRendererSessionResponse(get(), authority)) {
       if (isPendingModelSelection(token)) resetModelSelection();
-      return;
+      return false;
     }
     if (authoritativeModelMatches(modelTarget)) {
       confirmModelSelection(token);
-      return;
+      rememberCurrentSessionRuntime(authority);
+      return true;
     }
-    await recoverModelSelectionProjection(get, authority, modelTarget, token);
+    return recoverModelSelectionProjection(get, authority, modelTarget, token);
   } catch (error) {
-    if (!isPendingModelSelection(token)) return;
+    if (!isPendingModelSelection(token)) return false;
     const detail = errorMessage(error);
     failModelSelection(token, detail);
     publishActionError(error, "无法切换模型");
+    return false;
   }
 }
 
@@ -271,7 +280,7 @@ async function recoverModelSelectionProjection(
   authority: RendererSessionAuthority,
   modelTarget: ModelSelectionTarget,
   token: ModelSelectionToken
-): Promise<void> {
+): Promise<boolean> {
   const disposition = await resynchronizeRendererProjection(
     get,
     useAppStore.setState,
@@ -282,18 +291,20 @@ async function recoverModelSelectionProjection(
       failureTitle: messages.composer.modelSwitchConfirmationFailed
     }
   );
-  if (!isPendingModelSelection(token)) return;
+  if (!isPendingModelSelection(token)) return false;
   if (disposition === "committed" && authoritativeModelMatches(modelTarget)) {
     confirmModelSelection(token);
-    return;
+    rememberCurrentSessionRuntime(authority);
+    return true;
   }
   const detail = messages.composer.modelSwitchStateUnconfirmed;
-  if (!failModelSelection(token, detail) || disposition === "failed") return;
+  if (!failModelSelection(token, detail) || disposition === "failed") return false;
   publishNotification({
     level: "error",
     title: messages.composer.modelSwitchConfirmationFailed,
     message: detail
   });
+  return false;
 }
 
 function resolveModelSelectionTarget(provider: string, id: string): ModelSelectionTarget {
@@ -306,6 +317,21 @@ function resolveModelSelectionTarget(provider: string, id: string): ModelSelecti
 function authoritativeModelMatches(target: ModelSelectionTarget): boolean {
   return modelSelectionTargetKey(useSessionProjectionStore.getState().controls?.selectedModel)
     === modelSelectionTargetKey(target);
+}
+
+function rememberCurrentSessionRuntime(authority: RendererSessionAuthority): void {
+  const task = currentSessionResourceTask(rendererWorkbenchStore.getState());
+  const projection = useSessionProjectionStore.getState();
+  if (
+    !task
+    || task.conversation.kind !== "session"
+    || task.sessionId !== authority.sessionId
+    || projection.authority.phase !== "active"
+    || projection.authority.hostEpoch !== authority.hostEpoch
+    || projection.authority.sessionId !== authority.sessionId
+    || !projection.controls
+  ) return;
+  rememberSessionRuntimePreference(task.workspaceId, projection.controls);
 }
 
 function applyProjectionResponse(

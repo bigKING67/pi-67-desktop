@@ -15,6 +15,7 @@ describe("shell store", () => {
       modelPickerHandledRevision: 0,
       contextVisible: true,
       contextTab: "files",
+      contextDetailTab: "session",
       sessionTreeDialogOpen: false,
       commandPaletteOpen: false,
       workspaceConversationSearchDialogOpen: false,
@@ -68,6 +69,19 @@ describe("shell store", () => {
       contextVisible: true,
       contextTab: "changes",
       commandPaletteOpen: false
+    });
+  });
+
+  it("keeps the selected Context detail when switching primary inspector tabs", () => {
+    const shell = useShellStore.getState();
+    shell.setContextTab("context");
+    shell.setContextDetailTab("experience");
+    shell.setContextTab("files");
+    shell.setContextTab("context");
+
+    expect(useShellStore.getState()).toMatchObject({
+      contextTab: "context",
+      contextDetailTab: "experience"
     });
   });
 

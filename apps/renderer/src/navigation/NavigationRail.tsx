@@ -34,6 +34,9 @@ const WorkspaceRemovalDialog = lazy(async () => {
 const ConversationRenameDialog = lazy(() => import("./ConversationRenameDialog.js").then((module) => ({
   default: module.ConversationRenameDialog
 })));
+const ConversationDraftDiscardDialog = lazy(() => import("./ConversationDraftDiscardDialog.js").then((module) => ({
+  default: module.ConversationDraftDiscardDialog
+})));
 const ArchivedConversationsDialog = lazy(() => import("./ArchivedConversationsDialog.js").then((module) => ({
   default: module.ArchivedConversationsDialog
 })));
@@ -66,6 +69,7 @@ export function NavigationRail({
   const removalWorkspace = removalWorkspaceId ? workspaces[removalWorkspaceId] : undefined;
   const archivedWorkspaceId = useConversationDialogStore((state) => state.archivedWorkspaceId);
   const renameTarget = useConversationDialogStore((state) => state.renameTarget);
+  const draftDiscardTarget = useConversationDialogStore((state) => state.draftDiscardTarget);
   const archivedWorkspace = archivedWorkspaceId ? workspaces[archivedWorkspaceId] : undefined;
 
   return (
@@ -129,6 +133,11 @@ export function NavigationRail({
       {renameTarget ? (
         <Suspense fallback={<span className="sr-only" role="status">正在打开重命名对话框</span>}>
           <ConversationRenameDialog />
+        </Suspense>
+      ) : null}
+      {draftDiscardTarget ? (
+        <Suspense fallback={<span className="sr-only" role="status">正在打开丢弃草稿确认</span>}>
+          <ConversationDraftDiscardDialog />
         </Suspense>
       ) : null}
       {archivedWorkspace ? (

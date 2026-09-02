@@ -23,7 +23,8 @@ export const MAX_STORED_COMPOSER_DRAFT_STATE_BYTES = 8 * 1024 * 1024;
 const MAX_ID_CHARS = 1_024;
 const MAX_DRAFT_ID_CHARS = 200;
 const MAX_SESSION_PATH_CHARS = 32_768;
-
+const MAX_RUNTIME_IDENTIFIER_CHARS = 512;
+const MAX_THINKING_LEVEL_CHARS = 64;
 export interface StoredComposerDraftState {
   version: 1;
   encryptedState?: string;
@@ -45,7 +46,10 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
   for (const candidate of value.drafts) {
     if (!isRecordWithAllowedKeys(
       candidate,
-      ["conversation", "text", "streamBehavior", "updatedAt", "workspaceFiles", "reviewComments", "promptStash", "environmentIntent", "interactionMode"],
+      [
+        "conversation", "text", "streamBehavior", "updatedAt", "workspaceFiles", "reviewComments",
+        "promptStash", "environmentIntent", "interactionMode", "startupModel", "startupThinkingLevel"
+      ],
       ["conversation", "text", "streamBehavior", "updatedAt"]
     )) return undefined;
     const conversation = parseConversation(candidate.conversation);
@@ -56,7 +60,18 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
     if (candidate.reviewComments !== undefined && !reviewComments) return undefined;
     const promptStash = parsePromptStash(candidate.promptStash);
     if (candidate.promptStash !== undefined && !promptStash) return undefined;
-    if (candidate.text.length === 0 && !reviewComments?.length && !promptStash?.length) return undefined;
+    const startupModel = parseStartupModel(candidate.startupModel);
+    if (candidate.startupModel !== undefined && !startupModel) return undefined;
+    const startupThinkingLevel = candidate.startupThinkingLevel;
+    if (startupThinkingLevel !== undefined
+      && !isBoundedString(startupThinkingLevel, MAX_THINKING_LEVEL_CHARS)) return undefined;
+    if (
+      candidate.text.length === 0
+      && !reviewComments?.length
+      && !promptStash?.length
+      && !startupModel
+      && !startupThinkingLevel
+    ) return undefined;
     const textBytes = Buffer.byteLength(candidate.text, "utf8");
     const reviewBytes = (reviewComments ?? []).reduce(
       (total, comment) => total + Buffer.byteLength(comment.body, "utf8"),
@@ -89,6 +104,8 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
         && candidate.interactionMode !== "plan"
       )
       || (candidate.interactionMode !== undefined && conversation.kind !== "provisional")
+      || (candidate.startupModel !== undefined && conversation.kind !== "provisional")
+      || (candidate.startupThinkingLevel !== undefined && conversation.kind !== "provisional")
       || !Number.isSafeInteger(candidate.updatedAt)
       || Number(candidate.updatedAt) < 0
     ) return undefined;
@@ -104,7 +121,9 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
       ...(reviewComments?.length ? { reviewComments } : {}),
       ...(promptStash?.length ? { promptStash } : {}),
       ...(candidate.environmentIntent ? { environmentIntent: candidate.environmentIntent } : {}),
-      ...(candidate.interactionMode ? { interactionMode: candidate.interactionMode } : {})
+      ...(candidate.interactionMode ? { interactionMode: candidate.interactionMode } : {}),
+      ...(startupModel ? { startupModel } : {}),
+      ...(startupThinkingLevel ? { startupThinkingLevel } : {})
     });
   }
   const selectedConversation = value.selectedConversation === undefined
@@ -117,6 +136,16 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
     drafts,
     ...(selectedConversation ? { selectedConversation } : {})
   };
+}
+
+function parseStartupModel(value: unknown): ComposerDraftRecord["startupModel"] | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value) || !hasExactKeys(value, ["provider", "model"])) return undefined;
+  if (
+    !isBoundedString(value.provider, MAX_RUNTIME_IDENTIFIER_CHARS)
+    || !isBoundedString(value.model, MAX_RUNTIME_IDENTIFIER_CHARS)
+  ) return undefined;
+  return { provider: value.provider, model: value.model };
 }
 
 export function parseStoredComposerDraftState(value: unknown): StoredComposerDraftState | undefined {

@@ -13,6 +13,7 @@ import { useSessionProjectionStore } from "./session-projection-store.js";
 import { materializeRendererSessionIntent } from "./session-lifecycle-controller.js";
 import { useTaskDraftStore } from "../workbench/task-draft-store.js";
 import { setRendererSessionInteractionMode } from "./session-plan-controller.js";
+import { selectSessionModel, setSessionThinkingLevel } from "./session-control-controller.js";
 
 const MATERIALIZATION_TIMEOUT_MS = 5_000;
 const inFlightByTask = new Map<string, Promise<PromptSubmissionResult>>();
@@ -59,7 +60,10 @@ async function submitIntent(
     return { accepted: false, error };
   }
 
-  const interactionMode = useTaskDraftStore.getState().drafts[taskId]?.interactionMode ?? "execute";
+  const draft = useTaskDraftStore.getState().drafts[taskId];
+  const interactionMode = draft?.interactionMode ?? "execute";
+  const startupModel = draft?.startupModel;
+  const startupThinkingLevel = draft?.startupThinkingLevel;
 
   const materialized = await materializeRendererSessionIntent(taskId);
   if (materialized.status !== "materialized") {
@@ -71,6 +75,18 @@ async function submitIntent(
     return { accepted: false, error };
   }
   if (
+    startupModel
+    && !await selectSessionModel(startupModel.provider, startupModel.model)
+  ) {
+    return startupConfigurationFailure("模型未能确认");
+  }
+  if (
+    startupThinkingLevel
+    && !await setSessionThinkingLevel(startupThinkingLevel)
+  ) {
+    return startupConfigurationFailure("思考级别未能确认");
+  }
+  if (
     interactionMode === "plan"
     && !await setRendererSessionInteractionMode("plan")
   ) {
@@ -79,6 +95,12 @@ async function submitIntent(
     return { accepted: false, error };
   }
   return submitRendererPrompt(text, "send", submissionId, attachments, workspaceFiles);
+}
+
+function startupConfigurationFailure(detail: string): PromptSubmissionResult {
+  const error = `对话已经创建，但${detail}。草稿和附件已保留，请重试。`;
+  publishNotification({ level: "warning", title: "首条消息尚未发送", message: error });
+  return { accepted: false, error };
 }
 
 function waitForMaterializedTask(taskId: string): Promise<boolean> {

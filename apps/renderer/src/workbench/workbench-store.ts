@@ -19,6 +19,7 @@ import {
   taskFromRuntimeRecovery,
   taskFromSessionCreationRecovery
 } from "./workbench-task-recovery.js";
+import { taskRemovalSurfaces } from "./workbench-task-removal.js";
 export type { RendererWorkbenchState, RendererWorkbenchTask } from "./workbench-store-contract.js";
 export type { RendererTaskEnvironmentIntent } from "./workbench-store-contract.js";
 export function createRendererWorkbenchStore() {
@@ -289,16 +290,12 @@ export function createRendererWorkbenchStore() {
       if (!task) return false;
       const tasks = { ...current.tasks };
       delete tasks[taskId];
-      const selectedSurface = current.selectedSurface?.kind === "conversation"
-        && sameConversation(current.selectedSurface.conversation, task.conversation)
-        && task.conversation.kind === "provisional"
-        ? { kind: "workspace" as const, workspaceId: task.workspaceId }
-        : current.selectedSurface;
+      const surfaces = taskRemovalSurfaces(current, task, tasks);
       set({
         tasks,
         runtimeTaskOrder: current.runtimeTaskOrder.filter((id) => id !== taskId),
-        selectedSurface,
-        currentWorkspaceId: workspaceForSurface(selectedSurface) ?? current.currentWorkspaceId
+        ...surfaces,
+        currentWorkspaceId: workspaceForSurface(surfaces.selectedSurface) ?? current.currentWorkspaceId
       });
       return true;
     },

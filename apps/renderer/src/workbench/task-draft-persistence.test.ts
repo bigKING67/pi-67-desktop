@@ -311,6 +311,31 @@ describe("task draft persistence", () => {
     });
     expect(serializeTaskDraftState(803).drafts[0]?.interactionMode).toBeUndefined();
   });
+
+  it("persists provisional startup runtime choices without creating a Pi Session", () => {
+    const provisional = provisionalTask("task-intent-runtime");
+    expect(rendererWorkbenchStore.getState().restoreTask(provisional)).toBe(provisional.id);
+    const drafts = useTaskDraftStore.getState();
+    drafts.setStartupModel(provisional.id, { provider: "groland", model: "deepseek-v4-flash" });
+    drafts.setStartupThinkingLevel(provisional.id, "max");
+
+    const serialized = serializeTaskDraftState(804);
+    expect(serialized.drafts).toEqual([{
+      conversation: provisional.conversation,
+      text: "",
+      streamBehavior: "followUp",
+      updatedAt: 804,
+      startupModel: { provider: "groland", model: "deepseek-v4-flash" },
+      startupThinkingLevel: "max"
+    }]);
+    expect(parseComposerDraftPersistedState(serialized)).toEqual(serialized);
+
+    restorePersistedDrafts(serialized, { restoreSelection: false });
+    expect(useTaskDraftStore.getState().drafts[provisional.id]).toMatchObject({
+      startupModel: { provider: "groland", model: "deepseek-v4-flash" },
+      startupThinkingLevel: "max"
+    });
+  });
 });
 
 function workspace() {

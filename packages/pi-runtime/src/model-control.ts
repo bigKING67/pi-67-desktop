@@ -23,7 +23,7 @@ export function setSessionThinkingLevel(session: AgentSession, level: string): v
       details: { feature: "thinking-level" }
     });
   }
-  session.setThinkingLevel(selectedLevel);
+  session.setThinkingLevel(selectedLevel, { persist: true });
 }
 
 export async function restoreRuntimeApiKeys(

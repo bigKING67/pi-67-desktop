@@ -997,11 +997,24 @@ the only Runtime and behavior specification source.
 - `新建对话`, `Cmd/Ctrl+N`, `Cmd/Ctrl+T`, and `/new` first create only a
   Renderer-owned New Session Intent. The intent is an offline-capable Composer surface,
   not a Pi Session: it does not connect a Runtime, call `session.create`, or create Pi
-  JSONL until the first Prompt is submitted. That first submit materializes the same
-  Workbench Task under one stable creation authority and waits for its exact physical
-  Session identity before sending `prompt.submit`. Creation failure keeps the text and
+  JSONL until the first Prompt is submitted. The intent nevertheless exposes the
+  effective project model and exact Pi-supported thinking choices. An explicit choice
+  is stored only in the encrypted provisional draft; it neither changes global/project
+  defaults nor creates a Session. A fresh intent first reuses the most recent model and
+  thinking level that Pi successfully confirmed for that same Workspace; it never copies
+  an unsent/failed choice or a choice from another Workspace. If that model is no longer
+  configured, Desktop forgets the stale recent choice and returns to the effective project
+  or global Pi default. That first submit materializes the same Workbench Task
+  under one stable creation authority, waits for its exact physical Session identity,
+  confirms the selected model and thinking level in that order, and only then sends
+  `prompt.submit`. Any configuration or creation failure keeps the text and
   attachments on the intent; if creation succeeds but Prompt submission fails, retry uses
   the already materialized Session and never creates a second JSONL.
+- A provisional conversation row exposes `丢弃草稿` in its hover/focus menu. A draft
+  containing no user-authored text, attachment, Workspace reference, review comment, or
+  prompt stash is discarded directly; a content-bearing draft requires confirmation.
+  Runtime selectors alone do not make the draft content-bearing. This action removes only
+  the Renderer task and encrypted draft checkpoint, never a Pi Session or JSONL.
 - If `session.create` still ends with an unknown acknowledgement outcome, Desktop
   never submits a second create automatically. It keeps one provisional conversation
   in persisted Workbench state and reconciles it by the stable `creationId` written as
@@ -1133,6 +1146,10 @@ the only Runtime and behavior specification source.
   directories are hidden from both the tree and search by default; changing
   `显示依赖/生成目录` refreshes both while retaining expansion, selection, and
   scroll state. A failed child-directory read owns a local retry action.
+- `上下文` owns the secondary `会话 / 记忆 / 经验` views. They are not additional
+  primary Inspector tabs: the five primary actions always remain one equal-width row,
+  while the selected Context detail persists when the user briefly inspects another
+  primary view.
 - `Cmd/Ctrl+Alt+F` and the Command Palette open Workspace file-body search. It is
   separate from filename/path search, conversation search, and Provider Web Search.
   Agent Host accepts only a trusted registered Workspace, never follows symlinks,

@@ -1,4 +1,5 @@
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { RuntimeError } from "@pi67/domain";
 import type {
   PiConfigurationChangeSource,
@@ -132,7 +133,10 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
   const globalValid = globalDiagnostics.length === 0 && modelsDocument !== undefined && globalSettings !== undefined;
   const runtime = globalValid ? refreshedRuntime : undefined;
   const runtimeProviders = runtime ? projectRuntimeProviders(runtime) : undefined;
-  const runtimeModels = runtime?.getModels();
+  const runtimeModels = runtime?.getModels().map((model) => ({
+    ...model,
+    thinkingLevels: getSupportedThinkingLevels(model)
+  }));
   const credentials = globalValid
     ? (await options.credentials.list()).map((credential) => ({
         provider: credential.providerId,

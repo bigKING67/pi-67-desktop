@@ -193,6 +193,9 @@ Application-level surfaces use a separate wide-window shell:
   `消息`, `代理`, and `上下文`. Every action retains its 14px icon and full label on
   one line across platforms and display scaling; columns use `minmax(0, 1fr)`,
   icons never collapse or hide, and the strip never introduces horizontal scroll.
+  `上下文` opens one compact secondary segmented row for `会话 / 记忆 / 经验`;
+  those detail views never compete for primary-strip width, and their last selection
+  persists while switching primary Inspector views.
   At 1320px and below the Inspector defaults closed and becomes the existing
   right-side drawer. This preserves a comfortable central work plane instead of
   waiting until the 360px Inspector and 520px Transcript reach their physical
@@ -528,6 +531,10 @@ loading error where the operation can produce those states
   losing expansion, selection, or scroll; stale responses cannot replace the
   latest result. A failed child directory exposes an inline `重试` without forcing
   a whole-tree reset.
+- Context detail uses the same bounded Inspector body with a three-item
+  `会话 / 记忆 / 经验` segmented tab list. It keeps one-line labels, visible keyboard
+  focus, and one independently scrolling detail panel; it does not add overflow,
+  wrap the primary navigation, or introduce a generic `更多` menu that hides state.
 - `Cmd/Ctrl+Alt+F` and the Command Palette open one neutral, focus-trapped Workspace
   file-body search dialog. It owns query, case sensitivity, optional generated/
   dependency inclusion, loading, empty, error, incomplete, and opening states. It
@@ -1335,6 +1342,17 @@ loading error where the operation can produce those states
 
 ### Runtime controls
 
+- A provisional New Session Intent shows the same compact model and thinking
+  controls before any Pi Session or JSONL exists. Its model catalog comes from the
+  read-only effective project configuration projection (or the app projection when
+  project authority is unavailable). A new intent seeds those controls from the most
+  recent model and thinking level that Pi confirmed successfully in the same Workspace,
+  then falls back to effective project/global Pi defaults. Unsent or failed selections,
+  another Workspace's history, and models no longer present in the configured catalog are
+  never inherited. Explicit selections remain encrypted draft
+  intent. First submit creates the Session, confirms model, confirms thinking, then
+  sends the Prompt; failure at any stage keeps the draft and names the unconfirmed
+  setting. The controls never mutate Provider defaults merely by being changed.
 - The primary model selector lists configured models only. It may retain the
   current model if authentication changes so the selected value never disappears.
 - Provider setup belongs to the `Provider 与凭据` dialog rather than the model
@@ -1758,10 +1776,17 @@ loading error where the operation can produce those states
   or Host epoch replacement clear old pages; stale results cannot append across
   result sets.
 - A New Session action opens one selected provisional Composer intent without contacting Pi.
-  The surface states that Pi JSONL is created only when the first message is sent. Double-clicking
+  The surface states that Pi JSONL is created only when the first message is sent and shows
+  the effective model plus Pi-declared thinking options without initializing a Session. Double-clicking
   New while the current intent is empty reuses that intent; an intent with text remains distinct.
   First submit gives the same Task one stable `creationId`, materializes it through exactly one
-  `session.create`, waits for exact active Session authority, and only then submits the Prompt.
+  `session.create`, waits for exact active Session authority, applies any provisional model and
+  thinking choices, and only then submits the Prompt.
+  Its conversation-row overflow menu offers `丢弃草稿`. Configuration-only or empty
+  intents leave immediately; user-authored text, attachments, Workspace references,
+  review comments, or prompt stash require one danger confirmation. The action deletes
+  no Pi Session or JSONL and prefers another provisional intent in the same Workspace as
+  the next selection before returning to the Workspace surface.
   Creation failure preserves the intent draft; Prompt failure after materialization preserves the
   formal Session and cannot cause a second create. An unknown create outcome stops the indefinite loading state and
   shows `重新检查` plus `放弃此占位`; Desktop does not silently resubmit the create,

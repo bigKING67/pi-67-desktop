@@ -82,6 +82,20 @@
 .loadMore { justify-self: center; }
 .empty, .error { margin: auto; padding: 24px; color: var(--text-secondary); font-size: 12px; }
 .error { color: var(--danger); }
+.dangerButton {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-control);
+  background: var(--danger);
+  color: white;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+}
+.dangerButton[data-hovered] { filter: brightness(1.05); }
+.dangerButton[data-focus-visible] { box-shadow: var(--shadow-focus); outline: none; }
+.dangerButton[data-disabled] { cursor: not-allowed; opacity: 0.55; }
 @media (max-width: 680px) {
   .archiveRow {
     grid-template-columns: auto minmax(0, 1fr);

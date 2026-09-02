@@ -19,6 +19,7 @@ import {
 import { useSessionProjectionStore } from "./session-projection-store.js";
 import { useTaskDraftStore } from "../workbench/task-draft-store.js";
 import { setRendererSessionInteractionMode } from "./session-plan-controller.js";
+import { selectSessionModel, setSessionThinkingLevel } from "./session-control-controller.js";
 import {
   installSessionProjectionFixture,
   sessionSnapshotFixture
@@ -34,10 +35,16 @@ vi.mock("./session-lifecycle-controller.js", () => ({
 vi.mock("./session-plan-controller.js", () => ({
   setRendererSessionInteractionMode: vi.fn(async () => true)
 }));
+vi.mock("./session-control-controller.js", () => ({
+  selectSessionModel: vi.fn(async () => true),
+  setSessionThinkingLevel: vi.fn(async () => true)
+}));
 
 const materializeIntent = vi.mocked(materializeRendererSessionIntent);
 const submitPrompt = vi.mocked(submitRendererPrompt);
 const setInteractionMode = vi.mocked(setRendererSessionInteractionMode);
+const selectModel = vi.mocked(selectSessionModel);
+const setThinkingLevel = vi.mocked(setSessionThinkingLevel);
 
 describe("new Session intent controller", () => {
   beforeEach(() => {
@@ -45,6 +52,8 @@ describe("new Session intent controller", () => {
     materializeIntent.mockReset();
     submitPrompt.mockReset();
     setInteractionMode.mockReset().mockResolvedValue(true);
+    selectModel.mockReset().mockResolvedValue(true);
+    setThinkingLevel.mockReset().mockResolvedValue(true);
     rendererWorkbenchStore.getState().reset();
     useTaskDraftStore.getState().dispose();
     useSessionProjectionStore.setState(useSessionProjectionStore.getInitialState(), true);
@@ -71,6 +80,53 @@ describe("new Session intent controller", () => {
     expect(setInteractionMode.mock.invocationCallOrder[0]).toBeLessThan(
       submitPrompt.mock.invocationCallOrder[0]!
     );
+  });
+
+  it("applies the provisional model and thinking level before the first Prompt", async () => {
+    useTaskDraftStore.getState().setStartupModel("task-intent", {
+      provider: "groland",
+      model: "deepseek-v4-flash"
+    });
+    useTaskDraftStore.getState().setStartupThinkingLevel("task-intent", "max");
+    materializeIntent.mockImplementation(async () => {
+      installMaterializedTask();
+      return { status: "materialized" };
+    });
+    submitPrompt.mockResolvedValue(acceptedPrompt());
+
+    await expect(submitRendererNewSessionIntent(
+      "task-intent",
+      "使用所选运行配置",
+      "submission-runtime"
+    )).resolves.toEqual(acceptedPrompt());
+
+    expect(selectModel).toHaveBeenCalledWith("groland", "deepseek-v4-flash");
+    expect(setThinkingLevel).toHaveBeenCalledWith("max");
+    expect(selectModel.mock.invocationCallOrder[0]).toBeLessThan(setThinkingLevel.mock.invocationCallOrder[0]!);
+    expect(setThinkingLevel.mock.invocationCallOrder[0]).toBeLessThan(submitPrompt.mock.invocationCallOrder[0]!);
+  });
+
+  it.each([
+    { stage: "model", prepare: () => selectModel.mockResolvedValue(false), message: "模型未能确认" },
+    { stage: "thinking", prepare: () => setThinkingLevel.mockResolvedValue(false), message: "思考级别未能确认" }
+  ])("keeps the first Prompt when provisional $stage cannot be confirmed", async ({ prepare, message }) => {
+    useTaskDraftStore.getState().setStartupModel("task-intent", {
+      provider: "groland",
+      model: "deepseek-v4-flash"
+    });
+    useTaskDraftStore.getState().setStartupThinkingLevel("task-intent", "max");
+    prepare();
+    materializeIntent.mockImplementation(async () => {
+      installMaterializedTask();
+      return { status: "materialized" };
+    });
+
+    await expect(submitRendererNewSessionIntent(
+      "task-intent",
+      "保留运行配置",
+      `submission-${message}`
+    )).resolves.toMatchObject({ accepted: false, error: expect.stringContaining(message) });
+    expect(submitPrompt).not.toHaveBeenCalled();
   });
 
   it("keeps the first Prompt when provisional Plan Mode cannot be confirmed", async () => {

@@ -62,6 +62,26 @@ describe("renderer workbench store", () => {
     });
   });
 
+  it("selects the newest remaining provisional draft in the same Workspace after discarding one", () => {
+    const store = createRendererWorkbenchStore();
+    store.getState().registerWorkspace(workspace("a", "/work/a"));
+    store.getState().openTask(provisionalTask("draft-a", "a"));
+    store.getState().openTask(provisionalTask("draft-b", "a"));
+
+    expect(store.getState().removeRuntimeTask("draft-b")).toBe(true);
+    expect(store.getState().selectedSurface).toEqual({
+      kind: "conversation",
+      conversation: {
+        kind: "provisional",
+        workspaceId: "a",
+        draftId: "draft-a"
+      }
+    });
+
+    expect(store.getState().removeRuntimeTask("draft-a")).toBe(true);
+    expect(store.getState().selectedSurface).toEqual({ kind: "workspace", workspaceId: "a" });
+  });
+
   it("uses one Settings surface and follows project scope to the current Workspace", () => {
     const store = createRendererWorkbenchStore();
     store.getState().registerWorkspace(workspace("a", "/work/a"));
@@ -252,6 +272,22 @@ function task(id: string, workspaceId: string, lifecycle: TaskLifecycle): Render
     runtime: runtime(lifecycle),
     title: id,
     sessionPath: `/sessions/${id}.jsonl`,
+    hasDraft: false,
+    toolMode: "auto",
+    attachmentCount: 0
+  };
+}
+
+function provisionalTask(id: string, workspaceId: string): RendererWorkbenchTask {
+  return {
+    id,
+    conversation: { kind: "provisional", workspaceId, draftId: id },
+    workspaceId,
+    sessionId: `pending:${id}`,
+    taskGeneration: 1,
+    lifecycle: "draft",
+    runtime: { phase: "stopped", detail: "draft", recoverable: true },
+    title: "未命名会话",
     hasDraft: false,
     toolMode: "auto",
     attachmentCount: 0

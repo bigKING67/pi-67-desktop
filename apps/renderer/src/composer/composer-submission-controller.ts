@@ -53,4 +53,6 @@ export function clearAcceptedComposerDraft(input: {
   );
   if (!input.result.retainsAttachmentPreviews) revokeDraftAttachments(input.attachments);
   drafts.setAttachments(input.taskId, []);
+  drafts.setStartupModel(input.taskId, undefined);
+  drafts.setStartupThinkingLevel(input.taskId, undefined);
 }

@@ -13,7 +13,8 @@ import {
   PinOff,
   RotateCcw,
   Sparkles,
-  Square
+  Square,
+  Trash2
 } from "lucide-react";
 import type { MutableRefObject } from "react";
 import { Button, Menu, MenuItem, MenuTrigger, Popover, Separator } from "react-aria-components";
@@ -37,6 +38,7 @@ import {
   wakeRendererConversation
 } from "./conversation-organization-controller.js";
 import { useConversationDialogStore } from "./conversation-dialog-store.js";
+import { requestProvisionalDraftDiscard } from "./provisional-draft-discard-controller.js";
 import { statusLabel, type ConversationRowModel } from "./workspace-conversation-model.js";
 
 const PINNED_CONVERSATION_DRAG_TYPE = "application/x-pi67-pinned-conversation";
@@ -54,6 +56,10 @@ export function ConversationRow({
 }) {
   const task = row.task;
   const sessionConversation = row.conversation.kind === "session" ? row.conversation : undefined;
+  const discardableDraft = task?.conversation.kind === "provisional"
+    && task.lifecycle === "draft"
+    && task.runtime.phase === "stopped"
+    && task.creationStatus === undefined;
   const needsAttention = useConversationAttentionStore((state) => (
     sessionConversation
       ? conversationNeedsAttention(
@@ -122,6 +128,26 @@ export function ConversationRow({
           {row.status ? <span className={styles.conversationState}>{statusLabel(row.status)}</span> : null}
         </span>
       </button>
+      {discardableDraft && task ? (
+        <MenuTrigger>
+          <Button
+            className={styles.conversationMenuButton!}
+            aria-label={`${row.title} 草稿菜单`}
+            isDisabled={disabled}
+          >
+            <Ellipsis aria-hidden="true" size={13} />
+          </Button>
+          <Popover className={styles.menuPopover!} placement="bottom end" offset={4}>
+            <Menu aria-label={`${row.title} 草稿菜单`} className={styles.menu!}>
+              <MenuItem
+                className={`${styles.menuItem} ${styles.dangerMenuItem}`}
+                onAction={() => requestProvisionalDraftDiscard(task.id, row.title)}
+                textValue="丢弃草稿"
+              ><Trash2 aria-hidden="true" size={13} />丢弃草稿</MenuItem>
+            </Menu>
+          </Popover>
+        </MenuTrigger>
+      ) : null}
       {sessionConversation ? (
         <MenuTrigger>
           <Button

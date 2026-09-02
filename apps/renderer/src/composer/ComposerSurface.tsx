@@ -16,6 +16,7 @@ import { AttachmentPreviewLoading } from "./AttachmentPreviewLoading.js";
 import { ComposerAttachmentAction } from "./ComposerAttachmentAction.js";
 import { ComposerContextPressure } from "./ComposerContextPressure.js";
 import { ComposerInteractionModeControl } from "./ComposerInteractionModeControl.js";
+import { ComposerIntentRuntimeControls } from "./ComposerIntentRuntimeControls.js";
 import styles from "./Composer.module.css";
 import { ComposerQueuePanel } from "./ComposerQueuePanel.js";
 import { ComposerRuntimeControls } from "./ComposerRuntimeControls.js";
@@ -68,6 +69,7 @@ interface ComposerSurfaceProps {
   filePickerOpen: boolean;
   hasDraft: boolean;
   interactionMode: "execute" | "plan";
+  newSessionIntent: boolean;
   sessionTransitionPending: boolean;
   slashActiveIndex: number;
   slashCatalog: ComposerSlashCatalogState;
@@ -259,6 +261,14 @@ export function ComposerSurface(props: ComposerSurfaceProps) {
           <div className={styles.actions}>
             {props.activeSessionAuthority ? <ComposerContextPressure /> : null}
             {props.activeSessionAuthority ? <ComposerRuntimeControls submitting={props.submitting} /> : null}
+            {props.newSessionIntent && props.activeTaskId ? (
+              <ComposerIntentRuntimeControls
+                key={props.activeTaskId}
+                submitting={props.submitting}
+                taskId={props.activeTaskId}
+                workspaceId={props.activeWorkspaceId}
+              />
+            ) : null}
             {!props.canStop || props.hasDraft ? (
               <Button
                 className={`${styles.sendButton} ${props.canStop ? styles.secondarySendButton : ""}`}

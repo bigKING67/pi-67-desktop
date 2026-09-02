@@ -16,6 +16,11 @@ export const MAX_PROMPT_STASH_IMAGE_BYTES_TOTAL = 512 * 1024 * 1024;
 
 export type ComposerDraftEnvironmentIntent = "local" | "worktree";
 
+export interface ComposerDraftModelSelection {
+  provider: string;
+  model: string;
+}
+
 export interface ComposerWorkspaceFileRef {
   id: string;
   revision: string;
@@ -82,6 +87,8 @@ export interface ComposerDraftRecord {
   promptStash?: PromptStashItem[];
   environmentIntent?: ComposerDraftEnvironmentIntent;
   interactionMode?: SessionInteractionMode;
+  startupModel?: ComposerDraftModelSelection;
+  startupThinkingLevel?: string;
 }
 
 export interface ComposerDraftPersistedState {

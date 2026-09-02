@@ -2,7 +2,7 @@ import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
 import { describe, expect, it, vi } from "vitest";
-import { selectSessionModel } from "./model-control.js";
+import { selectSessionModel, setSessionThinkingLevel } from "./model-control.js";
 
 describe("model control", () => {
   it("exposes the Pi 0.84 DeepSeek Flash thinking levels without renderer-owned aliases", () => {
@@ -42,5 +42,18 @@ describe("model control", () => {
     expect(getModel).toHaveBeenCalledWith("anthropic", "claude-sonnet");
     expect(setModel).toHaveBeenCalledOnce();
     expect(setModel).toHaveBeenCalledWith(model, { persist: true });
+  });
+
+  it("persists a supported thinking level through the Pi Session", () => {
+    const setThinkingLevel = vi.fn();
+    const session = {
+      getAvailableThinkingLevels: () => ["off", "low", "high", "max"],
+      setThinkingLevel
+    } as unknown as AgentSession;
+
+    setSessionThinkingLevel(session, "max");
+
+    expect(setThinkingLevel).toHaveBeenCalledOnce();
+    expect(setThinkingLevel).toHaveBeenCalledWith("max", { persist: true });
   });
 });

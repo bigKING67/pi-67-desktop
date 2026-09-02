@@ -75,6 +75,7 @@ describe("Pi configuration documents", () => {
       reasoning: true,
       contextWindow: 200_000,
       maxTokens: 32_000,
+      thinkingLevels: ["off", "low", "high", "max"],
       headers: { "X-Provider-Feature": "runtime-header-secret" }
     }]);
 
@@ -90,6 +91,7 @@ describe("Pi configuration documents", () => {
         reasoning: true,
         contextWindow: 200_000,
         maxTokens: 32_000,
+        thinkingLevels: ["off", "low", "high", "max"],
         headerNames: ["X-Provider-Feature"],
         advancedJson: "{}"
       })]
@@ -119,7 +121,8 @@ describe("Pi configuration documents", () => {
       input: ["text"],
       reasoning: false,
       contextWindow: 8_192,
-      maxTokens: 2_048
+      maxTokens: 2_048,
+      thinkingLevels: ["off"]
     }]);
 
     expect(projected[0]?.origin).toBe("models.json");

@@ -7,6 +7,7 @@ import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-con
 import { resumeRendererTask } from "./task-activation-controller.js";
 import { rendererWorkbenchStore, selectedWorkbenchTask } from "./workbench-store.js";
 import { registerRendererWorkspaceWithHost } from "./workspace-host-registration-controller.js";
+import { forgetSessionRuntimePreference } from "../session/recent-session-runtime-preferences.js";
 
 export type WorkspaceRemovalDisposition =
   | "allowed"
@@ -56,6 +57,7 @@ export async function removeRendererWorkspace(workspaceId: string): Promise<Work
   await window.pi67.system.removeWorkspace(workspaceId);
   if (!rendererWorkbenchStore.getState().unregisterWorkspace(workspaceId)) return "workspace-missing";
   useSessionCatalogStore.getState().reset(workspaceId);
+  forgetSessionRuntimePreference(workspaceId);
   return "allowed";
 }
 

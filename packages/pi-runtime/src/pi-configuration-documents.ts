@@ -40,6 +40,7 @@ export interface RuntimeModelConfigurationProjection {
   reasoning: boolean;
   contextWindow: number;
   maxTokens: number;
+  thinkingLevels: readonly string[];
   headers?: Readonly<Record<string, unknown>>;
 }
 
@@ -181,7 +182,10 @@ function projectProvider(
   const rawModels = Array.isArray(provider.models) ? provider.models : [];
   const configuredModels = rawModels
     .filter(isPlainObject)
-    .map(projectModel)
+    .map((model) => projectModel(
+      model,
+      runtimeModels.find((candidate) => candidate.id === optionalString(model.id))
+    ))
     .filter((model): model is PiModelConfigurationView => model !== undefined);
   const models = configuredModels.length > 0
     ? configuredModels
@@ -218,12 +222,16 @@ function projectRuntimeModel(model: RuntimeModelConfigurationProjection): PiMode
     reasoning: model.reasoning,
     contextWindow: model.contextWindow,
     maxTokens: model.maxTokens,
+    thinkingLevels: [...model.thinkingLevels],
     headerNames: headerNames(model.headers),
     advancedJson: "{}"
   };
 }
 
-function projectModel(model: JsonObject): PiModelConfigurationView | undefined {
+function projectModel(
+  model: JsonObject,
+  runtimeModel?: RuntimeModelConfigurationProjection
+): PiModelConfigurationView | undefined {
   const id = optionalString(model.id);
   if (!id) return undefined;
   const input = Array.isArray(model.input)
@@ -238,6 +246,7 @@ function projectModel(model: JsonObject): PiModelConfigurationView | undefined {
     reasoning: model.reasoning === true,
     ...(positiveNumber(model.contextWindow) ? { contextWindow: positiveNumber(model.contextWindow)! } : {}),
     ...(positiveNumber(model.maxTokens) ? { maxTokens: positiveNumber(model.maxTokens)! } : {}),
+    ...(runtimeModel ? { thinkingLevels: [...runtimeModel.thinkingLevels] } : {}),
     headerNames: headerNames(model.headers),
     advancedJson: JSON.stringify(pickAdvanced(model, ["thinkingLevelMap", "cost", "compat"]), null, 2)
   };

@@ -17,7 +17,7 @@ import {
   rendererWorkbenchStore, selectedWorkbenchTask, taskForConversation,
   type RendererWorkbenchTask
 } from "./workbench-store.js";
-import { useTaskDraftStore, type TaskDraft } from "./task-draft-store.js";
+import { taskDraftHasContent, useTaskDraftStore, type TaskDraft } from "./task-draft-store.js";
 import { captureDraftRestoreSelectionGuard } from "./task-draft-restore-selection.js";
 import {
   cloneReviewComment,
@@ -41,7 +41,6 @@ let limitWarningPublished = false;
 let secureStorageUnavailable = false;
 const updatedAtByConversation = new Map<string, number>();
 const contentFingerprintByConversation = new Map<string, string>();
-
 export function initializeTaskDraftPersistence(): Promise<void> {
   initialization ??= initialize();
   return initialization;
@@ -177,13 +176,7 @@ function synchronizeTaskDraftFlags(drafts: Record<string, TaskDraft>): void {
   const workbench = rendererWorkbenchStore.getState();
   for (const task of Object.values(workbench.tasks)) {
     const draft = drafts[task.id];
-    const hasDraft = Boolean(draft && (
-      draft.text.trim().length > 0
-      || draft.attachments.length > 0
-      || draft.workspaceFiles.length > 0
-      || draft.reviewComments.length > 0
-      || draft.promptStash.length > 0
-    ));
+    const hasDraft = Boolean(draft && taskDraftHasContent(draft));
     const attachmentCount = draft?.attachments.length ?? 0;
     if (task.hasDraft === hasDraft && task.attachmentCount === attachmentCount) continue;
     workbench.updateTask(task.id, { hasDraft, attachmentCount });
@@ -278,6 +271,8 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
       draft.text.length === 0
       && draft.reviewComments.length === 0
       && draft.promptStash.length === 0
+      && draft.startupModel === undefined
+      && draft.startupThinkingLevel === undefined
     )) continue;
     const textBytes = encoder.encode(draft.text).byteLength;
     const reviewBytes = draft.reviewComments.reduce(
@@ -326,7 +321,11 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
         : {}),
       ...(task.conversation.kind === "provisional" && draft.interactionMode === "plan"
         ? { interactionMode: "plan" as const }
-        : {})
+        : {}),
+      ...(task.conversation.kind === "provisional" && draft.startupModel
+        ? { startupModel: { ...draft.startupModel } } : {}),
+      ...(task.conversation.kind === "provisional" && draft.startupThinkingLevel
+        ? { startupThinkingLevel: draft.startupThinkingLevel } : {})
     });
   }
 
@@ -386,7 +385,9 @@ function serializedStateIncludesTaskDraft(
     if (!record) {
       return draft.text.length === 0
         && draft.reviewComments.length === 0
-        && draft.promptStash.length === 0;
+        && draft.promptStash.length === 0
+        && draft.startupModel === undefined
+        && draft.startupThinkingLevel === undefined;
     }
   }
   return Boolean(

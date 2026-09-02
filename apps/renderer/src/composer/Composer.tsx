@@ -18,7 +18,11 @@ import {
   selectedWorkbenchTask,
   useWorkbenchStore
 } from "../workbench/workbench-store.js";
-import { EMPTY_TASK_DRAFT, useTaskDraftStore } from "../workbench/task-draft-store.js";
+import {
+  EMPTY_TASK_DRAFT,
+  taskDraftHasContent,
+  useTaskDraftStore
+} from "../workbench/task-draft-store.js";
 import { invokeRuntimeCommand } from "../operation/operation-controller.js";
 import { isActiveOperationLifecycle } from "../operation/operation-lifecycle.js";
 import {
@@ -45,7 +49,6 @@ import { prepareComposerReviewSubmission } from "../changes/change-review-contro
 import { clearAcceptedComposerDraft, submitComposerDraft } from "./composer-submission-controller.js";
 import { composerDraftActions } from "./composer-draft-actions.js";
 import { ActivePlanActionBar } from "../transcript/ActivePlanActionBar.js";
-
 export function Composer() {
   const sessionId = useSessionProjectionStore(selectSessionId);
   const connected = useAppStore((state) => state.connected);
@@ -97,6 +100,7 @@ export function Composer() {
     && activeTask.sessionFileIdentity === sessionFileIdentity
     && activeTask.sessionGeneration === sessionGeneration
   );
+  const newSessionIntent = activeTask?.conversation.kind === "provisional" && activeTask.creationStatus === undefined;
   const interactionMode = activeSessionAuthority
     ? authoritativeInteractionMode
     : draft.interactionMode;
@@ -205,14 +209,10 @@ export function Composer() {
   useEffect(() => {
     if (!activeTaskId) return;
     rendererWorkbenchStore.getState().updateTask(activeTaskId, {
-      hasDraft: text.trim().length > 0
-        || attachments.length > 0
-        || workspaceFiles.length > 0
-        || reviewComments.length > 0
-        || draft.promptStash.length > 0,
+      hasDraft: taskDraftHasContent(draft),
       attachmentCount: attachments.length
     });
-  }, [activeTaskId, attachments.length, draft.promptStash.length, reviewComments.length, text, workspaceFiles.length]);
+  }, [activeTaskId, attachments.length, draft]);
   const submit = async () => {
     if (!canSend || !activeTask || !activeTaskId) return;
     const baseText = text.trim();
@@ -404,6 +404,7 @@ export function Composer() {
     filePickerOpen={filePickerOpen}
     hasDraft={hasDraft}
     interactionMode={interactionMode}
+    newSessionIntent={newSessionIntent}
     sessionTransitionPending={sessionTransitionPending}
     slashActiveIndex={slashActiveIndex}
     slashCatalog={slashCatalog}

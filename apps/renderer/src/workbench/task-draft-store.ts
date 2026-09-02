@@ -1,5 +1,10 @@
 import { create } from "zustand";
-import type { ComposerReviewComment, ComposerWorkspaceFileRef, PromptStashItem } from "@pi67/domain";
+import type {
+  ComposerDraftModelSelection,
+  ComposerReviewComment,
+  ComposerWorkspaceFileRef,
+  PromptStashItem
+} from "@pi67/domain";
 import {
   MAX_COMPOSER_DRAFT_TEXT_BYTES,
   MAX_COMPOSER_REVIEW_COMMENTS,
@@ -23,6 +28,8 @@ export interface TaskDraft {
   promptStash: PromptStashItem[];
   streamBehavior: "steer" | "followUp";
   interactionMode: "execute" | "plan";
+  startupModel?: ComposerDraftModelSelection;
+  startupThinkingLevel?: string;
 }
 
 export const EMPTY_TASK_DRAFT: TaskDraft = {
@@ -52,9 +59,13 @@ interface TaskDraftState {
   removePromptStash: (taskId: string, itemId: string) => void;
   setStreamBehavior: (taskId: string, streamBehavior: TaskDraft["streamBehavior"]) => void;
   setInteractionMode: (taskId: string, interactionMode: TaskDraft["interactionMode"]) => void;
+  setStartupModel: (taskId: string, startupModel: ComposerDraftModelSelection | undefined) => void;
+  setStartupThinkingLevel: (taskId: string, startupThinkingLevel: string | undefined) => void;
   restore: (
     taskId: string,
-    draft: Pick<TaskDraft, "text" | "streamBehavior"> & Partial<Pick<TaskDraft, "interactionMode" | "workspaceFiles" | "reviewComments" | "promptStash">>
+    draft: Pick<TaskDraft, "text" | "streamBehavior"> & Partial<Pick<TaskDraft,
+      "interactionMode" | "workspaceFiles" | "reviewComments" | "promptStash"
+      | "startupModel" | "startupThinkingLevel">>
   ) => "restored" | "conflict";
   transfer: (sourceTaskId: string, targetTaskId: string) => "empty" | "moved" | "conflict";
   discard: (taskId: string) => void;
@@ -176,6 +187,28 @@ export const useTaskDraftStore = create<TaskDraftState>((set, get) => ({
     }));
   },
 
+  setStartupModel(taskId, startupModel) {
+    set((state) => ({
+      drafts: {
+        ...state.drafts,
+        [taskId]: startupModel
+          ? { ...draftFor(state, taskId), startupModel: { ...startupModel } }
+          : withoutStartupModel(draftFor(state, taskId))
+      }
+    }));
+  },
+
+  setStartupThinkingLevel(taskId, startupThinkingLevel) {
+    set((state) => ({
+      drafts: {
+        ...state.drafts,
+        [taskId]: startupThinkingLevel
+          ? { ...draftFor(state, taskId), startupThinkingLevel }
+          : withoutStartupThinkingLevel(draftFor(state, taskId))
+      }
+    }));
+  },
+
   restore(taskId, draft) {
     const current = get().drafts[taskId];
     // Any existing record represents a newer live-window mutation, including
@@ -191,7 +224,9 @@ export const useTaskDraftStore = create<TaskDraftState>((set, get) => ({
           reviewComments: draft.reviewComments?.map(cloneReviewComment) ?? [],
           promptStash: draft.promptStash?.map(cloneStashItem) ?? [],
           streamBehavior: draft.streamBehavior,
-          interactionMode: draft.interactionMode ?? "execute"
+          interactionMode: draft.interactionMode ?? "execute",
+          ...(draft.startupModel ? { startupModel: { ...draft.startupModel } } : {}),
+          ...(draft.startupThinkingLevel ? { startupThinkingLevel: draft.startupThinkingLevel } : {})
         }
       }
     }));
@@ -202,9 +237,9 @@ export const useTaskDraftStore = create<TaskDraftState>((set, get) => ({
     if (sourceTaskId === targetTaskId) return "conflict";
     const current = get();
     const source = current.drafts[sourceTaskId];
-    if (!source || !hasDraftContent(source)) return "empty";
+    if (!source || !taskDraftHasContent(source)) return "empty";
     const target = current.drafts[targetTaskId];
-    if (target && hasDraftContent(target)) return "conflict";
+    if (target && taskDraftHasContent(target)) return "conflict";
     const drafts = { ...current.drafts, [targetTaskId]: source };
     delete drafts[sourceTaskId];
     set({ drafts });
@@ -234,12 +269,28 @@ function draftFor(state: TaskDraftState, taskId: string): TaskDraft {
   return state.drafts[taskId] ?? emptyTaskDraft();
 }
 
-function hasDraftContent(draft: TaskDraft): boolean {
+export function taskDraftHasContent(draft: TaskDraft): boolean {
+  return taskDraftHasUserContent(draft)
+    || draft.startupModel !== undefined
+    || draft.startupThinkingLevel !== undefined;
+}
+
+export function taskDraftHasUserContent(draft: TaskDraft): boolean {
   return draft.text.trim().length > 0
     || draft.attachments.length > 0
     || draft.workspaceFiles.length > 0
     || draft.reviewComments.length > 0
     || draft.promptStash.length > 0;
+}
+
+function withoutStartupModel(draft: TaskDraft): TaskDraft {
+  const { startupModel: _startupModel, ...rest } = draft;
+  return rest;
+}
+
+function withoutStartupThinkingLevel(draft: TaskDraft): TaskDraft {
+  const { startupThinkingLevel: _startupThinkingLevel, ...rest } = draft;
+  return rest;
 }
 
 function cloneReviewComment(comment: ComposerReviewComment): ComposerReviewComment {
