@@ -7,7 +7,7 @@
       "displayName": "Pi Workspace Resources",
       "origin": "first-party",
       "internalPath": "packages/pi-workspace-resources",
-      "treeSha256": "ec4519c85610848e345784454763b90833bd4726939005a2d971fae2a44a9b11",
+      "treeSha256": "c0efa86f09d805a1e2310e4e7347bcdbbc81c440fca4b01aa99823c0a712702d",
       "version": "1.0.0",
       "includedExtensions": [
         {

@@ -44,7 +44,7 @@ describe("Desktop first-party capability source lock", () => {
     expect(lock.sources.filter((source) => source.repository).every((source) => /^[0-9a-f]{40}$/u.test(source.commit))).toBe(true);
     expect(lock.sources.find((source) => source.id === "pi-workspace-resources")).toMatchObject({
       internalPath: "packages/pi-workspace-resources",
-      treeSha256: "ec4519c85610848e345784454763b90833bd4726939005a2d971fae2a44a9b11",
+      treeSha256: "c0efa86f09d805a1e2310e4e7347bcdbbc81c440fca4b01aa99823c0a712702d",
       includedExtensions: [{
         id: "pi-rules-loader",
         displayName: "工作规则加载器",
