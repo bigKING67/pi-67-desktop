@@ -156,6 +156,7 @@ function createBindings(
     recordToolAuthorization: vi.fn(),
     setSessionCwd: vi.fn(),
     sharedExperienceAccess: undefined,
+    sharedSopAccess: undefined,
     subagents: new NativeSubagentCoordinator({
       admission: new NativeSubagentAdmission(),
       parentKey: "test-parent",

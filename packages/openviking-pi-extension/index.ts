@@ -20,7 +20,7 @@ import { buildProfileBlock } from "./shared/profile-inject.mjs";
 import { guardVikingUriToolCall } from "./lib/uri-guard-adapter.mjs";
 import { OPENVIKING_MODEL_RECALL_POLICY, registerTools } from "./tools.js";
 import { createTakeoverManager } from "./takeover.js";
-import { emitContextDiagnostic } from "./diagnostics.js";
+import { emitContextDiagnostic, hashDiagnosticValue } from "./diagnostics.js";
 import { detectMemoryOwnerConflict } from "./memory-owner-policy.js";
 
 export default async function (pi: ExtensionAPI) {
@@ -196,6 +196,7 @@ export default async function (pi: ExtensionAPI) {
     if (!connected || bypassed) return;
 
     const recallWasPending = recall.hasPendingSearch();
+    const startupQueryHash = recall.pendingQueryHash();
     const recallStartedAt = recallWasPending ? Date.now() : 0;
     if (recallWasPending) {
       emitContextDiagnostic({
@@ -210,8 +211,16 @@ export default async function (pi: ExtensionAPI) {
         kind: "context.recallCompleted",
         privacyMode: config.privacyMode,
         state: recallResult.state === "ready" ? "startup-ready" : "empty-or-degraded",
+        route: "startup-context",
         durationMs: Date.now() - recallStartedAt,
         count: recallResult.block ? 1 : 0,
+        selectedCount: recallResult.block ? 1 : 0,
+        tokenBudget: config.recallTokenBudget,
+        usedTokens: recallResult.block ? Math.ceil(recallResult.block.length / 4) : 0,
+        detailMode: config.recallPreferAbstract ? "abstract-first" : "bounded-content",
+        ...(startupQueryHash === undefined ? {} : { queryHash: startupQueryHash }),
+        scopeHash: hashDiagnosticValue(config.peerId),
+        ...(sync.piSessionId === null ? {} : { sessionIdHash: hashDiagnosticValue(sync.piSessionId) }),
       });
     }
 

@@ -33,7 +33,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins two Desktop-internal packages, three first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.09.01.1");
+    expect(lock.catalogVersion).toBe("2026.09.03.1");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi-workspace-resources",
       "openviking-pi-extension",
@@ -60,8 +60,8 @@ describe("Desktop first-party capability source lock", () => {
     });
     expect(lock.sources.find((source) => source.id === "openviking-pi-extension")).toMatchObject({
       internalPath: "packages/openviking-pi-extension",
-      treeSha256: "373b0c4243f87236b41c343615ab771c7718b35dadc283a15eaf3d55c9c19a87",
-      version: "0.2.0-desktop.1",
+      treeSha256: "b7812bb14c5baa455909a0a81cda1ea2662f9eaba9fb9568835e8e5f98ef3743",
+      version: "0.2.0-desktop.2",
       includedExtensions: [{ id: "pi67-openviking" }]
     });
     expect(lock.sources.find((source) => source.id === "browser67")).toMatchObject({

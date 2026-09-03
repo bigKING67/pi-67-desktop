@@ -1,5 +1,6 @@
 import {
   hasPi67SharedExperienceReadContract,
+  hasPi67SharedSopReadContract,
   networkReadTarget
 } from "./tool-input-contracts.js";
 
@@ -8,7 +9,10 @@ export function classifyPi67ContextToolIntent(
   input: Record<string, unknown>,
   sourceLabel: string
 ) {
-  if (hasPi67SharedExperienceReadContract(toolName, input)) {
+  if (
+    hasPi67SharedExperienceReadContract(toolName, input)
+    || hasPi67SharedSopReadContract(toolName, input)
+  ) {
     return {
       toolName,
       category: "network-read" as const,
@@ -23,6 +27,6 @@ export function classifyPi67ContextToolIntent(
     target: toolName,
     targetKind: "tool" as const,
     sourceLabel,
-    nonApprovableReason: "企业 Experience Tool 参数不符合 Desktop 的只读合同；请修正 query、limit 或 id 后重试。"
+    nonApprovableReason: "企业 Experience/SOP Tool 参数不符合 Desktop 的只读合同；请修正 query、limit 或 id 后重试。"
   };
 }

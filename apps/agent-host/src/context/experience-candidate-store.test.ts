@@ -44,7 +44,40 @@ describe("ExperienceCandidateStore", () => {
 
     const persisted = await readFile(store.path, "utf8");
     expect(persisted).not.toContain("/private/local/session.jsonl");
-    expect(persisted).toContain("pi67-experience-candidates.v1");
+    expect(persisted).toContain("pi67-experience-candidates.v2");
+  });
+
+  it("reads the v1 store and writes a separate v2 migration without deleting the source", async () => {
+    const root = await temporaryRoot();
+    const store = new ExperienceCandidateStore(root);
+    const candidate = storedCandidate();
+    const { method: _method, sourceCases: _sourceCases, ...legacySummary } = candidate.summary;
+    await mkdir(dirname(store.legacyPath), { recursive: true });
+    await writeFile(store.legacyPath, JSON.stringify({
+      schema: "pi67-experience-candidates.v1",
+      receipts: [{
+        ...provenance(),
+        submissionId: "submission-1",
+        state: "completed",
+        createdAt: 10,
+        updatedAt: 20,
+        candidateIds: ["candidate-1"]
+      }],
+      candidates: [{ summary: legacySummary, source: candidate.source }]
+    }));
+
+    await expect(store.getCandidate("candidate-1", "workspace-1")).resolves.toMatchObject({
+      summary: {
+        sourceCases: [expect.objectContaining({ source: "pi-session-commit", capturedAt: 10 })],
+        method: { steps: [], validationGates: [], rollback: "" }
+      }
+    });
+    await store.updateCandidate("candidate-1", "workspace-1", 20, (current) => ({
+      ...current,
+      summary: { ...current.summary, updatedAt: 21 }
+    }));
+    await expect(readFile(store.path, "utf8")).resolves.toContain("pi67-experience-candidates.v2");
+    await expect(readFile(store.legacyPath, "utf8")).resolves.toContain("pi67-experience-candidates.v1");
   });
 
   it("fails candidate storage closed for corrupt and symlinked state", async () => {
@@ -58,7 +91,7 @@ describe("ExperienceCandidateStore", () => {
     const linked = new ExperienceCandidateStore(symlinkRoot);
     await mkdir(dirname(linked.path), { recursive: true });
     const outside = join(symlinkRoot, "outside.json");
-    await writeFile(outside, JSON.stringify({ schema: "pi67-experience-candidates.v1", receipts: [], candidates: [] }));
+    await writeFile(outside, JSON.stringify({ schema: "pi67-experience-candidates.v2", receipts: [], candidates: [] }));
     await symlink(outside, linked.path);
     await expect(linked.listCandidates("workspace-1")).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
   });
@@ -87,6 +120,23 @@ function storedCandidate(): StoredExperienceCandidate {
     confidence: 0.5,
     status: "candidate",
     sensitivity: "project",
+    sourceCases: [{
+      id: "case-1",
+      source: "pi-session-commit",
+      result: "partial",
+      evidenceCount: 1,
+      workspaceId: "workspace-1",
+      capturedAt: 10
+    }],
+    method: {
+      preconditions: [],
+      steps: [],
+      tools: [],
+      validationGates: [],
+      completionCriteria: [],
+      failureModes: [],
+      rollback: ""
+    },
     applicableWhen: ["Host epoch changes"],
     notApplicableWhen: [],
     evidence: [{ kind: "artifact", label: "Pi JSONL snapshot", reference: `sha256:${"c".repeat(64)}`, verifiedAt: 10 }],

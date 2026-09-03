@@ -1,11 +1,17 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { lstat, mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { ExperienceCandidateSummary } from "@pi67/domain";
 import { HostCommandError } from "../protocol-error.js";
 import type { SessionCommitProvenance } from "./experience-candidate-provenance.js";
+import {
+  isCandidateSource,
+  isCandidateSummary,
+  isLegacyCandidateSummary
+} from "./experience-candidate-store-validation.js";
 
-const STORE_SCHEMA = "pi67-experience-candidates.v1";
+const STORE_SCHEMA = "pi67-experience-candidates.v2";
+const LEGACY_STORE_SCHEMA = "pi67-experience-candidates.v1";
 const MAX_STORE_BYTES = 4 * 1_024 * 1_024;
 const MAX_COMMIT_RECEIPTS = 512;
 const MAX_CANDIDATES = 512;
@@ -57,10 +63,12 @@ const EMPTY_STATE: CandidateStoreState = {
 
 export class ExperienceCandidateStore {
   readonly path: string;
+  readonly legacyPath: string;
   private queue: Promise<void> = Promise.resolve();
 
   constructor(agentDir: string) {
-    this.path = join(agentDir, "context-memory", "experience-candidates.v1.json");
+    this.path = join(agentDir, "context-memory", "experience-candidates.v2.json");
+    this.legacyPath = join(agentDir, "context-memory", "experience-candidates.v1.json");
   }
 
   prepareCommit(
@@ -223,22 +231,27 @@ export class ExperienceCandidateStore {
   }
 
   private async readDirect(): Promise<CandidateStoreState> {
-    const metadata = await stat(this.path).catch((error: NodeJS.ErrnoException) => {
+    const current = await this.readStateFile(this.path);
+    if (current !== undefined) return parseState(current);
+    const legacy = await this.readStateFile(this.legacyPath);
+    return legacy === undefined ? cloneState(EMPTY_STATE) : parseState(legacy);
+  }
+
+  private async readStateFile(path: string): Promise<unknown> {
+    const metadata = await stat(path).catch((error: NodeJS.ErrnoException) => {
       if (error.code === "ENOENT") return undefined;
       throw error;
     });
-    if (!metadata) return cloneState(EMPTY_STATE);
-    const link = await lstat(this.path);
+    if (!metadata) return undefined;
+    const link = await lstat(path);
     if (!link.isFile() || link.isSymbolicLink() || metadata.size > MAX_STORE_BYTES) {
       throw invalidStore();
     }
-    let parsed: unknown;
     try {
-      parsed = JSON.parse(await readFile(this.path, "utf8"));
+      return JSON.parse(await readFile(path, "utf8"));
     } catch {
       throw invalidStore();
     }
-    return parseState(parsed);
   }
 
   private async write(state: CandidateStoreState): Promise<void> {
@@ -266,11 +279,14 @@ export class ExperienceCandidateStore {
 }
 
 function parseState(value: unknown): CandidateStoreState {
-  if (!isRecord(value) || value.schema !== STORE_SCHEMA) throw invalidStore();
+  if (!isRecord(value) || (value.schema !== STORE_SCHEMA && value.schema !== LEGACY_STORE_SCHEMA)) {
+    throw invalidStore();
+  }
   if (!Array.isArray(value.receipts) || value.receipts.length > MAX_COMMIT_RECEIPTS) throw invalidStore();
   if (!Array.isArray(value.candidates) || value.candidates.length > MAX_CANDIDATES) throw invalidStore();
   const receipts = value.receipts.map(parseReceipt);
-  const candidates = value.candidates.map(parseCandidate);
+  const legacy = value.schema === LEGACY_STORE_SCHEMA;
+  const candidates = value.candidates.map((item) => parseCandidate(item, legacy, receipts));
   if (new Set(receipts.map((item) => item.submissionId)).size !== receipts.length) throw invalidStore();
   if (new Set(candidates.map((item) => item.summary.id)).size !== candidates.length) throw invalidStore();
   return { schema: STORE_SCHEMA, receipts, candidates };
@@ -299,9 +315,39 @@ function parseReceipt(value: unknown): CandidateCommitReceipt {
   return receipt;
 }
 
-function parseCandidate(value: unknown): StoredExperienceCandidate {
+function parseCandidate(
+  value: unknown,
+  legacy: boolean,
+  receipts: CandidateCommitReceipt[]
+): StoredExperienceCandidate {
   if (!isRecord(value) || !isRecord(value.summary) || !isRecord(value.source)) throw invalidStore();
-  return cloneCandidate(value as unknown as StoredExperienceCandidate);
+  const candidate = value as unknown as StoredExperienceCandidate;
+  if (!legacy) return cloneCandidate(candidate);
+  if (!isLegacyCandidateSummary(candidate.summary) || !isCandidateSource(candidate.source)) throw invalidStore();
+  const receipt = receipts.find((item) => item.submissionId === candidate.source.commitSubmissionId);
+  return cloneCandidate({
+    ...candidate,
+    summary: {
+      ...candidate.summary,
+      sourceCases: [{
+        id: `case-${sha256(`${candidate.source.sourceSessionIdHash}:${candidate.source.sessionContentHash}`).slice(0, 32)}`,
+        source: "pi-session-commit",
+        result: candidate.summary.result,
+        evidenceCount: candidate.summary.evidence.length,
+        workspaceId: candidate.summary.workspaceId,
+        capturedAt: receipt?.capturedAt ?? candidate.summary.createdAt
+      }],
+      method: {
+        preconditions: [],
+        steps: [],
+        tools: [],
+        validationGates: [],
+        completionCriteria: [],
+        failureModes: [],
+        rollback: ""
+      }
+    }
+  });
 }
 
 function cloneState(state: CandidateStoreState): CandidateStoreState {
@@ -326,55 +372,22 @@ function cloneCandidate(candidate: StoredExperienceCandidate): StoredExperienceC
   return {
     summary: {
       ...summary,
+      sourceCases: summary.sourceCases.map((item) => ({ ...item })),
+      method: {
+        ...summary.method,
+        preconditions: [...summary.method.preconditions],
+        steps: [...summary.method.steps],
+        tools: [...summary.method.tools],
+        validationGates: [...summary.method.validationGates],
+        completionCriteria: [...summary.method.completionCriteria],
+        failureModes: [...summary.method.failureModes]
+      },
       applicableWhen: [...summary.applicableWhen],
       notApplicableWhen: [...summary.notApplicableWhen],
       evidence: summary.evidence.map((item) => ({ ...item }))
     },
     source: { ...source }
   };
-}
-
-function isCandidateSummary(value: ExperienceCandidateSummary): boolean {
-  return typeof value === "object"
-    && value !== null
-    && textOrFalse(value.id, 512)
-    && textOrFalse(value.workspaceId, 512)
-    && textOrFalse(value.taskType, 256)
-    && textOrFalse(value.title, 512)
-    && textOrFalse(value.problem, 8_192)
-    && textOrFalse(value.strategy, 16_384)
-    && ["success", "partial", "failed", "rolled-back"].includes(value.result)
-    && ["private", "candidate", "submitted", "validated", "shared", "rejected", "revoked"].includes(value.status)
-    && ["private", "project", "team", "company"].includes(value.sensitivity)
-    && ["pending", "passed", "failed"].includes(value.redactionStatus)
-    && Number.isFinite(value.confidence)
-    && value.confidence >= 0
-    && value.confidence <= 1
-    && Number.isSafeInteger(value.createdAt)
-    && Number.isSafeInteger(value.updatedAt)
-    && Array.isArray(value.applicableWhen)
-    && Array.isArray(value.notApplicableWhen)
-    && Array.isArray(value.evidence)
-    && value.evidence.length <= 64
-    && value.evidence.every((item) => (
-      item !== null
-      && ["test", "tool-result", "user-confirmation", "artifact"].includes(item.kind)
-      && textOrFalse(item.label, 512)
-      && textOrFalse(item.reference, 2_048)
-      && Number.isSafeInteger(item.verifiedAt)
-    ));
-}
-
-function isCandidateSource(value: StoredCandidateSource): boolean {
-  return typeof value === "object"
-    && value !== null
-    && textOrFalse(value.commitSubmissionId, 512)
-    && hashOrFalse(value.workspaceFingerprint)
-    && hashOrFalse(value.sourceSessionIdHash)
-    && hashOrFalse(value.sessionContentHash)
-    && textOrFalse(value.experienceUri, 4_096)
-    && hashOrFalse(value.experienceUriHash)
-    && hashOrFalse(value.experienceContentHash);
 }
 
 function sameProvenance(
@@ -425,8 +438,8 @@ function hashOrFalse(value: unknown): value is string {
   return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
 }
 
-function textOrFalse(value: unknown, maximum: number): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= maximum;
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 function stringArray(value: unknown, maximumItems: number, maximumLength: number): string[] {

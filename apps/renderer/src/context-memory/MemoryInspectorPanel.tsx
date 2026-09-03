@@ -1,8 +1,10 @@
 import type {
+  ContextRecallMetrics,
   ContextRecallItem,
   ContextRuntimeStatus,
   ContextSessionStatus,
-  MemoryEntrySummary
+  MemoryEntrySummary,
+  RecallFeedbackKind
 } from "@pi67/domain";
 import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -13,8 +15,10 @@ import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   loadContextMemoryOverview,
   loadContextSession,
+  loadRecallMetrics,
   loadRecallItems,
-  searchPrivateMemories
+  searchPrivateMemories,
+  submitRecallFeedback
 } from "./context-memory-controller.js";
 import styles from "./MemoryInspectorPanel.module.css";
 
@@ -24,10 +28,12 @@ export function MemoryInspectorPanel() {
   const [status, setStatus] = useState<ContextRuntimeStatus>();
   const [session, setSession] = useState<ContextSessionStatus>();
   const [recalls, setRecalls] = useState<ContextRecallItem[]>([]);
+  const [metrics, setMetrics] = useState<ContextRecallMetrics>();
   const [memories, setMemories] = useState<MemoryEntrySummary[]>([]);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [feedbackBusyId, setFeedbackBusyId] = useState<string>();
 
   useEffect(() => {
     let active = true;
@@ -36,15 +42,21 @@ export function MemoryInspectorPanel() {
     void loadContextMemoryOverview(workspaceId).then(async (overview) => {
       if (!active) return;
       setStatus(overview.status);
-      if (workspaceId && sessionId) {
-        const [nextSession, nextRecalls] = await Promise.all([
-          loadContextSession(workspaceId, sessionId),
-          loadRecallItems(workspaceId, sessionId)
+      if (workspaceId) {
+        const [nextSession, nextRecalls, nextMetrics] = await Promise.all([
+          sessionId ? loadContextSession(workspaceId, sessionId) : Promise.resolve(undefined),
+          loadRecallItems(workspaceId, sessionId),
+          loadRecallMetrics(workspaceId)
         ]);
         if (active) {
           setSession(nextSession);
           setRecalls(nextRecalls);
+          setMetrics(nextMetrics);
         }
+      } else if (active) {
+        setSession(undefined);
+        setRecalls([]);
+        setMetrics(undefined);
       }
     }).catch((cause) => {
       if (active) setError(cause instanceof Error ? cause.message : "无法读取记忆状态。");
@@ -65,6 +77,22 @@ export function MemoryInspectorPanel() {
     }
   };
 
+  const recordFeedback = async (item: ContextRecallItem, feedback: RecallFeedbackKind): Promise<void> => {
+    if (!workspaceId) return;
+    setFeedbackBusyId(item.id);
+    setError(undefined);
+    try {
+      const recorded = await submitRecallFeedback(workspaceId, item.id, feedback, sessionId);
+      setRecalls((current) => current.map((candidate) => candidate.id === item.id
+        ? { ...candidate, feedback: recorded.feedback }
+        : candidate));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "召回反馈保存失败。");
+    } finally {
+      setFeedbackBusyId(undefined);
+    }
+  };
+
   return <div className={styles.panel} data-testid="memory-inspector">
     <section className={styles.hero}>
       <span className="section-label">OpenViking</span>
@@ -81,11 +109,27 @@ export function MemoryInspectorPanel() {
       <div><dt>Takeover</dt><dd>{session?.takeoverActive ? "Active" : "Fallback"}</dd></div>
     </dl>
 
+    <section className={styles.section} aria-label="召回质量">
+      <header><span className="section-label">召回质量</span><strong>{metrics?.sampleCount ?? 0} 个样本</strong></header>
+      <dl className="metric-list">
+        <div><dt>p50</dt><dd>{latencyLabel(metrics?.p50Ms)}</dd></div>
+        <div><dt>p95</dt><dd data-state={metrics?.withinTarget === false ? "warning" : "normal"}>{latencyLabel(metrics?.p95Ms)}</dd></div>
+        <div><dt>Fast path</dt><dd>{rateLabel(metrics?.fastPathRate)}</dd></div>
+        <div><dt>Expansion</dt><dd>{rateLabel(metrics?.expansionRate)}</dd></div>
+      </dl>
+      <p className={styles.metricNote}>目标 p95 ≤ {metrics?.targetP95Ms ?? 1_500} ms；只记录路由、耗时、数量和哈希，不记录查询或记忆正文。</p>
+    </section>
+
     <section className={styles.section}>
       <header><span className="section-label">本轮召回</span><strong>{recalls.length} 项</strong></header>
       {recalls.length === 0
         ? <p className="context-empty">当前没有可展示的 Recall 诊断；这不代表 OpenViking 没有捕获 Session。</p>
-        : <div className={styles.list}>{recalls.map((item) => <RecallRow item={item} key={item.id} />)}</div>}
+        : <div className={styles.list}>{recalls.map((item) => <RecallRow
+            busy={feedbackBusyId === item.id}
+            item={item}
+            key={item.id}
+            onFeedback={(feedback) => void recordFeedback(item, feedback)}
+          />)}</div>}
     </section>
 
     <section className={styles.section}>
@@ -101,13 +145,37 @@ export function MemoryInspectorPanel() {
   </div>;
 }
 
-function RecallRow({ item }: { item: ContextRecallItem }) {
+export function RecallRow({
+  item,
+  busy = false,
+  onFeedback = () => undefined
+}: {
+  item: ContextRecallItem;
+  busy?: boolean;
+  onFeedback?: (feedback: RecallFeedbackKind) => void;
+}) {
   return <article className={styles.row}>
     <div><strong>{item.title}</strong><small>{sourceLabel(item.source)} · {item.scope}</small></div>
     <span>{item.score.toFixed(2)}</span>
     <p>{item.reason}</p>
+    <div className={styles.feedback} aria-label={`评价召回：${item.title}`}>
+      {FEEDBACK_OPTIONS.map((option) => <Button
+        data-selected={item.feedback === option.value || undefined}
+        isDisabled={busy}
+        key={option.value}
+        onPress={() => onFeedback(option.value)}
+      >{option.label}</Button>)}
+    </div>
   </article>;
 }
+
+const FEEDBACK_OPTIONS: ReadonlyArray<{ value: RecallFeedbackKind; label: string }> = [
+  { value: "helpful", label: "有用" },
+  { value: "irrelevant", label: "无关" },
+  { value: "outdated", label: "过期" },
+  { value: "wrong-scope", label: "错范围" },
+  { value: "incorrect", label: "错误" }
+];
 
 function MemoryRow({ item }: { item: MemoryEntrySummary }) {
   return <article className={styles.row}>
@@ -129,4 +197,12 @@ function sourceLabel(value: ContextRecallItem["source"]): string {
   if (value === "private-experience") return "私人经验";
   if (value === "shared-experience") return "团队经验";
   return "资源";
+}
+
+function latencyLabel(value: number | undefined): string {
+  return value === undefined ? "-" : `${value.toLocaleString()} ms`;
+}
+
+function rateLabel(value: number | undefined): string {
+  return value === undefined ? "-" : `${Math.round(value * 100)}%`;
 }

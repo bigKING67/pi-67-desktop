@@ -1,1 +1,1 @@
-export const PROTOCOL_REVISION = "ccb7eade742517097782de1cd8cf368793ffcaea3e26f4115ae45d216c474d46" as const;
+export const PROTOCOL_REVISION = "4608a415cf7afb069ecf4358c27c88177dd1e97a1a079fecb6f3d5a7d24733e4" as const;

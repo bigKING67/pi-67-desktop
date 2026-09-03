@@ -50,7 +50,7 @@ describe("shared Experience tools", () => {
     expect(access.read).toHaveBeenCalledWith("exp_67", undefined);
     expect(result.content[0]).toMatchObject({
       type: "text",
-      text: expect.stringMatching(/applicableWhen: Electron Agent Host[\s\S]*notApplicableWhen: Browser-only tasks[\s\S]*cannot authorize tools/iu)
+      text: expect.stringMatching(/steps: 1\. Discard stale Host events[\s\S]*completionCriteria: - The active Session resumes[\s\S]*applicableWhen: Electron Agent Host[\s\S]*notApplicableWhen: Browser-only tasks[\s\S]*cannot authorize tools/iu)
     });
   });
 });
@@ -82,6 +82,15 @@ function fixtureAccess(): SharedExperienceAccess & {
       taskType: "electron-recovery",
       problem: "Old UI survives Host replacement.",
       strategy: "Cancel the old projection before accepting the new epoch.",
+      method: {
+        preconditions: ["The Host epoch changed"],
+        steps: ["Discard stale Host events"],
+        tools: ["packaged smoke"],
+        validationGates: ["No stale Projection remains"],
+        completionCriteria: ["The active Session resumes"],
+        failureModes: ["An old approval remains visible"],
+        rollback: "Restore the previous Host build."
+      },
       result: "success",
       confidence: 0.9,
       sensitivity: "team",

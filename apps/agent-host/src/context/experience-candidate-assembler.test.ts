@@ -127,6 +127,15 @@ describe("Experience candidate assembly", () => {
       result: "success",
       confidence: 0.9,
       sensitivity: "team",
+      method: {
+        preconditions: ["A project credential is rejected"],
+        steps: ["Replace the rejected credential", "Run the authentication tests"],
+        tools: ["test runner"],
+        validationGates: ["Authentication succeeds"],
+        completionCriteria: ["The protected request completes"],
+        failureModes: ["The replacement credential is also rejected"],
+        rollback: "Restore the previous credential reference."
+      },
       applicableWhen: ["A project credential is rejected"],
       notApplicableWhen: ["No authentication is involved"],
       evidence: [{
@@ -144,7 +153,12 @@ describe("Experience candidate assembly", () => {
       status: "validated",
       result: "success",
       redactionStatus: "passed",
-      sensitivity: "team"
+      sensitivity: "team",
+      sourceCases: [{ result: "success", evidenceCount: 3 }],
+      method: {
+        steps: ["Replace the rejected credential", "Run the authentication tests"],
+        validationGates: ["Authentication succeeds"]
+      }
     });
     expect(JSON.stringify(reviewed.summary)).not.toMatch(/alice|\/Users|api key|bearer|10\.0\.0\.8/iu);
     expect(reviewed.summary.evidence).toEqual(expect.arrayContaining([
@@ -201,6 +215,23 @@ function candidateFixture(): StoredExperienceCandidate {
       confidence: 0.5,
       status: "candidate",
       sensitivity: "project",
+      sourceCases: [{
+        id: "case-1",
+        source: "pi-session-commit",
+        result: "partial",
+        evidenceCount: 1,
+        workspaceId: "workspace-1",
+        capturedAt: 10
+      }],
+      method: {
+        preconditions: [],
+        steps: [],
+        tools: [],
+        validationGates: [],
+        completionCriteria: [],
+        failureModes: [],
+        rollback: ""
+      },
       applicableWhen: ["Host restarts"],
       notApplicableWhen: [],
       evidence: [{ kind: "artifact", label: "Pi JSONL snapshot", reference: `sha256:${"c".repeat(64)}`, verifiedAt: 10 }],

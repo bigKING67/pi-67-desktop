@@ -1,5 +1,6 @@
 import type {
   ContextMemoryConfiguration,
+  ContextRecallMetrics,
   ContextRecallItem,
   ContextRuntimeStatus,
   ContextSessionStatus,
@@ -8,13 +9,17 @@ import type {
   EnterpriseWorkspaceBinding,
   ExperienceCandidateSummary,
   ExperienceEvidenceSummary,
+  ExperienceMethodSummary,
   ExperienceResult,
   MemoryDiffSummary,
   MemoryEntrySummary,
   MemoryPrivacyMode,
   MemoryScope,
+  RecallFeedbackKind,
   SharedExperienceDetail,
-  SharedExperienceSearchItem
+  SharedExperienceSearchItem,
+  SharedSopDetail,
+  SharedSopSearchItem
 } from "@pi67/domain";
 
 export interface ContextMemoryConfigurationUpdate {
@@ -28,6 +33,7 @@ export interface ContextMemoryConfigurationUpdate {
   commitTokenThreshold: number;
   captureAssistantTurns: boolean;
   privateExperienceLimit: number;
+  localResourceRecallLimit: number;
   sharedExperienceLimit: number;
   takeover: {
     enabled: boolean;
@@ -46,6 +52,7 @@ export interface ExperienceCandidateReview {
   result: ExperienceResult;
   confidence: number;
   sensitivity: "project" | "team" | "company";
+  method: ExperienceMethodSummary;
   applicableWhen: string[];
   notApplicableWhen: string[];
   evidence: ExperienceEvidenceSummary[];
@@ -93,6 +100,8 @@ export interface ContextMemoryCommandPayloads {
   "context.session.get": { sessionId: string };
   "context.session.commit": { submissionId: string; sessionId: string };
   "context.recall.list": { sessionId?: string; limit?: number };
+  "context.recall.feedback": { id: string; feedback: RecallFeedbackKind; sessionId?: string };
+  "context.recall.metrics": Record<string, never>;
   "memory.search": { query: string; scope?: MemoryScope; limit?: number };
   "memory.get": { id: string };
   "memory.forget.preview": { id: string };
@@ -104,6 +113,8 @@ export interface ContextMemoryCommandPayloads {
   "experience.candidate.reject": { id: string; reason: string };
   "experience.shared.search": { query: string; limit?: number };
   "experience.shared.get": { id: string };
+  "sop.shared.search": { query: string };
+  "sop.shared.get": { id: string };
   "enterprise.identity.get": Record<string, never>;
   "enterprise.auth.begin": Record<string, never>;
   "enterprise.auth.poll": { authorizationId: string };
@@ -122,6 +133,8 @@ export interface ContextMemoryCommandResults {
   "context.session.get": ContextSessionStatus;
   "context.session.commit": ContextAsyncOperationAccepted;
   "context.recall.list": { items: ContextRecallItem[]; total: number };
+  "context.recall.feedback": { id: string; feedback: RecallFeedbackKind; recordedAt: number };
+  "context.recall.metrics": ContextRecallMetrics;
   "memory.search": { items: MemoryEntrySummary[]; total: number };
   "memory.get": MemoryEntrySummary;
   "memory.forget.preview": ForgetPreview;
@@ -133,6 +146,8 @@ export interface ContextMemoryCommandResults {
   "experience.candidate.reject": ExperienceCandidateSummary;
   "experience.shared.search": { items: SharedExperienceSearchItem[]; total: number };
   "experience.shared.get": SharedExperienceDetail;
+  "sop.shared.search": { items: SharedSopSearchItem[]; total: number };
+  "sop.shared.get": SharedSopDetail;
   "enterprise.identity.get": EnterpriseIdentityStatus;
   "enterprise.auth.begin": EnterpriseDeviceAuthorization;
   "enterprise.auth.poll": EnterpriseIdentityStatus;

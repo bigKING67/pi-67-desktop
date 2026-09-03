@@ -6,9 +6,11 @@ import type {
   EnterpriseProjectSummary,
   EnterpriseWorkspaceBinding,
   SharedExperienceDetail,
-  SharedExperienceSearchItem
+  SharedExperienceSearchItem,
+  SharedSopDetail,
+  SharedSopSearchItem
 } from "@pi67/domain";
-import { enterpriseCandidateEligibility } from "@pi67/domain";
+import { enterpriseCandidateEligibility, experienceMethodComplete } from "@pi67/domain";
 import type { CommandResults } from "@pi67/protocol";
 import type { HostEventChannel } from "../host-event-channel.js";
 import { HostCommandError } from "../protocol-error.js";
@@ -18,6 +20,8 @@ import type { ContextMemoryConfigurationStore } from "./context-memory-configura
 import type { EnterpriseCredentialBrokerClient } from "./enterprise-credential-broker-client.js";
 import { EnterpriseContextGatewayClient } from "./enterprise-context-gateway-client.js";
 import type { EnterpriseCandidateSubmissionReceipt } from "./enterprise-context-gateway-client.js";
+import { validateEnterpriseExperienceMethod } from "./experience-enterprise-method.js";
+import type { RecallObservationStore } from "./recall-observation-store.js";
 
 interface PendingEnterpriseAuthorization {
   endpoint: string;
@@ -34,7 +38,8 @@ export class EnterpriseContextController {
     private readonly configuration: ContextMemoryConfigurationStore,
     private readonly workspaces: WorkspaceContextRegistry,
     private readonly events: HostEventChannel,
-    private readonly credentials?: EnterpriseCredentialBrokerClient
+    private readonly credentials?: EnterpriseCredentialBrokerClient,
+    private readonly recall?: RecallObservationStore
   ) {}
 
   shutdown(): void {
@@ -214,7 +219,8 @@ export class EnterpriseContextController {
       result: input.candidate.result,
       evidenceCount: input.candidate.evidence.length,
       redactionStatus: input.candidate.redactionStatus,
-      sensitivity: input.candidate.sensitivity
+      sensitivity: input.candidate.sensitivity,
+      methodComplete: experienceMethodComplete(input.candidate.method)
     });
     if (!eligibility.eligible) {
       throw new HostCommandError(
@@ -246,6 +252,7 @@ export class EnterpriseContextController {
       title: input.candidate.title,
       problem: input.candidate.problem,
       strategy: input.candidate.strategy,
+      method: validateEnterpriseExperienceMethod(input.candidate.method),
       result: input.candidate.result,
       confidence: input.candidate.confidence,
       sensitivity: input.candidate.sensitivity,
@@ -276,17 +283,30 @@ export class EnterpriseContextController {
       Math.max(1, Math.floor(requestedLimit ?? configuration.sharedExperienceLimit)),
       5
     );
-    const items = await new EnterpriseContextGatewayClient(
+    const startedAt = Date.now();
+    const serverLimit = Math.min(5, limit + 2);
+    const candidates = await new EnterpriseContextGatewayClient(
       configuration.enterpriseGatewayEndpoint,
       credential.accessToken
-    ).searchSharedExperiences(workspaceFingerprint(workspaceId), query, limit, signal);
-    if (items.some((item) => item.projectId !== binding.enterpriseProjectId)) {
+    ).searchSharedExperiences(workspaceFingerprint(workspaceId), query, serverLimit, signal);
+    if (candidates.some((item) => item.projectId !== binding.enterpriseProjectId)) {
       throw new HostCommandError(
         "INVALID_PAYLOAD",
         "Enterprise Context Gateway returned a shared Experience outside the bound project.",
         false
       );
     }
+    const items = (this.recall
+      ? await this.recall.applyEnterpriseFeedback(workspaceId, "enterprise-experience", candidates)
+      : candidates).slice(0, limit);
+    await this.recall?.recordEnterprise({
+      workspaceId,
+      query,
+      route: "enterprise-experience",
+      durationMs: Date.now() - startedAt,
+      candidateCount: candidates.length,
+      items
+    });
     return { items, total: items.length };
   }
 
@@ -312,6 +332,62 @@ export class EnterpriseContextController {
     return item;
   }
 
+  async searchSharedSops(
+    workspaceId: string,
+    query: string,
+    signal?: AbortSignal
+  ): Promise<{ items: SharedSopSearchItem[]; total: number }> {
+    const configuration = await this.configuration.read();
+    const credential = this.requireCredential(configuration);
+    const binding = await this.requireBoundWorkspace(workspaceId);
+    const startedAt = Date.now();
+    const candidates = await new EnterpriseContextGatewayClient(
+      configuration.enterpriseGatewayEndpoint,
+      credential.accessToken
+    ).searchSharedSops(workspaceFingerprint(workspaceId), query, 2, signal);
+    if (candidates.length > 2 || candidates.some((item) => item.projectId !== binding.enterpriseProjectId)) {
+      throw new HostCommandError(
+        "INVALID_PAYLOAD",
+        "Enterprise Context Gateway returned an invalid SOP set for the bound project.",
+        false
+      );
+    }
+    const items = (this.recall
+      ? await this.recall.applyEnterpriseFeedback(workspaceId, "enterprise-sop", candidates)
+      : candidates).slice(0, 1);
+    await this.recall?.recordEnterprise({
+      workspaceId,
+      query,
+      route: "enterprise-sop",
+      durationMs: Date.now() - startedAt,
+      candidateCount: candidates.length,
+      items
+    });
+    return { items, total: items.length };
+  }
+
+  async getSharedSop(
+    workspaceId: string,
+    assetId: string,
+    signal?: AbortSignal
+  ): Promise<SharedSopDetail> {
+    const configuration = await this.configuration.read();
+    const credential = this.requireCredential(configuration);
+    const binding = await this.requireBoundWorkspace(workspaceId);
+    const item = await new EnterpriseContextGatewayClient(
+      configuration.enterpriseGatewayEndpoint,
+      credential.accessToken
+    ).getSharedSop(workspaceFingerprint(workspaceId), assetId, signal);
+    if (item.projectId !== binding.enterpriseProjectId) {
+      throw new HostCommandError(
+        "INVALID_PAYLOAD",
+        "Enterprise Context Gateway returned an SOP outside the bound project.",
+        false
+      );
+    }
+    return item;
+  }
+
   private async requireBoundWorkspace(workspaceId: string): Promise<EnterpriseWorkspaceBinding & {
     state: "bound";
     enterpriseProjectId: string;
@@ -320,7 +396,7 @@ export class EnterpriseContextController {
     if (binding.state !== "bound" || !binding.enterpriseProjectId) {
       throw new HostCommandError(
         "RUNTIME_NOT_READY",
-        "Bind this Workspace to an enterprise project before searching shared Experiences.",
+        "Bind this Workspace to an enterprise project before searching shared enterprise knowledge.",
         true
       );
     }

@@ -12,9 +12,9 @@ The imported lifecycle, client, recall, capture, pending queue, and takeover
 files remain close to the tagged upstream example. Pi-67 Desktop-specific changes are
 limited to private-by-default configuration, actor/workspace recall scope,
 bounded experience quotas, stable one-shot startup Recall, session-aware
-model-selected search and tiered read Tools, untrusted injection and Tool
-results, memory-owner conflict detection, typed diagnostics, and privacy-mode
-write gating.
+model-selected cheap-first search and tiered read Tools, local feedback,
+privacy-safe bounded recall diagnostics, untrusted injection and Tool results,
+memory-owner conflict detection, and privacy-mode write gating.
 
 The repository structure gate therefore has narrow, file-specific line limits
 for the three largest preserved upstream implementation files. The package is
@@ -29,8 +29,11 @@ classification or mutate historical recall anchors. Pi instead receives a fixed
 Tool policy: call `viking_search` once when a materially different task,
 earlier-work reference, or missing history requires retrieval; use returned URI
 abstracts first; then call `viking_read` for only a selected URI when deeper
-detail is needed. The explicit search path carries the current `session_id` and
-enables server-side query expansion, while startup Recall keeps expansion off.
+detail is needed. The explicit search path first uses bounded actor-scoped
+`/find`; only empty, weak, or ambiguous candidates upgrade to the current
+`session_id` context face with query expansion. Startup Recall keeps expansion
+off. Short positive and negative result caches are local to one Pi process and
+are invalidated when recall feedback changes.
 
 Startup Profile and Recall are bounded to 1,200-token baselines and default to
 one private plus one shared Experience. Recall and OpenViking Tool results remain

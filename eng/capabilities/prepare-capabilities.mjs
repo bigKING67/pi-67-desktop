@@ -249,9 +249,13 @@ async function prepareOpenVikingPiExtension(sourceRoot, source) {
     "memory-owner-policy.ts",
     "package.json",
     "recall.ts",
+    "recall-feedback.ts",
+    "recall-tool-policy.ts",
+    "recall-tool-support.ts",
     "shared",
     "sync.ts",
     "takeover.ts",
+    "tool-result.ts",
     "tools.ts"
   ]);
   const packageManifest = JSON.parse(await readFile(join(destination, "package.json"), "utf8"));

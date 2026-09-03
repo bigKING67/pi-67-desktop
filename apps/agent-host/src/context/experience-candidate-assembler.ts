@@ -9,12 +9,18 @@ import type {
 } from "./experience-candidate-store.js";
 import { ExperienceCandidateStore } from "./experience-candidate-store.js";
 import { redactAndRequireExperience } from "./experience-candidate-redaction.js";
+import {
+  emptyExperienceMethod,
+  normalizeReviewEvidence,
+  normalizeReviewMethod,
+  updateSourceCases
+} from "./experience-candidate-review.js";
+import { validateEnterpriseExperienceMethod } from "./experience-enterprise-method.js";
 import type { OpenVikingClient, OpenVikingCommitTaskResult } from "./openviking-client.js";
 
 const MAX_RECONCILIATIONS_PER_READ = 8;
 const MAX_MEMORY_DIFF_BYTES = 2 * 1_024 * 1_024;
 const MAX_MEMORY_OPERATIONS = 256;
-const HASH_REFERENCE = /^sha256:([a-f0-9]{64})$/u;
 
 interface MemoryDiffOperation {
   uri: string;
@@ -86,6 +92,8 @@ export async function listPrivateExperienceSummaries(
       confidence: 0.5,
       status: "private",
       sensitivity: "private",
+      sourceCases: [],
+      method: emptyExperienceMethod(),
       applicableWhen: [bounded(parsed.situation, 2_048)],
       notApplicableWhen: [],
       evidence: [],
@@ -119,6 +127,8 @@ export async function getPrivateExperienceSummary(
     confidence: 0.5,
     status: "private",
     sensitivity: "private",
+    sourceCases: [],
+    method: emptyExperienceMethod(),
     applicableWhen: [bounded(parsed.situation, 2_048)],
     notApplicableWhen: [],
     evidence: [],
@@ -142,6 +152,7 @@ export function reviewExperienceCandidate(
     );
   }
   const evidence = normalizeReviewEvidence(candidate, review, now);
+  const method = normalizeReviewMethod(review.method);
   const {
     enterpriseCandidateId: _enterpriseCandidateId,
     submittedAt: _submittedAt,
@@ -157,12 +168,15 @@ export function reviewExperienceCandidate(
     confidence: review.confidence,
     status: "validated",
     sensitivity: review.sensitivity,
+    sourceCases: updateSourceCases(candidate.summary.sourceCases, review.result, evidence.length),
+    method,
     applicableWhen: review.applicableWhen.map((item) => redactAndRequireExperience(item, 2_048, "applicable condition")),
     notApplicableWhen: review.notApplicableWhen.map((item) => redactAndRequireExperience(item, 2_048, "excluded condition")),
     evidence,
     redactionStatus: "passed",
     updatedAt: Math.max(now, candidate.summary.updatedAt + 1)
   };
+  validateEnterpriseExperienceMethod(summary.method);
   return { summary, source: { ...candidate.source } };
 }
 
@@ -246,6 +260,15 @@ function buildCandidate(
       confidence: 0.5,
       status: "candidate",
       sensitivity: "project",
+      sourceCases: [{
+        id: `case-${sha256(`${receipt.sourceSessionIdHash}:${receipt.sessionContentHash}`).slice(0, 32)}`,
+        source: "pi-session-commit",
+        result: "partial",
+        evidenceCount: 2,
+        workspaceId: receipt.workspaceId,
+        capturedAt: receipt.capturedAt
+      }],
+      method: emptyExperienceMethod(),
       applicableWhen: [redactAndRequireExperience(parsed.situation, 2_048, "applicable condition")],
       notApplicableWhen: [],
       evidence: [
@@ -355,35 +378,6 @@ function sectionFor(label: string): keyof ParsedExperience | undefined {
   if (["approach", "strategy", "solution", "方法", "策略", "方案"].includes(label)) return "approach";
   if (["reflect", "reflection", "lessons", "复盘", "反思", "经验"].includes(label)) return "reflection";
   return undefined;
-}
-
-function normalizeReviewEvidence(
-  candidate: StoredExperienceCandidate,
-  review: ExperienceCandidateReview,
-  now: number
-): ExperienceEvidenceSummary[] {
-  const evidence = [...candidate.summary.evidence];
-  for (const item of review.evidence) {
-    if (!HASH_REFERENCE.test(item.reference)) {
-      throw new HostCommandError("INVALID_PAYLOAD", "Experience evidence references must use sha256:<64 lowercase hex>.", false);
-    }
-    evidence.push({
-      ...item,
-      label: redactAndRequireExperience(item.label, 512, "evidence label")
-    });
-  }
-  evidence.push({
-    kind: "user-confirmation",
-    label: "User confirmed task outcome and reviewed redaction",
-    reference: `sha256:${sha256(JSON.stringify({
-      candidateId: candidate.summary.id,
-      result: review.result,
-      sensitivity: review.sensitivity,
-      confirmedAt: now
-    }))}`,
-    verifiedAt: now
-  });
-  return [...new Map(evidence.map((item) => [`${item.kind}:${item.reference}`, item])).values()].slice(-64);
 }
 
 function artifactEvidence(label: string, hash: string, verifiedAt: number): ExperienceEvidenceSummary {

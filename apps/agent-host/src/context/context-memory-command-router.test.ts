@@ -64,6 +64,7 @@ describe("ContextMemoryCommandRouter", () => {
       commitTokenThreshold: 21_000,
       captureAssistantTurns: true,
       privateExperienceLimit: 1,
+      localResourceRecallLimit: 1,
       sharedExperienceLimit: 2,
       takeover: { enabled: true, tokenThreshold: 31_000, keepRecentTurns: 3 }
     };
@@ -136,6 +137,8 @@ describe("ContextMemoryCommandRouter", () => {
     await expect(fixture.router.dispatchWorkspace(workspaceContext, { type: "experience.private.list", payload: {} }))
       .resolves.toEqual({ items: [], total: 0 });
     await expect(fixture.router.dispatchWorkspace(workspaceContext, { type: "experience.shared.search", payload: { query: "recovery" } }))
+      .rejects.toMatchObject({ code: "RUNTIME_NOT_READY" });
+    await expect(fixture.router.dispatchWorkspace(workspaceContext, { type: "sop.shared.search", payload: { query: "recovery" } }))
       .rejects.toMatchObject({ code: "RUNTIME_NOT_READY" });
     await expect(fixture.router.dispatchWorkspace(workspaceContext, { type: "experience.candidate.get", payload: { id: "missing" } }))
       .rejects.toMatchObject({ code: "RESOURCE_NOT_FOUND" });
@@ -252,11 +255,31 @@ describe("ContextMemoryCommandRouter", () => {
       strategy: "Discard stale epochs",
       evidence: [expect.objectContaining({ reference: `sha256:${"d".repeat(64)}` })]
     }));
+    await expect(fixture.router.dispatchWorkspace(workspaceContext, {
+      type: "sop.shared.search",
+      payload: { query: "standard host recovery" }
+    })).resolves.toEqual({
+      total: 1,
+      items: [expect.objectContaining({
+        id: "sop-1",
+        projectId: "project-1",
+        stableKey: "host-epoch-recovery",
+        semanticVersion: 2
+      })]
+    });
+    await expect(fixture.router.dispatchWorkspace(workspaceContext, {
+      type: "sop.shared.get",
+      payload: { id: "sop-1" }
+    })).resolves.toEqual(expect.objectContaining({
+      id: "sop-1",
+      projectId: "project-1",
+      method: expect.objectContaining({ steps: ["Discard stale events"] })
+    }));
 
     const authenticatedRequests = fetchMock.mock.calls.filter(([, init]) =>
       new Headers(init?.headers).has("Authorization")
     );
-    expect(authenticatedRequests).toHaveLength(5);
+    expect(authenticatedRequests).toHaveLength(7);
     for (const [, init] of authenticatedRequests) {
       expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer agent-access-token");
     }

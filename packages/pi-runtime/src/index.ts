@@ -2,6 +2,7 @@ export * from "./agent-runtime.js";
 export * from "./first-party-model-providers.js";
 export * from "./first-party-web-tools.js";
 export * from "./shared-experience-tools.js";
+export * from "./shared-sop-tools.js";
 export * from "./conversation-organization-store.js";
 export * from "./context-file-management.js";
 export * from "./desktop-package-toolchain.js";

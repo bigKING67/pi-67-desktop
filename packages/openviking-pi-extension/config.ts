@@ -5,7 +5,7 @@ import { buildUserAgent, resolveOpenVikingCredentials } from "./shared/credentia
 import { resolveEffectivePeerId } from "./shared/workspace-peer.mjs";
 
 /** Hand-maintained: this extension ships no manifest to read a version from. */
-export const EXTENSION_VERSION = "0.1.0-pi67.7";
+export const EXTENSION_VERSION = "0.2.0-desktop.2";
 
 export type PrivacyMode = "full-learning" | "private-learning" | "read-only" | "off";
 
@@ -32,6 +32,7 @@ export interface OVConfig {
   recallLimit: number;
   recallLimitConfigured: boolean;
   experienceRecallLimit: number;
+  /** Local OpenViking Resource quota; persisted as localResourceRecallLimit. */
   sharedExperienceLimit: number;
   recallTimeoutMs: number;
   healthTimeoutMs: number;
@@ -148,6 +149,9 @@ export function loadConfig(extensionDir: string): OVConfig {
     recallLimitConfigured: Object.prototype.hasOwnProperty.call(file, "recallLimit"),
     recallQueryExpansionConfigured: Object.prototype.hasOwnProperty.call(file, "recallQueryExpansion"),
     recallTokenBudget: file.recallTokenBudget ?? file.recallBudget ?? DEFAULT_CONFIG.recallTokenBudget,
+    sharedExperienceLimit: file.localResourceRecallLimit
+      ?? file.sharedExperienceLimit
+      ?? DEFAULT_CONFIG.sharedExperienceLimit,
     scoreThreshold: file.scoreThreshold ?? file.recallScoreThreshold ?? DEFAULT_CONFIG.scoreThreshold,
     minQueryLength: file.minQueryLength ?? file.recallMinQueryLength ?? DEFAULT_CONFIG.minQueryLength,
     profileTokenBudget: file.profileTokenBudget ?? file.profileBudget ?? DEFAULT_CONFIG.profileTokenBudget,

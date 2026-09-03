@@ -1,5 +1,6 @@
 import type {
   ContextMemoryConfiguration,
+  ContextRecallMetrics,
   ContextRecallItem,
   ContextRuntimeStatus,
   ContextSessionStatus,
@@ -7,7 +8,8 @@ import type {
   EnterpriseProjectSummary,
   EnterpriseWorkspaceBinding,
   ExperienceCandidateSummary,
-  MemoryEntrySummary
+  MemoryEntrySummary,
+  RecallFeedbackKind
 } from "@pi67/domain";
 import type {
   ContextMemoryConfigurationUpdate,
@@ -127,6 +129,27 @@ export async function loadRecallItems(
     limit: 20
   }, [], { context: { scope: "workspace", workspaceId } });
   return result.items;
+}
+
+export async function loadRecallMetrics(workspaceId: string): Promise<ContextRecallMetrics> {
+  await ensureAgentConnection();
+  return agentConnectionController.request("context.recall.metrics", {}, [], {
+    context: { scope: "workspace", workspaceId }
+  });
+}
+
+export async function submitRecallFeedback(
+  workspaceId: string,
+  id: string,
+  feedback: RecallFeedbackKind,
+  sessionId?: string
+): Promise<{ id: string; feedback: RecallFeedbackKind; recordedAt: number }> {
+  await ensureAgentConnection();
+  return agentConnectionController.request("context.recall.feedback", {
+    id,
+    feedback,
+    ...(sessionId === undefined ? {} : { sessionId })
+  }, [], { context: { scope: "workspace", workspaceId } });
 }
 
 export async function searchPrivateMemories(

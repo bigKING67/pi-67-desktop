@@ -143,7 +143,8 @@ export class PiSdkRuntime implements AgentRuntime {
       },
       setSessionCwd: (cwd) => this.toolSafety.setCwd(cwd),
       subagents: this.subagents,
-      sharedExperienceAccess: options.sharedExperienceAccess
+      sharedExperienceAccess: options.sharedExperienceAccess,
+      sharedSopAccess: options.sharedSopAccess
     });
     this.configurationReload = new PiRuntimeConfigurationReload({
       getSession: () => this.sessionBindings.session,
@@ -452,7 +453,6 @@ export class PiSdkRuntime implements AgentRuntime {
     return getPiRuntimeIdentity(this.sessionBindings);
   }
   flushStream(): void { this.streamBatcher.flush(); }
-
   private assertSessionWritable(): Promise<void> {
     return this.externalSessionChangeGuard.assertUnchanged(this.sessionBindings.session);
   }

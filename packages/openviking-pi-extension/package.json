@@ -1,6 +1,6 @@
 {
   "name": "@pi67/openviking-pi-extension",
-  "version": "0.2.0-desktop.1",
+  "version": "0.2.0-desktop.2",
   "private": true,
   "type": "module",
   "scripts": {

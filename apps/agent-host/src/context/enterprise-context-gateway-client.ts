@@ -1,11 +1,30 @@
 import type {
   EnterpriseProjectSummary,
   EnterpriseWorkspaceBinding,
+  ExperienceMethodSummary,
   SharedExperienceDetail,
-  SharedExperienceSearchItem
+  SharedExperienceSearchItem,
+  SharedSopDetail,
+  SharedSopSearchItem
 } from "@pi67/domain";
 import type { EnterpriseAccessCredential, EnterpriseDeviceAuthorization } from "@pi67/protocol";
 import { HostCommandError } from "../protocol-error.js";
+import {
+  asRecord,
+  boundedInteger,
+  boundedNumber,
+  boundedOptionalString,
+  boundedString,
+  boundedStringArray,
+  invalidResponse,
+  kebabIdentifier,
+  lowercaseSha256,
+  optionalExperienceMethod,
+  optionalTimestamp,
+  parseEvidence,
+  parseTimestamp,
+  secureUrl
+} from "./enterprise-context-gateway-validation.js";
 
 interface DeviceAuthorizationExchange {
   state: "pending" | "signed-in";
@@ -31,6 +50,7 @@ export interface EnterpriseCandidateSubmissionInput {
   title: string;
   problem: string;
   strategy: string;
+  method: ExperienceMethodSummary;
   result: "success";
   confidence: number;
   sensitivity: "project" | "team" | "company";
@@ -237,6 +257,7 @@ export class EnterpriseContextGatewayClient {
     if (!Array.isArray(value.evidence) || value.evidence.length > 64) {
       throw invalidResponse("shared.evidence");
     }
+    const method = optionalExperienceMethod(value.method);
     return {
       id: boundedString(value.id, "shared.id"),
       projectId: boundedString(value.projectId, "shared.projectId"),
@@ -244,6 +265,7 @@ export class EnterpriseContextGatewayClient {
       taskType: boundedString(value.taskType, "shared.taskType", 256),
       problem: boundedString(value.problem, "shared.problem", 8_192),
       strategy: boundedString(value.strategy, "shared.strategy", 16_384),
+      ...(method === undefined ? {} : { method }),
       result,
       confidence: boundedNumber(value.confidence, "shared.confidence", 0, 1),
       sensitivity,
@@ -264,6 +286,80 @@ export class EnterpriseContextGatewayClient {
       }),
       externalRevision: lowercaseSha256(value.externalRevision, "shared.externalRevision"),
       publishedAt: parseTimestamp(value.publishedAt, "shared.publishedAt")
+    };
+  }
+
+  async searchSharedSops(
+    workspaceFingerprint: string,
+    query: string,
+    limit = 1,
+    signal?: AbortSignal
+  ): Promise<SharedSopSearchItem[]> {
+    const value = asRecord(await this.#request("/shared-sops/search", {
+      method: "POST",
+      body: JSON.stringify({ workspaceFingerprint, query, limit: Math.max(1, Math.min(2, Math.floor(limit))) }),
+      ...(signal === undefined ? {} : { signal })
+    }));
+    if (!Array.isArray(value.items) || value.items.length > 2) throw invalidResponse("sop.items");
+    return value.items.map((item) => {
+      const record = asRecord(item);
+      const expiresAt = optionalTimestamp(record.expiresAt, "sop.expiresAt");
+      return {
+        id: boundedString(record.id, "sop.id"),
+        projectId: boundedString(record.projectId, "sop.projectId"),
+        stableKey: kebabIdentifier(record.stableKey, "sop.stableKey"),
+        semanticVersion: boundedInteger(record.semanticVersion, "sop.semanticVersion", 1),
+        title: boundedString(record.title, "sop.title", 512),
+        taskType: boundedString(record.taskType, "sop.taskType", 256),
+        summary: boundedOptionalString(record.summary, "sop.summary", 8_192),
+        score: boundedNumber(record.score, "sop.score", 0, 1),
+        applicableWhen: boundedStringArray(record.applicableWhen, "sop.applicableWhen"),
+        notApplicableWhen: boundedStringArray(record.notApplicableWhen, "sop.notApplicableWhen"),
+        ...(expiresAt === undefined ? {} : { expiresAt }),
+        externalRevision: lowercaseSha256(record.externalRevision, "sop.externalRevision"),
+        publishedAt: parseTimestamp(record.publishedAt, "sop.publishedAt")
+      };
+    });
+  }
+
+  async getSharedSop(
+    workspaceFingerprint: string,
+    assetId: string,
+    signal?: AbortSignal
+  ): Promise<SharedSopDetail> {
+    const value = asRecord(await this.#request(
+      `/shared-sops/${encodeURIComponent(assetId)}?workspaceFingerprint=${encodeURIComponent(workspaceFingerprint)}`,
+      { method: "GET", ...(signal === undefined ? {} : { signal }) }
+    ));
+    const sensitivity = value.sensitivity;
+    if (sensitivity !== "project" && sensitivity !== "team" && sensitivity !== "company") {
+      throw invalidResponse("sop.sensitivity");
+    }
+    if (!Array.isArray(value.evidence) || value.evidence.length > 64) {
+      throw invalidResponse("sop.evidence");
+    }
+    const method = optionalExperienceMethod(value.method);
+    if (method === undefined) throw invalidResponse("sop.method");
+    const expiresAt = optionalTimestamp(value.expiresAt, "sop.expiresAt");
+    return {
+      id: boundedString(value.id, "sop.id"),
+      projectId: boundedString(value.projectId, "sop.projectId"),
+      stableKey: kebabIdentifier(value.stableKey, "sop.stableKey"),
+      semanticVersion: boundedInteger(value.semanticVersion, "sop.semanticVersion", 1),
+      ownerUserIdHash: lowercaseSha256(value.ownerUserIdHash, "sop.ownerUserIdHash"),
+      title: boundedString(value.title, "sop.title", 512),
+      taskType: boundedString(value.taskType, "sop.taskType", 256),
+      problem: boundedString(value.problem, "sop.problem", 8_192),
+      strategy: boundedString(value.strategy, "sop.strategy", 16_384),
+      method,
+      confidence: boundedNumber(value.confidence, "sop.confidence", 0, 1),
+      sensitivity,
+      applicableWhen: boundedStringArray(value.applicableWhen, "sop.applicableWhen"),
+      notApplicableWhen: boundedStringArray(value.notApplicableWhen, "sop.notApplicableWhen"),
+      evidence: value.evidence.map((item) => parseEvidence(item, "sop.evidence")),
+      ...(expiresAt === undefined ? {} : { expiresAt }),
+      externalRevision: lowercaseSha256(value.externalRevision, "sop.externalRevision"),
+      publishedAt: parseTimestamp(value.publishedAt, "sop.publishedAt")
     };
   }
 
@@ -330,51 +426,6 @@ export class EnterpriseContextGatewayClient {
   }
 }
 
-function asRecord(value: unknown): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) throw invalidResponse("object");
-  return value as Record<string, unknown>;
-}
-
-function boundedString(value: unknown, field: string, maximum = 2_048): string {
-  if (typeof value !== "string" || value.length === 0 || value.length > maximum) throw invalidResponse(field);
-  return value;
-}
-
-function boundedInteger(value: unknown, field: string, minimum: number, maximum = Number.MAX_SAFE_INTEGER): number {
-  if (!Number.isSafeInteger(value) || (value as number) < minimum || (value as number) > maximum) {
-    throw invalidResponse(field);
-  }
-  return value as number;
-}
-
-function boundedNumber(
-  value: unknown,
-  field: string,
-  minimum: number,
-  maximum: number
-): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum) {
-    throw invalidResponse(field);
-  }
-  return value;
-}
-
-function boundedOptionalString(value: unknown, field: string, maximum: number): string {
-  if (typeof value !== "string" || value.length > maximum) throw invalidResponse(field);
-  return value;
-}
-
-function boundedStringArray(value: unknown, field: string): string[] {
-  if (!Array.isArray(value) || value.length > 64) throw invalidResponse(field);
-  return value.map((item, index) => boundedString(item, `${field}.${index}`, 2_048));
-}
-
-function lowercaseSha256(value: unknown, field: string): string {
-  const candidate = boundedString(value, field, 64);
-  if (!/^[a-f0-9]{64}$/u.test(candidate)) throw invalidResponse(field);
-  return candidate;
-}
-
 function isCandidateStatus(
   value: unknown
 ): value is EnterpriseCandidateSubmissionReceipt["status"] {
@@ -386,37 +437,4 @@ function isCandidateStatus(
     || value === "failed"
     || value === "rejected"
     || value === "revoked";
-}
-
-function parseTimestamp(value: unknown, field: string): number {
-  if (typeof value !== "string") throw invalidResponse(field);
-  const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp) || timestamp < 0) throw invalidResponse(field);
-  return timestamp;
-}
-
-function secureUrl(value: unknown, field: string): string {
-  const candidate = boundedString(value, field);
-  let url: URL;
-  try {
-    url = new URL(candidate);
-  } catch {
-    throw invalidResponse(field);
-  }
-  if (url.username || url.password || (url.protocol !== "https:" && !isLoopbackHttp(url))) {
-    throw invalidResponse(field);
-  }
-  return candidate;
-}
-
-function isLoopbackHttp(url: URL): boolean {
-  return url.protocol === "http:" && ["127.0.0.1", "localhost", "::1", "[::1]"].includes(url.hostname);
-}
-
-function invalidResponse(field: string): HostCommandError {
-  return new HostCommandError(
-    "INVALID_PAYLOAD",
-    `Enterprise Context Gateway returned an invalid ${field} field.`,
-    false
-  );
 }

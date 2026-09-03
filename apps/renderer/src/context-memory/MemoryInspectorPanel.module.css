@@ -80,6 +80,42 @@
 .row small, .row > span { color: var(--text-tertiary); font-size: 10px; }
 .row p { grid-column: 1 / -1; margin: 0; color: var(--text-secondary); font-size: 10px; line-height: 1.5; }
 
+.feedback {
+  display: flex !important;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 5px !important;
+  padding-top: 3px;
+}
+
+.feedback button {
+  min-height: 24px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: 9px;
+}
+
+.feedback button:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.feedback button[data-selected] {
+  border-color: color-mix(in srgb, var(--focus) 45%, var(--border));
+  background: color-mix(in srgb, var(--focus) 9%, transparent);
+  color: var(--focus);
+}
+.feedback button[data-disabled] { opacity: 0.45; }
+
+.metricNote {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.section dd[data-state="warning"] { color: var(--warning); }
+
 .error { margin: 0; color: var(--danger); font-size: 11px; line-height: 1.5; }
 
 .boundary {
@@ -166,6 +202,23 @@
   font-size: 9px;
 }
 
+.sopReadiness {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 2px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-muted);
+}
+
+.sopReadiness strong { font-size: 9px; }
+.sopReadiness small { color: var(--text-tertiary); font-size: 9px; line-height: 1.45; }
+.sopReadiness[data-ready="true"] {
+  border-color: color-mix(in srgb, var(--success) 30%, var(--border));
+  background: color-mix(in srgb, var(--success) 6%, var(--surface));
+}
+
 .candidateActions {
   display: flex !important;
   grid-column: 1 / -1;
@@ -239,6 +292,19 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
+
+.methodFields {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-raised) 84%, var(--surface-muted));
+}
+
+.methodFields > header { display: grid; gap: 2px; }
+.methodFields > header strong { font-size: 10px; }
+.methodFields > header small { color: var(--text-tertiary); font-size: 9px; line-height: 1.45; }
 
 .field {
   display: grid;

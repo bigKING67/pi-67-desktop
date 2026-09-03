@@ -1,0 +1,14 @@
+{
+  "schema": "pi67.openviking-recall-golden.v1",
+  "qualityThreshold": 1,
+  "fastPathBudgetMs": 800,
+  "expandedPathBudgetMs": 1500,
+  "cases": [
+    { "id": "strong-single-hit", "scores": [0.88], "configuredThreshold": 0.35, "canExpand": true, "expectedDecision": "return-fast", "estimatedLatencyMs": 420 },
+    { "id": "strong-separated-hit", "scores": [0.86, 0.61], "configuredThreshold": 0.35, "canExpand": true, "expectedDecision": "return-fast", "estimatedLatencyMs": 510 },
+    { "id": "ambiguous-upgrade", "scores": [0.83, 0.78], "configuredThreshold": 0.35, "canExpand": true, "expectedDecision": "expand", "estimatedLatencyMs": 1320 },
+    { "id": "weak-upgrade", "scores": [0.58], "configuredThreshold": 0.35, "canExpand": true, "expectedDecision": "expand", "estimatedLatencyMs": 1410 },
+    { "id": "empty-upgrade", "scores": [], "configuredThreshold": 0.35, "canExpand": true, "expectedDecision": "expand", "estimatedLatencyMs": 1480 },
+    { "id": "no-session-keeps-cheap", "scores": [0.54], "configuredThreshold": 0.35, "canExpand": false, "expectedDecision": "return-fast", "estimatedLatencyMs": 460 }
+  ]
+}

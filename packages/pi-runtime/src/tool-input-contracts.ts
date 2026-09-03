@@ -62,6 +62,21 @@ export function hasPi67SharedExperienceReadContract(
   return false;
 }
 
+export function hasPi67SharedSopReadContract(
+  toolName: string,
+  record: Record<string, unknown>
+): boolean {
+  if (toolName === "viking_sop_search") {
+    return hasOnlyKeys(record, ["query"])
+      && stringField(record, "query") !== undefined;
+  }
+  if (toolName === "viking_sop_read") {
+    return hasOnlyKeys(record, ["id"])
+      && stringField(record, "id") !== undefined;
+  }
+  return false;
+}
+
 export function networkReadTarget(
   record: Record<string, unknown>,
   fallback: string

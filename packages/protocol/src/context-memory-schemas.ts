@@ -4,8 +4,32 @@ import type {
   ContextMemoryCommandResults,
   ContextMemoryEventPayloads
 } from "./context-memory-messages.js";
+import {
+  EvidenceSchema,
+  ExperienceCandidateSummarySchema,
+  ExperienceResultSchema,
+  ExperienceStatusSchema,
+  ReviewedExperienceMethodSchema,
+  SharedExperienceDetailSchema,
+  SharedExperienceSearchItemSchema,
+  SharedSopDetailSchema,
+  SharedSopSearchItemSchema
+} from "./context-memory-experience-schemas.js";
+
+export {
+  ExperienceCandidateSummarySchema,
+  SharedExperienceDetailSchema,
+  SharedExperienceSearchItemSchema,
+  SharedSopDetailSchema,
+  SharedSopSearchItemSchema
+};
 
 const IdentifierSchema = Type.String({ minLength: 1, maxLength: 512 });
+const OpaqueRecallIdentifierSchema = Type.String({
+  pattern: "^[a-f0-9]{64}\\.[a-f0-9]{64}$",
+  minLength: 129,
+  maxLength: 129
+});
 const TimestampSchema = Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER });
 const EndpointSchema = Type.String({ minLength: 1, maxLength: 2_048 });
 const PrivacyModeSchema = Type.Union([
@@ -25,14 +49,22 @@ const MemoryScopeSchema = Type.Union([
   Type.Literal("team"),
   Type.Literal("company")
 ]);
-const ExperienceStatusSchema = Type.Union([
-  Type.Literal("private"),
-  Type.Literal("candidate"),
-  Type.Literal("submitted"),
-  Type.Literal("validated"),
-  Type.Literal("shared"),
-  Type.Literal("rejected"),
-  Type.Literal("revoked")
+const RecallFeedbackSchema = Type.Union([
+  Type.Literal("helpful"),
+  Type.Literal("irrelevant"),
+  Type.Literal("outdated"),
+  Type.Literal("wrong-scope"),
+  Type.Literal("incorrect")
+]);
+const RecallRouteSchema = Type.Union([
+  Type.Literal("startup-context"),
+  Type.Literal("scoped-find"),
+  Type.Literal("find-fast"),
+  Type.Literal("session-context"),
+  Type.Literal("find-fallback"),
+  Type.Literal("cache"),
+  Type.Literal("enterprise-experience"),
+  Type.Literal("enterprise-sop")
 ]);
 
 export const ContextTakeoverConfigurationSchema = strictObject({
@@ -54,6 +86,7 @@ export const ContextMemoryConfigurationSchema = strictObject({
   captureToolResults: Type.Literal(false),
   actorScopeOnly: Type.Literal(true),
   privateExperienceLimit: Type.Integer({ minimum: 0, maximum: 5 }),
+  localResourceRecallLimit: Type.Integer({ minimum: 0, maximum: 5 }),
   sharedExperienceLimit: Type.Integer({ minimum: 0, maximum: 5 }),
   healthTimeoutMs: Type.Integer({ minimum: 100, maximum: 10_000 }),
   recallTimeoutMs: Type.Integer({ minimum: 100, maximum: 10_000 }),
@@ -106,7 +139,12 @@ export const ContextRecallItemSchema = strictObject({
   createdAt: TimestampSchema,
   reason: Type.String({ minLength: 1, maxLength: 2_048 }),
   expiresAt: Type.Optional(TimestampSchema),
-  workspaceId: Type.Optional(IdentifierSchema)
+  workspaceId: Type.Optional(IdentifierSchema),
+  route: Type.Optional(RecallRouteSchema),
+  durationMs: Type.Optional(Type.Integer({ minimum: 0, maximum: 600_000 })),
+  candidateCount: Type.Optional(Type.Integer({ minimum: 0, maximum: 10_000 })),
+  selectedCount: Type.Optional(Type.Integer({ minimum: 0, maximum: 100 })),
+  feedback: Type.Optional(RecallFeedbackSchema)
 });
 
 export const MemoryEntrySummarySchema = strictObject({
@@ -126,88 +164,6 @@ export const MemoryDiffSummarySchema = strictObject({
   merged: Type.Integer({ minimum: 0 }),
   deleted: Type.Integer({ minimum: 0 }),
   committedAt: TimestampSchema
-});
-
-const EvidenceSchema = strictObject({
-  kind: Type.Union([
-    Type.Literal("test"),
-    Type.Literal("tool-result"),
-    Type.Literal("user-confirmation"),
-    Type.Literal("artifact")
-  ]),
-  label: Type.String({ minLength: 1, maxLength: 512 }),
-  reference: Type.String({ minLength: 1, maxLength: 2_048 }),
-  verifiedAt: TimestampSchema
-});
-
-export const ExperienceCandidateSummarySchema = strictObject({
-  id: IdentifierSchema,
-  taskType: Type.String({ minLength: 1, maxLength: 256 }),
-  title: Type.String({ minLength: 1, maxLength: 512 }),
-  problem: Type.String({ minLength: 1, maxLength: 8_192 }),
-  strategy: Type.String({ minLength: 1, maxLength: 16_384 }),
-  result: Type.Union([
-    Type.Literal("success"),
-    Type.Literal("partial"),
-    Type.Literal("failed"),
-    Type.Literal("rolled-back")
-  ]),
-  confidence: Type.Number({ minimum: 0, maximum: 1 }),
-  status: ExperienceStatusSchema,
-  sensitivity: Type.Union([
-    Type.Literal("private"),
-    Type.Literal("project"),
-    Type.Literal("team"),
-    Type.Literal("company")
-  ]),
-  applicableWhen: Type.Array(Type.String({ maxLength: 2_048 }), { maxItems: 64 }),
-  notApplicableWhen: Type.Array(Type.String({ maxLength: 2_048 }), { maxItems: 64 }),
-  evidence: Type.Array(EvidenceSchema, { maxItems: 64 }),
-  redactionStatus: Type.Union([Type.Literal("pending"), Type.Literal("passed"), Type.Literal("failed")]),
-  workspaceId: IdentifierSchema,
-  createdAt: TimestampSchema,
-  updatedAt: TimestampSchema,
-  enterpriseCandidateId: Type.Optional(IdentifierSchema),
-  submittedAt: Type.Optional(TimestampSchema)
-});
-
-export const SharedExperienceSearchItemSchema = strictObject({
-  id: IdentifierSchema,
-  projectId: IdentifierSchema,
-  title: Type.String({ minLength: 1, maxLength: 512 }),
-  taskType: Type.String({ minLength: 1, maxLength: 256 }),
-  summary: Type.String({ maxLength: 8_192 }),
-  score: Type.Number({ minimum: 0, maximum: 1 }),
-  applicableWhen: Type.Array(Type.String({ maxLength: 2_048 }), { maxItems: 64 }),
-  notApplicableWhen: Type.Array(Type.String({ maxLength: 2_048 }), { maxItems: 64 }),
-  externalRevision: Type.String({ pattern: "^[a-f0-9]{64}$" }),
-  publishedAt: TimestampSchema
-});
-
-export const SharedExperienceDetailSchema = strictObject({
-  id: IdentifierSchema,
-  projectId: IdentifierSchema,
-  title: Type.String({ minLength: 1, maxLength: 512 }),
-  taskType: Type.String({ minLength: 1, maxLength: 256 }),
-  problem: Type.String({ minLength: 1, maxLength: 8_192 }),
-  strategy: Type.String({ minLength: 1, maxLength: 16_384 }),
-  result: Type.Union([
-    Type.Literal("success"),
-    Type.Literal("partial"),
-    Type.Literal("failed"),
-    Type.Literal("rolled-back")
-  ]),
-  confidence: Type.Number({ minimum: 0, maximum: 1 }),
-  sensitivity: Type.Union([
-    Type.Literal("project"),
-    Type.Literal("team"),
-    Type.Literal("company")
-  ]),
-  applicableWhen: Type.Array(Type.String({ maxLength: 2_048 }), { maxItems: 64 }),
-  notApplicableWhen: Type.Array(Type.String({ maxLength: 2_048 }), { maxItems: 64 }),
-  evidence: Type.Array(EvidenceSchema, { maxItems: 64 }),
-  externalRevision: Type.String({ pattern: "^[a-f0-9]{64}$" }),
-  publishedAt: TimestampSchema
 });
 
 export const EnterpriseIdentityStatusSchema = strictObject({
@@ -269,6 +225,7 @@ export const ContextMemoryCommandPayloadSchemas: Record<keyof ContextMemoryComma
     commitTokenThreshold: Type.Integer({ minimum: 1_000, maximum: 1_000_000 }),
     captureAssistantTurns: Type.Boolean(),
     privateExperienceLimit: Type.Integer({ minimum: 0, maximum: 5 }),
+    localResourceRecallLimit: Type.Integer({ minimum: 0, maximum: 5 }),
     sharedExperienceLimit: Type.Integer({ minimum: 0, maximum: 5 }),
     takeover: ContextTakeoverConfigurationSchema
   }),
@@ -279,6 +236,12 @@ export const ContextMemoryCommandPayloadSchemas: Record<keyof ContextMemoryComma
     sessionId: Type.Optional(IdentifierSchema),
     limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 }))
   }),
+  "context.recall.feedback": strictObject({
+    id: OpaqueRecallIdentifierSchema,
+    feedback: RecallFeedbackSchema,
+    sessionId: Type.Optional(IdentifierSchema)
+  }),
+  "context.recall.metrics": strictObject({}),
   "memory.search": strictObject({
     query: Type.String({ minLength: 1, maxLength: 2_048 }),
     scope: Type.Optional(MemoryScopeSchema),
@@ -299,18 +262,14 @@ export const ContextMemoryCommandPayloadSchemas: Record<keyof ContextMemoryComma
     title: Type.String({ minLength: 1, maxLength: 512 }),
     problem: Type.String({ minLength: 1, maxLength: 8_192 }),
     strategy: Type.String({ minLength: 1, maxLength: 16_384 }),
-    result: Type.Union([
-      Type.Literal("success"),
-      Type.Literal("partial"),
-      Type.Literal("failed"),
-      Type.Literal("rolled-back")
-    ]),
+    result: ExperienceResultSchema,
     confidence: Type.Number({ minimum: 0, maximum: 1 }),
     sensitivity: Type.Union([
       Type.Literal("project"),
       Type.Literal("team"),
       Type.Literal("company")
     ]),
+    method: ReviewedExperienceMethodSchema,
     applicableWhen: Type.Array(Type.String({ minLength: 1, maxLength: 2_048 }), { minItems: 1, maxItems: 64 }),
     notApplicableWhen: Type.Array(Type.String({ minLength: 1, maxLength: 2_048 }), { minItems: 1, maxItems: 64 }),
     evidence: Type.Array(EvidenceSchema, { maxItems: 64 }),
@@ -327,6 +286,10 @@ export const ContextMemoryCommandPayloadSchemas: Record<keyof ContextMemoryComma
     limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 5 }))
   }),
   "experience.shared.get": strictObject({ id: IdentifierSchema }),
+  "sop.shared.search": strictObject({
+    query: Type.String({ minLength: 1, maxLength: 2_048 })
+  }),
+  "sop.shared.get": strictObject({ id: IdentifierSchema }),
   "enterprise.identity.get": strictObject({}),
   "enterprise.auth.begin": strictObject({}),
   "enterprise.auth.poll": strictObject({ authorizationId: IdentifierSchema }),
@@ -356,6 +319,22 @@ export const ContextMemoryCommandResultSchemas: Record<keyof ContextMemoryComman
   "context.session.get": ContextSessionStatusSchema,
   "context.session.commit": ContextAsyncOperationAcceptedSchema,
   "context.recall.list": strictObject({ items: Type.Array(ContextRecallItemSchema), total: Type.Integer({ minimum: 0 }) }),
+  "context.recall.feedback": strictObject({
+    id: OpaqueRecallIdentifierSchema,
+    feedback: RecallFeedbackSchema,
+    recordedAt: TimestampSchema
+  }),
+  "context.recall.metrics": strictObject({
+    sampleCount: Type.Integer({ minimum: 0, maximum: 500 }),
+    p50Ms: Type.Integer({ minimum: 0, maximum: 600_000 }),
+    p95Ms: Type.Integer({ minimum: 0, maximum: 600_000 }),
+    fastPathRate: Type.Number({ minimum: 0, maximum: 1 }),
+    expansionRate: Type.Number({ minimum: 0, maximum: 1 }),
+    cacheHitRate: Type.Number({ minimum: 0, maximum: 1 }),
+    emptyRate: Type.Number({ minimum: 0, maximum: 1 }),
+    targetP95Ms: Type.Integer({ minimum: 1, maximum: 600_000 }),
+    withinTarget: Type.Boolean()
+  }),
   "memory.search": strictObject({ items: Type.Array(MemoryEntrySummarySchema), total: Type.Integer({ minimum: 0 }) }),
   "memory.get": MemoryEntrySummarySchema,
   "memory.forget.preview": strictObject({
@@ -372,6 +351,8 @@ export const ContextMemoryCommandResultSchemas: Record<keyof ContextMemoryComman
   "experience.candidate.reject": ExperienceCandidateSummarySchema,
   "experience.shared.search": strictObject({ items: Type.Array(SharedExperienceSearchItemSchema), total: Type.Integer({ minimum: 0 }) }),
   "experience.shared.get": SharedExperienceDetailSchema,
+  "sop.shared.search": strictObject({ items: Type.Array(SharedSopSearchItemSchema, { maxItems: 1 }), total: Type.Integer({ minimum: 0, maximum: 1 }) }),
+  "sop.shared.get": SharedSopDetailSchema,
   "enterprise.identity.get": EnterpriseIdentityStatusSchema,
   "enterprise.auth.begin": strictObject({
     authorizationId: IdentifierSchema,

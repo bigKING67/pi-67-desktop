@@ -35,6 +35,7 @@ export class SyncManager {
   private client: OVClient;
   private config: OVConfig;
   private ovSessionId: string | null = null;
+  private sourcePiSessionId: string | null = null;
   private syncedEntryCount = 0;
 
   constructor(client: OVClient, config: OVConfig) {
@@ -43,6 +44,7 @@ export class SyncManager {
   }
 
   get sessionId(): string | null { return this.ovSessionId; }
+  get piSessionId(): string | null { return this.sourcePiSessionId; }
   get syncedCount(): number { return this.syncedEntryCount; }
 
   restoreWatermark(n: number): void {
@@ -51,9 +53,13 @@ export class SyncManager {
   }
 
   async ensureSession(piSessionId: string): Promise<boolean> {
-    if (this.ovSessionId) return true;
+    if (this.ovSessionId) {
+      this.sourcePiSessionId ??= piSessionId;
+      return true;
+    }
 
     const id = deriveHarnessSessionId("pi-", piSessionId);
+    this.sourcePiSessionId = piSessionId;
     this.ovSessionId = id;
     return true;
   }

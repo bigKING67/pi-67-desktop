@@ -10,7 +10,6 @@ export type MemoryPrivacyMode = (typeof MEMORY_PRIVACY_MODES)[number];
 export type ContextOwner = "pi67-openviking" | "pi-default-compaction" | "none";
 export type ContextRuntimeHealth = "healthy" | "degraded" | "unavailable" | "disabled" | "conflict";
 export type MemoryScope = "user" | "workspace" | "team" | "company";
-export type RecallSource = "private-memory" | "private-experience" | "shared-experience" | "resource";
 
 export interface MemoryPrivacyCapabilities {
   recall: boolean;
@@ -37,6 +36,7 @@ export interface ContextMemoryConfiguration {
   captureToolResults: false;
   actorScopeOnly: true;
   privateExperienceLimit: number;
+  localResourceRecallLimit: number;
   sharedExperienceLimit: number;
   healthTimeoutMs: number;
   recallTimeoutMs: number;
@@ -75,18 +75,6 @@ export interface ContextSessionStatus {
   lastCommitAt?: number;
 }
 
-export interface ContextRecallItem {
-  id: string;
-  title: string;
-  summary: string;
-  source: RecallSource;
-  scope: MemoryScope;
-  score: number;
-  createdAt: number;
-  reason: string;
-  expiresAt?: number;
-  workspaceId?: string;
-}
 
 export interface MemoryEntrySummary {
   id: string;
@@ -125,6 +113,46 @@ export interface ExperienceEvidenceSummary {
   verifiedAt: number;
 }
 
+export interface ExperienceSourceCaseSummary {
+  id: string;
+  source: "pi-session-commit";
+  result: ExperienceResult;
+  evidenceCount: number;
+  workspaceId: string;
+  capturedAt: number;
+}
+
+export interface ExperienceMethodSummary {
+  preconditions: string[];
+  steps: string[];
+  tools: string[];
+  validationGates: string[];
+  completionCriteria: string[];
+  failureModes: string[];
+  rollback: string;
+}
+
+export type SopReadinessReason =
+  | "experience-not-validated"
+  | "insufficient-independent-cases"
+  | "insufficient-independent-workspaces"
+  | "case-outcome-not-successful"
+  | "missing-preconditions"
+  | "missing-steps"
+  | "missing-validation-gates"
+  | "missing-completion-criteria"
+  | "missing-failure-modes"
+  | "missing-rollback";
+
+export interface SopReadinessAssessment {
+  state: "not-ready" | "candidate-ready";
+  reasons: SopReadinessReason[];
+  caseCount: number;
+  workspaceCount: number;
+  requiredCaseCount: 3;
+  requiredWorkspaceCount: 2;
+}
+
 export interface ExperienceCandidateSummary {
   id: string;
   taskType: string;
@@ -135,6 +163,8 @@ export interface ExperienceCandidateSummary {
   confidence: number;
   status: ExperienceCandidateStatus;
   sensitivity: "private" | "project" | "team" | "company";
+  sourceCases: ExperienceSourceCaseSummary[];
+  method: ExperienceMethodSummary;
   applicableWhen: string[];
   notApplicableWhen: string[];
   evidence: ExperienceEvidenceSummary[];
@@ -166,12 +196,50 @@ export interface SharedExperienceDetail {
   taskType: string;
   problem: string;
   strategy: string;
+  method?: ExperienceMethodSummary;
   result: ExperienceResult;
   confidence: number;
   sensitivity: "project" | "team" | "company";
   applicableWhen: string[];
   notApplicableWhen: string[];
   evidence: ExperienceEvidenceSummary[];
+  externalRevision: string;
+  publishedAt: number;
+}
+
+export interface SharedSopSearchItem {
+  id: string;
+  projectId: string;
+  stableKey: string;
+  semanticVersion: number;
+  title: string;
+  taskType: string;
+  summary: string;
+  score: number;
+  applicableWhen: string[];
+  notApplicableWhen: string[];
+  expiresAt?: number;
+  externalRevision: string;
+  publishedAt: number;
+}
+
+export interface SharedSopDetail {
+  id: string;
+  projectId: string;
+  stableKey: string;
+  semanticVersion: number;
+  ownerUserIdHash: string;
+  title: string;
+  taskType: string;
+  problem: string;
+  strategy: string;
+  method: ExperienceMethodSummary;
+  confidence: number;
+  sensitivity: "project" | "team" | "company";
+  applicableWhen: string[];
+  notApplicableWhen: string[];
+  evidence: ExperienceEvidenceSummary[];
+  expiresAt?: number;
   externalRevision: string;
   publishedAt: number;
 }
@@ -214,6 +282,7 @@ export interface EnterpriseCandidateEligibilityInput {
   evidenceCount: number;
   redactionStatus: ExperienceCandidateSummary["redactionStatus"];
   sensitivity: ExperienceCandidateSummary["sensitivity"];
+  methodComplete: boolean;
 }
 
 export interface EnterpriseCandidateEligibility {
@@ -226,6 +295,7 @@ export interface EnterpriseCandidateEligibility {
     | "result-unverified"
     | "missing-evidence"
     | "redaction-incomplete"
+    | "method-incomplete"
     | "private-sensitivity"
   >;
 }
@@ -242,6 +312,7 @@ export const DEFAULT_CONTEXT_MEMORY_CONFIGURATION: Omit<ContextMemoryConfigurati
   captureToolResults: false,
   actorScopeOnly: true,
   privateExperienceLimit: 1,
+  localResourceRecallLimit: 1,
   sharedExperienceLimit: 1,
   healthTimeoutMs: 800,
   recallTimeoutMs: 1_000,
@@ -294,6 +365,48 @@ export function enterpriseCandidateEligibility(
   if (input.result !== "success") reasons.push("result-unverified");
   if (input.evidenceCount === 0) reasons.push("missing-evidence");
   if (input.redactionStatus !== "passed") reasons.push("redaction-incomplete");
+  if (!input.methodComplete) reasons.push("method-incomplete");
   if (input.sensitivity === "private") reasons.push("private-sensitivity");
   return { eligible: reasons.length === 0, reasons };
+}
+
+export function experienceMethodComplete(method: ExperienceMethodSummary): boolean {
+  return method.preconditions.length > 0
+    && method.steps.length > 0
+    && method.validationGates.length > 0
+    && method.completionCriteria.length > 0
+    && method.failureModes.length > 0
+    && method.rollback.trim().length > 0;
+}
+
+export function assessSopReadiness(
+  experience: ExperienceCandidateSummary
+): SopReadinessAssessment {
+  const reasons: SopReadinessReason[] = [];
+  const caseIds = new Set(experience.sourceCases.map((item) => item.id));
+  const workspaceIds = new Set(experience.sourceCases.map((item) => item.workspaceId));
+  if (!isValidatedExperience(experience.status)) reasons.push("experience-not-validated");
+  if (caseIds.size < 3) reasons.push("insufficient-independent-cases");
+  if (workspaceIds.size < 2) reasons.push("insufficient-independent-workspaces");
+  if (experience.sourceCases.some((item) => item.result !== "success")) {
+    reasons.push("case-outcome-not-successful");
+  }
+  if (experience.method.preconditions.length === 0) reasons.push("missing-preconditions");
+  if (experience.method.steps.length === 0) reasons.push("missing-steps");
+  if (experience.method.validationGates.length === 0) reasons.push("missing-validation-gates");
+  if (experience.method.completionCriteria.length === 0) reasons.push("missing-completion-criteria");
+  if (experience.method.failureModes.length === 0) reasons.push("missing-failure-modes");
+  if (!experience.method.rollback.trim()) reasons.push("missing-rollback");
+  return {
+    state: reasons.length === 0 ? "candidate-ready" : "not-ready",
+    reasons,
+    caseCount: caseIds.size,
+    workspaceCount: workspaceIds.size,
+    requiredCaseCount: 3,
+    requiredWorkspaceCount: 2
+  };
+}
+
+function isValidatedExperience(status: ExperienceCandidateStatus): boolean {
+  return status === "validated" || status === "submitted" || status === "shared";
 }

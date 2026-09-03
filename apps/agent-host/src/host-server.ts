@@ -73,7 +73,8 @@ export class AgentHostServer {
       this.runtimeCredentialOverrides,
       {
         onRuntimeLoaded: (record, runtime) => this.tasks.bindRuntime(record, runtime),
-        sharedExperienceAccessForWorkspace: (workspaceId) => this.contextMemory.sharedExperienceAccess(workspaceId)
+        sharedExperienceAccessForWorkspace: (workspaceId) => this.contextMemory.sharedExperienceAccess(workspaceId),
+        sharedSopAccessForWorkspace: (workspaceId) => this.contextMemory.sharedSopAccess(workspaceId)
       },
       this.options.promptAttachments
     );
@@ -288,10 +289,7 @@ export class AgentHostServer {
       if (admissionLease && isSettledRunAdmissionResult(result)) this.tasks.releaseRun(admissionLease);
       return result;
     } catch (error) {
-      const failure = await this.taskLifecycle.cancelWriterTransitionAfterFailure(
-        writerReservation,
-        error
-      );
+      const failure = await this.taskLifecycle.cancelWriterTransitionAfterFailure(writerReservation, error);
       if (admissionLease) this.tasks.releaseRun(admissionLease);
       throw failure;
     }

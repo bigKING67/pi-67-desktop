@@ -146,6 +146,8 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "context.session.get": "workspace",
   "context.session.commit": "workspace",
   "context.recall.list": "workspace",
+  "context.recall.feedback": "workspace",
+  "context.recall.metrics": "workspace",
   "memory.search": "workspace",
   "memory.get": "workspace",
   "memory.forget.preview": "workspace",
@@ -157,6 +159,8 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "experience.candidate.reject": "workspace",
   "experience.shared.search": "workspace",
   "experience.shared.get": "workspace",
+  "sop.shared.search": "workspace",
+  "sop.shared.get": "workspace",
   "enterprise.workspace.get": "workspace",
   "enterprise.workspace.bind": "workspace",
   "enterprise.workspace.unbind": "workspace"

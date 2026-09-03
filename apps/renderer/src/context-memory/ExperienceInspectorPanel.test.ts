@@ -2,8 +2,9 @@ import type { ExperienceCandidateSummary } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
 import {
   buildExperienceCandidateReview,
-  createReviewDraft
-} from "./ExperienceInspectorPanel.js";
+  createReviewDraft,
+  experienceCandidateNeedsReview
+} from "./ExperienceCandidateReviewForm.js";
 
 describe("Experience Inspector review model", () => {
   it("never pre-confirms an extracted candidate", () => {
@@ -13,6 +14,25 @@ describe("Experience Inspector review model", () => {
       confirmRedaction: false,
       sensitivity: "project"
     });
+  });
+
+  it("lets a legacy validated candidate reopen review until its method is complete", () => {
+    const item = candidate();
+    expect(experienceCandidateNeedsReview(item)).toBe(true);
+    expect(experienceCandidateNeedsReview({ ...item, status: "validated" })).toBe(true);
+    expect(experienceCandidateNeedsReview({
+      ...item,
+      status: "validated",
+      method: {
+        preconditions: ["The Agent Host epoch changes"],
+        steps: ["Discard stale epoch events"],
+        tools: [],
+        validationGates: ["No stale Projection remains"],
+        completionCriteria: ["The active Session resumes"],
+        failureModes: ["An old approval remains visible"],
+        rollback: "Restore the previous Host build"
+      }
+    })).toBe(false);
   });
 
   it("requires explicit outcome, exclusion boundary, and redaction confirmation", () => {
@@ -25,6 +45,13 @@ describe("Experience Inspector review model", () => {
       confirmOutcome: true,
       confirmRedaction: true
     })).toBe("适用条件和不适用条件都至少需要一项。");
+    expect(buildExperienceCandidateReview(item, {
+      ...draft,
+      result: "success",
+      notApplicableWhen: "A normal renderer rerender occurs",
+      confirmOutcome: true,
+      confirmRedaction: true
+    })).toBe("前置条件和关键步骤都至少需要一项。");
   });
 
   it("builds a version-fenced local review without manufacturing extra evidence", () => {
@@ -34,6 +61,13 @@ describe("Experience Inspector review model", () => {
       result: "success",
       confidence: "0.90",
       sensitivity: "team",
+      preconditions: "The Agent Host epoch changes",
+      steps: "Discard stale epoch events\nRun recovery tests",
+      tools: "packaged smoke",
+      validationGates: "No stale Projection remains",
+      completionCriteria: "The active Session resumes",
+      failureModes: "An old approval remains visible",
+      rollback: "Restore the previous Host build",
       notApplicableWhen: "A normal renderer rerender occurs",
       confirmOutcome: true,
       confirmRedaction: true
@@ -48,6 +82,15 @@ describe("Experience Inspector review model", () => {
       result: "success",
       confidence: 0.9,
       sensitivity: "team",
+      method: {
+        preconditions: ["The Agent Host epoch changes"],
+        steps: ["Discard stale epoch events", "Run recovery tests"],
+        tools: ["packaged smoke"],
+        validationGates: ["No stale Projection remains"],
+        completionCriteria: ["The active Session resumes"],
+        failureModes: ["An old approval remains visible"],
+        rollback: "Restore the previous Host build"
+      },
       applicableWhen: ["The Agent Host epoch changes"],
       notApplicableWhen: ["A normal renderer rerender occurs"],
       evidence: [],
@@ -68,6 +111,23 @@ function candidate(): ExperienceCandidateSummary {
     confidence: 0.5,
     status: "candidate",
     sensitivity: "project",
+    sourceCases: [{
+      id: "case-1",
+      source: "pi-session-commit",
+      result: "partial",
+      evidenceCount: 1,
+      workspaceId: "workspace-1",
+      capturedAt: 1
+    }],
+    method: {
+      preconditions: [],
+      steps: [],
+      tools: [],
+      validationGates: [],
+      completionCriteria: [],
+      failureModes: [],
+      rollback: ""
+    },
     applicableWhen: ["The Agent Host epoch changes"],
     notApplicableWhen: [],
     evidence: [{

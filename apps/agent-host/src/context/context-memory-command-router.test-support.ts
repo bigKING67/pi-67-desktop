@@ -291,6 +291,61 @@ export function enterpriseFetch(expiresAt: number) {
         publishedAt: "2026-08-31T00:00:00Z"
       });
     }
+    if (url.endsWith("/shared-sops/search")) {
+      if (typeof init?.body !== "string" || JSON.parse(init.body).limit !== 2) {
+        throw new Error("Expected two-candidate SOP search contract before local feedback");
+      }
+      return jsonResponse({ items: [{
+        id: "sop-1",
+        projectId: "project-1",
+        stableKey: "host-epoch-recovery",
+        semanticVersion: 2,
+        title: "Host recovery SOP",
+        taskType: "electron-recovery",
+        summary: "Apply the governed recovery workflow.",
+        score: 0.95,
+        applicableWhen: ["Host epoch changes"],
+        notApplicableWhen: ["Ordinary render"],
+        expiresAt: "2026-12-01T00:00:00Z",
+        externalRevision: "e".repeat(64),
+        publishedAt: "2026-08-31T00:00:00Z"
+      }], total: 1 });
+    }
+    if (url.includes("/shared-sops/sop-1?")) {
+      return jsonResponse({
+        id: "sop-1",
+        projectId: "project-1",
+        stableKey: "host-epoch-recovery",
+        semanticVersion: 2,
+        ownerUserIdHash: "f".repeat(64),
+        title: "Host recovery SOP",
+        taskType: "electron-recovery",
+        problem: "Old events remain visible",
+        strategy: "Discard stale epochs",
+        method: {
+          preconditions: ["The Host epoch changed"],
+          steps: ["Discard stale events"],
+          tools: ["packaged smoke"],
+          validationGates: ["No stale Projection remains"],
+          completionCriteria: ["The active Session resumes"],
+          failureModes: ["An old approval remains visible"],
+          rollback: "Restore the previous Host build."
+        },
+        confidence: 0.94,
+        sensitivity: "team",
+        applicableWhen: ["Host epoch changes"],
+        notApplicableWhen: ["Ordinary render"],
+        evidence: [{
+          kind: "test",
+          label: "42 tests passed",
+          hash: "d".repeat(64),
+          verifiedAt: "2026-08-31T00:00:00Z"
+        }],
+        expiresAt: "2026-12-01T00:00:00Z",
+        externalRevision: "e".repeat(64),
+        publishedAt: "2026-08-31T00:00:00Z"
+      });
+    }
     throw new Error(`Unexpected enterprise request: ${url}`);
   });
 }

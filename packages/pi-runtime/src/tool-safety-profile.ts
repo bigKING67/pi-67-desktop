@@ -20,7 +20,9 @@ const PI_WEB_ACCESS_TOOLS = new Set([
 const PI67_PLAN_TOOLS = new Set(["plan_ask", "plan_complete"]);
 const PI67_SHARED_EXPERIENCE_TOOLS = new Set([
   "viking_shared_search",
-  "viking_shared_read"
+  "viking_shared_read",
+  "viking_sop_search",
+  "viking_sop_read"
 ]);
 const PI_FFF_GREP_TOOLS = new Set(["grep", "ffgrep"]);
 const PI_FFF_FIND_TOOLS = new Set(["find", "fffind"]);
@@ -29,7 +31,7 @@ export type ToolSafetyProfile =
   | { kind: "builtin"; toolName: string; sourceLabel: "Pi 内置" }
   | { kind: "pi67-web"; toolName: string; sourceLabel: "Pi-67 原生搜索" }
   | { kind: "pi67-plan"; toolName: string; sourceLabel: "Pi-67 原生计划" }
-  | { kind: "pi67-context"; toolName: string; sourceLabel: "Pi-67 企业经验" }
+  | { kind: "pi67-context"; toolName: string; sourceLabel: "Pi-67 企业知识" }
   | { kind: "pi-web-access"; toolName: string; sourceLabel: "pi-web-access@0.17.0" }
   | {
       kind: "pi-mcp-adapter";
@@ -106,7 +108,7 @@ export function createToolSafetyProfileResolver(catalog?: ConfiguredCapabilityCa
       PI67_SHARED_EXPERIENCE_TOOLS.has(toolName)
       && isFirstPartySdkIdentity(toolName, source)
     ) {
-      return { kind: "pi67-context", toolName, sourceLabel: "Pi-67 企业经验" };
+      return { kind: "pi67-context", toolName, sourceLabel: "Pi-67 企业知识" };
     }
     if (PI67_SHARED_EXPERIENCE_TOOLS.has(toolName)) {
       return reservedIdentityMismatch(toolName, "Pi-67 enterprise Experience");

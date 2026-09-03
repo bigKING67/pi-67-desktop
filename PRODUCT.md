@@ -201,6 +201,45 @@ the only Runtime and behavior specification source.
   action. Submission means `enterprise review pending`, never `shared`; publishing
   remains a distinct DataHub governance action and never exposes the private source
   Session or private Memory URI.
+- Recall uses a stable, bounded startup snapshot plus model-selected Tools. A
+  general `viking_search` first performs a small actor/Workspace-scoped vector
+  lookup; one strong separated hit returns immediately, while empty, weak, or
+  ambiguous results alone upgrade to session-aware query expansion. Results are
+  cached only briefly inside the current Pi process, abstracts and URIs come before
+  bounded deep reads, and cache state is invalidated when the user corrects a
+  recall. Private Experience, local OpenViking Resource, and enterprise Experience
+  limits remain independently named and governed.
+- Enterprise Experience and SOP retrieval asks OpenViking for a bounded candidate
+  set, intersects it with DataHub's current Account/Project active allowlist, then
+  deterministically reranks eligible assets using semantic relevance, task and
+  applicability overlap, negative applicability, evidence, confidence, freshness,
+  expiry, and SOP version before enforcing the final result limit. Revoked,
+  cross-Project, and expired assets cannot become prompt context even when their
+  vectors remain highly ranked.
+- Recall observations are local, bounded, and privacy-safe: only route, duration,
+  counts, scores, configuration detail, and SHA-256 identifiers are retained; raw
+  queries, recalled bodies, local paths, identities, and credentials are excluded.
+  The Memory Inspector reports sample count, p50/p95, fast/expanded/cache routes,
+  and accepts `有用 / 无关 / 过期 / 错范围 / 错误` feedback. Feedback adjusts or
+  suppresses later local results within the same Workspace boundary; enterprise
+  aggregation remains a separate future governance contract.
+- One exact Session Commit creates one pseudonymous task Case, not an SOP. A
+  reviewed Experience must add reusable preconditions, ordered steps, Tool
+  requirements, validation gates, completion criteria, failure modes, and a
+  rollback or non-applicability explanation. Desktop labels an Experience as
+  eligible for an SOP candidate only after at least three successful independent
+  Cases across two Workspaces carry a complete method. Eligibility never publishes
+  an SOP. DataHub owns organization Owner, immutable versions, approval,
+  supersession, expiry, rollback and release. A published SOP uses its own versioned
+  OpenViking resource and exactly one active version per Account/Project/stable key;
+  deprecated versions are never recalled unless an authorized restore makes one
+  active again, while revoked or expired versions remain blocked. Pi can search at
+  most one applicable SOP and deep-read it through `viking_sop_search` and
+  `viking_sop_read`. The returned SOP is untrusted reference context: it cannot run
+  itself, grant Tool authority, or override the user, project Rules, current code,
+  versions, evidence, or Desktop authorization policy. An executable Skill is a
+  separately reviewed automation asset and never follows automatically from Memory
+  extraction or SOP publication.
 - Desktop provisions `tmwd_browser` and `js-reverse` as managed browser67 MCP servers
   in the Pi Agent Profile with the private packaged Node executable. `tmwd_browser`
   is admitted with `directTools=true`, so its effective browser Tools enter Pi's
@@ -1146,7 +1185,9 @@ the only Runtime and behavior specification source.
   directories are hidden from both the tree and search by default; changing
   `显示依赖/生成目录` refreshes both while retaining expansion, selection, and
   scroll state. A failed child-directory read owns a local retry action.
-- `上下文` owns the secondary `会话 / 记忆 / 经验` views. They are not additional
+- `上下文` owns the secondary `会话 / 记忆 / 经验` views. `经验` distinguishes
+  exact task Cases, reviewed reusable Experiences, and SOP-candidate readiness;
+  it never labels a single successful task as an SOP. These are not additional
   primary Inspector tabs: the five primary actions always remain one equal-width row,
   while the selected Context detail persists when the user briefly inspects another
   primary view.

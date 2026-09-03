@@ -152,13 +152,28 @@ describe("createDesktopSafetyExtension", () => {
     const handler = safetyHandler(
       { ...trustedPolicy(), taskToolMode: "auto" },
       requestApproval,
-      () => [sdkTool("viking_shared_search"), sdkTool("viking_shared_read")]
+      () => [
+        sdkTool("viking_shared_search"),
+        sdkTool("viking_shared_read"),
+        sdkTool("viking_sop_search"),
+        sdkTool("viking_sop_read")
+      ]
     );
 
     await expect(handler({
       toolCallId: "shared-search",
       toolName: "viking_shared_search",
       input: { query: "Electron Host epoch recovery", limit: 2 }
+    }, { hasUI: true })).resolves.toBeUndefined();
+    await expect(handler({
+      toolCallId: "sop-search",
+      toolName: "viking_sop_search",
+      input: { query: "Standard Host epoch recovery" }
+    }, { hasUI: true })).resolves.toBeUndefined();
+    await expect(handler({
+      toolCallId: "sop-read",
+      toolName: "viking_sop_read",
+      input: { id: "sop_67" }
     }, { hasUI: true })).resolves.toBeUndefined();
     await expect(handler({
       toolCallId: "shared-read",

@@ -21,6 +21,7 @@ describe("ContextMemoryConfigurationStore", () => {
       captureToolResults: false,
       actorScopeOnly: true,
       privateExperienceLimit: 1,
+      localResourceRecallLimit: 1,
       sharedExperienceLimit: 1,
       revision: expect.stringMatching(/^[a-f0-9]{64}$/)
     });
@@ -54,6 +55,7 @@ describe("ContextMemoryConfigurationStore", () => {
       commitTokenThreshold: 24_000,
       captureAssistantTurns: true,
       privateExperienceLimit: 1,
+      localResourceRecallLimit: 1,
       sharedExperienceLimit: 2,
       takeover: { enabled: true, tokenThreshold: 36_000, keepRecentTurns: 4 }
     });
@@ -68,7 +70,12 @@ describe("ContextMemoryConfigurationStore", () => {
     const persisted = JSON.parse(await readFile(store.path, "utf8")) as Record<string, unknown>;
     expect(persisted).not.toHaveProperty("revision");
     expect(JSON.stringify(persisted)).not.toContain("secret");
-    expect(persisted).toMatchObject({ captureToolResults: false, recallPeerScope: "actor" });
+    expect(persisted).toMatchObject({
+      captureToolResults: false,
+      recallPeerScope: "actor",
+      localResourceRecallLimit: 1,
+      sharedExperienceLimit: 2
+    });
 
     await expect(store.update({
       expectedRevision: current.revision,
@@ -81,9 +88,41 @@ describe("ContextMemoryConfigurationStore", () => {
       commitTokenThreshold: updated.commitTokenThreshold,
       captureAssistantTurns: updated.captureAssistantTurns,
       privateExperienceLimit: updated.privateExperienceLimit,
+      localResourceRecallLimit: updated.localResourceRecallLimit,
       sharedExperienceLimit: updated.sharedExperienceLimit,
       takeover: updated.takeover
     })).rejects.toMatchObject({ code: "RESOURCE_CHANGED_EXTERNALLY" });
+  });
+
+  it("migrates the legacy shared limit while keeping local resources and enterprise Experiences independent", async () => {
+    const store = await createStore();
+    await writeFile(store.path, JSON.stringify({ sharedExperienceLimit: 3 }), "utf8");
+
+    const legacy = await store.read();
+    expect(legacy).toMatchObject({
+      localResourceRecallLimit: 3,
+      sharedExperienceLimit: 3
+    });
+
+    const updated = await store.update({
+      expectedRevision: legacy.revision,
+      enabled: legacy.enabled,
+      endpoint: legacy.endpoint,
+      enterpriseGatewayEndpoint: legacy.enterpriseGatewayEndpoint,
+      defaultPrivacyMode: legacy.defaultPrivacyMode,
+      recallTokenBudget: legacy.recallTokenBudget,
+      scoreThreshold: legacy.scoreThreshold,
+      commitTokenThreshold: legacy.commitTokenThreshold,
+      captureAssistantTurns: legacy.captureAssistantTurns,
+      privateExperienceLimit: legacy.privateExperienceLimit,
+      localResourceRecallLimit: 1,
+      sharedExperienceLimit: 2,
+      takeover: legacy.takeover
+    });
+    expect(updated).toMatchObject({
+      localResourceRecallLimit: 1,
+      sharedExperienceLimit: 2
+    });
   });
 });
 

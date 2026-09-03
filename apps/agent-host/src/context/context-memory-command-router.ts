@@ -9,7 +9,7 @@ import type {
   CommandResults,
   WorkspaceProtocolContext
 } from "@pi67/protocol";
-import type { SharedExperienceAccess } from "@pi67/pi-runtime";
+import type { SharedExperienceAccess, SharedSopAccess } from "@pi67/pi-runtime";
 import type { HostEventChannel } from "../host-event-channel.js";
 import { HostCommandError } from "../protocol-error.js";
 import type { WorkspaceContextRegistry } from "../workspace-context-registry.js";
@@ -40,6 +40,7 @@ import type {
   ContextMemoryAppCommandType,
   ContextMemoryWorkspaceCommandType
 } from "./context-memory-command-types.js";
+import { RecallObservationStore } from "./recall-observation-store.js";
 export * from "./context-memory-command-types.js";
 
 type ContextAppCommand = AgentCommand<ContextMemoryAppCommandType>;
@@ -69,6 +70,7 @@ export class ContextMemoryCommandRouter {
   private readonly enterprise: EnterpriseContextController;
   private readonly experience: ExperienceGovernanceController;
   private readonly sessionCommit: ContextSessionCommitController;
+  private readonly recall: RecallObservationStore;
 
   constructor(
     private readonly agentDir: string,
@@ -77,11 +79,13 @@ export class ContextMemoryCommandRouter {
     enterpriseCredentials?: EnterpriseCredentialBrokerClient
   ) {
     this.configuration = new ContextMemoryConfigurationStore(agentDir);
+    this.recall = new RecallObservationStore(agentDir);
     this.enterprise = new EnterpriseContextController(
       this.configuration,
       workspaces,
       events,
-      enterpriseCredentials
+      enterpriseCredentials,
+      this.recall
     );
     const experienceCandidates = new ExperienceCandidateStore(agentDir);
     this.experience = new ExperienceGovernanceController(experienceCandidates, this.enterprise, events);
@@ -105,6 +109,13 @@ export class ContextMemoryCommandRouter {
         workspaceId, query, limit, signal
       ),
       read: (id, signal) => this.enterprise.getSharedExperience(workspaceId, id, signal)
+    };
+  }
+
+  sharedSopAccess(workspaceId: string): SharedSopAccess {
+    return {
+      search: (query, signal) => this.enterprise.searchSharedSops(workspaceId, query, signal),
+      read: (id, signal) => this.enterprise.getSharedSop(workspaceId, id, signal)
     };
   }
 
@@ -157,7 +168,27 @@ export class ContextMemoryCommandRouter {
           client
         }));
       case "context.recall.list":
-        return { items: [], total: 0 };
+        return this.recall.list({
+          workspaceId: context.workspaceId,
+          actorPeerId: deriveWorkspacePeerId(workspace.cwd),
+          ...(command.payload.sessionId === undefined ? {} : { sessionId: command.payload.sessionId }),
+          limit: command.payload.limit ?? 20
+        });
+      case "context.recall.feedback": {
+        const recorded = await this.recall.recordFeedback({
+          id: command.payload.id,
+          feedback: command.payload.feedback,
+          workspaceId: context.workspaceId,
+          actorPeerId: deriveWorkspacePeerId(workspace.cwd),
+          ...(command.payload.sessionId === undefined ? {} : { sessionId: command.payload.sessionId })
+        });
+        return { id: recorded.id, feedback: recorded.feedback, recordedAt: recorded.recordedAt };
+      }
+      case "context.recall.metrics":
+        return this.recall.metrics({
+          workspaceId: context.workspaceId,
+          actorPeerId: deriveWorkspacePeerId(workspace.cwd)
+        });
       case "memory.search":
         return this.searchPrivateMemory(
           client,
@@ -209,6 +240,10 @@ export class ContextMemoryCommandRouter {
         );
       case "experience.shared.get":
         return this.enterprise.getSharedExperience(context.workspaceId, command.payload.id);
+      case "sop.shared.search":
+        return this.enterprise.searchSharedSops(context.workspaceId, command.payload.query);
+      case "sop.shared.get":
+        return this.enterprise.getSharedSop(context.workspaceId, command.payload.id);
       case "enterprise.workspace.get":
         return this.enterprise.getWorkspaceBinding(context.workspaceId);
       case "enterprise.workspace.bind":

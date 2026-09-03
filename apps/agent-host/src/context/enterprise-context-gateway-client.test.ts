@@ -72,6 +72,7 @@ describe("EnterpriseContextGatewayClient", () => {
         taskType: "electron-recovery",
         problem: "Old events remain visible",
         strategy: "Discard stale epochs",
+        method: method(),
         result: "success",
         confidence: 0.9,
         sensitivity: "team",
@@ -86,6 +87,11 @@ describe("EnterpriseContextGatewayClient", () => {
         externalRevision: "e".repeat(64),
         publishedAt: expiresAt
       });
+      if (url.endsWith("/shared-sops/search")) return response({
+        items: [sopSearchItem(expiresAt)],
+        total: 1
+      });
+      if (url.includes("/shared-sops/sop-1?")) return response(sopDetail(expiresAt));
       throw new Error(`Unexpected request: ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -120,6 +126,7 @@ describe("EnterpriseContextGatewayClient", () => {
       title: "Host recovery",
       problem: "Old events remain visible",
       strategy: "Discard stale epochs",
+      method: method(),
       result: "success",
       confidence: 0.9,
       sensitivity: "team",
@@ -148,18 +155,60 @@ describe("EnterpriseContextGatewayClient", () => {
       .resolves.toEqual(expect.objectContaining({
         id: "shared-1",
         strategy: "Discard stale epochs",
+        method: method(),
+        evidence: [expect.objectContaining({ reference: `sha256:${"d".repeat(64)}` })]
+      }));
+    await expect(authenticated.searchSharedSops("f".repeat(64), "host recovery"))
+      .resolves.toEqual([expect.objectContaining({
+        id: "sop-1",
+        stableKey: "host-epoch-recovery",
+        semanticVersion: 2,
+        expiresAt: Date.parse("2026-12-01T00:00:00Z")
+      })]);
+    await expect(authenticated.getSharedSop("f".repeat(64), "sop-1"))
+      .resolves.toEqual(expect.objectContaining({
+        id: "sop-1",
+        stableKey: "host-epoch-recovery",
+        method: method(),
         evidence: [expect.objectContaining({ reference: `sha256:${"d".repeat(64)}` })]
       }));
 
     for (const [input, init] of fetchMock.mock.calls) {
       const url = requestUrl(input);
       const authorizationHeader = new Headers(init?.headers).get("Authorization");
-      if (url.endsWith("/projects") || url.includes("/bindings") || url.includes("workspace-bindings") || url.endsWith("/candidates") || url.includes("shared-experiences")) {
+      if (url.endsWith("/projects") || url.includes("/bindings") || url.includes("workspace-bindings") || url.endsWith("/candidates") || url.includes("shared-experiences") || url.includes("shared-sops")) {
         expect(authorizationHeader).toBe("Bearer agent-access-token");
       } else {
         expect(authorizationHeader).toBeNull();
       }
     }
+  });
+
+  it("keeps a legacy shared Experience readable when the Gateway has no structured method", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => response({
+      id: "shared-legacy",
+      projectId: "project-1",
+      title: "Legacy recovery",
+      taskType: "electron-recovery",
+      problem: "Old events remain visible",
+      strategy: "Discard stale epochs",
+      result: "success",
+      confidence: 0.8,
+      sensitivity: "team",
+      applicableWhen: ["Host epoch changes"],
+      notApplicableWhen: ["Ordinary render"],
+      evidence: [],
+      externalRevision: "e".repeat(64),
+      publishedAt: "2026-09-01T10:00:00Z"
+    })));
+
+    await expect(new EnterpriseContextGatewayClient(
+      "https://datahub.example.test",
+      "agent-access-token"
+    ).getSharedExperience("f".repeat(64), "shared-legacy")).resolves.toEqual(expect.objectContaining({
+      id: "shared-legacy",
+      strategy: "Discard stale epochs"
+    }));
   });
 
   it("rejects insecure verification links and malformed Gateway data", async () => {
@@ -196,6 +245,54 @@ function binding(boundAt: string) {
     enterpriseProjectName: "Desktop",
     accountId: "account-1",
     boundAt
+  };
+}
+
+function method() {
+  return {
+    preconditions: ["The Host epoch changed"],
+    steps: ["Discard stale events"],
+    tools: ["packaged smoke"],
+    validationGates: ["No stale Projection remains"],
+    completionCriteria: ["The active Session resumes"],
+    failureModes: ["An old approval remains visible"],
+    rollback: "Restore the previous Host build."
+  };
+}
+
+function sopSearchItem(publishedAt: string) {
+  return {
+    id: "sop-1",
+    projectId: "project-1",
+    stableKey: "host-epoch-recovery",
+    semanticVersion: 2,
+    title: "Host recovery SOP",
+    taskType: "electron-recovery",
+    summary: "Apply the governed recovery workflow.",
+    score: 0.95,
+    applicableWhen: ["Host epoch changes"],
+    notApplicableWhen: ["Ordinary render"],
+    expiresAt: "2026-12-01T00:00:00Z",
+    externalRevision: "e".repeat(64),
+    publishedAt
+  };
+}
+
+function sopDetail(publishedAt: string) {
+  return {
+    ...sopSearchItem(publishedAt),
+    ownerUserIdHash: "f".repeat(64),
+    problem: "Old events remain visible",
+    strategy: "Discard stale epochs",
+    method: method(),
+    confidence: 0.94,
+    sensitivity: "team",
+    evidence: [{
+      kind: "test",
+      label: "42 tests passed",
+      hash: "d".repeat(64),
+      verifiedAt: publishedAt
+    }]
   };
 }
 

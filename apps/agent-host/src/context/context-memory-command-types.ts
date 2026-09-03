@@ -39,6 +39,8 @@ export function isContextMemoryWorkspaceCommand(
   return type === "context.session.get"
     || type === "context.session.commit"
     || type === "context.recall.list"
+    || type === "context.recall.feedback"
+    || type === "context.recall.metrics"
     || type === "memory.search"
     || type === "memory.get"
     || type === "memory.forget.preview"
@@ -50,6 +52,8 @@ export function isContextMemoryWorkspaceCommand(
     || type === "experience.candidate.reject"
     || type === "experience.shared.search"
     || type === "experience.shared.get"
+    || type === "sop.shared.search"
+    || type === "sop.shared.get"
     || type === "enterprise.workspace.get"
     || type === "enterprise.workspace.bind"
     || type === "enterprise.workspace.unbind";

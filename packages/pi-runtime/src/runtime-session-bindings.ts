@@ -48,6 +48,7 @@ import {
   createSharedExperienceTools,
   type SharedExperienceAccess
 } from "./shared-experience-tools.js";
+import { createSharedSopTools, type SharedSopAccess } from "./shared-sop-tools.js";
 
 const DESKTOP_EXCLUDED_SDK_TOOLS = ["powershell"];
 
@@ -68,6 +69,7 @@ interface RuntimeSessionBindingsOptions {
   setSessionCwd: (cwd: string) => void;
   subagents: NativeSubagentCoordinator;
   sharedExperienceAccess: SharedExperienceAccess | undefined;
+  sharedSopAccess: SharedSopAccess | undefined;
 }
 
 /** Owns the mutable Pi SDK session runtime and all bindings tied to its current session. */
@@ -131,6 +133,7 @@ export class RuntimeSessionBindings {
       const customTools = [
         ...createFirstPartyWebTools(),
         ...createSharedExperienceTools(this.options.sharedExperienceAccess),
+        ...createSharedSopTools(this.options.sharedSopAccess),
         ...this.planMode.createTools(),
         ...createNativeSubagentTools(this.options.subagents),
         ...toolAliases.tools
@@ -224,6 +227,7 @@ export class RuntimeSessionBindings {
       const customTools = [
         ...createFirstPartyWebTools(),
         ...createSharedExperienceTools(this.options.sharedExperienceAccess),
+        ...createSharedSopTools(this.options.sharedSopAccess),
         ...this.planMode.createTools(),
         ...createNativeSubagentTools(this.options.subagents),
         ...toolAliases.tools
@@ -312,6 +316,7 @@ export class RuntimeSessionBindings {
     const customTools = [
       ...createFirstPartyWebTools(),
       ...createSharedExperienceTools(this.options.sharedExperienceAccess),
+      ...createSharedSopTools(this.options.sharedSopAccess),
       ...createNativeSubagentTools(this.options.subagents, {
         parentChildId: input.lineage.childId,
         depth: input.lineage.depth

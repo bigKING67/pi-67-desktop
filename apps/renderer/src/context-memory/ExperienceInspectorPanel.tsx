@@ -1,13 +1,16 @@
 import type {
   EnterpriseIdentityStatus,
   EnterpriseWorkspaceBinding,
-  ExperienceCandidateSummary,
-  ExperienceResult
+  ExperienceCandidateSummary
 } from "@pi67/domain";
-import type { ExperienceCandidateReview } from "@pi67/protocol";
+import {
+  assessSopReadiness,
+  experienceMethodComplete,
+  type SopReadinessReason
+} from "@pi67/domain";
 import { Check, RefreshCw, Send, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Button, Checkbox, Input, Label, TextArea, TextField } from "react-aria-components";
+import { Button } from "react-aria-components";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
@@ -18,21 +21,14 @@ import {
   reviewExperienceCandidate,
   submitExperienceCandidate
 } from "./context-memory-controller.js";
+import {
+  ExperienceCandidateReviewForm,
+  buildExperienceCandidateReview,
+  createReviewDraft,
+  experienceCandidateNeedsReview,
+  type CandidateReviewDraft
+} from "./ExperienceCandidateReviewForm.js";
 import styles from "./MemoryInspectorPanel.module.css";
-
-export interface CandidateReviewDraft {
-  taskType: string;
-  title: string;
-  problem: string;
-  strategy: string;
-  result: "" | ExperienceResult;
-  confidence: string;
-  sensitivity: "project" | "team" | "company";
-  applicableWhen: string;
-  notApplicableWhen: string;
-  confirmOutcome: boolean;
-  confirmRedaction: boolean;
-}
 
 export function ExperienceInspectorPanel() {
   const workspaceId = useWorkbenchStore((state) => state.currentWorkspaceId);
@@ -83,27 +79,31 @@ export function ExperienceInspectorPanel() {
 
   const enterpriseReady = identity.state === "signed-in" && binding?.state === "bound";
   const pendingCount = items.filter((item) => item.status === "candidate").length;
-  const validatedCount = items.filter((item) => item.status === "validated").length;
+  const validatedCount = items.filter((item) => (
+    item.status === "validated" || item.status === "submitted" || item.status === "shared"
+  )).length;
+  const caseCount = items.reduce((total, item) => total + item.sourceCases.length, 0);
+  const sopReadyCount = items.filter((item) => assessSopReadiness(item).state === "candidate-ready").length;
 
   return <div className={styles.panel} data-testid="experience-inspector">
     <section className={styles.hero}>
       <span className="section-label">Experience Governance</span>
-      <strong>{identity.state === "signed-in" ? "企业经验已连接" : "本地私人经验"}</strong>
+      <strong>{identity.state === "signed-in" ? "Case 与企业经验已连接" : "本地 Case 与私人经验"}</strong>
       <p>{identity.state === "signed-in"
-        ? `项目${binding?.state === "bound" ? "已绑定" : "未绑定"}；候选仍需脱敏、验证和企业审核后才能共享。`
-        : "无需登录即可保留私人经验；登录不会自动公开已有记忆。"}</p>
+        ? `项目${binding?.state === "bound" ? "已绑定" : "未绑定"}；一次成功只形成任务 Case，经过验证才成为经验，多个独立 Case 才可能晋升 SOP。`
+        : "无需登录即可保留私人经验；一次任务不会自动成为 SOP，登录也不会公开已有记忆。"}</p>
     </section>
 
     <dl className="metric-list">
-      <div><dt>私人经验</dt><dd>{items.filter((item) => item.status === "private").length}</dd></div>
-      <div><dt>待人工审核</dt><dd>{pendingCount}</dd></div>
-      <div><dt>可提交候选</dt><dd>{validatedCount}</dd></div>
-      <div><dt>项目绑定</dt><dd>{binding?.state === "bound" ? "已绑定" : "未绑定"}</dd></div>
+      <div><dt>任务 Case</dt><dd>{caseCount}</dd></div>
+      <div><dt>经验候选</dt><dd>{pendingCount}</dd></div>
+      <div><dt>已验证经验</dt><dd>{validatedCount}</dd></div>
+      <div><dt>SOP 候选</dt><dd>{sopReadyCount}</dd></div>
     </dl>
 
     <section className={styles.section}>
       <header>
-        <span className="section-label">经验候选</span>
+        <span className="section-label">Case 与经验候选</span>
         <div className={styles.sectionActions}>
           <strong>{items.length} 项</strong>
           <Button aria-label="刷新经验候选" className={styles.iconButton!} isDisabled={loading} onPress={() => void refresh()}>
@@ -113,7 +113,7 @@ export function ExperienceInspectorPanel() {
       </header>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {loading && items.length === 0 ? <p className="context-empty">正在核对 OpenViking Commit 与本地候选…</p> : null}
-      {!loading && items.length === 0 ? <p className="context-empty">尚无经验候选。只有完整学习模式下、带精确 Commit 证据并通过本地脱敏的任务才会进入这里。</p>
+      {!loading && items.length === 0 ? <p className="context-empty">尚无任务 Case 或经验候选。完整学习模式下，带精确 Commit 证据的任务会先成为 Case；人工核对后才成为可提交经验。</p>
         : <div className={styles.list}>{items.map((item) => <ExperienceCandidateCard
             enterpriseReady={enterpriseReady}
             item={item}
@@ -124,8 +124,8 @@ export function ExperienceInspectorPanel() {
     </section>
 
     <section className={styles.boundary}>
-      <strong>共享边界</strong>
-      <p>私人 Session 与 Memory 不跨用户读取。这里提交的是新建的脱敏候选；“已提交”仍不等于“已共享”，企业发布资产保留独立撤回和审计记录。</p>
+      <strong>晋升与共享边界</strong>
+      <p>私人 Session 与 Memory 不跨用户读取。Case 经审核成为经验；经验提交后仍不等于共享，更不等于 SOP。SOP 至少需要 3 个成功 Case、2 个 Workspace 和独立的版本治理。</p>
     </section>
   </div>;
 }
@@ -203,7 +203,10 @@ function ExperienceCandidateCard({
     && item.status === "validated"
     && item.result === "success"
     && item.redactionStatus === "passed"
-    && item.sensitivity !== "private";
+    && item.sensitivity !== "private"
+    && experienceMethodComplete(item.method);
+  const needsReview = experienceCandidateNeedsReview(item);
+  const sopReadiness = assessSopReadiness(item);
 
   return <article className={`${styles.row} ${styles.experienceRow}`} data-status={item.status}>
     <div className={styles.candidateHeading}>
@@ -215,13 +218,22 @@ function ExperienceCandidateCard({
     <div className={styles.candidateMeta}>
       <span>结果：{resultLabel(item.result)}</span>
       <span>范围：{sensitivityLabel(item.sensitivity)}</span>
+      <span>Case：{item.sourceCases.length}</span>
       <span>证据：{item.evidence.length}</span>
       <span>脱敏：{redactionLabel(item.redactionStatus)}</span>
     </div>
+    <div className={styles.sopReadiness} data-ready={sopReadiness.state === "candidate-ready"}>
+      <strong>{sopReadiness.state === "candidate-ready" ? "具备 SOP 候选条件" : "尚不是 SOP"}</strong>
+      <small>{sopReadiness.state === "candidate-ready"
+        ? `已汇总 ${sopReadiness.caseCount} 个 Case；仍需企业 Owner、版本和发布审核。`
+        : sopReadinessText(sopReadiness.reasons)}</small>
+    </div>
 
-    {item.status === "candidate" ? <div className={styles.candidateActions}>
+    {needsReview ? <div className={styles.candidateActions}>
       <Button className="secondary-button" isDisabled={busy !== undefined} onPress={() => setReviewOpen((value) => !value)}>
-        <ShieldCheck aria-hidden="true" size={13} />{reviewOpen ? "收起审核" : "审核候选"}
+        <ShieldCheck aria-hidden="true" size={13} />{reviewOpen
+          ? "收起审核"
+          : item.status === "validated" ? "补全经验方法" : "审核候选"}
       </Button>
       <Button className="secondary-button" isDisabled={busy !== undefined} onPress={() => void keepPrivate()}>
         {busy === "reject" ? "处理中…" : "仅保留私人"}
@@ -232,7 +244,13 @@ function ExperienceCandidateCard({
       <Button className="primary-button" isDisabled={!canSubmit || busy !== undefined} onPress={() => void submit()}>
         <Send aria-hidden="true" size={13} />{busy === "submit" ? "正在提交…" : "提交企业审核"}
       </Button>
-      {!enterpriseReady ? <small>请先登录企业账户并绑定当前项目。</small> : item.result !== "success" ? <small>只有已确认成功的经验可以提交。</small> : null}
+      {!enterpriseReady
+        ? <small>请先登录企业账户并绑定当前项目。</small>
+        : item.result !== "success"
+          ? <small>只有已确认成功的经验可以提交。</small>
+          : !experienceMethodComplete(item.method)
+            ? <small>请先补全前置条件、步骤、验证门禁、完成标准、失败模式和回滚方式。</small>
+            : null}
     </div> : null}
 
     {item.status === "submitted" ? <div className={styles.submittedNotice}>
@@ -242,7 +260,7 @@ function ExperienceCandidateCard({
     {item.status === "rejected" ? <div className={styles.privateNotice}>已从企业候选流程移除，私人 Experience 不受影响。</div> : null}
     {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
     {error ? <p className={styles.error} role="alert">{error}</p> : null}
-    {reviewOpen ? <CandidateReviewForm
+    {reviewOpen ? <ExperienceCandidateReviewForm
       busy={busy !== undefined}
       draft={draft}
       onCancel={() => setReviewOpen(false)}
@@ -250,142 +268,6 @@ function ExperienceCandidateCard({
       onSubmit={() => void saveReview()}
     /> : null}
   </article>;
-}
-
-function CandidateReviewForm({ busy, draft, onCancel, onChange, onSubmit }: {
-  busy: boolean;
-  draft: CandidateReviewDraft;
-  onCancel: () => void;
-  onChange: (draft: CandidateReviewDraft) => void;
-  onSubmit: () => void;
-}) {
-  const update = <Key extends keyof CandidateReviewDraft>(key: Key, value: CandidateReviewDraft[Key]): void => {
-    onChange({ ...draft, [key]: value });
-  };
-  return <section aria-label="经验候选人工审核" className={styles.reviewForm}>
-    <header>
-      <div><span className="section-label">Human Review</span><strong>确认结果、边界与脱敏</strong></div>
-      <small>本机审核记录不会自动发布。</small>
-    </header>
-    <div className={styles.reviewGrid}>
-      <ReviewTextField label="任务类型" value={draft.taskType} onChange={(value) => update("taskType", value)} />
-      <ReviewTextField label="候选标题" value={draft.title} onChange={(value) => update("title", value)} />
-      <label className={styles.field}>
-        <span>任务结果</span>
-        <select disabled={busy} value={draft.result} onChange={(event) => update("result", event.currentTarget.value as CandidateReviewDraft["result"])}>
-          <option value="">请选择并确认</option>
-          <option value="success">成功</option>
-          <option value="partial">部分完成</option>
-          <option value="failed">失败</option>
-          <option value="rolled-back">已回滚</option>
-        </select>
-      </label>
-      <label className={styles.field}>
-        <span>共享敏感级别</span>
-        <select disabled={busy} value={draft.sensitivity} onChange={(event) => update("sensitivity", event.currentTarget.value as CandidateReviewDraft["sensitivity"])}>
-          <option value="project">仅当前企业项目</option>
-          <option value="team">团队</option>
-          <option value="company">企业</option>
-        </select>
-      </label>
-      <ReviewTextField label="置信度（0–1）" type="number" value={draft.confidence} onChange={(value) => update("confidence", value)} />
-    </div>
-    <ReviewTextArea label="问题与任务背景" value={draft.problem} onChange={(value) => update("problem", value)} />
-    <ReviewTextArea label="经过验证的策略" value={draft.strategy} onChange={(value) => update("strategy", value)} />
-    <ReviewTextArea description="每行一个条件。" label="适用条件" value={draft.applicableWhen} onChange={(value) => update("applicableWhen", value)} />
-    <ReviewTextArea description="至少填写一个明确边界。" label="不适用条件" value={draft.notApplicableWhen} onChange={(value) => update("notApplicableWhen", value)} />
-    <div className={styles.confirmations}>
-      <Checkbox className={styles.checkbox!} isDisabled={busy} isSelected={draft.confirmOutcome} onChange={(value) => update("confirmOutcome", value)}>
-        <span aria-hidden="true" className={styles.checkboxIndicator}><Check size={11} /></span>
-        <span><strong>我已核对任务结果</strong><small>成功、部分完成、失败或回滚与真实证据一致。</small></span>
-      </Checkbox>
-      <Checkbox className={styles.checkbox!} isDisabled={busy} isSelected={draft.confirmRedaction} onChange={(value) => update("confirmRedaction", value)}>
-        <span aria-hidden="true" className={styles.checkboxIndicator}><Check size={11} /></span>
-        <span><strong>我已核对脱敏结果</strong><small>不包含凭据、客户隐私、个人信息、本机路径或内部账号。</small></span>
-      </Checkbox>
-    </div>
-    <footer className={styles.reviewActions}>
-      <Button className="secondary-button" isDisabled={busy} onPress={onCancel}>取消</Button>
-      <Button className="primary-button" isDisabled={busy} onPress={onSubmit}>{busy ? "正在保存…" : "保存人工审核"}</Button>
-    </footer>
-  </section>;
-}
-
-function ReviewTextField({ label, onChange, type = "text", value }: {
-  label: string;
-  onChange: (value: string) => void;
-  type?: "text" | "number";
-  value: string;
-}) {
-  return <TextField className={styles.field!} isRequired value={value} onChange={onChange}>
-    <Label>{label}</Label>
-    <Input min={type === "number" ? 0 : undefined} max={type === "number" ? 1 : undefined} step={type === "number" ? 0.05 : undefined} type={type} />
-  </TextField>;
-}
-
-function ReviewTextArea({ description, label, onChange, value }: {
-  description?: string;
-  label: string;
-  onChange: (value: string) => void;
-  value: string;
-}) {
-  return <TextField className={styles.field!} isRequired value={value} onChange={onChange}>
-    <Label>{label}</Label>
-    {description ? <small>{description}</small> : null}
-    <TextArea />
-  </TextField>;
-}
-
-export function createReviewDraft(item: ExperienceCandidateSummary): CandidateReviewDraft {
-  return {
-    taskType: item.taskType,
-    title: item.title,
-    problem: item.problem,
-    strategy: item.strategy,
-    result: "",
-    confidence: item.confidence.toFixed(2),
-    sensitivity: item.sensitivity === "private" ? "project" : item.sensitivity,
-    applicableWhen: item.applicableWhen.join("\n"),
-    notApplicableWhen: item.notApplicableWhen.join("\n"),
-    confirmOutcome: false,
-    confirmRedaction: false
-  };
-}
-
-export function buildExperienceCandidateReview(
-  item: ExperienceCandidateSummary,
-  draft: CandidateReviewDraft
-): ExperienceCandidateReview | string {
-  const confidence = Number(draft.confidence);
-  const applicableWhen = lines(draft.applicableWhen);
-  const notApplicableWhen = lines(draft.notApplicableWhen);
-  if (!draft.taskType.trim() || !draft.title.trim() || !draft.problem.trim() || !draft.strategy.trim()) {
-    return "请完整填写任务类型、标题、问题和策略。";
-  }
-  if (!draft.result) return "请选择并确认真实任务结果。";
-  if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) return "置信度必须在 0 到 1 之间。";
-  if (applicableWhen.length === 0 || notApplicableWhen.length === 0) return "适用条件和不适用条件都至少需要一项。";
-  if (!draft.confirmOutcome || !draft.confirmRedaction) return "请完成结果确认和脱敏确认。";
-  return {
-    id: item.id,
-    expectedUpdatedAt: item.updatedAt,
-    taskType: draft.taskType.trim(),
-    title: draft.title.trim(),
-    problem: draft.problem.trim(),
-    strategy: draft.strategy.trim(),
-    result: draft.result,
-    confidence,
-    sensitivity: draft.sensitivity,
-    applicableWhen,
-    notApplicableWhen,
-    evidence: [],
-    confirmOutcome: true,
-    confirmRedaction: true
-  };
-}
-
-function lines(value: string): string[] {
-  return [...new Set(value.split(/\r?\n/u).map((item) => item.trim()).filter(Boolean))];
 }
 
 function upsertCandidate(items: ExperienceCandidateSummary[], candidate: ExperienceCandidateSummary): ExperienceCandidateSummary[] {
@@ -424,4 +306,20 @@ function redactionLabel(value: ExperienceCandidateSummary["redactionStatus"]): s
   if (value === "passed") return "已核对";
   if (value === "failed") return "失败";
   return "待核对";
+}
+
+function sopReadinessText(reasons: SopReadinessReason[]): string {
+  const labels = reasons.map((reason) => {
+    if (reason === "experience-not-validated") return "经验尚未验证";
+    if (reason === "insufficient-independent-cases") return "不足 3 个独立 Case";
+    if (reason === "insufficient-independent-workspaces") return "不足 2 个 Workspace";
+    if (reason === "case-outcome-not-successful") return "仍有未成功 Case";
+    if (reason === "missing-preconditions") return "缺前置条件";
+    if (reason === "missing-steps") return "缺关键步骤";
+    if (reason === "missing-validation-gates") return "缺验证门禁";
+    if (reason === "missing-completion-criteria") return "缺完成标准";
+    if (reason === "missing-failure-modes") return "缺失败模式";
+    return "缺回滚说明";
+  });
+  return [...new Set(labels)].slice(0, 3).join(" · ");
 }

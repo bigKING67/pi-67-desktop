@@ -57,6 +57,7 @@ export class ContextMemoryConfigurationStore {
       captureToolResults: false,
       recallPeerScope: "actor",
       experienceRecallLimit: input.privateExperienceLimit,
+      localResourceRecallLimit: input.localResourceRecallLimit,
       sharedExperienceLimit: input.sharedExperienceLimit,
       recallTimeoutMs: current.recallTimeoutMs,
       healthTimeoutMs: current.healthTimeoutMs,
@@ -74,6 +75,7 @@ export class ContextMemoryConfigurationStore {
       captureToolResults: false,
       recallPeerScope: "actor",
       experienceRecallLimit: next.privateExperienceLimit,
+      localResourceRecallLimit: next.localResourceRecallLimit,
       sharedExperienceLimit: next.sharedExperienceLimit,
       recallTimeoutMs: next.recallTimeoutMs,
       healthTimeoutMs: next.healthTimeoutMs,
@@ -111,6 +113,12 @@ function normalizeConfiguration(value: unknown): Omit<ContextMemoryConfiguration
     captureToolResults: false,
     actorScopeOnly: true,
     privateExperienceLimit: integerValue(input.experienceRecallLimit, 0, 5, DEFAULT_CONTEXT_MEMORY_CONFIGURATION.privateExperienceLimit),
+    localResourceRecallLimit: integerValue(
+      input.localResourceRecallLimit ?? input.sharedExperienceLimit,
+      0,
+      5,
+      DEFAULT_CONTEXT_MEMORY_CONFIGURATION.localResourceRecallLimit
+    ),
     sharedExperienceLimit: integerValue(input.sharedExperienceLimit, 0, 5, DEFAULT_CONTEXT_MEMORY_CONFIGURATION.sharedExperienceLimit),
     recallTimeoutMs: integerValue(input.recallTimeoutMs, 100, 10_000, DEFAULT_CONTEXT_MEMORY_CONFIGURATION.recallTimeoutMs),
     healthTimeoutMs: integerValue(input.healthTimeoutMs, 100, 10_000, DEFAULT_CONTEXT_MEMORY_CONFIGURATION.healthTimeoutMs),

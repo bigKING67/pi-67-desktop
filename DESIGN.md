@@ -1055,14 +1055,43 @@ loading error where the operation can produce those states
   Pi ResourceLoader. OpenViking is the only supported third-party Context/Memory
   owner. Legacy observational-memory and Hy-Memory names are detection/migration
   identifiers only; their runtimes are never bundled or presented as alternatives.
-- The `Experience` Inspector presents private records and enterprise candidates in
-  one dense governance list. A candidate expands an inline review surface rather
-  than a modal: task result starts unselected, applicable and excluded conditions
-  are both required, and outcome plus redaction use independent explicit
-  confirmations. `保存人工审核` and `提交企业审核` remain two separate actions.
+- The `Experience` Inspector presents private records, exact task Cases, and
+  enterprise candidates in one dense governance list. Its hero and metrics teach
+  the progression `Case -> Experience -> SOP candidate` without presenting a new
+  navigation tier. Every card shows its Case count and one compact SOP-readiness
+  explanation; a single successful Case is explicitly `尚不是 SOP`. A candidate
+  expands an inline review surface rather than a modal: task result starts
+  unselected; applicable and excluded conditions are both required; the reusable
+  method requires preconditions, ordered steps, validation gates, completion
+  criteria, failure modes, and rollback or non-applicability copy; Tool requirements
+  remain optional. Outcome plus redaction use independent explicit confirmations.
+  `保存人工审核` and `提交企业审核` remain two separate actions.
   `已提交` is visibly labeled as awaiting review and must never look equivalent to
   `已共享`; asynchronous Gateway failure stays visible beside the list and never
   resolves as success from the accepted operation alone.
+- The `Memory` Inspector keeps recall quality next to the recalled items instead of
+  creating a separate analytics page. One compact metric block shows bounded sample
+  count, p50, p95, fast-path rate, and expansion rate; p95 crosses into warning
+  styling only when it exceeds the stated 1,500 ms target. Every recalled row keeps
+  its score and route reason, followed by five small React Aria actions: `有用`,
+  `无关`, `过期`, `错范围`, and `错误`. The settled choice remains visible, pending
+  actions disable only that row, and an error stays in the panel rather than
+  pretending the feedback succeeded. The interface explicitly states that metrics
+  retain hashes and bounded metadata, never query or Memory bodies. No extra modal,
+  toast loop, or blocking prompt is introduced.
+- DataHub presents `候选`, `经验库`, and `SOP 库` as different governance stages.
+  A formal SOP row shows its stable key, version, active/deprecated/revoked or
+  expired retrieval state, optional expiry, immutable locator, and explicit revoke
+  action. Only a deprecated, unexpired version exposes `恢复此版本`; restoring it
+  atomically deprecates the currently active version. Publishing an approved SOP
+  candidate uses the dedicated `发布 SOP` action and cannot fall through the
+  ordinary Experience publication path.
+- Pi exposes separate `viking_sop_search` and `viking_sop_read` Tools after an
+  enterprise Workspace is bound. Search returns at most one active, unexpired SOP.
+  Both Tool Results use the existing untrusted Context envelope, escape injected
+  markup, and state that an approved SOP still cannot authorize or auto-execute a
+  Tool. The normal first-party Tool identity, schema, safety mode, and approval
+  pipeline remains authoritative.
 - Installing another Pi Package starts from one page-level action and opens a focused
   confirmation dialog that identifies npm, Git, or local-directory sources, the
   target scope, and the fact that a Package may load executable Extension code.

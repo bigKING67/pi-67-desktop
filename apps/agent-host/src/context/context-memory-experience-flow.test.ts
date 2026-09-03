@@ -66,6 +66,15 @@ describe("Context Memory enterprise Experience flow", () => {
         result: "success",
         confidence: 0.9,
         sensitivity: "team",
+        method: {
+          preconditions: ["The Agent Host epoch changes"],
+          steps: ["Discard stale epoch events", "Run recovery tests"],
+          tools: ["packaged smoke"],
+          validationGates: ["No stale Projection remains"],
+          completionCriteria: ["The active Session resumes"],
+          failureModes: ["An old approval remains visible"],
+          rollback: "Restore the previous Host build."
+        },
         applicableWhen: ["The Agent Host epoch changes"],
         notApplicableWhen: ["A normal renderer rerender occurs"],
         evidence: [{
@@ -108,7 +117,17 @@ describe("Context Memory enterprise Experience flow", () => {
       workspaceFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u),
       sourceSessionIdHash: expect.stringMatching(/^[a-f0-9]{64}$/u),
       result: "success",
-      redactionStatus: "passed"
+      redactionStatus: "passed",
+      strategy: "Discard stale epoch events and run recovery tests",
+      method: {
+        preconditions: ["The Agent Host epoch changes"],
+        steps: ["Discard stale epoch events", "Run recovery tests"],
+        tools: ["packaged smoke"],
+        validationGates: ["No stale Projection remains"],
+        completionCriteria: ["The active Session resumes"],
+        failureModes: ["An old approval remains visible"],
+        rollback: "Restore the previous Host build."
+      }
     });
     expect(JSON.stringify(candidateBody)).not.toContain("session/one");
     expect(JSON.stringify(candidateBody)).not.toContain(fixture.sessionPath);

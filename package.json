@@ -18,6 +18,7 @@
     "typecheck": "corepack pnpm exec tsc -p tsconfig.tests.json --noEmit && corepack pnpm -r --if-present run typecheck",
     "lint": "oxlint --type-aware --type-check --deny-warnings apps packages tests eng",
     "test": "vitest run",
+    "eval:openviking-recall": "vitest run eng/evals/openviking-recall-golden.test.mjs",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "corepack pnpm run build && playwright test",
     "performance:prepare": "corepack pnpm run build && corepack pnpm run prepare:toolchain && corepack pnpm run prepare:capabilities && node eng/performance/prepare-packaged-app.mjs",

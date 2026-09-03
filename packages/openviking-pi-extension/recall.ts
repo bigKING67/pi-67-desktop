@@ -1,5 +1,6 @@
 import type { OVClient } from "./client.js";
 import type { OVConfig } from "./config.js";
+import { hashDiagnosticValue } from "./diagnostics.js";
 import { buildRecallBlock } from "./shared/recall-core.mjs";
 
 export type StartupRecallState = "idle" | "pending" | "running" | "ready" | "empty";
@@ -51,6 +52,11 @@ export class RecallManager {
   hasPendingSearch(): boolean {
     this.alignSession();
     return Boolean(this.pendingPrompt);
+  }
+
+  pendingQueryHash(): string | undefined {
+    this.alignSession();
+    return this.pendingPrompt ? hashDiagnosticValue(this.pendingPrompt) : undefined;
   }
 
   async searchPending(): Promise<RecallSearchResult> {
