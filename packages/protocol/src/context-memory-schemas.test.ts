@@ -63,9 +63,8 @@ describe("Context Memory Experience schemas", () => {
       sampleCount: 12,
       p50Ms: 320,
       p95Ms: 1_100,
-      fastPathRate: 0.5,
-      expansionRate: 0.25,
-      cacheHitRate: 0.25,
+      automaticRecallRate: 0.5,
+      toolSearchRate: 0.25,
       emptyRate: 0,
       targetP95Ms: 1_500,
       withinTarget: true

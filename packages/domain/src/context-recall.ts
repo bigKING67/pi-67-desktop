@@ -13,7 +13,9 @@ export const RECALL_FEEDBACK_KINDS = [
 export type RecallFeedbackKind = (typeof RECALL_FEEDBACK_KINDS)[number];
 
 export type RecallRoute =
+  | "prompt-context"
   | "startup-context"
+  | "official-find"
   | "scoped-find"
   | "find-fast"
   | "session-context"
@@ -44,9 +46,8 @@ export interface ContextRecallMetrics {
   sampleCount: number;
   p50Ms: number;
   p95Ms: number;
-  fastPathRate: number;
-  expansionRate: number;
-  cacheHitRate: number;
+  automaticRecallRate: number;
+  toolSearchRate: number;
   emptyRate: number;
   targetP95Ms: number;
   withinTarget: boolean;
@@ -74,9 +75,15 @@ export function summarizeRecallMetrics(
     sampleCount,
     p50Ms,
     p95Ms,
-    fastPathRate: ratio(bounded.filter((sample) => sample.route === "find-fast").length),
-    expansionRate: ratio(bounded.filter((sample) => sample.route === "session-context").length),
-    cacheHitRate: ratio(bounded.filter((sample) => sample.route === "cache").length),
+    automaticRecallRate: ratio(bounded.filter((sample) =>
+      sample.route === "prompt-context" || sample.route === "startup-context").length),
+    toolSearchRate: ratio(bounded.filter((sample) => [
+      "official-find",
+      "scoped-find",
+      "find-fast",
+      "session-context",
+      "find-fallback"
+    ].includes(sample.route)).length),
     emptyRate: ratio(bounded.filter((sample) => sample.selectedCount === 0).length),
     targetP95Ms,
     withinTarget: sampleCount === 0 || p95Ms <= targetP95Ms

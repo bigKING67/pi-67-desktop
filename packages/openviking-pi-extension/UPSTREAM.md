@@ -3,18 +3,20 @@
 - Project: `volcengine/OpenViking`
 - Source: `examples/pi-coding-agent-extension`
 - Tag: `v0.4.16`
+- Commit: `499995f3ed2e7f551a715179c4053772c51ff819`
 - Upstream repository license: AGPL-3.0
 - Example/integration exception: the upstream project documents example and Pi
   integration code as Apache-2.0; retain upstream notices when redistributing.
 - Imported: 2026-08-31
 
 The imported lifecycle, client, recall, capture, pending queue, and takeover
-files remain close to the tagged upstream example. Pi-67 Desktop-specific changes are
-limited to private-by-default configuration, actor/workspace recall scope,
-bounded experience quotas, stable one-shot startup Recall, session-aware
-model-selected cheap-first search and tiered read Tools, local feedback,
-privacy-safe bounded recall diagnostics, untrusted injection and Tool results,
-memory-owner conflict detection, and privacy-mode write gating.
+files remain close to the tagged upstream example. Recall follows the upstream
+current-prompt lifecycle and server-assembled context algorithm. Pi-67
+Desktop-specific changes are limited to private-by-default configuration,
+actor/workspace recall scope, bounded experience quotas, tiered read bounds,
+local feedback, privacy-safe bounded recall diagnostics, untrusted injection
+and Tool results, memory-owner conflict detection, and privacy-mode write
+gating.
 
 The repository structure gate therefore has narrow, file-specific line limits
 for the three largest preserved upstream implementation files. The package is
@@ -23,21 +25,28 @@ limits still fails the gate and requires review.
 
 OpenViking Server is not copied into or linked with this repository.
 
-The first meaningful prompt in each OpenViking Session produces one stable
-startup Recall snapshot. Later Turns never run adapter-owned task-shift
-classification or mutate historical recall anchors. Pi instead receives a fixed
-Tool policy: call `viking_search` once when a materially different task,
-earlier-work reference, or missing history requires retrieval; use returned URI
-abstracts first; then call `viking_read` for only a selected URI when deeper
-detail is needed. The explicit search path first uses bounded actor-scoped
-`/find`; only empty, weak, or ambiguous candidates upgrade to the current
-`session_id` context face with query expansion. Startup Recall keeps expansion
-off. Short positive and negative result caches are local to one Pi process and
-are invalidated when recall feedback changes.
+Every Prompt queues the current query before Pi's provider request; matching the
+upstream Extension, prompts below `minQueryLength` clear stale Recall and skip the
+network request.
+The `context` hook synchronously asks OpenViking's context search face for a
+fresh server-assembled block using the current `session_id`, automatic query
+expansion, and five-turn cross-turn dedup. The block is injected at the latest
+user message and reused only for Tool continuations within the same Pi agent
+run. Task switches therefore require no classifier, manual refresh, or extra
+model-selected search round trip.
 
-Startup Profile and Recall are bounded to 1,200-token baselines and default to
-one private plus one shared Experience. Recall and OpenViking Tool results remain
-untrusted user-level context and are never promoted into the System Prompt.
+Pi keeps the official on-demand Tool shape. `viking_search` makes one bounded
+`/find` request and is reserved for an absent or insufficient inline Recall,
+an explicit user history-search request, or discovery of a still-missing prior
+decision. `viking_read` deepens only a selected URI. Pi-67 adds strict actor and
+URI scope, user-feedback filtering, untrusted result envelopes, and bounded
+diagnostics after the official retrieval result; it does not add a second
+cheap-first/expansion router or a hidden result cache.
+
+Session Profile and each current-prompt Recall are bounded to 1,200-token
+baselines and default to one private plus one shared Experience. Recall and
+OpenViking Tool results remain untrusted user-level context and are never
+promoted into the System Prompt.
 Session Profile and Archive Overview follow the same envelope and trust level;
 only the static OpenViking Tool policy is appended to the System Prompt.
 

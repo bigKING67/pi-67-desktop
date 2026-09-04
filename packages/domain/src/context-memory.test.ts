@@ -41,17 +41,16 @@ describe("context and memory policy", () => {
 
   it("summarizes bounded recall latency without source content", () => {
     expect(summarizeRecallMetrics([
-      { durationMs: 120, route: "find-fast", selectedCount: 1 },
-      { durationMs: 160, route: "cache", selectedCount: 1 },
-      { durationMs: 900, route: "session-context", selectedCount: 0 },
+      { durationMs: 120, route: "prompt-context", selectedCount: 1 },
+      { durationMs: 160, route: "official-find", selectedCount: 1 },
+      { durationMs: 900, route: "scoped-find", selectedCount: 0 },
       { durationMs: 1_700, route: "enterprise-experience", selectedCount: 1 }
     ], 1_500)).toEqual({
       sampleCount: 4,
       p50Ms: 160,
       p95Ms: 1_700,
-      fastPathRate: 0.25,
-      expansionRate: 0.25,
-      cacheHitRate: 0.25,
+      automaticRecallRate: 0.25,
+      toolSearchRate: 0.5,
       emptyRate: 0.25,
       targetP95Ms: 1_500,
       withinTarget: false

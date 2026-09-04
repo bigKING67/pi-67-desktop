@@ -137,6 +137,51 @@ describe("RecallObservationStore", () => {
     });
   });
 
+  it("projects official current-prompt and on-demand routes without storing source content", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-recall-official-routes-"));
+    roots.push(root);
+    const store = new RecallObservationStore(root);
+    const scopeHash = await createObservedScopeHash(store, "workspace");
+
+    await writeFile(store.observationPath, [
+      JSON.stringify({
+        kind: "context.recallCompleted",
+        at: "2026-09-04T00:00:00Z",
+        state: "prompt-ready",
+        durationMs: 120,
+        route: "prompt-context",
+        candidateCount: 2,
+        selectedCount: 1,
+        scopeHash,
+        items: [{ id: "a".repeat(64), source: "private-memory", score: 0.9 }]
+      }),
+      JSON.stringify({
+        kind: "context.recallCompleted",
+        at: "2026-09-04T00:00:01Z",
+        state: "tool-completed",
+        durationMs: 180,
+        route: "official-find",
+        candidateCount: 1,
+        selectedCount: 1,
+        scopeHash,
+        items: [{ id: "b".repeat(64), source: "private-experience", score: 0.8 }]
+      })
+    ].join("\n") + "\n", { mode: 0o600 });
+
+    const listed = await store.list({ workspaceId: "workspace", actorPeerId: "peer", limit: 10 });
+    expect(listed.items.map((item) => item.route)).toEqual(["official-find", "prompt-context"]);
+    await expect(store.metrics({ workspaceId: "workspace", actorPeerId: "peer" })).resolves.toEqual({
+      sampleCount: 2,
+      p50Ms: 120,
+      p95Ms: 180,
+      automaticRecallRate: 0.5,
+      toolSearchRate: 0.5,
+      emptyRate: 0,
+      targetP95Ms: 1_500,
+      withinTarget: true
+    });
+  });
+
   it("drops unscoped or malformed persisted recall items instead of projecting them", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-recall-invalid-"));
     roots.push(root);

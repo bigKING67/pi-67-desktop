@@ -201,14 +201,17 @@ the only Runtime and behavior specification source.
   action. Submission means `enterprise review pending`, never `shared`; publishing
   remains a distinct DataHub governance action and never exposes the private source
   Session or private Memory URI.
-- Recall uses a stable, bounded startup snapshot plus model-selected Tools. A
-  general `viking_search` first performs a small actor/Workspace-scoped vector
-  lookup; one strong separated hit returns immediately, while empty, weak, or
-  ambiguous results alone upgrade to session-aware query expansion. Results are
-  cached only briefly inside the current Pi process, abstracts and URIs come before
-  bounded deep reads, and cache state is invalidated when the user corrects a
-  recall. Private Experience, local OpenViking Resource, and enterprise Experience
-  limits remain independently named and governed.
+- Recall follows OpenViking's official current-prompt lifecycle: every current
+  Prompt submission synchronously asks the server for one actor/Workspace-scoped context block
+  before the provider request, including task switches inside one Session. Server
+  query expansion and cross-turn dedup use the active OpenViking Session; the client
+  adds no task classifier or manual refresh workflow. The model uses `viking_search`
+  only when inline Recall is absent or insufficient, the user explicitly requests a
+  history search, or a specific prior decision still needs discovery. That Tool
+  follows upstream with one bounded `/find`; abstracts and URIs come before bounded
+  `viking_read`. User feedback may suppress or rerank returned items as a governance
+  layer, but never broadens retrieval scope. Private Experience, local OpenViking
+  Resource, and enterprise Experience limits remain independently named and governed.
 - Enterprise Experience and SOP retrieval asks OpenViking for a bounded candidate
   set, intersects it with DataHub's current Account/Project active allowlist, then
   deterministically reranks eligible assets using semantic relevance, task and
@@ -219,7 +222,8 @@ the only Runtime and behavior specification source.
 - Recall observations are local, bounded, and privacy-safe: only route, duration,
   counts, scores, configuration detail, and SHA-256 identifiers are retained; raw
   queries, recalled bodies, local paths, identities, and credentials are excluded.
-  The Memory Inspector reports sample count, p50/p95, fast/expanded/cache routes,
+  The Memory Inspector reports sample count, p50/p95, automatic-current-prompt and
+  on-demand-Tool search rates,
   and accepts `有用 / 无关 / 过期 / 错范围 / 错误` feedback. Feedback adjusts or
   suppresses later local results within the same Workspace boundary; enterprise
   aggregation remains a separate future governance contract.

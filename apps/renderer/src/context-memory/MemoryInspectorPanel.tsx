@@ -114,8 +114,8 @@ export function MemoryInspectorPanel() {
       <dl className="metric-list">
         <div><dt>p50</dt><dd>{latencyLabel(metrics?.p50Ms)}</dd></div>
         <div><dt>p95</dt><dd data-state={metrics?.withinTarget === false ? "warning" : "normal"}>{latencyLabel(metrics?.p95Ms)}</dd></div>
-        <div><dt>Fast path</dt><dd>{rateLabel(metrics?.fastPathRate)}</dd></div>
-        <div><dt>Expansion</dt><dd>{rateLabel(metrics?.expansionRate)}</dd></div>
+        <div><dt>自动召回</dt><dd>{rateLabel(metrics?.automaticRecallRate)}</dd></div>
+        <div><dt>按需搜索</dt><dd>{rateLabel(metrics?.toolSearchRate)}</dd></div>
       </dl>
       <p className={styles.metricNote}>目标 p95 ≤ {metrics?.targetP95Ms ?? 1_500} ms；只记录路由、耗时、数量和哈希，不记录查询或记忆正文。</p>
     </section>

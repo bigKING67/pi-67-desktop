@@ -2,8 +2,8 @@
  * Pi OpenViking Extension
  *
  * Integrates pi with an OpenViking context database for persistent,
- * cross-session memory. Syncs conversation turns to OV, builds one stable
- * startup recall snapshot, exposes session-aware Tools for later on-demand
+ * cross-session memory. Syncs conversation turns to OV, recalls relevant
+ * context for every current prompt, exposes Tools for bounded on-demand
  * retrieval, and commits sessions for long-term memory extraction.
  *
  * Design informed by: OpenClaw (synchronous recall), Claude Code plugin
@@ -140,8 +140,6 @@ export default async function (pi: ExtensionAPI) {
       const branch = typeof ctx.sessionManager.getBranch === "function"
         ? ctx.sessionManager.getBranch()
         : [];
-      const existingStartupPrompt = firstUserPrompt(branch);
-      if (existingStartupPrompt) recall.queueSearch(existingStartupPrompt);
       if (config.takeoverEnabled) {
         takeover.restore(branch);
         sync.restoreWatermark(takeover.state.syncedEntryCount);
@@ -175,8 +173,8 @@ export default async function (pi: ExtensionAPI) {
 
     if (!connected || bypassed) return;
 
-    // RecallManager accepts only the first meaningful prompt in this Session.
-    // Later task changes stay under Pi's normal Tool-selection authority.
+    // Follow the official OpenViking lifecycle: every current prompt receives
+    // synchronous Recall in the context hook, including in-Session task shifts.
     recall.queueSearch(event.prompt);
 
     // Only static Tool availability belongs in the System Prompt. Profile,
@@ -196,7 +194,7 @@ export default async function (pi: ExtensionAPI) {
     if (!connected || bypassed) return;
 
     const recallWasPending = recall.hasPendingSearch();
-    const startupQueryHash = recall.pendingQueryHash();
+    const currentQueryHash = recall.pendingQueryHash();
     const recallStartedAt = recallWasPending ? Date.now() : 0;
     if (recallWasPending) {
       emitContextDiagnostic({
@@ -210,15 +208,15 @@ export default async function (pi: ExtensionAPI) {
       emitContextDiagnostic({
         kind: "context.recallCompleted",
         privacyMode: config.privacyMode,
-        state: recallResult.state === "ready" ? "startup-ready" : "empty-or-degraded",
-        route: "startup-context",
+        state: recallResult.state === "ready" ? "prompt-ready" : "empty-or-degraded",
+        route: "prompt-context",
         durationMs: Date.now() - recallStartedAt,
         count: recallResult.block ? 1 : 0,
         selectedCount: recallResult.block ? 1 : 0,
         tokenBudget: config.recallTokenBudget,
         usedTokens: recallResult.block ? Math.ceil(recallResult.block.length / 4) : 0,
         detailMode: config.recallPreferAbstract ? "abstract-first" : "bounded-content",
-        ...(startupQueryHash === undefined ? {} : { queryHash: startupQueryHash }),
+        ...(currentQueryHash === undefined ? {} : { queryHash: currentQueryHash }),
         scopeHash: hashDiagnosticValue(config.peerId),
         ...(sync.piSessionId === null ? {} : { sessionIdHash: hashDiagnosticValue(sync.piSessionId) }),
       });
@@ -298,12 +296,19 @@ export default async function (pi: ExtensionAPI) {
     recall.invalidate();
   });
 
+  // --- agent_end ---
+  // Match upstream lifecycle ownership: the current-prompt snapshot exists only
+  // for one Pi agent run and cannot survive into an idle Session.
+  pi.on("agent_end", async (_event, _ctx) => {
+    recall.invalidate();
+  });
+
   // ================================================================
   // Commands
   // ================================================================
 
   pi.registerCommand("viking", {
-    description: "OpenViking status and commit operations. Later retrieval is automatic through Pi's viking_search/viking_read Tool calls.",
+    description: "OpenViking status and commit operations. Current prompts recall automatically; Tools provide bounded deep retrieval.",
     handler: async (args, ctx) => {
       if (!connected) {
         ctx.ui.notify("OpenViking: not connected", "warning");
@@ -335,7 +340,7 @@ export default async function (pi: ExtensionAPI) {
         ? ` | takeover: ${t.coveredUserTurns}/${t.lastSeenUserTurns} turns archived, ~${t.pendingTokens} tokens pending`
         : "";
       ctx.ui.notify(
-        `OpenViking: ${connected ? "connected" : "disconnected"} | session: ${sid.slice(0, 12)}... | startup recall: ${recall.state} | later recall: Pi Tool auto${takeoverInfo}`,
+        `OpenViking: ${connected ? "connected" : "disconnected"} | session: ${sid.slice(0, 12)}... | current-prompt recall: ${recall.state} | deep retrieval: Pi Tool${takeoverInfo}`,
         "info",
       );
     },
@@ -355,27 +360,6 @@ function matchBypass(cwd: string, pattern: string): boolean {
     return cwd.startsWith(pattern.slice(0, -1));
   }
   return cwd === pattern || cwd.startsWith(pattern + "/");
-}
-
-/** Recover the same startup query when Pi resumes an existing JSONL Session. */
-function firstUserPrompt(branch: any[]): string {
-  for (const entry of Array.isArray(branch) ? branch : []) {
-    const message = entry?.type === "message" && entry?.message
-      ? entry.message
-      : entry?.message ?? entry;
-    if (String(message?.role ?? "").toLowerCase() !== "user") continue;
-    const content = message?.content;
-    if (typeof content === "string" && content.trim()) return content.trim();
-    if (Array.isArray(content)) {
-      const text = content
-        .filter((part: any) => part?.type === "text" && typeof part.text === "string")
-        .map((part: any) => part.text)
-        .join("\n")
-        .trim();
-      if (text) return text;
-    }
-  }
-  return "";
 }
 
 /** Build the inner Session profile block for user-level memory injection. */

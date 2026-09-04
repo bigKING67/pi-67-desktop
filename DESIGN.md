@@ -1071,7 +1071,8 @@ loading error where the operation can produce those states
   resolves as success from the accepted operation alone.
 - The `Memory` Inspector keeps recall quality next to the recalled items instead of
   creating a separate analytics page. One compact metric block shows bounded sample
-  count, p50, p95, fast-path rate, and expansion rate; p95 crosses into warning
+  count, p50, p95, current-prompt automatic Recall rate, and on-demand Tool search
+  rate; p95 crosses into warning
   styling only when it exceeds the stated 1,500 ms target. Every recalled row keeps
   its score and route reason, followed by five small React Aria actions: `有用`,
   `无关`, `过期`, `错范围`, and `错误`. The settled choice remains visible, pending

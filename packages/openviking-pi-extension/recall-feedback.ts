@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 type FeedbackKind = "helpful" | "irrelevant" | "outdated" | "wrong-scope" | "incorrect";
@@ -26,17 +26,6 @@ export function applyRecallFeedback<T extends { uri: string; score: number }>(
       return [{ ...entry, score: clampScore(entry.score + adjustment) }];
     })
     .sort((left, right) => right.score - left.score || left.uri.localeCompare(right.uri));
-}
-
-export function recallFeedbackRevision(): string {
-  const file = feedbackPath();
-  if (!file) return "none";
-  try {
-    const stat = statSync(file);
-    return `${stat.mtimeMs}:${stat.size}`;
-  } catch {
-    return "none";
-  }
 }
 
 function readFeedback(): FeedbackRecord[] {

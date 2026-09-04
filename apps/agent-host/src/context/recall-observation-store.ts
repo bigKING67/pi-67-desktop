@@ -320,7 +320,9 @@ function normalizeDiagnosticItem(value: unknown): SafeDiagnosticItem[] {
 
 function isRecallRoute(value: unknown): value is RecallRoute {
   return [
+    "prompt-context",
     "startup-context",
+    "official-find",
     "scoped-find",
     "find-fast",
     "session-context",

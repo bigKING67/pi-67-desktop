@@ -294,11 +294,11 @@ export function ContextMemorySettings() {
       <SettingsNotice tone="info"><ShieldCheck aria-hidden="true" size={14} /> 当前选择：{privacy.label}。Memory 始终以不可信上下文注入，不能授权 Shell、文件或外部操作。</SettingsNotice>
     </SettingsSectionBlock>
 
-    <SettingsSectionBlock title="Session Context" description="Pi Extension 注入一次稳定启动 Recall；后续缺少历史时由 Pi 自动调用 OpenViking Tool，Desktop 只做治理和显式操作。">
+    <SettingsSectionBlock title="Session Context" description="Pi Extension 按 OpenViking 官方生命周期为符合检索条件的当前 Prompt 自动 Recall；信息不足时再由 Pi 调用 OpenViking Tool，Desktop 只做治理和显式操作。">
       <SettingsRows>
         <SettingsRow leading={<BrainCircuit aria-hidden="true" size={17} />} title="Context Takeover" description={`达到 ${draft.takeover.tokenThreshold.toLocaleString()} tokens 后归档，保留最近 ${draft.takeover.keepRecentTurns} turns。`} value={draft.takeover.enabled ? "开启" : "关闭"} />
         <SettingsRow title="Commit 阈值" description="达到阈值后由 Extension 排队归档；失败时保留本地上下文。" value={`${draft.commitTokenThreshold.toLocaleString()} tokens`} />
-        <SettingsRow title="单次召回预算" description={`启动快照和后续按需检索每次最多 ${draft.recallTokenBudget.toLocaleString()} tokens；私人 Experience ${draft.privateExperienceLimit} 条、本地 Resource ${draft.localResourceRecallLimit} 条、企业 Experience ${draft.sharedExperienceLimit} 条。`} value={`${draft.recallTokenBudget.toLocaleString()} tokens`} />
+        <SettingsRow title="单次召回预算" description={`符合检索条件的当前 Prompt 自动召回最多 ${draft.recallTokenBudget.toLocaleString()} tokens；信息仍不足时才按需搜索和深读。私人 Experience ${draft.privateExperienceLimit} 条、本地 Resource ${draft.localResourceRecallLimit} 条、企业 Experience ${draft.sharedExperienceLimit} 条。`} value={`${draft.recallTokenBudget.toLocaleString()} tokens`} />
         <SettingsRow
           title="当前 Session"
           description={sessionId ? `Session ${sessionId.slice(0, 12)}…` : "当前没有可提交的 Pi Session。"}

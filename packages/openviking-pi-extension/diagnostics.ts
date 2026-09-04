@@ -24,7 +24,7 @@ export interface ContextDiagnosticEvent {
   durationMs?: number;
   count?: number;
   reason?: string;
-  route?: "startup-context" | "scoped-find" | "find-fast" | "session-context" | "find-fallback" | "cache";
+  route?: "prompt-context" | "startup-context" | "official-find" | "scoped-find" | "find-fast" | "session-context" | "find-fallback" | "cache";
   candidateCount?: number;
   selectedCount?: number;
   tokenBudget?: number;

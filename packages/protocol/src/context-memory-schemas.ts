@@ -57,7 +57,9 @@ const RecallFeedbackSchema = Type.Union([
   Type.Literal("incorrect")
 ]);
 const RecallRouteSchema = Type.Union([
+  Type.Literal("prompt-context"),
   Type.Literal("startup-context"),
+  Type.Literal("official-find"),
   Type.Literal("scoped-find"),
   Type.Literal("find-fast"),
   Type.Literal("session-context"),
@@ -328,9 +330,8 @@ export const ContextMemoryCommandResultSchemas: Record<keyof ContextMemoryComman
     sampleCount: Type.Integer({ minimum: 0, maximum: 500 }),
     p50Ms: Type.Integer({ minimum: 0, maximum: 600_000 }),
     p95Ms: Type.Integer({ minimum: 0, maximum: 600_000 }),
-    fastPathRate: Type.Number({ minimum: 0, maximum: 1 }),
-    expansionRate: Type.Number({ minimum: 0, maximum: 1 }),
-    cacheHitRate: Type.Number({ minimum: 0, maximum: 1 }),
+    automaticRecallRate: Type.Number({ minimum: 0, maximum: 1 }),
+    toolSearchRate: Type.Number({ minimum: 0, maximum: 1 }),
     emptyRate: Type.Number({ minimum: 0, maximum: 1 }),
     targetP95Ms: Type.Integer({ minimum: 1, maximum: 600_000 }),
     withinTarget: Type.Boolean()

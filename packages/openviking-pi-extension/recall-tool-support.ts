@@ -28,24 +28,7 @@ export function emptySearchResult(mode: string): Record<string, unknown> {
   };
 }
 
-export function resultEntries(result: Record<string, unknown>): DiagnosticSearchEntry[] {
-  const details = result.details;
-  if (!details || typeof details !== "object") return [];
-  const results = (details as { results?: unknown }).results;
-  if (!Array.isArray(results)) return [];
-  return results.flatMap((entry) => {
-    if (!entry || typeof entry !== "object") return [];
-    const value = entry as Record<string, unknown>;
-    if (typeof value.uri !== "string") return [];
-    return [{
-      uri: value.uri,
-      category: typeof value.category === "string" ? value.category : "memory",
-      score: typeof value.score === "number" ? value.score : 0,
-    }];
-  });
-}
-
-export function formatSearchEntry(
+function formatSearchEntry(
   uri: string,
   category: string,
   score: number,
@@ -56,7 +39,7 @@ export function formatSearchEntry(
   return `[${Math.max(0, Math.min(1, score)).toFixed(2)}] [${category || "memory"}] ${uri}\n  ${abstract}`;
 }
 
-export function toSearchMetadata(
+function toSearchMetadata(
   entry: { uri: string; context_type: string; score: number },
 ): Record<string, unknown> {
   return { uri: entry.uri, category: entry.context_type, score: entry.score };
@@ -74,7 +57,7 @@ export function completeToolRecall(
   count: number,
   state: string,
   diagnostic?: {
-    route: "scoped-find" | "find-fast" | "session-context" | "find-fallback" | "cache";
+    route: "official-find" | "scoped-find";
     query: string;
     sessionId: string | undefined;
     candidateCount: number;

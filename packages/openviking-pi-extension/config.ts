@@ -5,7 +5,7 @@ import { buildUserAgent, resolveOpenVikingCredentials } from "./shared/credentia
 import { resolveEffectivePeerId } from "./shared/workspace-peer.mjs";
 
 /** Hand-maintained: this extension ships no manifest to read a version from. */
-export const EXTENSION_VERSION = "0.2.0-desktop.2";
+export const EXTENSION_VERSION = "0.2.0-desktop.3";
 
 export type PrivacyMode = "full-learning" | "private-learning" | "read-only" | "off";
 
@@ -70,13 +70,11 @@ const DEFAULT_CONFIG: OVConfig = {
   privacyMode: "private-learning",
   privateWriteEnabled: true,
   enterpriseCandidateEnabled: false,
-  // Server-side query expansion costs a model call before retrieval starts, so
-  // it has to be switchable from the client that pays the latency.
-  recallQueryExpansion: "off",
+  // Match the official current-prompt context path. OpenViking owns query
+  // expansion and cross-turn result rotation for the active OV Session.
+  recallQueryExpansion: "auto",
   recallQueryExpansionConfigured: true,
-  // Startup recall is one-shot and later retrieval is an explicit Pi Tool call,
-  // so server-side cross-turn result rotation is unnecessary.
-  recallDedupTurns: 0,
+  recallDedupTurns: 5,
   syncTurns: true,
   recallTokenBudget: 1200,
   recallMaxContentChars: 500,

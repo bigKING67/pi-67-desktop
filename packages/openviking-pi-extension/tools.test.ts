@@ -1,46 +1,53 @@
 import { describe, expect, it, vi } from "vitest";
 import { registerTools } from "./tools.js";
 
-describe("viking_search cheap-first execution", () => {
-  it("returns a strong cheap result without Query Expansion and caches it", async () => {
+describe("viking_search official on-demand execution", () => {
+  it("uses exactly one bounded find request per invocation without context expansion or a hidden cache", async () => {
     const find = vi.fn().mockResolvedValue([
       result("viking://strong", 0.9),
       result("viking://weak", 0.55)
     ]);
-    const searchContext = vi.fn();
-    const tool = registeredSearchTool({ find, searchContext });
+    const tool = registeredSearchTool(find);
 
     const first = await tool.execute("call-1", { query: "host recovery", limit: 2 }, new AbortController().signal);
     const second = await tool.execute("call-2", { query: "host recovery", limit: 2 }, new AbortController().signal);
-    expect((first.details as { mode: string }).mode).toBe("find-fast");
+    expect((first.details as { mode: string }).mode).toBe("official-find");
+    expect((first.content as Array<{ text: string }>)[0]?.text).toContain(
+      '<pi67-memory-tool-result provider="openviking" trust="untrusted" kind="search">',
+    );
     expect(second).toEqual(first);
-    expect(find).toHaveBeenCalledTimes(1);
-    expect(searchContext).not.toHaveBeenCalled();
+    expect(find).toHaveBeenCalledTimes(2);
+    expect(find).toHaveBeenNthCalledWith(1, "host recovery", {
+      topK: 2,
+      timeoutMs: 1_000
+    });
   });
 
-  it("upgrades ambiguous cheap results to session-aware search once", async () => {
-    const find = vi.fn().mockResolvedValue([
-      result("viking://a", 0.82),
-      result("viking://b", 0.78)
-    ]);
-    const searchContext = vi.fn().mockResolvedValue({
-      entries: [{ uri: "viking://expanded", category: "experience", detail: "abstract", score: 0.93, text: "verified path" }],
-      rendered: "",
-      digest: "",
-      stats: {}
-    });
-    const tool = registeredSearchTool({ find, searchContext });
+  it("preserves an explicit URI scope and exposes the no-duplicate-search policy", async () => {
+    const find = vi.fn().mockResolvedValue([result("viking://scoped", 0.82)]);
+    const tool = registeredSearchTool(find);
 
-    const value = await tool.execute("call", { query: "ambiguous recovery" }, new AbortController().signal);
-    expect((value.details as { mode: string }).mode).toBe("session-context");
+    const value = await tool.execute("call", {
+      query: "workspace recovery",
+      scope: "viking://user/memories/"
+    }, new AbortController().signal);
+    expect((value.details as { mode: string }).mode).toBe("scoped-find");
     expect(find).toHaveBeenCalledTimes(1);
-    expect(searchContext).toHaveBeenCalledTimes(1);
-    expect(searchContext).toHaveBeenCalledWith("ambiguous recovery", { sessionId: "session-1", limit: 5 });
+    expect(find).toHaveBeenCalledWith("workspace recovery", {
+      targetUri: "viking://user/memories/",
+      topK: 10,
+      timeoutMs: 1_000
+    });
+    expect(tool.promptGuidelines.join(" ")).toContain("Do not call when the current prompt's inline OpenViking context already answers the need.");
   });
 });
 
-function registeredSearchTool(overrides: { find: ReturnType<typeof vi.fn>; searchContext: ReturnType<typeof vi.fn> }) {
-  const registered: Array<{ name: string; execute: (...args: any[]) => Promise<any> }> = [];
+function registeredSearchTool(find: ReturnType<typeof vi.fn>) {
+  const registered: Array<{
+    name: string;
+    promptGuidelines: string[];
+    execute: (...args: any[]) => Promise<any>;
+  }> = [];
   registerTools({ registerTool: (tool: any) => registered.push(tool) }, {
     connected: true,
     cfg: {
@@ -53,8 +60,7 @@ function registeredSearchTool(overrides: { find: ReturnType<typeof vi.fn>; searc
       privacyMode: "private-learning"
     },
     health: vi.fn().mockResolvedValue(true),
-    find: overrides.find,
-    searchContext: overrides.searchContext
+    find
   } as any, { sessionId: "session-1" } as any);
   return registered.find((tool) => tool.name === "viking_search")!;
 }
