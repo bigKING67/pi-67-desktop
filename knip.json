@@ -2,7 +2,10 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
-      "entry": ["eng/capabilities/ai-berkshire-skill-pack-sync.mjs"]
+      "entry": [
+        "eng/capabilities/ai-berkshire-skill-pack-sync.mjs",
+        "eng/evals/openviking-agent-pilot/evaluation-extension.mjs"
+      ]
     },
     "apps/agent-host": {
       "project": ["src/**/*.ts"]

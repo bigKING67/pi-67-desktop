@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { decideCheapRecall } from "../../packages/openviking-pi-extension/recall-tool-policy.ts";
+import { decideCheapRecall } from "./openviking-adaptive-policy.mjs";
 
 const goldenPath = fileURLToPath(new URL("./openviking-recall-golden-set.json", import.meta.url));
 const golden = JSON.parse(readFileSync(goldenPath, "utf8"));
 
-describe("OpenViking recall Golden Set", () => {
+describe("historical OpenViking adaptive-policy Golden Set", () => {
   it("meets the synthetic route-accuracy and deterministic latency budgets", () => {
     expect(golden.schema).toBe("pi67.openviking-recall-golden.v1");
     const results = golden.cases.map((testCase) => {

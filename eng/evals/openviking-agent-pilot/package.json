@@ -1,0 +1,11 @@
+{
+  "name": "@pi67/openviking-agent-pilot-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "pi": {
+    "extensions": [
+      "./evaluation-extension.mjs"
+    ]
+  }
+}

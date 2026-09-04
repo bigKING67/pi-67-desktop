@@ -1,0 +1,167 @@
+{
+  "schema": "pi67.openviking-ab-corpus.v1",
+  "officialUpstream": {
+    "repository": "https://github.com/volcengine/OpenViking",
+    "commit": "63ba98cadb1d6816bfa8617627f192fcc86cd726",
+    "configSha256": "922dca2df349ef0f17c73709e04b385b4ed5486eb1a78d52d8a2315cecaf7a0a",
+    "readmeSha256": "39498bd9fe22258e50b7effa5b172890c560ca536ddae1880aecfe757ab4582e"
+  },
+  "controlledConfiguration": {
+    "scoreThreshold": 0.35,
+    "recallTokenBudget": 1200,
+    "findCandidateLimit": 5,
+    "finalResultLimit": 3,
+    "resourceQuota": 3,
+    "fastScoreFloor": 0.72,
+    "fastScoreMargin": 0.1,
+    "findTimeoutMs": 5000,
+    "contextTimeoutMs": 20000,
+    "failureBudget": 3
+  },
+  "documents": [
+    {
+      "id": "mac-host-epoch-recovery",
+      "title": "macOS Agent Host epoch recovery",
+      "body": "Use this experience when a macOS Apple Silicon Electron Agent Host restarts and stale Extension UI projections remain visible. Increment the Host epoch, cancel projections from the old epoch, restore the Pi JSONL Session, and verify one new Turn completes. Do not use this procedure for Windows service recovery.",
+      "queries": [
+        "macOS 重启 Agent Host 后旧 Extension UI 还显示怎么办",
+        "How should stale projections be cancelled after an Electron host epoch changes on Apple Silicon?",
+        "恢复 macOS packaged app 的 Pi JSONL 会话并清掉旧 host projection",
+        "Agent Host epoch 切换后继续显示上一次工具 UI",
+        "Apple Silicon desktop host restart session recovery procedure"
+      ]
+    },
+    {
+      "id": "windows-process-cleanup",
+      "title": "Windows process tree cleanup",
+      "body": "Use this experience for Windows x64 packaged process cleanup. Terminate the exact owned child process tree through the Windows Job Object, wait for bounded shutdown, and verify no owned worker remains. Do not apply this macOS process logic or run broad process-name deletion.",
+      "queries": [
+        "Windows x64 打包应用如何清理自己启动的子进程树",
+        "Job Object bounded shutdown for an owned package worker",
+        "不要按进程名批量杀进程，应该怎样回收 Windows worker",
+        "Windows installer leaves an owned Agent Host child running",
+        "exact process tree cleanup after Windows packaged app exits"
+      ]
+    },
+    {
+      "id": "extension-ui-epoch-cancel",
+      "title": "Extension UI cancellation at Host epoch boundary",
+      "body": "When any desktop Host epoch changes, reject events from the prior epoch and settle pending Extension UI operations as cancelled. Renderer projections must never survive their owning Host. This is a cross-platform UI lifecycle rule and does not replace Session resume.",
+      "queries": [
+        "Host epoch 变化时 Extension UI 应该如何处理",
+        "Reject stale extension events after utility process recovery",
+        "Renderer 上遗留了前一个 Host 拥有的审批 Projection",
+        "cross-platform extension UI lifecycle during host replacement",
+        "pending Extension operation needs cancellation when host owner disappears"
+      ]
+    },
+    {
+      "id": "openviking-owner-conflict",
+      "title": "Single OpenViking memory owner",
+      "body": "Pi-67 Desktop permits one OpenViking Context and Memory owner. If two OpenViking owners are detected, disable the conflicting Memory runtime, keep Pi chat and ordinary tools available, and fall back to Pi native compaction. Retired observational-memory and Hy-Memory names are migration identifiers, not active owners.",
+      "queries": [
+        "检测到两个 OpenViking Owner 时应该禁用什么",
+        "Why should Pi chat continue when memory-owner preflight fails?",
+        "OM 和 Hy-Memory 已退役后还算 active context owner 吗",
+        "duplicate OpenViking extensions and native Pi compaction fallback",
+        "Memory fail-closed but Agent fail-open ownership rule"
+      ]
+    },
+    {
+      "id": "shared-experience-revoke",
+      "title": "Enterprise shared Experience revoke-first lifecycle",
+      "body": "For an enterprise shared Experience, revoke DataHub retrieval eligibility before attempting external OpenViking deletion. The active Account and Project allowlist must stop recall immediately even if the vector or resource still exists. Preserve audit records and do not delete the private source Memory.",
+      "queries": [
+        "企业共享经验撤回时为什么要先阻断检索再删除 OpenViking",
+        "revoked Experience vector still exists but must not be recalled",
+        "撤回团队经验不能顺便删除私人 Memory",
+        "DataHub active allowlist revoke-first workflow",
+        "how to audit external resource deletion after shared asset revoke"
+      ]
+    },
+    {
+      "id": "windows-chinese-path-doctor",
+      "title": "Windows Chinese username effective-config doctor",
+      "body": "On Windows with a Chinese username or spaces in the user path, the Doctor must compare disk configuration, the configuration actually loaded by the Pi Extension, and the OpenViking server capability. Showing only config.json is insufficient. Keep the Agent usable when Memory configuration fails.",
+      "queries": [
+        "Windows 中文用户名导致 OpenViking 插件配置不生效怎么诊断",
+        "Doctor should show effective loaded values instead of only config.json",
+        "带空格用户路径下 Pi Extension 实际配置检查",
+        "disk config differs from loaded OpenViking plugin settings",
+        "Memory 配置失败时仍然允许 Agent 正常聊天"
+      ]
+    },
+    {
+      "id": "context-takeover-fallback",
+      "title": "OpenViking Context Takeover fail-open fallback",
+      "body": "When OpenViking Context Takeover cannot flush pending writes, commit the Session, or obtain an archive overview, it must not replace local history. Pi keeps the full local context or performs native compaction, then continues the Turn and supports restart Resume from the same JSONL Session.",
+      "queries": [
+        "OpenViking 断线时 Context Takeover 应该如何回退",
+        "archive overview unavailable during Pi compaction",
+        "pending writes cannot flush but the conversation must continue",
+        "native compaction and restart resume after memory server failure",
+        "Takeover 失败后不能丢掉本地完整历史"
+      ]
+    },
+    {
+      "id": "workspace-fingerprint",
+      "title": "Stable Workspace identity fingerprint",
+      "body": "Identify a Workspace with the Account, user, repository remote hash, repository root identity hash, and optional relative Workspace id. Do not use only the folder name. Stable fingerprints avoid collisions between projects both named frontend and survive folder moves or different local paths.",
+      "queries": [
+        "两个都叫 frontend 的项目如何避免记忆串线",
+        "workspace identity should survive moving the folder",
+        "repository remote hash and root identity for project memory scope",
+        "不同用户本地路径不同但需要同一个项目身份",
+        "why a directory basename is not a safe Workspace fingerprint"
+      ]
+    },
+    {
+      "id": "paid-live-no-conversion",
+      "title": "Paid livestream traffic without conversion",
+      "body": "Use this commerce experience when paid livestream traffic rises but orders do not. Check audience intent, product-card click-through, landing price consistency, anchor explanation, inventory availability, and checkout errors before increasing spend. Do not conclude that more traffic alone will repair conversion.",
+      "queries": [
+        "付费直播间有流量没成交应该先查什么",
+        "paid live traffic increased but orders stayed flat",
+        "投流后商品卡点击率和结算错误怎么排查",
+        "为什么不能继续加预算解决直播转化低",
+        "livestream audience intent and product price consistency diagnosis"
+      ]
+    },
+    {
+      "id": "product-card-low-cvr",
+      "title": "Product card low conversion workflow",
+      "body": "Use this workflow when a product card receives clicks but conversion remains low. Verify offer clarity, price ladder, reviews, stock, delivery promise, variant defaults, and mobile checkout friction. Separate click-through problems from post-click conversion problems before changing creative.",
+      "queries": [
+        "商品卡有点击但转化率低如何分析",
+        "product detail receives traffic but checkout conversion is weak",
+        "先区分点击率问题还是点击后转化问题",
+        "variant default stock delivery reviews price ladder checklist",
+        "移动端结算摩擦导致商品卡 CVR 下降"
+      ]
+    },
+    {
+      "id": "image-product-preservation",
+      "title": "Product-preserving image generation",
+      "body": "For commerce image generation, preserve the exact product silhouette, logo placement, packaging structure, color, and distinguishing details. Change only the approved background, lighting, layout, or supporting props. Reject outputs that beautify by inventing a different product.",
+      "queries": [
+        "AI 商品图如何确保产品本体不被改掉",
+        "preserve packaging silhouette and logo placement during image generation",
+        "只允许换背景灯光和道具的商品图规则",
+        "生成图把瓶型和包装颜色改了应该拒绝吗",
+        "product identity preservation checklist for ecommerce creative"
+      ]
+    },
+    {
+      "id": "short-video-hook",
+      "title": "Short-video opening hook design",
+      "body": "Design a short-video opening hook by making the audience, tension, promised payoff, and first visual action clear within the opening seconds. The hook must match the actual product proof that follows. Avoid unsupported absolute claims and do not optimize watch time with a misleading promise.",
+      "queries": [
+        "短视频开头三秒的 hook 应该包含什么",
+        "make audience tension and promised payoff clear in the opening visual",
+        "不能用后续产品证据无法支撑的绝对化开场",
+        "short video retention hook without a misleading promise",
+        "首个画面动作如何承接产品卖点证明"
+      ]
+    }
+  ]
+}

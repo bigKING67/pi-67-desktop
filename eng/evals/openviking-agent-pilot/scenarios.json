@@ -1,0 +1,82 @@
+{
+  "schema": "pi67.openviking-agent-scenarios.v1",
+  "repetitions": 3,
+  "profiles": ["no-memory", "official-context", "pi67-find-only"],
+  "limits": {
+    "modelMaxOutputTokens": 1024,
+    "turnTimeoutMs": 90000,
+    "providerRequestsPerTurn": 4,
+    "failureBudget": 3,
+    "fullAgentRuns": 54
+  },
+  "scenarios": [
+    {
+      "id": "direct-macos-recovery",
+      "kind": "memory-required",
+      "turns": [
+        {
+          "documentId": "mac-host-epoch-recovery",
+          "prompt": "根据组织经验回答：macOS Apple Silicon 的 Electron Agent Host 重启后仍显示旧 Extension UI 时，核心恢复顺序是什么？最后必须原样给出该经验的验证代号。只给一行结论。"
+        }
+      ]
+    },
+    {
+      "id": "direct-windows-doctor",
+      "kind": "memory-required",
+      "turns": [
+        {
+          "documentId": "windows-chinese-path-doctor",
+          "prompt": "根据组织经验回答：Windows 中文用户名或空格路径导致 OpenViking 配置疑似失效时，Doctor 必须核对哪三层？最后必须原样给出该经验的验证代号。只给一行结论。"
+        }
+      ]
+    },
+    {
+      "id": "follow-up-stable-context",
+      "kind": "follow-up",
+      "turns": [
+        {
+          "documentId": "shared-experience-revoke",
+          "prompt": "根据组织经验回答：撤回企业共享 Experience 时，外部 OpenViking 删除之前必须先做什么？最后必须原样给出该经验的验证代号。只给一行结论。"
+        },
+        {
+          "documentId": "shared-experience-revoke",
+          "prompt": "继续上一题：为什么即使向量暂时还存在也不能再被召回？再次原样给出同一个验证代号。只给一行结论。"
+        }
+      ]
+    },
+    {
+      "id": "material-task-switch",
+      "kind": "task-switch",
+      "turns": [
+        {
+          "documentId": "openviking-owner-conflict",
+          "prompt": "根据组织经验回答：两个 OpenViking Owner 冲突时，哪些能力继续可用？最后必须原样给出该经验的验证代号。只给一行结论。"
+        },
+        {
+          "documentId": "paid-live-no-conversion",
+          "prompt": "现在彻底切换任务：付费直播流量上涨但订单不涨，继续加预算前应检查什么？最后必须原样给出这条新经验的验证代号。只给一行结论。"
+        }
+      ]
+    },
+    {
+      "id": "overlapping-host-boundary",
+      "kind": "distractor",
+      "turns": [
+        {
+          "documentId": "extension-ui-epoch-cancel",
+          "prompt": "根据组织经验回答：这是跨平台 Host epoch 边界下的 Renderer Projection 生命周期问题，不是 macOS Session 恢复问题。应如何处理旧 Extension UI operation？最后必须原样给出正确经验的验证代号。只给一行结论。"
+        }
+      ]
+    },
+    {
+      "id": "no-memory-control",
+      "kind": "control",
+      "turns": [
+        {
+          "expectedLiteral": "95",
+          "prompt": "这是无需历史知识的控制题：37 加 58 等于多少？不要调用任何工具，只输出 CONTROL=<答案数字>。"
+        }
+      ]
+    }
+  ]
+}
