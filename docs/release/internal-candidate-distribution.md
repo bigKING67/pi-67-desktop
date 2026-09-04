@@ -87,6 +87,28 @@ packaged smoke、source SHA、version 和 Pi runtime 绑定为同一候选。上
   一致性和预置文件不变，但不覆盖同事真实 Profile 的全部第三方资源、真实凭据、历史规模、Defender/EDR、
   OneDrive、重解析点、网络盘或企业目录重定向；这些仍属于两台目标 Windows 的人工验收。
 
+## Local artifact retention
+
+本地产物用于完成打包、smoke、identity、上传和精确字节验证，不是长期归档。候选已经镜像或发布、对应的
+小型 identity、manifest、smoke、人工验收和发布 receipt 已保留后，应先运行只读计划：
+
+```bash
+corepack pnpm run release:local:cleanup
+```
+
+计划只识别固定 `artifacts/` 边界内、符合 Pi-67 版本化命名的 EXE/DMG/ZIP/Blockmap、Electron Builder
+解包目录和上传 staging 中的产品副本。它保留 JSON/text 证据、SHA256SUMS、验证截图、快捷方式观察和
+R2 发布 receipt，也不读取或删除未知目录。核对计划后使用精确确认参数执行：
+
+```bash
+corepack pnpm run release:local:cleanup -- apply --confirm-local-artifact-cleanup
+```
+
+执行前会检查当前仓库 `artifacts/release/mac-arm64` 预览是否仍在运行；有占用、符号链接、未知平台或目标
+在计划后发生身份变化时 fail closed。该命令只清理本机 ignored output，不上传、删除或修改 Feishu、R2、
+GitHub Actions artifact、Tag、Release 或 CDN 缓存。`preview:mac:unsigned` 必须从仓库 artifact 启动应用，
+因此只能在预览退出后运行本地清理。
+
 ## Formal release boundary
 
 小团队的未签名应用内更新是候选测试之后的独立分发层，使用 Cloudflare R2，并遵循

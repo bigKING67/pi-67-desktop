@@ -149,6 +149,13 @@
 - Upload only the three current, versioned product files. Do not use ambiguous
   `latest` names. Re-list the Feishu folder after upload and verify the expected
   names and sizes before asking for manual-test confirmation.
+- Local installers, package directories, and upload staging are temporary. Once
+  their exact candidate is mirrored or published and the small identity,
+  manifest, smoke, manual-test, and publication receipts are retained, run
+  `corepack pnpm run release:local:cleanup` to review the bounded delete set and
+  apply it with the command's exact confirmation flag. The cleanup must fail
+  closed while the repository preview is running and must preserve unknown
+  files and evidence by default.
 - Feishu is an internal distribution mirror, not the artifact identity
   authority. Bind every test result to the source SHA, workflow run/attempt when
   applicable, candidate identity, size, and SHA-256 recorded by the build.
