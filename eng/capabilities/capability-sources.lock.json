@@ -1,6 +1,6 @@
 {
   "schema": "pi67.capability-sources-lock.v1",
-  "catalogVersion": "2026.09.04.1",
+  "catalogVersion": "2026.09.04.4",
   "sources": [
     {
       "id": "pi-workspace-resources",
@@ -22,8 +22,8 @@
       "displayName": "OpenViking Pi Extension",
       "origin": "first-party",
       "internalPath": "packages/openviking-pi-extension",
-      "treeSha256": "381884e4e459d191360772c26e5942c5c6e105e2380e038de4d23f8460e7c71a",
-      "version": "0.2.0-desktop.3",
+      "treeSha256": "08c076cc5e732f432c688221ecacf521e78ccb359bed27b47a8f237d4cc137ad",
+      "version": "0.2.0-desktop.6",
       "includedExtensions": [
         {
           "id": "pi67-openviking",

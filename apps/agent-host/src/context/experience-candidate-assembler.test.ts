@@ -121,9 +121,9 @@ describe("Experience candidate assembly", () => {
       id: candidate.summary.id,
       expectedUpdatedAt: candidate.summary.updatedAt,
       taskType: "credential rotation",
-      title: "Fix API key in /Users/alice/project/.env",
+      title: "Fix api_key=SYNTHETIC_SECRET_1234567890 in /Users/alice/project/.env",
       problem: "Contact alice@example.com and inspect 10.0.0.8",
-      strategy: "Replace bearer abc and rerun tests",
+      strategy: "Replace Authorization: Bearer SYNTHETIC_TOKEN_1234567890 and rerun tests",
       result: "success",
       confidence: 0.9,
       sensitivity: "team",
@@ -160,7 +160,8 @@ describe("Experience candidate assembly", () => {
         validationGates: ["Authentication succeeds"]
       }
     });
-    expect(JSON.stringify(reviewed.summary)).not.toMatch(/alice|\/Users|api key|bearer|10\.0\.0\.8/iu);
+    expect(JSON.stringify(reviewed.summary)).not.toMatch(/alice|\/Users|api[_ ]key|bearer|SYNTHETIC_|10\.0\.0\.8/iu);
+    expect(JSON.stringify(reviewed.summary)).toContain("[REDACTED_CREDENTIAL]");
     expect(reviewed.summary.evidence).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: "test", reference: `sha256:${"1".repeat(64)}` }),
       expect.objectContaining({ kind: "user-confirmation" })

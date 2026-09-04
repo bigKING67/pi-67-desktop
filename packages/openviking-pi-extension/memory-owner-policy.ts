@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const CONTEXT_OWNER_ID = "pi67-openviking";
@@ -15,9 +15,7 @@ export interface MemoryOwnerConflict {
 }
 
 export function detectMemoryOwnerConflict(agentDir: string): MemoryOwnerConflict | null {
-  const configured = configuredPackageIds(join(agentDir, "settings.json"));
-  const installed = installedExtensionIds(join(agentDir, "extensions"));
-  const active = new Set([...configured, ...installed]);
+  const active = new Set(configuredOwnerIds(join(agentDir, "settings.json")));
   const conflicts = [...active].filter((id) => CONFLICTING_IDS.has(id)).sort();
   if (conflicts.length > 0) {
     return { owner: CONTEXT_OWNER_ID, conflicts, reason: "multiple-context-owners" };
@@ -35,23 +33,16 @@ export function detectMemoryOwnerConflict(agentDir: string): MemoryOwnerConflict
   return null;
 }
 
-function configuredPackageIds(settingsPath: string): string[] {
+function configuredOwnerIds(settingsPath: string): string[] {
   try {
     if (!existsSync(settingsPath)) return [];
     const parsed = JSON.parse(readFileSync(settingsPath, "utf8"));
     const packages = Array.isArray(parsed?.packages) ? parsed.packages : [];
-    return packages.map(packageSource).filter(Boolean).map(packageId);
-  } catch {
-    return [];
-  }
-}
-
-function installedExtensionIds(root: string): string[] {
-  try {
-    if (!existsSync(root)) return [];
-    return readdirSync(root, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name);
+    const extensions = Array.isArray(parsed?.extensions) ? parsed.extensions : [];
+    return [
+      ...packages.filter(packageExtensionEnabled).map(packageSource),
+      ...extensions.filter(activeExtensionEntry),
+    ].filter(Boolean).map(packageId);
   } catch {
     return [];
   }
@@ -67,8 +58,34 @@ function packageSource(value: unknown): string {
   return "";
 }
 
+function packageExtensionEnabled(value: unknown): boolean {
+  if (typeof value === "string") return true;
+  if (!value || typeof value !== "object") return false;
+  const entry = value as { autoload?: unknown; extensions?: unknown };
+  if (Array.isArray(entry.extensions)) {
+    if (entry.extensions.length === 0) return false;
+    if (entry.autoload === false) {
+      return entry.extensions.some((pattern) => typeof pattern === "string"
+        && !pattern.startsWith("!") && !pattern.startsWith("-"));
+    }
+    return true;
+  }
+  return entry.autoload !== false;
+}
+
+function activeExtensionEntry(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== ""
+    && !value.startsWith("!") && !value.startsWith("-");
+}
+
 function packageId(source: string): string {
   const normalized = source.replace(/^(npm|git):/, "").replace(/\\/g, "/");
-  const tail = normalized.split("/").filter(Boolean).pop() ?? normalized;
-  return tail.replace(/\.git(?:@.*)?$/, "").replace(/@\d.*$/, "");
+  const segments = normalized.split("/").filter(Boolean);
+  const candidate = segments.findLast((segment) => /openviking/i.test(segment))
+    ?? segments.at(-1)
+    ?? normalized;
+  const id = candidate.replace(/\.git(?:@.*)?$/, "").replace(/@\d.*$/, "");
+  return id === "openviking-pi-extension" || id === CONTEXT_OWNER_ID
+    ? CONTEXT_OWNER_ID
+    : id;
 }

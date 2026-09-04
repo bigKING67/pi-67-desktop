@@ -21,10 +21,11 @@
  */
 
 import { mkdir, readdir, readFile, rename, writeFile, unlink, stat, chmod } from "node:fs/promises";
-import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { isRetryableFailure } from "./retryable.mjs";
+import { makeDedupKey, pendingFilename, pendingFromProcessingFilename, processingFilename, retryFilename } from "./pending-queue-identity.mjs";
+import { operationPriority, remoteOperationState } from "./pending-replay-policy.mjs";
 
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_TTL_DAYS = 7;
@@ -70,43 +71,6 @@ function getTTLDays() {
 function getReplayLimit() {
   const v = parseInt(process.env.OPENVIKING_PENDING_REPLAY_LIMIT || "", 10);
   return Number.isFinite(v) && v > 0 ? v : DEFAULT_REPLAY_LIMIT;
-}
-
-function stableStringify(value) {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
-  const keys = Object.keys(value).sort();
-  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(value[k])}`).join(",")}}`;
-}
-
-function makeDedupKey(type, sessionId, payload) {
-  return createHash("sha256")
-    .update(type)
-    .update("\n")
-    .update(sessionId)
-    .update("\n")
-    .update(stableStringify(payload))
-    .digest("hex");
-}
-
-function pendingFilename(dedupKey, retries = 0) {
-  return `${dedupKey}_${Math.max(0, Number(retries) || 0)}.json`;
-}
-
-function retryFilename(filename, retries) {
-  const bare = filename.replace(/\.(json|processing)$/, "");
-  const nextBare = /_\d+$/.test(bare)
-    ? bare.replace(/_\d+$/, `_${retries}`)
-    : `${bare}_${retries}`;
-  return `${nextBare}.json`;
-}
-
-function processingFilename(filename) {
-  return filename.replace(/\.json$/, ".processing");
-}
-
-function pendingFromProcessingFilename(filename) {
-  return filename.replace(/\.processing$/, ".json");
 }
 
 function isRetryableReplayFailure(res) {
@@ -254,7 +218,12 @@ export async function listPending() {
     }
   }
 
-  entries.sort((a, b) => (a.entry.createdAt || 0) - (b.entry.createdAt || 0));
+  entries.sort((a, b) => {
+    const priority = operationPriority(a.entry.type) - operationPriority(b.entry.type);
+    if (priority !== 0) return priority;
+    const created = (a.entry.createdAt || 0) - (b.entry.createdAt || 0);
+    return created !== 0 ? created : a.filename.localeCompare(b.filename);
+  });
   return entries;
 }
 
@@ -271,6 +240,17 @@ export async function claimForReplay(filename) {
     return claimed;
   } catch {
     return null;
+  }
+}
+
+export async function releaseReplayClaim(filename) {
+  if (!filename.endsWith(".processing")) return false;
+  const dir = getPendingDir();
+  try {
+    await rename(join(dir, filename), join(dir, pendingFromProcessingFilename(filename)));
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -350,13 +330,13 @@ export async function cleanStale() {
  *
  * @param {Function} fetchJSON - the configured fetchJSON from makeFetchJSON
  * @param {Function} log - logger function
- * @returns {{ replayed: number, failed: number, skipped: number, deferred: number }}
+ * @returns {{ replayed: number, failed: number, skipped: number, deferred: number, outcomes: Record<string, string> }}
  */
 export async function replayPending(fetchJSON, log) {
   const pending = await listPending();
 
   if (pending.length === 0) {
-    return { replayed: 0, failed: 0, skipped: 0, deferred: 0 };
+    return { replayed: 0, failed: 0, skipped: 0, deferred: 0, outcomes: {} };
   }
 
   const replayLimit = getReplayLimit();
@@ -367,22 +347,26 @@ export async function replayPending(fetchJSON, log) {
   let skipped = 0;
   let deferred = 0;
   let processed = 0;
+  const outcomes = {};
 
   for (const { filename, entry } of pending) {
     if (processed >= replayLimit) {
       deferred++;
+      outcomes[entry.dedupKey] = "deferred";
       continue;
     }
 
     if ((entry.retries || 0) >= getMaxRetries()) {
       await dequeue(filename);
       skipped++;
+      outcomes[entry.dedupKey] = "skipped";
       continue;
     }
 
     const claimedFilename = await claimForReplay(filename);
     if (!claimedFilename) {
-      skipped++;
+      deferred++;
+      outcomes[entry.dedupKey] = "deferred";
       continue;
     }
     processed++;
@@ -390,11 +374,29 @@ export async function replayPending(fetchJSON, log) {
     let res;
     try {
       const encodedSid = encodeURIComponent(entry.sessionId);
-      if (entry.type === "addMessage") {
-        res = await fetchJSON(`/api/v1/sessions/${encodedSid}/messages`, {
-          method: "POST",
-          body: JSON.stringify(entry.payload),
-        });
+      if (entry.type === "createSession" || entry.type === "addMessage") {
+        const remote = await remoteOperationState(fetchJSON, entry);
+        if (!remote.known) {
+          await releaseReplayClaim(claimedFilename);
+          outcomes[entry.dedupKey] = "deferred";
+          deferred += Math.max(1, pending.length - processed + 1);
+          break;
+        }
+        if (remote.present) {
+          await dequeue(claimedFilename);
+          replayed++;
+          outcomes[entry.dedupKey] = "replayed";
+          continue;
+        }
+        res = entry.type === "createSession"
+          ? await fetchJSON("/api/v1/sessions", {
+              method: "POST",
+              body: JSON.stringify(entry.payload),
+            })
+          : await fetchJSON(`/api/v1/sessions/${encodedSid}/messages`, {
+              method: "POST",
+              body: JSON.stringify(entry.payload),
+            });
       } else if (entry.type === "commitSession") {
         res = await fetchJSON(`/api/v1/sessions/${encodedSid}/commit`, {
           method: "POST",
@@ -403,6 +405,7 @@ export async function replayPending(fetchJSON, log) {
       } else {
         await dequeue(claimedFilename);
         skipped++;
+        outcomes[entry.dedupKey] = "skipped";
         continue;
       }
     } catch {
@@ -423,12 +426,15 @@ export async function replayPending(fetchJSON, log) {
     if (res?.ok) {
       await dequeue(claimedFilename);
       replayed++;
+      outcomes[entry.dedupKey] = "replayed";
     } else if (!isRetryableReplayFailure(res)) {
       await dequeue(claimedFilename);
       skipped++;
+      outcomes[entry.dedupKey] = "skipped";
     } else {
       await incrementRetry(claimedFilename, entry);
       failed++;
+      outcomes[entry.dedupKey] = "failed";
       if (entry.type === "addMessage") {
         deferred += Math.max(0, pending.length - processed);
         break;
@@ -447,5 +453,5 @@ export async function replayPending(fetchJSON, log) {
     cleaned,
   });
 
-  return { replayed, failed, skipped, deferred };
+  return { replayed, failed, skipped, deferred, outcomes };
 }

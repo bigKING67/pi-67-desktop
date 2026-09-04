@@ -18,6 +18,16 @@ local feedback, privacy-safe bounded recall diagnostics, untrusted injection
 and Tool results, memory-owner conflict detection, and privacy-mode write
 gating.
 
+Desktop `0.2.0-desktop.6` additionally keeps every private Tool inside the
+current user/current peer Memory trees, removes direct Resource ingestion from
+the local adapter, bounds and escapes current-Session Archive expansion, and
+selects credentials as one endpoint-matched source rather than mixing
+environment, `ovcli.conf`, and server configuration fields.
+
+Actor-scoped Recall is fail-closed across server versions. If a legacy server
+rejects `peer_scope`, the adapter skips Recall for that prompt; it never removes
+the scope field, retries more broadly, or falls through to a wider raw search.
+
 The repository structure gate therefore has narrow, file-specific line limits
 for the three largest preserved upstream implementation files. The package is
 not exempt as a whole; any new large file or growth beyond those explicit
@@ -54,6 +64,16 @@ The standalone Extension can only self-disable when it detects a competing
 owner; it cannot unload an Extension that Pi already imported. Global
 Memory-fail-closed behavior therefore belongs to an owner-aware Host preload
 gate (Pi-67 Desktop) or a conflict-free standalone Agent Directory.
+
+Capture uses deterministic `source_message_ids`, persisted semantic prefix
+state, and a separate OpenViking Session lineage after Branch/Fork/Rewind.
+Create and append operations enter the durable outbox before transport; replay
+checks the remote Session/message identity before sending and never treats a
+dropped queue file as delivery. OpenViking server auto-commit is disabled so
+the adapter can persist the accepted source watermark before an explicit
+commit. Recall requests have AbortSignal plus generation/Session fences, and
+one client-owned connection state lets automatic Recall/Capture resume after a
+temporary outage without restarting Pi.
 
 ## Desktop source migration
 

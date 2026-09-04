@@ -1055,6 +1055,21 @@ loading error where the operation can produce those states
   Pi ResourceLoader. OpenViking is the only supported third-party Context/Memory
   owner. Legacy observational-memory and Hy-Memory names are detection/migration
   identifiers only; their runtimes are never bundled or presented as alternatives.
+  A loaded Session may only tighten its Memory privacy authority: `read-only` and
+  `off` are re-read at the next Pi lifecycle or OpenViking Tool boundary, while
+  re-enabling Memory, learning, or changing Owner/Endpoint waits for a new Session.
+  Actor-scoped Recall never retries without `peer_scope`; incompatible servers skip
+  that Prompt's Memory instead of widening the search boundary.
+  Private OpenViking Tools authorize canonical URIs against the current user and
+  current Workspace peer before transport. They cannot browse another user or
+  account Resources, cannot delete a Memory root, and cannot create shared
+  Resources. Archive expansion is current-Session-only, cancellable, bounded,
+  and rendered inside the same escaped untrusted Tool-result envelope.
+  Capture persists stable source-message identity and semantic branch-prefix
+  state; Branch/Fork/Rewind rotates to a separate OpenViking Session lineage.
+  The durable outbox remotely verifies Session/message identity before replay,
+  while a single recoverable connection authority restores automatic Recall and
+  Capture after an outage without a manual refresh.
 - The `Experience` Inspector presents private records, exact task Cases, and
   enterprise candidates in one dense governance list. Its hero and metrics teach
   the progression `Case -> Experience -> SOP candidate` without presenting a new
@@ -1065,6 +1080,9 @@ loading error where the operation can produce those states
   method requires preconditions, ordered steps, validation gates, completion
   criteria, failure modes, and rollback or non-applicability copy; Tool requirements
   remain optional. Outcome plus redaction use independent explicit confirmations.
+  Credential handling replaces the complete credential-bearing expression, then
+  runs a second residual scan. A field that remains credential-like cannot receive
+  `redactionStatus=passed` or enter enterprise submission.
   `保存人工审核` and `提交企业审核` remain two separate actions.
   `已提交` is visibly labeled as awaiting review and must never look equivalent to
   `已共享`; asynchronous Gateway failure stays visible beside the list and never

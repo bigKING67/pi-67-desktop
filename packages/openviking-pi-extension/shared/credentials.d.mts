@@ -2,7 +2,10 @@ export function buildUserAgent(harness: string, version?: string): string;
 
 export function readManifestVersion(manifest: string | URL): string;
 
-export function resolveOpenVikingCredentials(env?: Record<string, string | undefined>): {
+export function resolveOpenVikingCredentials(
+  env?: Record<string, string | undefined>,
+  endpoint?: string,
+): {
   credentialSource: string;
   baseUrl: string;
   mcpUrl: string;

@@ -116,8 +116,6 @@ function sourceMode(env) {
 
 function hasEnvCredentialFields(env) {
   return Boolean(
-    str(env.OPENVIKING_URL, str(env.OPENVIKING_BASE_URL, "")) ||
-    str(env.OPENVIKING_MCP_URL, "") ||
     str(env.OPENVIKING_BEARER_TOKEN, str(env.OPENVIKING_API_KEY, "")) ||
     str(env.OPENVIKING_ACCOUNT, "") ||
     str(env.OPENVIKING_USER, "") ||
@@ -125,13 +123,13 @@ function hasEnvCredentialFields(env) {
   );
 }
 
-function deriveBaseUrl({ env, cliFile, ovFile, mode, useCli }) {
+function deriveConfiguredBaseUrl({ env, cliFile, ovFile, endpoint }) {
   const envUrl = str(env.OPENVIKING_URL, str(env.OPENVIKING_BASE_URL, ""));
   const cliUrl = str(cliFile.url, "");
 
-  if (mode !== "cli" && envUrl) return envUrl.replace(/\/+$/, "");
-  if (useCli && cliUrl) return cliUrl.replace(/\/+$/, "");
-  if (mode !== "env" && cliUrl) return cliUrl.replace(/\/+$/, "");
+  if (envUrl) return envUrl.replace(/\/+$/, "");
+  if (str(endpoint, "")) return str(endpoint, "").replace(/\/+$/, "");
+  if (cliUrl) return cliUrl.replace(/\/+$/, "");
 
   const server = ovFile.server || {};
   const ovUrl = str(server.url, "");
@@ -142,57 +140,74 @@ function deriveBaseUrl({ env, cliFile, ovFile, mode, useCli }) {
   return `http://${host}:${port}`;
 }
 
-export function resolveOpenVikingCredentials(env = process.env) {
+function normalizedEndpoint(value) {
+  const candidate = str(value, "").replace(/\/+$/, "");
+  try {
+    const url = new URL(candidate);
+    url.pathname = url.pathname.replace(/\/+$/, "") || "/";
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return candidate;
+  }
+}
+
+function sourceMatchesEndpoint(sourceUrl, endpoint) {
+  return Boolean(str(sourceUrl, "")) && normalizedEndpoint(sourceUrl) === normalizedEndpoint(endpoint);
+}
+
+export function resolveOpenVikingCredentials(env = process.env, endpoint = "") {
   const files = loadCredentialFiles(env);
   const mode = sourceMode(env);
   const envHasCredentials = hasEnvCredentialFields(env);
-  const useCli = mode === "cli" ||
-    (mode === "auto" && !envHasCredentials && files.cliPath && hasCredentialFields(files.cliFile));
   const cx = files.ovFile.codex || {};
-  const server = files.ovFile.server || {};
+  const baseUrl = deriveConfiguredBaseUrl({ env, ...files, endpoint });
+  const cliMatches = sourceMatchesEndpoint(files.cliFile.url, baseUrl);
+  const ovServerUrl = deriveConfiguredBaseUrl({
+    env: {},
+    cliFile: {},
+    ovFile: files.ovFile,
+    endpoint: "",
+  });
+  const codexHasCredentials = hasCredentialFields({
+    api_key: cx.apiKey,
+    account: cx.accountId,
+    user: cx.userId,
+    peer_id: cx.peerId || cx.peer_id,
+  });
+  const codexMatches = sourceMatchesEndpoint(ovServerUrl, baseUrl);
+  const useEnv = mode === "env" || (mode === "auto" && envHasCredentials);
+  const useCli = !useEnv && (mode === "cli" || mode === "auto")
+    && Boolean(files.cliPath)
+    && hasCredentialFields(files.cliFile)
+    && cliMatches;
+  const useCodex = !useEnv && !useCli && mode === "auto" && codexHasCredentials && codexMatches;
+  const source = useEnv ? "env" : useCli ? "ovcli" : useCodex ? "codex" : "none";
 
-  const baseUrl = deriveBaseUrl({ env, ...files, mode, useCli });
-
-  const apiKey = useCli
-    ? str(files.cliFile.api_key, "")
-    : (
-        str(env.OPENVIKING_BEARER_TOKEN, "") ||
-        str(env.OPENVIKING_API_KEY, "") ||
-        str(files.cliFile.api_key, "") ||
-        str(cx.apiKey, "") ||
-        str(server.root_api_key, "")
-      );
-
-  const account = useCli
-    ? str(files.cliFile.account, str(files.cliFile.account_id, ""))
-    : (
-        str(env.OPENVIKING_ACCOUNT, "") ||
-        str(files.cliFile.account, str(files.cliFile.account_id, "")) ||
-        str(cx.accountId, "")
-      );
-
-  const user = useCli
-    ? str(files.cliFile.user, str(files.cliFile.user_id, ""))
-    : (
-        str(env.OPENVIKING_USER, "") ||
-        str(files.cliFile.user, str(files.cliFile.user_id, "")) ||
-        str(cx.userId, "")
-      );
-
-  const peerId = useCli
-    ? str(files.cliFile.actor_peer_id, str(files.cliFile.peer_id, ""))
-    : (
-        str(env.OPENVIKING_PEER_ID, "") ||
-        str(files.cliFile.actor_peer_id, str(files.cliFile.peer_id, "")) ||
-        str(cx.peerId, str(cx.peer_id, ""))
-      );
+  const apiKey = source === "env"
+    ? str(env.OPENVIKING_BEARER_TOKEN, str(env.OPENVIKING_API_KEY, ""))
+    : source === "ovcli" ? str(files.cliFile.api_key, "")
+      : source === "codex" ? str(cx.apiKey, "") : "";
+  const account = source === "env"
+    ? str(env.OPENVIKING_ACCOUNT, "")
+    : source === "ovcli" ? str(files.cliFile.account, str(files.cliFile.account_id, ""))
+      : source === "codex" ? str(cx.accountId, "") : "";
+  const user = source === "env"
+    ? str(env.OPENVIKING_USER, "")
+    : source === "ovcli" ? str(files.cliFile.user, str(files.cliFile.user_id, ""))
+      : source === "codex" ? str(cx.userId, "") : "";
+  const peerId = source === "env"
+    ? str(env.OPENVIKING_PEER_ID, "")
+    : source === "ovcli" ? str(files.cliFile.actor_peer_id, str(files.cliFile.peer_id, ""))
+      : source === "codex" ? str(cx.peerId, str(cx.peer_id, "")) : "";
 
   const explicitMcpUrl = str(env.OPENVIKING_MCP_URL, "");
   const mcpUrl = (mode !== "cli" && explicitMcpUrl) ? explicitMcpUrl : `${baseUrl.replace(/\/+$/, "")}/mcp`;
 
   return {
     ...files,
-    credentialSource: useCli ? "ovcli" : ((mode === "env" || envHasCredentials) ? "env" : "auto"),
+    credentialSource: source,
     baseUrl,
     mcpUrl,
     apiKey,

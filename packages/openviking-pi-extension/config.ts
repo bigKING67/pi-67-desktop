@@ -5,7 +5,7 @@ import { buildUserAgent, resolveOpenVikingCredentials } from "./shared/credentia
 import { resolveEffectivePeerId } from "./shared/workspace-peer.mjs";
 
 /** Hand-maintained: this extension ships no manifest to read a version from. */
-export const EXTENSION_VERSION = "0.2.0-desktop.3";
+export const EXTENSION_VERSION = "0.2.0-desktop.6";
 
 export type PrivacyMode = "full-learning" | "private-learning" | "read-only" | "off";
 
@@ -113,9 +113,11 @@ export function loadConfigFromModuleUrl(moduleUrl: string): OVConfig {
 export function loadConfig(extensionDir: string): OVConfig {
   const configPath = join(extensionDir, "config.json");
   let file: any = {};
+  let invalidConfiguration = false;
   try {
     if (existsSync(configPath)) file = JSON.parse(readFileSync(configPath, "utf8"));
   } catch {
+    invalidConfiguration = true;
     file = {};
   }
   const agentDir = process.env.PI_CODING_AGENT_DIR || process.env.PI_AGENT_DIR || "";
@@ -127,18 +129,27 @@ export function loadConfig(extensionDir: string): OVConfig {
         file = { ...file, ...userFile, takeover: { ...file.takeover, ...userFile.takeover } };
       }
     } catch {
-      // Invalid user configuration is diagnosed by Desktop Context Doctor; Pi stays usable.
+      // Pi stays usable, but Memory fails closed until a valid configuration
+      // is written and a new Session is created.
+      invalidConfiguration = true;
     }
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(file, "privacyMode")
+    && !isPrivacyMode(file.privacyMode)
+  ) {
+    invalidConfiguration = true;
   }
 
   const takeover = file.takeover && typeof file.takeover === "object" ? file.takeover : {};
-  const creds = resolveOpenVikingCredentials();
+  const configuredEndpoint = typeof file.endpoint === "string" && file.endpoint.trim()
+    ? file.endpoint.trim().replace(/\/+$/, "")
+    : "";
+  const creds = resolveOpenVikingCredentials(process.env, configuredEndpoint);
   const config: OVConfig = {
     ...DEFAULT_CONFIG,
     ...file,
-    endpoint: typeof file.endpoint === "string" && file.endpoint.trim()
-      ? file.endpoint.trim().replace(/\/+$/, "")
-      : creds.baseUrl,
+    endpoint: creds.baseUrl,
     apiKey: creds.apiKey,
     account: creds.account,
     user: creds.user,
@@ -210,6 +221,10 @@ export function loadConfig(extensionDir: string): OVConfig {
   config.recallPeerScope = config.recallPeerScope === "actor" ? "actor" : "all";
   config.recallQueryExpansion = config.recallQueryExpansion === "off" ? "off" : "auto";
   config.privacyMode = normalizePrivacyMode(config.privacyMode);
+  if (invalidConfiguration) {
+    config.enabled = false;
+    config.privacyMode = "off";
+  }
   if (!isSafeEndpoint(config.endpoint)) config.enabled = false;
   config.privateWriteEnabled = config.privacyMode === "private-learning" || config.privacyMode === "full-learning";
   config.enterpriseCandidateEnabled = config.privacyMode === "full-learning";
@@ -221,6 +236,43 @@ export function loadConfig(extensionDir: string): OVConfig {
   if (!Array.isArray(config.bypassPatterns)) config.bypassPatterns = [];
   config.peerId = resolveEffectivePeerId({ cfg: config as any, cwd: process.cwd() }).peerId;
   return config;
+}
+
+/**
+ * Re-read persisted privacy policy at a Pi lifecycle/Tool boundary and apply
+ * only changes that reduce the current Session's authority. Re-enabling
+ * Memory, learning, assistant capture, or Context Takeover requires a new
+ * Session so a running Session can never gain privileges from a file edit.
+ */
+export function tightenRuntimePrivacyFromModuleUrl(
+  current: OVConfig,
+  moduleUrl: string,
+): OVConfig {
+  return tightenRuntimePrivacy(current, loadConfigFromModuleUrl(moduleUrl));
+}
+
+export function tightenRuntimePrivacy(current: OVConfig, requested: OVConfig): OVConfig {
+  const requestedMode = requested.enabled ? requested.privacyMode : "off";
+  const effectiveMode = privacyRank(requestedMode) < privacyRank(current.privacyMode)
+    ? requestedMode
+    : current.privacyMode;
+
+  current.privacyMode = effectiveMode;
+  current.enabled = current.enabled && requested.enabled && effectiveMode !== "off";
+  current.privateWriteEnabled = current.privateWriteEnabled
+    && requested.privateWriteEnabled
+    && (effectiveMode === "private-learning" || effectiveMode === "full-learning");
+  current.enterpriseCandidateEnabled = current.enterpriseCandidateEnabled
+    && requested.enterpriseCandidateEnabled
+    && effectiveMode === "full-learning";
+  current.syncTurns = current.syncTurns && requested.syncTurns && current.privateWriteEnabled;
+  current.takeoverEnabled = current.takeoverEnabled
+    && requested.takeoverEnabled
+    && current.privateWriteEnabled;
+  current.captureAssistantTurns = current.captureAssistantTurns
+    && requested.captureAssistantTurns
+    && current.privateWriteEnabled;
+  return current;
 }
 
 export function isSafeEndpoint(value: string): boolean {
@@ -235,9 +287,22 @@ export function isSafeEndpoint(value: string): boolean {
 }
 
 function normalizePrivacyMode(value: unknown): PrivacyMode {
-  return ["full-learning", "private-learning", "read-only", "off"].includes(String(value))
+  return isPrivacyMode(value)
     ? value as PrivacyMode
     : DEFAULT_CONFIG.privacyMode;
+}
+
+function isPrivacyMode(value: unknown): value is PrivacyMode {
+  return ["full-learning", "private-learning", "read-only", "off"].includes(String(value));
+}
+
+function privacyRank(value: PrivacyMode): number {
+  return {
+    off: 0,
+    "read-only": 1,
+    "private-learning": 2,
+    "full-learning": 3,
+  }[value];
 }
 
 function envBool(value: string, fallback: boolean): boolean {

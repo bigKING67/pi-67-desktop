@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   extractPartsFromPayload,
   extractTextFromPayload,
@@ -17,9 +18,7 @@ function normalizeRole(role) {
 
 function entryPayload(entry) {
   if (!entry || typeof entry !== "object") return null;
-  if (entry.type === "message" && entry.message && typeof entry.message === "object") {
-    return entry.message;
-  }
+  if (entry.type === "message" && entry.message && typeof entry.message === "object") return entry.message;
   if (entry.message && typeof entry.message === "object") return entry.message;
   return entry;
 }
@@ -29,28 +28,41 @@ function faithfulDecision(rawText, cfg) {
   if (!sanitized) return { shouldCapture: false, reason: "empty", text: "" };
   const capped = truncateCaptureText(sanitized, cfg.captureMaxLength || 24000);
   const compact = String(capped || "").replace(/\s+/g, " ").trim();
-  if (/^\[openviking-memory\]/i.test(compact)) {
-    return { shouldCapture: false, reason: "plugin_status", text: "" };
-  }
-  if (/^\/[a-z0-9_-]{1,64}\b/i.test(compact)) {
-    return { shouldCapture: false, reason: "slash_command", text: "" };
-  }
+  if (/^\[openviking-memory\]/i.test(compact)) return { shouldCapture: false, reason: "plugin_status", text: "" };
+  if (/^\/[a-z0-9_-]{1,64}\b/i.test(compact)) return { shouldCapture: false, reason: "slash_command", text: "" };
   return { shouldCapture: true, reason: "faithful", text: capped };
 }
 
-export function extractBranchCapturePayloads(branch, syncedEntryCount = 0, cfg = {}) {
+export function extractBranchCapturePayloads(branch, syncedCaptureCount = 0, cfg = {}, expectedPrefixHash = "") {
   const entries = Array.isArray(branch) ? branch : [];
-  const previousCount = Math.max(0, Number(syncedEntryCount) || 0);
-  const resetWatermark = entries.length < previousCount;
-  const start = resetWatermark ? 0 : Math.min(previousCount, entries.length);
-  const payloads = [];
+  const captures = captureEntries(entries, cfg);
+  const previousCount = Math.max(0, Math.floor(Number(syncedCaptureCount) || 0));
+  const actualPrefixHash = hashSourceIds(captures.slice(0, previousCount).map((entry) => entry.sourceId));
+  const resetWatermark = captures.length < previousCount
+    || Boolean(expectedPrefixHash && expectedPrefixHash !== actualPrefixHash);
+  const start = resetWatermark ? 0 : Math.min(previousCount, captures.length);
+  return {
+    payloads: captures.slice(start).map((entry) => entry.payload),
+    prefixHashes: captures.slice(start).map((_entry, index) => (
+      hashSourceIds(captures.slice(0, start + index + 1).map((capture) => capture.sourceId))
+    )),
+    nextEntryCount: captures.length,
+    observedEntryCount: entries.length,
+    observedCaptureCount: captures.length,
+    currentPrefixHash: hashSourceIds(captures.map((entry) => entry.sourceId)),
+    resetWatermark,
+  };
+}
 
-  for (const entry of entries.slice(start)) {
+function captureEntries(entries, cfg) {
+  const captures = [];
+  let turnNumber = 0;
+  for (const entry of entries) {
     const payload = entryPayload(entry);
     if (!payload) continue;
-
     const role = normalizeRole(payload.role || payload.type || payload.kind);
     if (!role) continue;
+    if (role === "user") turnNumber++;
     if (role === "assistant" && cfg.captureAssistantTurns === false) continue;
 
     const parts = extractPartsFromPayload(payload, { toolMaxChars: cfg.captureToolMaxChars });
@@ -60,33 +72,42 @@ export function extractBranchCapturePayloads(branch, syncedEntryCount = 0, cfg =
     const decision = cfg.faithfulCapture || cfg.takeoverEnabled
       ? faithfulDecision(rawText, cfg)
       : shouldCaptureText(rawText, role, cfg);
-    const structuredParts = cfg.captureToolResults === false
-      ? []
-      : parts.filter((part) => part?.type !== "text");
+    const structuredParts = cfg.captureToolResults === false ? [] : parts.filter((part) => part?.type !== "text");
     if (!decision.shouldCapture && structuredParts.length === 0) continue;
 
-    // decision.text is derived from rawText, which renders tool I/O as
-    // "[tool-result ...]" lines. For a tool-only payload that would resend the
-    // same output the tool part already carries, so only keep it when the
-    // payload really had text of its own.
     const hasTextPart = parts.some((part) => part?.type === "text");
     const bodyParts = [
-      ...(hasTextPart && decision.shouldCapture && decision.text
-        ? [{ type: "text", text: decision.text }]
-        : []),
+      ...(hasTextPart && decision.shouldCapture && decision.text ? [{ type: "text", text: decision.text }] : []),
       ...structuredParts,
     ];
-    const body = bodyParts.length > 0
-      ? { role, parts: bodyParts }
-      : { role, content: decision.text };
+    const body = bodyParts.length > 0 ? { role, parts: bodyParts } : { role, content: decision.text };
     if (cfg.peerId) body.peer_id = cfg.peerId;
-    payloads.push(body);
+    const sourceId = stableSourceId(entry, body, captures.length);
+    body.source_message_ids = [sourceId];
+    body.turn_id = `pi-turn-${Math.max(1, turnNumber)}`;
+    body.message_kind = role === "user" ? "user_query" : "assistant_step";
+    captures.push({ sourceId, payload: body });
   }
+  return captures;
+}
 
-  return {
-    payloads,
-    nextEntryCount: entries.length,
-    observedEntryCount: entries.length,
-    resetWatermark,
+function stableSourceId(entry, payload, captureIndex) {
+  const identity = {
+    captureIndex,
+    entryId: String(entry?.id ?? entry?.entryId ?? ""),
+    parentId: String(entry?.parentId ?? entry?.parent_id ?? ""),
+    payload,
   };
+  return `pi67:${createHash("sha256").update(stableStringify(identity)).digest("hex")}`;
+}
+
+function hashSourceIds(ids) {
+  return createHash("sha256").update(ids.join("\n")).digest("hex");
+}
+
+function stableStringify(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  const keys = Object.keys(value).sort();
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
 }

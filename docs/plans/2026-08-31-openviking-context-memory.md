@@ -1,6 +1,6 @@
 # OpenViking unified Context, Memory, and Experience vertical slice
 
-Status: official OpenViking Recall convergence implemented, aggregate-verified, and freshly packaged on macOS arm64; Windows and production acceptance pending
+Status: All sealed OpenViking review findings are source-, real-Lab-, and macOS-packaged-verified; Windows and production acceptance remain pending
 Owner: Codex
 Started: 2026-08-31
 Last updated: 2026-09-04
@@ -44,6 +44,9 @@ migration behavior are absorbed into Desktop-owned Pi capability distribution.
   assets, runtime status, and audit-oriented state.
 - Enterprise storage accepts only redacted candidate payloads with pseudonymous
   source references and evidence hashes; publishing is an explicit review action.
+- Loaded Sessions apply stricter privacy settings monotonically at the next Pi
+  lifecycle or OpenViking Tool boundary; no compatibility path may remove actor
+  scope, and no candidate may pass while retaining a credential-like value.
 - Focused schema, policy, route, component, backend, and cross-process tests pass.
 
 ## Delivery boundary
@@ -60,7 +63,7 @@ migration behavior are absorbed into Desktop-owned Pi capability distribution.
 
 | State | Evidence | Source | Verified at |
 | --- | --- | --- | --- |
-| OBSERVED | Desktop is at `30d7fae809f9d4fa26072d161fde988940300710`, four commits ahead of `origin/main`, with pre-existing uncommitted OpenViking A/B tooling plus the current official-Recall convergence WIP; Protocol version is v4. | live Git and source | 2026-09-04 |
+| OBSERVED | Desktop is at pre-delivery baseline `47f25710e7d78ab4996103d3ee0f5550327b7f7b`, eight commits ahead of `origin/main`, with the completed scoped OpenViking sealed-review remediation still uncommitted; Protocol version is v4. | live Git and source | 2026-09-04 |
 | SUPERSEDED | The former standalone `pi-67` repository supplied validated migration, Doctor, and Extension-distribution behavior, but is no longer an active product runtime or ownership boundary. | accepted product boundary and current Desktop architecture | 2026-09-02 |
 | OBSERVED | DataHub remains at `438e10d019ac13cf3fc029e479eee8a5928e31b9`; its local tracking ref is two commits ahead of the checkout, and unrelated DataOps/WeChat/package WIP overlaps shared manifests. The Agent Trellis task remains `in_progress`. | live Git and Trellis context; no fetch performed | 2026-09-02 |
 | VERIFIED | Pi JSONL remains the Session truth; Desktop index remains disposable. | repository AGENTS and architecture contracts | 2026-08-31 |
@@ -70,6 +73,7 @@ migration behavior are absorbed into Desktop-owned Pi capability distribution.
 | VERIFIED | DataHub renders authenticated `not_configured`, `unavailable`, and `degraded` runtime states with exact DOM/network state and three current browser67 PNG receipts. | disposable DataHub fixture and browser67 Agent Window | 2026-09-02 |
 | VERIFIED | The macOS arm64 packaged Desktop isolates Agent Directory/Profile/Workspace/OpenViking identity and falls back to Pi's native threshold Compaction when OpenViking returns no successful response, then continues and resumes the same Session. | packaged isolation and compaction-fallback receipts | 2026-09-02 |
 | VERIFIED | A 54-run Agent A/B (six scenarios, three profiles, three repetitions) found equal task/control correctness but materially worse cost and latency for the custom extra-Tool candidate: official-style used 24 provider and 60 OpenViking requests, 124,059 tokens, p50 9.5 s and p95 20.1 s; the custom candidate used 34 provider and 78 OpenViking requests, 200,850 tokens, p50 11.6 s and p95 27.4 s. | isolated Agent A/B receipt and report | 2026-09-03 |
+| VERIFIED | Review Craft identified three P0 OpenViking boundaries: loaded-Session privacy split-brain, actor-scope compatibility widening, and label-only credential redaction. The remediation now enforces monotonic privacy tightening, actor-scope fail-closed Recall, and whole-value redaction plus residual scanning. | sealed review plus focused and aggregate source gates | 2026-09-04 |
 
 Evidence artifacts retained outside the product/runtime truth boundary:
 
@@ -118,6 +122,7 @@ Evidence artifacts retained outside the product/runtime truth boundary:
 | Default privacy mode is `private-learning`; `full-learning` may create review candidates only for trusted enterprise-bound projects. | Preserves useful private learning while keeping enterprise publication reviewable. | Organization policy explicitly requires stricter no-write defaults. |
 | Current-prompt Recall remains bounded to one private and one shared Experience within a 1,200-token Recall budget; Session Profile has a separate 1,200-token ceiling. | The bounded local budget and quotas constrain stale Experience dominance while preserving the official server lifecycle and leaving deep reads demand-driven. | Production task-quality and latency evidence supports a bounded budget or quota change. |
 | Recall lifecycle and retrieval algorithm follow OpenViking v0.4.16: every eligible current Prompt uses one synchronous context search with active `session_id`, `query_expansion=auto`, and five-turn dedup; prompts below the official minimum length skip the network. `viking_search` performs one bounded `/find`, followed by `viking_read` only for a selected URI. The adapter adds no task classifier, manual refresh, cheap-first router, second expansion path, or hidden result cache. | The 54-run A/B showed that the custom extra-Tool strategy preserved correctness but increased provider calls, OpenViking requests, tokens, p50, and p95. Upstream alignment is faster, cheaper, and simpler to maintain while Pi remains the sole Tool-selection authority. | A later upstream release or production A/B demonstrates a materially better strategy under the same correctness and isolation gates. |
+| Privacy changes in a loaded Session are monotonic; actor scope never downgrades; candidate redaction replaces whole credential expressions and rejects residual credential-like values. | A running Session must be able to lose authority without silently gaining it, and compatibility or review UX must never widen a privacy boundary. | Pi/OpenViking later provide an equivalent atomic policy-reload and scope contract with independently verified guarantees. |
 | DataHub stores governance metadata; OpenViking stores shared resource content/vector state. | Keeps audit/RBAC transactional while avoiding a second vector/memory implementation. | OpenViking adopts the required enterprise review ledger and relational governance contracts. |
 | Private Agent Evolution is enabled for personal Case/Trajectory/Experience extraction; automatic enterprise publication remains disabled, and only reviewed assets become shared. | Personal experience extraction is required for local value, while organizational mutation must remain evidence-backed, redacted, reviewable, and reversible. | Review/audit metrics justify an explicitly governed auto-promotion policy. |
 
@@ -202,6 +207,22 @@ Evidence artifacts retained outside the product/runtime truth boundary:
   count, and whether the Gateway was invoked; it never stores the raw query or
   shared content. Real-Lab and deterministic HTTP E2E require publish, search,
   read, revoke, and OpenViking cleanup actions in the disposable audit ledger.
+- [x] 16. Remediate the three P0 findings from the 2026-09-04 OpenViking review.
+  Re-read privacy at Pi lifecycle and Tool boundaries without permitting a loaded
+  Session to widen authority; fail closed when a server rejects `peer_scope`;
+  replace complete credential-bearing expressions and reject residual high-risk
+  values before `redactionStatus=passed`. Pin Extension `0.2.0-desktop.4` in
+  capability catalog `2026.09.04.2`, then pass focused, aggregate, and fresh
+  macOS packaged smoke gates.
+- [x] 17. Close the remaining sealed-review findings in Extension
+  `0.2.0-desktop.6`: cancel and generation-fence Recall, persist branch-aware
+  capture lineage, add stable source-message identity and verified outbox replay,
+  authorize every private Tool URI, bound current-Session Archive expansion,
+  unify the recoverable connection state, ignore retired on-disk owners unless
+  configured, and select credentials from one endpoint-matched source. Pin the
+  resulting tree in capability catalog `2026.09.04.4`, then pass focused,
+  provenance, aggregate, real v0.4.16 compatibility, packaged isolation,
+  Compaction fallback, and fresh macOS preview gates.
 
 ## Validation matrix
 
@@ -210,12 +231,12 @@ Evidence artifacts retained outside the product/runtime truth boundary:
 | Legacy `pi-67` migration evidence | focused Extension/config/Doctor/conflict/Recall-and-Tool tests; historical release-contract and packed-artifact gates | pinned provenance, bounded deep read, truthful effective config, and explicit source selection are preserved during Desktop absorption | PASS as migration evidence: focused OpenViking 17/17, TypeScript, 69/69 release contracts, CLI self-test, packed artifact, and release check passed with the historical missing-`pwsh` warning. The standalone control plane and its former startup-Recall policy are superseded and are not current product targets. |
 | Recall strategy and upstream parity | 54-run isolated Agent A/B plus current Extension/domain/Protocol/Host/Renderer focused tests | official current-prompt Recall preserves task/control correctness while avoiding custom Tool continuations; current product performs one context request per eligible Prompt and one `/find` per explicit Tool call | PASS for strategy selection: official-style and custom candidate both passed all 24 correctness checks, while official-style reduced provider requests by 29%, OpenViking requests by 23%, tokens by 38%, p50 by 18%, and p95 by 27% relative to the custom candidate. Final aggregate/package evidence is recorded separately after the current source convergence. |
 | Desktop domain/protocol | focused tests, protocol revision gate, aggregate typecheck | schema and policy contracts pass | PASS: Protocol v4 revision `ff9f5ba8e657e838f240efe6f8f1981175918f30cae6d818940ecf4ea8d9d372`; affected Domain/Protocol/Agent Host/Desktop/Renderer typechecks pass. Typed candidate review, submission, assembly-failure, validation, promotion-failure, official Recall route, and Recall performance-summary contracts are covered. |
-| Desktop host/renderer | Agent Host/config/client/router, secure-credential store, Supervisor, candidate assembler/governance, renderer review, authority, binding recovery, isolation, and Compaction fallback tests | no direct renderer service channel; token/private URI/raw Session identity never reaches Renderer or Gateway; states render and recover correctly | PASS: exact Commit provenance, bounded Pi JSONL hashing, OpenViking task/diff reconciliation, deterministic redaction, durable private candidates, explicit review, separate enterprise submission, and submitted-not-shared behavior are covered. Enterprise credential restoration no longer gates Agent Host readiness, and an empty Profile does not probe Keychain. The latest aggregate source gate passes with 659 test files passed, 1 skipped, and 3,369 tests passed; 4 tests are contractually skipped. Architecture reports 940 modules, 3,507 imports, and zero cycles; Statements/Branches/Functions/Lines coverage is 82.12%/76.15%/86.18%/85.99%. |
+| Desktop host/renderer | Agent Host/config/client/router, secure-credential store, Supervisor, candidate assembler/governance, renderer review, authority, binding recovery, isolation, and Compaction fallback tests | no direct renderer service channel; token/private URI/raw Session identity never reaches Renderer or Gateway; states render and recover correctly | PASS: exact Commit provenance, bounded Pi JSONL hashing, OpenViking task/diff reconciliation, whole-value credential redaction plus residual scanning, durable private candidates, explicit review, separate enterprise submission, and submitted-not-shared behavior are covered. Enterprise credential restoration no longer gates Agent Host readiness, and an empty Profile does not probe Keychain. The latest aggregate source gate passes with 669 test files passed, 2 skipped, and 3,414 tests passed; 5 tests are contractually skipped. Architecture reports 944 modules, 3,515 imports, and zero cycles; Statements/Branches/Functions/Lines coverage is 82.12%/76.15%/86.18%/86.00%. |
 | DataHub migration/backend | migration checks, `cargo fmt`, `cargo check`, `cargo clippy`, `cargo test`, disposable authenticated real-Lab E2E | RBAC, redaction, review, publish/search/read/revoke/audit contracts pass | PASS: 210 ordinary Rust tests passed and 7 opt-in tests were skipped by the ordinary suite; the dedicated harness separately passed the PostgreSQL repository, authenticated HTTP Double, and authenticated real OpenViking v0.4.16 contracts. Migration 018 was applied only to the disposable PostgreSQL database, never production. |
 | DataHub frontend | focused Vitest, typecheck, lint, build, route/design/structure gates, and browser67 authenticated Agent Window | Agent route/navigation/permission, healthy, empty, populated, `not_configured`, `unavailable`, and `degraded` states pass | PASS: focused tests, typecheck, lint, production build, protected navigation, semantic-list cleanup, and authenticated visual states pass. The three runtime-state PNGs are current 3024-pixel-wide captures with SHA-256 values `ef35f0a…`, `35ec85c9…`, and `cf77f405…`; the managed task ended with zero remaining tabs. |
 | Aggregate source | each repository's required aggregate gate | no unrelated regression introduced | PARTIAL at delivery level: latest Desktop `corepack pnpm run check` PASS, including Protocol revision, typecheck, lint, architecture, dead code, references, structure, production transport, workflow pins, and coverage. DataHub functional Rust/frontend/migration/build gates pass, but its aggregate delivery baseline remains unresolved because the checkout is two commits behind the current local tracking ref; no fetch, pull, merge, rebase, or version normalization was authorized. |
 | Runtime/host | local OpenViking v0.4.16 Lab, real Pi/Agent Host contracts, authenticated DataHub Gateway, and disposable enterprise namespace | authenticated data plane, Pi Tool selection, capture, Turn retention, private extraction/recall, shared publication/recall/revoke, and fail-open behavior | PASS locally: the loopback-only arm64 Lab is healthy; private capture, logical-Turn retention, Agent Evolution, search/read/forget, and outage continuation pass. The authenticated enterprise path publishes one reviewed tenant/project-scoped Experience, returns exactly one active allowlisted semantic hit, deep-reads it as untrusted content, revokes and deletes it, then returns zero. Pi chat/local Tools remain available when OpenViking or the Gateway is unavailable. |
-| Packaged artifact | unsigned macOS arm64 package, product flow, isolation receipt, and native Compaction-fallback receipt | correct renderer/host wiring; no OM runtime; no credential leakage or local-owner contamination; Pi fallback continuity | PASS on macOS arm64. The fresh 2026-09-04 preview packages capability catalog `2026.09.04.1`, passes the packaged Electron smoke, launches the repository artifact through `app://pi67`, and binds `app.asar` SHA-256 `441cb659a483311c9ad45e54b8c6f3c3c9a4f82265ee7733311e537beff53e54`. Earlier exact product E2E remains bound to executable SHA-256 `79019361f697c1a81489dba3e94631b0977770c1ab15236f1f033f9de6238874`: Device Authorization, Workspace binding/recovery, real model-selected `viking_shared_search`/`viking_shared_read`, XML escaping, untrusted projection, Tool-authority non-inheritance, revoke-to-zero, credential expiry, Host epoch recovery, and service degradation all pass. Its isolation receipt records zero canonical Session mutations and zero existing-memory injection. With six failed OpenViking connections and zero successful responses, Pi created exactly one native threshold Compaction entry, continued the Session, and resumed the same Session after a second packaged launch. No paid exact-source task-quality rerun was performed for the fresh artifact. |
+| Packaged artifact | unsigned macOS arm64 package, product flow, isolation receipt, and native Compaction-fallback receipt | correct renderer/host wiring; no OM runtime; no credential leakage or local-owner contamination; Pi fallback continuity | PASS on macOS arm64. The final preview packages OpenViking `0.2.0-desktop.6` with source-tree SHA-256 `08c076cc…` in capability catalog `2026.09.04.4`; the prepared package contains the complete checked runtime-module closure and has tree SHA-256 `a6638415…`. Packaged Electron smoke passes, opens `app://pi67`, and binds `app.asar` SHA-256 `b0ff42e9c4d4d0223e8f5aaeea471c9e81ef504cb71beda59988408316b753cf`. Fresh serial exact-source isolation receipt `0762da9b-ef1f-4096-937e-979929023844` records one isolated Session, 16 synthetic OpenViking requests, zero canonical Session mutations, zero existing-memory injection, and complete cleanup. Fresh serial Compaction receipt `a4ba574e-588e-458e-a890-1bf3f031634f` records six failed OpenViking connections, exactly one Pi-native threshold Compaction with `fromExtension=false`, a continued Turn, and same-Session Resume after restart. The artifact remains present with the same hash after both serial receipts and the preview process remains live. Earlier deep authenticated product E2E remains bound to executable SHA-256 `79019361f697c1a81489dba3e94631b0977770c1ab15236f1f033f9de6238874`: Device Authorization, Workspace binding/recovery, real model-selected shared search/read, XML escaping, untrusted projection, Tool-authority non-inheritance, revoke-to-zero, credential expiry, Host epoch recovery, and service degradation all pass. |
 | Windows/VPS | real Windows x64 and DataHub VPS acceptance | distribution, Chinese paths, TLS/identity/storage | UNVERIFIED: outside local delivery boundary |
 
 ## Rollback
@@ -523,6 +544,29 @@ Context owner; start a new Session under the restored baseline.
   Native inspection confirmed the new app process and `app://pi67` workbench are
   active. A fresh paid task-quality A/B is intentionally not inferred from this
   packaging result; the prior 54-run receipt remains the strategy evidence.
+- 2026-09-04: Remediated the three P0 findings from the sealed OpenViking review.
+  Loaded Sessions now apply only privacy reductions at lifecycle/Tool boundaries;
+  `peer_scope` incompatibility skips Recall without an unscoped retry or raw
+  fallback; Experience review removes complete synthetic credential expressions
+  and rejects suspicious residual values. Focused tests pass 18/18, the aggregate
+  gate passes 661 files and 3,377 tests, and a fresh catalog `2026.09.04.2`
+  macOS arm64 preview passed packaged smoke and opened with `app.asar` SHA-256
+  `068867159a0f5bd7ef4f2aedfce1e09e3584ac1b0592788e7b6d49b3023e2d29`.
+- 2026-09-04: Closed all remaining sealed-review findings in OpenViking Extension
+  `0.2.0-desktop.6`. Recall is abortable and Session-generation fenced; Capture
+  persists semantic branch lineage and stable source-message identities; the
+  outbox verifies uncertain remote acceptance before replay; private Tools are
+  limited to the current actor/Workspace; Archive expansion is current-Session,
+  bounded, escaped, and cancellable; connection recovery uses one state; owner
+  conflicts inspect configured packages rather than retired directories; and
+  credentials come from exactly one endpoint-matched source. Real v0.4.16
+  compatibility passes without reading existing resources and deletes its exact
+  synthetic Session. Packaged testing exposed and fixed an independent capability
+  preparation defect: four new runtime modules were omitted by the old copy
+  allowlist. Capability preparation now validates the recursive local-module
+  closure before packaging. Final catalog `2026.09.04.4`, aggregate 669-file /
+  3,414-test gate, exact-source packaged smoke, isolation receipt, and Pi-native
+  Compaction/Resume receipt all pass; the fresh preview is open.
 
 ## Closeout
 

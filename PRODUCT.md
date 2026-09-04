@@ -197,7 +197,8 @@ the only Runtime and behavior specification source.
   Enterprise login and Workspace binding only make the current trusted project
   eligible to create a separate redacted candidate. A candidate is assembled from
   one exact Pi JSONL snapshot and its exact OpenViking Session Commit memory diff,
-  then requires explicit local outcome/redaction review and a separate submit
+  then requires whole-value credential redaction, a residual credential scan,
+  explicit local outcome/redaction review, and a separate submit
   action. Submission means `enterprise review pending`, never `shared`; publishing
   remains a distinct DataHub governance action and never exposes the private source
   Session or private Memory URI.
@@ -212,6 +213,18 @@ the only Runtime and behavior specification source.
   `viking_read`. User feedback may suppress or rerank returned items as a governance
   layer, but never broadens retrieval scope. Private Experience, local OpenViking
   Resource, and enterprise Experience limits remain independently named and governed.
+- Local OpenViking Tools are private-memory capabilities, not an arbitrary
+  `viking://` filesystem. Search, read, browse, forget, and Archive expansion
+  are restricted to the current user/current Workspace peer; direct account
+  Resource ingestion remains an enterprise-governed Gateway action. Every
+  returned body is bounded and untrusted, including archived Session messages.
+- OpenViking capture is outbox-first and lineage-aware. Stable source-message
+  identities plus remote preflight prevent crash-window duplicate appends;
+  Branch/Fork/Rewind starts a separate OpenViking Session lineage rather than
+  mixing replaced history. One recoverable client connection state restores
+  automatic Recall and Capture after a transient outage without user refresh.
+  Environment, `ovcli.conf`, and local server credentials are never field-wise
+  combined, and a file credential is accepted only for its matching endpoint.
 - Enterprise Experience and SOP retrieval asks OpenViking for a bounded candidate
   set, intersects it with DataHub's current Account/Project active allowlist, then
   deterministically reranks eligible assets using semantic relevance, task and
@@ -219,6 +232,12 @@ the only Runtime and behavior specification source.
   expiry, and SOP version before enforcing the final result limit. Revoked,
   cross-Project, and expired assets cannot become prompt context even when their
   vectors remain highly ranked.
+- Privacy changes inside a loaded Session are monotonic. `read-only` and `off`
+  take effect at the next Pi lifecycle or OpenViking Tool boundary and remove
+  later write/capture authority; enabling Memory, reopening learning, or changing
+  Owner/Endpoint requires a new Session. Actor scope is a hard boundary: a server
+  that rejects `peer_scope` receives no unscoped retry or wider raw-search fallback
+  for that Prompt.
 - Recall observations are local, bounded, and privacy-safe: only route, duration,
   counts, scores, configuration detail, and SHA-256 identifiers are retained; raw
   queries, recalled bodies, local paths, identities, and credentials are excluded.

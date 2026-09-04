@@ -33,6 +33,7 @@ const evidenceDirectory = process.env.PI67_ISOLATION_EVIDENCE_DIR?.trim()
 const artifact = resolvePackagedArtifact();
 const directories = await createPackagedTestDirectories("pi67-packaged-isolation-", "synthetic-workspace");
 const providerObservationPath = join(directories.userDataDirectory, "provider-observations.jsonl");
+const contextDiagnosticPath = join(directories.agentDir, "runtime", "context-recall-observations.ndjson");
 const canonicalBefore = await snapshotDirectoryMetadata(canonicalSessionRoot);
 if (!canonicalBefore.exists) {
   throw new Error("Canonical Pi Session root is absent; refusing to create or inspect it for an isolation receipt.");
@@ -40,11 +41,14 @@ if (!canonicalBefore.exists) {
 const canonicalProbe = watchDirectoryMutationDigests(canonicalSessionRoot);
 const openViking = await startSyntheticOpenViking({ accountId, accessValue, peerId, userId });
 let application;
+let runtimeWindow;
 let isolatedSessions = [];
 let modelContext = { memoryContextBlockCount: -1 };
 let canonicalAfter = canonicalBefore;
 let isolatedProfileRemoved = false;
 let openVikingDoubleClosed = false;
+let contextDiagnosticEvents = [];
+let boundedUiState = "";
 let runError;
 let closeFailure;
 try {
@@ -64,7 +68,8 @@ try {
       OPENVIKING_ACCOUNT: accountId,
       OPENVIKING_USER: userId,
       OPENVIKING_PEER_ID: peerId,
-      OPENVIKING_WORKSPACE_PEER: "0"
+      OPENVIKING_WORKSPACE_PEER: "0",
+      PI67_CONTEXT_EVENT_LOG: contextDiagnosticPath
     },
     hideNativeWindow: true,
     isolateNativeWindow: true,
@@ -72,6 +77,7 @@ try {
     userDataDirectory: directories.userDataDirectory
   });
   const window = await application.firstWindow({ timeout: 60_000 });
+  runtimeWindow = window;
   await window.waitForLoadState("domcontentloaded");
   await window.getByRole("button", { name: "选择工作区" }).waitFor({ state: "visible", timeout: 30_000 });
   await application.evaluate(({ dialog }, workspace) => {
@@ -102,6 +108,7 @@ try {
   ]);
 } catch (error) {
   runError = error;
+  boundedUiState = await runtimeWindow?.locator("body").innerText().then((value) => value.slice(0, 4_000)).catch(() => "") ?? "";
 } finally {
   if (application) {
     const close = await closeElectronApplicationWithinTimeout({ application, timeoutMs: 5_000 });
@@ -111,12 +118,23 @@ try {
   }
   canonicalProbe.close();
   canonicalAfter = await snapshotDirectoryMetadata(canonicalSessionRoot);
+  contextDiagnosticEvents = await readBoundedNdjson(contextDiagnosticPath);
   await openViking.close();
   openVikingDoubleClosed = await endpointUnavailable(openViking.endpoint);
   await cleanupPackagedTestDirectories(directories.userDataDirectory);
   isolatedProfileRemoved = !(await pathExists(directories.userDataDirectory));
 }
-if (runError) throw runError;
+if (runError) {
+  const requestBoundaries = openViking.observations.slice(-50).map(({ method, path, identityMatched }) => ({
+    method,
+    path,
+    identityMatched
+  }));
+  throw new Error(
+    `Packaged isolation failed after bounded OpenViking requests=${JSON.stringify(requestBoundaries)} diagnostics=${JSON.stringify(contextDiagnosticEvents)} ui=${JSON.stringify(boundedUiState)}`,
+    { cause: runError }
+  );
+}
 if (closeFailure) throw closeFailure;
 
 const artifactMetadata = await stat(artifact.executablePath);
@@ -256,6 +274,7 @@ function isolationProviderSource(observationPath) {
 
 async function startSyntheticOpenViking({ accountId: expectedAccount, accessValue: expectedAccess, peerId: expectedPeer, userId: expectedUser }) {
   const observations = [];
+  let sessionCreated = false;
   const server = createServer(async (request, response) => {
     await drainRequest(request);
     const path = request.url ?? "/";
@@ -264,25 +283,29 @@ async function startSyntheticOpenViking({ accountId: expectedAccount, accessValu
       && request.headers["x-openviking-actor-peer"] === expectedPeer
       && request.headers.authorization === `Bearer ${expectedAccess}`;
     observations.push({ method: request.method ?? "GET", path, identityMatched });
-    response.writeHead(200, { "Content-Type": "application/json" });
+    const send = (statusCode, result) => {
+      response.writeHead(statusCode, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ status: statusCode < 400 ? "ok" : "error", result }));
+    };
     if (path === "/health") {
-      response.end(JSON.stringify({ status: "ok", result: { version: "0.4.16-isolated-double" } }));
+      send(200, { version: "0.4.16-isolated-double" });
     } else if (path === "/api/v1/system/status") {
-      response.end(JSON.stringify({ status: "ok", result: { user: expectedUser } }));
+      send(200, { user: expectedUser });
     } else if (path.startsWith("/api/v1/fs/ls")) {
-      response.end(JSON.stringify({ status: "ok", result: [] }));
+      send(200, []);
+    } else if (path === "/api/v1/sessions" && request.method === "POST") {
+      sessionCreated = true;
+      send(200, {});
+    } else if (/^\/api\/v1\/sessions\/[^/]+$/u.test(path) && request.method === "GET") {
+      send(sessionCreated ? 200 : 404, sessionCreated ? {} : null);
+    } else if (path.includes("/context?") && request.method === "GET") {
+      send(sessionCreated ? 200 : 404, sessionCreated ? { messages: [] } : null);
     } else if (path === "/api/v1/search/find") {
-      response.end(JSON.stringify({
-        status: "ok",
-        result: { memories: [], resources: [], skills: [], total: 0 }
-      }));
+      send(200, { memories: [], resources: [], skills: [], total: 0 });
     } else if (path === "/api/v1/search/search") {
-      response.end(JSON.stringify({
-        status: "ok",
-        result: { entries: [], rendered: "", digest: "", stats: {} }
-      }));
+      send(200, { entries: [], rendered: "", digest: "", stats: {} });
     } else {
-      response.end(JSON.stringify({ status: "ok", result: {} }));
+      send(200, {});
     }
   });
   await new Promise((resolvePromise, reject) => {
@@ -317,6 +340,18 @@ async function readModelContext(path) {
     observationCount: entries.length,
     memoryContextBlockCount: entries.reduce((sum, entry) => sum + entry.memoryContextBlockCount, 0)
   };
+}
+
+async function readBoundedNdjson(path) {
+  try {
+    return (await readFile(path, "utf8"))
+      .split(/\r?\n/u)
+      .filter(Boolean)
+      .slice(-50)
+      .map((line) => JSON.parse(line));
+  } catch {
+    return [];
+  }
 }
 
 async function waitFor(predicate, timeoutMs = 10_000) {

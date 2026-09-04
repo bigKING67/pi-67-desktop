@@ -28,6 +28,7 @@ import {
   copyCapabilityEntry as copyEntry,
   writeCapabilityPackageManifest as writePackageManifest
 } from "./prepared-capability-files.mjs";
+import { assertPreparedLocalModuleClosure } from "./prepared-module-closure.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const lockPath = resolve(repositoryRoot, "eng/capabilities/capability-sources.lock.json");
@@ -240,7 +241,9 @@ async function prepareOpenVikingPiExtension(sourceRoot, source) {
   const destination = join(outputRoot, "packages", source.id);
   await copyAllowed(sourceRoot, destination, [
     "UPSTREAM.md",
+    "archive-tool-support.ts",
     "client.ts",
+    "client-contracts.ts",
     "config.json",
     "config.ts",
     "diagnostics.ts",
@@ -248,16 +251,19 @@ async function prepareOpenVikingPiExtension(sourceRoot, source) {
     "lib",
     "memory-owner-policy.ts",
     "package.json",
+    "private-uri-policy.ts",
     "recall.ts",
     "recall-feedback.ts",
     "recall-tool-policy.ts",
     "recall-tool-support.ts",
+    "runtime-privacy.ts",
     "shared",
     "sync.ts",
     "takeover.ts",
     "tool-result.ts",
     "tools.ts"
   ]);
+  await assertPreparedLocalModuleClosure(destination, "index.ts");
   const packageManifest = JSON.parse(await readFile(join(destination, "package.json"), "utf8"));
   if (packageManifest.version !== source.version || packageManifest.pi?.extensions?.[0] !== "./index.ts") {
     throw new Error("Bundled OpenViking Pi Extension does not match its Desktop source lock.");

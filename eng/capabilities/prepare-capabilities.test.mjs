@@ -12,6 +12,7 @@ import {
   treeSha256
 } from "./prepared-capabilities-validation.mjs";
 import { assertPi67SkillPackSource } from "./pi67-skill-pack-overlay.mjs";
+import { assertPreparedLocalModuleClosure } from "./prepared-module-closure.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 
@@ -30,10 +31,23 @@ describe("Desktop first-party capability source lock", () => {
     }
   });
 
+  it("rejects an incomplete prepared runtime module closure", async () => {
+    const prepared = await mkdtemp(join(tmpdir(), "pi67-prepared-module-closure-"));
+    try {
+      await writeFile(join(prepared, "index.ts"), 'import "./dependency.js";\n', "utf8");
+      await expect(assertPreparedLocalModuleClosure(prepared, "index.ts"))
+        .rejects.toThrow(/missing local module/u);
+      await writeFile(join(prepared, "dependency.ts"), "export {};\n", "utf8");
+      await expect(assertPreparedLocalModuleClosure(prepared, "index.ts")).resolves.toBeUndefined();
+    } finally {
+      await rm(prepared, { recursive: true, force: true });
+    }
+  });
+
   it("pins two Desktop-internal packages, three first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.09.04.1");
+    expect(lock.catalogVersion).toBe("2026.09.04.4");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi-workspace-resources",
       "openviking-pi-extension",
@@ -60,8 +74,8 @@ describe("Desktop first-party capability source lock", () => {
     });
     expect(lock.sources.find((source) => source.id === "openviking-pi-extension")).toMatchObject({
       internalPath: "packages/openviking-pi-extension",
-      treeSha256: "381884e4e459d191360772c26e5942c5c6e105e2380e038de4d23f8460e7c71a",
-      version: "0.2.0-desktop.3",
+      treeSha256: "08c076cc5e732f432c688221ecacf521e78ccb359bed27b47a8f237d4cc137ad",
+      version: "0.2.0-desktop.6",
       includedExtensions: [{ id: "pi67-openviking" }]
     });
     expect(lock.sources.find((source) => source.id === "browser67")).toMatchObject({

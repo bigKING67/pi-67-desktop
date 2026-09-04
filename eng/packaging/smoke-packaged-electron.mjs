@@ -420,6 +420,7 @@ function packagedSmokeEnvironment(profileRoot) {
     USERPROFILE: profileRoot,
     APPDATA: join(profileRoot, "app-data", "roaming"),
     LOCALAPPDATA: join(profileRoot, "app-data", "local"),
+    PI67_MEMORY_PRIVACY_MODE: "off",
     PATH: process.platform === "win32"
       ? [join(windowsRoot, "System32"), windowsRoot].join(delimiter)
       : "/usr/bin:/bin:/usr/sbin:/sbin"

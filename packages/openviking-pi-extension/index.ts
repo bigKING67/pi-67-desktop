@@ -22,6 +22,7 @@ import { OPENVIKING_MODEL_RECALL_POLICY, registerTools } from "./tools.js";
 import { createTakeoverManager } from "./takeover.js";
 import { emitContextDiagnostic, hashDiagnosticValue } from "./diagnostics.js";
 import { detectMemoryOwnerConflict } from "./memory-owner-policy.js";
+import { createRuntimePrivacyGuard } from "./runtime-privacy.js";
 
 export default async function (pi: ExtensionAPI) {
   // --- Load config ---
@@ -58,7 +59,16 @@ export default async function (pi: ExtensionAPI) {
 
   // --- Initialize modules ---
   const client = new OVClient(config);
-  const sync = new SyncManager(client, config);
+  client.onConnectionChange((connected) => {
+    emitContextDiagnostic({
+      kind: "context.healthChanged",
+      privacyMode: config.privacyMode,
+      state: connected ? "healthy" : "degraded",
+    });
+  });
+  const sync = new SyncManager(client, config, {
+    persistEntry: (customType, data) => pi.appendEntry(customType, data),
+  });
   const recall = new RecallManager(client, config, () => sync.sessionId);
   const debugLog = (message: string) => {
     const file = process.env.OV_DEBUG_LOG;
@@ -73,7 +83,6 @@ export default async function (pi: ExtensionAPI) {
   const takeover = createTakeoverManager({ pi, client, sync, config, log: debugLog });
 
   // Session state
-  let connected = false;
   let bypassed = false;
   let profileBlock = "";
   let archiveOverview = "";
@@ -81,6 +90,11 @@ export default async function (pi: ExtensionAPI) {
   let compacted = false;
   let started = false;
   let startPromise: Promise<void> | null = null;
+  const refreshRuntimePrivacy = createRuntimePrivacyGuard(config, import.meta.url, () => {
+    recall.invalidate();
+    profileBlock = "";
+    archiveOverview = "";
+  });
 
   // ================================================================
   // Event Handlers
@@ -91,6 +105,10 @@ export default async function (pi: ExtensionAPI) {
     if (startPromise) return startPromise;
 
     startPromise = (async () => {
+      if (!refreshRuntimePrivacy()) {
+        started = true;
+        return;
+      }
       // Bypass check
       const cwd = process.cwd();
       for (const pattern of config.bypassPatterns) {
@@ -105,18 +123,12 @@ export default async function (pi: ExtensionAPI) {
       // viking_read perform a fresh health probe, so a recovered server becomes
       // usable without restarting Pi.
       if (!toolsRegistered) {
-        registerTools(pi, client, sync);
+        registerTools(pi, client, sync, refreshRuntimePrivacy);
         toolsRegistered = true;
       }
 
       // Health check
-      connected = await client.health();
-      emitContextDiagnostic({
-        kind: "context.healthChanged",
-        privacyMode: config.privacyMode,
-        state: connected ? "healthy" : "degraded",
-      });
-      if (!connected) {
+      if (!await client.ensureConnected(true)) {
         if (config.logLevel === "info") {
           ctx.ui.notify("OpenViking: server not reachable", "warning");
         }
@@ -125,11 +137,18 @@ export default async function (pi: ExtensionAPI) {
 
       // Ensure OV session
       const piSessionId = ctx.sessionManager.getSessionId();
+      const branch = typeof ctx.sessionManager.getBranch === "function"
+        ? ctx.sessionManager.getBranch()
+        : [];
+      if (config.takeoverEnabled) takeover.restore(branch);
+      sync.restore(branch, piSessionId, config.takeoverEnabled ? takeover.state.syncedEntryCount : 0);
       const ok = await sync.ensureSession(piSessionId);
       if (!ok) {
-        if (config.logLevel !== "silent") {
-          ctx.ui.notify("OpenViking: failed to create session", "error");
-        }
+        emitContextDiagnostic({ kind: "context.healthChanged", privacyMode: config.privacyMode,
+          state: "degraded", reason: "session-create-failed" });
+        if (config.logLevel === "info") ctx.ui.notify(
+          "OpenViking: Session 暂不可用，Pi 已继续运行", "warning",
+        );
         return;
       }
       await sync.replayPending();
@@ -137,18 +156,12 @@ export default async function (pi: ExtensionAPI) {
       // Profile injection
       profileBlock = await buildSessionProfileBlock(client, config);
 
-      const branch = typeof ctx.sessionManager.getBranch === "function"
-        ? ctx.sessionManager.getBranch()
-        : [];
-      if (config.takeoverEnabled) {
-        takeover.restore(branch);
-        sync.restoreWatermark(takeover.state.syncedEntryCount);
-      } else if (sync.sessionId) {
+      if (!config.takeoverEnabled && sync.sessionId) {
         // Resume rehydration — fetch archive overview if session was previously committed.
         archiveOverview = await fetchArchiveOverview(client, sync.sessionId, config);
       }
 
-      updateStatus(ctx, connected, 0, sync.sessionId, config, takeover.state);
+      updateStatus(ctx, client.connected, 0, sync.sessionId, config, takeover.state);
 
       started = true;
       if (config.logLevel === "info") {
@@ -168,10 +181,19 @@ export default async function (pi: ExtensionAPI) {
 
   // --- before_agent_start ---
   pi.on("before_agent_start", async (event, ctx) => {
+    if (!refreshRuntimePrivacy()) return;
     // session_start doesn't fire for pi -c continuations.
     await start(ctx);
 
-    if (!connected || bypassed) return;
+    if (!refreshRuntimePrivacy() || bypassed || !await client.ensureConnected()) return;
+
+    const branch = typeof ctx.sessionManager.getBranch === "function"
+      ? ctx.sessionManager.getBranch()
+      : [];
+    if (await sync.alignBranch(branch)) {
+      archiveOverview = "";
+      compacted = false;
+    }
 
     // Follow the official OpenViking lifecycle: every current prompt receives
     // synchronous Recall in the context hook, including in-Session task shifts.
@@ -181,7 +203,7 @@ export default async function (pi: ExtensionAPI) {
     // archive, Recall, and Experience content comes from the Memory trust
     // domain and is injected later as untrusted user-level context.
     const additions = [
-      "OpenViking tools: viking_search, viking_read, viking_browse, viking_remember, viking_forget, viking_add_resource, viking_archive_expand.",
+      "OpenViking tools: viking_search, viking_read, viking_browse, viking_remember, viking_forget, viking_archive_expand.",
       OPENVIKING_MODEL_RECALL_POLICY,
     ].join("\n");
     return {
@@ -191,7 +213,10 @@ export default async function (pi: ExtensionAPI) {
 
   // --- context ---
   pi.on("context", async (event, _ctx) => {
-    if (!connected || bypassed) return;
+    if (!refreshRuntimePrivacy()) {
+      return { messages: recall.injectContext(event.messages as any, []) };
+    }
+    if (!client.connected || bypassed) return;
 
     const recallWasPending = recall.hasPendingSearch();
     const currentQueryHash = recall.pendingQueryHash();
@@ -204,6 +229,9 @@ export default async function (pi: ExtensionAPI) {
       });
     }
     const recallResult = await recall.searchPending();
+    if (!refreshRuntimePrivacy()) {
+      return { messages: recall.injectContext(event.messages as any, []) };
+    }
     if (recallWasPending) {
       emitContextDiagnostic({
         kind: "context.recallCompleted",
@@ -244,7 +272,8 @@ export default async function (pi: ExtensionAPI) {
 
   // --- turn_end ---
   pi.on("turn_end", async (event, ctx) => {
-    if (!connected || bypassed || !config.syncTurns) return;
+    if (!refreshRuntimePrivacy() || bypassed || !config.syncTurns) return;
+    if (!await client.ensureConnected()) return;
 
     const branch = ctx.sessionManager.getBranch();
     const result = await sync.syncBranch(branch);
@@ -256,12 +285,12 @@ export default async function (pi: ExtensionAPI) {
     });
     debugLog(`turn_end: synced ${result.added} entries, ~${result.tokens} tokens`);
     await takeover.onTurnSynced(result.tokens);
-    updateStatus(ctx, connected, result.added, sync.sessionId, config, takeover.state);
+    updateStatus(ctx, client.connected, result.added, sync.sessionId, config, takeover.state);
   });
 
   // --- session_before_compact ---
   pi.on("session_before_compact", async (event, _ctx) => {
-    if (!connected || bypassed) return;
+    if (!refreshRuntimePrivacy() || !client.connected || bypassed) return;
 
     if (config.takeoverEnabled) {
       const prep = (event as any)?.preparation ?? {};
@@ -285,7 +314,7 @@ export default async function (pi: ExtensionAPI) {
 
   // --- session_shutdown ---
   pi.on("session_shutdown", async (_event, _ctx) => {
-    if (!connected || bypassed) return;
+    if (!refreshRuntimePrivacy() || !client.connected || bypassed) return;
 
     await sync.shutdown();
     if (config.takeoverEnabled) {
@@ -310,7 +339,11 @@ export default async function (pi: ExtensionAPI) {
   pi.registerCommand("viking", {
     description: "OpenViking status and commit operations. Current prompts recall automatically; Tools provide bounded deep retrieval.",
     handler: async (args, ctx) => {
-      if (!connected) {
+      if (!refreshRuntimePrivacy()) {
+        ctx.ui.notify("OpenViking: memory is disabled for this Session", "warning");
+        return;
+      }
+      if (!await client.ensureConnected()) {
         ctx.ui.notify("OpenViking: not connected", "warning");
         return;
       }
@@ -340,7 +373,7 @@ export default async function (pi: ExtensionAPI) {
         ? ` | takeover: ${t.coveredUserTurns}/${t.lastSeenUserTurns} turns archived, ~${t.pendingTokens} tokens pending`
         : "";
       ctx.ui.notify(
-        `OpenViking: ${connected ? "connected" : "disconnected"} | session: ${sid.slice(0, 12)}... | current-prompt recall: ${recall.state} | deep retrieval: Pi Tool${takeoverInfo}`,
+        `OpenViking: ${client.connected ? "connected" : "disconnected"} | session: ${sid.slice(0, 12)}... | current-prompt recall: ${recall.state} | deep retrieval: Pi Tool${takeoverInfo}`,
         "info",
       );
     },

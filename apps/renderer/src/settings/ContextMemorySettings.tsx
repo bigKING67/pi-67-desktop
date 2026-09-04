@@ -150,7 +150,11 @@ export function ContextMemorySettings() {
       });
       setDraft(saved);
       setOverview((current) => current ? { ...current, configuration: saved } : current);
-      publishNotification({ level: "success", title: "Context & Memory 配置已保存", message: "新配置从下一轮或新 Session 起生效。" });
+      publishNotification({
+        level: "success",
+        title: "Context & Memory 配置已保存",
+        message: "更严格的隐私设置会在当前 Session 的下一次 Pi 边界生效；开放学习、Owner 与 Endpoint 变更需新 Session。"
+      });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "保存失败。");
     } finally {
@@ -291,7 +295,7 @@ export function ContextMemorySettings() {
           <strong>{mode.label}</strong><span>{mode.detail}</span>
         </Button>)}
       </div>
-      <SettingsNotice tone="info"><ShieldCheck aria-hidden="true" size={14} /> 当前选择：{privacy.label}。Memory 始终以不可信上下文注入，不能授权 Shell、文件或外部操作。</SettingsNotice>
+      <SettingsNotice tone="info"><ShieldCheck aria-hidden="true" size={14} /> 当前选择：{privacy.label}。切到更严格的模式会在当前 Session 的下一次 Pi 生命周期或 OpenViking Tool 边界生效；重新开放学习需新 Session。Memory 始终以不可信上下文注入，不能授权 Shell、文件或外部操作。</SettingsNotice>
     </SettingsSectionBlock>
 
     <SettingsSectionBlock title="Session Context" description="Pi Extension 按 OpenViking 官方生命周期为符合检索条件的当前 Prompt 自动 Recall；信息不足时再由 Pi 调用 OpenViking Tool，Desktop 只做治理和显式操作。">

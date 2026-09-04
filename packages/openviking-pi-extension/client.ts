@@ -1,109 +1,19 @@
 import type { OVConfig } from "./config.js";
-
-// --- OV API Response Shapes ---
-// All OV responses wrap in: { status: "ok"|"error", result: T, error?: {...}, ... }
-// This client normalizes to { ok, result } internally.
-
-export interface OVSearchResult {
-  uri: string;
-  context_type: string;   // "memory" | "resource" | "skill"
-  score: number;
-  abstract: string;
-  overview: string | null;
-  level: number;          // 0=L0, 1=L1, 2=L2
-  category: string;
-  match_reason: string;
-}
-
-export interface OVContextSearchEntry {
-  uri: string;
-  category: string;
-  detail: string;
-  score: number;
-  text: string;
-}
-
-export interface OVContextSearchResult {
-  entries: OVContextSearchEntry[];
-  rendered: string;
-  digest: string;
-  stats: Record<string, unknown>;
-}
-
-export interface OVDirEntry {
-  uri: string;
-  name: string;
-  isDir: boolean;
-  size: number;
-  mode: number;
-  modTime: string;
-  abstract: string;
-}
-
-export interface OVStatInfo {
-  name: string;
-  size: number;
-  mode: number;
-  modTime: string;
-  isDir: boolean;
-  isLocked: boolean;
-  uri?: string;
-  count?: number;         // directories only
-}
-
-export interface OVSessionMeta {
-  session_id: string;
-  message_count: number;
-  total_message_count?: number;
-  commit_count: number;
-  pending_tokens?: number;
-  memories_extracted?: Record<string, number>;
-  last_commit_at?: string;
-}
-
-export interface OVSessionContext {
-  latest_archive_overview: string | null;
-  pre_archive_abstracts: any[];
-  messages: any[];
-  estimatedTokens: number;
-  stats: {
-    totalArchives: number;
-    includedArchives: number;
-    droppedArchives: number;
-    failedArchives: number;
-    activeTokens: number;
-    archiveTokens: number;
-  };
-}
-
-export interface OVCommitResult {
-  status?: string;
-  archived?: boolean;
-  reason?: string;
-  task_id?: string;
-  archive_uri?: string;
-  trace_id?: string;
-}
-
-export interface OVCommitRetention {
-  keepRecentCount?: number;
-  keepRecentTurns?: number;
-}
-
-export interface OVCommitResponse {
-  result: OVCommitResult | null;
-  traceId?: string;
-  error?: any;
-  status?: number;
-}
-
-export interface OVResponse<T> {
-  ok: boolean;
-  result: T | null;
-  error?: any;
-  status?: number;
-  traceId?: string;
-}
+import type {
+  OVCommitResponse,
+  OVCommitResult,
+  OVCommitRetention,
+  OVContextSearchEntry,
+  OVContextSearchResult,
+  OVDirEntry,
+  OVResponse,
+  OVSearchResult,
+  OVSessionArchive,
+  OVSessionContext,
+  OVSessionMeta,
+  OVStatInfo,
+} from "./client-contracts.js";
+export type * from "./client-contracts.js";
 
 export class OVClient {
   private baseUrl: string;
@@ -111,7 +21,10 @@ export class OVClient {
   private account: string;
   private user: string;
   private peerId: string;
-  connected: boolean = false;
+  private connectionState = false;
+  private lastHealthAttemptAt = 0;
+  private healthPromise: Promise<boolean> | null = null;
+  private connectionListeners = new Set<(connected: boolean) => void>();
 
   private resolvedSpaces: Map<string, string> = new Map();
 
@@ -130,6 +43,15 @@ export class OVClient {
     this.peerId = config.peerId;
   }
 
+  get connected(): boolean {
+    return this.connectionState;
+  }
+
+  onConnectionChange(listener: (connected: boolean) => void): () => void {
+    this.connectionListeners.add(listener);
+    return () => this.connectionListeners.delete(listener);
+  }
+
   private headers(): Record<string, string> {
     const h: Record<string, string> = { "Content-Type": "application/json" };
     if (this.apiKey) h["Authorization"] = `Bearer ${this.apiKey}`;
@@ -142,18 +64,22 @@ export class OVClient {
 
   /** Core fetch wrapper. Returns { ok, result } after parsing OV's { status, result } envelope. */
   async fetchJSON<T>(path: string, init?: RequestInit, timeoutMs = 10000): Promise<OVResponse<T>> {
+    const controller = new AbortController();
+    const externalSignal = init?.signal;
+    const abortFromExternal = () => controller.abort(externalSignal?.reason);
+    if (externalSignal?.aborted) abortFromExternal();
+    else externalSignal?.addEventListener("abort", abortFromExternal, { once: true });
+    const timer = setTimeout(() => controller.abort(new Error("OpenViking request timed out")), timeoutMs);
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
       const resp = await fetch(`${this.baseUrl}${path}`, {
         ...init,
         headers: { ...this.headers(), ...(init?.headers as Record<string, string> | undefined) },
         signal: controller.signal,
       });
-      clearTimeout(timer);
       const body = await resp.json().catch(() => ({}));
       const traceId = body?.result?.trace_id || body?.error?.trace_id || body?.trace_id || undefined;
       if (!resp.ok || body.status === "error") {
+        this.setConnected(path !== "/health");
         return {
           ok: false,
           result: null,
@@ -162,19 +88,47 @@ export class OVClient {
           traceId,
         };
       }
+      this.setConnected(true);
       return { ok: true, result: (body.result ?? body) as T, traceId };
     } catch (err: any) {
-      this.connected = false;
+      this.setConnected(false);
       return { ok: false, result: null, status: 0, error: { message: err?.message || String(err) } };
+    } finally {
+      clearTimeout(timer);
+      externalSignal?.removeEventListener("abort", abortFromExternal);
     }
   }
 
   // ========== Health ==========
 
-  async health(): Promise<boolean> {
-    const res = await this.fetchJSON<any>("/health", undefined, this.cfg.healthTimeoutMs);
-    this.connected = res.ok;
+  async health(signal?: AbortSignal): Promise<boolean> {
+    const res = await this.fetchJSON<any>(
+      "/health",
+      signal ? { signal } : undefined,
+      this.cfg.healthTimeoutMs,
+    );
+    this.setConnected(res.ok);
     return res.ok;
+  }
+
+  async ensureConnected(force = false, signal?: AbortSignal): Promise<boolean> {
+    if (signal?.aborted || this.cfg.enabled === false) return false;
+    if (this.connected) return true;
+    if (this.healthPromise) return this.healthPromise;
+    const now = Date.now();
+    if (!force && now - this.lastHealthAttemptAt < 1_000) return false;
+    this.lastHealthAttemptAt = now;
+    const healthPromise = this.health(signal).finally(() => {
+      if (this.healthPromise === healthPromise) this.healthPromise = null;
+    });
+    this.healthPromise = healthPromise;
+    return healthPromise;
+  }
+
+  private setConnected(connected: boolean): void {
+    if (this.connectionState === connected) return;
+    this.connectionState = connected;
+    for (const listener of this.connectionListeners) listener(connected);
   }
 
   // ========== Sessions ==========
@@ -183,7 +137,7 @@ export class OVClient {
   async createSession(sessionId: string): Promise<boolean> {
     const res = await this.fetchJSON<any>("/api/v1/sessions", {
       method: "POST",
-      body: JSON.stringify({ session_id: sessionId }),
+      body: JSON.stringify({ session_id: sessionId, auto_commit_policy: null }),
     });
     return res.ok;
   }
@@ -199,10 +153,23 @@ export class OVClient {
   }
 
   /** GET /api/v1/sessions/{id}/context — assembled context with archive overview */
-  async getSessionContext(sessionId: string, tokenBudget = 128000): Promise<OVSessionContext | null> {
+  async getSessionContext(sessionId: string, tokenBudget = 128000, signal?: AbortSignal): Promise<OVSessionContext | null> {
     const res = await this.fetchJSON<OVSessionContext>(
       `/api/v1/sessions/${encodeURIComponent(sessionId)}/context?token_budget=${tokenBudget}`,
-      undefined, 10000,
+      signal ? { signal } : undefined, 10000,
+    );
+    return res.ok ? res.result : null;
+  }
+
+  async getSessionArchive(
+    sessionId: string,
+    archiveId: string,
+    signal?: AbortSignal,
+  ): Promise<OVSessionArchive | null> {
+    const res = await this.fetchJSON<OVSessionArchive>(
+      `/api/v1/sessions/${encodeURIComponent(sessionId)}/archives/${encodeURIComponent(archiveId)}`,
+      signal ? { signal } : undefined,
+      10000,
     );
     return res.ok ? res.result : null;
   }
@@ -279,7 +246,7 @@ export class OVClient {
   /** POST /api/v1/search/find — basic vector search */
   async find(
     query: string,
-    opts?: { targetUri?: string; topK?: number; scoreThreshold?: number; timeoutMs?: number },
+    opts?: { targetUri?: string; topK?: number; scoreThreshold?: number; timeoutMs?: number; signal?: AbortSignal },
   ): Promise<OVSearchResult[]> {
     const body: Record<string, unknown> = { query };
     if (opts?.targetUri) body.target_uri = opts.targetUri;
@@ -287,7 +254,9 @@ export class OVClient {
     if (opts?.scoreThreshold) body.score_threshold = opts.scoreThreshold;
 
     const res = await this.fetchJSON<any>("/api/v1/search/find", {
-      method: "POST", body: JSON.stringify(body),
+      method: "POST",
+      body: JSON.stringify(body),
+      ...(opts?.signal ? { signal: opts.signal } : {}),
     }, opts?.timeoutMs ?? 10000);
     if (!res.ok || !res.result) return [];
 
@@ -367,28 +336,28 @@ export class OVClient {
   // ========== Content ==========
 
   /** GET /api/v1/content/abstract — L0 summary */
-  async abstract(uri: string): Promise<string | null> {
+  async abstract(uri: string, signal?: AbortSignal): Promise<string | null> {
     const res = await this.fetchJSON<string>(
       `/api/v1/content/abstract?uri=${encodeURIComponent(uri)}`,
-      undefined, 10000,
+      signal ? { signal } : undefined, 10000,
     );
     return res.ok ? res.result : null;
   }
 
   /** GET /api/v1/content/overview — L1 overview (directories only) */
-  async overview(uri: string): Promise<string | null> {
+  async overview(uri: string, signal?: AbortSignal): Promise<string | null> {
     const res = await this.fetchJSON<string>(
       `/api/v1/content/overview?uri=${encodeURIComponent(uri)}`,
-      undefined, 10000,
+      signal ? { signal } : undefined, 10000,
     );
     return res.ok ? res.result : null;
   }
 
   /** GET /api/v1/content/read — L2 full content (files only) */
-  async readContent(uri: string): Promise<string | null> {
+  async readContent(uri: string, signal?: AbortSignal): Promise<string | null> {
     const res = await this.fetchJSON<string>(
       `/api/v1/content/read?uri=${encodeURIComponent(uri)}`,
-      undefined, 10000,
+      signal ? { signal } : undefined, 10000,
     );
     return res.ok ? res.result : null;
   }
@@ -396,10 +365,10 @@ export class OVClient {
   // ========== Filesystem ==========
 
   /** GET /api/v1/fs/ls — list directory */
-  async ls(uri: string): Promise<OVDirEntry[]> {
+  async ls(uri: string, signal?: AbortSignal): Promise<OVDirEntry[]> {
     const res = await this.fetchJSON<any[]>(
       `/api/v1/fs/ls?uri=${encodeURIComponent(uri)}`,
-      undefined, 10000,
+      signal ? { signal } : undefined, 10000,
     );
     if (!res.ok || !Array.isArray(res.result)) return [];
     return res.result.map(e => ({
@@ -414,19 +383,19 @@ export class OVClient {
   }
 
   /** GET /api/v1/fs/stat — file/directory metadata */
-  async stat(uri: string): Promise<OVStatInfo | null> {
+  async stat(uri: string, signal?: AbortSignal): Promise<OVStatInfo | null> {
     const res = await this.fetchJSON<OVStatInfo>(
       `/api/v1/fs/stat?uri=${encodeURIComponent(uri)}`,
-      undefined, 10000,
+      signal ? { signal } : undefined, 10000,
     );
     return res.ok ? res.result : null;
   }
 
   /** DELETE /api/v1/fs — remove file or directory */
-  async delete(uri: string, recursive = false): Promise<boolean> {
+  async delete(uri: string, recursive = false, signal?: AbortSignal): Promise<boolean> {
     const res = await this.fetchJSON<any>(
       `/api/v1/fs?uri=${encodeURIComponent(uri)}&recursive=${recursive}`,
-      { method: "DELETE" },
+      { method: "DELETE", ...(signal ? { signal } : {}) },
       10000,
     );
     return res.ok;

@@ -552,6 +552,13 @@ async function recallViaEndpoint(fetchJSON, cfg, query, actorPeerId = "", log = 
   body.query = query;
   const res = await postRecall(fetchJSON, body, { actorPeerId, log });
   if (!res.ok) {
+    if (body.peer_scope && (res.status === 400 || res.status === 422)) {
+      // Actor scope is a privacy boundary, not an optional compatibility hint.
+      // An older server that cannot enforce it gets no broader retry and no raw
+      // /find fallback for this prompt.
+      log("recall_peer_scope_fail_closed", { status: res.status || 0 });
+      return "";
+    }
     log("recall_endpoint_fallback", { status: res.status || 0 });
     return null;
   }
@@ -568,17 +575,10 @@ export async function postRecall(fetchJSON, body, opts = {}) {
     method: "POST",
     body: JSON.stringify(request),
   }, { actorPeerId });
-  if (!request.peer_scope || (res.status !== 400 && res.status !== 422)) {
-    return res;
+  if (request.peer_scope && (res.status === 400 || res.status === 422)) {
+    log("recall_peer_scope_unsupported", { status: res.status || 0 });
   }
-
-  const downgraded = { ...request };
-  delete downgraded.peer_scope;
-  log("recall_peer_scope_downgrade", { status: res.status || 0 });
-  return fetchJSON("/api/v1/search/recall", {
-    method: "POST",
-    body: JSON.stringify(downgraded),
-  }, { actorPeerId });
+  return res;
 }
 
 export async function buildRecallBlock(fetchJSON, cfg, query, options = {}) {
