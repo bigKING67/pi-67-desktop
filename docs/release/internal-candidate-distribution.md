@@ -64,8 +64,9 @@ packaged smoke、source SHA、version 和 Pi runtime 绑定为同一候选。上
 6. **Upload with authorization**：上传属于外部写操作，必须有当前明确授权。三个文件全部在本地准备完毕后，
    可以对三个不同 file token 并行 multipart 上传；同一个 file token 不得并发写。覆盖同名文件时使用原
    file token，让飞书保留版本历史并避免目录出现重复名称。删除远端文件或历史版本需要单独授权。
-7. **Verify mirror**：上传成功后重新列出目标文件夹。目录必须恰好包含本轮期望的三个产品名称；逐项核对
-   upload response 的远端 size 与本地 size。构建记录中的 SHA-256 继续作为内容身份，不以飞书文件名代替。
+7. **Verify mirror**：上传成功后重新列出目标文件夹，确认本轮期望的三个产品名称全部存在，逐项核对远端
+   size 与本地 size，通过后再请求人工测试确认。旧候选可以在获准清理前保留；不得为了目录只剩三个文件而
+   提前删除它们。构建记录中的 SHA-256 继续作为内容身份，不以飞书文件名代替。
 8. **Manual test**：Windows x64 和 macOS Apple Silicon 分别下载并测试。Windows 同一组 exact bytes
    必须在一台从未安装/使用 Pi TUI 的电脑和一台已有 Pi TUI/Profile 的电脑上分别测试。人工结论必须记录所测文件的
    version、source SHA、size、SHA-256，以及 Windows run/attempt 和 identity；不得把一轮结论转移给
@@ -117,3 +118,9 @@ R2 安装包和可变 manifest 上传仍要求对 exact version 的当前明确�
 
 只有用户明确要求正式发布时，才从已验证候选进入签名、公证、promotion、Tag 或 GitHub Release。正式流程
 必须重新核对授权、版本、source SHA、目标平台证据和 exact bytes；内部飞书候选通过不等于已经发布。
+
+## Support report diagnosis
+
+候选使用者提供私有诊断报告后，必须先完整阅读
+[`support-diagnostics-operator-read.md`](./support-diagnostics-operator-read.md)，再按当前授权读取精确对象。
+候选构建或分发授权不自动授权读取报告、配置诊断凭据或操作诊断存储桶。

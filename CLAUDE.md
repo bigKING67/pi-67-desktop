@@ -2,18 +2,11 @@
 
 Pi-67 Desktop —— 面向 Windows x64 与 macOS Apple Silicon 的 Pi-first Electron 桌面客户端。
 
-本文件是 Claude Code 的入口速查。**权威规则以下列文档为准，本文件不复制其内容，只做导航与高频命令**。
+本文件是 Claude Code 的入口速查。权威规则以 `AGENTS.md` 及其指定文档为准；下列架构和红线仅作速查，不另立规则。
 
-## 权威文档（改动前必读）
+## 权威文档与按需读取
 
-| 文档 | 负责范围 |
-|------|---------|
-| `AGENTS.md` | 产品与架构硬边界、安全隐私红线（**最高优先级**） |
-| `PRODUCT.md` | 产品意图与非目标 |
-| `DESIGN.md` / `DESIGN.dark.md` | 视觉、交互与 token 真源 |
-| `CONTRIBUTING.md` | 工程规则与本地门禁清单 |
-| `docs/architecture/processes-and-protocol.md` | 进程与协议责任划分 |
-| `docs/adr/` | 关键架构决策记录 |
+修改前先读 `AGENTS.md`，再按其 `Reading and authority` 路由读取本次涉及的权威章节；工程命令和贡献规则见 `CONTRIBUTING.md`。不要求每次修改全文读取所有产品、设计和架构文档；范围或引用合同不清楚时，先扩展阅读再修改。
 
 > 行为、视觉 token 或交互变化时，必须在**同一改动**中更新对应 authority 文档。
 
@@ -29,9 +22,9 @@ Pi-67 Desktop —— 面向 Windows x64 与 macOS Apple Silicon 的 Pi-first Ele
 
 ## 硬红线（详见 AGENTS.md）
 
-- `@earendil-works/pi-coding-agent` 是唯一 agent runtime；**不加** Pi RPC adapter、系统 `pi` 回退或其他 provider。
+- `@earendil-works/pi-coding-agent` 是唯一 agent runtime；**不加** Pi RPC adapter、系统 `pi` 回退或非 Pi Provider adapter。内置和自定义 Provider 通过 Pi 支持的机制接入，以 Pi 配置为真源，不另建 Runtime 或模型路由。
 - renderer **不得**导入 Electron、Node、Pi SDK 或文件系统 API；保持 `contextIsolation`、sandbox、严格 CSP 与窄 preload 桥。
-- 生产渲染资源经 `app://pi67` 加载；**不加** localhost server、业务 WebSocket、RPC adapter。
+- 生产渲染资源经 `app://pi67` 加载；**不加**生产 localhost server、业务 WebSocket、Pi RPC adapter。开发时 Vite 仅用于 `127.0.0.1` 上的资源和 HMR。
 - 不创建 `utils`/`helpers`/`common`/`misc`/`legacy` 等兜底目录（共享代码需两个真实调用方）。
 - 不记录/持久化 API key、token、cookie、凭据、prompt、源码正文或原始 tool payload。
 - 不提交 build/installer 输出、日志、数据库、截图、trace、用户 session 或凭据。
@@ -49,7 +42,7 @@ corepack pnpm run typecheck
 corepack pnpm run lint
 corepack pnpm run test                     # vitest；test:coverage 带覆盖率
 corepack pnpm run check                    # 聚合门禁：typecheck+lint+架构/死代码/结构/传输检查+覆盖率
-corepack pnpm run test:e2e                 # Playwright（先 build）
+corepack pnpm run test:e2e                 # 脚本自动 build 后运行 Playwright
 ```
 
 ## 环境与验证

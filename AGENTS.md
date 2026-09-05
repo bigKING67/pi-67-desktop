@@ -1,11 +1,31 @@
 # Pi-67 Desktop Repository Instructions
 
+## Reading and authority
+
+- Read this file before making changes. Before editing an affected area, locate
+  and read the relevant sections of its authority documents using the routing
+  below. Do not read every authority document in full for every task. If the
+  scope or a referenced contract is unclear, expand the read before editing.
+- Product behavior and non-goals: `PRODUCT.md`.
+- UI, interaction, and visual tokens: `DESIGN.md` and `DESIGN.dark.md`.
+- Process boundaries and cross-process commands/events:
+  `docs/architecture/processes-and-protocol.md`.
+- Architecture decisions: the applicable records under `docs/adr/`.
+- Development commands and contribution rules: `CONTRIBUTING.md`.
+- L2 execution plans: `PLANS.md`. Candidate distribution, R2 updates, and support
+  diagnostics: follow the dedicated sections below before those operations.
+- Reading only relevant sections does not reduce their authority. Behavior,
+  interaction, or token changes must update the corresponding authority document
+  in the same change.
+
 ## Product boundary
 
 - This repository builds the Pi-first Electron desktop client for Windows x64
   and macOS Apple Silicon.
 - `@earendil-works/pi-coding-agent` is the only agent runtime. Do not add a Pi
   RPC adapter, system `pi` fallback, or non-Pi provider adapters.
+- Built-in and custom Providers use supported Pi mechanisms and Pi configuration
+  as their source of truth; they do not create a second runtime or model router.
 - Pi JSONL sessions remain the conversation source of truth. Any application
   index is disposable and rebuildable.
 - `pi-gui` and `t3code` are the only comprehensive implementation references.
@@ -107,6 +127,12 @@
 
 ## Security and privacy
 
+The Workspace trust, AUTO/ASK/PLAN/YOLO, and installed-capability grants below
+describe Pi-67 product behavior to implement and preserve. They do not authorize
+the coding agent developing this repository to upload, publish, or operate
+external systems. Development operations remain subject to the current user's
+authorization and the repository's separate operation and distribution rules.
+
 - Never log or persist API keys, OAuth tokens, cookies, credential payloads,
   prompts, source bodies, or raw tool payloads by default.
 - Project trust controls project resources. It is distinct from one-shot tool
@@ -138,57 +164,28 @@
 
 ## Candidate distribution
 
-- `docs/release/internal-candidate-distribution.md` is the canonical daily
-  development flow: source-only Git boundary, exact-SHA Windows/macOS builds,
-  packaged smoke, three versioned product files in Feishu, and target-OS manual
-  testing. Stop there by default; do not create a Tag, GitHub Release, or
-  promotion without separate current authorization.
-- Windows Actions artifacts are temporary build transport, not the product
-  download channel. Distribute the Windows x64 NSIS EXE and macOS arm64 DMG/ZIP
-  through the configured internal Feishu Drive folder. Do not use Taildrop.
-- Upload only the three current, versioned product files. Do not use ambiguous
-  `latest` names. Re-list the Feishu folder after upload and verify the expected
-  names and sizes before asking for manual-test confirmation.
-- Local installers, package directories, and upload staging are temporary. Once
-  their exact candidate is mirrored or published and the small identity,
-  manifest, smoke, manual-test, and publication receipts are retained, run
-  `corepack pnpm run release:local:cleanup` to review the bounded delete set and
-  apply it with the command's exact confirmation flag. The cleanup must fail
-  closed while the repository preview is running and must preserve unknown
-  files and evidence by default.
+- Before candidate preparation, distribution, replacement, or local artifact
+  cleanup, read `docs/release/internal-candidate-distribution.md` in full and
+  follow its operation and retention contracts. It is the canonical daily flow:
+  source-only Git, exact-SHA builds, packaged smoke, three versioned Feishu
+  product files, and target-OS manual testing. Stop there by default.
 - Feishu is an internal distribution mirror, not the artifact identity
   authority. Bind every test result to the source SHA, workflow run/attempt when
   applicable, candidate identity, size, and SHA-256 recorded by the build.
-- Keep the Feishu folder URL/token and all Feishu credentials or login state
-  outside the repository. Resolve the destination from operator configuration,
-  such as `PI67_FEISHU_CANDIDATE_FOLDER_TOKEN`.
 - Uploads, remote candidate deletion, promotion, and publishing each require
-  explicit current authorization. Distinct file tokens may upload in parallel;
-  never write one file token concurrently. Do not remove the previous candidate
-  until the replacement set is uploaded and verified, and cleanup is authorized.
-- An explicitly authorized unsigned in-app R2 update follows
-  `docs/release/internal-r2-update-distribution.md`. Feishu candidate success
+  explicit current authorization. Do not remove the previous candidate until
+  the replacement set is uploaded and verified, and cleanup is authorized.
+- Before an explicitly authorized unsigned in-app R2 update, read
+  `docs/release/internal-r2-update-distribution.md` in full. Feishu candidate success
   does not authorize R2 artifact or manifest publication, retention deletion,
   cache purge, withdrawal, promotion, Tag, or GitHub Release.
 
 ## Support diagnostics operation
 
-- Routine private-report diagnosis uses the local exact-key reader before any
-  Cloudflare dashboard or browser workflow:
-  `corepack pnpm run support:diagnostics:read -- --object-key <receipt-object-key>`.
-  For an older receipt without an object key, use
-  `--report PI67-XXXXXXXXXXXX --date YYYY-MM-DD` with the known UTC object date.
-- The reader is fixed to the private `pi67-support-diagnostics` bucket, performs
-  exactly one `GetObject`, downloads at most 64 KiB, validates the shared schema,
-  object locator, and diagnostics SHA-256, and prints only a bounded analysis.
-  It must not grow a default list, search, dump-all, write, delete, or lifecycle
-  mode. Browser/dashboard access is a separately justified fallback, not the
-  routine read path.
-- Store the bucket-scoped Cloudflare R2 `Object Read only` credential outside Git
-  at `~/.config/pi67/support-r2-read.env` with mode `0600`. The only accepted keys
-  are `PI67_SUPPORT_R2_ACCOUNT_ID`, `PI67_SUPPORT_R2_ACCESS_KEY_ID`, and
-  `PI67_SUPPORT_R2_SECRET_ACCESS_KEY`. Never put their values in `AGENTS.md`, repo
-  files, shell history, logs, diagnostics, plans, or output.
+- Before support credential setup, private-report diagnosis, or reader changes,
+  read `docs/release/support-diagnostics-operator-read.md` in full. Use the local
+  exact-key reader as the routine path; browser/dashboard access is a separately
+  justified fallback. Keep credentials outside Git and never expose their values.
 - Creating/revoking the read-only token and exact reads of user-supplied reports
   require current operator authorization. Listing, writes, deletes, retention,
   Worker deployment, and update-bucket operations remain distinct external
