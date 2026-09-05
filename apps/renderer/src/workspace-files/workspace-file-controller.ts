@@ -226,6 +226,8 @@ export async function reloadWorkspaceFile(
   });
 }
 
+const fileSavesInFlight = new Set<string>();
+
 export async function saveWorkspaceFile(
   workspace: WorkspaceDescriptor,
   relativePath: string
@@ -240,6 +242,9 @@ export async function saveWorkspaceFile(
     });
     return false;
   }
+  const saveKey = JSON.stringify([workspace.id, tab.id]);
+  if (fileSavesInFlight.has(saveKey)) return false;
+  fileSavesInFlight.add(saveKey);
   try {
     await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
     const result = await agentConnectionController.request(
@@ -248,8 +253,7 @@ export async function saveWorkspaceFile(
       [],
       { context: { scope: "workspace", workspaceId: workspace.id } }
     );
-    workspaceFileStore.getState().markSaved(workspace.id, result.entry);
-    return true;
+    return workspaceFileStore.getState().markSaved(workspace.id, result.entry, tab);
   } catch (error) {
     if (error instanceof ProtocolRequestError && error.code === "RESOURCE_CHANGED_EXTERNALLY") {
       workspaceFileStore.getState().markConflict(workspace.id, relativePath, error.message);
@@ -260,6 +264,8 @@ export async function saveWorkspaceFile(
       message: errorMessage(error)
     });
     return false;
+  } finally {
+    fileSavesInFlight.delete(saveKey);
   }
 }
 

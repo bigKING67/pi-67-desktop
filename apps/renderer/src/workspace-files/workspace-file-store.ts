@@ -8,9 +8,7 @@ import {
 } from "@pi67/domain";
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
-import type {
-  WorkspaceFileNavigationIntent, WorkspaceFileTab, WorkspaceFileWorkspaceState
-} from "./workspace-file-state.js";
+import type { WorkspaceFileNavigationIntent, WorkspaceFileTab, WorkspaceFileWorkspaceState } from "./workspace-file-state.js";
 interface WorkspaceFileStoreState {
   workspaces: Record<string, WorkspaceFileWorkspaceState>;
   draftPersistence: "available" | "unavailable";
@@ -25,7 +23,7 @@ interface WorkspaceFileStoreState {
   installOpenResult: (workspaceId: string, result: WorkspaceFileOpenResult, discardDraft?: boolean) => void;
   failOpen: (workspaceId: string, relativePath: string, message: string, missing?: boolean) => void;
   updateContent: (workspaceId: string, relativePath: string, content: string) => void;
-  markSaved: (workspaceId: string, entry: WorkspaceFileEntry) => void;
+  markSaved: (workspaceId: string, entry: WorkspaceFileEntry, snapshot: WorkspaceFileTab) => boolean;
   markConflict: (workspaceId: string, relativePath: string, message?: string) => void;
   closeTab: (workspaceId: string, relativePath: string) => void;
   renamePath: (workspaceId: string, previousPath: string, nextPath: string, entry: WorkspaceFileEntry) => void;
@@ -259,10 +257,13 @@ export const workspaceFileStore = createStore<WorkspaceFileStoreState>((set) => 
     }));
   },
 
-  markSaved(workspaceId, entry) {
+  markSaved(workspaceId, entry, snapshot) {
+    let fullySaved = false;
     set((state) => updateWorkspace(state, workspaceId, (workspace) => {
       const current = workspace.byPath[entry.relativePath];
-      if (!current) return workspace;
+      if (!current || current.id !== snapshot.id || current.revision !== snapshot.revision
+        || current.documentVersion !== snapshot.documentVersion) return workspace;
+      fullySaved = current.content === snapshot.content;
       return {
         ...workspace,
         byPath: {
@@ -271,14 +272,15 @@ export const workspaceFileStore = createStore<WorkspaceFileStoreState>((set) => 
             ...current,
             id: entry.id,
             revision: entry.revision,
-            savedContent: current.content ?? "",
-            dirty: false,
+            savedContent: snapshot.content ?? "",
+            dirty: !fullySaved,
             conflict: false,
             reason: undefined
           }
         }
       };
     }));
+    return fullySaved;
   },
 
   markConflict(workspaceId, relativePath, message) {

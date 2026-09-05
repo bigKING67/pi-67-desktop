@@ -12,7 +12,7 @@
 import type { ExtensionAPI } from "@pi67/pi-runtime/pi-sdk-types";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { loadConfigFromModuleUrl, type OVConfig } from "./config.js";
+import { bindWorkspacePeer, loadConfigFromModuleUrl, type OVConfig } from "./config.js";
 import { OVClient } from "./client.js";
 import { RecallManager } from "./recall.js";
 import { SyncManager } from "./sync.js";
@@ -55,9 +55,6 @@ export default async function (pi: ExtensionAPI) {
     state: "locked",
   });
 
-  // Env overrides
-
-  // --- Initialize modules ---
   const client = new OVClient(config);
   client.onConnectionChange((connected) => {
     emitContextDiagnostic({
@@ -97,10 +94,13 @@ export default async function (pi: ExtensionAPI) {
   });
 
   // ================================================================
-  // Event Handlers
   // ================================================================
 
   const start = async (ctx: any): Promise<void> => {
+    const sessionCwd = typeof ctx?.sessionManager?.getCwd === "function" ? ctx.sessionManager.getCwd() : "";
+    // Rebind reused Extension instances before lifecycle fast paths.
+    bindWorkspacePeer(config, sessionCwd);
+    client.setPeerId(config.peerId);
     if (started) return;
     if (startPromise) return startPromise;
 
@@ -110,7 +110,7 @@ export default async function (pi: ExtensionAPI) {
         return;
       }
       // Bypass check
-      const cwd = process.cwd();
+      const cwd = sessionCwd;
       for (const pattern of config.bypassPatterns) {
         if (matchBypass(cwd, pattern)) {
           bypassed = true;

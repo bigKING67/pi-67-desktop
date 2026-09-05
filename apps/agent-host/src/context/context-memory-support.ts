@@ -73,6 +73,7 @@ export function assertPrivateMemoryUri(uri: string): void {
 
 export function isPrivateMemoryUri(uri: string): boolean {
   return /^viking:\/\/user\/memories\/.+/.test(uri)
+    || /^viking:\/\/user\/peers\/[a-f0-9]{64}\/memories\/.+/.test(uri)
     || /^viking:\/\/user\/[^/?#]+\/memories\/.+/.test(uri)
     || /^viking:\/\/user\/[^/?#]+\/peers\/[a-f0-9]{64}\/memories\/.+/.test(uri);
 }
@@ -90,4 +91,43 @@ function workspaceFingerprint(cwd: string): string {
   }
   if (process.platform === "win32") canonicalCwd = canonicalCwd.toLowerCase();
   return createHash("sha256").update(canonicalCwd).digest("hex");
+}
+
+export interface PendingForget {
+  uri: string;
+  entry: MemoryEntrySummary;
+  workspaceId: string;
+  actorPeerId: string;
+  userId?: string;
+  expiresAt: number;
+}
+
+export function assertAuthorizedPrivateMemoryUri(uri: string, actorPeerId: string, currentUser?: string): void {
+  assertPrivateMemoryUri(uri);
+  let parsed: URL;
+  try { parsed = new URL(uri); } catch {
+    throw new HostCommandError("INVALID_PAYLOAD", "Private Memory URI must be canonical.", false);
+  }
+  if (parsed.pathname !== uri.slice("viking://user".length) || parsed.protocol !== "viking:" || parsed.hostname !== "user" || parsed.username || parsed.password || parsed.search || parsed.hash) {
+    throw new HostCommandError("INVALID_PAYLOAD", "Private Memory URI must be canonical.", false);
+  }
+  const segments = parsed.pathname.split("/").filter(Boolean).map((segment) => {
+    let decoded: string;
+    try { decoded = decodeURIComponent(segment); } catch {
+      throw new HostCommandError("INVALID_PAYLOAD", "Private Memory URI must be canonical.", false);
+    }
+    if (!decoded || decoded === "." || decoded === ".." || decoded.includes("/") || decoded.includes("\\")) {
+      throw new HostCommandError("INVALID_PAYLOAD", "Private Memory URI must be canonical.", false);
+    }
+    return decoded;
+  });
+  const global = segments[0] === "memories" && segments.length > 1;
+  const ownGlobal = segments[0] === currentUser && segments[1] === "memories";
+  const peerOffset = segments[0] === "peers" ? 0 : segments[1] === "peers" && segments[0] === currentUser ? 1 : -1;
+  const currentPeer = peerOffset >= 0
+    && segments[peerOffset + 1] === actorPeerId
+    && segments[peerOffset + 2] === "memories"
+    && segments.length > peerOffset + 3;
+  if (global || ownGlobal || currentPeer) return;
+  throw new HostCommandError("INVALID_PAYLOAD", "Private Memory URI is outside the current user or Workspace peer scope.", false);
 }

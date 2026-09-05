@@ -12,7 +12,9 @@ import type { EnterpriseCredentialBrokerClient } from "./enterprise-credential-b
 const roots: string[] = [];
 
 export const workspaceContext = { scope: "workspace" as const, workspaceId: "workspace-1" };
-export const workspaceMemoryUri = `viking://user/local-owner/peers/${deriveWorkspacePeerId("/private/local/workspace")}/memories/events/host-recovery.md`;
+export const workspaceContextB = { scope: "workspace" as const, workspaceId: "workspace-2" };
+export const workspaceMemoryUri = `viking://user/peers/${deriveWorkspacePeerId("/private/local/workspace")}/memories/events/host-recovery.md`;
+export const workspaceMemoryUriB = `viking://user/peers/${deriveWorkspacePeerId("/private/local/workspace-two")}/memories/events/host-recovery.md`;
 
 export async function cleanupRouterFixtures(): Promise<void> {
   vi.unstubAllGlobals();
@@ -42,8 +44,8 @@ export async function createRouter(
     }
   } as unknown as HostEventChannel;
   const workspaces = {
-    require: () => ({
-      cwd: "/private/local/workspace",
+    require: (workspaceId: string) => ({
+      cwd: workspaceId === "workspace-2" ? "/private/local/workspace-two" : "/private/local/workspace",
       initialization: { trust: options.workspaceTrusted ? "trusted" : "untrusted" }
     }),
     queryCatalog: async () => ({

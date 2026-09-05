@@ -124,16 +124,22 @@ export async function restoreComposerPromptStash(
       return { status: "persistence-failed" };
     }
   }
+  const beforeRestore = useTaskDraftStore.getState().drafts[taskId];
+  if (beforeRestore !== draft) {
+    revokeDraftAttachments(restoredAttachments);
+    return { status: beforeRestore ? "conflict" : "missing" };
+  }
   useTaskDraftStore.getState().setText(taskId, item.text);
   useTaskDraftStore.getState().setAttachments(taskId, restoredAttachments);
+  const restoredDraft = useTaskDraftStore.getState().drafts[taskId];
   const restorePersistence = await persistTaskDraftStateAcknowledged(taskId);
   if (restorePersistence !== "persisted") {
     const current = useTaskDraftStore.getState().drafts[taskId];
-    if (current?.text === item.text && sameAttachmentIds(current.attachments, restoredAttachments)) {
+    if (current === restoredDraft) {
       useTaskDraftStore.getState().setAttachments(taskId, []);
-      useTaskDraftStore.getState().setText(taskId, "");
+      useTaskDraftStore.getState().setText(taskId, draft.text);
+      revokeDraftAttachments(restoredAttachments);
     }
-    revokeDraftAttachments(restoredAttachments);
     return persistenceFailure(restorePersistence);
   }
   useTaskDraftStore.getState().removePromptStash(taskId, itemId);

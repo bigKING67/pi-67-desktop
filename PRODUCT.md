@@ -215,7 +215,10 @@ the only Runtime and behavior specification source.
   Resource, and enterprise Experience limits remain independently named and governed.
 - Local OpenViking Tools are private-memory capabilities, not an arbitrary
   `viking://` filesystem. Search, read, browse, forget, and Archive expansion
-  are restricted to the current user/current Workspace peer; direct account
+  are restricted to the current user/current Workspace peer. Direct reads validate
+  canonical URI ownership before dispatch; forget previews bind Workspace, peer,
+  user and exact target and revalidate them before execution. The default peer is
+  derived from the Pi Session cwd, not the shared Host process cwd; direct account
   Resource ingestion remains an enterprise-governed Gateway action. Every
   returned body is bounded and untrusted, including archived Session messages.
 - OpenViking capture is outbox-first and lineage-aware. Stable source-message
@@ -970,7 +973,9 @@ the only Runtime and behavior specification source.
   result never clears the Composer, never falls back to plaintext, and never replaces
   the last encrypted state with an unencrypted placeholder. Restore is allowed only into an empty
   Composer, creates new staging identities after decrypt/hash validation, is durably
-  removed from the stash, closes the Popover, and returns focus to input.
+  removed from the stash, closes the Popover, and returns focus to input. If the
+  draft changes while secure storage or images are being restored, restoration
+  preserves the newer draft and the stash item and releases unused staged images.
 - Composer context pressure becomes warning state at 75% and critical state at 92%.
   Manual compression uses Pi's native `session.compact`; automatic and manual
   compaction are labeled separately, never show duplicate actions, and remain legible

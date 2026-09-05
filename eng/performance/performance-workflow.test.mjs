@@ -87,7 +87,7 @@ describe("release performance workflow gates", () => {
     );
     expect(windowsSource).toContain("runs-on: windows-2025");
     expect(windowsSource).toContain("needs.change-scope.outputs.run_windows == 'true'");
-    expect(windowsSource).not.toContain("run: pnpm run check");
+    expect(windowsSource).not.toMatch(/run: pnpm run check(?:\r?\n|$)/u);
     expect(windowsSource).toContain("pnpm run prepare:runtime-resources");
     expect(windowsSource).toContain("name: Restore Electron packaging downloads");
     expect(windowsSource).toContain("~/AppData/Local/electron/Cache");

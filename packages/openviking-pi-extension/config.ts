@@ -234,8 +234,19 @@ export function loadConfig(extensionDir: string): OVConfig {
   }
   if (config.privacyMode === "off") config.enabled = false;
   if (!Array.isArray(config.bypassPatterns)) config.bypassPatterns = [];
-  config.peerId = resolveEffectivePeerId({ cfg: config as any, cwd: process.cwd() }).peerId;
   return config;
+}
+
+const explicitPeerByConfig = new WeakMap<OVConfig, boolean>();
+
+/** Bind the default peer to the actual Pi Session workspace. Explicit user/env peer IDs win. */
+export function bindWorkspacePeer(config: OVConfig, cwd: string): void {
+  let explicit = explicitPeerByConfig.get(config);
+  if (explicit === undefined) {
+    explicit = config.peerId.trim() !== "";
+    explicitPeerByConfig.set(config, explicit);
+  }
+  config.peerId = explicit ? config.peerId : resolveEffectivePeerId({ cfg: { ...config, peerId: "" }, cwd }).peerId;
 }
 
 /**

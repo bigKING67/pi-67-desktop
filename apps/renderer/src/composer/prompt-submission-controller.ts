@@ -48,14 +48,19 @@ export async function submitRendererPrompt(
     : behavior === "followUp" ? "follow-up" : "new-turn";
   const state = useAppStore.getState();
   const workbench = rendererWorkbenchStore.getState();
-  const selectedTaskId = selectedWorkbenchTask(workbench)?.id;
+  const selectedTask = selectedWorkbenchTask(workbench);
+  const selectedTaskId = selectedTask?.id;
   if (selectedTaskId && workbench.canStartTask(selectedTaskId) === "run-limit") {
     const detail = `已有 ${MAX_RUNNING_TASKS} 个会话任务正在运行或等待交互。请先完成或停止一个任务。`;
     publishNotification({ level: "warning", title: "已达到并发上限", message: `${detail} 草稿和附件已保留。` });
     return { accepted: false, error: detail };
   }
   const expectedAuthority = capturePromptSubmissionAuthority(state);
-  if (!expectedAuthority) {
+  if (!expectedAuthority || state.sessionTransitionPending
+    || (selectedTask && (selectedTask.conversation.kind !== "session"
+      || selectedTask.sessionId !== expectedAuthority.sessionId
+      || selectedTask.sessionFileIdentity !== expectedAuthority.sessionFileIdentity
+      || selectedTask.sessionGeneration !== expectedAuthority.sessionGeneration))) {
     const detail = promptSubmissionAuthorityMessage("AUTHORITY_NOT_READY");
     publishNotification({ level: "warning", title: detail, message: "草稿和附件已保留。" });
     return { accepted: false, error: detail };

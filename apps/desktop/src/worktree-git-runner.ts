@@ -215,7 +215,12 @@ export class BoundedPrivateGitRunner implements RepositoryMutationGitRunner {
     return this.#execute(
       "status",
       cwd,
-      ["--no-optional-locks", "-c", "core.longpaths=true", "status", "--porcelain=v2", "-z", "--untracked-files=all"],
+      [
+        "--no-optional-locks",
+        "-c", "core.longpaths=true",
+        "-c", "core.fsmonitor=false",
+        "status", "--porcelain=v2", "-z", "--untracked-files=all"
+      ],
       this.#budgets.statusTimeoutMs,
       this.#budgets.statusOutputBytes,
       signal

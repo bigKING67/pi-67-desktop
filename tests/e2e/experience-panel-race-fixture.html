@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>Experience workspace race fixture</title></head>
+<body>
+<button id="switch-workspace">Switch workspace B</button>
+<button id="resolve-old-workspace">Resolve workspace A</button>
+<div id="fixture-root"></div>
+<script type="module">
+import RefreshRuntime from "/@react-refresh";
+RefreshRuntime.injectIntoGlobalHook(window);
+window.$RefreshReg$ = () => {};
+window.$RefreshSig$ = () => (type) => type;
+window.__vite_plugin_react_preamble_installed__ = true;
+</script>
+<script type="module" src="../../apps/renderer/src/context-memory/ExperienceInspectorPanel.browser-fixture.tsx"></script>
+</body>
+</html>

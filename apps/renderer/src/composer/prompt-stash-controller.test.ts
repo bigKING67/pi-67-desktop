@@ -216,6 +216,36 @@ describe("Prompt stash controller", () => {
     expect(releaseAttachments).toHaveBeenCalledWith(["attachment-a"]);
   });
 
+  it("preserves an edit made while secure storage is opening", async () => {
+    const access = deferred<"available">();
+    ensureSecureStorageAccess.mockReturnValue(access.promise);
+    useTaskDraftStore.getState().addPromptStash("task", { id: "stash", text: "old", createdAt: 1 });
+    const restoring = restoreComposerPromptStash("task", "stash");
+    useTaskDraftStore.getState().setText("task", "new input");
+    access.resolve("available");
+    await expect(restoring).resolves.toEqual({ status: "conflict" });
+    expect(useTaskDraftStore.getState().drafts.task).toMatchObject({ text: "new input", promptStash: [{ id: "stash" }] });
+    expect(persist).not.toHaveBeenCalled();
+  });
+
+  it("releases restored handles without consuming the stash after an intervening edit", async () => {
+    const images = deferred<{ itemId: string; attachments: Array<{ id: string; name: string; mimeType: string; byteLength: number; kind: "image" }> }>();
+    restoreImages.mockReturnValue(images.promise);
+    useTaskDraftStore.getState().addPromptStash("task", {
+      id: "stash", text: "old", createdAt: 1,
+      attachments: [{ blobId: "blob", name: "image.png", mimeType: "image/png", byteLength: 8, kind: "image" }]
+    });
+    const restoring = restoreComposerPromptStash("task", "stash");
+    await vi.waitFor(() => expect(restoreImages).toHaveBeenCalledOnce());
+    useTaskDraftStore.getState().setText("task", "new input");
+    images.resolve({ itemId: "stash", attachments: [{ id: "fresh", name: "image.png", mimeType: "image/png", byteLength: 8, kind: "image" }] });
+    await expect(restoring).resolves.toEqual({ status: "conflict" });
+    expect(useTaskDraftStore.getState().drafts.task).toMatchObject({ text: "new input", attachments: [], promptStash: [{ id: "stash" }] });
+    expect(releaseAttachments).toHaveBeenCalledWith(["fresh"]);
+    expect(deleteImages).not.toHaveBeenCalled();
+    expect(persist).not.toHaveBeenCalled();
+  });
+
   it("restores encrypted image metadata to fresh staging ids and then removes the encrypted item", async () => {
     persist.mockResolvedValue("persisted");
     restoreImages.mockResolvedValue({

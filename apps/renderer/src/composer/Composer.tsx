@@ -95,7 +95,7 @@ export function Composer() {
   const streaming = useCommittedConversationStreaming();
   const activeSessionAuthority = Boolean(
     activeTask?.conversation.kind === "session"
-    && sessionReady
+    && sessionReady && !sessionTransitionPending
     && activeTask.sessionId === sessionId
     && activeTask.sessionFileIdentity === sessionFileIdentity
     && activeTask.sessionGeneration === sessionGeneration
@@ -109,7 +109,7 @@ export function Composer() {
     || attachments.length > 0
     || workspaceFiles.length > 0
     || reviewComments.length > 0;
-  const canSend = !submitting && !stagingAttachments && hasDraft;
+  const canSend = !submitting && !stagingAttachments && hasDraft && (newSessionIntent || activeSessionAuthority);
   const activeOperation = Boolean(
     activeSessionAuthority
     && operation

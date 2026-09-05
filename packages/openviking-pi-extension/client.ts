@@ -43,6 +43,10 @@ export class OVClient {
     this.peerId = config.peerId;
   }
 
+  setPeerId(peerId: string): void {
+    this.peerId = peerId;
+  }
+
   get connected(): boolean {
     return this.connectionState;
   }

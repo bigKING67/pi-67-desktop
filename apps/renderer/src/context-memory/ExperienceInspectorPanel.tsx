@@ -9,11 +9,11 @@ import {
   type SopReadinessReason
 } from "@pi67/domain";
 import { Check, RefreshCw, Send, ShieldCheck } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
-import { useWorkbenchStore } from "../workbench/workbench-store.js";
+import { rendererWorkbenchStore, useWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   loadContextMemoryOverview,
   loadPrivateExperiences,
@@ -38,22 +38,34 @@ export function ExperienceInspectorPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
 
+  const refreshGeneration = useRef(0);
+
   const refresh = useCallback(async (): Promise<void> => {
+    const generation = ++refreshGeneration.current;
     setLoading(true);
     setError(undefined);
     try {
       const overview = await loadContextMemoryOverview(workspaceId);
+      const candidates = workspaceId ? await loadPrivateExperiences(workspaceId) : [];
+      if (generation !== refreshGeneration.current) return;
       setIdentity(overview.identity);
       setBinding(overview.binding);
-      setItems(workspaceId ? await loadPrivateExperiences(workspaceId) : []);
+      setItems(candidates);
     } catch (cause) {
+      if (generation !== refreshGeneration.current) return;
       setError(cause instanceof Error ? cause.message : "无法读取经验候选。");
     } finally {
-      setLoading(false);
+      if (generation === refreshGeneration.current) setLoading(false);
     }
   }, [workspaceId]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    setItems([]);
+    setBinding(undefined);
+    setIdentity({ state: "signed-out" });
+    void refresh();
+    return () => { refreshGeneration.current += 1; };
+  }, [refresh]);
 
   useEffect(() => agentConnectionController.subscribe({
     onEvent: (event, envelope) => {
@@ -118,7 +130,11 @@ export function ExperienceInspectorPanel() {
             enterpriseReady={enterpriseReady}
             item={item}
             key={item.id}
-            onChanged={(candidate) => setItems((current) => upsertCandidate(current, candidate))}
+            onChanged={(candidate) => {
+              if (rendererWorkbenchStore.getState().currentWorkspaceId === workspaceId) {
+                setItems((current) => upsertCandidate(current, candidate));
+              }
+            }}
             {...(workspaceId === undefined ? {} : { workspaceId })}
           />)}</div>}
     </section>

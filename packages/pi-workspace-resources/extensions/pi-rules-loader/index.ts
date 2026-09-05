@@ -128,15 +128,17 @@ function ancestorsFromRoot(cwd: string): string[] {
   return dirs.reverse();
 }
 
-function collectRules(cwd: string): RuleFile[] {
+function collectRules(cwd: string, projectTrusted: boolean): RuleFile[] {
   const candidates: Array<{ source: RuleSource; dir: string }> = [
     { source: "global", dir: GLOBAL_RULES_DIR },
   ];
 
-  for (const ancestor of ancestorsFromRoot(cwd)) {
-    candidates.push({ source: "project", dir: path.join(ancestor, ".pi", "rules") });
-    candidates.push({ source: "agents", dir: path.join(ancestor, ".agents", "rules") });
-    candidates.push({ source: "claude", dir: path.join(ancestor, ".claude", "rules") });
+  if (projectTrusted) {
+    for (const ancestor of ancestorsFromRoot(cwd)) {
+      candidates.push({ source: "project", dir: path.join(ancestor, ".pi", "rules") });
+      candidates.push({ source: "agents", dir: path.join(ancestor, ".agents", "rules") });
+      candidates.push({ source: "claude", dir: path.join(ancestor, ".claude", "rules") });
+    }
   }
 
   const seen = new Set<string>();
@@ -288,6 +290,10 @@ function sameRulePaths(left: RuleFile[], right: RuleFile[]): boolean {
   return left.length === right.length && left.every((rule, index) => rule.absolutePath === right[index]?.absolutePath);
 }
 
+function samePaths(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
 function formatRules(rules: RuleFile[]): string {
   return rules
     .map((rule) => {
@@ -353,18 +359,26 @@ export default function piRulesLoader(pi: ExtensionAPI) {
   let rules: RuleFile[] = [];
 
   pi.on("session_start", async (_event, ctx) => {
-    rules = collectRules(ctx.cwd);
+    rules = collectRules(ctx.cwd, ctx.isProjectTrusted());
     if (rules.length > 0) {
       ctx.ui.notify(`Pi rules loader indexed ${rules.length} rule file(s).`, "info");
     }
   });
 
   pi.on("before_agent_start", async (event, ctx) => {
+    rules = collectRules(ctx.cwd, ctx.isProjectTrusted());
+    const branch = ctx.sessionManager.getBranch() as SessionEntryLike[];
+    const previousActiveRulePaths = activeRulePathsFromEntries(branch) ?? [];
     if (rules.length === 0) {
+      if (previousActiveRulePaths.length > 0) {
+        pi.appendEntry(ACTIVE_RULE_STATE_TYPE, {
+          schema: ACTIVE_RULE_STATE_SCHEMA,
+          activeRulePaths: [],
+        } satisfies ActiveRuleState);
+      }
       return;
     }
 
-    const branch = ctx.sessionManager.getBranch() as SessionEntryLike[];
     const previousActiveRules = activeRulesFromEntries(branch, rules);
     const directMatches = matchedRulesForPrompt(rules, event.prompt);
     const priorPrompt = previousUserPrompt(branch, event.prompt);
@@ -372,10 +386,11 @@ export default function piRulesLoader(pi: ExtensionAPI) {
     const activeRules = directMatches.length > 0 ? directMatches : inheritPrevious ? previousActiveRules : [];
     const activation = directMatches.length > 0 ? "direct" : inheritPrevious ? "inherited" : "none";
 
-    if (!sameRulePaths(previousActiveRules, activeRules)) {
+    const activeRulePaths = activeRules.map((rule) => rule.absolutePath);
+    if (!sameRulePaths(previousActiveRules, activeRules) || !samePaths(previousActiveRulePaths, activeRulePaths)) {
       pi.appendEntry(ACTIVE_RULE_STATE_TYPE, {
         schema: ACTIVE_RULE_STATE_SCHEMA,
-        activeRulePaths: activeRules.map((rule) => rule.absolutePath),
+        activeRulePaths,
       } satisfies ActiveRuleState);
       if (activeRules.length > 0) {
         ctx.ui.notify(`Pi rules loader activated ${activeRules.map((rule) => path.basename(rule.absolutePath)).join(", ")}.`, "info");

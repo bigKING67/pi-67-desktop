@@ -47,7 +47,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins two Desktop-internal packages, three first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.09.04.4");
+    expect(lock.catalogVersion).toBe("2026.09.05.1");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi-workspace-resources",
       "openviking-pi-extension",
@@ -58,7 +58,7 @@ describe("Desktop first-party capability source lock", () => {
     expect(lock.sources.filter((source) => source.repository).every((source) => /^[0-9a-f]{40}$/u.test(source.commit))).toBe(true);
     expect(lock.sources.find((source) => source.id === "pi-workspace-resources")).toMatchObject({
       internalPath: "packages/pi-workspace-resources",
-      treeSha256: "c0efa86f09d805a1e2310e4e7347bcdbbc81c440fca4b01aa99823c0a712702d",
+      treeSha256: "9d45a479a3bd364985742e5e5405f10c899be51db0b9dc2b70b939e7cb12eec0",
       includedExtensions: [{
         id: "pi-rules-loader",
         displayName: "工作规则加载器",
@@ -74,7 +74,7 @@ describe("Desktop first-party capability source lock", () => {
     });
     expect(lock.sources.find((source) => source.id === "openviking-pi-extension")).toMatchObject({
       internalPath: "packages/openviking-pi-extension",
-      treeSha256: "08c076cc5e732f432c688221ecacf521e78ccb359bed27b47a8f237d4cc137ad",
+      treeSha256: "eaad30ca1c2c7c630d9d252e85cced9ec96fd0715fe10d0361abb718389f4028",
       version: "0.2.0-desktop.6",
       includedExtensions: [{ id: "pi67-openviking" }]
     });

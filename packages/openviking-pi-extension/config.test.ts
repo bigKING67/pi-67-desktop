@@ -3,9 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  bindWorkspacePeer,
   loadConfig,
   tightenRuntimePrivacy,
   tightenRuntimePrivacyFromModuleUrl,
+  type OVConfig,
 } from "./config.js";
 
 describe("OpenViking runtime privacy", () => {
@@ -126,3 +128,20 @@ function restoreEnv(key: string, value: string | undefined): void {
   if (value === undefined) delete process.env[key];
   else process.env[key] = value;
 }
+
+describe("OpenViking workspace peer binding", () => {
+  it("derives each Session peer from its own cwd while preserving an explicit peer", () => {
+    const workspaceA = "/tmp/pi67-openviking-workspace-a";
+    const workspaceB = "/tmp/pi67-openviking-workspace-b";
+    const derived = { peerId: "", workspacePeer: true } as OVConfig;
+    bindWorkspacePeer(derived, workspaceA);
+    const peerA = derived.peerId;
+    bindWorkspacePeer(derived, workspaceB);
+    expect(derived.peerId).not.toBe(peerA);
+
+    const explicit = { peerId: "operator-peer", workspacePeer: true } as OVConfig;
+    bindWorkspacePeer(explicit, workspaceA);
+    bindWorkspacePeer(explicit, workspaceB);
+    expect(explicit.peerId).toBe("operator-peer");
+  });
+});

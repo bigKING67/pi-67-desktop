@@ -24,7 +24,8 @@ import {
 } from "./context-memory-runtime-diagnostics.js";
 import {
   appContextAuthority,
-  assertPrivateMemoryUri,
+  assertAuthorizedPrivateMemoryUri,
+  type PendingForget,
   deriveWorkspacePeerId,
   isPrivateMemoryUri,
   memoryScopeForUri,
@@ -46,11 +47,6 @@ export * from "./context-memory-command-types.js";
 type ContextAppCommand = AgentCommand<ContextMemoryAppCommandType>;
 type ContextWorkspaceCommand = AgentCommand<ContextMemoryWorkspaceCommandType>;
 
-interface PendingForget {
-  uri: string;
-  entry: MemoryEntrySummary;
-  expiresAt: number;
-}
 
 interface MutationRecord {
   fingerprint: string;
@@ -199,9 +195,9 @@ export class ContextMemoryCommandRouter {
           deriveWorkspacePeerId(workspace.cwd)
         );
       case "memory.get":
-        return this.getPrivateMemory(client, command.payload.id, context.workspaceId);
+        return this.getPrivateMemory(client, command.payload.id, context.workspaceId, deriveWorkspacePeerId(workspace.cwd));
       case "memory.forget.preview":
-        return this.previewForget(client, command.payload.id, context.workspaceId);
+        return this.previewForget(client, command.payload.id, context.workspaceId, deriveWorkspacePeerId(workspace.cwd));
       case "memory.forget.confirm":
         return this.confirmForget(context.workspaceId, client, command, idempotencyKey);
       case "experience.private.list":
@@ -330,9 +326,10 @@ export class ContextMemoryCommandRouter {
   private async getPrivateMemory(
     client: OpenVikingClient,
     uri: string,
-    workspaceId: string
+    workspaceId: string,
+    actorPeerId: string
   ): Promise<MemoryEntrySummary> {
-    assertPrivateMemoryUri(uri);
+    assertAuthorizedPrivateMemoryUri(uri, actorPeerId, client.currentUser);
     const summary = await client.read(uri);
     return {
       id: uri,
@@ -348,13 +345,14 @@ export class ContextMemoryCommandRouter {
   private async previewForget(
     client: OpenVikingClient,
     uri: string,
-    workspaceId: string
+    workspaceId: string,
+    actorPeerId: string
   ): Promise<CommandResults["memory.forget.preview"]> {
     this.pruneForgetPreviews();
-    const entry = await this.getPrivateMemory(client, uri, workspaceId);
+    const entry = await this.getPrivateMemory(client, uri, workspaceId, actorPeerId);
     const previewToken = randomUUID();
     const expiresAt = Date.now() + FORGET_PREVIEW_TTL_MS;
-    this.forgetPreviews.set(previewToken, { uri, entry, expiresAt });
+    this.forgetPreviews.set(previewToken, { uri, entry, workspaceId, actorPeerId, ...(client.currentUser === undefined ? {} : { userId: client.currentUser }), expiresAt });
     return {
       previewToken,
       entry,
@@ -375,6 +373,12 @@ export class ContextMemoryCommandRouter {
     this.pruneForgetPreviews();
     const preview = this.forgetPreviews.get(command.payload.previewToken);
     if (!preview) throw new HostCommandError("RESOURCE_NOT_FOUND", "The forget preview expired or is invalid.", true);
+    const workspace = this.workspaces.require(workspaceId);
+    const actorPeerId = deriveWorkspacePeerId(workspace.cwd);
+    if (preview.workspaceId !== workspaceId || preview.actorPeerId !== actorPeerId || preview.userId !== client.currentUser) {
+      throw new HostCommandError("RESOURCE_NOT_FOUND", "The forget preview is not valid for this Workspace identity.", true);
+    }
+    assertAuthorizedPrivateMemoryUri(preview.uri, actorPeerId, client.currentUser);
     return this.acceptAsyncMutation(idempotencyKey, command, async (operationId) => {
       await client.forget(preview.uri);
       this.forgetPreviews.delete(command.payload.previewToken);

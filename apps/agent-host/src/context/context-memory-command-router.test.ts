@@ -11,7 +11,9 @@ import {
   enterpriseFetch,
   healthyFetch,
   workspaceContext,
-  workspaceMemoryUri
+  workspaceContextB,
+  workspaceMemoryUri,
+  workspaceMemoryUriB
 } from "./context-memory-command-router.test-support.js";
 
 afterEach(cleanupRouterFixtures);
@@ -172,6 +174,44 @@ describe("ContextMemoryCommandRouter", () => {
       .map(([, init]) => new Headers(init?.headers).get("X-OpenViking-Actor-Peer"))
       .find(Boolean);
     expect(actorHeader).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("rejects cross-workspace peer URIs and binds forget previews before HTTP", async () => {
+    const fetchMock = healthyFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const fixture = await createRouter();
+    const preview = await fixture.router.dispatchWorkspace(workspaceContext, {
+      type: "memory.forget.preview",
+      payload: { id: workspaceMemoryUri }
+    });
+    if (!("previewToken" in preview)) throw new Error("Expected preview");
+    const beforeConfirm = fetchMock.mock.calls.length;
+    await expect(fixture.router.dispatchWorkspace(workspaceContextB, {
+      type: "memory.forget.confirm",
+      payload: { submissionId: "cross-workspace", previewToken: preview.previewToken }
+    }, "cross-workspace")).rejects.toMatchObject({ code: "RESOURCE_NOT_FOUND" });
+    expect(fetchMock).toHaveBeenCalledTimes(beforeConfirm);
+
+    const beforeRead = fetchMock.mock.calls.length;
+    await expect(fixture.router.dispatchWorkspace(workspaceContextB, {
+      type: "memory.get", payload: { id: workspaceMemoryUri }
+    })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    expect(fetchMock).toHaveBeenCalledTimes(beforeRead);
+
+    await expect(fixture.router.dispatchWorkspace(workspaceContextB, {
+      type: "memory.get", payload: { id: "viking://user/memories/preferences.md" }
+    })).resolves.toMatchObject({ scope: "user" });
+    const beforeMalformed = fetchMock.mock.calls.length;
+    for (const id of [
+      `viking://user/peers/${"f".repeat(64)}/memories/foreign.md`,
+      workspaceMemoryUriB.replace("host-recovery.md", "%2e%2e%2fescape.md"),
+      "viking://user/memories/preferences.md?scope=foreign"
+    ]) {
+      await expect(fixture.router.dispatchWorkspace(workspaceContextB, {
+        type: "memory.get", payload: { id }
+      })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(beforeMalformed);
   });
 
   it("keeps device credentials in the Host and binds a trusted Workspace through the Gateway", async () => {

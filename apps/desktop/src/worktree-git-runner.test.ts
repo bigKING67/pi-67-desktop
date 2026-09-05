@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -189,6 +189,30 @@ describe("BoundedPrivateGitRunner", () => {
     await expect(runner.listWorktrees(repository)).resolves.toHaveLength(1);
   }, REAL_GIT_TEST_TIMEOUT_MS);
 
+  it("does not invoke a repository-configured fsmonitor during porcelain status", async () => {
+    const root = await temporaryRoot();
+    const repository = join(root, "repository");
+    const monitor = join(root, "fsmonitor.mjs");
+    const marker = join(root, "fsmonitor-invoked");
+    await mkdir(repository);
+    await runSystemGit(repository, ["init"]);
+    await runSystemGit(repository, [
+      "-c", "user.name=Pi-67",
+      "-c", "user.email=pi67@example.invalid",
+      "commit", "--allow-empty", "-m", "initial"
+    ]);
+    await writeFile(monitor, `import { writeFileSync } from "node:fs";\nwriteFileSync(process.argv[2], "invoked");\n`, "utf8");
+    await runSystemGit(repository, [
+      "config",
+      "core.fsmonitor",
+      [process.execPath, monitor, marker].map(quoteGitCommandArgument).join(" ")
+    ]);
+    const runner = new BoundedPrivateGitRunner(await systemGitToolchain(root));
+
+    await expect(runner.statusPorcelain(repository)).resolves.toBe("");
+    await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" });
+  }, REAL_GIT_TEST_TIMEOUT_MS);
+
   it("initializes a linked-checkout Submodule from existing local objects without network transport", async () => {
     const root = await temporaryRoot();
     const module = join(root, "module");
@@ -311,4 +335,8 @@ async function systemGitToolchain(root: string): Promise<DesktopToolchain> {
 
 async function runSystemGit(cwd: string, arguments_: string[]): Promise<void> {
   await execFileAsync("git", arguments_, { cwd, encoding: "utf8" });
+}
+
+function quoteGitCommandArgument(value: string): string {
+  return `"${value.replaceAll("\"", "\\\"")}"`;
 }

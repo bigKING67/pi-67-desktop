@@ -175,6 +175,9 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Verify pnpm execution runtime
         run: pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
+      - name: Verify workflow and packaging PowerShell syntax
+        shell: pwsh
+        run: pnpm run check:workflow-powershell
       - name: Restore Electron packaging downloads
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:

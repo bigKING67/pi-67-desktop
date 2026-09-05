@@ -14,6 +14,7 @@
       "project": ["src/**/*.ts"]
     },
     "apps/renderer": {
+      "entry": ["src/context-memory/ExperienceInspectorPanel.browser-fixture.tsx"],
       "project": ["src/**/*.{ts,tsx}"]
     },
     "packages/domain": {

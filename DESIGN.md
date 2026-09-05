@@ -592,7 +592,10 @@ loading error where the operation can produce those states
   unavailable states. Clean inactive tabs release source text and reopen it on
   demand rather than retaining every file body indefinitely.
 - Save carries the opened opaque revision and cannot overwrite an external
-  change. A dirty conflict exposes `放弃草稿并重新读取` and `将草稿另存为`;
+  change. Its acknowledgement applies only to the submitted content snapshot;
+  edits made while saving remain dirty, and save-and-close keeps the tab open
+  until the current content is saved. Only one save per file may be in flight;
+  later edits remain dirty and can be saved against the acknowledged revision. A dirty conflict exposes `放弃草稿并重新读取` and `将草稿另存为`;
   every reload that would replace a dirty draft requires a confirmation and a
   failed read leaves the draft intact. Closing a dirty tab offers save, discard,
   and cancel. Clean tabs and dirty drafts restore per
@@ -1075,7 +1078,9 @@ loading error where the operation can produce those states
   The durable outbox remotely verifies Session/message identity before replay,
   while a single recoverable connection authority restores automatic Recall and
   Capture after an outage without a manual refresh.
-- The `Experience` Inspector presents private records, exact task Cases, and
+- The `Experience` Inspector discards refresh and mutation results belonging to a
+  previous Workspace; switching Workspace clears old candidates and binding state.
+  It presents private records, exact task Cases, and
   enterprise candidates in one dense governance list. Its hero and metrics teach
   the progression `Case -> Experience -> SOP candidate` without presenting a new
   navigation tier. Every card shows its Case count and one compact SOP-readiness
@@ -1841,7 +1846,9 @@ loading error where the operation can produce those states
   no Pi Session or JSONL and prefers another provisional intent in the same Workspace as
   the next selection before returning to the Workspace surface.
   Creation failure preserves the intent draft; Prompt failure after materialization preserves the
-  formal Session and cannot cause a second create. An unknown create outcome stops the indefinite loading state and
+  formal Session and cannot cause a second create. A materialized Task cannot
+  submit while its selected identity and active Session projection are still
+  transitioning; the draft stays editable and retained. An unknown create outcome stops the indefinite loading state and
   shows `重新检查` plus `放弃此占位`; Desktop does not silently resubmit the create,
   and the provisional identity remains in persisted Workbench state across restart.
   Recheck asks `session.creation.resolve` for the exact Pi JSONL carrying the stable

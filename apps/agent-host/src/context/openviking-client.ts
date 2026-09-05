@@ -72,6 +72,8 @@ export class OpenVikingClient {
     )
   ) {}
 
+  get currentUser(): string | undefined { return this.credentials.user; }
+
   async health(): Promise<{ version?: string; latencyMs: number }> {
     const startedAt = Date.now();
     const result = await this.request<Record<string, unknown>>(
