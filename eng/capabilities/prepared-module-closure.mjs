@@ -1,5 +1,5 @@
 import { access, readFile } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export async function assertPreparedLocalModuleClosure(packageRoot, entryPath) {
   const visited = new Set();
@@ -13,7 +13,8 @@ export async function assertPreparedLocalModuleClosure(packageRoot, entryPath) {
     ];
     for (const match of imports) {
       const resolved = await resolvePreparedLocalModule(dirname(path), match[1]);
-      if (!resolved || !resolved.startsWith(`${packageRoot}/`)) {
+      const localPath = resolved ? relative(packageRoot, resolved) : undefined;
+      if (!localPath || isAbsolute(localPath) || localPath === ".." || localPath.startsWith(`..${sep}`)) {
         throw new Error(
           `Prepared package is missing local module ${match[1]} from ${relative(packageRoot, path)}.`,
         );

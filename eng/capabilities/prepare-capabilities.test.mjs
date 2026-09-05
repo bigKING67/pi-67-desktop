@@ -44,6 +44,24 @@ describe("Desktop first-party capability source lock", () => {
     }
   });
 
+  it("rejects imports escaping the prepared package while allowing nested local imports", async () => {
+    const fixture = await mkdtemp(join(tmpdir(), "pi67-prepared-module-boundary-"));
+    const prepared = join(fixture, "package");
+    try {
+      await mkdir(join(prepared, "nested"), { recursive: true });
+      await writeFile(join(prepared, "index.ts"), 'import "./nested/entry.js";\n');
+      await writeFile(join(prepared, "config.ts"), "export {};\n");
+      await writeFile(join(prepared, "nested", "entry.ts"), 'import "../config.js";\n');
+      await expect(assertPreparedLocalModuleClosure(prepared, "index.ts")).resolves.toBeUndefined();
+      await writeFile(join(fixture, "outside.ts"), "export {};\n");
+      await writeFile(join(prepared, "nested", "entry.ts"), 'import "../../outside.js";\n');
+      await expect(assertPreparedLocalModuleClosure(prepared, "index.ts"))
+        .rejects.toThrow(/missing local module/u);
+    } finally {
+      await rm(fixture, { recursive: true, force: true });
+    }
+  });
+
   it("pins two Desktop-internal packages, three first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");

@@ -4,6 +4,10 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
+      // The standalone Agent pilot builds dist; source tests must also work before that build.
+      "../../../packages/pi-runtime/dist/index.mjs": fileURLToPath(
+        new URL("./packages/pi-runtime/src/index.ts", import.meta.url)
+      ),
       "@pi67/domain": fileURLToPath(new URL("./packages/domain/src/index.ts", import.meta.url)),
       "@pi67/extension-compat": fileURLToPath(new URL("./packages/extension-compat/src/index.ts", import.meta.url)),
       "@pi67/pi-runtime": fileURLToPath(new URL("./packages/pi-runtime/src/index.ts", import.meta.url)),
