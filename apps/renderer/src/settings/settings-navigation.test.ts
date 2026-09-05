@@ -17,7 +17,7 @@ describe("settings navigation", () => {
         items: [
           { id: "account", label: "账户" },
           { id: "general", label: "外观" },
-          { id: "context-memory", label: "Context & Memory" }
+          { id: "context-memory", label: "上下文与记忆" }
         ]
       },
       {

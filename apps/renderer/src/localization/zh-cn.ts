@@ -31,8 +31,8 @@ export const zhCNMessages = {
         summary: "选择跟随系统、浅色或深色应用外观。"
       },
       contextMemory: {
-        label: "Context & Memory",
-        summary: "配置 OpenViking、隐私模式、Session Context 与企业经验边界。"
+        label: "上下文与记忆",
+        summary: "配置 OpenViking、隐私模式、会话上下文与企业经验边界。"
       },
       providers: {
         label: "模型",

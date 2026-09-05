@@ -44,7 +44,7 @@ const PRIVACY_MODES: Array<{ id: MemoryPrivacyMode; label: string; detail: strin
   { id: "full-learning", label: "完整学习", detail: "私人学习，并允许生成脱敏的团队经验候选；仍需审核后发布。" },
   { id: "private-learning", label: "私人学习", detail: "召回并写入本地私人记忆，不生成团队候选。" },
   { id: "read-only", label: "只读记忆", detail: "允许召回，不捕获或写入新记忆。" },
-  { id: "off", label: "完全关闭", detail: "本 Session 不召回、不捕获、不生成候选。" }
+  { id: "off", label: "完全关闭", detail: "本会话不召回、不捕获、不生成候选。" }
 ];
 
 export function ContextMemorySettings() {
@@ -77,7 +77,7 @@ export function ContextMemorySettings() {
         setSelectedProjectId(undefined);
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "无法读取 Context & Memory 状态。");
+      setError(cause instanceof Error ? cause.message : "无法读取上下文与记忆状态。");
     } finally {
       setBusy(undefined);
     }
@@ -104,7 +104,7 @@ export function ContextMemorySettings() {
           setProjects(nextProjects);
           setSelectedProjectId(selectEnterpriseProjectId(nextOverview, nextProjects));
           setAuthorization(undefined);
-          publishNotification({ level: "success", title: "企业账户已连接", message: "本地私人记忆保持独立；现在可以绑定当前 Workspace。" });
+          publishNotification({ level: "success", title: "企业账户已连接", message: "本地私人记忆保持独立；现在可以绑定当前工作区。" });
           return;
         }
         if (identity.state === "expired") {
@@ -152,8 +152,8 @@ export function ContextMemorySettings() {
       setOverview((current) => current ? { ...current, configuration: saved } : current);
       publishNotification({
         level: "success",
-        title: "Context & Memory 配置已保存",
-        message: "更严格的隐私设置会在当前 Session 的下一次 Pi 边界生效；开放学习、Owner 与 Endpoint 变更需新 Session。"
+        title: "上下文与记忆设置已保存",
+        message: "更严格的隐私设置会在当前会话的下一次 Pi 生命周期边界生效；重新开放学习、变更所有者或服务地址需要新建会话。"
       });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "保存失败。");
@@ -206,9 +206,9 @@ export function ContextMemorySettings() {
     try {
       const binding = await bindEnterpriseWorkspace(workspaceId, selectedProjectId);
       setOverview((current) => current ? { ...current, binding } : current);
-      publishNotification({ level: "success", title: "Workspace 已绑定", message: "完整学习模式下的脱敏候选可以提交企业审核。" });
+      publishNotification({ level: "success", title: "工作区已绑定", message: "完整学习模式下的脱敏候选可以提交企业审核。" });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Workspace 绑定失败。");
+      setError(cause instanceof Error ? cause.message : "工作区绑定失败。");
     } finally {
       setBusy(undefined);
     }
@@ -237,9 +237,9 @@ export function ContextMemorySettings() {
     setBusy("commit");
     try {
       await commitContextSession(workspaceId, sessionId);
-      publishNotification({ level: "success", title: "Session Commit 已受理", message: "归档与记忆抽取在 Agent Host 中继续执行。" });
+      publishNotification({ level: "success", title: "会话归档已受理", message: "归档与记忆抽取将在后台继续执行。" });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Commit 未能受理。");
+      setError(cause instanceof Error ? cause.message : "归档请求未能受理。");
     } finally {
       setBusy(undefined);
     }
@@ -253,8 +253,8 @@ export function ContextMemorySettings() {
   const privacy = PRIVACY_MODES.find((mode) => mode.id === draft.defaultPrivacyMode)!;
   return <div className={styles.workspace} data-testid="context-memory-settings">
     <SettingsSectionBlock
-      title="Context & Memory"
-      description="OpenViking 负责 Session Context、私人记忆和经验；Pi JSONL 始终是 Session 事实源。"
+      title="OpenViking 服务"
+      description="OpenViking 负责会话上下文、私人记忆与经验；Pi JSONL 始终是会话事实源。"
       actions={<div className={styles.actions}>
         <Button className="secondary-button" isDisabled={busy !== undefined} onPress={() => void doctor()}>测试连接</Button>
         <Button className="primary-button" isDisabled={!changed || busy !== undefined} onPress={() => void save()}>保存设置</Button>
@@ -263,14 +263,14 @@ export function ContextMemorySettings() {
       <SettingsRows>
         <SettingsRow
           leading={<Database aria-hidden="true" size={17} />}
-          title="OpenViking Runtime"
-          description={overview.status.detail ?? "Memory 故障不会阻止 Pi；新 Session 启动前会校验唯一 Context Owner。"}
+          title="OpenViking 运行状态"
+          description={overview.status.detail ?? "记忆服务故障不会阻止 Pi；新会话启动前会校验唯一的上下文所有者。"}
           value={healthLabel(overview.status.health)}
         />
-        <SettingsRow title="Session Context Owner" description="Owner 在 Session 创建时锁定；修改配置后只对新 Session 生效。" value={ownerLabel(overview.status.owner)} />
-        <SettingsRow title="Endpoint" description="远程地址必须使用 HTTPS；HTTP 仅允许 127.0.0.1 / localhost。">
+        <SettingsRow title="会话上下文所有者" description="所有者在会话创建时锁定；修改配置后仅对新会话生效。" value={ownerLabel(overview.status.owner)} />
+        <SettingsRow title="服务地址" description="远程地址必须使用 HTTPS；HTTP 仅允许 127.0.0.1 / localhost。">
           <Input
-            aria-label="OpenViking Endpoint"
+            aria-label="OpenViking 服务地址"
             className={styles.input!}
             value={draft.endpoint}
             onChange={(event) => setDraft({ ...draft, endpoint: event.currentTarget.value })}
@@ -278,7 +278,7 @@ export function ContextMemorySettings() {
         </SettingsRow>
       </SettingsRows>
       {overview.status.conflictExtensions.length > 0 ? <SettingsNotice tone="danger">
-        新 Session 检测到冲突的 Memory Owner：{overview.status.conflictExtensions.join("、")}。启动前门禁已阻止这些第三方 Memory Extension 加载；Pi 聊天、工具、JSONL 与默认 Compaction 继续可用，旧记忆数据不会被删除。
+        新会话检测到冲突的记忆所有者：{overview.status.conflictExtensions.join("、")}。启动前门禁已阻止这些第三方记忆扩展加载；Pi 聊天、工具、JSONL 与默认上下文压缩继续可用，旧记忆数据不会被删除。
       </SettingsNotice> : null}
       {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
     </SettingsSectionBlock>
@@ -295,28 +295,28 @@ export function ContextMemorySettings() {
           <strong>{mode.label}</strong><span>{mode.detail}</span>
         </Button>)}
       </div>
-      <SettingsNotice tone="info"><ShieldCheck aria-hidden="true" size={14} /> 当前选择：{privacy.label}。切到更严格的模式会在当前 Session 的下一次 Pi 生命周期或 OpenViking Tool 边界生效；重新开放学习需新 Session。Memory 始终以不可信上下文注入，不能授权 Shell、文件或外部操作。</SettingsNotice>
+      <SettingsNotice tone="info"><ShieldCheck aria-hidden="true" size={14} /> 当前选择：{privacy.label}。切到更严格的模式会在当前会话的下一次 Pi 生命周期或 OpenViking 工具边界生效；重新开放学习需要新建会话。记忆始终以不可信上下文注入，不能授权 Shell、文件或外部操作。</SettingsNotice>
     </SettingsSectionBlock>
 
-    <SettingsSectionBlock title="Session Context" description="Pi Extension 按 OpenViking 官方生命周期为符合检索条件的当前 Prompt 自动 Recall；信息不足时再由 Pi 调用 OpenViking Tool，Desktop 只做治理和显式操作。">
+    <SettingsSectionBlock title="会话上下文" description="Pi 扩展按 OpenViking 官方生命周期，为符合检索条件的当前提示词自动召回；信息不足时再由 Pi 调用 OpenViking 工具，桌面端只负责治理和显式操作。">
       <SettingsRows>
-        <SettingsRow leading={<BrainCircuit aria-hidden="true" size={17} />} title="Context Takeover" description={`达到 ${draft.takeover.tokenThreshold.toLocaleString()} tokens 后归档，保留最近 ${draft.takeover.keepRecentTurns} turns。`} value={draft.takeover.enabled ? "开启" : "关闭"} />
-        <SettingsRow title="Commit 阈值" description="达到阈值后由 Extension 排队归档；失败时保留本地上下文。" value={`${draft.commitTokenThreshold.toLocaleString()} tokens`} />
-        <SettingsRow title="单次召回预算" description={`符合检索条件的当前 Prompt 自动召回最多 ${draft.recallTokenBudget.toLocaleString()} tokens；信息仍不足时才按需搜索和深读。私人 Experience ${draft.privateExperienceLimit} 条、本地 Resource ${draft.localResourceRecallLimit} 条、企业 Experience ${draft.sharedExperienceLimit} 条。`} value={`${draft.recallTokenBudget.toLocaleString()} tokens`} />
+        <SettingsRow leading={<BrainCircuit aria-hidden="true" size={17} />} title="上下文接管" description={`达到 ${draft.takeover.tokenThreshold.toLocaleString()} Token 后归档，保留最近 ${draft.takeover.keepRecentTurns} 轮对话。`} value={draft.takeover.enabled ? "开启" : "关闭"} />
+        <SettingsRow title="归档阈值" description="达到阈值后由 Pi 扩展排队归档；失败时保留本地上下文。" value={`${draft.commitTokenThreshold.toLocaleString()} Token`} />
+        <SettingsRow title="单次召回预算" description={`符合检索条件的当前提示词自动召回最多 ${draft.recallTokenBudget.toLocaleString()} Token；信息仍不足时才按需搜索和深读。私人经验 ${draft.privateExperienceLimit} 条、本地资源 ${draft.localResourceRecallLimit} 条、企业经验 ${draft.sharedExperienceLimit} 条。`} value={`${draft.recallTokenBudget.toLocaleString()} Token`} />
         <SettingsRow
-          title="当前 Session"
-          description={sessionId ? `Session ${sessionId.slice(0, 12)}…` : "当前没有可提交的 Pi Session。"}
+          title="当前会话"
+          description={sessionId ? `会话 ${sessionId.slice(0, 12)}…` : "当前没有可归档的 Pi 会话。"}
           value={sessionId ? "可提交" : "未就绪"}
-          actions={<Button className="secondary-button" isDisabled={!workspaceId || !sessionId || busy !== undefined} onPress={() => void commit()}>立即 Commit</Button>}
+          actions={<Button className="secondary-button" isDisabled={!workspaceId || !sessionId || busy !== undefined} onPress={() => void commit()}>立即归档</Button>}
         />
       </SettingsRows>
     </SettingsSectionBlock>
 
-    <SettingsSectionBlock title="企业记忆与经验" description="登录只增加共享召回和候选提交流程，不会把本地私人 Memory 改成公开数据。">
+    <SettingsSectionBlock title="企业记忆与经验" description="登录只增加共享召回和候选提交流程，不会把本地私人记忆改成公开数据。">
       <SettingsRows>
-        <SettingsRow title="Enterprise Context Gateway" description="远程地址必须使用 HTTPS；本地联调只允许 loopback HTTP。">
+        <SettingsRow title="企业上下文网关" description="远程地址必须使用 HTTPS；本地联调只允许使用本机回环 HTTP 地址。">
           <Input
-            aria-label="Enterprise Context Gateway Endpoint"
+            aria-label="企业上下文网关地址"
             className={styles.input!}
             placeholder="https://datahub.example.com"
             value={draft.enterpriseGatewayEndpoint}
@@ -328,7 +328,7 @@ export function ContextMemorySettings() {
           title="企业账户"
           description={overview.identity.state === "signed-in"
             ? `${overview.identity.displayName ?? overview.identity.userId ?? "企业用户"} · ${overview.identity.accountId ?? "企业空间"}`
-            : "Desktop 只持有短期身份；Root/Admin Key 不进入客户端。"}
+            : "桌面端只持有短期身份；根密钥或管理员密钥不会进入客户端。"}
           value={identityLabel(overview.identity.state)}
           actions={overview.identity.state === "signed-in" ? <Button
             className="secondary-button"
@@ -342,7 +342,7 @@ export function ContextMemorySettings() {
         />
         <SettingsRow
           title="当前项目绑定"
-          description="只有已登录、可信且明确绑定的 Workspace 才能提交经验候选。"
+          description="只有已登录、可信且明确绑定的工作区才能提交经验候选。"
           value={bindingLabel(overview.binding?.state)}
           actions={overview.identity.state === "signed-in" && overview.binding?.state !== "bound" ? <div className={styles.bindingActions}>
             <EnterpriseProjectSelect
@@ -364,10 +364,10 @@ export function ContextMemorySettings() {
         className="secondary-button"
         onPress={() => void window.pi67.system.requestOpenExternal(authorization.verificationUri)}
       ><ExternalLink aria-hidden="true" size={14} />打开授权页</Button>}>
-        请在 DataHub 登录并确认此设备。验证码：<code>{authorization.userCode}</code>；完成后 Desktop 会自动刷新。
+        请在 DataHub 登录并确认此设备。验证码：<code>{authorization.userCode}</code>；完成后桌面端会自动刷新。
       </SettingsNotice> : null}
-      {overview.identity.state === "signed-out" ? <SettingsNotice tone="info">企业 Context Gateway 尚未连接；本地私人记忆和私人经验不受影响。</SettingsNotice> : null}
-      {changed && draft.enterpriseGatewayEndpoint ? <SettingsNotice tone="warning">请先保存 Gateway 地址，再连接企业账户。</SettingsNotice> : null}
+      {overview.identity.state === "signed-out" ? <SettingsNotice tone="info">企业上下文网关尚未连接；本地私人记忆和私人经验不受影响。</SettingsNotice> : null}
+      {changed && draft.enterpriseGatewayEndpoint ? <SettingsNotice tone="warning">请先保存网关地址，再连接企业账户。</SettingsNotice> : null}
     </SettingsSectionBlock>
   </div>;
 }

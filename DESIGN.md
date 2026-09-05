@@ -1055,6 +1055,11 @@ loading error where the operation can produce those states
   Pi ResourceLoader. OpenViking is the only supported third-party Context/Memory
   owner. Legacy observational-memory and Hy-Memory names are detection/migration
   identifiers only; their runtimes are never bundled or presented as alternatives.
+  The zh-CN Settings surface names this category `上下文与记忆` and uses Chinese
+  product language for user-facing concepts such as sessions, owners, runtime
+  state, service addresses, recall, and archives. `OpenViking`, `Pi`, `Pi JSONL`,
+  `DataHub`, protocols, and units remain unchanged as proper nouns or technical
+  identifiers; English aliases stay searchable without becoming visible labels.
   A loaded Session may only tighten its Memory privacy authority: `read-only` and
   `off` are re-read at the next Pi lifecycle or OpenViking Tool boundary, while
   re-enabling Memory, learning, or changing Owner/Endpoint waits for a new Session.
