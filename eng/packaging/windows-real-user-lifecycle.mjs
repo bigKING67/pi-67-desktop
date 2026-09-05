@@ -68,7 +68,6 @@ export const REAL_USER_WORKBENCH_CONVERGENCE_TIMEOUT_MS = 10_000;
 export const REAL_USER_RESTART_COUNT = 3;
 
 const POLL_INTERVAL_MS = 50;
-
 export async function verifyInstalledRealUserLifecycle({
   agentDir,
   artifact,
@@ -153,6 +152,7 @@ async function runRealUserLaunch({
   let application;
   let failureWindow;
   let processOutput = () => "";
+  let failureStage = "launch";
   try {
     const launchStartedAt = performance.now();
     application = await launchPackagedApplication({
@@ -181,6 +181,7 @@ async function runRealUserLaunch({
       throw new Error("Windows real-user lifecycle unexpectedly inherited PI_OFFLINE.");
     }
 
+    failureStage = "startup-surface";
     const startupSurface = await waitForInstalledStartupSurface(window, false);
     if (startupSurface === "workspace-picker") {
       if (launchIndex > 0) {
@@ -189,13 +190,16 @@ async function runRealUserLaunch({
       await installWorkspaceDialogResult(application, workspace);
       await window.getByRole("button", { name: "选择工作区" }).click();
     }
+    failureStage = "workspace-authority";
     const workspaceCwd = await resolveRealUserWorkspaceAuthority(
       window,
       workspace,
       expectedWorkspaceCwd
     );
 
+    failureStage = "catalog-request";
     const catalogRequestStart = await waitForCatalogRequestStart(window, INSTALLED_RUNTIME_READINESS_TIMEOUT_MS);
+    failureStage = "catalog-state";
     const catalog = await waitForCatalogState(window, expectedSessionIdentity, undefined, {
       launchIndex,
       inspectExpectedSessionFile: () => inspectRealUserSessionFile(expectedSessionPath),
@@ -212,6 +216,7 @@ async function runRealUserLaunch({
     let sessionPath = expectedSessionPath;
     if (shouldCreateInitialRealUserSession({ catalog, expectedSessionIdentity, launchIndex })) {
       try {
+        failureStage = "creation-authority";
         await waitForRealUserCreationAuthority(
           window,
           INSTALLED_RUNTIME_READINESS_TIMEOUT_MS
@@ -229,25 +234,33 @@ async function runRealUserLaunch({
       }
       await assertHealthyWorkbench(window);
       if (launchIndex === 0 && verifyInitialProfileState) {
+        failureStage = "initial-profile-preservation";
         initialProfileVerification = await verifyInitialProfileState();
       }
+      failureStage = "controlled-conversation";
       const created = await createControlledConversation(window, agentDir, conversationContract());
       create = created.report;
       sessionIdentity = created.sessionIdentity;
       sessionPath = created.sessionPath;
     } else {
+      failureStage = "catalog-activation";
       sessionIdentity = await activateCatalogSession(window, expectedSessionIdentity);
     }
+    failureStage = "runtime-ready";
     const runtimeReadyMs = await waitForRealUserRuntimeReady(window, sessionIdentity);
     const launchToReadyMs = performance.now() - launchStartedAt;
     await waitForHealthyWorkbenchConvergence(window);
     if (launchIndex === 0 && verifyInitialProfileState && !initialProfileVerification) {
+      failureStage = "initial-profile-preservation";
       initialProfileVerification = await verifyInitialProfileState();
     }
+    failureStage = "provider-configuration";
     const providerConfiguration = await verifyProviderConfiguration(window);
+    failureStage = "file-projection";
     const fileProjection = await verifyGitMetadataIsHidden(window);
 
     if (launchIndex === 0 && !create) {
+      failureStage = "controlled-conversation";
       const created = await createControlledConversation(window, agentDir, conversationContract());
       create = created.report;
       sessionIdentity = created.sessionIdentity;
@@ -266,6 +279,7 @@ async function runRealUserLaunch({
       throw new Error("Windows real-user lifecycle could not observe the Agent Host utility process.");
     }
 
+    failureStage = "shutdown";
     const shutdownMeasurement = await measureElectronApplicationShutdown({
       application,
       budgetMs: INSTALLED_SHUTDOWN_BUDGET_MS,
@@ -315,6 +329,7 @@ async function runRealUserLaunch({
   } catch (error) {
     const diagnostic = {
       failure: realUserLifecycleFailureKind(error),
+      stage: failureStage,
       initialization: parseInitializationObservations(processOutput()),
       lane,
       launchIndex,

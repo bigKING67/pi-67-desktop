@@ -105,3 +105,11 @@ explicit peerId, global rules, provisional Task creation, and current user draft
 - Opened repository `artifacts/release/mac-arm64/Pi-67 Desktop.app`, pid 22151 at verification time. `app.asar` size 198037171, SHA-256 `3fe3435e29dd78f39c6a4f884c379ce35c048e8a5755ccf874ed35fba4586c92`.
 - Canonical fix session: `rcf-20260905T035907Z-0e6aeddc63aa`; final attempt receipt and assessment remain outside Git.
 - Frontend route: L1-F functional, PRODUCT/DESIGN authority, design-craft, main-owned implementation; no visual/token changes. Browser runtime evidence is distinct from packaged smoke.
+
+## Windows CI follow-up
+
+- Source remediation was committed as `32a534c`; `9d28d65` corrected Windows path containment and clean-checkout Agent pilot test resolution. Both were pushed with current operator authorization.
+- CI `33948707060` on `9d28d65` passed macOS native smoke, Renderer E2E, and source checks (3434 passed / 5 skipped after one unchanged-source timeout retry). Windows passed real PowerShell AST (26 scripts), Native E2E, packaged smoke, and synthetic scale/IME checks.
+- NSIS failed at the existing-profile preservation check. An isolated macOS packaged reproduction confirmed that only synthetic `settings.json` changed: the four stable Desktop Package entries required by PRODUCT.md were appended. User-owned fields and files were unchanged. The old whole-file hash assertion predates the shared-profile projection contract.
+- The verifier now accepts either the original exact settings bytes or the exact expected four-Package projection; all other original files remain byte-exact. Negative fixtures reject changed user settings, removed user Packages, changed filters, additional Packages, and outside paths. Static lifecycle stage labels distinguish future failures without retaining raw error bodies.
+- Windows acceptance uses the existing verifier-only candidate reuse path. The previously failed installer remains the artifact under test; no new product behavior, signing, publication, or distribution is implied by this verifier correction.

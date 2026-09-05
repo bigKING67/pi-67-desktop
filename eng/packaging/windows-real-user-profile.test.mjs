@@ -185,11 +185,48 @@ describe("Windows installed real-user Pi profile", () => {
       await mkdir(join(profile.lifecycleAgentDir, "desktop-capabilities"), { recursive: true });
       await writeFile(join(profile.lifecycleAgentDir, "desktop-capabilities", "state.json"), "{}\n");
       await expect(assertWindowsExistingProfilePreserved(profile.lifecycleAgentDir, before))
-        .resolves.toEqual({ preservedFileCount: Object.keys(before).length });
+        .resolves.toEqual({ preservedFileCount: Object.keys(before.files).length });
 
       await writeFile(join(profile.lifecycleAgentDir, "AGENTS.md"), "changed\n");
       await expect(assertWindowsExistingProfilePreserved(profile.lifecycleAgentDir, before))
         .rejects.toThrow("changed user files");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("admits only the exact shared-profile Package projection and preserves user filters", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-windows-profile-projection-"));
+    try {
+      const profile = resolveWindowsRealUserProfilePaths(root);
+      await prepareWindowsRealUserProfile(profile);
+      const agentDir = profile.lifecycleAgentDir;
+      const settingsPath = join(agentDir, "settings.json");
+      const original = JSON.parse(await readFile(settingsPath, "utf8"));
+      original.packages = [{ source: "npm:user-package", extensions: ["user.ts"] }];
+      await writeFile(settingsPath, `${JSON.stringify(original, null, 2)}\n`);
+      const before = await snapshotWindowsExistingProfile(agentDir);
+      const managed = join(agentDir, "desktop-capabilities", "shared-profile", "active", "packages");
+      const projected = { ...original, packages: [
+        ...original.packages,
+        { source: join(managed, "pi-workspace-resources"), extensions: [] },
+        ...["browser67", "design-craft", "commerce-growth-os"].map((id) => join(managed, id))
+      ] };
+      await writeFile(settingsPath, `${JSON.stringify(projected, null, 2)}\n`);
+      await expect(assertWindowsExistingProfilePreserved(agentDir, before)).resolves.toBeDefined();
+      await expect(assertWindowsExistingProfileInteractionPreserved(agentDir, before)).resolves.toBeDefined();
+      const mutations = [
+        { ...projected, defaultModel: "changed-model" },
+        { ...projected, packages: projected.packages.slice(1) },
+        { ...projected, packages: [{ source: "npm:user-package", extensions: [] }, ...projected.packages.slice(1)] },
+        { ...projected, packages: [...projected.packages, join(managed, "unapproved-package")] },
+        { ...projected, packages: [...projected.packages.slice(0, -1), join(agentDir, "outside-package")] }
+      ];
+      for (const mutation of mutations) {
+        await writeFile(settingsPath, `${JSON.stringify(mutation, null, 2)}\n`);
+        await expect(assertWindowsExistingProfilePreserved(agentDir, before)).rejects.toThrow("changed user files");
+        await expect(assertWindowsExistingProfileInteractionPreserved(agentDir, before)).rejects.toThrow("changed user files");
+      }
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -205,7 +242,7 @@ describe("Windows installed real-user Pi profile", () => {
         profile.lifecycleAgentDir,
         before
       )).resolves.toMatchObject({
-        preservationMode: "pre-and-post-interaction-exact-user-files"
+        preservationMode: "exact-user-files-with-bounded-desktop-package-projection"
       });
 
       await writeFile(join(profile.lifecycleAgentDir, "settings.json"), "{\"changed\":true}\n");

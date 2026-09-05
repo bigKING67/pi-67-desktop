@@ -117,40 +117,60 @@ async function inspectCleanWindowsProfileProvisioning(agentDir) {
 
 export async function snapshotWindowsExistingProfile(agentDir) {
   const files = await collectFiles(agentDir);
-  return Object.fromEntries(await Promise.all(files.map(async (relativePath) => [
+  const hashes = Object.fromEntries(await Promise.all(files.map(async (relativePath) => [
     relativePath,
-    createHash("sha256").update(await readFile(join(agentDir, relativePath))).digest("hex")
+    sha256(await readFile(join(agentDir, relativePath)))
   ])));
+  // This controlled fixture uses JSON. Only these stable Desktop Package entries
+  // may be appended; every pre-existing setting and user Package stays unchanged.
+  const settings = JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8"));
+  const packageRoot = join(agentDir, "desktop-capabilities", "shared-profile", "active", "packages");
+  const projectedSettings = {
+    ...settings,
+    packages: [
+      ...(settings.packages ?? []),
+      { source: join(packageRoot, "pi-workspace-resources"), extensions: [] },
+      ...["browser67", "design-craft", "commerce-growth-os"].map((id) => join(packageRoot, id))
+    ]
+  };
+  return {
+    files: hashes,
+    projectedSettingsSha256: sha256(`${JSON.stringify(projectedSettings, null, 2)}\n`)
+  };
 }
 
 export async function assertWindowsExistingProfilePreserved(agentDir, before) {
-  const after = await snapshotWindowsExistingProfile(agentDir);
-  const changed = Object.entries(before).flatMap(([relativePath, sha256]) => (
-    after[relativePath] === sha256 ? [] : [relativePath]
-  ));
+  const changed = await changedExistingProfileFiles(agentDir, before);
   if (changed.length > 0) {
     throw new Error(`Windows existing-pi-profile lane changed user files: ${JSON.stringify(changed.slice(0, 8))}`);
   }
-  return { preservedFileCount: Object.keys(before).length };
+  return { preservedFileCount: Object.keys(before.files).length };
 }
 
-export async function assertWindowsExistingProfileInteractionPreserved(
-  agentDir,
-  before
-) {
-  const after = await snapshotWindowsExistingProfile(agentDir);
-  const changedUserFiles = Object.entries(before).flatMap(([relativePath, sha256]) => (
-    after[relativePath] === sha256 ? [] : [relativePath]
-  ));
+export async function assertWindowsExistingProfileInteractionPreserved(agentDir, before) {
+  const changedUserFiles = await changedExistingProfileFiles(agentDir, before);
   if (changedUserFiles.length > 0) {
     throw new Error(
       `Windows existing-pi-profile interaction changed user files: ${JSON.stringify(changedUserFiles.slice(0, 8))}`
     );
   }
   return {
-    preservedFileCount: Object.keys(before).length,
-    preservationMode: "pre-and-post-interaction-exact-user-files"
+    preservedFileCount: Object.keys(before.files).length,
+    preservationMode: "exact-user-files-with-bounded-desktop-package-projection"
   };
+}
+
+async function changedExistingProfileFiles(agentDir, before) {
+  const after = await snapshotWindowsExistingProfile(agentDir);
+  return Object.entries(before.files).flatMap(([path, hash]) => (
+    after.files[path] === hash
+      || (path === "settings.json" && after.files[path] === before.projectedSettingsSha256)
+      ? [] : [path]
+  ));
+}
+
+function sha256(content) {
+  return createHash("sha256").update(content).digest("hex");
 }
 
 function writeConfiguredProfile(agentDir) {
