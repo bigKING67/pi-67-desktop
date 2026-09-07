@@ -22,7 +22,8 @@ export async function preparePackagedProjectedImage(window) {
 }
 
 export async function verifyPackagedProjectedImage(window, stage, { expectRuntimeReady = true } = {}) {
-  const image = window.getByRole("img", { name: "会话图片" }).last();
+  const image = window.getByTestId("message-card")
+    .getByRole("img", { name: "pi67-restored-image.png", exact: true }).last();
   try {
     await image.waitFor({ state: "visible", timeout: 30_000 });
   } catch (error) {
