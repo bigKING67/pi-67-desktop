@@ -7,7 +7,7 @@ import type {
   RecallFeedbackKind
 } from "@pi67/domain";
 import { Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Input, SearchField } from "react-aria-components";
 import { selectSessionId } from "../session/session-projection-selectors.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
@@ -24,6 +24,11 @@ import styles from "./MemoryInspectorPanel.module.css";
 
 export function MemoryInspectorPanel() {
   const workspaceId = useWorkbenchStore((state) => state.currentWorkspaceId);
+  return <WorkspaceMemoryInspector key={workspaceId ?? "no-workspace"} workspaceId={workspaceId} />;
+}
+
+function WorkspaceMemoryInspector({ workspaceId }: { workspaceId: string | undefined }) {
+  const searchGeneration = useRef(0);
   const sessionId = useSessionProjectionStore(selectSessionId);
   const [status, setStatus] = useState<ContextRuntimeStatus>();
   const [session, setSession] = useState<ContextSessionStatus>();
@@ -68,12 +73,14 @@ export function MemoryInspectorPanel() {
     if (!workspaceId || !query.trim()) return;
     setBusy(true);
     setError(undefined);
+    const generation = ++searchGeneration.current;
     try {
-      setMemories(await searchPrivateMemories(workspaceId, query.trim()));
+      const result = await searchPrivateMemories(workspaceId, query.trim());
+      if (generation === searchGeneration.current) setMemories(result);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "记忆搜索失败。");
+      if (generation === searchGeneration.current) setError(cause instanceof Error ? cause.message : "记忆搜索失败。");
     } finally {
-      setBusy(false);
+      if (generation === searchGeneration.current) setBusy(false);
     }
   };
 

@@ -1,3 +1,6 @@
+import { basename } from "node:path";
+import { configureRuntimeProvider, selectProviderModel } from "./real-provider-startup-ui.mjs";
+import { installProviderStartupReceipt, readProviderStartupSelection } from "./real-provider-startup-receipt.mjs";
 import { _electron as electron } from "@playwright/test";
 import { installWorkspaceDialogResult } from "../packaging/packaged-electron-fixture.mjs";
 import {
@@ -13,8 +16,7 @@ import {
   installProtocolReceiptProbe,
   markProviderPromptSubmission,
   readRealProviderProtocolProbe,
-  waitForRealProviderApprovalRequest,
-  waitForRealProviderControlResponse
+  waitForRealProviderApprovalRequest
 } from "./real-provider-protocol-receipt.mjs";
 
 const PROVIDER_PROMPT = [
@@ -49,9 +51,10 @@ export async function runRealProviderPackagedScenario({
     await assertProviderRendererBoundary(page);
     evidence.rendererBoundaryVerified = true;
     await installProtocolReceiptProbe(page);
+    await page.evaluate(installProviderStartupReceipt);
     onStage("runtime-initialize");
     await page.getByRole("button", { name: "选择工作区" }).click();
-    await page.getByText("Pi SDK 已就绪", { exact: true }).waitFor({
+    await page.getByLabel("当前状态：Pi SDK 已就绪", { exact: true }).waitFor({
       state: "visible",
       timeout: 30_000
     });
@@ -62,39 +65,33 @@ export async function runRealProviderPackagedScenario({
     );
     evidence.runtimeReady = true;
 
-    onStage("workspace-trust");
-    const trustButton = page.getByRole("button", { name: /信任并加载资源/u });
-    await trustButton.waitFor({ state: "visible", timeout: 10_000 });
-    await trustButton.click();
-    await page.getByText("Pi 资源已就绪", { exact: true }).waitFor({
-      state: "visible",
-      timeout: 30_000
-    });
-
     onStage("session-create");
-    await page.getByRole("button", { name: "新建 Session" }).click();
-    await page.getByRole("banner").getByText("Pi 新会话已就绪", { exact: true }).waitFor({
-      state: "visible",
-      timeout: 30_000
-    });
+    await page.getByRole("button", {
+      name: `在 ${basename(directories.workspace)} 新建对话`, exact: true
+    }).click();
+    await page.getByTestId("new-session-intent").waitFor({ state: "visible" });
+    await page.locator('[data-testid="conversation-row"][aria-current="page"][data-conversation-id^="provisional:"]')
+      .waitFor({ state: "visible" });
 
     onStage("credential-install");
     await configureRuntimeProvider(page, config);
     evidence.credentialInstalled = true;
     onStage("model-select");
-    const selection = await selectProviderModel(page, config);
+    await selectProviderModel(page, config);
     evidence.modelSelected = true;
     onStage("prompt-submit");
     await page.getByLabel("给 Pi 发送消息", { exact: true }).fill(PROVIDER_PROMPT);
     await markProviderPromptSubmission(page);
+    await page.evaluate(() => { globalThis.__pi67ProviderStartupReceipt.armed = true; });
     await page.getByRole("button", { name: "发送", exact: true }).click();
     evidence.promptSubmitted = true;
     onStage("prompt-ack");
     await page.waitForFunction(
       () => Number.isFinite(globalThis.__pi67ProviderLongTurnProbe?.acceptedAt),
       undefined,
-      { timeout: 10_000 }
+      { timeout: 60_000 }
     );
+    const selection = await readProviderStartupSelection(page, config);
     evidence.promptAccepted = true;
 
     onStage("tool-approval");
@@ -156,59 +153,6 @@ export async function runRealProviderPackagedScenario({
   } finally {
     await application?.close().catch(() => undefined);
   }
-}
-
-async function configureRuntimeProvider(page, config) {
-  await page.getByRole("button", { name: "打开更多菜单" }).click();
-  await page.getByRole("menu").getByRole("menuitem", { name: /Provider 与凭据/u }).click();
-  const dialog = page.getByRole("dialog", { name: "Provider 与凭据" });
-  await dialog.waitFor({ state: "visible", timeout: 10_000 });
-  const providerButton = dialog.locator(".provider-list button").filter({
-    hasText: config.providerId
-  });
-  await providerButton.waitFor({ state: "visible", timeout: 10_000 });
-  await providerButton.click();
-  await dialog.getByLabel("Provider API 密钥", { exact: true }).fill(config.apiKey);
-  await dialog.getByRole("button", {
-    name: /启用本次运行密钥|替换本次运行密钥/u
-  }).click();
-  await dialog.getByText("来源：当前运行内存（完全退出后失效）", { exact: true }).waitFor({
-    state: "visible",
-    timeout: 30_000
-  });
-  await dialog.getByRole("button", { name: "关闭", exact: true }).click();
-}
-
-async function selectProviderModel(page, config) {
-  const modelValue = `${config.providerId}/${config.modelId}`;
-  const model = page.getByLabel("Pi 模型", { exact: true });
-  await model.locator(`option[value=${JSON.stringify(modelValue)}]`).waitFor({
-    state: "attached",
-    timeout: 30_000
-  });
-  await model.selectOption(modelValue);
-  await waitForRealProviderControlResponse(page, "model.select");
-
-  const thinking = page.getByLabel("Pi 思考级别", { exact: true });
-  const thinkingOption = thinking.locator(
-    `option[value=${JSON.stringify(config.thinkingLevel)}]`
-  );
-  await thinkingOption.waitFor({ state: "attached", timeout: 30_000 });
-  await thinking.selectOption(config.thinkingLevel);
-  await waitForRealProviderControlResponse(page, "thinking.set");
-  await page.waitForFunction(
-    ({ expectedModel, expectedThinking }) => {
-      const modelSelect = document.querySelector("select[aria-label='Pi 模型']");
-      const thinkingSelect = document.querySelector("select[aria-label='Pi 思考级别']");
-      return modelSelect?.value === expectedModel && thinkingSelect?.value === expectedThinking;
-    },
-    { expectedModel: modelValue, expectedThinking: config.thinkingLevel },
-    { timeout: 30_000 }
-  );
-  return {
-    modelValue,
-    effectiveThinkingLevel: await thinking.inputValue()
-  };
 }
 
 async function assertProviderRendererBoundary(page) {
