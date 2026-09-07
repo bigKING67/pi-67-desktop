@@ -135,6 +135,13 @@ export class RepositoryWorktreeActionService {
         if (!currentAuthority || currentAuthority.record.creationId !== record.creationId) {
           return rejectedRecovery("identity-changed", false);
         }
+        if (
+          currentAuthority.source.availability !== "available"
+          || currentAuthority.source.trust !== "trusted"
+          || currentAuthority.workspace.availability === "available"
+          || workspaceIdentityFingerprint(currentAuthority.source) !== workspaceIdentityFingerprint(source)
+          || workspaceIdentityFingerprint(currentAuthority.workspace) !== workspaceIdentityFingerprint(workspace)
+        ) return rejectedRecovery("identity-changed", false);
         const profile = await recoverWorktreeProfilePath(
           this.options.userData,
           record.repositoryGroupId,

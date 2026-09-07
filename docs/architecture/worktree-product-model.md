@@ -381,7 +381,8 @@ Renderer 是跨 Main 与 Agent Host 的产品流程协调者，但不拥有 Git 
   不自动写 Git config，也不把失败伪装成完整。divergent 或 conflicted 状态不通过网络动作覆盖。
 - 缺失恢复只适用于 durable binding 标记为 app-owned、创建记录已 `committed`、source Workspace
   可用且可信的 Worktree。UI 明确说明只重建已提交的 branch 状态，原目录中的未提交改动和未跟踪
-  文件无法恢复。
+  文件无法恢复。恢复请求取得 Repository mutation 执行权后，必须重新核验 source 的可用/可信状态、
+  source 与 target 的 Workspace identity，以及 target 仍不可用；排队期间任何漂移都在 Git 操作前拒绝。
 - 恢复只处理 profile 内 exact target。若 Git 留有该 exact missing registration，只定点执行
   `git worktree remove --force <exact-target>`；禁止 Repository-wide `git worktree prune`。随后 checkout
   已存在的 exact branch，验证 common-dir、branch、HEAD、非 detached/locked/prunable 和 clean status。

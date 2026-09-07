@@ -137,6 +137,43 @@ describe("RepositoryWorktreeActionService", () => {
     expect(removeRegistration).toHaveBeenCalledOnce();
   }, REAL_GIT_TEST_TIMEOUT_MS);
 
+  it.each(["source-trust", "source-missing", "target-available"] as const)("rejects recovery after queued authority drift: %s", async (drift) => {
+    const fixture = await actionFixture();
+    const created = await createCommittedWorktree(fixture);
+    if (created.status !== "created") throw new Error("Expected a created Worktree.");
+    await rm(created.receipt.workspace.identity.canonicalPath, { recursive: true, force: true });
+    await fixture.workbenchState.update((state) => replaceWorkspaceRegistrations(state,
+      state.workspaces.map((workspace) => workspace.id === created.receipt.workspace.id
+        ? { ...workspace, availability: "missing" as const } : workspace)));
+    const group = (await fixture.workbenchState.load()).state.environmentMutations[0]!.repositoryGroupId;
+    let release!: () => void;
+    const blocker = fixture.scheduler.run(group, () => new Promise<void>((resolve) => { release = resolve; }));
+    const restore = vi.spyOn(fixture.runner, "restoreWorktree");
+    const remove = vi.spyOn(fixture.runner, "removeWorktree");
+    const recovery = fixture.actions.recoverAppOwnedWorktree({
+      workspaceId: created.receipt.workspace.id, confirmation: "recreate-committed-state"
+    });
+    try {
+      await vi.waitFor(() => expect(fixture.scheduler.diagnostics().queuedCount).toBe(1));
+      await fixture.workbenchState.update((state) => replaceWorkspaceRegistrations(state,
+        state.workspaces.map((workspace) => {
+          if (drift === "target-available" && workspace.id === created.receipt.workspace.id) {
+            return { ...workspace, availability: "available" as const };
+          }
+          if (workspace.id !== fixture.source.id) return workspace;
+          if (drift === "source-trust") return { ...workspace, trust: "untrusted" as const };
+          if (drift === "source-missing") return { ...workspace, availability: "missing" as const };
+          return workspace;
+        })));
+    } finally {
+      release();
+      await blocker;
+    }
+    await expect(recovery).resolves.toMatchObject({ status: "rejected" });
+    expect(restore).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+  }, REAL_GIT_TEST_TIMEOUT_MS);
+
   it("uses network-capable Submodule Git only after the exact explicit action", async () => {
     const fixture = await actionFixture();
     const inspect = vi.spyOn(fixture.runner, "inspectSubmodules")
