@@ -393,7 +393,8 @@ export class WorktreeCreationService {
         scheduler: this.#scheduler,
         workbenchState: this.#workbenchState,
         now: this.#now,
-        platform: this.#platform
+        platform: this.#platform,
+        observeIdentity: this.#observeIdentity
       }, source.identity.canonicalPath, prepared.targetPath, record, error);
     }
   }

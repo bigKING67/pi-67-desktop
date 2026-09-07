@@ -2,6 +2,7 @@ import type {
   EnvironmentMutationRecoveryRecord,
   WorktreeCreationResult
 } from "@pi67/protocol";
+import { repositoryGroupId, type PhysicalDirectoryIdentity } from "./repository-identity.js";
 import { advanceEnvironmentMutation } from "./workbench-state-mutations.js";
 import type { RepositoryMutationScheduler } from "./repository-mutation-scheduler.js";
 import {
@@ -22,6 +23,7 @@ export interface WorktreeCreationFailureRollbackOptions {
   workbenchState: WorkbenchStateAuthority;
   now: () => number;
   platform: NodeJS.Platform;
+  observeIdentity(path: string): Promise<PhysicalDirectoryIdentity>;
 }
 
 export async function rollbackFailedWorktreeCreation(
@@ -36,12 +38,20 @@ export async function rollbackFailedWorktreeCreation(
     return rejected("git", "repository-indeterminate", true);
   }
   try {
+    const sourceCommonDirectory = await options.runner.resolveCommonDirectory(sourcePath);
+    if (repositoryGroupId(await options.observeIdentity(sourceCommonDirectory)) !== record.repositoryGroupId) {
+      return markRollbackProtected(options, record);
+    }
     const [worktrees, branchHead] = await Promise.all([
       options.runner.listWorktrees(sourcePath),
       options.runner.resolveBranchHead(sourcePath, record.branchName)
     ]);
     const worktree = worktrees.find((candidate) => pathsEqual(candidate.path, targetPath, options.platform));
     if (worktree) {
+      const targetCommonDirectory = await options.runner.resolveCommonDirectory(targetPath);
+      if (repositoryGroupId(await options.observeIdentity(targetCommonDirectory)) !== record.repositoryGroupId) {
+        return markRollbackProtected(options, record);
+      }
       const clean = await options.runner.statusPorcelain(targetPath);
       if (
         worktree.branchName !== record.branchName

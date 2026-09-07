@@ -589,7 +589,9 @@ prompt.submit
 - Git add 明确失败且 reconcile 证明没有 path/branch：journal 可标记 failed，无 rollback。
 - Git path 已创建但 Workspace registration 失败：creation service 只回滚本次 app-owned exact
   artifact；使用 `worktree remove --force` 和 `branch -D` 前必须证明 branch/path/HEAD/common-dir 仍等于
-  本次 creation receipt、没有用户变化。无法证明则 `rollback-protected`。
+  本次 creation receipt、没有用户变化。失败回滚必须重新观察 source 和已存在 target 的 common-dir
+  物理身份，不能因创建验证已经失败而沿用旧观察；身份不匹配则 `rollback-protected`，观察失败则
+  保留产物并将 Repository 标为 indeterminate。
 - 对外 rollback 只允许 durable state 仍为 `workspace-registered`、Main 尚未推进到
   `host-registering`、没有 runtime/session recovery authority、Workspace binding/path/branch/HEAD/
   common-dir 全部 exact、且 Worktree clean、non-detached、non-locked、non-prunable 的情况。Main 必须先
