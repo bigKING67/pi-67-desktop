@@ -12,6 +12,28 @@ afterEach(async () => {
 });
 
 describe("ComposerDraftStateStore", () => {
+  it.each(["cold", "warm"] as const)("rejects unpersisted removal and preserves unrelated drafts (%s)", async (mode) => {
+    const root = await userData();
+    let available = true;
+    const encryption = { ...reversibleEncryption(), isAvailable: () => available };
+    const original = new ComposerDraftStateStore(root, { encryption });
+    const state = { version: 1 as const, drafts: [draftState().drafts[0]!, { ...draftState().drafts[0]!, conversation: { kind: "provisional" as const, workspaceId: "workspace-b", draftId: "task-b" } }] };
+    await original.update(state);
+    const before = await readFile(original.requestedStatePath, "utf8");
+    available = false;
+    const store = mode === "cold" ? new ComposerDraftStateStore(root, { encryption: unavailableEncryption() }) : original;
+    await expect(store.removeWorkspace("workspace-a")).rejects.toThrow("persistence is unavailable");
+    expect(await readFile(original.requestedStatePath, "utf8")).toBe(before);
+    if (mode === "warm") expect((await store.load()).state).toEqual(state);
+    available = true;
+    const recovered = mode === "cold" ? new ComposerDraftStateStore(root, { encryption }) : store;
+    await recovered.removeWorkspace("workspace-a");
+    await recovered.removeWorkspace("workspace-a");
+    const restored = await new ComposerDraftStateStore(root, { encryption }).load();
+    expect(restored.persistence).toBe("available");
+    expect(restored.state.drafts).toEqual([state.drafts[1]]);
+  });
+
   it("encrypts drafts and restores the selected conversation", async () => {
     const root = await userData();
     const store = new ComposerDraftStateStore(root, { encryption: reversibleEncryption() });

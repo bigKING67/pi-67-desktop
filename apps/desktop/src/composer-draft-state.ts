@@ -85,6 +85,7 @@ export class ComposerDraftStateStore {
   removeWorkspace(workspaceId: string): Promise<void> {
     return this.#enqueue(async () => {
       const loaded = await this.#loadUnlocked();
+      if (loaded.persistence !== "available") throw new Error("Composer draft persistence is unavailable for Workspace removal.");
       const state = {
         version: 1 as const,
         drafts: loaded.state.drafts.filter((draft) => draft.conversation.workspaceId !== workspaceId),
@@ -94,7 +95,9 @@ export class ComposerDraftStateStore {
             ? { selectedConversation: loaded.state.selectedConversation }
             : {})
       };
-      this.#memoryPersistence = await this.#writeUnlocked(state);
+      const persistence = await this.#writeUnlocked(state);
+      if (persistence !== "available") throw new Error("Composer draft persistence is unavailable for Workspace removal.");
+      this.#memoryPersistence = persistence;
       this.#memoryState = state;
     });
   }

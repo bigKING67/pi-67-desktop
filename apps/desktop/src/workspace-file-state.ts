@@ -68,11 +68,13 @@ export class WorkspaceFileStateStore {
   removeWorkspace(workspaceId: string): Promise<void> {
     return this.#enqueue(async () => {
       const loaded = await this.#loadUnlocked();
+      if (loaded.draftPersistence !== "available") throw new Error("Workspace file persistence is unavailable for Workspace removal.");
       const state = {
         ...loaded.state,
         workspaces: loaded.state.workspaces.filter((workspace) => workspace.workspaceId !== workspaceId)
       };
       const draftPersistence = await this.#writeUnlocked(state);
+      if (draftPersistence !== "available") throw new Error("Workspace file persistence is unavailable for Workspace removal.");
       this.#memoryState = state;
       this.#memoryDraftPersistence = draftPersistence;
     });

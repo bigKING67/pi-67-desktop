@@ -11,6 +11,28 @@ afterEach(async () => {
 });
 
 describe("WorkspaceFileStateStore", () => {
+  it.each(["cold", "warm"] as const)("rejects unpersisted removal and preserves unrelated drafts (%s)", async (mode) => {
+    const root = await userData();
+    let available = true;
+    const encryption = { ...reversibleEncryption(), isAvailable: () => available };
+    const original = new WorkspaceFileStateStore(root, { encryption });
+    const state = { version: 1 as const, workspaces: ["workspace-a", "workspace-b"].map((workspaceId) => ({ workspaceId, tabs: [{ relativePath: "notes.md", baseRevision: "revision_1", draft: "retained draft" }] })) };
+    await original.update(state);
+    const before = await readFile(original.requestedStatePath, "utf8");
+    available = false;
+    const store = mode === "cold" ? new WorkspaceFileStateStore(root, { encryption: unavailableEncryption() }) : original;
+    await expect(store.removeWorkspace("workspace-a")).rejects.toThrow("persistence is unavailable");
+    expect(await readFile(original.requestedStatePath, "utf8")).toBe(before);
+    if (mode === "warm") expect((await store.load()).state).toEqual(state);
+    available = true;
+    const recovered = mode === "cold" ? new WorkspaceFileStateStore(root, { encryption }) : store;
+    await recovered.removeWorkspace("workspace-a");
+    await recovered.removeWorkspace("workspace-a");
+    const restored = await new WorkspaceFileStateStore(root, { encryption }).load();
+    expect(restored.draftPersistence).toBe("available");
+    expect(restored.state.workspaces).toEqual([state.workspaces[1]]);
+  });
+
   it("encrypts dirty drafts while preserving clean tab metadata", async () => {
     const root = await userData();
     const store = new WorkspaceFileStateStore(root, { encryption: reversibleEncryption() });
