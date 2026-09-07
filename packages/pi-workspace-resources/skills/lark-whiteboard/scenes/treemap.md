@@ -84,12 +84,12 @@
       "type": "rect",
       "id": "cat-A-item-1",
       "x": 40, "y": 110,
-      "width": 440, "height": 380,
+      "width": 440, "height": 378,
       "borderRadius": 4
     },
     {
       "type": "text",
-      "x": 48, "y": 116,
+      "x": 48, "y": 118,
       "width": 424, "height": 24,
       "text": "{{ITEM_A1}} (24)",
       "fontSize": 14
@@ -97,8 +97,8 @@
     {
       "type": "rect",
       "id": "cat-A-item-2",
-      "x": 40, "y": 490,
-      "width": 440, "height": 250,
+      "x": 40, "y": 488,
+      "width": 440, "height": 252,
       "borderRadius": 4
     },
     {
@@ -127,12 +127,12 @@
       "type": "rect",
       "id": "cat-B-item-1",
       "x": 480, "y": 110,
-      "width": 385, "height": 380,
+      "width": 385, "height": 360,
       "borderRadius": 4
     },
     {
       "type": "text",
-      "x": 488, "y": 116,
+      "x": 488, "y": 118,
       "width": 369, "height": 24,
       "text": "{{ITEM_B1}} (20)",
       "fontSize": 14
@@ -140,13 +140,13 @@
     {
       "type": "rect",
       "id": "cat-B-item-2",
-      "x": 480, "y": 490,
-      "width": 385, "height": 285,
+      "x": 480, "y": 470,
+      "width": 385, "height": 270,
       "borderRadius": 4
     },
     {
       "type": "text",
-      "x": 488, "y": 496,
+      "x": 488, "y": 478,
       "width": 369, "height": 24,
       "text": "{{ITEM_B2}} (15)",
       "fontSize": 14
@@ -170,12 +170,12 @@
       "type": "rect",
       "id": "cat-C-item-1",
       "x": 865, "y": 110,
-      "width": 275, "height": 399,
+      "width": 275, "height": 378,
       "borderRadius": 4
     },
     {
       "type": "text",
-      "x": 873, "y": 116,
+      "x": 873, "y": 118,
       "width": 259, "height": 24,
       "text": "{{ITEM_C1}} (15)",
       "fontSize": 14
@@ -183,13 +183,13 @@
     {
       "type": "rect",
       "id": "cat-C-item-2",
-      "x": 865, "y": 509,
-      "width": 275, "height": 231,
+      "x": 865, "y": 488,
+      "width": 275, "height": 252,
       "borderRadius": 4
     },
     {
       "type": "text",
-      "x": 873, "y": 515,
+      "x": 873, "y": 496,
       "width": 259, "height": 24,
       "text": "{{ITEM_C2}} (10)",
       "fontSize": 14

@@ -318,7 +318,7 @@ lark-cli slides <resource> <method> [flags]  # 调用 API
 | [examples.md](references/examples.md) | CLI 调用示例 |
 | [slides_demo.xml](references/slides_demo.xml) | 真实 PPT 的完整 XML |
 | [slides_xml_schema_definition.xml](references/slides_xml_schema_definition.xml) | **完整 Schema 定义**（唯一协议依据） |
-| [lark-slides-xml-presentations-create.md](references/lark-slides-xml-presentations-create.md) | 创建空白 PPT 命令详情 |
+| [lark-slides-create.md](references/lark-slides-create.md) | 创建空白 PPT 命令详情 |
 | [lark-slides-xml-presentations-get.md](references/lark-slides-xml-presentations-get.md) | 读取 PPT 命令详情 |
 | [lark-slides-xml-presentation-slide-create.md](references/lark-slides-xml-presentation-slide-create.md) | 添加幻灯片命令详情 |
 | [lark-slides-xml-presentation-slide-delete.md](references/lark-slides-xml-presentation-slide-delete.md) | 删除幻灯片命令详情 |

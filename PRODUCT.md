@@ -120,10 +120,10 @@ the only Runtime and behavior specification source.
   returns at most 1 MiB of validated IPC data, and discards stdout/stderr. Host
   shutdown rejects new Package work, terminates every active worker process tree in
   two bounded phases, and waits for observed exit before reporting graceful cleanup.
-  POSIX uses a dedicated process group; Windows uses tree-aware `taskkill`, whose
-  final release evidence still requires real Windows validation. Windows does not
-  yet use a Job Object; when a dead root PID leaves descendant cleanup unprovable,
-  shutdown fails closed instead of reporting graceful cleanup.
+  POSIX uses a dedicated process group; Windows requires native Job Object attachment
+  before dispatch and confirms zero active processes during cleanup, as detailed below.
+  Unprovable descendant cleanup fails closed instead of reporting graceful shutdown.
+  Windows release claims still require real Windows validation.
 - Desktop-owned install/update/uninstall mutations use a private durable receipt
   keyed by digests of the owner, source, idempotency key, and mutation fingerprint.
   The receipt never stores a raw source URL/path, install path, Workspace path,

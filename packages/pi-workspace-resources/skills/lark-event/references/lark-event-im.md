@@ -26,7 +26,7 @@
 
 **sender_id is open_id only**: the event payload carries no display name. Call the contact API separately if you need the sender's name.
 
-**`.content` shape depends on `message_type`** (this key uses a flat Custom schema; see [`events/im/message_receive.go`](../../../events/im/message_receive.go)):
+**`.content` shape depends on `message_type`** (the following table describes the CLI flat Custom projection, not the raw OpenAPI event envelope; inspect the actual event schema before consuming another CLI version):
 
 | message_type | `.content` shape | How to read |
 |---|---|---|

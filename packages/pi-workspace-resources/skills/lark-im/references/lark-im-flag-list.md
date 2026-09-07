@@ -8,7 +8,7 @@ This skill maps to shortcut: `lark-cli im +flag-list`. Underlying API: `GET /ope
 
 The API returns data sorted by `update_time` in **ascending order**, meaning **oldest first, newest last**. When `has_more=true`, you cannot simply take the first page's items as the latest flags — you must paginate through all pages and take the last item on the last page as the newest.
 
-Recommended: use `--page-all` for auto-pagination to get the complete list, then use `-q '.data.flag_items[-1]'` to get the latest item.
+Use `--page-all` while retaining `has_more` and `page_token`; its page limit may truncate the result. Only after `has_more=false` may the final item be called the latest overall. Otherwise continue from `page_token` and label any interim last item as the last item in the fetched range.
 
 ## Commands
 
@@ -22,8 +22,8 @@ lark-cli im +flag-list --as user --page-size 30 --page-token <page_token>
 # Auto-paginate to get all flags (recommended)
 lark-cli im +flag-list --as user --page-all
 
-# Auto-paginate + get the latest flag
-lark-cli im +flag-list --as user --page-all -q '.data.flag_items[-1]'
+# Preserve pagination state; continue from page_token while has_more=true
+lark-cli im +flag-list --as user --page-all -q '{has_more:.data.has_more,page_token:.data.page_token,last_fetched:.data.flag_items[-1]}'
 
 # Auto-paginate + get only item_id list
 lark-cli im +flag-list --as user --page-all -q '.data.flag_items[].item_id'

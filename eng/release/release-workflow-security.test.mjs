@@ -9,6 +9,14 @@ async function readWorkflowSource() {
 }
 
 describe("signed release workflow security", () => {
+  it("binds checkout-free publication to the triggering repository", async () => {
+    const source = await readWorkflowSource();
+    const publish = source.slice(source.indexOf("  publish:\n"));
+    expect(publish).toContain("gh release create");
+    expect(publish).not.toContain("uses: actions/checkout@");
+    expect(publish).toContain("GH_REPO: ${{ github.repository }}");
+  });
+
   it("never interpolates workflow inputs into shell source", async () => {
     const source = await readWorkflowSource();
     for (const body of extractWorkflowRunBodies(source)) {

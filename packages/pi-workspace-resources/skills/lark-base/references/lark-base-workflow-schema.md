@@ -151,7 +151,7 @@
   "table_name": "订单表",
   "watched_field_name": "状态",
   "trigger_control_list": ["pasteUpdate", "automationBatchUpdate"],
-  "condition_list": [] /* AndCondition 数组 */
+  "condition_list": null
 }
 ```
 
@@ -319,8 +319,23 @@
   "field_values": [
     { "field_name": "状态", "value": [{ "value_type": "option", "value": { "id": "opt1", "name": "已完成" } }] }
   ],
-  "filter_info": { /* RecordFilterInfo */ },
   "ref_info": { "step_id": "step_trigger" }
+}
+```
+
+上例通过 `ref_info` 引用前置步骤。若按字段条件定位记录，使用下例，**不同时传 `ref_info`**：
+
+```json
+{
+  "table_name": "订单表",
+  "max_set_record_num": 10,
+  "field_values": [
+    { "field_name": "状态", "value": [{ "value_type": "option", "value": { "id": "opt1", "name": "已完成" } }] }
+  ],
+  "filter_info": {
+    "conjunction": "and",
+    "conditions": [{ "field_name": "状态", "operator": "is", "value": [{ "value_type": "text", "value": "待处理" }] }]
+  }
 }
 ```
 

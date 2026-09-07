@@ -474,6 +474,8 @@
 
 **场景**: 每天早上 9 点，查找昨天的订单，按金额分级，给不同级别的销售发送不同的通知。
 
+本例“昨天”指已确认业务时区中的 `[昨天 00:00, 今天 00:00)`，不含今天订单。执行前核对工作流调度和相对日期解析使用同一业务时区；不能确认时先澄清，不按执行机器时区猜测。`isLess` 和相对日期值的结构见同组 workflow schema；真实服务端执行仍需按现有验证流程验收。
+
 ```json
 {
   "client_token": "1704067205",
@@ -502,7 +504,8 @@
         "filter_info": {
           "conjunction": "and",
           "conditions": [
-            { "field_name": "创建时间", "operator": "isGreaterEqual", "value": [{ "value_type": "date", "value": "yesterday" }] }
+            { "field_name": "创建时间", "operator": "isGreaterEqual", "value": [{ "value_type": "date", "value": "yesterday" }] },
+            { "field_name": "创建时间", "operator": "isLess", "value": [{ "value_type": "date", "value": "today" }] }
           ]
         }
       }

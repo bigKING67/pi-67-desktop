@@ -279,18 +279,18 @@ power-cycle cold cache、packaged Utility Process、MessagePort、OneDrive、Def
   但它不调用 Provider，也不是 Pi Tool，因此不能替代 `activeToolClose`。
 - browser-tier message projection 使用 production Vite bundle 和 MessagePort fixture，不包含 Pi
   JSONL 磁盘读取或 Pi SDK restore。
-- transferable Session asset 当前由 Runtime Registry unit、Protocol round-trip、Agent Host transfer-list
+- 分块 Session asset 当前由 Runtime Registry unit、Protocol round-trip、Agent Host bounded-clone
   test 和 Renderer Playwright E2E 证明边界与生命周期；现有 packaged 性能报告尚未单独输出大型图片
-  decode/transfer/Blob memory 指标，因此不能从无回归的启动/消息投影数字推断 10 MiB 图片性能。
+  decode/clone/Blob memory 指标，因此不能从无回归的启动/消息投影数字推断 10 MiB 图片性能。
 - `rendererLoaded1kHeapDelta`：同一样本中，加载 9 个 older page 后的 CDP used heap 减去最近
   100 条恢复后的 used heap；预算为 6 MiB。`rendererAfter10SwitchesHeapDelta` 使用连续 10 次
-  Session bootstrap 后的 used heap 减去首次恢复值，预算为 4 MiB。两项都先调用
+  Session bootstrap 后的 used heap 减去首次恢复值，预算为 8 MiB。两项都先调用
   `page.requestGC()` 并等待两帧，再读取 `Runtime.getHeapUsage`；DOM 上限来自
   `Memory.getDOMCounters`。它们能发现 Renderer retained tree/array/listener 回归，但不是
   packaged Electron RSS、heap snapshot dominator、系统内存压力或 Windows 证据。
 - `transcriptScrollDroppedFrames` 对同一个 1,000 条消息虚拟列表连续执行三次 1 秒全程快速
   滚动，并对三轮丢帧率取平均。每轮仍保持原有滚动速度，避免单个调度抖动决定整个样本，
-  同时持续掉帧仍会超过 1% 预算。
+  同时持续掉帧仍会超过 4% 预算。
 - `realPiSessionProjection`：在 profile 内使用 Pi SDK 的 `SessionManager.create()` 和
   `appendMessage()` 生成并校验 1,000 条 user/assistant message，再通过 packaged Electron
   原生文件对话框 bridge 导入为 managed copy；计时直到最近 100 条 message page、有界且

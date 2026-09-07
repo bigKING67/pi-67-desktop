@@ -433,8 +433,8 @@ Snapshot 和 Conversation Page 不携带图片 base64 或 data URL。可展示�
 保留明确不可用占位，不把原始数据跨进程发送。
 
 Agent Host 为当前 Session generation 维护最多 512 个可丢弃 Asset handle，懒解码缓存最多
-64 MiB。`asset.read` 属于 Query lane，每次最多返回 1 MiB 新 `ArrayBuffer`，response 使用 transfer
-list；Host 在读取前同时校验 Host epoch 和 Session generation。Session bind/reset、Host restart
+64 MiB。`asset.read` 属于 Query lane，每次最多返回 1 MiB 新 `ArrayBuffer`，response 通过结构化克隆传送，不把 `ArrayBuffer` 放入 Electron Host Port 不支持的
+transfer list；Host 在读取前同时校验 Host epoch 和 Session generation。Session bind/reset、Host restart
 或 epoch replacement 会使旧 handle 失效。Asset Registry 不写 SQLite 或 Pi JSONL。
 
 Renderer 只有在虚拟化 Transcript 实际挂载图片时才分块读取，完成后生成 Blob URL；二进制和
@@ -689,9 +689,14 @@ Notification history 已迁移到独立 `notificationStore`，App Store 不再�
 
 ## Safety and resource limits
 
-- Shell command text is not classified as safe by prefix. Every Bash/Shell tool
-  call requires one-shot approval; structured read/search tools are the path for
-  approval-free reads.
+- Shell approval follows the validated Tool identity, current mode, exact targets,
+  and conservative syntax/side-effect classification, never a command-prefix grant.
+  AUTO permits classified bounded local checks, Workspace scripts/dependency changes,
+  and non-destructive local Git operations. Unclassifiable AUTO Shell returns a
+  corrective Tool Result without a meaningless approval dialog. Recognized destructive
+  actions require exact one-shot confirmation before installed-capability AUTO grants
+  and YOLO; ASK keeps the verified read-only exemptions below and otherwise requires
+  one-shot approval, while PLAN remains read-only.
 - Safety Approval 与普通 Extension `confirm` 使用不同 event、pending registry、Store 和 Dialog。
   Approval 绑定 `hostEpoch + sessionId + sessionGeneration + operationId + requestId + toolCallId`；
   Port 不可投递、session/operation 过期、requester 异常、等待期间 abort 或 target/cwd 无法完整
@@ -699,8 +704,17 @@ Notification history 已迁移到独立 `notificationStore`，App Store 不再�
 - Pi `0.84.3` 中用户 Extension 先运行，Desktop inline Safety Extension 后运行；Safety 因而检查
   其他 Extension 修改后的最终 Tool 输入。真实 Pi ordering contract test 固定该属性，SDK
   升级若改变顺序必须失败。
-- Project trust only enables project resources. It does not replace per-action
-  approval for destructive、external、system or workspace-external work.
+- Project trust enables project resources and is distinct from Tool approval.
+  An enabled, admitted Package/MCP capability with a unique effective Tool identity
+  grants AUTO execution for its registered side effects, except recognized destructive
+  actions. In AUTO, external, system and Workspace-external actions outside that
+  grant and the explicit read-only exemptions require one-shot approval. Those
+  exemptions cover canonical Workspace reads, capability inspection, verified
+  read-only web Tools, read/search/list inside a Skill directory already loaded by
+  this Session's Pi ResourceLoader, and exact canonical-file read/search for other
+  loaded resources (never directory listing by that file grant); they never grant
+  writes or arbitrary home-directory reads. Invalid identity/schema/route/target remains fail-closed
+  in every mode; loaded resources alone never create an installed-capability grant.
 - Session import performs a streaming preflight before creating a managed copy:
   the file is limited to 256 MiB and each physical JSONL line to 64 MiB,
   including a final line without a trailing newline.

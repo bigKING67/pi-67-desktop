@@ -40,10 +40,24 @@ localStorage、sessionStorage 或 IndexedDB。
 
 ## 项目信任与一次性批准
 
-项目信任只决定是否加载项目级 Skills、Prompts、Extensions 和上下文文件，不等于工具
-批准或操作系统 sandbox。未信任工作区阻止工具执行；受信任工作区仍按 guided / balanced
-策略处理写入、工作区外路径、破坏性命令、依赖变更、外部 Git 和网络副作用。高风险动作
-只允许一次，不持久化“永久允许”。
+项目信任决定项目级资源是否可加载，不等于 Tool 批准或操作系统 sandbox；未信任
+Workspace 阻止 Tool 执行。受信任 Workspace 默认 AUTO（`balanced`）：已分类的有界
+Workspace 读写、本地检查、常用项目脚本、Workspace 内依赖变更、非破坏性本地 Git，
+以及已验证只读 Web Tool，可按策略执行。AUTO 无法可靠分类的 Shell 返回纠正结果。
+
+启用且内容已准入的 Package/MCP 能力，其有效 Tool 身份唯一时构成 AUTO 授权，覆盖该能力
+已注册的外部路径、系统、上传、认证、发布、依赖或远端副作用；仅加载资源不构成此授权。
+AUTO 在此能力授权及明确只读例外之外的外部、系统与 Workspace 外操作仍需单次批准。
+明确只读例外包括规范化 Workspace 读取、能力检查、已验证只读 Web，以及当前 Session 的
+Pi ResourceLoader 已加载的 Skill 目录内 read/search/list，以及其他已加载资源的精确规范
+文件 read/search（不扩大为目录 list）；它不授予写入或
+任意 home 目录访问。可信 YOLO 自动执行其他有效注册
+Tool，但不会使无效身份、schema、路由或目标有效；ASK 保留上述只读免批范围，其余动作单次批准；PLAN 保持只读。
+
+已识别的文件、持久状态、外部对象、Shell 或破坏性 Git 删除，在 AUTO 能力授权和 YOLO
+之前都必须经过精确目标的一次性硬确认，不持久化为永久允许。完整行为与资源读取例外见
+[产品安全合同](PRODUCT.md)和[进程协议](docs/architecture/processes-and-protocol.md)；这些是
+Pi-67 产品行为，不授予开发代理发布或操作外部系统的权限。
 
 HTTP/HTTPS transcript 链接会显示完整目标，并在每次交给系统浏览器前确认。其他 scheme
 直接拒绝。

@@ -77,3 +77,7 @@ packaged/macOS/Windows：独立记录已验证与未验证，不由源码门禁�
 
 - 第二批源码整改关闭11项：RC-RUNTIME-001/002/003/004/006/007、RC-STATE-001/002/003/005、RC-SUPPORT-001。聚合3598 passed / 5 skipped；独立复核同意。首次12项attempt保留PARTIAL（RC-STATE-002当时残余非文本边界，RC-STATE-004缺UI验收）。重载补修15项回归、类型与lint通过，独立审阅同意；补修attempt `rcf-20260907T123958Z-3cc8f1276434/attempts/attempt-0001-d906e570ef90` VERIFIED且live validation通过。
 - 第二批提交排除MemoryInspectorPanel未验收改动及全部并行UI WIP；企业登录生命周期独立为EnterpriseAuthorizationController，保留原Broker/事件与外层接口。累计14项已关闭，剩余28项确认问题（其中Memory面板源码已改但验收未闭合）及8项BLOCKED。未重跑修复前全仓评分；未push或新建候选。
+
+- 第三批关闭26项：RC-BUILD-001、RC-DOC-001至006，以及19项RC-RESOURCE确认问题（001至008、010、012至021）。发布job显式绑定GH_REPO；文档对齐实际IPC clone、Windows Job Object、安全模式、性能预算和Pi版本；内置资源修正链接、CLI参数、分页/附件完整性、身份、权限及示例结构/算术。
+- 第三批7项初次attempt保留PARTIAL；安全模式文档补修 `rcf-20260907T125337Z-3c183edd1100/attempts/attempt-0001-70dd6f370046` VERIFIED，资源 `rcf-20260907T125420Z-98844dcdc2e4/attempts/attempt-0001-9bc6622d27c5` VERIFIED。全部snapshot validation和lineage检查通过，独立复核同意。合同测试、资源有界检查、结构/外部引用/Action pin/PowerShell静态门禁通过；附带仅格式化既有store接口签名以满足结构门禁。
+- 累计40/42项确认问题关闭；剩余RC-BUILD-002的真实Provider脚本存在5处旧UI/草稿生命周期假设，RC-STATE-004仍缺Memory面板跨Workspace真实UI验收。8项BLOCKED未重试或绕过。未执行飞书业务API、付费Provider、Windows或macOS新候选验收；未push。并发WIP使clean-checkout delivery attestation暂不适用。

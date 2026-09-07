@@ -168,7 +168,7 @@ Text:
 
 Purpose: explain components, dependencies, or system flow.
 
-Implementation: prefer `<whiteboard>` (see `lark-slides-whiteboard.md`); use `<shape>` + `<line>` only as fallback.
+Implementation: use supported `<shape>` text/geometry and `<line>` connectors; follow [the XML element contract](xml-schema-quick-ref.md). Do not emit `<whiteboard>`, which is not a writable SML 2.0 element.
 
 Geometry:
 - Main visual area should be a diagram, not prose.
@@ -184,7 +184,7 @@ Text:
 
 Purpose: show operational steps, workflow, or cause-effect path.
 
-Implementation: prefer `<whiteboard>` (see `lark-slides-whiteboard.md`); use `<shape>` + `<line>` only as fallback.
+Implementation: use supported `<shape>` text/geometry and `<line>` connectors; follow [the XML element contract](xml-schema-quick-ref.md). Do not emit `<whiteboard>`, which is not a writable SML 2.0 element.
 
 Geometry:
 - Use numbered steps connected by arrows or lines.

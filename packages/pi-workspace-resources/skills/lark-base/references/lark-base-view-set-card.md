@@ -11,7 +11,7 @@ lark-cli base +view-set-card \
   --base-token app_xxx \
   --table-id tbl_xxx \
   --view-id viw_xxx \
-  --json {"cover_field":"fld_cover"}
+  --json '{"cover_field":"fld_cover"}'
 ```
 
 ## JSON 结构

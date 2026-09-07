@@ -6,6 +6,14 @@ const candidateUrl = new URL("../../.github/workflows/windows-candidate.yml", im
 const promotionUrl = new URL("../../.github/workflows/unsigned-preview.yml", import.meta.url);
 
 describe("unsigned preview candidate and promotion workflow security", () => {
+  it("binds checkout-free publication to the triggering repository", async () => {
+    const source = await readFile(promotionUrl, "utf8");
+    const publish = source.slice(source.indexOf("  publish:\n"));
+    expect(publish).toContain("gh release create");
+    expect(publish).not.toContain("uses: actions/checkout@");
+    expect(publish).toContain("GH_REPO: ${{ github.repository }}");
+  });
+
   it("never interpolates workflow inputs into shell source", async () => {
     for (const url of [candidateUrl, promotionUrl]) {
       const source = await readFile(url, "utf8");

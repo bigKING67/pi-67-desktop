@@ -28,10 +28,7 @@ interface WorkspaceFileStoreState {
   closeTab: (workspaceId: string, relativePath: string) => void;
   renamePath: (workspaceId: string, previousPath: string, nextPath: string, entry: WorkspaceFileEntry) => void;
   removePath: (workspaceId: string, relativePath: string, directory: boolean) => void;
-  requestNavigation: (
-    workspaceId: string,
-    intent: Omit<WorkspaceFileNavigationIntent, "nonce">
-  ) => void;
+  requestNavigation: (workspaceId: string, intent: Omit<WorkspaceFileNavigationIntent, "nonce">) => void;
 }
 
 export const workspaceFileStore = createStore<WorkspaceFileStoreState>((set) => ({

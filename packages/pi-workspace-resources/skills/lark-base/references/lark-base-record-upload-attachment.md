@@ -48,4 +48,4 @@ lark-cli base +record-upload-attachment \
 ## 参考
 
 - [lark-base-record.md](lark-base-record.md) — record 索引页
-- [lark-base-shortcut-record-value.md](lark-base-shortcut-record-value.md) — 记录值格式详解
+- [lark-base-cell-value.md](lark-base-cell-value.md) — 记录值格式详解

@@ -877,6 +877,7 @@ jobs:
           EXPECTED_PROVIDER_ID: ${{ inputs.provider_id }}
           EXPECTED_THINKING_LEVEL: ${{ inputs.thinking_level }}
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
@@ -1013,6 +1014,7 @@ jobs:
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           VERSION="${RELEASE_TAG#v}"

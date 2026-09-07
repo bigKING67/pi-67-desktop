@@ -85,53 +85,53 @@
       "text": "0", "fontSize": 12, "textAlign": "right" },
 
     { "type": "connector", "connector": {
-      "from": { "x": 70, "y": 400 }, "to": { "x": 80, "y": 400 },
+      "from": { "x": 70, "y": 380 }, "to": { "x": 80, "y": 380 },
       "lineShape": "straight", "lineWidth": 1,
       "startArrow": "none", "endArrow": "none"
     }},
-    { "type": "text", "x": 20, "y": 390, "width": 50, "height": 20,
+    { "type": "text", "x": 20, "y": 370, "width": 50, "height": 20,
       "text": "50", "fontSize": 12, "textAlign": "right" },
     { "type": "connector", "connector": {
-      "from": { "x": 80, "y": 400 }, "to": { "x": 980, "y": 400 },
+      "from": { "x": 80, "y": 380 }, "to": { "x": 980, "y": 380 },
       "lineShape": "straight", "lineWidth": 1, "lineStyle": "dashed",
       "startArrow": "none", "endArrow": "none"
     }},
 
     { "type": "connector", "connector": {
-      "from": { "x": 70, "y": 320 }, "to": { "x": 80, "y": 320 },
+      "from": { "x": 70, "y": 280 }, "to": { "x": 80, "y": 280 },
       "lineShape": "straight", "lineWidth": 1,
       "startArrow": "none", "endArrow": "none"
     }},
-    { "type": "text", "x": 20, "y": 310, "width": 50, "height": 20,
+    { "type": "text", "x": 20, "y": 270, "width": 50, "height": 20,
       "text": "100", "fontSize": 12, "textAlign": "right" },
     { "type": "connector", "connector": {
-      "from": { "x": 80, "y": 320 }, "to": { "x": 980, "y": 320 },
+      "from": { "x": 80, "y": 280 }, "to": { "x": 980, "y": 280 },
       "lineShape": "straight", "lineWidth": 1, "lineStyle": "dashed",
       "startArrow": "none", "endArrow": "none"
     }},
 
     { "type": "connector", "connector": {
-      "from": { "x": 70, "y": 240 }, "to": { "x": 80, "y": 240 },
+      "from": { "x": 70, "y": 180 }, "to": { "x": 80, "y": 180 },
       "lineShape": "straight", "lineWidth": 1,
       "startArrow": "none", "endArrow": "none"
     }},
-    { "type": "text", "x": 20, "y": 230, "width": 50, "height": 20,
+    { "type": "text", "x": 20, "y": 170, "width": 50, "height": 20,
       "text": "150", "fontSize": 12, "textAlign": "right" },
     { "type": "connector", "connector": {
-      "from": { "x": 80, "y": 240 }, "to": { "x": 980, "y": 240 },
+      "from": { "x": 80, "y": 180 }, "to": { "x": 980, "y": 180 },
       "lineShape": "straight", "lineWidth": 1, "lineStyle": "dashed",
       "startArrow": "none", "endArrow": "none"
     }},
 
     { "type": "connector", "connector": {
-      "from": { "x": 70, "y": 160 }, "to": { "x": 80, "y": 160 },
+      "from": { "x": 70, "y": 80 }, "to": { "x": 80, "y": 80 },
       "lineShape": "straight", "lineWidth": 1,
       "startArrow": "none", "endArrow": "none"
     }},
-    { "type": "text", "x": 20, "y": 150, "width": 50, "height": 20,
+    { "type": "text", "x": 20, "y": 70, "width": 50, "height": 20,
       "text": "200", "fontSize": 12, "textAlign": "right" },
     { "type": "connector", "connector": {
-      "from": { "x": 80, "y": 160 }, "to": { "x": 980, "y": 160 },
+      "from": { "x": 80, "y": 80 }, "to": { "x": 980, "y": 80 },
       "lineShape": "straight", "lineWidth": 1, "lineStyle": "dashed",
       "startArrow": "none", "endArrow": "none"
     }},

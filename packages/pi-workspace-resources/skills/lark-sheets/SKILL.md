@@ -175,51 +175,51 @@ lark-cli sheets +write --url "URL" --sheet-id "sheetId" --range "C6" \
 **限制**：
 - 公式支持 IMPORTRANGE 跨表引用（最多 5 层嵌套、每个工作表最多 100 个引用）
 - @人仅支持同租户用户，单次最多 50 人
-- 下拉列表需**先配置下拉选项**，否则 `multipleValue` 写入会变成纯文本。配置方法见 [`references/lark-sheets-set-dropdown.md`](references/lark-sheets-set-dropdown.md)。值中的字符串不能包含逗号
+- 下拉列表需**先配置下拉选项**，否则 `multipleValue` 写入会变成纯文本。配置方法见 [`references/lark-sheets-dropdown.md`](references/lark-sheets-dropdown.md)。值中的字符串不能包含逗号
 
 ## Shortcuts（推荐优先使用）
 
-Shortcut 是对常用操作的高级封装（`lark-cli sheets +<verb> [flags]`）。有 Shortcut 的操作优先使用。
+Shortcut 是对常用操作的高级封装（`lark-cli sheets +<verb> [flags]`）。有 Shortcut 的操作优先使用。下表链接指向随包的合并主题合同；执行具体命令前仍须核对该命令的 `--help`。
 
 | Shortcut | 说明 |
 |----------|------|
-| [`+info`](references/lark-sheets-info.md) | View spreadsheet and sheet information |
-| [`+read`](references/lark-sheets-read.md) | Read spreadsheet cell values |
-| [`+write`](references/lark-sheets-write.md) | Write to spreadsheet cells (overwrite mode) |
-| [`+write-image`](references/lark-sheets-write-image.md) | Write an image into a spreadsheet cell |
-| [`+append`](references/lark-sheets-append.md) | Append rows to a spreadsheet |
-| [`+find`](references/lark-sheets-find.md) | Find cells in a spreadsheet |
-| [`+create`](references/lark-sheets-create.md) | Create a spreadsheet (optional header row and initial data) |
-| [`+export`](references/lark-sheets-export.md) | Export a spreadsheet (async task polling + optional download) |
-| [`+merge-cells`](references/lark-sheets-merge-cells.md) | Merge cells in a spreadsheet |
-| [`+unmerge-cells`](references/lark-sheets-unmerge-cells.md) | Unmerge (split) cells in a spreadsheet |
-| [`+replace`](references/lark-sheets-replace.md) | Find and replace cell values |
-| [`+set-style`](references/lark-sheets-set-style.md) | Set cell style for a range |
-| [`+batch-set-style`](references/lark-sheets-batch-set-style.md) | Batch set cell styles for multiple ranges |
-| [`+add-dimension`](references/lark-sheets-add-dimension.md) | Add rows or columns at the end of a sheet |
-| [`+insert-dimension`](references/lark-sheets-insert-dimension.md) | Insert rows or columns at a specified position |
-| [`+update-dimension`](references/lark-sheets-update-dimension.md) | Update row or column properties (visibility, size) |
-| [`+move-dimension`](references/lark-sheets-move-dimension.md) | Move rows or columns to a new position |
-| [`+delete-dimension`](references/lark-sheets-delete-dimension.md) | Delete rows or columns |
-| [`+create-filter-view`](references/lark-sheets-create-filter-view.md) | Create a filter view |
-| [`+update-filter-view`](references/lark-sheets-update-filter-view.md) | Update a filter view |
-| [`+list-filter-views`](references/lark-sheets-list-filter-views.md) | List all filter views in a sheet |
-| [`+get-filter-view`](references/lark-sheets-get-filter-view.md) | Get a filter view by ID |
-| [`+delete-filter-view`](references/lark-sheets-delete-filter-view.md) | Delete a filter view |
-| [`+create-filter-view-condition`](references/lark-sheets-create-filter-view-condition.md) | Create a filter condition on a filter view |
-| [`+update-filter-view-condition`](references/lark-sheets-update-filter-view-condition.md) | Update a filter condition |
-| [`+list-filter-view-conditions`](references/lark-sheets-list-filter-view-conditions.md) | List all filter conditions of a filter view |
-| [`+get-filter-view-condition`](references/lark-sheets-get-filter-view-condition.md) | Get a filter condition by column |
-| [`+delete-filter-view-condition`](references/lark-sheets-delete-filter-view-condition.md) | Delete a filter condition |
+| [`+info`](references/lark-sheets-spreadsheet-management.md) | View spreadsheet and sheet information |
+| [`+read`](references/lark-sheets-cell-data.md) | Read spreadsheet cell values |
+| [`+write`](references/lark-sheets-cell-data.md) | Write to spreadsheet cells (overwrite mode) |
+| [`+write-image`](references/lark-sheets-cell-images.md) | Write an image into a spreadsheet cell |
+| [`+append`](references/lark-sheets-cell-data.md) | Append rows to a spreadsheet |
+| [`+find`](references/lark-sheets-cell-data.md) | Find cells in a spreadsheet |
+| [`+create`](references/lark-sheets-spreadsheet-management.md) | Create a spreadsheet (optional header row and initial data) |
+| [`+export`](references/lark-sheets-spreadsheet-management.md) | Export a spreadsheet (async task polling + optional download) |
+| [`+merge-cells`](references/lark-sheets-cell-style-and-merge.md) | Merge cells in a spreadsheet |
+| [`+unmerge-cells`](references/lark-sheets-cell-style-and-merge.md) | Unmerge (split) cells in a spreadsheet |
+| [`+replace`](references/lark-sheets-cell-data.md) | Find and replace cell values |
+| [`+set-style`](references/lark-sheets-cell-style-and-merge.md) | Set cell style for a range |
+| [`+batch-set-style`](references/lark-sheets-cell-style-and-merge.md) | Batch set cell styles for multiple ranges |
+| [`+add-dimension`](references/lark-sheets-row-column-management.md) | Add rows or columns at the end of a sheet |
+| [`+insert-dimension`](references/lark-sheets-row-column-management.md) | Insert rows or columns at a specified position |
+| [`+update-dimension`](references/lark-sheets-row-column-management.md) | Update row or column properties (visibility, size) |
+| [`+move-dimension`](references/lark-sheets-row-column-management.md) | Move rows or columns to a new position |
+| [`+delete-dimension`](references/lark-sheets-row-column-management.md) | Delete rows or columns |
+| [`+create-filter-view`](references/lark-sheets-filter-views.md) | Create a filter view |
+| [`+update-filter-view`](references/lark-sheets-filter-views.md) | Update a filter view |
+| [`+list-filter-views`](references/lark-sheets-filter-views.md) | List all filter views in a sheet |
+| [`+get-filter-view`](references/lark-sheets-filter-views.md) | Get a filter view by ID |
+| [`+delete-filter-view`](references/lark-sheets-filter-views.md) | Delete a filter view |
+| [`+create-filter-view-condition`](references/lark-sheets-filter-views.md) | Create a filter condition on a filter view |
+| [`+update-filter-view-condition`](references/lark-sheets-filter-views.md) | Update a filter condition |
+| [`+list-filter-view-conditions`](references/lark-sheets-filter-views.md) | List all filter conditions of a filter view |
+| [`+get-filter-view-condition`](references/lark-sheets-filter-views.md) | Get a filter condition by column |
+| [`+delete-filter-view-condition`](references/lark-sheets-filter-views.md) | Delete a filter condition |
 
 ### 下拉列表
 
 | Shortcut | 说明 |
 |----------|------|
-| [`+set-dropdown`](references/lark-sheets-set-dropdown.md) | 设置下拉列表（`multipleValue` 写入的前置步骤） |
-| [`+update-dropdown`](references/lark-sheets-update-dropdown.md) | 更新下拉列表选项 |
-| [`+get-dropdown`](references/lark-sheets-get-dropdown.md) | 查询下拉列表配置 |
-| [`+delete-dropdown`](references/lark-sheets-delete-dropdown.md) | 删除下拉列表 |
+| [`+set-dropdown`](references/lark-sheets-dropdown.md) | 设置下拉列表（`multipleValue` 写入的前置步骤） |
+| [`+update-dropdown`](references/lark-sheets-dropdown.md) | 更新下拉列表选项 |
+| [`+get-dropdown`](references/lark-sheets-dropdown.md) | 查询下拉列表配置 |
+| [`+delete-dropdown`](references/lark-sheets-dropdown.md) | 删除下拉列表 |
 
 ## API Resources
 

@@ -158,17 +158,15 @@ lark-cli mail user_mailbox.drafts cancel_scheduled_send --params '{"user_mailbox
 
 ## 转发整个会话
 
-`+forward` 操作的是单封邮件（`--message-id`），但转发整个会话时应 forward **会话中最后一条消息**，因为邮件客户端会将完整的回复链嵌套在最新一条中。典型流程：
+`+forward` 只转发 `--message-id` 指定的单封邮件。最新邮件可能删改引用正文，且不保证包含早期邮件附件，不能据此声称完整转发会话。
+
+1. 用 `+thread` 读取会话，检查分页完整性，逐封核对 message_id、正文和附件清单。
+2. 根据用户要求确定是逐封转发，还是整理成一份包含来源、完整正文及附件的草稿；无法完整读取时先说明缺口。
+3. 创建可审阅的草稿，核对收件人、全部消息与附件后，沿本文件既有的用户确认和发送流程执行。未确认前不得发送。
 
 ```bash
-# 1. 用 +triage 或 +thread 找到会话
+# 读取会话；不能仅投影 messages[-1]
 lark-cli mail +thread --thread-id <THREAD_ID> --html=false --format json
-
-# 2. 取最后一条消息的 message_id
-#    messages 按时间升序排列，最后一条 = messages[-1].message_id
-
-# 3. 转发该消息
-lark-cli mail +forward --message-id <最后一条的message_id> --to recipient@example.com --body '请过目'
 ```
 
 ## 实现说明
