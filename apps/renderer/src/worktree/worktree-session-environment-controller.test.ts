@@ -169,7 +169,8 @@ describe("Worktree Session environment controller", () => {
       sessionFileIdentity: "session-file-created",
       sessionPath: "/sessions/created.jsonl",
       sessionGeneration: 1,
-      lifecycle: "idle",
+      lifecycle: "stopped",
+      runtime: { phase: "stopped", detail: "session pending open", recoverable: true },
       creationId: undefined,
       creationStatus: undefined
     });
@@ -195,6 +196,9 @@ describe("Worktree Session environment controller", () => {
     ]);
     expect(fixture.persistCheckpoint).toHaveBeenCalledOnce();
     expect(rendererWorkbenchStore.getState().tasks["task-intent"]?.environmentCreationState).toBe("committed");
+    expect(rendererWorkbenchStore.getState().tasks["task-intent"]?.runtime).toEqual({
+      phase: "stopped", detail: "session pending open", recoverable: true
+    });
   });
 });
 

@@ -250,7 +250,7 @@ export async function commitWorktreeSessionEnvironment(
   if (sessionBound !== "session-bound" && sessionBound !== "committed") {
     return commitUnconfirmed(taskId);
   }
-  updateCreationState(taskId, sessionBound);
+  rendererWorkbenchStore.getState().updateTask(taskId, { environmentCreationState: sessionBound });
 
   const committed = await advanceCreation(
     creationId,
@@ -259,7 +259,7 @@ export async function commitWorktreeSessionEnvironment(
     dependencies
   );
   if (committed !== "committed") return commitUnconfirmed(taskId);
-  updateCreationState(taskId, committed);
+  rendererWorkbenchStore.getState().updateTask(taskId, { environmentCreationState: committed });
   try {
     await dependencies.persistCheckpoint();
   } catch {
