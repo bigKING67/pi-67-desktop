@@ -169,6 +169,10 @@ export class WorktreeCreationRollbackService {
     record: EnvironmentMutationRecoveryRecord,
     sourcePath: string
   ): Promise<RollbackArtifactObservation> {
+    const sourceCommon = await this.options.runner.resolveCommonDirectory(sourcePath);
+    if (repositoryGroupId(await this.options.observeIdentity(sourceCommon)) !== record.repositoryGroupId) {
+      return { kind: "present-mismatch" };
+    }
     const [profile, worktrees, branchHead] = await Promise.all([
       this.options.recoverProfilePath(
         this.options.userData,

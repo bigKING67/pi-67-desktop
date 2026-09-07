@@ -628,6 +628,9 @@ prompt.submit
   common-dir 全部 exact、且 Worktree clean、non-detached、non-locked、non-prunable 的情况。Main 必须先
   原子写入 `rollback-pending + rollbackSafety: pre-host-confirmed`，再清理 Git artifact 和 Workspace
   registration。startup reconcile 只有看到该安全标记才可继续收尾；不能从 `rollback-pending` 猜测权限。
+  显式 rollback 和 startup reconcile 必须先重新核验 source Git common-dir 的物理 Repository
+  identity，再观察 artifact；即使 target 已缺失、仅剩 branch 或全部 artifact 已消失，也不能
+  跳过源身份校验而删除 branch、判定 absent 或完成 durable rollback。
 - Host registration 开始后或 Session materialization 开始后禁止自动 rollback。失败或未知结果保留
   Worktree 和 recovery authority，进入可恢复或受保护状态，而不是推断 Host 没有接触该 Workspace。
 - Session creation `REQUEST_OUTCOME_UNKNOWN`：禁止 rollback。保留 Worktree，使用现有

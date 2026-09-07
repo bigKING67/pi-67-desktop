@@ -233,6 +233,10 @@ export class WorktreeStartupReconcileService {
     record: EnvironmentMutationRecoveryRecord,
     sourcePath: string
   ): Promise<WorktreeArtifactObservation> {
+    const sourceCommon = await this.#runner.resolveCommonDirectory(sourcePath);
+    if (repositoryGroupId(await this.#observeIdentity(sourceCommon)) !== record.repositoryGroupId) {
+      return { kind: "present-mismatch" };
+    }
     const [profile, worktrees, branchHead] = await Promise.all([
       this.#recoverProfilePath(this.#userData, record.repositoryGroupId, record.worktreeToken),
       this.#runner.listWorktrees(sourcePath),
