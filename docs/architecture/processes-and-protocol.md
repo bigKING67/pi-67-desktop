@@ -37,6 +37,8 @@ Workspace 移除在 Host 注销确认后失效该 Workspace 的注册缓存。Ma
 注册仍在则恢复 Host 注册；已移除则同步清理 Renderer 注册；读取失败保留可见状态而不猜测 Host 补偿。
 原移除错误继续对调用方可见，补偿失败必须同时报告，不能伪装成功。移除弹窗按当前 Renderer
 登记区分仍显示的失败与已移除后的清理/确认失败；后者关闭失效的移除弹窗。
+Main 仅在 Registry 移除成功后清理附属状态；按顺序尝试全部清理项，单项失败不阻断其余项，
+包括 Catalog 在内的清理错误汇总返回。重复请求仍执行清理；这不构成持久重试队列或自动恢复保证。
 
 Electron Main 的 Workspace Registry 保存稳定 `workspaceId`、native canonical path、lossless
 `dev` / `ino` / `birthtimeNs` 物理身份（可用时）和最近一次成功验证时间。同一挂载周期内的重复目录判定

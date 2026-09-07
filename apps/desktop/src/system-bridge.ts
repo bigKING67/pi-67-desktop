@@ -1,3 +1,4 @@
+import { cleanRemovedWorkspaceState } from "./workspace-removal-cleanup.js";
 import { app, clipboard, dialog, ipcMain, Menu, net, Notification, shell, type BrowserWindow } from "electron";
 import { join } from "node:path";
 import { DesktopUpdateController } from "./desktop-update-controller.js";
@@ -203,13 +204,7 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
   ipcMain.handle("pi67:workspace-remove", async (_event, workspaceId: unknown) => {
     const id = assertWorkspaceId(workspaceId);
     const state = await workbenchState.update((current) => removeWorkspaceRegistration(current, id));
-    await options.composerDraftState.removeWorkspace(id);
-    await options.promptStashImages.removeWorkspace(id);
-    await options.workspaceFileState.removeWorkspace(id);
-    await options.repositoryEnvironmentInspection.removeWorkspace(id).catch(() => {
-      console.warn("Worktree Catalog cleanup failed after Workspace removal.");
-    });
-    await options.repositoryWorkingTree.removeWorkspace(id);
+    await cleanRemovedWorkspaceState(id, options);
     return state;
   });
   ipcMain.handle("pi67:workspace-reorder", (_event, workspaceIds: unknown) => (
