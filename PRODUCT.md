@@ -377,6 +377,13 @@ the only Runtime and behavior specification source.
   Multi-source design suites have no invented aggregate version, and Lark's bundled
   copy remains explicitly unversioned until its build provenance supplies a
   verifiable suite version.
+- On POSIX, finite Desktop-owned Skill Pack commands return only after their process
+  group is empty and output pipes have closed within bounded cleanup deadlines, including
+  natural success and failure. The two Lark authorization launchers (`auth login --no-wait`
+  and `config init --new`) explicitly retain root-exit completion to preserve external
+  authorization UI. Their cancellation and timeout still terminate the owned group.
+  This exception does not weaken Windows Job Object containment or claim containment
+  of POSIX descendants that independently leave the owned process group.
 - Settings owns one global `办公 -> 飞书` surface with `用户授权` and `应用连接`
   page-level tabs. `用户授权` is first and selected by default because the user's
   personal identity is the primary office task. Both tabs first expose a missing

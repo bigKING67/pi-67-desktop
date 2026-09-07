@@ -197,6 +197,7 @@ describe("LarkAuthManagement", () => {
     let pollingSignal: AbortSignal | undefined;
     const runProcess = vi.fn<SkillPackProcessRunner>(async (_executable, arguments_, options) => {
       if (arguments_.includes("--no-wait")) {
+        expect(options.preserveAuthorizationDescendants).toBe(true);
         expect(arguments_).toEqual([
           "auth",
           "login",
@@ -252,6 +253,7 @@ describe("LarkAuthManagement", () => {
     let appReady = false;
     const runProcess = vi.fn<SkillPackProcessRunner>(async (_executable, arguments_, options) => {
       if (arguments_.includes("--no-wait")) {
+        expect(options.preserveAuthorizationDescendants).toBe(true);
         expect(arguments_).toEqual([
           "auth",
           "login",
@@ -270,6 +272,7 @@ describe("LarkAuthManagement", () => {
         };
       }
       if (arguments_[0] === "config") {
+        expect(options.preserveAuthorizationDescendants).toBe(true);
         options.onOutput?.({
           stream: "stderr",
           chunk: Buffer.from("打开链接 https://open.feishu.cn/setup/connection?opaque=1\n", "utf8")
@@ -331,6 +334,7 @@ describe("LarkAuthManagement", () => {
     const runProcess = vi.fn<SkillPackProcessRunner>(async (_executable, arguments_, options) => {
       if (arguments_.includes("--no-wait")) throw new Error("not configured");
       if (arguments_[0] === "config") {
+        expect(options.preserveAuthorizationDescendants).toBe(true);
         options.onOutput?.({ stream: "stdout", chunk: Buffer.from("https://open.", "utf8") });
         options.onOutput?.({ stream: "stderr", chunk: Buffer.from("feishu.cn/setup\n", "utf8") });
         return { stdout: "", stderr: "" };

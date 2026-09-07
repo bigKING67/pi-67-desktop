@@ -33,6 +33,8 @@ export type SkillPackProcessRunner = (
     environment: NodeJS.ProcessEnv;
     signal?: AbortSignal;
     stdin?: Uint8Array;
+    /** POSIX authorization launchers only; cancellation still owns the process group. */
+    preserveAuthorizationDescendants?: boolean;
     onOutput?: (output: { stream: "stdout" | "stderr"; chunk: Uint8Array }) => void;
   }
 ) => Promise<{ stdout: string; stderr: string }>;
@@ -76,6 +78,9 @@ const runDirectSkillPackProcess: SkillPackProcessRunner = (
   let timer: ReturnType<typeof setTimeout> | undefined;
   let markExited!: () => void;
   const exited = new Promise<void>((resolveExited) => { markExited = resolveExited; });
+  let markClosed!: () => void;
+  const closed = new Promise<void>((resolveClosed) => { markClosed = resolveClosed; });
+  child.once("close", markClosed);
   const settle = (callback: () => void) => {
     if (settled) return;
     settled = true;
@@ -83,7 +88,7 @@ const runDirectSkillPackProcess: SkillPackProcessRunner = (
     options.signal?.removeEventListener("abort", onAbort);
     callback();
   };
-  const terminate = (message: string) => {
+  const finish = (callback: () => void) => {
     if (settled || terminating) return;
     terminating = true;
     if (timer) clearTimeout(timer);
@@ -96,11 +101,28 @@ const runDirectSkillPackProcess: SkillPackProcessRunner = (
       options.environment,
       terminatePackageWorkerProcessTree,
       inspectPackageWorkerProcessTree
-    ).then(
-      () => settle(() => reject(new Error(message))),
-      (error: unknown) => settle(() => reject(error))
-    );
+    ).then(async () => {
+      let closeTimer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          closed,
+          new Promise<never>((_, rejectClose) => {
+            closeTimer = setTimeout(() => rejectClose(new Error(
+              "Skill Pack output streams did not close after process cleanup."
+            )), PROCESS_TREE_TERMINATION_DEADLINE_MS);
+          })
+        ]);
+      } finally {
+        if (closeTimer) clearTimeout(closeTimer);
+      }
+      settle(callback);
+    }).catch((error: unknown) => {
+      child.stdout?.destroy();
+      child.stderr?.destroy();
+      settle(() => reject(error));
+    });
   };
+  const terminate = (message: string) => finish(() => reject(new Error(message)));
   const onAbort = () => terminate("Skill Pack operation was cancelled.");
   child.stdout!.on("data", (chunk: Buffer) => {
     stdout = appendAndObserveProcessOutput(stdout, chunk, "stdout", options.onOutput);
@@ -114,19 +136,21 @@ const runDirectSkillPackProcess: SkillPackProcessRunner = (
   }
   child.once("error", (error) => {
     markExited();
-    if (!terminating) settle(() => reject(error));
+    if (!terminating) finish(() => reject(error));
   });
   child.once("exit", (code, signal) => {
     markExited();
     if (terminating) return;
-    settle(() => {
+    const complete = () => {
       const decodedStdout = decodeSkillPackProcessOutput(stdout);
       const decodedStderr = decodeSkillPackProcessOutput(stderr);
       if (code === 0) resolve({ stdout: decodedStdout, stderr: decodedStderr });
       else reject(new Error(
         `${basename(executable)} exited with ${signal ?? code}: ${boundedProcessMessage(decodedStderr || decodedStdout) ?? "no output"}`
       ));
-    });
+    };
+    if (options.preserveAuthorizationDescendants) settle(complete);
+    else finish(complete);
   });
   options.signal?.addEventListener("abort", onAbort, { once: true });
   timer = setTimeout(() => {

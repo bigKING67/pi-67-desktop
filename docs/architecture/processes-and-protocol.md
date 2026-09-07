@@ -126,6 +126,15 @@ Supervisor `stop()` 是 idempotent Promise。graceful 路径等待 Host 实际�
 路径都保持 stopping fence，不能因 late exit、late parent message、`activate` 或 `did-finish-load` 复活 Host。
 Shutdown metadata 不包含 Prompt、Session path、命令、source、raw Tool payload 或错误堆栈。
 
+## Skill Pack process completion
+
+POSIX Skill Pack runner 默认按有限任务处理：root 自然成功/失败、取消和超时均经过所属
+process group 的有界回收；确认组内无存活进程并等待 stdout/stderr close 后才返回。
+清理失败优先于命令结果，管道关闭超时返回失败并释放本地管道；不承诺回收主动脱离组的进程。
+仅 Lark `auth login --no-wait` 与 `config init --new` 显式设置内部
+`preserveAuthorizationDescendants`，保留自然 root-exit 返回以免关闭授权 UI；取消和超时
+仍回收所属组。该选项不跨 IPC，不改变 Windows Job Object 的既有完成规则。
+
 ## Package operation isolation
 
 Extension Package 的 check/install/update/uninstall 不在长期存活的 Pi Runtime 对象中执行。Agent Host

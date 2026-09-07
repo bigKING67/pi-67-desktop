@@ -153,6 +153,7 @@ class LarkAuthManagement implements LarkAuthManagementPort {
       {
         cwd: this.#homeDirectory,
         timeoutMs: LOGIN_START_TIMEOUT_MS,
+        preserveAuthorizationDescendants: true,
         environment: larkCliProcessEnvironment(this.#environment, executable)
       }
     );
@@ -229,6 +230,7 @@ class LarkAuthManagement implements LarkAuthManagementPort {
       {
         cwd: this.#homeDirectory,
         timeoutMs: CONNECTION_SETUP_TIMEOUT_MS,
+        preserveAuthorizationDescendants: true,
         environment: larkCliProcessEnvironment(this.#environment, executable),
         signal: controller.signal,
         onOutput: ({ stream, chunk }) => observe(stream, chunk)
