@@ -79,6 +79,7 @@ export class AgentHostSupervisor {
     message: AgentHostStartupFailedMessage;
   } | undefined;
   #startupBlocked = false;
+  #restartBudgetExhausted = false;
   #lastFailureNotificationKey: string | undefined;
   #restartScheduledAt: number | undefined;
   #restartCount = 0;
@@ -131,7 +132,7 @@ export class AgentHostSupervisor {
   }
 
   connect(replaceCurrent = false): void {
-    if (this.#stopping) return;
+    if (this.#stopping || this.#restartBudgetExhausted) return;
     if (this.#startupBlocked) {
       this.#sendStructuredStartupFailure();
       return;
@@ -143,13 +144,12 @@ export class AgentHostSupervisor {
     this.#startAgentHost();
   }
 
-  /**
-   * Restart the utility process so Main-owned env (e.g. team MCP token) is re-read.
-   * Safe while the app remains running; not used for application quit.
-   */
+  /** Re-read Main-owned env while running; application quit uses stop(). */
   restart(): void {
     if (this.#stopping) return;
     this.#startupBlocked = false;
+    this.#restartBudgetExhausted = false;
+    this.#restartHistory = [];
     this.#structuredStartupFailure = undefined;
     this.#lastFailureNotificationKey = undefined;
     if (this.#restartTimer) {
@@ -228,7 +228,7 @@ export class AgentHostSupervisor {
   }
 
   #startAgentHost(): void {
-    if (this.#agentHost || this.#restartTimer || this.#stopping) return;
+    if (this.#agentHost || this.#restartTimer || this.#stopping || this.#restartBudgetExhausted) return;
     const identity = { hostEpoch: ++this.#nextHostEpoch, hostInstanceId: randomUUID() };
     this.#phase = "starting";
     this.#processStartRequestedAt = Date.now();
@@ -320,6 +320,7 @@ export class AgentHostSupervisor {
     };
     const window = this.#options.getMainWindow();
     if (!restart.recoverable) {
+      this.#restartBudgetExhausted = true;
       this.#phase = "failed";
       window?.webContents.send("pi67:agent-host-failed", { code, recoverable: false });
       return;

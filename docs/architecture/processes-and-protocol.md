@@ -80,6 +80,7 @@ Context/Provider validation 或 Runtime reload 失败时，只有当前文件仍
    `runtime.initialize(payload)` 生命周期加载 Pi SDK，并通过 `runtime.ready` 投影权威
    `sessionGeneration`。`session.create` 只在当前 workspace 创建新 Session，不接受伪 cwd。
 8. 未发送结构化 startup failure 的未知 crash 在 60 秒内最多自动重启三次，退避为 0.5/1/2 秒。
+   预算耗尽后普通 connect/Port renewal 保持停止，只有显式 Main-owned restart 清除停止状态并重置预算。
    `agent-host-startup-failed` 是确定性失败：Main 记录安全 stage/issue、向当前 Renderer document 只发送
    一次失败并停止自动重启。显式 Main-owned restart 可开始新 Host epoch。
 9. 新端口携带 `appInstanceId` 与 `hostEpoch`。Renderer 的连接请求是有界 single-flight：Port-only
@@ -87,7 +88,9 @@ Context/Provider validation 或 Runtime reload 失败时，只有当前文件仍
    握手尚未完成，后续调用先等待该 Port，不能再次请求交接并关闭握手中的 Client。同 epoch 重连通过
    `projection.resync` 恢复 Snapshot、Recorded Changes、Catalog status、session generation 和 active
    Operation；若 Operation 在断线窗口内结束，resync 还可返回最近的 typed terminal receipt。Renderer
-   只在 receipt 的 Operation ID 与断线前 active Operation 相同时恢复它，不采用无关历史。只有
+   只在 receipt 的 Operation ID 与断线前 active Operation 相同时恢复它，不采用无关历史。
+   同一恢复 incident 内重复 Port 中断保留首次在途 Operation 身份，直到恢复收敛或 Host replacement；
+   已清空的瞬态 AppState 不得覆盖该身份。只有
    `hostEpoch` 变化才用当前 workspace、trust、approval mode 与 session path 重新初始化。
 
 打包环境无条件忽略 `PI67_RENDERER_DEV_URL`，只加载 `app://pi67/index.html`；开发环境只接受

@@ -863,7 +863,9 @@ the only Runtime and behavior specification source.
   a Provider bill or public-pricing estimate, and Pi-67 does not invent reasoning or
   subagent token attribution. Catalog gaps, unreadable/invalid/future-format Sessions,
   undated entries, scan limits, and deadline exhaustion remain visible as coverage
-  facts. The current implementation is a bounded cold rebuild; no incremental or
+  facts. Each read must match the Catalog physical JSONL identity; a replaced locator
+  contributes no Usage and is reported as invalid/incomplete, while same-file appends
+  remain eligible. The current implementation is a bounded cold rebuild; no incremental or
   persisted Usage cache is claimed.
 - Removing a custom Provider deletes only its `models.json` definition and does not
   silently remove a same-named `auth.json` credential. Persistent credential removal
@@ -1193,7 +1195,12 @@ the only Runtime and behavior specification source.
   open a cold Task Runtime, call a model, scan outside the requested bounded
   indexing flight, or persist transcript bodies. SQLite may cache the disposable
   generated/seed projection for bounded list and search, but Pi JSONL remains the
-  title authority.
+  title authority. Content-index reads stop when their context/generation flight is
+  invalidated, including after asynchronous filesystem checks and before the next
+  source open. A source-read failure leaves no completed projection for that row;
+  a later bounded flight retries the same metadata version. Projection algorithm
+  versioning invalidates earlier cached failures once, while successful bounded
+  truncation remains cacheable and visibly incomplete.
 - The active managed Session uses file and parent-directory watchers only as dirty
   signals. An authoritative bounded JSONL tail verifies file identity, byte offsets,
   strict UTF-8, physical-line limits, and complete JSON records. Appends already

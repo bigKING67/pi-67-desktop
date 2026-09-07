@@ -1,8 +1,9 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { SessionSummary } from "@pi67/domain";
 import { afterEach, describe, expect, it } from "vitest";
+import { resolveExistingSessionFileIdentity } from "./session-path-identity.js";
 import { scanSessionUsage } from "./session-usage-scanner.js";
 
 const roots: string[] = [];
@@ -195,7 +196,6 @@ describe("scanSessionUsage", () => {
     const existing = await writeSession("existing", []);
     const missing: SessionSummary = {
       ...existing,
-      fileIdentity: "missing",
       path: `${existing.path}.missing`
     };
     const report = await scanSessionUsage({
@@ -215,6 +215,62 @@ describe("scanSessionUsage", () => {
       complete: false
     });
   });
+
+  it("rejects a Session path atomically replaced after the Catalog identity was captured", async () => {
+    const session = await writeSession("workspace-a", [
+      { type: "session", version: 3, id: "workspace-a", cwd: "/workspace-a" },
+      assistantUsage("2026-08-09T01:00:00.000Z", 10)
+    ]);
+    const replacementPath = join(dirname(session.path), "workspace-b.jsonl");
+    await writeFile(replacementPath, `${[
+      { type: "session", version: 3, id: "workspace-b", cwd: "/workspace-b" },
+      assistantUsage("2026-08-09T01:00:00.000Z", 900)
+    ].map((entry) => JSON.stringify(entry)).join("\n")}\n`, "utf8");
+    await rename(replacementPath, session.path);
+    await expect(resolveExistingSessionFileIdentity(session.path)).resolves.not.toBe(session.fileIdentity);
+
+    const report = await scanSessionUsage({
+      workspaceId: "workspace-a",
+      sessions: [session],
+      discoveredSessions: 1,
+      catalogIncomplete: false,
+      catalogSkippedCount: 0,
+      window: "7d",
+      now: Date.UTC(2026, 7, 9, 12)
+    });
+
+    expect(report.totals.total).toBe(0);
+    expect(report.coverage).toMatchObject({
+      scannedSessions: 0,
+      invalidSessions: 1,
+      complete: false
+    });
+  });
+
+  it("accepts entries appended to the Cataloged physical Session file", async () => {
+    const session = await writeSession("appended", [
+      { type: "session", version: 3, id: "appended", cwd: "/workspace" },
+      assistantUsage("2026-08-09T01:00:00.000Z", 10)
+    ]);
+    await writeFile(session.path, `${JSON.stringify(assistantUsage("2026-08-09T02:00:00.000Z", 20))}\n`, {
+      encoding: "utf8",
+      flag: "a"
+    });
+    await expect(resolveExistingSessionFileIdentity(session.path)).resolves.toBe(session.fileIdentity);
+
+    const report = await scanSessionUsage({
+      workspaceId: "workspace-1",
+      sessions: [session],
+      discoveredSessions: 1,
+      catalogIncomplete: false,
+      catalogSkippedCount: 0,
+      window: "7d",
+      now: Date.UTC(2026, 7, 9, 12)
+    });
+
+    expect(report.totals.total).toBe(30);
+    expect(report.coverage).toMatchObject({ scannedSessions: 1, complete: true });
+  });
 });
 
 async function writeSession(id: string, entries: unknown[]): Promise<SessionSummary> {
@@ -223,7 +279,7 @@ async function writeSession(id: string, entries: unknown[]): Promise<SessionSumm
   const path = join(root, `${id}.jsonl`);
   await writeFile(path, `${entries.map((entry) => JSON.stringify(entry)).join("\n")}\n`, "utf8");
   return {
-    fileIdentity: `identity-${id}`,
+    fileIdentity: await resolveExistingSessionFileIdentity(path),
     id,
     path,
     cwd: "/workspace",
@@ -240,7 +296,7 @@ async function writeRawSession(id: string, lines: string[]): Promise<SessionSumm
   const path = join(root, `${id}.jsonl`);
   await writeFile(path, `${lines.join("\n")}\n`, "utf8");
   return {
-    fileIdentity: `identity-${id}`,
+    fileIdentity: await resolveExistingSessionFileIdentity(path),
     id,
     path,
     cwd: "/workspace",

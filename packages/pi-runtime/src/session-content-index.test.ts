@@ -1,9 +1,10 @@
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdtemp, realpath, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   indexSessionContentRecords,
   searchIndexedSessionContent,
@@ -31,7 +32,7 @@ describe("indexed Workspace Session content search", () => {
     const record = await fixture.record(2, 2);
     fixture.sqlite.replaceAll("source-a", [record], metadata(), 0);
 
-    await indexSessionContentRecords({ records: [record], sqlite: fixture.sqlite, isCurrent: () => true });
+    await indexSessionContentRecords(indexOptions(fixture, [record]));
     const chinese = await searchIndexedSessionContent(searchOptions(fixture, record, "小红书"));
     const latin = await searchIndexedSessionContent(searchOptions(fixture, record, "release marker"));
 
@@ -69,14 +70,14 @@ describe("indexed Workspace Session content search", () => {
     fixture.manager.appendMessage(assistantMessage("initial response", 2));
     const first = await fixture.record(2, 2);
     fixture.sqlite.replaceAll("source-a", [first], metadata(), 0);
-    await indexSessionContentRecords({ records: [first], sqlite: fixture.sqlite, isCurrent: () => true });
+    await indexSessionContentRecords(indexOptions(fixture, [first]));
     expect((await searchIndexedSessionContent(searchOptions(fixture, first, "new marker"))).items).toEqual([]);
 
     fixture.manager.appendMessage({ role: "user", content: "continue", timestamp: 3 });
     fixture.manager.appendMessage(assistantMessage("new marker appears after the next Turn", 4));
     const second = { ...first, modifiedAt: 4, messageCount: 4 };
     fixture.sqlite.upsert(second, 1);
-    await indexSessionContentRecords({ records: [second], sqlite: fixture.sqlite, isCurrent: () => true });
+    await indexSessionContentRecords(indexOptions(fixture, [second]));
 
     expect(sessionContentProjectionVersion(second)).not.toBe(sessionContentProjectionVersion(first));
     expect((await searchIndexedSessionContent(searchOptions(fixture, second, "new marker"))).items)
@@ -90,7 +91,7 @@ describe("indexed Workspace Session content search", () => {
     fixture.manager.appendMessage(assistantMessage("cancel response", 2));
     const record = await fixture.record(2, 2);
     fixture.sqlite.replaceAll("source-a", [record], metadata(), 0);
-    await indexSessionContentRecords({ records: [record], sqlite: fixture.sqlite, isCurrent: () => true });
+    await indexSessionContentRecords(indexOptions(fixture, [record]));
     const controller = new AbortController();
     controller.abort();
 
@@ -99,6 +100,128 @@ describe("indexed Workspace Session content search", () => {
       signal: controller.signal
     })).rejects.toMatchObject({ name: "AbortError" });
     fixture.sqlite.close();
+  });
+
+  it("retries a same-version source after a transient read failure", async () => {
+    const fixture = await createFixture();
+    fixture.manager.appendMessage({ role: "user", content: "transient recovery marker", timestamp: 1 });
+    fixture.manager.appendMessage(assistantMessage("transient response", 2));
+    const record = await fixture.record(2, 2);
+    fixture.sqlite.replaceAll("source-a", [record], metadata(), 0);
+    const heldPath = `${record.path}.held`;
+
+    await rename(record.path, heldPath);
+    await indexSessionContentRecords(indexOptions(fixture, [record]));
+    expect(fixture.sqlite.contentIndexVersions().has(record.fileIdentity)).toBe(false);
+
+    await rename(heldPath, record.path);
+    await indexSessionContentRecords(indexOptions(fixture, [record]));
+
+    expect((await searchIndexedSessionContent(searchOptions(fixture, record, "transient recovery marker"))).items)
+      .toHaveLength(1);
+    expect(fixture.sqlite.contentIndexCoverage(record.cwdKey)).toMatchObject({
+      sessionCount: 1,
+      incompleteCount: 0
+    });
+    fixture.sqlite.close();
+  });
+
+  it("removes an obsolete projection when its current source read fails", async () => {
+    const fixture = await createFixture();
+    fixture.manager.appendMessage({ role: "user", content: "old projection marker", timestamp: 1 });
+    fixture.manager.appendMessage(assistantMessage("old projection response", 2));
+    const first = await fixture.record(2, 2);
+    fixture.sqlite.replaceAll("source-a", [first], metadata(), 0);
+    await indexSessionContentRecords(indexOptions(fixture, [first]));
+    const current = { ...first, modifiedAt: 3, messageCount: 3 };
+    fixture.sqlite.upsert(current, 1);
+    const heldPath = `${current.path}.held`;
+
+    await rename(current.path, heldPath);
+    await indexSessionContentRecords(indexOptions(fixture, [current]));
+
+    expect(fixture.sqlite.contentIndexVersions().has(current.fileIdentity)).toBe(false);
+    const search = await searchIndexedSessionContent(searchOptions(fixture, current, "old projection marker"));
+    expect(search).toMatchObject({ items: [], incomplete: true, sessionsVisited: 0 });
+    await rename(heldPath, current.path);
+    fixture.sqlite.close();
+  });
+
+  it("rebuilds an old failed projection version after the source is readable", async () => {
+    const fixture = await createFixture();
+    fixture.manager.appendMessage({ role: "user", content: "legacy failure recovery marker", timestamp: 1 });
+    fixture.manager.appendMessage(assistantMessage("legacy response", 2));
+    const record = await fixture.record(2, 2);
+    fixture.sqlite.replaceAll("source-a", [record], metadata(), 0);
+    fixture.sqlite.replaceContentIndex({
+      fileIdentity: record.fileIdentity,
+      projectionVersion: legacySessionContentProjectionVersion(record),
+      indexedEntries: 0,
+      incomplete: true,
+      messages: []
+    });
+
+    await indexSessionContentRecords(indexOptions(fixture, [record]));
+
+    expect(fixture.sqlite.contentIndexVersions().get(record.fileIdentity))
+      .toBe(sessionContentProjectionVersion(record));
+    expect((await searchIndexedSessionContent(searchOptions(fixture, record, "legacy failure recovery marker"))).items)
+      .toHaveLength(1);
+    fixture.sqlite.close();
+  });
+
+  it("keeps a successfully bounded incomplete projection cached for its version", async () => {
+    const fixture = await createFixture();
+    fixture.manager.appendMessage({ role: "user", content: "bounded projection", timestamp: 1 });
+    fixture.manager.appendMessage(assistantMessage("bounded response", 2));
+    for (let index = 0; index <= 20_000; index += 1) {
+      fixture.manager.appendMessage({ role: "user", content: `bounded projection ${index}`, timestamp: index + 3 });
+    }
+    const record = await fixture.record(20_003, 20_003);
+    fixture.sqlite.replaceAll("source-a", [record], metadata(), 0);
+    await indexSessionContentRecords(indexOptions(fixture, [record]));
+    expect(fixture.sqlite.contentIndexCoverage(record.cwdKey)).toMatchObject({
+      sessionCount: 1,
+      incompleteCount: 1
+    });
+
+    const originalOpen = SessionManager.open.bind(SessionManager);
+    const open = vi.spyOn(SessionManager, "open").mockImplementation((...args) => originalOpen(...args));
+    try {
+      await indexSessionContentRecords(indexOptions(fixture, [record]));
+      expect(open).not.toHaveBeenCalled();
+    } finally {
+      open.mockRestore();
+      fixture.sqlite.close();
+    }
+  });
+
+  it("stops obsolete indexing flights before opening later Session sources", async () => {
+    const fixture = await createFixture();
+    fixture.manager.appendMessage({ role: "user", content: "obsolete flight marker", timestamp: 1 });
+    fixture.manager.appendMessage(assistantMessage("obsolete response", 2));
+    const record = await fixture.record(2, 2);
+    const records = Array.from({ length: 20 }, (_, index) => ({
+      ...record,
+      fileIdentity: `obsolete-flight-${index}`
+    }));
+    let flightCurrent = true;
+    const originalOpen = SessionManager.open.bind(SessionManager);
+    const open = vi.spyOn(SessionManager, "open").mockImplementation((...args) => {
+      flightCurrent = false;
+      return originalOpen(...args);
+    });
+    try {
+      await indexSessionContentRecords({
+        ...indexOptions(fixture, records),
+        isCurrentFlight: () => flightCurrent
+      });
+      expect(open).toHaveBeenCalledTimes(1);
+      expect(fixture.sqlite.contentIndexVersions()).toEqual(new Map());
+    } finally {
+      open.mockRestore();
+      fixture.sqlite.close();
+    }
   });
 });
 
@@ -147,6 +270,30 @@ function searchOptions(
     catalogSkippedCount: 0,
     sqlite: fixture.sqlite
   };
+}
+
+function indexOptions(
+  fixture: Awaited<ReturnType<typeof createFixture>>,
+  records: readonly SessionCatalogRecord[]
+) {
+  return {
+    records,
+    sqlite: fixture.sqlite,
+    isCurrentFlight: () => true,
+    isCurrent: () => true
+  };
+}
+
+function legacySessionContentProjectionVersion(record: SessionCatalogRecord): string {
+  return createHash("sha256")
+    .update(record.fileIdentity)
+    .update("\0")
+    .update(record.path)
+    .update("\0")
+    .update(String(record.modifiedAt))
+    .update("\0")
+    .update(String(record.messageCount))
+    .digest("hex");
 }
 
 function metadata() {

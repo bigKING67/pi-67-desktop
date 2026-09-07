@@ -24,10 +24,12 @@ export class ProjectionRecoveryLedger {
     if (!this.connectionLossIncidentActive || stableBeforeLoss) {
       this.connectionLossIncidentActive = true;
       this.connectionLossNoticeRevision = revision;
+      this.interruptedOperationId = state.workspace ? activeOperationId(state) : undefined;
+    } else if (!state.workspace) {
+      this.interruptedOperationId = undefined;
+    } else {
+      this.interruptedOperationId = activeOperationId(state) ?? this.interruptedOperationId;
     }
-    this.interruptedOperationId = state.workspace
-      ? activeOperationId(state)
-      : undefined;
     return revision;
   }
 

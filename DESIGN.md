@@ -2296,7 +2296,9 @@ loading error where the operation can produce those states
   recovery restores the active Operation through projection resync. If the task
   settles while events are unavailable, recovery may restore the latest typed terminal
   receipt only when its Operation ID matches the task that was active before the gap;
-  unrelated historical terminals are ignored. Host replacement remains visibly
+  unrelated historical terminals are ignored. Repeated Port loss within the same recovery
+  incident preserves that interrupted task identity, so an authoritative failure still
+  restores the failed state and its single terminal notification. Host replacement remains visibly
   recovering until runtime initialization completes and never reuses the prior Host's
   in-memory receipt ledger. A replacement request waits for a strictly newer Renderer
   connection generation, so closure of the generation being replaced cannot collapse

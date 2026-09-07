@@ -25,6 +25,7 @@ const MAX_SESSION_TOKEN_HASHES = 200_000;
 const CONTENT_INDEX_WORKERS = 4;
 const CONTENT_INDEX_WRITE_BATCH = 16;
 const CANDIDATE_MULTIPLIER = 8;
+const CONTENT_INDEX_PROJECTION_ALGORITHM = "content-index-v2:";
 
 export interface SessionContentIndexSearchOptions {
   workspaceId: string;
@@ -42,7 +43,7 @@ export interface SessionContentIndexSearchOutcome extends WorkspaceMessageSearch
 }
 
 export function sessionContentProjectionVersion(record: SessionCatalogRecord): string {
-  return createHash("sha256")
+  return CONTENT_INDEX_PROJECTION_ALGORITHM + createHash("sha256")
     .update(record.fileIdentity)
     .update("\0")
     .update(record.path)
@@ -56,8 +57,10 @@ export function sessionContentProjectionVersion(record: SessionCatalogRecord): s
 export async function indexSessionContentRecords(options: {
   records: readonly SessionCatalogRecord[];
   sqlite: IndexedSqliteSessionCatalog;
+  isCurrentFlight(): boolean;
   isCurrent(record: SessionCatalogRecord): boolean;
 }): Promise<void> {
+  if (!options.isCurrentFlight()) return;
   const versions = options.sqlite.contentIndexVersions();
   const pending = options.records.filter((record) => (
     versions.get(record.fileIdentity) !== sessionContentProjectionVersion(record)
@@ -65,30 +68,45 @@ export async function indexSessionContentRecords(options: {
   if (pending.length === 0) return;
   const salt = options.sqlite.contentIndexSalt();
   for (let offset = 0; offset < pending.length; offset += CONTENT_INDEX_WRITE_BATCH) {
+    if (!options.isCurrentFlight()) return;
     const records = pending.slice(offset, offset + CONTENT_INDEX_WRITE_BATCH);
     const documents: Array<{ record: SessionCatalogRecord; document: SessionContentIndexDocument }> = [];
     let next = 0;
     const worker = async () => {
-      while (next < records.length) {
+      while (options.isCurrentFlight() && next < records.length) {
         const record = records[next++];
         if (!record) return;
+        if (!options.isCurrent(record)) continue;
         const projectionVersion = sessionContentProjectionVersion(record);
         let document: SessionContentIndexDocument;
         try {
-          document = await buildSessionContentIndexDocument(record, projectionVersion, salt);
-        } catch {
-          document = {
-            fileIdentity: record.fileIdentity,
+          const built = await buildSessionContentIndexDocument(
+            record,
             projectionVersion,
-            indexedEntries: 0,
-            incomplete: true,
-            messages: []
-          };
+            salt,
+            () => options.isCurrentFlight(),
+            () => options.isCurrent(record)
+          );
+          if (!built) {
+            if (!options.isCurrentFlight()) return;
+            continue;
+          }
+          document = built;
+        } catch {
+          // A transient source failure is not a completed projection version. Leaving
+          // it absent makes the next bounded indexing flight retry this same version.
+          if (options.isCurrentFlight() && options.isCurrent(record)) {
+            options.sqlite.removeContentIndex(record.fileIdentity);
+          }
+          continue;
         }
+        if (!options.isCurrentFlight()) return;
+        if (!options.isCurrent(record)) continue;
         documents.push({ record, document });
       }
     };
     await Promise.all(Array.from({ length: Math.min(CONTENT_INDEX_WORKERS, records.length) }, worker));
+    if (!options.isCurrentFlight()) return;
     options.sqlite.replaceContentIndexes(documents.flatMap(({ record, document }) => (
       options.isCurrent(record) ? [document] : []
     )));
@@ -201,9 +219,12 @@ export function tokenHashesForText(value: string, salt: string): string[] {
 async function buildSessionContentIndexDocument(
   record: SessionCatalogRecord,
   projectionVersion: string,
-  salt: string
-): Promise<SessionContentIndexDocument> {
+  salt: string,
+  isCurrentFlight: () => boolean,
+  isCurrentRecord: () => boolean
+): Promise<SessionContentIndexDocument | undefined> {
   const info = await lstat(record.path);
+  if (!isCurrentFlight() || !isCurrentRecord()) return undefined;
   if (!info.isFile() || info.isSymbolicLink() || info.size > MAX_SESSION_FILE_BYTES) {
     throw new Error("Session content source is outside the index bounds.");
   }

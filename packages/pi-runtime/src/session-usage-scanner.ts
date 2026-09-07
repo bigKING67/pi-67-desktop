@@ -15,6 +15,7 @@ import {
   usageWindowEndUtcExclusive,
   usageWindowStartUtc
 } from "@pi67/domain";
+import { resolveExistingSessionFileIdentity } from "./session-path-identity.js";
 
 const MAX_USAGE_SESSION_BYTES = 16 * 1024 * 1024;
 const MAX_USAGE_TOTAL_BYTES = 128 * 1024 * 1024;
@@ -79,7 +80,7 @@ export async function scanSessionUsage(options: SessionUsageScanOptions): Promis
       deadlineExceeded = true;
       break;
     }
-    const loaded = await readTrustedSession(session.path, options.signal);
+    const loaded = await readTrustedSession(session.path, session.fileIdentity, options.signal);
     if (loaded.kind === "unavailable") {
       unavailableSessions += 1;
       continue;
@@ -254,6 +255,7 @@ function usageEntry(
 
 async function readTrustedSession(
   path: string,
+  expectedFileIdentity: string,
   signal?: AbortSignal
 ): Promise<
   | { kind: "ok"; lines: string[]; bytes: number }
@@ -267,6 +269,9 @@ async function readTrustedSession(
       return { kind: "invalid" };
     }
     const canonical = await realpath(absolute);
+    if (await resolveExistingSessionFileIdentity(canonical) !== expectedFileIdentity) {
+      return { kind: "invalid" };
+    }
     const handle = await open(canonical, "r");
     try {
       const before = await handle.stat();

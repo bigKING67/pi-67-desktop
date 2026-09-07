@@ -94,6 +94,7 @@ export class SessionCatalogIndexCoordinator {
     const promise = indexSessionContentRecords({
       records: batch,
       sqlite,
+      isCurrentFlight: () => this.options.isCurrentContext(context, contextGeneration),
       isCurrent: (record) => {
         const current = this.options.projectionRecord(record.fileIdentity);
         return this.options.isCurrentContext(context, contextGeneration)

@@ -52,6 +52,24 @@ describe("ProjectionRecoveryLedger", () => {
     expect(ledger.claimConnectionLossNotification(later)).toBe(true);
   });
 
+  it.each(["completed", "failed", "cancelled"] as const)("preserves a %s terminal across repeated losses in one incident", (lifecycle) => {
+    const ledger = new ProjectionRecoveryLedger();
+    ledger.beginConnectionLoss(appState(operation("running", "running")));
+    const recovering = { ...appState(), connected: false, sessionTransitionPending: true } as AppState;
+    ledger.beginConnectionLoss(recovering);
+    ledger.beginConnectionLoss(recovering);
+    const receipt: OperationSettled = lifecycle === "failed"
+      ? { ...terminal("running"), lifecycle, error: { code: "INTERNAL", message: "failed", recoverable: true } }
+      : lifecycle === "cancelled"
+        ? { ...terminal("running"), lifecycle, reason: "cancelled" }
+        : { ...terminal("running"), lifecycle };
+    expect(ledger.matchingInterruptedTerminal(receipt)).toBe(receipt);
+    expect(ledger.matchingInterruptedTerminal(terminal("other"))).toBeUndefined();
+    ledger.completeConnectionLoss();
+    ledger.beginConnectionLoss(appState());
+    expect(ledger.matchingInterruptedTerminal(receipt)).toBeUndefined();
+  });
+
   it("supports explicit resync ownership and clears it on Host replacement", () => {
     const ledger = new ProjectionRecoveryLedger();
     ledger.captureInterruptedOperation(appState(), "operation-explicit");
