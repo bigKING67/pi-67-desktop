@@ -47,7 +47,9 @@ export class RuntimeSessionTransitions {
       switched = true;
       return await this.options.commit("session-imported");
     } catch (error) {
-      if (!switched) await discardStagedSessionImport(staged, error);
+      if (!switched && this.options.getActiveSessionPath() !== staged.path) {
+        await discardStagedSessionImport(staged, error);
+      }
       throw error;
     }
   }

@@ -295,6 +295,10 @@ function isExtensionPackageMutation(type: AgentCommandType): boolean {
 }
 
 function mutationScope(command: ExtensionPackageCommand): "global" | "project" {
+  // Pi update(source) reconciles matching identities across global and project
+  // settings. Its public API cannot constrain scope, so every update needs the
+  // global Task fence/reload even when its receipt targets a project entry.
+  if (command.type === "extension.package.update") return "global";
   return command.type === "extension.package.restoreInheritance"
     || ("scope" in command.payload && command.payload.scope === "project")
     ? "project"

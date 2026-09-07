@@ -10,7 +10,11 @@ import {
   type RendererHello
 } from "@pi67/protocol";
 import { AgentHostServer } from "./host-server.js";
-import { commandEnvelope } from "./protocol-test-fixtures.js";
+import {
+  commandEnvelope,
+  commandEnvelopeForContext,
+  testTaskContext
+} from "./protocol-test-fixtures.js";
 
 class FakePort implements ProtocolPort {
   readonly sent: unknown[] = [];
@@ -111,6 +115,87 @@ describe("AgentHostServer replay-safe control mutations", () => {
       ok: false,
       error: { code: "STALE_SESSION_IDENTITY" }
     });
+    await server.shutdown();
+  });
+
+  it("rechecks queued Session-bound mutations before dispatch after a Session transition", async () => {
+    let sessionId = "session-a";
+    let sessionGeneration = 1;
+    let finishCreate!: () => void;
+    const createSession = vi.fn(() => new Promise<ReturnType<typeof snapshot>>((resolve) => {
+      finishCreate = () => {
+        sessionId = "session-b";
+        sessionGeneration = 2;
+        resolve(snapshot("session-b"));
+      };
+    }));
+    const setSessionName = vi.fn(async () => undefined);
+    const rollback = vi.fn(async () => undefined);
+    const runtime = {
+      getSdkVersion: () => "0.81.1",
+      subscribe: () => () => undefined,
+      getIdentity: () => ({ sessionId, sessionFileIdentity: `session-file-${sessionId}`, sessionGeneration }),
+      createSession,
+      setSessionName,
+      rollback,
+      cancelInteractiveRequests: () => [],
+      dispose: async () => undefined
+    } as unknown as AgentRuntime;
+    const server = new AgentHostServer(async () => runtime);
+    const port = await attach(server);
+    const originalAuthority = testTaskContext(1, {
+      sessionId: "session-a",
+      sessionFileIdentity: "session-file-session-a",
+      sessionGeneration: 1
+    });
+    const create = commandEnvelope("session.create", { creationId: "session-creation-b" }, 5, "create-session-b");
+    const rename = commandEnvelopeForContext(
+      "session.name",
+      { mutation: { action: "set", name: "name intended for A" } },
+      originalAuthority,
+      5,
+      "rename-session-a"
+    );
+    const renameReplay = commandEnvelopeForContext(
+      "session.name",
+      { mutation: { action: "set", name: "name intended for A" } },
+      originalAuthority,
+      5,
+      "rename-session-a"
+    );
+    const rollbackRequest = commandEnvelopeForContext(
+      "session.rollback",
+      { entryId: "entry-from-a" },
+      originalAuthority,
+      5,
+      "rollback-session-a"
+    );
+
+    port.emit(create);
+    await vi.waitFor(() => expect(createSession).toHaveBeenCalledOnce());
+    port.emit(rename);
+    port.emit(renameReplay);
+    port.emit(rollbackRequest);
+    finishCreate();
+
+    await expectResponse(port, create.requestId, { ok: true, type: "session.create" });
+    await expectResponse(port, rename.requestId, {
+      ok: false,
+      type: "session.name",
+      error: { code: "STALE_SESSION_GENERATION" }
+    });
+    await expectResponse(port, renameReplay.requestId, {
+      ok: false,
+      type: "session.name",
+      error: { code: "STALE_SESSION_GENERATION" }
+    });
+    await expectResponse(port, rollbackRequest.requestId, {
+      ok: false,
+      type: "session.rollback",
+      error: { code: "STALE_SESSION_GENERATION" }
+    });
+    expect(setSessionName).not.toHaveBeenCalled();
+    expect(rollback).not.toHaveBeenCalled();
     await server.shutdown();
   });
 

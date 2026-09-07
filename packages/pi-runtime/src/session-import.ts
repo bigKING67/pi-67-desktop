@@ -1,5 +1,5 @@
 import { constants, createReadStream } from "node:fs";
-import { copyFile, mkdir, realpath, rm, stat } from "node:fs/promises";
+import { copyFile, mkdir, open, realpath, rm, stat } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { RuntimeError } from "@pi67/domain";
@@ -63,29 +63,48 @@ export async function stageSessionImport(
   }
   await assertImportLineLimits(resolvedSource);
 
-  // Parse the source before creating a managed copy so invalid JSONL leaves no artifact.
-  const sourceManager = SessionManager.open(resolvedSource, undefined, cwdOverride);
   await mkdir(sessionDirectory, { recursive: true });
   const resolvedSessionDirectory = await realpath(resolve(sessionDirectory));
   if (dirname(resolvedSource) === resolvedSessionDirectory) {
     return {
       copied: false,
       path: resolvedSource,
-      sessionManager: SessionManager.open(resolvedSource, resolvedSessionDirectory, cwdOverride)
+      sessionManager: await openImportedSession(resolvedSource, resolvedSessionDirectory, cwdOverride)
     };
   }
 
   const destination = await copyWithoutOverwrite(resolvedSource, resolvedSessionDirectory);
   try {
+    // Recheck the owned copy: the external source may have changed while copying.
+    await assertImportLineLimits(destination);
     return {
       copied: true,
       path: destination,
-      sessionManager: SessionManager.open(destination, resolvedSessionDirectory, sourceManager.getCwd())
+      sessionManager: await openImportedSession(destination, resolvedSessionDirectory, cwdOverride)
     };
   } catch (error) {
     await removeStagedSessionImport(destination, error);
     throw error;
   }
+}
+
+async function openImportedSession(path: string, sessionDirectory: string, cwd: string): Promise<SessionManager> {
+  // SDK open can migrate legacy JSONL. External sources must already be copied.
+  const manager = SessionManager.open(path, sessionDirectory, cwd);
+  const file = await open(path, "a+");
+  try {
+    const { size } = await file.stat();
+    if (size > 0) {
+      const lastByte = Buffer.alloc(1);
+      await file.read(lastByte, 0, 1, size - 1);
+      // A complete final JSON object without LF is valid input, but SDK append
+      // assumes a record separator already exists before the next entry.
+      if (lastByte[0] !== 0x0a) await file.write("\n");
+    }
+  } finally {
+    await file.close();
+  }
+  return manager;
 }
 
 async function assertImportLineLimits(path: string): Promise<void> {

@@ -109,6 +109,11 @@ the only Runtime and behavior specification source.
 - Windows x64 and macOS arm64 packages include pinned private Node, npm, and Git
   toolchains. Package operations fail closed when the bundled toolchain is
   missing or invalid and never fall back to unverified system executables.
+- Package updates use Pi's public `update(source)` API, which can reconcile the
+  same package identity across global and project settings. Every update therefore
+  requires all Task lanes to be idle, fences all Workspaces while it runs, and
+  reloads all initialized Tasks afterward. The requested project/global scope
+  remains the durable receipt identity; other mutations retain their scoped policy.
 - Networked Package check/install/update/uninstall operations run in one
   Agent-Host-owned isolated worker per request. The worker receives an explicit
   operating-system/toolchain environment allowlist rather than the Host environment,

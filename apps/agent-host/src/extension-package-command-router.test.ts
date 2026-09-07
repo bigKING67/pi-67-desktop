@@ -40,23 +40,68 @@ describe("ExtensionPackageCommandRouter", () => {
   });
 
   it("limits a project mutation to its Workspace and reloads only its initialized Tasks", async () => {
-    const update = vi.fn(async () => MUTATED_LIST);
+    const install = vi.fn(async () => MUTATED_LIST);
     const runtimeA = runtime();
     const runtimeB = runtime();
     const tasks = [
       task("workspace-a", true, runtimeA.runtime),
       task("workspace-b", false, runtimeB.runtime)
     ];
-    const router = createRouter({ update }, tasks);
+    const router = createRouter({ install }, tasks);
 
     await expect(router.dispatch(
       WORKSPACE_A,
-      command("extension.package.update", { source: "npm:example", scope: "project" }),
-      "update-project"
+      command("extension.package.install", { source: "npm:example", scope: "project" }),
+      "install-project"
     )).resolves.toMatchObject({ ...MUTATED_LIST, receiptState: "active" });
 
     expect(runtimeA.reloadResources).toHaveBeenCalledOnce();
     expect(runtimeB.reloadResources).not.toHaveBeenCalled();
+  });
+
+  it("rejects project-requested updates while another Workspace has an active Task", async () => {
+    const update = vi.fn(async () => MUTATED_LIST);
+    const router = createRouter({ update }, [
+      task("workspace-a", true),
+      task("workspace-b", false)
+    ]);
+
+    await expect(router.dispatch(
+      WORKSPACE_A,
+      command("extension.package.update", { source: "npm:shared@2.0.0", scope: "project" }),
+      "update-shared-project"
+    )).rejects.toMatchObject({ code: "BUSY", details: { scope: "global" } });
+
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("reloads every Workspace for Pi's shared update while retaining the requested receipt scope", async () => {
+    const update = vi.fn(async () => MUTATED_LIST);
+    const commitActive = vi.fn(async () => undefined);
+    const services = workspaceServices({ commitActive });
+    const runtimeA = runtime();
+    const runtimeB = runtime();
+    const router = createRouter({ update }, [
+      task("workspace-a", true, runtimeA.runtime),
+      task("workspace-b", true, runtimeB.runtime)
+    ], services);
+
+    await expect(router.dispatch(
+      WORKSPACE_A,
+      command("extension.package.update", { source: "npm:shared@2.0.0", scope: "project" }),
+      "update-shared-project-reload"
+    )).resolves.toMatchObject({ changed: true, receiptState: "active" });
+
+    expect(update).toHaveBeenCalledWith("npm:shared@2.0.0", "project");
+    expect(runtimeA.reloadResources).toHaveBeenCalledOnce();
+    expect(runtimeB.reloadResources).toHaveBeenCalledOnce();
+    expect(commitActive).toHaveBeenCalledWith(
+      "npm:shared@2.0.0",
+      "project",
+      "update-shared-project-reload",
+      observedPackage(),
+      true
+    );
   });
 
   it("records content approval while busy Tasks defer reload and idle Tasks reload immediately", async () => {

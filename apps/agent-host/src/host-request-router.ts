@@ -406,7 +406,13 @@ export class HostRequestRouter {
       result = this.tasks.requireControlMutationLedger(state).run(
         request.idempotencyKey,
         controlCommand,
-        () => scheduler.run(controlCommand, () => this.options.dispatchTask(controlCommand, state))
+        () => scheduler.run(controlCommand, async () => {
+          // Exclusive control mutations may wait behind a Session transition.
+          // Re-check the request's original authority immediately before the
+          // runtime dispatch so an admitted A-bound mutation cannot apply to B.
+          this.tasks.authorizeRequestContext(request);
+          return this.options.dispatchTask(controlCommand, state);
+        })
       );
     } catch (error) {
       origin.sendError(request.requestId, request.type, toProtocolError(error));
