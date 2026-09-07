@@ -89,29 +89,14 @@ export class RepositoryWorktreeActionService {
             ? { status: "initialized", submodules: before } as const
             : { status: "incomplete", submodules: before } as const;
         }
-        const fences = new RepositoryActionFenceStore(this.options.userData);
-        const repositoryId = snapshot.repository!.repositoryGroupId;
         try {
-          await fences.begin(repositoryId);
+          await this.#withPersistentFence(snapshot.repository!.repositoryGroupId, () => (
+            this.options.runner.initializeSubmodules(current.identity.canonicalPath, "network-explicit")
+          ));
         } catch (error) {
-          this.options.scheduler.fence(repositoryId);
-          throw error;
+          if (!(error instanceof GitInspectionError) || error.code !== "process-failed"
+            || error.details.cleanupConfirmed === false) throw error;
         }
-        let failure: GitInspectionError | undefined;
-        try {
-          await this.options.runner.initializeSubmodules(current.identity.canonicalPath, "network-explicit");
-        } catch (error) {
-          if (!(error instanceof GitInspectionError) || error.details.cleanupConfirmed === false) {
-            this.options.scheduler.fence(repositoryId);
-            throw error;
-          }
-          failure = error;
-        }
-        try { await fences.complete(repositoryId); } catch (error) {
-          this.options.scheduler.fence(repositoryId);
-          throw error;
-        }
-        if (failure && failure.code !== "process-failed") throw failure;
         const after = submoduleObservation(await this.options.runner.inspectSubmodules(
           current.identity.canonicalPath
         ));
@@ -219,31 +204,34 @@ export class RepositoryWorktreeActionService {
           || exactRegistration.headSha !== branchHead
         )) return rejectedRecovery("identity-changed", false);
 
-        if (exactRegistration) {
-          await this.options.runner.removeWorktree(
-            currentAuthority.source.identity.canonicalPath,
-            profile.targetPath
+        const restoredPath = await this.#withPersistentFence(record.repositoryGroupId, async () => {
+          if (exactRegistration) {
+            await this.options.runner.removeWorktree(
+              currentAuthority.source.identity.canonicalPath,
+              profile.targetPath
+            );
+          }
+          const prepared = await prepareWorktreeProfilePath(
+            this.options.userData,
+            record.repositoryGroupId,
+            record.worktreeToken
           );
-        }
-        const prepared = await prepareWorktreeProfilePath(
-          this.options.userData,
-          record.repositoryGroupId,
-          record.worktreeToken
-        );
-        await this.options.runner.restoreWorktree({
-          cwd: currentAuthority.source.identity.canonicalPath,
-          targetPath: prepared.targetPath,
-          branchName: record.branchName,
-          hooksPath: prepared.hooksPath
+          await this.options.runner.restoreWorktree({
+            cwd: currentAuthority.source.identity.canonicalPath,
+            targetPath: prepared.targetPath,
+            branchName: record.branchName,
+            hooksPath: prepared.hooksPath
+          });
+          await this.#verifyRecoveredWorktree(
+            currentAuthority.source.identity.canonicalPath,
+            prepared.targetPath,
+            record.repositoryGroupId,
+            record.branchName,
+            branchHead
+          );
+          return prepared.targetPath;
         });
-        await this.#verifyRecoveredWorktree(
-          currentAuthority.source.identity.canonicalPath,
-          prepared.targetPath,
-          record.repositoryGroupId,
-          record.branchName,
-          branchHead
-        );
-        return this.#registerRecoveredWorkspace(request.workspaceId, record.creationId, prepared.targetPath);
+        return this.#registerRecoveredWorkspace(request.workspaceId, record.creationId, restoredPath);
       });
     } catch (error) {
       if (error instanceof RepositoryMutationAdmissionError) {
@@ -251,6 +239,28 @@ export class RepositoryWorktreeActionService {
       }
       return rejectedRecovery(error instanceof GitInspectionError ? "git-failed" : "internal", true);
     }
+  }
+
+  async #withPersistentFence<T>(repositoryId: string, operation: () => Promise<T>): Promise<T> {
+    const fences = new RepositoryActionFenceStore(this.options.userData);
+    try { await fences.begin(repositoryId); } catch (error) {
+      this.options.scheduler.fence(repositoryId);
+      throw error;
+    }
+    const result = await Promise.resolve().then(operation).then(
+      (value) => ({ ok: true, value } as const),
+      (error: unknown) => ({ ok: false, error } as const)
+    );
+    if (!result.ok && (!(result.error instanceof GitInspectionError) || result.error.details.cleanupConfirmed === false)) {
+      this.options.scheduler.fence(repositoryId);
+      throw result.error;
+    }
+    try { await fences.complete(repositoryId); } catch (error) {
+      this.options.scheduler.fence(repositoryId);
+      throw error;
+    }
+    if (!result.ok) throw result.error;
+    return result.value;
   }
 
   async #registerRecoveredWorkspace(

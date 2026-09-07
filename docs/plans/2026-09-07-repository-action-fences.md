@@ -54,3 +54,16 @@ Additional I/O validation: 22 action/store/startup tests passed; Desktop typeche
 passed. Begin failure uses a real invalid directory; complete failure injects EACCES at the
 store method boundary. Independent incremental review found no issues. Production bytes
 match the prior full gate. Receipt: `/tmp/pi67-action-fence-io-tests.log`.
+
+## Recovery mutation extension
+
+Baseline 57bb7f9: injected cleanup-unconfirmed failures at remove and restore both failed
+the fence regression (`/tmp/pi67-recovery-fence-before.log`). Extend the same marker
+wrapper to recovery Git mutations after exact identity/filter checks, before removal.
+Keep Workspace registration outside confirmed Git completion; state-write retry semantics
+remain unchanged. Reuse the marker format and startup loader; no migration or protocol change.
+Validation: 24 targeted tests passed; independent review found no issues; aggregate
+`corepack pnpm run check` passed (3510 passed, 5 skipped). Receipts:
+`/tmp/pi67-recovery-fence-tests-final.log` and `/tmp/pi67-recovery-fence-check.log`.
+Recovery extension remains uncommitted. Real recovery process crash/Windows/power-loss
+acceptance remains unverified.

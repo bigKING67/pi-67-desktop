@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 const REPOSITORY_ID = /^repo_[0-9a-f]{32}$/u;
 
-/** Presence means an explicit submodule mutation has not confirmed its completion. */
+/** Presence means an explicit Repository action has not confirmed its completion. */
 export class RepositoryActionFenceStore {
   readonly #directory: string;
 

@@ -355,7 +355,8 @@ Renderer 是跨 Main 与 Agent Host 的产品流程协调者，但不拥有 Git 
   超限先发生、root 随后在清理开始前关闭时，同样保留 cleanup unconfirmed。
 - mutation timeout/abort 后若无法证明 child tree 已退出，journal 记录 `indeterminate`，同一
   RepositoryGroup 后续 mutation 全部拒绝，直到 read-only reconcile 证明 Git 状态。
-- 显式 submodule 补齐在 Git 开始前持久化 Repository-only action marker；清理未确认或进程
+- 显式 submodule 补齐与缺失 Worktree 恢复在 Git 变更开始前持久化 Repository-only action marker；
+  清理未确认或进程
   中断时保留并 fence，重启先恢复这些保护。标记库存不可读/非法时禁用 mutation admission，
   不自动清空保护；普通已确认失败仍可返回 incomplete。标记不保存路径或 Git 输出。
 - application shutdown 不报告 graceful，除非所有 active Git mutation tree 已退出或被明确标记为

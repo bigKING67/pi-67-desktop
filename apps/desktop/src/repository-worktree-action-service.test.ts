@@ -110,6 +110,31 @@ describe("RepositoryWorktreeActionService", () => {
     }
   }, REAL_GIT_TEST_TIMEOUT_MS);
 
+  it.each(["removeWorktree", "restoreWorktree"] as const)("retains a persistent fence after unconfirmed recovery %s", async (method) => {
+    const fixture = await actionFixture();
+    const created = await createCommittedWorktree(fixture);
+    if (created.status !== "created") throw new Error("Expected created");
+    const target = created.receipt.workspace.identity.canonicalPath;
+    await rm(target, { recursive: true, force: true });
+    await fixture.workbenchState.update((state) => replaceWorkspaceRegistrations(state,
+      state.workspaces.map((workspace) => workspace.id === created.receipt.workspace.id
+        ? { ...workspace, availability: "missing" as const } : workspace)));
+    const repositoryId = (await fixture.workbenchState.load()).state.environmentMutations[0]!.repositoryGroupId;
+    const failing = vi.spyOn(fixture.runner, method).mockRejectedValueOnce(new GitInspectionError(
+      method === "removeWorktree" ? "worktree-remove" : "worktree-add", "timeout", { cleanupConfirmed: false }));
+    const request = { workspaceId: created.receipt.workspace.id, confirmation: "recreate-committed-state" as const };
+    await expect(fixture.actions.recoverAppOwnedWorktree(request)).resolves.toMatchObject({ status: "rejected", error: "git-failed" });
+    expect(fixture.scheduler.isFenced(repositoryId)).toBe(true);
+    expect(await new RepositoryActionFenceStore(fixture.userData).load()).toEqual([repositoryId]);
+    await expect(fixture.actions.recoverAppOwnedWorktree(request)).resolves.toMatchObject({ status: "rejected" });
+    expect(failing).toHaveBeenCalledTimes(1);
+    const restarted = new RepositoryMutationScheduler();
+    await new WorktreeStartupReconcileService({
+      userData: fixture.userData, runner: fixture.runner, scheduler: restarted, workbenchState: fixture.workbenchState
+    }).reconcile();
+    await expect(restarted.run(repositoryId, async () => undefined)).rejects.toMatchObject({ code: "repository-indeterminate" });
+  }, REAL_GIT_TEST_TIMEOUT_MS);
+
   it("explicitly recreates only a committed app-owned missing Worktree and preserves its branch", async () => {
     const fixture = await actionFixture();
     const created = await createCommittedWorktree(fixture);
