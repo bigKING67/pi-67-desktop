@@ -215,7 +215,7 @@ export class BoundedPrivateGitRunner implements RepositoryMutationGitRunner {
     signal?: AbortSignal
   ): Promise<string> {
     assertRelativeGitPath(relativePath);
-    const common = ["--no-optional-locks", "-c", "core.longpaths=true", "diff", "--no-ext-diff", "--no-textconv", "--unified=3"];
+    const common = ["--no-optional-locks", "-c", "core.longpaths=true", "-c", "core.fsmonitor=false", "diff", "--no-ext-diff", "--no-textconv", "--unified=3"];
     const arguments_ = mode === "staged"
       ? [...common, "--cached", "--", relativePath]
       : mode === "conflict"

@@ -232,7 +232,9 @@ function projectEntryRecord(
           type: "vision-evidence",
           provider: evidence.provider,
           model: evidence.model,
-          attachments: evidence.attachments,
+          attachments: evidence.attachments.map(({ id, name, mimeType, byteLength }) => ({
+            id, name, mimeType, byteLength
+          })),
           description: evidence.description,
           inputTokens: evidence.usage.input,
           outputTokens: evidence.usage.output,

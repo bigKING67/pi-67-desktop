@@ -535,6 +535,10 @@ State transition 必须由 domain pure functions 校验；Main 不允许直接�
 
 所有 payload/result 在 `packages/protocol` 使用 strict TypeBox schema。当前 creation API 是：
 
+`sessionFileIdentity` 是 Pi Session 的 opaque 身份，可包含 NUL 分隔符；请求、回执和恢复记录
+均保留原值，并采用共享 `MAX_SESSION_FILE_IDENTITY_CHARS` 上限，不将它当作文件路径校验。
+真实路径仍保持独立的绝对路径、NUL 禁止与所有权检查。
+
 ```ts
 inspectRepositoryEnvironment({ workspaceId })
   -> RepositoryEnvironmentSnapshot

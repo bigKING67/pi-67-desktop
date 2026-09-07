@@ -1,3 +1,4 @@
+import { MAX_SESSION_FILE_IDENTITY_CHARS } from "@pi67/domain";
 import type {
   WorktreeCreationErrorView,
   WorktreeCreationAdvanceResult,
@@ -225,7 +226,7 @@ function isDecimal(value: unknown): boolean {
 }
 
 function isSessionFileIdentity(value: unknown): value is string {
-  return typeof value === "string" && value.length >= 1 && value.length <= 1_024 && !value.includes("\0");
+  return typeof value === "string" && value.length >= 1 && value.length <= MAX_SESSION_FILE_IDENTITY_CHARS;
 }
 
 function isId(value: unknown): value is string {

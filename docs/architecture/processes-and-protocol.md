@@ -213,6 +213,10 @@ GIF，最多 8 张、单张最多 10 MiB、总计最多 30 MiB；每个 `data` �
 的 `ArrayBuffer`，并通过 transfer list 移交以避免复制。Session 输出图片使用独立的
 `AssetReference` / `asset.read` 合同，不复用 Prompt 输入数组。
 
+消息页、快照及重同步的消息联合包含 `vision-evidence`。其 Provider/Model、图片附件元数据、
+非空描述和非负有限 usage/cost 与 Pi 视觉辅助记录投影一致，并保持严格字段和数量/长度边界。
+合法的持久化视觉辅助记录不得使 Renderer 的 Port 校验失败。
+
 Renderer 对 Host event 不只校验 type-specific payload schema，还按完整事件清单校验 context：Session-scoped
 事件必须同时携带 `sessionId + sessionFileIdentity + sessionGeneration`，Operation/Turn/Approval
 事件还必须携带

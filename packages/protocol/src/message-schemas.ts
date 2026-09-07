@@ -70,11 +70,28 @@ const PlanProposalPartSchema = messageObject({
     ])
   })
 });
+const VisionEvidencePartSchema = messageObject({
+  type: Type.Literal("vision-evidence"),
+  provider: Type.String({ minLength: 1, maxLength: 512 }),
+  model: Type.String({ minLength: 1, maxLength: 512 }),
+  attachments: Type.Array(messageObject({
+    id: Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" }),
+    name: Type.String({ minLength: 1, maxLength: 512 }),
+    mimeType: Type.String({ maxLength: 128, pattern: "^image/" }),
+    byteLength: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })
+  }), { minItems: 1, maxItems: 20 }),
+  description: Type.String({ minLength: 1, maxLength: 65_536, pattern: "\\S" }),
+  inputTokens: Type.Number({ minimum: 0, maximum: Number.MAX_VALUE }),
+  outputTokens: Type.Number({ minimum: 0, maximum: Number.MAX_VALUE }),
+  totalTokens: Type.Number({ minimum: 0, maximum: Number.MAX_VALUE }),
+  totalCost: Type.Number({ minimum: 0, maximum: Number.MAX_VALUE })
+});
 const MessagePartSchema = Type.Union([
   TextPartSchema,
   ToolCallPartSchema,
   ImagePartSchema,
   AttachmentPartSchema,
+  VisionEvidencePartSchema,
   PlanProposalPartSchema
 ]);
 

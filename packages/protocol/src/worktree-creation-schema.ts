@@ -1,3 +1,4 @@
+import { MAX_SESSION_FILE_IDENTITY_CHARS } from "@pi67/domain";
 import { Type, type TProperties } from "./typebox-schema.js";
 
 const BoundedIdSchema = Type.String({ minLength: 1, maxLength: 200, pattern: "^[A-Za-z0-9._:-]+$" });
@@ -9,8 +10,7 @@ const PathSchema = Type.String({
 const DecimalBigintSchema = Type.String({ minLength: 1, maxLength: 40, pattern: "^(?:0|[1-9][0-9]*)$" });
 const SessionFileIdentitySchema = Type.String({
   minLength: 1,
-  maxLength: 1_024,
-  pattern: "^[^\\x00]{1,1024}$"
+  maxLength: MAX_SESSION_FILE_IDENTITY_CHARS
 });
 
 const WorkspaceIdentitySchema = Type.Union([

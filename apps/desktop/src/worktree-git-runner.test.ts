@@ -213,6 +213,30 @@ describe("BoundedPrivateGitRunner", () => {
     await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" });
   }, REAL_GIT_TEST_TIMEOUT_MS);
 
+  it.each(["staged", "unstaged"] as const)("does not invoke fsmonitor during %s Patch reads", async (mode) => {
+    const root = await temporaryRoot();
+    const repository = join(root, "repository");
+    const monitor = join(root, "fsmonitor.mjs");
+    const marker = join(root, "fsmonitor-invoked");
+    await mkdir(repository);
+    await runSystemGit(repository, ["init"]);
+    await writeFile(join(repository, "file.txt"), "before\n");
+    await runSystemGit(repository, ["add", "file.txt"]);
+    await runSystemGit(repository, [
+      "-c", "user.name=Pi-67", "-c", "user.email=pi67@example.invalid", "commit", "-m", "initial"
+    ]);
+    await writeFile(join(repository, "file.txt"), "after\n");
+    if (mode === "staged") await runSystemGit(repository, ["add", "file.txt"]);
+    await writeFile(monitor, `import { writeFileSync } from "node:fs";\nwriteFileSync(process.argv[2], "invoked");\n`);
+    await runSystemGit(repository, [
+      "config", "core.fsmonitor", [process.execPath, monitor, marker].map(quoteGitCommandArgument).join(" ")
+    ]);
+    const runner = new BoundedPrivateGitRunner(await systemGitToolchain(root));
+
+    await expect(runner.diffPath(repository, "file.txt", mode)).resolves.toContain("+after");
+    await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" });
+  }, REAL_GIT_TEST_TIMEOUT_MS);
+
   it("initializes a linked-checkout Submodule from existing local objects without network transport", async () => {
     const root = await temporaryRoot();
     const module = join(root, "module");

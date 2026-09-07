@@ -1310,7 +1310,9 @@ the only Runtime and behavior specification source.
   and gives Renderer only revision-scoped opaque `changeId` values plus display
   paths. Detail requests carry only `workspaceId + revision + changeId`; Main
   revalidates Workspace identity and the status fingerprint before and after each
-  bounded Patch read. This surface never stages, discards, commits, pushes, opens a
+  bounded Patch read. Read-only status and diff explicitly disable repository-configured
+  `core.fsmonitor`; diff also disables external diff and text conversion commands.
+  This surface never stages, discards, commits, pushes, opens a
   PR, or claims to replace a full Git client.
 - Complete, line-mappable Session and staged/unstaged Git patches support an explicit
   review lifecycle: `Viewed` is exact-fingerprint inspection, `Reviewed` is a separate

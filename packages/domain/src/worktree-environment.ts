@@ -1,3 +1,5 @@
+import { MAX_SESSION_FILE_IDENTITY_CHARS } from "./projection-limits.js";
+
 export type WorkspaceEnvironmentKind = "plain" | "repository-primary" | "repository-worktree";
 export type WorkspaceEnvironmentOwnership = "user" | "app";
 
@@ -159,7 +161,11 @@ export function isEnvironmentMutationRecoveryRecord(
   if (!isOneOf(value.state, Object.keys(ENVIRONMENT_CREATION_TRANSITIONS) as EnvironmentCreationState[])) return false;
   if (!isTimestamp(value.createdAt) || !isTimestamp(value.updatedAt) || value.updatedAt < value.createdAt) return false;
   if (value.workspaceId !== undefined && !isBoundedId(value.workspaceId, 200)) return false;
-  if (value.sessionFileIdentity !== undefined && !isBoundedString(value.sessionFileIdentity, 1_024)) return false;
+  if (value.sessionFileIdentity !== undefined && (
+    typeof value.sessionFileIdentity !== "string"
+    || value.sessionFileIdentity.length === 0
+    || value.sessionFileIdentity.length > MAX_SESSION_FILE_IDENTITY_CHARS
+  )) return false;
   if (value.rollbackSafety !== undefined && value.rollbackSafety !== "pre-host-confirmed") return false;
 
   const workspaceRequired = [
