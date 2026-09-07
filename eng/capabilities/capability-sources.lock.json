@@ -7,7 +7,7 @@
       "displayName": "Pi Workspace Resources",
       "origin": "first-party",
       "internalPath": "packages/pi-workspace-resources",
-      "treeSha256": "9d45a479a3bd364985742e5e5405f10c899be51db0b9dc2b70b939e7cb12eec0",
+      "treeSha256": "e26edd23fe794f98332cb33a0edaa094b760ec31c2a9e4c4d4cf30da8981ecc5",
       "version": "1.0.0",
       "includedExtensions": [
         {
@@ -22,7 +22,7 @@
       "displayName": "OpenViking Pi Extension",
       "origin": "first-party",
       "internalPath": "packages/openviking-pi-extension",
-      "treeSha256": "eaad30ca1c2c7c630d9d252e85cced9ec96fd0715fe10d0361abb718389f4028",
+      "treeSha256": "3fda4d0f4a4b14b598b0e9a4ebd03897e23ae810b0686a2d63e9a4b8b04bdd8d",
       "version": "0.2.0-desktop.6",
       "includedExtensions": [
         {

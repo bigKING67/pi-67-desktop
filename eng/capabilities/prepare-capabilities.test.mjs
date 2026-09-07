@@ -76,7 +76,7 @@ describe("Desktop first-party capability source lock", () => {
     expect(lock.sources.filter((source) => source.repository).every((source) => /^[0-9a-f]{40}$/u.test(source.commit))).toBe(true);
     expect(lock.sources.find((source) => source.id === "pi-workspace-resources")).toMatchObject({
       internalPath: "packages/pi-workspace-resources",
-      treeSha256: "9d45a479a3bd364985742e5e5405f10c899be51db0b9dc2b70b939e7cb12eec0",
+      treeSha256: await treeSha256(resolve(root, "packages/pi-workspace-resources"), { includeNodeModules: false }),
       includedExtensions: [{
         id: "pi-rules-loader",
         displayName: "工作规则加载器",
@@ -92,7 +92,7 @@ describe("Desktop first-party capability source lock", () => {
     });
     expect(lock.sources.find((source) => source.id === "openviking-pi-extension")).toMatchObject({
       internalPath: "packages/openviking-pi-extension",
-      treeSha256: "eaad30ca1c2c7c630d9d252e85cced9ec96fd0715fe10d0361abb718389f4028",
+      treeSha256: await treeSha256(resolve(root, "packages/openviking-pi-extension"), { includeNodeModules: false }),
       version: "0.2.0-desktop.6",
       includedExtensions: [{ id: "pi67-openviking" }]
     });
