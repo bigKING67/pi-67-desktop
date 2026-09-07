@@ -1,3 +1,4 @@
+import { initializeAdmittedSubmodules } from "./worktree-submodule-admission.js";
 import { spawn } from "node:child_process";
 import { realpath, stat } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -175,41 +176,20 @@ export class BoundedPrivateGitRunner implements RepositoryMutationGitRunner {
     mode: "local-only" | "network-explicit",
     signal?: AbortSignal
   ): Promise<void> {
+    const deadline = Date.now() + this.#budgets.submoduleUpdateTimeoutMs;
     const local = mode === "local-only" ? await this.#localSubmoduleMaterialization(cwd, signal) : undefined;
     if (mode === "local-only" && (!local || local.paths.length === 0)) {
       throw new GitInspectionError("submodule-update", "process-failed");
     }
-    const transports = mode === "local-only"
-      ? [
-          "-c", "protocol.allow=never",
-          "-c", "protocol.file.allow=always",
-        ]
-      : [
-          "-c", "protocol.allow=never",
-          "-c", "protocol.http.allow=always",
-          "-c", "protocol.https.allow=always",
-          "-c", "protocol.ssh.allow=always",
-          "-c", "protocol.git.allow=always",
-          "-c", "protocol.file.allow=never"
-        ];
-    await this.#execute(
-      "submodule-update",
-      cwd,
-      [
-        "--no-optional-locks",
-        "-c", "core.longpaths=true",
-        "-c", "core.hooksPath=/dev/null",
-        ...transports,
-        ...(local?.overrides ?? []),
-        "submodule", "update", "--init",
-        ...(mode === "network-explicit" ? ["--recursive"] : []),
-        "--checkout",
-        ...(mode === "local-only" ? ["--no-fetch", "--", ...local!.paths] : [])
-      ],
-      this.#budgets.submoduleUpdateTimeoutMs,
-      this.#budgets.submoduleOutputBytes,
-      signal
-    );
+    await initializeAdmittedSubmodules({
+      cwd, mode, ...(local ? { local } : {}),
+      execute: (directory, args, acceptedExitCodes) => {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) throw new GitInspectionError("submodule-update", "timeout", { cleanupConfirmed: true });
+        return this.#execute("submodule-update", directory, args, remaining,
+          this.#budgets.submoduleOutputBytes, signal, acceptedExitCodes);
+      }
+    });
   }
 
   statusPorcelain(cwd: string, signal?: AbortSignal): Promise<string> {

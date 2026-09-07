@@ -387,7 +387,18 @@ Renderer 是跨 Main 与 Agent Host 的产品流程协调者，但不拥有 Git 
   本地补齐的普通 process failure 可保留 incomplete；若错误明确标记 cleanup unconfirmed，必须
   终止创建并持久化 indeterminate/fence，不得降级为“待联网补齐”后继续注册 Workspace。
 - 需要网络的 Submodule 只在用户点击“联网补齐”后运行；该动作仍禁用交互式 credential prompt，
-  不自动写 Git config，也不把失败伪装成完整。divergent 或 conflicted 状态不通过网络动作覆盖。
+  不写 global/system Git config，也不把失败伪装成完整。初始化可以写 Git 自身所需的
+  submodule URL、模块仓库配置和工作目录连接；divergent 或 conflicted 状态不通过网络动作覆盖。
+- 子模块先在 Git 解析出的 per-worktree modules 目录准备 bare object repository，保持 target
+  未连接、状态未初始化；以实际子 Git directory/HEAD 配置检查 filter 后，才转换为 non-bare，
+  交由 Git submodule update 完成连接与检出。拒绝时保留可重试的 module metadata，不伪造完成。
+  不使用 clone --no-checkout 后手工连接 target，也不强制覆盖已有工作目录。
+  已连接的合法 old-form（内嵌 .git 目录）子模块按实际 gitdir 校验，不重新 clone 或迁移。
+  显式递归保留 Git active flag/pathspec 的选择语义，逐层通过同一校验；命令层设置
+  submodule.recurse=false，防止继承配置提前递归 checkout 未校验的子模块。active pathspec
+  只查询子模块状态；换行路径或歧义 label fail closed，不枚举普通 tracked 文件。Git 命令序列按
+  初始化入口的 120 秒 deadline 分配剩余预算（本地 preflight 仍有自身上限，文件系统调用不保证
+  硬实时中断），最多处理 128 个子模块、9 层（含第一层）；超界按既有 cleanup/fence 合同处理。
 - 缺失恢复只适用于 durable binding 标记为 app-owned、创建记录已 `committed`、source Workspace
   可用且可信的 Worktree。UI 明确说明只重建已提交的 branch 状态，原目录中的未提交改动和未跟踪
   文件无法恢复。恢复请求取得 Repository mutation 执行权后，必须重新核验 source 的可用/可信状态、
