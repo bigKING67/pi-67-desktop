@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { MAX_SESSION_FILE_IDENTITY_CHARS } from "@pi67/domain";
 import { installProviderStartupReceipt, readProviderStartupSelection } from "./real-provider-startup-receipt.mjs";
 
 afterEach(() => {
@@ -32,6 +33,30 @@ const config = { providerId: "provider", modelId: "model", thinkingLevel: "high"
 const page = { evaluate: async (fn) => fn() };
 
 describe("Provider first Prompt startup proof", () => {
+  it.each([679, MAX_SESSION_FILE_IDENTITY_CHARS])("preserves a valid %i character physical identity", async (length) => {
+    const f = fixture(); f.state.armed = true;
+    const context = { ...f.context, sessionFileIdentity: "session-file-path-v1\0".padEnd(length, "x") };
+    f.send("thinking.set", controls, { context });
+    f.send("prompt.submit", ack, { context });
+    globalThis.__pi67ProviderLongTurnProbe = { operationId: "operation" };
+    await expect(readProviderStartupSelection(page, config)).resolves.toMatchObject({
+      authority: { sessionFileIdentity: context.sessionFileIdentity }
+    });
+  });
+  it.each([
+    ["sessionFileIdentity", ""],
+    ["sessionFileIdentity", "x".repeat(MAX_SESSION_FILE_IDENTITY_CHARS + 1)],
+    ["workspaceId", "x".repeat(513)],
+    ["taskId", "x".repeat(513)],
+    ["sessionId", "x".repeat(513)]
+  ])("rejects invalid bounded %s", (field, value) => {
+    const f = fixture(); f.state.armed = true;
+    const context = { ...f.context, [field]: value };
+    f.send("thinking.set", controls, { context });
+    f.send("prompt.submit", ack, { context });
+    expect(f.state.controls).toBeUndefined();
+    expect(f.state.accepted).toBeUndefined();
+  });
   it("observes the actual installed listener and freezes bounded effective controls at acknowledgement", async () => {
     const f = fixture();
     f.send("thinking.set", controls);

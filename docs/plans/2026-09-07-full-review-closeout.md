@@ -103,3 +103,6 @@ packaged/macOS/Windows：独立记录已验证与未验证，不由源码门禁�
 - 模块74 passed /1 skipped；独立复核27/27通过且AGREE，报告`/tmp/pi67-outbox-final-independent.json`。主Desktop的materializeSession在Extension绑定前重开Pi JSONL，源码支持首次锚点同步追加；不声明其他宿主、fsync/断电持久性或真实服务身份映射已验收。
 - Canonical attempt `rcf-20260907T142855Z-bcee509c39f5/attempts/attempt-0001-910e814a60f2`保留FAILED：聚合type-aware lint发现新增测试隐式URL字符串转换，snapshot validation及lineage通过。补正仅显式区分string/URL/Request，不改行为断言；最终原生`env VITEST_MAX_WORKERS=2 corepack pnpm run check`退出0，703测试文件通过、3642 tests passed /5 skipped，全部静态及覆盖率门禁通过，日志`/tmp/pi67-outbox-final-check.log`，源码摘要`/tmp/pi67-outbox-final-source-hashes.json`。此后验通过不改写canonical FAILED，也不声称VERIFIED_WITH_RETRY或clean-checkout delivery attestation。
 - 两个既有测试fixture（index-peer/lifecycle-recovery）另由独立摘要与最终聚合门禁覆盖。38个无关WIP路径已核验保留；无push、服务端操作、macOS新候选或Windows验收。GAP001-004自动安全审查边界、GAP007连接绑定专项、GAP008真实平台未知和Provider完整UI PARTIAL仍未闭合；原74分仅为修复前基线。
+
+- 第八批修复Provider认证工具的物理身份上限残留：真实安装的startup receipt监听器仅对sessionFileIdentity使用协议一致的32832上限，普通ID保持512限制。监听函数需要被序列化进Renderer，因此保留自包含数值，由引用domain权威常量的边界回归约束一致性。新增679字符、最大值接受、空/超长物理身份和普通ID越界拒绝7项回归；eng/provider 9文件41/41通过，受影响文件type-aware lint通过。本批为两文件工具局部修复，不改产品协议，不重复全仓门禁；不将监听器fixture通过宣称完整Provider UI或打包认证。
+- 上一批聚合通过后仅清理新增storage文件末尾空行并检查staged diff，不涉及逻辑变化。当前仍需完整Provider UI/打包证据、GAP007专项连接绑定与GAP008真实Windows证据；GAP001-004的自动安全审查中止不通过重试或替代路径绕过。

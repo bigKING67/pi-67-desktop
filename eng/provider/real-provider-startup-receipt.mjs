@@ -4,12 +4,15 @@ export function installProviderStartupReceipt() {
   const state = { armed: false, hostEpoch: undefined, controls: undefined, accepted: undefined };
   globalThis.__pi67ProviderStartupReceipt = state;
   const text = (value) => typeof value === "string" && value.length > 0 && value.length <= 512;
+  // Serialized into Renderer without module scope; regression binds this to the domain limit.
+  const fileIdentity = (value) => typeof value === "string" && value.length > 0 && value.length <= 32832;
   const integer = (value) => Number.isSafeInteger(value) && value >= 0;
   const identity = (envelope) => {
     const context = envelope.context;
     if (context?.scope !== "task" || !integer(envelope.hostEpoch)
       || !integer(context.taskGeneration) || !integer(context.sessionGeneration)
-      || ![context.workspaceId, context.taskId, context.sessionId, context.sessionFileIdentity].every(text)) {
+      || ![context.workspaceId, context.taskId, context.sessionId].every(text)
+      || !fileIdentity(context.sessionFileIdentity)) {
       return undefined;
     }
     return {
