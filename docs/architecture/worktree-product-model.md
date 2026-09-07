@@ -86,6 +86,9 @@ Session 主链路仍可用，再证明 Worktree 增量路径。
   改写为 starting；恢复得到的 stopped Session 保持等待显式打开，运行态继续由 Session/Host 投影负责。
 - Session exact-owner 合并删除恢复占位前，必须将其 Worktree 环境创建身份转交给没有该身份的
   目标 Task，供后续环境提交定位；相同身份保留目标已有进度，不同创建身份保留双方 Task/草稿并拒绝合并。
+- Renderer 恢复只对本轮 Host 注册及进度持久化均成功的记录继续环境提交；失败时按创建身份
+  定位当前 Task（包括合并后的 owner）标记 recovery-required，Session 合并后仍须保留该失败状态。成功重试
+  提交后，仅将仍停留在本恢复错误上的 Task 恢复为 stopped/等待打开，不覆盖期间更新的 Session runtime。
 - 已有对话可以 Fork 到当前 Workspace 或新的隔离 Worktree。
 - Worktree 在导航、对话标题区和删除确认中始终可辨认。
 - 崩溃、窗口 reload、Host replacement、Git timeout 和局部持久化失败后不重复创建、不静默丢分支、

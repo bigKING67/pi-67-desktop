@@ -56,28 +56,45 @@ export async function reconcileRendererWorktreeCreations(
   }
 
   const records = state.environmentMutations.filter(isProgressRecord);
+  const hostReady = new Set<string>();
   for (const record of records) {
     const workspace = record.workspaceId
       ? state.workspaces.find((candidate) => candidate.id === record.workspaceId)
       : undefined;
-    if (!workspace) continue;
-    await replayHostRegistration(record, workspace, dependencies);
+    if (workspace && await replayHostRegistration(record, workspace, dependencies)) {
+      hostReady.add(record.creationId);
+    }
   }
 
   await dependencies.reconcileSessions();
 
   for (const record of records) {
+    if (!hostReady.has(record.creationId)) {
+      markRecoveryRequired(record);
+      continue;
+    }
     const task = worktreeTaskForRecord(record);
     if (!task || task.conversation.kind !== "session") continue;
     if (
       record.sessionFileIdentity !== undefined
       && task.sessionFileIdentity !== record.sessionFileIdentity
     ) {
-      markRecoveryRequired(task.id);
+      markRecoveryRequired(record);
       continue;
     }
     const result = await dependencies.commitSession(task.id, record.creationId);
-    if (result.status !== "committed") markRecoveryRequired(task.id);
+    if (result.status !== "committed") {
+      markRecoveryRequired(record);
+    } else {
+      const current = worktreeTaskForRecord(record);
+      if (current?.runtime.phase === "failed"
+        && current.runtime.detail === messages.runtime.worktreeCreation.recoveryRequired) {
+        rendererWorkbenchStore.getState().updateTask(current.id, {
+          lifecycle: "stopped",
+          runtime: { phase: "stopped", detail: messages.runtime.workbench.sessionPendingOpen, recoverable: true }
+        });
+      }
+    }
   }
 }
 
@@ -85,28 +102,29 @@ async function replayHostRegistration(
   record: EnvironmentMutationRecoveryRecord,
   workspace: WorkspaceDescriptor,
   dependencies: RendererWorktreeRecoveryDependencies
-): Promise<void> {
+): Promise<boolean> {
   const hostRegistering = await advance(record, workspace.id, "host-registering", dependencies);
   if (!hostRegistering) {
-    markRecoveryRequired(record.requestId);
-    return;
+    markRecoveryRequired(record);
+    return false;
   }
   updateTaskProgress(record, hostRegistering);
   try {
     if (!await dependencies.registerWorkspace(workspace)) {
-      markRecoveryRequired(record.requestId);
-      return;
+      markRecoveryRequired(record);
+      return false;
     }
   } catch {
-    markRecoveryRequired(record.requestId);
-    return;
+    markRecoveryRequired(record);
+    return false;
   }
   const hostRegistered = await advance(record, workspace.id, "host-registered", dependencies);
   if (!hostRegistered) {
-    markRecoveryRequired(record.requestId);
-    return;
+    markRecoveryRequired(record);
+    return false;
   }
   updateTaskProgress(record, hostRegistered);
+  return true;
 }
 
 async function advance(
@@ -147,8 +165,10 @@ function updateTaskProgress(
   });
 }
 
-function markRecoveryRequired(taskId: string): void {
-  rendererWorkbenchStore.getState().updateTask(taskId, {
+function markRecoveryRequired(record: EnvironmentMutationRecoveryRecord): void {
+  const task = worktreeTaskForRecord(record);
+  if (!task) return;
+  rendererWorkbenchStore.getState().updateTask(task.id, {
     environmentCreationState: "recovery-required",
     runtime: {
       phase: "failed",

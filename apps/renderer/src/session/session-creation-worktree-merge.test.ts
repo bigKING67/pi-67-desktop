@@ -1,4 +1,4 @@
-import { reconcileRendererWorktreeCreations } from "../worktree/worktree-creation-recovery-controller.js";
+import { reconcileRendererWorktreeCreations, type RendererWorktreeRecoveryDependencies } from "../worktree/worktree-creation-recovery-controller.js";
 import { beforeEach, expect, it, vi } from "vitest";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { useTaskDraftStore } from "../workbench/task-draft-store.js";
@@ -46,14 +46,14 @@ beforeEach(() => {
     expect(rendererWorkbenchStore.getState().tasks["task-existing-owner"]?.environmentCreationId).toBe("another-environment");
   });
 
-it("commits the merged owner through Worktree recovery after the original request Task disappears", async () => {
+it.each(["advance-start", "register", "register-throw", "advance-end"] as const)("reports %s recovery failure on the merged owner without committing it", async (fault) => {
   const creationId = "session-creation-unconfirmed";
   openUnconfirmedTask({ environmentIntent: "worktree", environmentCreationId: creationId,
     environmentSourceWorkspaceId: "workspace-source", environmentCreationState: "session-materializing" });
   openExistingOwner(catalogSession("session-created", 10_100));
   mockMaterializedResolution();
   const commitSession = vi.fn(async () => ({ status: "committed" as const }));
-  await reconcileRendererWorktreeCreations({
+  const dependencies: RendererWorktreeRecoveryDependencies = {
     loadWorkbenchState: async () => ({
       version: 5, workspaces: [workspace()], workspaceOrder: ["workspace-a"], expandedWorkspaceIds: [],
       runtimeRecovery: [], sessionCreationRecovery: [], workspaceEnvironments: [],
@@ -70,7 +70,48 @@ it("commits the merged owner through Worktree recovery after the original reques
     registerWorkspace: async () => true,
     reconcileSessions: reconcileUnconfirmedRendererSessions,
     commitSession
-  });
+  };
+  await reconcileRendererWorktreeCreations(dependencies);
   expect(rendererWorkbenchStore.getState().tasks["task-unconfirmed"]).toBeUndefined();
   expect(commitSession).toHaveBeenCalledExactlyOnceWith("task-existing-owner", creationId);
+  commitSession.mockClear();
+  await reconcileRendererWorktreeCreations({
+    ...dependencies,
+    advance: async (id, targetState) => {
+      if ((fault === "advance-start" && targetState === "host-registering")
+        || (fault === "advance-end" && targetState === "host-registered")) throw new Error("advance unavailable");
+      return dependencies.advance(id, targetState);
+    },
+    registerWorkspace: async () => {
+      if (fault === "register-throw") throw new Error("Host unavailable");
+      return fault !== "register";
+    }
+  });
+  expect(commitSession).not.toHaveBeenCalled();
+  expect(rendererWorkbenchStore.getState().tasks["task-existing-owner"]).toMatchObject({
+    environmentCreationState: "recovery-required", runtime: { phase: "failed", recoverable: true }
+  });
+  await reconcileRendererWorktreeCreations(dependencies);
+  expect(commitSession).toHaveBeenCalledExactlyOnceWith("task-existing-owner", creationId);
+  expect(rendererWorkbenchStore.getState().tasks["task-existing-owner"]).toMatchObject({
+    lifecycle: "stopped", runtime: { phase: "stopped" }
+  });
+  // A fresh placeholder can merge during the same failed recovery pass.
+  openUnconfirmedTask({ environmentIntent: "worktree", environmentCreationId: creationId,
+    environmentSourceWorkspaceId: "workspace-source", environmentCreationState: "session-materializing" });
+  commitSession.mockClear();
+  await reconcileRendererWorktreeCreations({ ...dependencies, registerWorkspace: async () => false });
+  expect(rendererWorkbenchStore.getState().tasks["task-unconfirmed"]).toBeUndefined();
+  expect(commitSession).not.toHaveBeenCalled();
+  expect(rendererWorkbenchStore.getState().tasks["task-existing-owner"]?.runtime.phase).toBe("failed");
+  commitSession.mockImplementationOnce(async () => {
+    rendererWorkbenchStore.getState().updateTask("task-existing-owner", {
+      runtime: { phase: "stopped", detail: "new Session projection", recoverable: false }
+    });
+    return { status: "committed" };
+  });
+  await reconcileRendererWorktreeCreations(dependencies);
+  expect(rendererWorkbenchStore.getState().tasks["task-existing-owner"]?.runtime).toEqual({
+    phase: "stopped", detail: "new Session projection", recoverable: false
+  });
 });
