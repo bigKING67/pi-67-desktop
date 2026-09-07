@@ -6,6 +6,7 @@ import {
 } from "./worktree-git-contract.js";
 
 const TERMINATION_GRACE_MS = 250;
+const TASKKILL_TIMEOUT_MS = 1000;
 export type GitChild = ChildProcessByStdio<null, Readable, Readable>;
 
 export async function captureGitProcess(options: {
@@ -77,7 +78,13 @@ export async function captureGitProcess(options: {
     }
     return Buffer.concat(stdout).toString("utf8");
   } catch (error) {
-    if (!(error instanceof GitInspectionError) || closed) throw error;
+    if (!(error instanceof GitInspectionError)) throw error;
+    if (closed) {
+      if (options.platform === "win32" && ["cancelled", "timeout", "output-limit"].includes(error.code)) {
+        throw new GitInspectionError(error.stage, error.code, { ...error.details, cleanupConfirmed: false });
+      }
+      throw error;
+    }
     const cleanupConfirmed = await terminateGitProcessTree(
       options.child,
       closePromise,
@@ -107,16 +114,13 @@ async function terminateGitProcessTree(
   const pid = child.pid;
   if (!pid) return false;
   if (platform === "win32") {
-    child.kill();
-    if (await closesWithin(closePromise, TERMINATION_GRACE_MS)) return true;
-    const systemRoot = process.env.SystemRoot ?? "C:\\Windows";
-    const taskkill = spawn(`${systemRoot}\\System32\\taskkill.exe`, ["/PID", String(pid), "/T", "/F"], {
-      shell: false,
-      stdio: "ignore",
-      windowsHide: true
-    });
-    await new Promise<void>((resolvePromise) => taskkill.once("close", () => resolvePromise()));
-    return closesWithin(closePromise, TERMINATION_GRACE_MS);
+    // Keep the root alive until taskkill has located its descendants.
+    const gentle = await runTaskkill(pid, false);
+    if (gentle && await closesWithin(closePromise, TERMINATION_GRACE_MS)) return true;
+    // A dead root is no longer a reliable target for another tree traversal.
+    if (isClosed()) return false;
+    const forced = await runTaskkill(pid, true);
+    return forced && await closesWithin(closePromise, TERMINATION_GRACE_MS);
   }
 
   signalProcessGroup(pid, "SIGTERM");
@@ -124,6 +128,36 @@ async function terminateGitProcessTree(
   signalProcessGroup(pid, "SIGKILL");
   await closesWithin(closePromise, TERMINATION_GRACE_MS);
   return !processGroupExists(pid);
+}
+
+function runTaskkill(pid: number, force: boolean): Promise<boolean> {
+  return new Promise<boolean>((resolvePromise) => {
+    const systemRoot = process.env.SystemRoot ?? "C:\\Windows";
+    let taskkill: ReturnType<typeof spawn>;
+    try {
+      taskkill = spawn(`${systemRoot}\\System32\\taskkill.exe`, ["/PID", String(pid), "/T", ...(force ? ["/F"] : [])], {
+        shell: false,
+        stdio: "ignore",
+        windowsHide: true
+      });
+    } catch {
+      resolvePromise(false);
+      return;
+    }
+    let settled = false;
+    const finish = (success: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolvePromise(success);
+    };
+    const timeout = setTimeout(() => {
+      finish(false);
+      try { taskkill.kill(); } catch { /* Cleanup remains unconfirmed. */ }
+    }, TASKKILL_TIMEOUT_MS);
+    taskkill.once("error", () => finish(false));
+    taskkill.once("close", (code) => finish(code === 0));
+  });
 }
 
 function signalProcessGroup(pid: number, signal: NodeJS.Signals): void {
@@ -144,10 +178,15 @@ function processGroupExists(pid: number): boolean {
 }
 
 async function closesWithin(closePromise: Promise<unknown>, timeoutMs: number): Promise<boolean> {
-  return Promise.race([
-    closePromise.then(() => true, () => true),
-    new Promise<boolean>((resolvePromise) => setTimeout(() => resolvePromise(false), timeoutMs))
-  ]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      closePromise.then(() => true, () => false),
+      new Promise<boolean>((resolvePromise) => { timer = setTimeout(() => resolvePromise(false), timeoutMs); })
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {

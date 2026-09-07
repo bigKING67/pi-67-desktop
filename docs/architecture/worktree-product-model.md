@@ -349,7 +349,10 @@ Renderer 是跨 Main 与 Agent Host 的产品流程协调者，但不拥有 Git 
 
 - POSIX 使用独立 process group，先 `SIGTERM` 再 `SIGKILL` 并观察 group 消失。
 - Windows 优先使用 Job Object；在 Job Object 尚未实现时，使用有界 `taskkill /PID /T` 和 `/F`
-  两阶段清理，但 dead root PID 不能证明 descendants 已退出。
+  两阶段清理，每阶段最多等待 1 s，成功后最多等待 root close 250 ms。先定位整棵树，
+  不预先单杀 root；taskkill 启动错误、超时或非零退出不能作为清理成功。dead root PID
+  不能证明 descendants 已退出，也不能作为失败后的再次 tree traversal 目标。取消、超时或输出
+  超限先发生、root 随后在清理开始前关闭时，同样保留 cleanup unconfirmed。
 - mutation timeout/abort 后若无法证明 child tree 已退出，journal 记录 `indeterminate`，同一
   RepositoryGroup 后续 mutation 全部拒绝，直到 read-only reconcile 证明 Git 状态。
 - application shutdown 不报告 graceful，除非所有 active Git mutation tree 已退出或被明确标记为
