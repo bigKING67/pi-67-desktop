@@ -34,17 +34,49 @@ describe("packaged Changes Inspector smoke", () => {
       "screenshot:01-changes-empty.png"
     ]);
   });
+  it("reports only bounded state flags and preserves the original failure", async () => {
+    const cause = new Error("original timeout");
+    const fixture = inspectorFixture(true, cause);
+    const error = await verifyPackagedChangesInspector(fixture.window, fixture.captureScreenshot).catch((error) => error);
+    expect(error.cause).toBe(cause);
+    const state = JSON.parse(error.message.split(": ").slice(1).join(": "));
+    expect(state).toMatchObject({ inspectorVisible: true, missingAuthorityVisible: true, runtimeReadyVisible: true });
+    expect(Object.values(state).every((value) => typeof value === "boolean" || value === null)).toBe(true);
+    expect(fixture.captureScreenshot).not.toHaveBeenCalled();
+  });
+
+  it("bounds diagnostic collection when the page stops responding", async () => {
+    vi.useFakeTimers();
+    try {
+      const cause = new Error("original timeout");
+      const fixture = inspectorFixture(true, cause);
+      fixture.window.locator = () => ({ isVisible: () => new Promise(() => undefined) });
+      const result = verifyPackagedChangesInspector(fixture.window, fixture.captureScreenshot).catch((error) => error);
+      await vi.advanceTimersByTimeAsync(1_500);
+      const error = await result;
+      expect(error.cause).toBe(cause);
+      expect(error.message).toContain('"reason":"diagnostic-timeout"');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
 });
 
-function inspectorFixture(initiallyVisible) {
+function inspectorFixture(initiallyVisible, failure) {
   const actions = [];
   let visible = initiallyVisible;
   const inspector = {
     getByRole: vi.fn((_role, options) => ({
-      click: async () => actions.push(`tab:${options.name === "修改" ? "changes" : options.name}`)
+      click: async () => actions.push(`tab:${options.name === "修改" ? "changes" : options.name}`),
+      isVisible: async () => true
     })),
     getByText: vi.fn((text) => ({
-      waitFor: async ({ state }) => actions.push(`text:${textLabel(text)}:${state}`)
+      waitFor: async ({ state }) => {
+        if (failure) throw failure;
+        actions.push(`text:${textLabel(text)}:${state}`);
+      },
+      isVisible: async () => text.startsWith("打开一个运行中的会话")
     })),
     isVisible: vi.fn(async () => visible),
     waitFor: vi.fn(async ({ state }) => {
@@ -65,6 +97,7 @@ function inspectorFixture(initiallyVisible) {
     })
   };
   const window = {
+    locator: () => ({ isVisible: async () => true }),
     getByRole: vi.fn((role, options) => {
       if (role === "complementary") return inspector;
       if (options.name === "显示任务检查器") return show;
