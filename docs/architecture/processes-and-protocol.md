@@ -33,6 +33,11 @@ Agent 消息不经过 IPC invoke、HTTP 或 WebSocket。Preload 的 invoke API �
 
 ## Workspace identity and atomic file mutations
 
+Workspace 移除在 Host 注销确认后失效该 Workspace 的注册缓存。Main 移除失败时重新读取其 Registry：
+注册仍在则恢复 Host 注册；已移除则同步清理 Renderer 注册；读取失败保留可见状态而不猜测 Host 补偿。
+原移除错误继续对调用方可见，补偿失败必须同时报告，不能伪装成功。移除弹窗按当前 Renderer
+登记区分仍显示的失败与已移除后的清理/确认失败；后者关闭失效的移除弹窗。
+
 Electron Main 的 Workspace Registry 保存稳定 `workspaceId`、native canonical path、lossless
 `dev` / `ino` / `birthtimeNs` 物理身份（可用时）和最近一次成功验证时间。同一挂载周期内的重复目录判定
 继续严格比较三项物理字段；跨启动恢复则区分持久文件身份和挂载期设备编号：macOS/APFS 在重启或重挂载后

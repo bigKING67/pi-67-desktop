@@ -6,7 +6,7 @@ import { useSessionCatalogStore } from "../navigation/session-catalog-store.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import { resumeRendererTask } from "./task-activation-controller.js";
 import { rendererWorkbenchStore, selectedWorkbenchTask } from "./workbench-store.js";
-import { registerRendererWorkspaceWithHost } from "./workspace-host-registration-controller.js";
+import { invalidateWorkspaceHostRegistration, registerRendererWorkspaceWithHost } from "./workspace-host-registration-controller.js";
 import { forgetSessionRuntimePreference } from "../session/recent-session-runtime-preferences.js";
 
 export type WorkspaceRemovalDisposition =
@@ -48,13 +48,37 @@ export async function removeRendererWorkspace(workspaceId: string): Promise<Work
     if (error instanceof ProtocolRequestError && error.code === "BUSY") return "host-busy";
     throw error;
   }
+  invalidateWorkspaceHostRegistration(workspaceId);
   const currentDisposition = workspaceRemovalDisposition(workspaceId);
   if (currentDisposition !== "allowed") {
     const workspace = rendererWorkbenchStore.getState().workspaces[workspaceId];
     if (workspace) await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
     return currentDisposition;
   }
-  await window.pi67.system.removeWorkspace(workspaceId);
+  try {
+    await window.pi67.system.removeWorkspace(workspaceId);
+  } catch (error) {
+    const state = await window.pi67.system.loadWorkbenchState().catch(() => undefined);
+    if (state) {
+      const retained = state.workspaces.find((workspace) => workspace.id === workspaceId);
+      if (retained) {
+        try {
+          if (!await registerRendererWorkspaceWithHost(retained, { queryCatalog: false })) {
+            throw new Error("Retained Workspace could not be registered with Host.");
+          }
+        } catch (registrationError) {
+          throw new AggregateError([error, registrationError], "Workspace removal failed and Host registration could not be restored.");
+        }
+      } else {
+        forgetRemovedRendererWorkspace(workspaceId);
+      }
+    }
+    throw error;
+  }
+  return forgetRemovedRendererWorkspace(workspaceId);
+}
+
+function forgetRemovedRendererWorkspace(workspaceId: string): WorkspaceRemovalDisposition {
   if (!rendererWorkbenchStore.getState().unregisterWorkspace(workspaceId)) return "workspace-missing";
   useSessionCatalogStore.getState().reset(workspaceId);
   forgetSessionRuntimePreference(workspaceId);

@@ -30,7 +30,8 @@ vi.mock("./task-activation-controller.js", () => ({
 }));
 
 vi.mock("./workspace-host-registration-controller.js", () => ({
-  registerRendererWorkspaceWithHost: vi.fn()
+  registerRendererWorkspaceWithHost: vi.fn(),
+  invalidateWorkspaceHostRegistration: vi.fn()
 }));
 
 const ensureConnection = vi.mocked(ensureAgentConnection);
@@ -40,6 +41,7 @@ const registerWorkspace = vi.mocked(registerRendererWorkspaceWithHost);
 const removeWorkspace = vi.fn();
 const reorderWorkspaces = vi.fn();
 const repairWorkspace = vi.fn();
+const loadWorkbenchState = vi.fn();
 
 describe("workspace registration controller", () => {
   beforeEach(() => {
@@ -61,10 +63,12 @@ describe("workspace registration controller", () => {
     removeWorkspace.mockReset().mockResolvedValue({});
     reorderWorkspaces.mockReset().mockResolvedValue({});
     repairWorkspace.mockReset();
+    loadWorkbenchState.mockReset();
     vi.stubGlobal("window", {
       pi67: {
         system: {
           removeWorkspace,
+          loadWorkbenchState,
           reorderWorkspaces,
           repairWorkspace,
           updateWorkbenchLayout: vi.fn()
@@ -132,6 +136,44 @@ describe("workspace registration controller", () => {
 
     expect(registerWorkspace).toHaveBeenCalledWith(workspace(), { queryCatalog: false });
     expect(removeWorkspace).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])("reconciles Main removal failure against durable registration (retained=%s)", async (retained) => {
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue({} as never);
+    const failure = new Error("removal failed");
+    removeWorkspace.mockRejectedValue(failure);
+    loadWorkbenchState.mockResolvedValue({ workspaces: retained ? [workspace()] : [] });
+    await expect(removeRendererWorkspace("workspace-a")).rejects.toBe(failure);
+    if (retained) {
+      expect(registerWorkspace).toHaveBeenCalledExactlyOnceWith(workspace(), { queryCatalog: false });
+      expect(rendererWorkbenchStore.getState().workspaces["workspace-a"]).toBeDefined();
+    } else {
+      expect(registerWorkspace).not.toHaveBeenCalled();
+      expect(rendererWorkbenchStore.getState().workspaces["workspace-a"]).toBeUndefined();
+    }
+  });
+
+  it.each([false, "throw"])("reports failed Host compensation (%s) alongside the original failure", async (failureMode) => {
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue({} as never);
+    const failure = new Error("removal failed");
+    removeWorkspace.mockRejectedValue(failure);
+    loadWorkbenchState.mockResolvedValue({ workspaces: [workspace()] });
+    if (failureMode === "throw") registerWorkspace.mockRejectedValue(new Error("Host failed"));
+    else registerWorkspace.mockResolvedValue(false);
+    await expect(removeRendererWorkspace("workspace-a")).rejects.toMatchObject({
+      name: "AggregateError", errors: [failure, expect.any(Error)]
+    });
+    expect(rendererWorkbenchStore.getState().workspaces["workspace-a"]).toBeDefined();
+  });
+
+  it("does not guess Host registration when Main removal outcome cannot be read", async () => {
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue({} as never);
+    const failure = new Error("removal failed");
+    removeWorkspace.mockRejectedValue(failure);
+    loadWorkbenchState.mockRejectedValue(new Error("state unavailable"));
+    await expect(removeRendererWorkspace("workspace-a")).rejects.toBe(failure);
+    expect(registerWorkspace).not.toHaveBeenCalled();
+    expect(rendererWorkbenchStore.getState().workspaces["workspace-a"]).toBeDefined();
   });
 
   it("removes a quiescent Workspace from Main, renderer state, and Catalog state", async () => {

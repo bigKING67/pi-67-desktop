@@ -46,7 +46,7 @@ async function ensureWorkspaceRegistration(key: string, workspace: WorkspaceDesc
     [],
     { context: { scope: "workspace", workspaceId: workspace.id } }
   ).then(() => {
-    registeredWorkspaces.add(key);
+    if (registrationFlights.get(key) === flight) registeredWorkspaces.add(key);
   });
   registrationFlights.set(key, flight);
   try {
@@ -89,6 +89,14 @@ function workspaceRegistrationKey(hostEpoch: number, workspace: WorkspaceDescrip
     workspace.identity.canonicalPath,
     workspace.trust
   ]);
+}
+
+export function invalidateWorkspaceHostRegistration(workspaceId: string): void {
+  for (const key of new Set([...registeredWorkspaces, ...registrationFlights.keys()])) {
+    if ((JSON.parse(key) as [number, string, string, string])[1] !== workspaceId) continue;
+    registeredWorkspaces.delete(key);
+    registrationFlights.delete(key);
+  }
 }
 
 export function resetWorkspaceHostRegistrationState(): void {

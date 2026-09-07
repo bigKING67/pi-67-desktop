@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
 import { publishNotification } from "../notifications/notification-store.js";
 import { removeRendererWorkspace } from "../workbench/workspace-registration-controller.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import styles from "./WorkspaceRemovalDialog.module.css";
 
 export function WorkspaceRemovalDialog({
@@ -26,12 +27,18 @@ export function WorkspaceRemovalDialog({
         title: "无法移除工作区",
         message: removalBlocker(disposition)
       });
-    } catch {
+    } catch (error) {
+      const retained = rendererWorkbenchStore.getState().workspaces[workspace.id] !== undefined;
       publishNotification({
         level: "error",
-        title: "无法移除工作区",
-        message: "工作区仍保留在工作台中，请重试。"
+        title: retained ? "无法完成工作区移除" : "工作区已移除，后续清理未完成",
+        message: retained
+          ? error instanceof AggregateError
+            ? "工作区仍显示在工作台中，但 Pi 运行服务注册未能恢复。请重新打开工作区后重试。"
+            : "未能确认移除完成。工作区仍显示在工作台中，请重试。"
+          : "工作台登记已移除，但后续清理或结果确认未完成。目录、Pi Session 和项目文件不会因此删除。"
       });
+      if (!retained) onDismiss();
     } finally {
       setRemoving(false);
     }

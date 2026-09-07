@@ -4,6 +4,7 @@ import { agentConnectionController } from "../connection/AgentConnectionControll
 import { useSessionCatalogStore } from "../navigation/session-catalog-store.js";
 import {
   registerRendererWorkspaceWithHost,
+  invalidateWorkspaceHostRegistration,
   resetWorkspaceHostRegistrationState
 } from "./workspace-host-registration-controller.js";
 
@@ -22,6 +23,34 @@ describe("workspace host registration coordinator", () => {
       sdkVersion: "fixture",
       eventSequence: 0
     }));
+  });
+
+  it("re-registers only the invalidated Workspace on the same Host", async () => {
+    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue({} as never);
+    const first = workspace();
+    const second = { ...first, id: "workspace-other" };
+    await registerRendererWorkspaceWithHost(first, { queryCatalog: false });
+    await registerRendererWorkspaceWithHost(second, { queryCatalog: false });
+    request.mockClear();
+    invalidateWorkspaceHostRegistration(first.id);
+    await registerRendererWorkspaceWithHost(first, { queryCatalog: false });
+    await registerRendererWorkspaceWithHost(second, { queryCatalog: false });
+    expect(request).toHaveBeenCalledOnce();
+    expect(request.mock.calls[0]?.[3]?.context).toMatchObject({ workspaceId: first.id });
+  });
+
+  it("does not let an invalidated pending registration repopulate the cache", async () => {
+    const pending = deferred<void>();
+    const request = vi.spyOn(agentConnectionController, "request")
+      .mockReturnValueOnce(pending.promise as never).mockResolvedValue({} as never);
+    const original = registerRendererWorkspaceWithHost(workspace(), { queryCatalog: false });
+    await Promise.resolve();
+    expect(request).toHaveBeenCalledOnce();
+    invalidateWorkspaceHostRegistration(workspace().id);
+    pending.resolve();
+    await original;
+    await registerRendererWorkspaceWithHost(workspace(), { queryCatalog: false });
+    expect(request).toHaveBeenCalledTimes(2);
   });
 
   it("shares registration and first catalog flights across concurrent callers", async () => {
