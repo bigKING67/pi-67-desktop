@@ -89,10 +89,10 @@ describe("Git worktree porcelain parser", () => {
 describe("Git filter parser", () => {
   it("allows only LFS while returning bounded unknown filter names", () => {
     expect(parseConfiguredFilters([
-      "filter.lfs.process git-lfs filter-process",
-      "filter.lfs.required true",
-      "filter.generated.smudge generate-file"
-    ].join("\n"))).toEqual({
+      "filter.lfs.process\ngit-lfs filter-process",
+      "filter.lfs.required\ntrue",
+      "filter.generated.smudge\ngenerate-file"
+    ].join("\0"))).toEqual({
       lfsConfigured: true,
       unknownFilterNames: ["generated"]
     });

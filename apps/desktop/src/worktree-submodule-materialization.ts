@@ -27,7 +27,9 @@ export async function materializeLocalSubmodules(
     try {
       await runner.initializeSubmodules(targetPath, "local-only", signal);
     } catch (error) {
-      if (!(error instanceof GitInspectionError && error.code === "process-failed")) throw error;
+      if (!(error instanceof GitInspectionError)
+        || error.code !== "process-failed"
+        || error.details.cleanupConfirmed === false) throw error;
     }
     inspection = await runner.inspectSubmodules(targetPath, signal);
   }

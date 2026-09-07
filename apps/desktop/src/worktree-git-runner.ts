@@ -144,7 +144,7 @@ export class BoundedPrivateGitRunner implements RepositoryMutationGitRunner {
       output = await this.#execute(
         "filters",
         cwd,
-        ["--no-optional-locks", "-c", "core.longpaths=true", "config", "--get-regexp", "^filter\\..*\\.(process|smudge|required)$"],
+        ["--no-optional-locks", "-c", "core.longpaths=true", "config", "--null", "--get-regexp", "^filter\\..*\\.(process|smudge|clean|required)$"],
         this.#budgets.filterInspectionTimeoutMs,
         this.#budgets.filterInspectionOutputBytes,
         signal

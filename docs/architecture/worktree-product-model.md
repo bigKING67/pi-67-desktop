@@ -380,6 +380,8 @@ Renderer 是跨 Main 与 Agent Host 的产品流程协调者，但不拥有 Git 
   Preload 暴露 URL、路径或 Git 输出。新 Worktree 只会自动尝试已存在于同一 Git common-dir 的
   top-level Submodule object：逐项覆盖到已验证的本地 module source，`--no-fetch`，并禁用 HTTP、
   HTTPS、SSH 和 Git transport。普通 `submodule update` 可能重新 clone，因此不能作为“本地优先”。
+  本地补齐的普通 process failure 可保留 incomplete；若错误明确标记 cleanup unconfirmed，必须
+  终止创建并持久化 indeterminate/fence，不得降级为“待联网补齐”后继续注册 Workspace。
 - 需要网络的 Submodule 只在用户点击“联网补齐”后运行；该动作仍禁用交互式 credential prompt，
   不自动写 Git config，也不把失败伪装成完整。divergent 或 conflicted 状态不通过网络动作覆盖。
 - 缺失恢复只适用于 durable binding 标记为 app-owned、创建记录已 `committed`、source Workspace
@@ -403,8 +405,11 @@ Renderer 是跨 Main 与 Agent Host 的产品流程协调者，但不拥有 Git 
 
 - 使用 Main-owned empty hooks directory 覆盖 `core.hooksPath`，禁止 checkout hook。
 - 设置 `GIT_LFS_SKIP_SMUDGE=1`，Phase 1 不允许 Worktree 创建隐式下载 LFS 内容。
-- preflight 检查 configured filter process。已知 LFS 以 pointer-file 状态继续并显式提示；未知
-  custom filter 默认阻止 mutation，后续可增加单次确认和更强隔离。
+- preflight 以 NUL 分隔读取 configured filter 的 process/smudge/clean/required，保留命令值内的
+  换行。已知 LFS 仅接受当前 `git lfs install` 的标准命令和 `--skip-smudge` 形式（空命令表示
+  禁用）；不能只凭 `lfs` 名称放行。包装脚本、非标准命令或 Shell 拼接按 custom filter 阻止
+  mutation，不修改用户 Git config。已知 LFS 以 pointer-file 状态继续并显式提示；其他 custom
+  filter 默认阻止 mutation，后续可增加单次确认和更强隔离。
 - 不运行 remote fetch/pull，不解析远端 branch，不安装依赖。
 - `safe.directory` 只允许对 native-picker 已信任的 exact Workspace 做单次进程内 `-c` override，
   不写 global/system Git config。

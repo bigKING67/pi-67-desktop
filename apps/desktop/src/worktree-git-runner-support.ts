@@ -164,17 +164,30 @@ export function parseHeadSha(output: string, stage: GitInspectionStage): string 
 
 export function parseConfiguredFilters(output: string): GitFilterInspection {
   const names = new Set<string>();
-  for (const line of output.split(/\r?\n/u)) {
-    if (line.length === 0) continue;
-    const match = /^filter\.([A-Za-z0-9._-]{1,128})\.(?:process|smudge|required)(?:\s|$)/u.exec(line);
-    if (!match?.[1]) throw new GitInspectionError("filters", "invalid-output");
+  const unknown = new Set<string>();
+  for (const entry of output.split("\0")) {
+    if (entry.length === 0) continue;
+    const separator = entry.indexOf("\n");
+    const key = separator < 0 ? entry : entry.slice(0, separator);
+    const value = separator < 0 ? "" : entry.slice(separator + 1);
+    const match = /^filter\.([A-Za-z0-9._-]{1,128})\.(process|smudge|clean|required)$/u.exec(key);
+    if (!match?.[1] || !match[2]) throw new GitInspectionError("filters", "invalid-output");
     names.add(match[1]);
+    if (match[1] !== "lfs" || !isKnownLfsFilter(match[2], value)) unknown.add(match[1]);
   }
-  const values = [...names].sort((left, right) => left.localeCompare(right));
   return {
-    lfsConfigured: values.includes("lfs"),
-    unknownFilterNames: values.filter((name) => name !== "lfs")
+    lfsConfigured: names.has("lfs"),
+    unknownFilterNames: [...unknown].sort((left, right) => left.localeCompare(right))
   };
+}
+
+function isKnownLfsFilter(property: string, value: string): boolean {
+  // Exact command forms emitted by Git LFS install, including --skip-smudge.
+  // Never normalize shell syntax or split a multiline command into separate entries.
+  if (property === "required" || value === "") return true;
+  if (property === "clean") return value === "git-lfs clean -- %f";
+  if (property === "smudge") return value === "git-lfs smudge -- %f" || value === "git-lfs smudge --skip -- %f";
+  return value === "git-lfs filter-process" || value === "git-lfs filter-process --skip";
 }
 
 export function assertMutationIdentity(input: {
