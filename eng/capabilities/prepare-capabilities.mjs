@@ -237,8 +237,9 @@ async function prepareWorkspaceResources(sourceRoot, source, skillPackOverlays) 
   );
 }
 
-async function prepareOpenVikingPiExtension(sourceRoot, source) {
-  const destination = join(outputRoot, "packages", source.id);
+export async function prepareOpenVikingPiExtension(
+  sourceRoot, source, destination = join(outputRoot, "packages", source.id)
+) {
   await copyAllowed(sourceRoot, destination, [
     "UPSTREAM.md",
     "archive-tool-support.ts",
@@ -257,6 +258,7 @@ async function prepareOpenVikingPiExtension(sourceRoot, source) {
     "recall-tool-policy.ts",
     "recall-tool-support.ts",
     "runtime-privacy.ts",
+    "scoped-pending-queue.ts",
     "shared",
     "sync.ts",
     "takeover.ts",

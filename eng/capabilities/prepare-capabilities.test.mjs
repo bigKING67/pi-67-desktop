@@ -13,10 +13,23 @@ import {
 } from "./prepared-capabilities-validation.mjs";
 import { assertPi67SkillPackSource } from "./pi67-skill-pack-overlay.mjs";
 import { assertPreparedLocalModuleClosure } from "./prepared-module-closure.mjs";
+import { prepareOpenVikingPiExtension } from "./prepare-capabilities.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 
 describe("Desktop first-party capability source lock", () => {
+  it("prepares the actual OpenViking runtime with its complete imported module graph", async () => {
+    const destination = await mkdtemp(join(tmpdir(), "pi67-openviking-prepared-"));
+    try {
+      const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
+      const definition = lock.sources.find((source) => source.id === "openviking-pi-extension");
+      await prepareOpenVikingPiExtension(resolve(root, definition.internalPath), definition, destination);
+      await assertPreparedLocalModuleClosure(destination, "index.ts");
+    } finally {
+      await rm(destination, { recursive: true, force: true });
+    }
+  });
+
   it("excludes only reinstallable node_modules from internal source hashes", async () => {
     const source = await mkdtemp(join(tmpdir(), "pi67-capability-source-hash-"));
     try {
