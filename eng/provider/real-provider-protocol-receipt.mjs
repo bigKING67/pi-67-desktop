@@ -216,17 +216,6 @@ export async function installProtocolReceiptProbe(page) {
   });
 }
 
-export async function waitForRealProviderControlResponse(page, type, timeoutMs = 30_000) {
-  if (!CONTROL_RESPONSE_TYPES.has(type)) {
-    throw new Error(`Unsupported Provider control response type: ${String(type)}.`);
-  }
-  await page.waitForFunction(
-    (expectedType) => globalThis.__pi67ProviderLongTurnProbe?.controlResponses?.[expectedType] === true,
-    type,
-    { timeout: timeoutMs }
-  );
-}
-
 export async function waitForRealProviderApprovalRequest(page, timeoutMs = 10_000) {
   await page.waitForFunction(
     () => globalThis.__pi67ProviderLongTurnProbe?.approval !== undefined,

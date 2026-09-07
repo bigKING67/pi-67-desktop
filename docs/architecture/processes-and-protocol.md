@@ -601,7 +601,9 @@ reach the selected live projection.
 Formal Workbench identity is `workspaceId + sessionFileIdentity`; `sessionId` remains a Pi business
 check and `sessionPath` remains a display/open locator. Workbench persistence v4 therefore accepts
 the opaque physical identity emitted by the authoritative Snapshot even though its internal format
-may contain separators. It persists live Runtime recovery without consulting the disposable Catalog.
+may contain separators. Task context, running Operation, accepted and settled receipts all use
+the existing `MAX_SESSION_FILE_IDENTITY_CHARS` bound for this field; other protocol identifiers
+retain their own bounds, and the envelope byte limit is unchanged. It persists live Runtime recovery without consulting the disposable Catalog.
 The v3 migration never promotes a path-only formal record into physical identity: it drops formal
 runtime recovery and falls back to the Workspace surface, while retaining a provisional selection
 only when a matching durable `creationId` recovery record exists. Catalog reconciliation may update

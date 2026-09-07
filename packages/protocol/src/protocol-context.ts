@@ -1,3 +1,4 @@
+import { MAX_SESSION_FILE_IDENTITY_CHARS } from "@pi67/domain";
 import { strictObject, Type, Value } from "./typebox-schema.js";
 import type { AgentCommandType } from "./agent-messages.js";
 
@@ -49,7 +50,7 @@ export const TaskProtocolContextWithSessionSchema = strictObject({
   taskId: ProtocolIdentifierSchema,
   taskGeneration: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
   sessionId: ProtocolIdentifierSchema,
-  sessionFileIdentity: ProtocolIdentifierSchema,
+  sessionFileIdentity: Type.String({ minLength: 1, maxLength: MAX_SESSION_FILE_IDENTITY_CHARS }),
   sessionGeneration: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
   operationId: Type.Optional(ProtocolIdentifierSchema)
 });
