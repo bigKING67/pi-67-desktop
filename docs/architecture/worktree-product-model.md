@@ -266,7 +266,9 @@ interface WorkbenchStateV5 extends Omit<WorkbenchStateV4, "version"> {
 - 最大 Workspace 数继续是 100；active/recovery mutation record 建议最大 32；
 - corrupt/future-version/quarantine 继续沿用现有 Workbench store 合同。成功的 corrupt reset 必须先
   持久化空 V5 状态再返回，避免下一次 load/update 重新迁移保留的旧版 Workspace 注册；
-  隔离文件和旧版文件继续保留，重置写入失败必须向调用方报错。
+  隔离文件和旧版文件继续保留，重置写入失败必须向调用方报错。当前状态缺失时，按 V5→V1
+  优先级检查状态及其隔离记录；某版本状态缺失但已有隔离记录时先完成空 V5 重置，
+  不继续向更旧版本迁移。有效的更高版本状态优先于低版本隔离记录；不读取隔离内容。
 
 ### 7.2 Worktree Catalog
 

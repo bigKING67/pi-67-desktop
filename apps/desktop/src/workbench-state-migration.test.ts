@@ -1,4 +1,4 @@
-import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -7,7 +7,9 @@ import {
   LEGACY_WORKBENCH_STATE_V3_FILENAME,
   LEGACY_WORKBENCH_STATE_V4_FILENAME,
   WORKBENCH_STATE_DIRECTORY,
-  WORKBENCH_STATE_FILENAME
+  WORKBENCH_STATE_FILENAME,
+  WorkbenchStateStore,
+  createEmptyWorkbenchState
 } from "./workbench-state.js";
 import {
   cleanupWorkbenchStateTestRoots,
@@ -71,6 +73,75 @@ describe("Workbench state migration", () => {
     expect((await store.update((state) => state)).workspaces).toEqual([]);
     expect((await workbenchStateTestStore(userData).load()).state.workspaces).toEqual([]);
     expect(await readdir(directory)).toContain(LEGACY_WORKBENCH_STATE_V4_FILENAME);
+  });
+
+  it("resumes an interrupted reset before considering retained legacy state", async () => {
+    const userData = await temporaryWorkbenchStateRoot();
+    const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
+    await mkdir(directory);
+    const legacyPath = join(directory, LEGACY_WORKBENCH_STATE_V4_FILENAME);
+    const workspace = workbenchDescriptorFixture("old-workspace", "/workspace/old", "34");
+    const legacy = JSON.stringify({
+      version: 4, workspaces: [workspace], workspaceOrder: [workspace.id],
+      expandedWorkspaceIds: [], runtimeRecovery: [], sessionCreationRecovery: [],
+      settings: { section: "general", scope: "global" }, cleanExit: true
+    });
+    await writeFile(legacyPath, legacy);
+    await writeFile(join(directory, WORKBENCH_STATE_FILENAME), "{broken");
+    let tokens = 0;
+    const interrupted = new WorkbenchStateStore(userData, {
+      now: () => 1_700_000_000_000,
+      createToken: () => {
+        if (++tokens === 2) throw new Error("injected reset write interruption");
+        return "interrupted";
+      }
+    });
+    await expect(interrupted.load()).rejects.toThrow("injected reset write interruption");
+    expect(await readdir(directory)).not.toContain(WORKBENCH_STATE_FILENAME);
+    const recovered = await workbenchStateTestStore(userData).load();
+    expect(recovered.recovery?.kind).toBe("corrupt-reset");
+    expect(recovered.state.workspaces).toEqual([]);
+    expect((await workbenchStateTestStore(userData).load()).state.workspaces).toEqual([]);
+    expect(await readFile(legacyPath, "utf8")).toBe(legacy);
+    expect(await readFile(join(directory, "state-v5.corrupt-1700000000000-interrupted.json"), "utf8"))
+      .toBe("{broken");
+  });
+
+  it.each([1, 2, 3, 4, 5])("resumes a missing V%i state with quarantine evidence", async (version) => {
+    const userData = await temporaryWorkbenchStateRoot();
+    const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
+    await mkdir(directory);
+    await writeFile(join(directory, `state-v${version}.corrupt-1700000000000-token.json`), "{broken");
+    expect((await workbenchStateTestStore(userData).load()).recovery?.kind).toBe("corrupt-reset");
+    expect((await workbenchStateTestStore(userData).load()).recovery).toBeUndefined();
+  });
+
+  it("prefers a valid higher-version state over older quarantine evidence", async () => {
+    const userData = await temporaryWorkbenchStateRoot();
+    const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
+    await mkdir(directory);
+    const workspace = workbenchDescriptorFixture("retained-workspace", "/workspace/retained", "35");
+    await writeFile(join(directory, LEGACY_WORKBENCH_STATE_V4_FILENAME), JSON.stringify({
+      version: 4, workspaces: [workspace], workspaceOrder: [workspace.id],
+      expandedWorkspaceIds: [], runtimeRecovery: [], sessionCreationRecovery: [],
+      settings: { section: "general", scope: "global" }, cleanExit: true
+    }));
+    await writeFile(join(directory, "state-v3.corrupt-1700000000000-token.json"), "{broken");
+    const store = workbenchStateTestStore(userData);
+    expect((await store.load()).state.workspaces).toEqual([workspace]);
+    await writeFile(join(directory, "state-v5.corrupt-1700000000000-token.json"), "{broken");
+    expect((await store.load()).state.workspaces).toEqual([workspace]);
+  });
+
+  it("does not treat unrelated files as reset evidence", async () => {
+    const userData = await temporaryWorkbenchStateRoot();
+    const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
+    await mkdir(directory);
+    await writeFile(join(directory, ".state-v5.json.123.token.tmp"), "{partial");
+    await writeFile(join(directory, "unrelated.corrupt-1700000000000-token.json"), "{broken");
+    expect(await workbenchStateTestStore(userData).load()).toEqual({
+      state: createEmptyWorkbenchState(), recovery: { kind: "initialized" }
+    });
   });
 
   it("migrates V2 layout metadata while clearing every legacy recovery shell", async () => {

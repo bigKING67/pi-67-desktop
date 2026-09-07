@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { realpath } from "node:fs";
-import { chmod, lstat, mkdir, open, rename, unlink } from "node:fs/promises";
+import { chmod, lstat, mkdir, open, opendir, rename, unlink } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import {
@@ -88,6 +88,8 @@ export class WorkbenchStateStore {
   }
 
   async #loadLegacyOrEmpty(directory: string): Promise<WorkbenchLoadResult> {
+    const quarantinedVersion = await this.#highestQuarantinedVersion(directory);
+    if (quarantinedVersion >= 5) return this.#resumeCorruptReset();
     const legacyV4Path = join(directory, LEGACY_WORKBENCH_STATE_V4_FILENAME);
     const legacyV4 = await this.#readStateFile(legacyV4Path);
     if (legacyV4.kind !== "missing") {
@@ -103,6 +105,7 @@ export class WorkbenchStateStore {
       return { state: structuredClone(migrated), recovery: { kind: "migrated-v4" } };
     }
 
+    if (quarantinedVersion >= 4) return this.#resumeCorruptReset();
     const legacyV3Path = join(directory, LEGACY_WORKBENCH_STATE_V3_FILENAME);
     const legacyV3 = await this.#readStateFile(legacyV3Path);
     if (legacyV3.kind !== "missing") {
@@ -118,6 +121,7 @@ export class WorkbenchStateStore {
       return { state: structuredClone(migrated), recovery: { kind: "migrated-v3" } };
     }
 
+    if (quarantinedVersion >= 3) return this.#resumeCorruptReset();
     const legacyV2Path = join(directory, LEGACY_WORKBENCH_STATE_V2_FILENAME);
     const legacyV2 = await this.#readStateFile(legacyV2Path);
     if (legacyV2.kind !== "missing") {
@@ -133,9 +137,11 @@ export class WorkbenchStateStore {
       return { state: structuredClone(migrated), recovery: { kind: "migrated-v2" } };
     }
 
+    if (quarantinedVersion >= 2) return this.#resumeCorruptReset();
     const legacyPath = join(directory, LEGACY_WORKBENCH_STATE_FILENAME);
     const legacy = await this.#readStateFile(legacyPath);
     if (legacy.kind === "missing") {
+      if (quarantinedVersion >= 1) return this.#resumeCorruptReset();
       return { state: createEmptyWorkbenchState(), recovery: { kind: "initialized" } };
     }
     if (legacy.kind === "invalid") return this.#quarantineCorruptState(legacyPath);
@@ -149,6 +155,23 @@ export class WorkbenchStateStore {
     await this.#writeUnlocked(migrated);
     if (process.platform !== "win32") await chmod(legacyPath, 0o600);
     return { state: structuredClone(migrated), recovery: { kind: "migrated-v1" } };
+  }
+
+  async #highestQuarantinedVersion(directory: string): Promise<number> {
+    let version = 0;
+    for await (const entry of await opendir(directory)) {
+      // Names are reset evidence only; never open quarantined files or follow their links.
+      const match = /^state-v([1-5])\.corrupt-[0-9]+-.+\.json$/u.exec(entry.name);
+      if (match) version = Math.max(version, Number(match[1]));
+      if (version === WORKBENCH_STATE_VERSION) break;
+    }
+    return version;
+  }
+
+  async #resumeCorruptReset(): Promise<WorkbenchLoadResult> {
+    const state = createEmptyWorkbenchState();
+    await this.#writeUnlocked(state);
+    return { state, recovery: { kind: "corrupt-reset" } };
   }
 
   async #readStateFile(path: string): Promise<
