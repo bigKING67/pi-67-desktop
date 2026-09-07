@@ -84,6 +84,8 @@ Session 主链路仍可用，再证明 Worktree 增量路径。
 - app-owned Worktree 创建、Workspace 注册、Session materialization 和首次 Prompt 形成可恢复事务。
 - Session 已物化后的 `session-bound` / `committed` 回执只推进环境创建记录，不把 Session runtime
   改写为 starting；恢复得到的 stopped Session 保持等待显式打开，运行态继续由 Session/Host 投影负责。
+- Session exact-owner 合并删除恢复占位前，必须将其 Worktree 环境创建身份转交给没有该身份的
+  目标 Task，供后续环境提交定位；相同身份保留目标已有进度，不同创建身份保留双方 Task/草稿并拒绝合并。
 - 已有对话可以 Fork 到当前 Workspace 或新的隔离 Worktree。
 - Worktree 在导航、对话标题区和删除确认中始终可辨认。
 - 崩溃、窗口 reload、Host replacement、Git timeout 和局部持久化失败后不重复创建、不静默丢分支、

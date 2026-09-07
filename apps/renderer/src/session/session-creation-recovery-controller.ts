@@ -89,6 +89,14 @@ export async function recheckUnconfirmedRendererSession(
     && candidate.sessionId === resolution.sessionId
   ));
   if (existingOwner) {
+    if (
+      current.environmentCreationId
+      && existingOwner.environmentCreationId
+      && current.environmentCreationId !== existingOwner.environmentCreationId
+    ) {
+      notifyUnresolved(options.notify);
+      return "still-unconfirmed";
+    }
     const wasSelected = selectedWorkbenchTask(workbench)?.id === current.id;
     const ownerIsStopped = existingOwner.runtime.phase === "stopped"
       || existingOwner.lifecycle === "stopped";
@@ -119,6 +127,14 @@ export async function recheckUnconfirmedRendererSession(
       workbench.updateTask(existingOwner.id, {
         hasDraft: Boolean(moved?.text.trim()),
         attachmentCount: moved?.attachments.length ?? 0
+      });
+    }
+    if (current.environmentCreationId && !existingOwner.environmentCreationId) {
+      workbench.updateTask(existingOwner.id, {
+        environmentIntent: current.environmentIntent,
+        environmentCreationId: current.environmentCreationId,
+        environmentSourceWorkspaceId: current.environmentSourceWorkspaceId,
+        environmentCreationState: current.environmentCreationState
       });
     }
     workbench.removeRuntimeTask(current.id);
