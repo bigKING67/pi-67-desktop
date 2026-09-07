@@ -353,14 +353,14 @@ export async function dispatchHostCommand(
         return operations.queueForActive(
           command.payload.submissionId,
           fingerprint,
-          () => runtime.steer(command.payload.text, attachments)
+          (signal) => runtime.steer(command.payload.text, attachments, signal)
         );
       }
       if (command.payload.delivery === "follow-up") {
         return operations.queueForActive(
           command.payload.submissionId,
           fingerprint,
-          () => runtime.followUp(command.payload.text, attachments)
+          (signal) => runtime.followUp(command.payload.text, attachments, signal)
         );
       }
       return operations.accept({

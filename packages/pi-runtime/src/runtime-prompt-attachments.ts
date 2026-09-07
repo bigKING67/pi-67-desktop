@@ -45,7 +45,7 @@ export class RuntimePromptAttachments {
     signal?.throwIfAborted();
     const images = await this.images(attachments);
     signal?.throwIfAborted();
-    const assistance = await this.prepareVisionAssistance(session, text, attachments, images);
+    const assistance = await this.prepareVisionAssistance(session, text, attachments, images, signal);
     signal?.throwIfAborted();
     if (attachments) {
       await session.sendCustomMessage(promptAttachmentMessage(attachments), { triggerTurn: false });
@@ -75,28 +75,40 @@ export class RuntimePromptAttachments {
   async steer(
     session: AgentSession,
     text: string,
-    attachments?: PreparedPromptAttachmentSet
+    attachments?: PreparedPromptAttachmentSet,
+    signal?: AbortSignal
   ): Promise<void> {
+    signal?.throwIfAborted();
     const images = await this.images(attachments);
-    const assistance = await this.prepareVisionAssistance(session, text, attachments, images);
+    signal?.throwIfAborted();
+    const assistance = await this.prepareVisionAssistance(session, text, attachments, images, signal);
+    signal?.throwIfAborted();
     if (attachments) {
       await session.sendCustomMessage(promptAttachmentMessage(attachments), { deliverAs: "steer" });
     }
+    signal?.throwIfAborted();
     if (assistance) await this.queueVisionAssistance(session, assistance, "steer");
+    signal?.throwIfAborted();
     await session.steer(text, assistance ? [] : images);
   }
 
   async followUp(
     session: AgentSession,
     text: string,
-    attachments?: PreparedPromptAttachmentSet
+    attachments?: PreparedPromptAttachmentSet,
+    signal?: AbortSignal
   ): Promise<void> {
+    signal?.throwIfAborted();
     const images = await this.images(attachments);
-    const assistance = await this.prepareVisionAssistance(session, text, attachments, images);
+    signal?.throwIfAborted();
+    const assistance = await this.prepareVisionAssistance(session, text, attachments, images, signal);
+    signal?.throwIfAborted();
     if (attachments) {
       await session.sendCustomMessage(promptAttachmentMessage(attachments), { deliverAs: "followUp" });
     }
+    signal?.throwIfAborted();
     if (assistance) await this.queueVisionAssistance(session, assistance, "followUp");
+    signal?.throwIfAborted();
     await session.followUp(text, assistance ? [] : images);
   }
 
@@ -112,13 +124,15 @@ export class RuntimePromptAttachments {
     session: AgentSession,
     text: string,
     attachments: PreparedPromptAttachmentSet | undefined,
-    images: Awaited<ReturnType<PromptAttachmentAccess["readImages"]>>
+    images: Awaited<ReturnType<PromptAttachmentAccess["readImages"]>>,
+    signal?: AbortSignal
   ) {
     if (!attachments || images.length === 0 || session.model?.input.includes("image")) return undefined;
     if (!session.model) {
       throw new RuntimeError("MODEL_NOT_FOUND", "Select a Pi chat model before sending images.");
     }
     const selection = await this.resolveVisionAssistant?.(session.sessionManager.getCwd());
+    signal?.throwIfAborted();
     if (!selection) {
       throw new RuntimeError(
         "UNSUPPORTED",
@@ -165,7 +179,7 @@ export class RuntimePromptAttachments {
           timestamp: Date.now()
         }]
       }, {
-        signal: controller.signal,
+        signal: signal ? AbortSignal.any([controller.signal, signal]) : controller.signal,
         temperature: 0.1,
         maxTokens: Math.min(model.maxTokens, 4_096)
       });

@@ -39,23 +39,31 @@ export class PiRuntimePromptActions {
     if (completed) this.options.generateSemanticTitle();
   }
 
-  async steer(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void> {
+  async steer(text: string, attachments?: PreparedPromptAttachmentSet, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
     await this.options.assertWritable();
+    signal?.throwIfAborted();
     await this.options.configurationReload.assertReady();
+    signal?.throwIfAborted();
     await this.options.promptAttachments.steer(
       this.options.sessionBindings.requireSession(),
       text,
-      attachments
+      attachments,
+      signal
     );
   }
 
-  async followUp(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void> {
+  async followUp(text: string, attachments?: PreparedPromptAttachmentSet, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
     await this.options.assertWritable();
+    signal?.throwIfAborted();
     await this.options.configurationReload.assertReady();
+    signal?.throwIfAborted();
     await this.options.promptAttachments.followUp(
       this.options.sessionBindings.requireSession(),
       text,
-      attachments
+      attachments,
+      signal
     );
   }
 

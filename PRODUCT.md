@@ -1036,6 +1036,11 @@ the only Runtime and behavior specification source.
   Host. The renderer does not infer thinking, Tool use, or interactive-wait state
   from local UI actions, and unknown Provider phases remain generic running state.
 - Steer and follow-up delivery is strictly FIFO and bounded in the Agent Host.
+  Cancelling the owning Operation invalidates in-flight queue preparation before
+  further Session writes or delivery. Slow attachment/visual preparation cannot
+  hold the cancellation terminal or Host recovery notification open; already completed
+  writes are not rolled back. A failed abort may restore the main task, but never
+  revives the cancelled queue preparation.
   The Host admits at most 32 queued delivery commands by default and fails closed
   with `RESOURCE_LIMIT_EXCEEDED` instead of growing an unbounded Promise chain.
   Clearing the queue cancels Host-admitted work that has not reached Pi, waits for

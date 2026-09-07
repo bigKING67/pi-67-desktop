@@ -117,8 +117,8 @@ export interface AgentRuntime {
     attachments?: PreparedPromptAttachmentSet,
     signal?: AbortSignal
   ): Promise<void>;
-  steer(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void>;
-  followUp(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void>;
+  steer(text: string, attachments?: PreparedPromptAttachmentSet, signal?: AbortSignal): Promise<void>;
+  followUp(text: string, attachments?: PreparedPromptAttachmentSet, signal?: AbortSignal): Promise<void>;
   clearQueue(): RuntimeQueueClearResult;
   abort(): Promise<void>;
   selectModel(provider: string, id: string): Promise<SessionModelCatalogResult>;

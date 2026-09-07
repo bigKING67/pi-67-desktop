@@ -214,7 +214,7 @@ export class OperationRegistry {
   async queueForActive(
     submissionId: string,
     fingerprint: string,
-    execute: () => Promise<void>
+    execute: (signal: AbortSignal) => Promise<void>
   ): Promise<OperationSubmissionResult> {
     const existing = this.submissionFor(submissionId, fingerprint);
     if (existing) return await existing;
@@ -248,10 +248,10 @@ export class OperationRegistry {
       return { aborted: false, ...(operationId === undefined ? {} : { operationId }) };
     }
     if (active.terminalLifecycle) {
+      active.queueAbortController?.abort();
       await active.terminalPromise;
       return { aborted: false, operationId: active.view.operationId };
     }
-    // Claim the terminal state before awaiting Pi so a resolving prompt cannot win the race.
     this.active = undefined;
     this.terminating = active;
     try {
@@ -291,6 +291,7 @@ export class OperationRegistry {
     this.active = undefined;
     if (this.terminating?.view.operationId !== operation.view.operationId) this.terminating = operation;
     if (operation.terminalLifecycle) {
+      operation.queueAbortController?.abort();
       await operation.terminalPromise;
       if (this.terminating?.view.operationId === operation.view.operationId) this.terminating = undefined;
       return shutdownResultFor(operation.terminalLifecycle);
@@ -378,7 +379,6 @@ export class OperationRegistry {
     );
     this.active = undefined;
   }
-
   private async restoreAfterAbortFailure(operation: ActiveOperation): Promise<void> {
     this.terminating = undefined;
     if (operation.settled?.kind === "completed") {
@@ -397,9 +397,9 @@ export class OperationRegistry {
       );
       return;
     }
+    delete operation.queueAbortController;
     this.active = operation;
   }
-
   private async poisonAfterAbortTimeout(operation: ActiveOperation): Promise<void> {
     if (this.terminating?.view.operationId !== operation.view.operationId) return;
     this.terminating = undefined;

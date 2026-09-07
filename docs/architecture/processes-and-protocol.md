@@ -347,6 +347,12 @@ Extension command handler 不属于 Agent streaming abort signal，因此 `comma
 deadline 收口；Host 对不可取消 Operation 的 `operation.abort` 返回 `aborted=false`，Renderer 不显示虚假的
 停止按钮。
 
+排队 steer/follow-up 使用独立的 Operation 队列取消信号。用户取消、forced-loss 或失败终态立即
+取消队列执行等待；底层附件读取或视觉辅助即使不响应取消，也不能阻塞终态和 replacement 通知。
+Pi Runtime 在 writable/configuration、附件和视觉准备之后，以及后续 Session 写入与入队之前复核信号；
+迟到 resolve/reject 仍被观察，但不得继续交付。正常完成仍等待已接受队列完成；abort 失败恢复主任务时，
+新队列使用新的取消信号，不复活已取消的旧队列。终态仍必须持久化一次后才发布。
+
 可取消 Operation 的 Pi abort 受 10 秒 watchdog 约束。watchdog 到期不代表底层工作已经停止，因此
 Host 绝不清除保护后继续接收新 Turn：Operation 先进入 `operation.lost`，stream buffer 只 flush 一次，
 Registry 标记为 poisoned，并以 `RUNTIME_POISONED` 结束 abort request。Host 随后发送 recovering status，

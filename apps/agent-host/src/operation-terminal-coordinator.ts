@@ -16,6 +16,7 @@ export interface ActiveOperation {
   terminalPrepared?: boolean;
   terminalLifecycle?: "completed" | "failed" | "cancelled" | "lost";
   terminalPromise?: Promise<boolean>;
+  queueAbortController?: AbortController;
   pendingQueues: Set<Promise<OperationSubmissionResult>>;
   settled?: { kind: "completed" } | { kind: "failed"; error: ProtocolError };
 }
@@ -34,12 +35,14 @@ export class OperationTerminalCoordinator {
   constructor(private readonly options: OperationTerminalCoordinatorOptions) {}
 
   lost(operation: ActiveOperation, reason: string, lostAt: number): Promise<boolean> {
+    operation.queueAbortController?.abort();
     return this.finalize(operation, { lifecycle: "lost", settledAt: lostAt, reason });
   }
 
   finalize(operation: ActiveOperation, details: OperationTerminalDetails): Promise<boolean> {
     if (operation.terminalPromise) return operation.terminalPromise;
     if (operation.terminalLifecycle) return Promise.resolve(false);
+    if (details.lifecycle !== "completed") operation.queueAbortController?.abort();
     operation.terminalLifecycle = details.lifecycle;
     operation.terminalPromise = this.persist(operation, details);
     return operation.terminalPromise;
