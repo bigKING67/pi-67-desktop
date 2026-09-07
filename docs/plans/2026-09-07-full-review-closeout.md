@@ -106,3 +106,12 @@ packaged/macOS/Windows：独立记录已验证与未验证，不由源码门禁�
 
 - 第八批修复Provider认证工具的物理身份上限残留：真实安装的startup receipt监听器仅对sessionFileIdentity使用协议一致的32832上限，普通ID保持512限制。监听函数需要被序列化进Renderer，因此保留自包含数值，由引用domain权威常量的边界回归约束一致性。新增679字符、最大值接受、空/超长物理身份和普通ID越界拒绝7项回归；eng/provider 9文件41/41通过，受影响文件type-aware lint通过。本批为两文件工具局部修复，不改产品协议，不重复全仓门禁；不将监听器fixture通过宣称完整Provider UI或打包认证。
 - 上一批聚合通过后仅清理新增storage文件末尾空行并检查staged diff，不涉及逻辑变化。当前仍需完整Provider UI/打包证据、GAP007专项连接绑定与GAP008真实Windows证据；GAP001-004的自动安全审查中止不通过重试或替代路径绕过。
+
+- RC-GAP-007推进为SOURCE_GAP_CONFIRMED：默认fetch_content预解析校验不返回地址快照，随后globalThis.fetch接收原URL；三个生产Session绑定路径确实使用默认依赖。独立Reviewer同意源码存在未绑定连接目标的缺口，不声明实际利用成功。证据与当前源码摘要`/tmp/pi67-fetch-binding-design-evidence.json`。
+- 已确定下一批整改边界：显式依赖锁中已存在的undici 8.9.0，每个redirect hop独占Agent/custom lookup，仅返回已校验快照；保留原Host/SNI/证书验证与Provider-native fetch，禁止全局dispatcher变更及fallback。DNS等待取消不得产生迟到请求；逐跳body/Agent清理、解压后2MiB、真实socket绑定与TLS、现有native search回归和聚合门禁属于必要验收。直接Agent不继承全局代理；代理支持不在该修复中作已覆盖声明。尚未修改实现或依赖，packaged/Windows仍需独立证据。
+
+- 第九批完成RC-GAP-007的源码与本机连接机制整改：每hop冻结整组公网DNS结果，独占Agent的lookup只返回快照，保留URL Host/SNI和证书验证；DNS等待可取消且迟到结果不派发，响应完成/拒绝/redirect/超限/异常均销毁本hop Agent。Provider-native搜索仍走原fetch；公网内容仅走受约束直连，PRODUCT同步其代理边界。
+- 实际socket实验淘汰Undici8方案：8.9 Agent与Node内置fetch报invalid onRequestStart；配套8 fetch顶层导入又被独立Reviewer验证会覆盖既有v1 dispatcher。最终显式固定锁内已有undici7.28.0（本机Node24.18内置同版本），实际生产模块导入的独立子进程回归保留既有dispatcher；无预设时的默认初始化也由Reviewer独立验证与Node一致。依赖变更仅package声明、lock importer及该snapshot从optional转直接生产依赖，无版本批量更新。
+- 新增7项机制回归，含真实socket与原Host、已关闭连接、gzip解压后2MiB拒绝、读取取消、transport不自动redirect、DNS等待取消无迟到请求、同hostname下一跳变私网被拒绝且旧hop清理；连同既有native search共21/21通过。本机临时CA的真实HTTPS实验验证正确证书/SNI成功及错误hostname证书拒绝，脚本`/tmp/pi67-fetch-tls-smoke.mjs`和日志保留，临时私钥/证书已清理，无外部目标请求。
+- 包typecheck、受影响type-aware lint、runtime构建与编译产物Node导入通过；构建产生23个未跟踪声明文件按精确清单清理。最终`env VITEST_MAX_WORKERS=2 corepack pnpm run check`退出0：704文件通过、3656 tests passed /5 skipped，所有静态与覆盖率门禁通过，日志`/tmp/pi67-fetch-source-gate.log`。独立最终AGREE且无剩余阻断，源码hash绑定`/tmp/pi67-fetch-independent-final.json`。本批为有界原生整改与独立验证，不宣称生成新的canonical VERIFIED或改写原BLOCKED台账。
+- 未执行packaged Electron、Windows、真实代理出口或漏洞利用；源码编译导入不等于Agent Host打包验收。38个无关WIP内容核验保留，PRODUCT仅本批合同hunk进入scoped提交；无push。剩余Provider完整UI/打包、GAP008真实Windows及GAP001-004自动安全审查边界尚未闭合。

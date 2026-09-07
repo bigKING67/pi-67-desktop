@@ -371,7 +371,10 @@ async function executeTool(
     auth: { ok: boolean; apiKey?: string };
   }
 ) {
-  const tool = createFirstPartyWebTools(dependencies).find((candidate) => candidate.name === name);
+  const tool = createFirstPartyWebTools({ ...dependencies, openPublicResponse: async (url, _addresses, signal) => ({
+    response: await dependencies.fetch(url, { method: "GET", redirect: "manual", ...(signal ? { signal } : {}) }),
+    dispose: async () => {}
+  }) }).find((candidate) => candidate.name === name);
   if (!tool) throw new Error(`Missing ${name} Tool.`);
   return tool.execute("test-tool-call", input, signal, undefined, {
     model: context?.model,

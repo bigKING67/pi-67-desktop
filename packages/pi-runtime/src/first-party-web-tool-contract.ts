@@ -1,3 +1,5 @@
+import type { Response as UndiciResponse } from "undici";
+
 export const MAX_SEARCH_QUERIES = 5;
 export const MAX_FETCH_URLS = 5;
 export const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
@@ -23,8 +25,16 @@ export interface SearchResult {
   sourceLabel: string;
 }
 
+export type BoundedResponse = Response | UndiciResponse;
+
+export interface PublicFetchResponse {
+  response: BoundedResponse;
+  dispose(): Promise<void>;
+}
+
 export interface FetchDependencies {
   fetch: typeof globalThis.fetch;
+  openPublicResponse?(url: URL, addresses: readonly string[], signal?: AbortSignal): Promise<PublicFetchResponse>;
   resolveAddresses(hostname: string): Promise<string[]>;
 }
 
@@ -56,7 +66,7 @@ export function nonNegativeInteger(value: unknown): number | undefined {
 }
 
 export async function readBoundedResponseBytes(
-  response: Response,
+  response: BoundedResponse,
   tooLargeMessage: string
 ): Promise<Uint8Array> {
   const declaredLength = Number(response.headers.get("content-length"));

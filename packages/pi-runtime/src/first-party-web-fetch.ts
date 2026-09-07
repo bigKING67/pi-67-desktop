@@ -1,3 +1,4 @@
+import { openPinnedPublicResponse } from "./first-party-web-fetch-transport.js";
 import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import {
@@ -25,30 +26,33 @@ export async function fetchPublicText(
 ): Promise<{ url: string; text: string }> {
   let current = validatePublicHttpUrl(rawUrl);
   for (let redirect = 0; redirect <= 3; redirect += 1) {
-    await assertPublicHostname(current.hostname, (hostname) => dependencies.resolveAddresses(hostname));
-    const response = await dependencies.fetch(current, {
-      method: "GET",
-      headers: { accept: "text/html, text/plain, application/json;q=0.9, */*;q=0.1" },
-      redirect: "manual",
-      ...(signal ? { signal } : {})
-    });
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      if (!location || redirect === 3) {
-        throw new Error("FETCH_REDIRECT_REJECTED: redirect chain is incomplete or too long.");
+    const addresses = await assertPublicHostname(current.hostname, (hostname) => dependencies.resolveAddresses(hostname), signal);
+    signal?.throwIfAborted();
+    const opened = dependencies.openPublicResponse
+      ? await dependencies.openPublicResponse(current, addresses, signal)
+      : await openPinnedPublicResponse(current, addresses, signal);
+    const { response } = opened;
+    try {
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        if (!location || redirect === 3) {
+          throw new Error("FETCH_REDIRECT_REJECTED: redirect chain is incomplete or too long.");
+        }
+        current = validatePublicHttpUrl(new URL(location, current).toString());
+        continue;
       }
-      current = validatePublicHttpUrl(new URL(location, current).toString());
-      continue;
+      if (!response.ok) throw new Error(`FETCH_CONTENT_FAILED: ${current.origin} returned HTTP ${response.status}.`);
+      const bytes = await readBoundedResponseBytes(
+        response,
+        "FETCH_CONTENT_TOO_LARGE: response exceeds the 2 MiB extraction limit."
+      );
+      const decoded = new TextDecoder().decode(bytes);
+      const type = response.headers.get("content-type")?.toLocaleLowerCase("en-US") ?? "";
+      const text = type.includes("html") ? htmlToText(decoded) : decoded;
+      return { url: current.toString(), text: text.slice(0, MAX_RESULT_CHARS) };
+    } finally {
+      await opened.dispose();
     }
-    if (!response.ok) throw new Error(`FETCH_CONTENT_FAILED: ${current.origin} returned HTTP ${response.status}.`);
-    const bytes = await readBoundedResponseBytes(
-      response,
-      "FETCH_CONTENT_TOO_LARGE: response exceeds the 2 MiB extraction limit."
-    );
-    const decoded = new TextDecoder().decode(bytes);
-    const type = response.headers.get("content-type")?.toLocaleLowerCase("en-US") ?? "";
-    const text = type.includes("html") ? htmlToText(decoded) : decoded;
-    return { url: current.toString(), text: text.slice(0, MAX_RESULT_CHARS) };
   }
   throw new Error("FETCH_REDIRECT_REJECTED: redirect chain is too long.");
 }
@@ -77,15 +81,28 @@ function validatePublicHttpUrl(rawUrl: string): URL {
 
 async function assertPublicHostname(
   hostname: string,
-  resolveAddresses: FetchDependencies["resolveAddresses"]
-): Promise<void> {
+  resolveAddresses: FetchDependencies["resolveAddresses"],
+  signal?: AbortSignal
+): Promise<readonly string[]> {
   const normalizedHostname = hostname.startsWith("[") && hostname.endsWith("]")
     ? hostname.slice(1, -1)
     : hostname;
-  const addresses = await resolveAddresses(normalizedHostname);
+  signal?.throwIfAborted();
+  const addresses = await resolveWithCancellation(resolveAddresses(normalizedHostname), signal);
   if (addresses.length === 0 || addresses.some(isPrivateAddress)) {
     throw new Error("FETCH_SSRF_REJECTED: destination resolves to a local, private, reserved, or link-local address.");
   }
+  return Object.freeze([...addresses]);
+}
+
+function resolveWithCancellation(pending: Promise<string[]>, signal?: AbortSignal): Promise<string[]> {
+  if (!signal) return pending;
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(signal.reason);
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
+    pending.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
+  });
 }
 
 const NON_PUBLIC_ADDRESSES = createNonPublicAddressBlockLists();

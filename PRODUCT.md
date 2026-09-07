@@ -593,7 +593,12 @@ the only Runtime and behavior specification source.
   empty-result failures remain visible; Pi-67 never switches Provider or silently
   resends the query through an Extension or third-party search service.
   `fetch_content` rejects URL credentials, non-public DNS
-  results, unsafe redirects, and responses over 2 MiB. Successful search or fetch
+  results, unsafe redirects, and responses over 2 MiB. Each redirect hop uses
+  an isolated direct connection bound to that hop's validated IP snapshot while
+  preserving the original hostname and TLS certificate checks. Public content
+  fetch does not inherit or replace the process-global Provider dispatcher or
+  proxy configuration. Cancellation stops later dispatch even during DNS lookup;
+  response limits apply after decompression. Successful search or fetch
   results receive an in-memory bounded `responseId` for `get_search_content`; the
   reference neither performs a second network request nor broadens Tool authority.
   Recognized irreversible deletion and destructive commands retain exact one-shot
