@@ -1,4 +1,4 @@
-// GENERATED FROM examples/memory-plugin-shared/lib. DO NOT EDIT.
+// Adapted from examples/memory-plugin-shared/lib; Desktop adds runtime write revocation.
 /**
  * Local pending queue for offline resilience.
  *
@@ -332,37 +332,31 @@ export async function cleanStale() {
  * @param {Function} log - logger function
  * @returns {{ replayed: number, failed: number, skipped: number, deferred: number, outcomes: Record<string, string> }}
  */
-export async function replayPending(fetchJSON, log) {
+export async function replayPending(fetchJSON, log, canReplay = () => true) {
   const pending = await listPending();
-
   if (pending.length === 0) {
     return { replayed: 0, failed: 0, skipped: 0, deferred: 0, outcomes: {} };
   }
-
   const replayLimit = getReplayLimit();
   log("pending-queue", { count: pending.length, replayLimit, action: "replay-start" });
-
   let replayed = 0;
   let failed = 0;
   let skipped = 0;
   let deferred = 0;
   let processed = 0;
   const outcomes = {};
-
   for (const { filename, entry } of pending) {
-    if (processed >= replayLimit) {
+    if (!canReplay() || processed >= replayLimit) {
       deferred++;
       outcomes[entry.dedupKey] = "deferred";
       continue;
     }
-
     if ((entry.retries || 0) >= getMaxRetries()) {
       await dequeue(filename);
       skipped++;
       outcomes[entry.dedupKey] = "skipped";
       continue;
     }
-
     const claimedFilename = await claimForReplay(filename);
     if (!claimedFilename) {
       deferred++;
@@ -370,13 +364,18 @@ export async function replayPending(fetchJSON, log) {
       continue;
     }
     processed++;
-
+    if (!canReplay()) {
+      await releaseReplayClaim(claimedFilename);
+      deferred++;
+      outcomes[entry.dedupKey] = "deferred";
+      continue;
+    }
     let res;
     try {
       const encodedSid = encodeURIComponent(entry.sessionId);
       if (entry.type === "createSession" || entry.type === "addMessage") {
         const remote = await remoteOperationState(fetchJSON, entry);
-        if (!remote.known) {
+        if (!canReplay() || !remote.known) {
           await releaseReplayClaim(claimedFilename);
           outcomes[entry.dedupKey] = "deferred";
           deferred += Math.max(1, pending.length - processed + 1);
@@ -411,7 +410,12 @@ export async function replayPending(fetchJSON, log) {
     } catch {
       res = { ok: false };
     }
-
+    if (!res?.ok && !canReplay()) {
+      await releaseReplayClaim(claimedFilename);
+      deferred++;
+      outcomes[entry.dedupKey] = "deferred";
+      continue;
+    }
     if (entry.type === "commitSession") {
       log("pending-queue", {
         action: "commit-replay",
@@ -422,7 +426,6 @@ export async function replayPending(fetchJSON, log) {
         error: res?.ok ? undefined : res?.error?.message || res?.error?.code,
       });
     }
-
     if (res?.ok) {
       await dequeue(claimedFilename);
       replayed++;
@@ -441,9 +444,7 @@ export async function replayPending(fetchJSON, log) {
       }
     }
   }
-
-  const cleaned = await cleanStale();
-
+  const cleaned = canReplay() ? await cleanStale() : 0;
   log("pending-queue", {
     action: "replay-done",
     replayed,
@@ -452,6 +453,5 @@ export async function replayPending(fetchJSON, log) {
     deferred,
     cleaned,
   });
-
   return { replayed, failed, skipped, deferred, outcomes };
 }

@@ -127,6 +127,7 @@ function fakeTransport() {
     client: {
       connected: true,
       fetchJSON,
+      writeJSON: fetchJSON,
       getSession: vi.fn().mockResolvedValue({ pending_tokens: 0 }),
     } as unknown as OVClient,
   };
@@ -134,6 +135,8 @@ function fakeTransport() {
 
 function config(): OVConfig {
   return {
+    enabled: true,
+    privateWriteEnabled: true,
     peerId: "workspace-peer",
     faithfulCapture: true,
     captureAssistantTurns: true,

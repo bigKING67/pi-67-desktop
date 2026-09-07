@@ -105,6 +105,13 @@ export class OVClient {
 
   // ========== Health ==========
 
+  async writeJSON<T>(path: string, init: RequestInit, timeoutMs = 10000): Promise<OVResponse<T>> {
+    if (!this.cfg.enabled || !this.cfg.privateWriteEnabled) {
+      return { ok: false, result: null, error: { code: "PRIVACY_READ_ONLY", message: "Private Memory write authority is unavailable." } };
+    }
+    return this.fetchJSON<T>(path, init, timeoutMs);
+  }
+
   async health(signal?: AbortSignal): Promise<boolean> {
     const res = await this.fetchJSON<any>(
       "/health",
@@ -139,7 +146,7 @@ export class OVClient {
 
   /** POST /api/v1/sessions — create or reuse session */
   async createSession(sessionId: string): Promise<boolean> {
-    const res = await this.fetchJSON<any>("/api/v1/sessions", {
+    const res = await this.writeJSON<any>("/api/v1/sessions", {
       method: "POST",
       body: JSON.stringify({ session_id: sessionId, auto_commit_policy: null }),
     });
@@ -180,7 +187,7 @@ export class OVClient {
 
   /** POST /api/v1/sessions/{id}/messages — add a message (simple text mode) */
   async addMessage(sessionId: string, role: string, content: string): Promise<boolean> {
-    const res = await this.fetchJSON<any>(
+    const res = await this.writeJSON<any>(
       `/api/v1/sessions/${encodeURIComponent(sessionId)}/messages`,
       { method: "POST", body: JSON.stringify({ role, content }) },
       10000,
@@ -190,7 +197,7 @@ export class OVClient {
 
   /** POST /api/v1/sessions/{id}/messages — add a message with parts */
   async addMessageParts(sessionId: string, role: string, parts: any[]): Promise<boolean> {
-    const res = await this.fetchJSON<any>(
+    const res = await this.writeJSON<any>(
       `/api/v1/sessions/${encodeURIComponent(sessionId)}/messages`,
       { method: "POST", body: JSON.stringify({ role, parts }) },
       10000,
@@ -199,7 +206,7 @@ export class OVClient {
   }
 
   async addMessagePayload(sessionId: string, payload: any): Promise<boolean> {
-    const res = await this.fetchJSON<any>(
+    const res = await this.writeJSON<any>(
       `/api/v1/sessions/${encodeURIComponent(sessionId)}/messages`,
       { method: "POST", body: JSON.stringify(payload) },
       10000,
@@ -212,7 +219,7 @@ export class OVClient {
     sessionId: string,
     retention: number | OVCommitRetention = this.cfg.commitKeepRecentCount,
   ): Promise<OVCommitResponse> {
-    const res = await this.fetchJSON<OVCommitResult>(
+    const res = await this.writeJSON<OVCommitResult>(
       `/api/v1/sessions/${encodeURIComponent(sessionId)}/commit`,
       { method: "POST", body: JSON.stringify(buildCommitRequestBody(retention)) },
       30000,
@@ -237,7 +244,7 @@ export class OVClient {
 
   /** DELETE /api/v1/sessions/{id} */
   async deleteSession(sessionId: string): Promise<boolean> {
-    const res = await this.fetchJSON<any>(
+    const res = await this.writeJSON<any>(
       `/api/v1/sessions/${encodeURIComponent(sessionId)}`,
       { method: "DELETE" },
       10000,
@@ -397,7 +404,7 @@ export class OVClient {
 
   /** DELETE /api/v1/fs — remove file or directory */
   async delete(uri: string, recursive = false, signal?: AbortSignal): Promise<boolean> {
-    const res = await this.fetchJSON<any>(
+    const res = await this.writeJSON<any>(
       `/api/v1/fs?uri=${encodeURIComponent(uri)}&recursive=${recursive}`,
       { method: "DELETE", ...(signal ? { signal } : {}) },
       10000,
@@ -413,7 +420,7 @@ export class OVClient {
   ): Promise<{ root_uri: string } | null> {
     const body: Record<string, unknown> = { path };
     if (opts?.to) body.to = opts.to;
-    const res = await this.fetchJSON<{ root_uri: string }>(
+    const res = await this.writeJSON<{ root_uri: string }>(
       "/api/v1/resources",
       { method: "POST", body: JSON.stringify(body) },
       30000,

@@ -9,6 +9,7 @@ export function dequeue(filename: string): Promise<boolean>;
 export function replayPending(
   fetchJSON: (path: string, init?: any) => Promise<{ ok: boolean; status?: number; result?: any; error?: any }>,
   log: (stage: string, data?: any) => void,
+  canReplay?: () => boolean,
 ): Promise<{
   replayed: number;
   failed: number;

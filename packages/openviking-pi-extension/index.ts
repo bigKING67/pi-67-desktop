@@ -79,7 +79,6 @@ export default async function (pi: ExtensionAPI) {
   };
   const takeover = createTakeoverManager({ pi, client, sync, config, log: debugLog });
 
-  // Session state
   let bypassed = false;
   let profileBlock = "";
   let archiveOverview = "";
@@ -92,9 +91,6 @@ export default async function (pi: ExtensionAPI) {
     profileBlock = "";
     archiveOverview = "";
   });
-
-  // ================================================================
-  // ================================================================
 
   const start = async (ctx: any): Promise<void> => {
     const sessionCwd = typeof ctx?.sessionManager?.getCwd === "function" ? ctx.sessionManager.getCwd() : "";
@@ -142,16 +138,18 @@ export default async function (pi: ExtensionAPI) {
         : [];
       if (config.takeoverEnabled) takeover.restore(branch);
       sync.restore(branch, piSessionId, config.takeoverEnabled ? takeover.state.syncedEntryCount : 0);
-      const ok = await sync.ensureSession(piSessionId);
-      if (!ok) {
-        emitContextDiagnostic({ kind: "context.healthChanged", privacyMode: config.privacyMode,
-          state: "degraded", reason: "session-create-failed" });
-        if (config.logLevel === "info") ctx.ui.notify(
-          "OpenViking: Session 暂不可用，Pi 已继续运行", "warning",
-        );
-        return;
+      if (config.privateWriteEnabled) {
+        const ok = await sync.ensureSession(piSessionId);
+        if (!ok) {
+          emitContextDiagnostic({ kind: "context.healthChanged", privacyMode: config.privacyMode,
+            state: "degraded", reason: "session-create-failed" });
+          if (config.logLevel === "info") ctx.ui.notify(
+            "OpenViking: Session 暂不可用，Pi 已继续运行", "warning",
+          );
+          return;
+        }
+        await sync.replayPending();
       }
-      await sync.replayPending();
 
       // Profile injection
       profileBlock = await buildSessionProfileBlock(client, config);
@@ -190,7 +188,7 @@ export default async function (pi: ExtensionAPI) {
     const branch = typeof ctx.sessionManager.getBranch === "function"
       ? ctx.sessionManager.getBranch()
       : [];
-    if (await sync.alignBranch(branch)) {
+    if (config.privateWriteEnabled && await sync.alignBranch(branch)) {
       archiveOverview = "";
       compacted = false;
     }
@@ -290,7 +288,7 @@ export default async function (pi: ExtensionAPI) {
 
   // --- session_before_compact ---
   pi.on("session_before_compact", async (event, _ctx) => {
-    if (!refreshRuntimePrivacy() || !client.connected || bypassed) return;
+    if (!refreshRuntimePrivacy() || !config.privateWriteEnabled || !client.connected || bypassed) return;
 
     if (config.takeoverEnabled) {
       const prep = (event as any)?.preparation ?? {};
@@ -314,7 +312,8 @@ export default async function (pi: ExtensionAPI) {
 
   // --- session_shutdown ---
   pi.on("session_shutdown", async (_event, _ctx) => {
-    if (!refreshRuntimePrivacy() || !client.connected || bypassed) return;
+    recall.invalidate();
+    if (!refreshRuntimePrivacy() || !config.privateWriteEnabled || !client.connected || bypassed) return;
 
     await sync.shutdown();
     if (config.takeoverEnabled) {
@@ -322,7 +321,6 @@ export default async function (pi: ExtensionAPI) {
     } else {
       await sync.commit();
     }
-    recall.invalidate();
   });
 
   // --- agent_end ---
@@ -332,9 +330,7 @@ export default async function (pi: ExtensionAPI) {
     recall.invalidate();
   });
 
-  // ================================================================
   // Commands
-  // ================================================================
 
   pi.registerCommand("viking", {
     description: "OpenViking status and commit operations. Current prompts recall automatically; Tools provide bounded deep retrieval.",
@@ -349,6 +345,10 @@ export default async function (pi: ExtensionAPI) {
       }
 
       if (args?.trim() === "commit") {
+        if (!config.privateWriteEnabled) {
+          ctx.ui.notify("OpenViking: commit is unavailable in read-only mode", "warning");
+          return;
+        }
         await sync.shutdown();
         const commitResult = config.takeoverEnabled ? null : await sync.commit();
         const ok = config.takeoverEnabled

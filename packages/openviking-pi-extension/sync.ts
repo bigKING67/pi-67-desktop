@@ -93,6 +93,7 @@ export class SyncManager {
   }
 
   async ensureSession(piSessionId: string): Promise<boolean> {
+    if (!this.config.enabled || !this.config.privateWriteEnabled) return false;
     if (!this.sourcePiSessionId) this.sourcePiSessionId = piSessionId;
     if (this.sourcePiSessionId !== piSessionId) return false;
     this.ovSessionId ??= deriveHarnessSessionId("pi-", piSessionId);
@@ -107,10 +108,13 @@ export class SyncManager {
   }
 
   async replayPending(): Promise<ReplayResult> {
-    if (!this.client.connected) return emptyReplayResult();
+    if (!this.client.connected || !this.config.enabled || !this.config.privateWriteEnabled) return emptyReplayResult();
     return replayPending(
-      (path: string, init?: any) => this.client.fetchJSON(path, init, 10000),
+      (path: string, init?: any) => init?.method === "POST"
+        ? this.client.writeJSON(path, init, 10000)
+        : this.client.fetchJSON(path, init, 10000),
       (stage: string, data: unknown) => debugLog(`${stage}: ${JSON.stringify(data)}`),
+      () => this.config.enabled && this.config.privateWriteEnabled,
     );
   }
 
@@ -179,7 +183,7 @@ export class SyncManager {
   }
 
   async addPayload(payload: any): Promise<AddPayloadResult> {
-    if (!this.ovSessionId) return { accepted: false, delivered: false };
+    if (!this.ovSessionId || !this.config.enabled || !this.config.privateWriteEnabled) return { accepted: false, delivered: false };
     const queued = await enqueue("addMessage", this.ovSessionId, payload);
     if (!queued.ok) return { accepted: false, delivered: false };
     const replay = this.client.connected ? await this.replayPending() : emptyReplayResult();
@@ -205,7 +209,7 @@ export class SyncManager {
     const result = response.result;
     if (!result) {
       debugLog(`commit: session=${this.ovSessionId} ok=false status=${response.status ?? 0} trace_id=${response.traceId || "none"} error=${response.error?.message || response.error?.code || "unknown"}`);
-      if (opts.queueOnFailure !== false) {
+      if (opts.queueOnFailure !== false && this.config.enabled && this.config.privateWriteEnabled) {
         await enqueue("commitSession", this.ovSessionId, buildCommitRequestBody(retention));
       }
       return null;
