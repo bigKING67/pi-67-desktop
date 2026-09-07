@@ -1,13 +1,6 @@
-/**
- * Pi OpenViking Extension
- *
- * Integrates pi with an OpenViking context database for persistent,
- * cross-session memory. Syncs conversation turns to OV, recalls relevant
- * context for every current prompt, exposes Tools for bounded on-demand
- * retrieval, and commits sessions for long-term memory extraction.
- *
- * Design informed by: OpenClaw (synchronous recall), Claude Code plugin
- * (most mature, production-hardened), Hermes (anti-pattern: stale prefetch).
+/** Pi SDK Extension: current-prompt Recall, scoped durable capture and Memory Tools.
+ * OpenViking owns storage; Pi owns Session history and lifecycle.
+ * Design references: OpenClaw recall, Claude Code plugin, Hermes lifecycle lessons.
  */
 import type { ExtensionAPI } from "@pi67/pi-runtime/pi-sdk-types";
 import { appendFileSync, mkdirSync } from "node:fs";
@@ -78,7 +71,6 @@ export default async function (pi: ExtensionAPI) {
     }
   };
   const takeover = createTakeoverManager({ pi, client, sync, config, log: debugLog });
-
   let bypassed = false;
   let profileBlock = "";
   let archiveOverview = "";
@@ -86,17 +78,19 @@ export default async function (pi: ExtensionAPI) {
   let compacted = false;
   let started = false;
   let startPromise: Promise<void> | null = null;
-  const refreshRuntimePrivacy = createRuntimePrivacyGuard(config, import.meta.url, () => {
+  const invalidateMemoryContext = () => {
     recall.invalidate();
     profileBlock = "";
     archiveOverview = "";
-  });
+  };
+  const refreshRuntimePrivacy = createRuntimePrivacyGuard(config, import.meta.url, invalidateMemoryContext);
 
   const start = async (ctx: any): Promise<void> => {
     const sessionCwd = typeof ctx?.sessionManager?.getCwd === "function" ? ctx.sessionManager.getCwd() : "";
     // Rebind reused Extension instances before lifecycle fast paths.
     bindWorkspacePeer(config, sessionCwd);
     client.setPeerId(config.peerId);
+    if (started && sync.blockedReason) invalidateMemoryContext();
     if (started) return;
     if (startPromise) return startPromise;
 
@@ -123,6 +117,15 @@ export default async function (pi: ExtensionAPI) {
         toolsRegistered = true;
       }
 
+      // Restore and anchor ownership before health so an outage cannot leave new history unbound.
+      const piSessionId = ctx.sessionManager.getSessionId();
+      const branch = typeof ctx.sessionManager.getBranch === "function"
+        ? ctx.sessionManager.getBranch()
+        : [];
+      if (config.takeoverEnabled) takeover.restore(branch);
+      sync.restore(branch, piSessionId, config.takeoverEnabled ? takeover.state.syncedEntryCount : 0);
+      if (config.privateWriteEnabled) sync.anchorScope();
+
       // Health check
       if (!await client.ensureConnected(true)) {
         if (config.logLevel === "info") {
@@ -131,21 +134,15 @@ export default async function (pi: ExtensionAPI) {
         return;
       }
 
-      // Ensure OV session
-      const piSessionId = ctx.sessionManager.getSessionId();
-      const branch = typeof ctx.sessionManager.getBranch === "function"
-        ? ctx.sessionManager.getBranch()
-        : [];
-      if (config.takeoverEnabled) takeover.restore(branch);
-      sync.restore(branch, piSessionId, config.takeoverEnabled ? takeover.state.syncedEntryCount : 0);
       if (config.privateWriteEnabled) {
         const ok = await sync.ensureSession(piSessionId);
         if (!ok) {
           emitContextDiagnostic({ kind: "context.healthChanged", privacyMode: config.privacyMode,
-            state: "degraded", reason: "session-create-failed" });
+            state: "degraded", reason: sync.blockedReason ?? "session-create-failed" });
           if (config.logLevel === "info") ctx.ui.notify(
-            "OpenViking: Session 暂不可用，Pi 已继续运行", "warning",
+            sync.blockedReason ? "OpenViking: 历史记忆归属无法验证，请新建 Session；旧数据已保留" : "OpenViking: Session 暂不可用，Pi 已继续运行", "warning",
           );
+          started = Boolean(sync.blockedReason);
           return;
         }
         await sync.replayPending();
@@ -183,7 +180,7 @@ export default async function (pi: ExtensionAPI) {
     // session_start doesn't fire for pi -c continuations.
     await start(ctx);
 
-    if (!refreshRuntimePrivacy() || bypassed || !await client.ensureConnected()) return;
+    if (!refreshRuntimePrivacy() || sync.blockedReason || bypassed || !await client.ensureConnected()) return;
 
     const branch = typeof ctx.sessionManager.getBranch === "function"
       ? ctx.sessionManager.getBranch()
@@ -211,7 +208,8 @@ export default async function (pi: ExtensionAPI) {
 
   // --- context ---
   pi.on("context", async (event, _ctx) => {
-    if (!refreshRuntimePrivacy()) {
+    if (!refreshRuntimePrivacy() || sync.blockedReason) {
+      invalidateMemoryContext();
       return { messages: recall.injectContext(event.messages as any, []) };
     }
     if (!client.connected || bypassed) return;
@@ -227,7 +225,8 @@ export default async function (pi: ExtensionAPI) {
       });
     }
     const recallResult = await recall.searchPending();
-    if (!refreshRuntimePrivacy()) {
+    if (!refreshRuntimePrivacy() || sync.blockedReason) {
+      invalidateMemoryContext();
       return { messages: recall.injectContext(event.messages as any, []) };
     }
     if (recallWasPending) {
@@ -278,10 +277,12 @@ export default async function (pi: ExtensionAPI) {
     emitContextDiagnostic({
       kind: "context.captureCompleted",
       privacyMode: config.privacyMode,
-      state: result.allDelivered ? "delivered" : "queued",
+      state: result.blockedReason ? "blocked" : result.allDelivered ? "delivered" : "queued",
+      ...(result.blockedReason ? { reason: result.blockedReason } : {}),
       count: result.added,
     });
     debugLog(`turn_end: synced ${result.added} entries, ~${result.tokens} tokens`);
+    if (result.blockedReason) return;
     await takeover.onTurnSynced(result.tokens);
     updateStatus(ctx, client.connected, result.added, sync.sessionId, config, takeover.state);
   });
@@ -331,7 +332,6 @@ export default async function (pi: ExtensionAPI) {
   });
 
   // Commands
-
   pi.registerCommand("viking", {
     description: "OpenViking status and commit operations. Current prompts recall automatically; Tools provide bounded deep retrieval.",
     handler: async (args, ctx) => {

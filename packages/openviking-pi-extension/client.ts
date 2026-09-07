@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { OVConfig } from "./config.js";
 import type {
   OVCommitResponse,
@@ -45,6 +46,14 @@ export class OVClient {
 
   setPeerId(peerId: string): void {
     this.peerId = peerId;
+  }
+
+  get memoryScopeKey(): string {
+    // Missing actor headers require conservative credential partitioning, not an inferred server identity.
+    return createHash("sha256").update(JSON.stringify([
+      "pi67-memory-outbox-v1", this.baseUrl, this.account, this.user, this.peerId,
+      this.account && this.user ? "" : this.apiKey,
+    ])).digest("hex");
   }
 
   get connected(): boolean {

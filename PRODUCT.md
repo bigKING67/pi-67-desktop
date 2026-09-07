@@ -229,7 +229,14 @@ the only Runtime and behavior specification source.
 - OpenViking capture is outbox-first and lineage-aware. Stable source-message
   identities plus remote preflight prevent crash-window duplicate appends;
   Branch/Fork/Rewind starts a separate OpenViking Session lineage rather than
-  mixing replaced history. One recoverable client connection state restores
+  mixing replaced history. Queue directories, entries and the latest restore
+  watermark bind an immutable Endpoint/Account/User/effective-peer scope. An
+  incomplete actor uses the credential only as an input to the combined scope
+  digest; no credential or separate credential hash is stored. Unscoped legacy
+  queues remain isolated. Historical Sessions with unverified or mismatched
+  scope cannot capture, replay or commit; they require a new empty Session and
+  preserve old data. New Sessions durably anchor scope before their first enqueue.
+  One recoverable client connection state restores
   automatic Recall and Capture after a transient outage without user refresh.
   Environment, `ovcli.conf`, and local server credentials are never field-wise
   combined, and a file credential is accepted only for its matching endpoint.

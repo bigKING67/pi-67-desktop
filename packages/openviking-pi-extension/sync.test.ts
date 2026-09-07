@@ -24,7 +24,7 @@ describe("OpenViking SyncManager lineage and identity", () => {
 
   it("keeps the raw Pi Session identity separate from the derived OpenViking Session ID", async () => {
     const transport = fakeTransport();
-    const sync = new SyncManager(transport.client, config());
+    const sync = new SyncManager(transport.client, config(), { persistEntry: vi.fn() });
     sync.restore([], "pi-jsonl-session-1");
 
     await expect(sync.ensureSession("pi-jsonl-session-1")).resolves.toBe(true);
@@ -39,7 +39,7 @@ describe("OpenViking SyncManager lineage and identity", () => {
     const states: any[] = [];
     const branch = [message("u1", "user", "task"), custom("noise"), message("a1", "assistant", "answer")];
     const first = manager(transport.client, states);
-    first.restore(branch, "pi-session");
+    first.restore([], "pi-session");
     await first.ensureSession("pi-session");
     await expect(first.syncBranch(branch)).resolves.toMatchObject({ added: 2, lineageChanged: false });
     expect(first.syncedCount).toBe(2);
@@ -63,7 +63,7 @@ describe("OpenViking SyncManager lineage and identity", () => {
     const states: any[] = [];
     const original = [message("u1", "user", "task"), message("a1", "assistant", "old answer")];
     const first = manager(transport.client, states);
-    first.restore(original, "pi-session");
+    first.restore([], "pi-session");
     await first.ensureSession("pi-session");
     await first.syncBranch(original);
     const baseSessionId = first.sessionId!;
@@ -126,6 +126,7 @@ function fakeTransport() {
     createBodies,
     client: {
       connected: true,
+      memoryScopeKey: "a".repeat(64),
       fetchJSON,
       writeJSON: fetchJSON,
       getSession: vi.fn().mockResolvedValue({ pending_tokens: 0 }),

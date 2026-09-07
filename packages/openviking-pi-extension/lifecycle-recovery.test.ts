@@ -139,7 +139,7 @@ describe("OpenViking Pi lifecycle recovery", () => {
     expect(requests.some(({ path }) => path === "/api/v1/search/search")).toBe(true);
     expect(requests.filter(({ path, method }) => path.endsWith("/messages") && method === "POST")).toHaveLength(2);
     expect(remoteMessages).toHaveLength(2);
-    expect(persistedEntries.some(({ customType }) => customType === "ov-sync-state-v1")).toBe(true);
+    expect(persistedEntries.some(({ customType }) => customType === "ov-sync-state-v2")).toBe(true);
   });
 
   it("keeps Session creation degradation in diagnostics instead of an error toast", async () => {

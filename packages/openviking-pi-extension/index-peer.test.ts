@@ -47,6 +47,7 @@ vi.mock("./sync.js", () => ({
   SyncManager: class {
     sessionId: string | null = null;
     restore() {}
+    anchorScope = vi.fn(() => true);
     ensureSession = vi.fn(async () => true);
     replayPending = vi.fn(async () => undefined);
     alignBranch = vi.fn(async () => false);

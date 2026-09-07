@@ -213,6 +213,9 @@ export function registerTools(
       if (!await ensureConnected(client, _signal)) {
         return { content: [{ type: "text", text: "OpenViking server is not reachable." }] };
       }
+      if (sync?.blockedReason) {
+        return { content: [{ type: "text", text: "Memory scope cannot be verified for this history. Start a new Session; existing data is preserved." }], details: { stored: false, reason: sync.blockedReason } };
+      }
       // Store as a tagged message directly in OV — the extractor picks up [Remember — ...] prefix
       const category = params.category ?? "general";
       const tagged = `[Remember — ${category}] ${params.content}`;

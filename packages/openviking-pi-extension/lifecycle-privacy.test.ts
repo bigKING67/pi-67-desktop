@@ -3,7 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import openVikingExtension from "./index.js";
-import { enqueue, listPending } from "./shared/pending-queue.mjs";
+import { OVClient } from "./client.js";
+import { loadConfigFromModuleUrl } from "./config.js";
+import { createScopedPendingQueue } from "./scoped-pending-queue.js";
+import { enqueue } from "./shared/pending-queue.mjs";
 
 let root = "";
 afterEach(async () => {
@@ -37,6 +40,7 @@ async function fixture(mode: string, takeover = false) {
     return new Response(JSON.stringify(missingSession ? { status: "error", error: { code: "NOT_FOUND" } } : { status: "ok", result }),
       { status: missingSession ? 404 : 200, headers: { "content-type": "application/json" } });
   }));
+  const queue = createScopedPendingQueue(new OVClient(loadConfigFromModuleUrl(import.meta.url)).memoryScopeKey);
   const handlers = new Map<string, (event: any, ctx: any) => Promise<any>>();
   const commands = new Map<string, any>();
   const tools = new Map<string, any>(); const entries: any[] = []; let branch: any[] = [];
@@ -48,7 +52,7 @@ async function fixture(mode: string, takeover = false) {
     ui: { notify: vi.fn(), setStatus: vi.fn() } };
   const run = (name: string) => handlers.get(name)?.({ prompt: "fixture prompt", systemPrompt: "system", messages: [] }, context);
   const writes = () => requests.filter(({ path, method }) => path.startsWith("/api/v1/sessions") && method !== "GET");
-  return { run, writes, requests, pending, setMode, context, commands, entries, tools, setBranch: (value: any[]) => { branch = value; } };
+  return { run, writes, requests, pending, queue, setMode, context, commands, entries, tools, setBranch: (value: any[]) => { branch = value; } };
 }
 
 describe("OpenViking lifecycle private write authority", () => {
@@ -86,7 +90,7 @@ describe("OpenViking lifecycle private write authority", () => {
 describe("restored lifecycle boundaries", () => {
   it("restores a committed lineage for reads but never realigns, captures, replays or appends in read-only", async () => {
     const f = await fixture("read-only", true);
-    f.setBranch([{type:"custom",customType:"ov-sync-state-v1",data:{version:1,piSessionId:"fixture-session",ovSessionId:"pi-fixture-session__lineage-3",lineage:3,syncedCaptureCount:2,prefixHash:"a".repeat(64)}}]);
+    f.setBranch([{type:"custom",customType:"ov-sync-state-v2",data:{version:2,scopeKey:f.queue.scopeKey,piSessionId:"fixture-session",ovSessionId:"pi-fixture-session__lineage-3",lineage:3,syncedCaptureCount:2,prefixHash:"a".repeat(64)}}]);
     await enqueue("commitSession", "older-session", {});
     const names=await readdir(f.pending);const before=await Promise.all(names.map(n=>readFile(join(f.pending,n),"utf8")));
     await f.run("session_start"); await f.run("before_agent_start"); await f.run("turn_end");
@@ -121,7 +125,7 @@ describe("parallel Tool privacy revocation", () => {
     const before=f.writes().length;release();await write;
     const afterBoundary=f.writes().slice(before);
     expect(afterBoundary).toEqual([]);
-    const pending = await listPending();
+    const pending = await f.queue.listPending();
     expect(pending).toHaveLength(1);
     expect(pending[0]!.entry.retries).toBe(0);
     expect(pending[0]!.entry.payload.content).toContain("fixture outstanding memory");
@@ -155,11 +159,48 @@ describe("revocation while an authorized write is in flight", () => {
       new AbortController().signal, () => {}, f.context);
     release();
     await writing;
-    const pending = await listPending();
+    const pending = await f.queue.listPending();
     if (status === 200) expect(pending).toEqual([]);
     else {
       expect(pending).toHaveLength(1);
       expect(pending[0]!.entry.retries).toBe(0);
     }
+  });
+});
+
+describe("Session ownership through real Extension lifecycle", () => {
+  it("keeps unknown historical scope blocked in capture, manual remember and automatic context", async () => {
+    const f = await fixture("private-learning", true);
+    f.setBranch([{ type: "message", id: "old-message", message: { role: "user", content: "old history" } }]);
+    await f.run("session_start");
+    await f.run("before_agent_start");
+    await f.run("turn_end");
+    const context = await f.run("context");
+    const result = await f.tools.get("viking_remember").execute("blocked-remember", { content: "must-not-capture" },
+      new AbortController().signal, () => {}, f.context);
+    expect(result.details).toMatchObject({ stored: false, reason: "memory-scope-unverified" });
+    expect(context.messages).toEqual([]);
+    expect(f.writes()).toEqual([]);
+    expect(f.entries).toEqual([]);
+  });
+
+  it("anchors ownership before an initial health failure and later recovers capture with real history", async () => {
+    const f = await fixture("private-learning");
+    const transport = globalThis.fetch;
+    let failHealth = true;
+    vi.stubGlobal("fetch", async (input: any, init?: RequestInit) => {
+      if (String(input).endsWith("/health") && failHealth) { failHealth = false; throw new Error("fixture outage"); }
+      return transport(input, init);
+    });
+    await f.run("session_start");
+    expect(f.entries[0]).toMatchObject(["ov-sync-state-v2", { scopeKey: f.queue.scopeKey, syncedCaptureCount: 0 }]);
+    expect(f.writes()).toEqual([]);
+    f.setBranch([
+      ...f.entries.map(([customType, data]) => ({ type: "custom", customType, data })),
+      { type: "message", id: "new-message", message: { role: "user", content: "new history after outage" } },
+    ]);
+    await f.run("before_agent_start");
+    await f.run("turn_end");
+    expect(f.writes().some(({ path }) => path.endsWith("/messages"))).toBe(true);
   });
 });
