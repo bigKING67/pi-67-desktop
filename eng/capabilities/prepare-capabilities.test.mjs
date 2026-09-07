@@ -65,7 +65,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins two Desktop-internal packages, three first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.09.05.1");
+    expect(lock.catalogVersion).toBe("2026.09.07.1");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi-workspace-resources",
       "openviking-pi-extension",
@@ -97,9 +97,9 @@ describe("Desktop first-party capability source lock", () => {
       includedExtensions: [{ id: "pi67-openviking" }]
     });
     expect(lock.sources.find((source) => source.id === "browser67")).toMatchObject({
-      version: "0.8.0",
+      version: "0.11.4",
       ref: "refs/heads/main",
-      commit: "c9d45ae020ca502390b4b4838d924ace0d8e60d7"
+      commit: "71baa17da2831992693bb1f63599ad90c3138230"
     });
     expect(lock.skillPacks).toHaveLength(1);
     expect(lock.skillPacks[0]).toMatchObject({
@@ -108,11 +108,11 @@ describe("Desktop first-party capability source lock", () => {
       adapterSourceId: "pi-workspace-resources",
       repository: "https://github.com/xbtlin/ai-berkshire",
       ref: "refs/heads/main",
-      commit: "fd83d06347c6e3ee50133cda6962f40e226b5252",
+      commit: "c0c4fb8b1045233492566a50b02cf762f43d42f0",
       localSibling: "../ai-berkshire",
-      version: "1.1.1",
-      manifestSha256: "2db432f23f09146ef5ffcfdd5615ce2643637f592f3f3d90e30531fa65c87ac6",
-      bundleSha256: "65e12e1320560fb9f707665729ff58a9941c0ebd324202ec9dbe67cdc1baa04c"
+      version: "1.1.2",
+      manifestSha256: "8d0882d5891f15cba399dd533b35c90fd66e619e17ffc15167e263b08e77f31f",
+      bundleSha256: "ed1a8c28b7cee7d9bd01f71ebbab52cd57870bafed094521383c7eb8b516870a"
     });
     expect(lock.skillPacks[0].skills).toHaveLength(22);
     expect(lock.skillPacks[0].skills.map((skill) => skill.name)).toEqual([

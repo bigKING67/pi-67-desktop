@@ -287,6 +287,7 @@ async function prepareBrowser67(sourceRoot, source, npmCommand) {
     "src",
     "extension",
     "skills",
+    "docs/codex-integration.md",
     "scripts/build-extension.mjs",
     "scripts/extension-install-doctor.mjs",
     "scripts/reload-extension-live.mjs",

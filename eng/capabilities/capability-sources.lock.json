@@ -1,6 +1,6 @@
 {
   "schema": "pi67.capability-sources-lock.v1",
-  "catalogVersion": "2026.09.05.1",
+  "catalogVersion": "2026.09.07.1",
   "sources": [
     {
       "id": "pi-workspace-resources",
@@ -38,9 +38,9 @@
       "origin": "first-party",
       "repository": "https://github.com/bigKING67/browser67.git",
       "ref": "refs/heads/main",
-      "commit": "c9d45ae020ca502390b4b4838d924ace0d8e60d7",
+      "commit": "71baa17da2831992693bb1f63599ad90c3138230",
       "localSibling": "../browser67",
-      "version": "0.8.0"
+      "version": "0.11.4"
     },
     {
       "id": "design-craft",
@@ -68,99 +68,99 @@
       "adapterSourceId": "pi-workspace-resources",
       "repository": "https://github.com/xbtlin/ai-berkshire",
       "ref": "refs/heads/main",
-      "commit": "fd83d06347c6e3ee50133cda6962f40e226b5252",
+      "commit": "c0c4fb8b1045233492566a50b02cf762f43d42f0",
       "localSibling": "../ai-berkshire",
-      "version": "1.1.1",
-      "manifestSha256": "2db432f23f09146ef5ffcfdd5615ce2643637f592f3f3d90e30531fa65c87ac6",
-      "bundleSha256": "65e12e1320560fb9f707665729ff58a9941c0ebd324202ec9dbe67cdc1baa04c",
+      "version": "1.1.2",
+      "manifestSha256": "8d0882d5891f15cba399dd533b35c90fd66e619e17ffc15167e263b08e77f31f",
+      "bundleSha256": "ed1a8c28b7cee7d9bd01f71ebbab52cd57870bafed094521383c7eb8b516870a",
       "skills": [
         {
           "name": "bottleneck-hunter",
-          "sha256": "5caf457b0e7e867e32378d903fd6ae29c34c11ea589e871c616c4c25f8c85947"
+          "sha256": "7f544ac45f10d3d2e96b03782365413b362e1925c39160fa1cb580bc74d86753"
         },
         {
           "name": "deep-company-series",
-          "sha256": "2b67e86a25c4ceee0a97c420e5f4674d4d34dbf68270540f731edd122d503dbf"
+          "sha256": "1c3e06f894e18f4737c4b352f8b34cdcde6168cfa702b022dcd54fa4037469e9"
         },
         {
           "name": "dyp-ask",
-          "sha256": "9164bb10295fbb8b4088cde1ff27832338b2fbf858563c63e860928d1986524b"
+          "sha256": "bb09ee1c0367520aaeb990af98857cd7ee504c8c2c1b777bceddfe60d459a592"
         },
         {
           "name": "earnings-review",
-          "sha256": "854a1ad594813eed5d4ec7232c24b1b7b77a8e264c07ec6fbbd1ba8d5b44630f"
+          "sha256": "a5c960f166177d2100ba05e26cbac0c1e48042d5b64d3feae4bebc64740f1bbd"
         },
         {
           "name": "earnings-team",
-          "sha256": "92d1f42697b43ab8075dd514e877bb0e9b155269f4235080d6b8b44bea8457fc"
+          "sha256": "121084c7c1f7eb9015ed0bef74f6a6378e415cbc7a638d905053ed4e07cfd4a1"
         },
         {
           "name": "era-alpha",
-          "sha256": "65fb2a8a924be15b26155550e5a07574beae1efc10e789bcc36f561e424e5fe4"
+          "sha256": "315549c573280a3b5302f4929484abe1dd692d4f022fe08b498bd2a71d75be6c"
         },
         {
           "name": "financial-data",
-          "sha256": "54650ad0246d5f5c5b0ac14910fcce48cab39c5dfa53dfe01e91198743248da4"
+          "sha256": "32637078c566342764b55381b3d5e237e558ec13e3130c3707d50e5b7b0b55b3"
         },
         {
           "name": "income-investment",
-          "sha256": "060fb29cf00368c1892b587e3e15bdf78120a135963ad479cce0285450788342"
+          "sha256": "0a54f6007bcf23ee9991a40b52547f49aafa70180bff3d243823f12e8e740f7a"
         },
         {
           "name": "industry-funnel",
-          "sha256": "06fdab6e05e1d55cf54ce8aac6fc9c3381db6ecd5b5d3705e4b9b99bb76fa16f"
+          "sha256": "cf4733be308ba9eb2874f0a82d114d2d94737326e4a74aedf84e6688ec80e8f3"
         },
         {
           "name": "industry-research",
-          "sha256": "0dcd7345d720a41c6fc21943f2f927f7afe2868dad170a9b09b6b3ba04b64697"
+          "sha256": "345f17020d75d6baccfcdafe441ea132632885e73c1eddf06f7766c80a5d4bf8"
         },
         {
           "name": "investment-checklist",
-          "sha256": "7dec00fff6ef5310cc2d24f1eac4a145c6da0a3b7e91149daf8147c16b5dbd83"
+          "sha256": "8856014e2e75e37ac17bbf5e3a4c6e6437e11ce6c1fb81a90f70603069a6a01e"
         },
         {
           "name": "investment-memo-craft",
-          "sha256": "8b268ec558c21acf8bb7f46b631da14a61e513e9308523c1867cf3465646b14f"
+          "sha256": "7220df06131d0eb8113e384fe792e1f0936ae0e39a94ff6f495e790f139f042e"
         },
         {
           "name": "investment-research",
-          "sha256": "a87681a5bb6d64e1e5add1c8755fc2c0ff9787bf2dcc5a26fd901365283affb4"
+          "sha256": "70defb9976d852ceb3e0e9ad430bb6360720166be782f30ed23c12d395eadf51"
         },
         {
           "name": "investment-team",
-          "sha256": "f5de65de51c13b768b3d2d43a1daa7cb4fc79dbaad86f5248707068b33ab3783"
+          "sha256": "2c5b2518339525e2c597fc09135cf7f27fd3f063835cf1a99446591019d58610"
         },
         {
           "name": "management-deep-dive",
-          "sha256": "98c90da42bb41b4666480fb89faaadb586e5d07617f4add548651c1fa1c5144d"
+          "sha256": "4230e33bd29c6c1e339e9cc3590aec828c3c62c7bb933454c91128bff7d5d421"
         },
         {
           "name": "news-pulse",
-          "sha256": "3e8155ed0531fa0c0772b171e83015f7fa870c6c364797b0495df571ceebc794"
+          "sha256": "e9aa2e66af56db7d08874e04b3244977a5e4e288b7cb87d6486d3bc5b0d8fc80"
         },
         {
           "name": "portfolio-review",
-          "sha256": "adb377f4f752918b5b24bfa8d38f710103ac3be62d68002d966945bd160bd300"
+          "sha256": "b65370a8e0cf6083795829567836c0a59582e28a25e43abfe3ad425b0f9c21a3"
         },
         {
           "name": "private-company-research",
-          "sha256": "762954440c177f12e987c770ce3e7a88142d6f822f4b16c479e9e5871a75062f"
+          "sha256": "d0d460e7720a6cd2fe8f6eb2b72ab4b65ad1c98223f71117197f2051e487d0de"
         },
         {
           "name": "quality-screen",
-          "sha256": "b425f69038830e8b4627f899672b5c55f821563b6d2cb62ac829c907a55791ac"
+          "sha256": "e2d66978fe8d83299d6bfd9eda64234649b8d72f59f1016920c6c33ccae1f029"
         },
         {
           "name": "thesis-drift",
-          "sha256": "5985ca1d21e209e8d2ba3801e597a28d0dafc7ad86c028dbc75da230094a7f28"
+          "sha256": "b343e40e0a93f7431b5ed442911ce97efb85d3e35009856344f00ee78293af36"
         },
         {
           "name": "thesis-tracker",
-          "sha256": "73152841029ab8d7c4adac0ebd7024df49a00a2bc35b2b65879ebbba2cc7758a"
+          "sha256": "c5e11aef6780f5a160b871084091f953ca364a87b9ba22030014a013d175da0d"
         },
         {
           "name": "wechat-article",
-          "sha256": "11d6260096cb87f6176c263743a110a11402c9483ac182289e820b76c9b39ac9"
+          "sha256": "672cc31998fcc830e8abe19dda1eca5e5fa2f0af76be749844f460486118f646"
         }
       ]
     }
