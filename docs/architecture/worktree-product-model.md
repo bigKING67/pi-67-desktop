@@ -410,6 +410,8 @@ Renderer 是跨 Main 与 Agent Host 的产品流程协调者，但不拥有 Git 
 初始策略：
 
 - 使用 Main-owned empty hooks directory 覆盖 `core.hooksPath`，禁止 checkout hook。
+  子模块的 local-only 与 network-explicit 初始化也必须在命令层禁用 hooks，并传递给子 Git；
+  不能依赖此前父 Worktree checkout 的一次性配置。
 - 设置 `GIT_LFS_SKIP_SMUDGE=1`，Phase 1 不允许 Worktree 创建隐式下载 LFS 内容。
 - preflight 以 NUL 分隔读取 configured filter 的 process/smudge/clean/required，保留命令值内的
   换行。已知 LFS 仅接受当前 `git lfs install` 的标准命令和 `--skip-smudge` 形式（空命令表示

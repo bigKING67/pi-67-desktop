@@ -198,6 +198,7 @@ export class BoundedPrivateGitRunner implements RepositoryMutationGitRunner {
       [
         "--no-optional-locks",
         "-c", "core.longpaths=true",
+        "-c", "core.hooksPath=/dev/null",
         ...transports,
         ...(local?.overrides ?? []),
         "submodule", "update", "--init",
