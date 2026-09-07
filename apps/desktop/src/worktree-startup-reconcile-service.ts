@@ -1,3 +1,4 @@
+import { RepositoryActionFenceStore } from "./repository-action-fence-store.js";
 import { randomUUID } from "node:crypto";
 import type {
   EnvironmentCreationState,
@@ -94,6 +95,16 @@ export class WorktreeStartupReconcileService {
 
   async reconcile(): Promise<WorktreeStartupReconcileResult> {
     const result = emptyResult();
+    try {
+      for (const repositoryId of await new RepositoryActionFenceStore(this.#userData).load()) {
+        this.#scheduler.fence(repositoryId);
+        result.indeterminate += 1;
+      }
+    } catch (error) {
+      // An unreadable journal cannot safely identify which Repository must be fenced.
+      this.#scheduler.dispose();
+      throw error;
+    }
     const state = (await this.#workbenchState.load()).state;
     for (const record of state.environmentMutations) {
       if (record.state === "indeterminate" || record.state === "rollback-protected") {

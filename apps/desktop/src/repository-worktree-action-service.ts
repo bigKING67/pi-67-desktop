@@ -1,3 +1,4 @@
+import { RepositoryActionFenceStore } from "./repository-action-fence-store.js";
 import type {
   AppOwnedWorktreeRecoveryRequest,
   AppOwnedWorktreeRecoveryResult,
@@ -88,11 +89,29 @@ export class RepositoryWorktreeActionService {
             ? { status: "initialized", submodules: before } as const
             : { status: "incomplete", submodules: before } as const;
         }
+        const fences = new RepositoryActionFenceStore(this.options.userData);
+        const repositoryId = snapshot.repository!.repositoryGroupId;
+        try {
+          await fences.begin(repositoryId);
+        } catch (error) {
+          this.options.scheduler.fence(repositoryId);
+          throw error;
+        }
+        let failure: GitInspectionError | undefined;
         try {
           await this.options.runner.initializeSubmodules(current.identity.canonicalPath, "network-explicit");
         } catch (error) {
-          if (!(error instanceof GitInspectionError && error.code === "process-failed")) throw error;
+          if (!(error instanceof GitInspectionError) || error.details.cleanupConfirmed === false) {
+            this.options.scheduler.fence(repositoryId);
+            throw error;
+          }
+          failure = error;
         }
+        try { await fences.complete(repositoryId); } catch (error) {
+          this.options.scheduler.fence(repositoryId);
+          throw error;
+        }
+        if (failure && failure.code !== "process-failed") throw failure;
         const after = submoduleObservation(await this.options.runner.inspectSubmodules(
           current.identity.canonicalPath
         ));
@@ -159,6 +178,8 @@ export class RepositoryWorktreeActionService {
         if (repositoryGroupId(commonIdentity) !== record.repositoryGroupId) {
           return rejectedRecovery("identity-changed", false);
         }
+        const filters = await this.options.runner.inspectFilters(currentAuthority.source.identity.canonicalPath);
+        if (filters.unknownFilterNames.length > 0) return rejectedRecovery("git-failed", true);
         const [worktrees, branchHead] = await Promise.all([
           this.options.runner.listWorktrees(currentAuthority.source.identity.canonicalPath),
           this.options.runner.resolveBranchHead(currentAuthority.source.identity.canonicalPath, record.branchName)

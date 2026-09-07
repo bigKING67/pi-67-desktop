@@ -355,6 +355,9 @@ Renderer 是跨 Main 与 Agent Host 的产品流程协调者，但不拥有 Git 
   超限先发生、root 随后在清理开始前关闭时，同样保留 cleanup unconfirmed。
 - mutation timeout/abort 后若无法证明 child tree 已退出，journal 记录 `indeterminate`，同一
   RepositoryGroup 后续 mutation 全部拒绝，直到 read-only reconcile 证明 Git 状态。
+- 显式 submodule 补齐在 Git 开始前持久化 Repository-only action marker；清理未确认或进程
+  中断时保留并 fence，重启先恢复这些保护。标记库存不可读/非法时禁用 mutation admission，
+  不自动清空保护；普通已确认失败仍可返回 incomplete。标记不保存路径或 Git 输出。
 - application shutdown 不报告 graceful，除非所有 active Git mutation tree 已退出或被明确标记为
   unresolved 并保持 fail-closed fence。
 
@@ -393,6 +396,8 @@ Renderer 是跨 Main 与 Agent Host 的产品流程协调者，但不拥有 Git 
   已存在的 exact branch，验证 common-dir、branch、HEAD、非 detached/locked/prunable 和 clean status。
   如果上一次 Git 恢复成功但 Workbench state 写入失败，重试只对账同一精确 Worktree 并补写状态；
   foreign、dirty、branch elsewhere、identity drift 或任何 ambiguous target 都 fail closed。
+  恢复在取得 Repository 执行权后重新检查 source filter，在移除旧 registration 或 checkout 前
+  拒绝非标准命令；首次创建时通过检查不能替代恢复时的检查。
 - Turn/Session 启动、Provider command 或普通 inspection 永远不触发上述恢复或网络动作。
 
 ## 10. Git 安全与信任
