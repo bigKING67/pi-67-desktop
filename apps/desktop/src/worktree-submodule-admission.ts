@@ -96,7 +96,20 @@ export async function initializeAdmittedSubmodules(input: {
       } else if (bare !== "false") {
         throw new GitInspectionError("submodule-update", "invalid-output");
       }
-      await run(cwd, [...overrides, "submodule", "update", "--init", "--checkout", ...(input.mode === "local-only" ? ["--no-fetch"] : []), "--", entry.path]);
+      try {
+        await run(cwd, [...overrides, "submodule", "update", "--init", "--checkout", ...(input.mode === "local-only" ? ["--no-fetch"] : []), "--", entry.path]);
+      } catch (error) {
+        // Matching gitlinks cannot prove that a failed checkout wrote its files.
+        // Preserve process-cleanup uncertainty; otherwise surface unknown repository
+        // state so the existing action marker stays fenced across restarts.
+        if (error instanceof GitInspectionError && error.details.cleanupConfirmed === false) throw error;
+        if (error instanceof GitInspectionError) {
+          throw new GitInspectionError(error.stage, error.code, {
+            ...error.details, repositoryStateConfirmed: false
+          });
+        }
+        throw error;
+      }
       // No --recursive checkout may bypass the next child's admission.
       if (input.mode === "network-explicit") await visit(target, depth + 1);
     }

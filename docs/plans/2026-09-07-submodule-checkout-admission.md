@@ -139,3 +139,34 @@ Both original checkout-hook and child-only conditional-filter findings are resol
 at source/local-Git level. Windows, real network clone and packaged runtime remain
 unverified; this does not complete the broader repository review. Prepared metadata
 is retained for safe retries, and ambiguous activity status fails closed as documented.
+
+## Follow-up: checkout failure truth
+
+At baseline 4eb1f29 a real local index.lock fixture made checkout fail while the
+child HEAD already matched its gitlink. The explicit action returned initialized,
+its payload was absent, and no fence persisted. Evidence is in
+`/tmp/pi67-submodule-explicit-checkout-failure.json` and the corresponding log.
+The creation path already rejected through its final dirty-worktree verification;
+that existing defense must remain covered, not be reported as a second bug.
+
+Classify errors from the checkout command with repositoryStateConfirmed=false,
+separately from process cleanup. Keep the Git stage/code/details, preserving an
+original cleanupConfirmed=false Git error without alteration. An independent
+review identified that a generic Error wrapper would lose cancelled projection
+following successful rollback; the separate state flag avoids that regression. Earlier
+preparation/admission failures retain their ordinary incomplete semantics. Reuse
+the existing persistent action fence and startup restoration; do not unlink child
+.git files, clear locks, force checkout, or invent a parallel state store. Regression
+acceptance covers real explicit action, absent payload, retained marker, denied
+retry and restored fence in a fresh scheduler.
+
+Final follow-up validation: 20 targeted tests passed, followed by the complete
+`corepack pnpm run check --maxWorkers=4`: 3521 tests passed, 5 skipped, all static
+and coverage gates passed. Source hashes matched the snapshot captured before the
+final gate. Independent read-only review confirmed the state flag consumers and
+preserved cancellation/cleanup semantics. The cancellation regression injects a
+runner-boundary error and performs real rollback; it is not an OS-level kill test.
+Logs: `/tmp/pi67-submodule-checkout-state-final-tests.log` and
+`/tmp/pi67-submodule-checkout-state-check.log`. Earlier intermediate runs predate
+the final error representation and are not delivery evidence. No Windows,
+packaged-runtime, network or automatic fence-repair claim is made.

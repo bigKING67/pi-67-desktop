@@ -386,6 +386,10 @@ Renderer 是跨 Main 与 Agent Host 的产品流程协调者，但不拥有 Git 
   HTTPS、SSH 和 Git transport。普通 `submodule update` 可能重新 clone，因此不能作为“本地优先”。
   本地补齐的普通 process failure 可保留 incomplete；若错误明确标记 cleanup unconfirmed，必须
   终止创建并持久化 indeterminate/fence，不得降级为“待联网补齐”后继续注册 Workspace。
+  普通 incomplete 降级只适用于检出前失败；执行可能检出的 submodule update 命令失败后按仓库
+  状态不确定处理，显式补齐保留 action marker/fence。即使 gitlink/HEAD 匹配也不能证明文件
+  已完整落盘；不能在该失败后依据 submodule status 返回 initialized。进程清理未确认的原始
+  Git 错误必须继续原样传播，不能改写为清理已确认。
 - 需要网络的 Submodule 只在用户点击“联网补齐”后运行；该动作仍禁用交互式 credential prompt，
   不写 global/system Git config，也不把失败伪装成完整。初始化可以写 Git 自身所需的
   submodule URL、模块仓库配置和工作目录连接；divergent 或 conflicted 状态不通过网络动作覆盖。

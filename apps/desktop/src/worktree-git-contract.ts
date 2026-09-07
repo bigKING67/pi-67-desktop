@@ -30,6 +30,7 @@ export class GitInspectionError extends Error {
       exitCode?: number;
       signal?: NodeJS.Signals;
       cleanupConfirmed?: boolean;
+      repositoryStateConfirmed?: boolean;
     } = {}
   ) {
     super(`Git repository inspection failed at ${stage} (${code}).`);

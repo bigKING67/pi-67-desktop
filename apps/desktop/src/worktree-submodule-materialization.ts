@@ -29,7 +29,8 @@ export async function materializeLocalSubmodules(
     } catch (error) {
       if (!(error instanceof GitInspectionError)
         || error.code !== "process-failed"
-        || error.details.cleanupConfirmed === false) throw error;
+        || error.details.cleanupConfirmed === false
+        || error.details.repositoryStateConfirmed === false) throw error;
     }
     inspection = await runner.inspectSubmodules(targetPath, signal);
   }

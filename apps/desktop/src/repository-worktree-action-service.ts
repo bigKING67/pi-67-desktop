@@ -95,7 +95,8 @@ export class RepositoryWorktreeActionService {
           ));
         } catch (error) {
           if (!(error instanceof GitInspectionError) || error.code !== "process-failed"
-            || error.details.cleanupConfirmed === false) throw error;
+            || error.details.cleanupConfirmed === false
+            || error.details.repositoryStateConfirmed === false) throw error;
         }
         const after = submoduleObservation(await this.options.runner.inspectSubmodules(
           current.identity.canonicalPath
@@ -251,7 +252,8 @@ export class RepositoryWorktreeActionService {
       (value) => ({ ok: true, value } as const),
       (error: unknown) => ({ ok: false, error } as const)
     );
-    if (!result.ok && (!(result.error instanceof GitInspectionError) || result.error.details.cleanupConfirmed === false)) {
+    if (!result.ok && (!(result.error instanceof GitInspectionError) || result.error.details.cleanupConfirmed === false
+      || result.error.details.repositoryStateConfirmed === false)) {
       this.options.scheduler.fence(repositoryId);
       throw result.error;
     }
