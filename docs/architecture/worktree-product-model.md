@@ -264,7 +264,9 @@ interface WorkbenchStateV5 extends Omit<WorkbenchStateV4, "version"> {
 - migration 不运行 Git，不猜测 Repository relation；
 - Phase A 的只读 inspection 成功后，才通过普通 atomic update 补充 observed binding；
 - 最大 Workspace 数继续是 100；active/recovery mutation record 建议最大 32；
-- corrupt/future-version/quarantine 继续沿用现有 Workbench store 合同。
+- corrupt/future-version/quarantine 继续沿用现有 Workbench store 合同。成功的 corrupt reset 必须先
+  持久化空 V5 状态再返回，避免下一次 load/update 重新迁移保留的旧版 Workspace 注册；
+  隔离文件和旧版文件继续保留，重置写入失败必须向调用方报错。
 
 ### 7.2 Worktree Catalog
 

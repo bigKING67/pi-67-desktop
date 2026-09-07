@@ -233,12 +233,17 @@ export class WorkbenchStateStore {
       await rename(statePath, quarantinePath);
     } catch (error) {
       if (isNodeError(error, "ENOENT")) {
-        return { state: createEmptyWorkbenchState(), recovery: { kind: "corrupt-reset" } };
+        const state = createEmptyWorkbenchState();
+        await this.#writeUnlocked(state);
+        return { state, recovery: { kind: "corrupt-reset" } };
       }
       throw error;
     }
+    const state = createEmptyWorkbenchState();
+    // A later load must not resurrect retained legacy registrations after this reset.
+    await this.#writeUnlocked(state);
     return {
-      state: createEmptyWorkbenchState(),
+      state,
       recovery: { kind: "corrupt-reset", quarantinedFileName: basename(quarantinePath) }
     };
   }

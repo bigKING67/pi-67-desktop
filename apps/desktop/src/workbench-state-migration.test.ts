@@ -49,6 +49,30 @@ describe("Workbench state migration", () => {
     expect(await readdir(directory)).toEqual([LEGACY_WORKBENCH_STATE_V4_FILENAME, WORKBENCH_STATE_FILENAME]);
   });
 
+  it("keeps a corrupt V5 reset authoritative over retained legacy registrations", async () => {
+    const userData = await temporaryWorkbenchStateRoot();
+    const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
+    const workspace = workbenchDescriptorFixture("old-workspace", "/workspace/old", "34");
+    await mkdir(directory);
+    await writeFile(join(directory, LEGACY_WORKBENCH_STATE_V4_FILENAME), JSON.stringify({
+      version: 4,
+      workspaces: [workspace],
+      workspaceOrder: [workspace.id],
+      expandedWorkspaceIds: [],
+      runtimeRecovery: [],
+      sessionCreationRecovery: [],
+      settings: { section: "general", scope: "global" },
+      cleanExit: true
+    }));
+    await writeFile(join(directory, WORKBENCH_STATE_FILENAME), "{broken");
+    const store = workbenchStateTestStore(userData);
+    expect((await store.load()).recovery?.kind).toBe("corrupt-reset");
+    // Main loads again in beginWorkbenchRun before startup reconciliation.
+    expect((await store.update((state) => state)).workspaces).toEqual([]);
+    expect((await workbenchStateTestStore(userData).load()).state.workspaces).toEqual([]);
+    expect(await readdir(directory)).toContain(LEGACY_WORKBENCH_STATE_V4_FILENAME);
+  });
+
   it("migrates V2 layout metadata while clearing every legacy recovery shell", async () => {
     const userData = await temporaryWorkbenchStateRoot();
     const directory = join(userData, WORKBENCH_STATE_DIRECTORY);

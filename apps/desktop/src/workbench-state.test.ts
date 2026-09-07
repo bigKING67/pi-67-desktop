@@ -93,7 +93,7 @@ describe("WorkbenchStateV5 persistence", () => {
       kind: "corrupt-reset",
       quarantinedFileName: "state-v5.corrupt-1700000000000-token.json"
     });
-    expect(await readdir(directory)).toEqual(["state-v5.corrupt-1700000000000-token.json"]);
+    expect(await readdir(directory)).toEqual(["state-v5.corrupt-1700000000000-token.json", WORKBENCH_STATE_FILENAME]);
 
     await writeFile(statePath, "x".repeat(MAX_WORKBENCH_STATE_BYTES + 1), { mode: 0o600 });
     await expect(testStore(userData).load()).resolves.toMatchObject({ recovery: { kind: "corrupt-reset" } });
