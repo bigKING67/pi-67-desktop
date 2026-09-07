@@ -256,6 +256,8 @@ async function readPreviousRulesLoaderTreeSha256(managedRoot: string): Promise<s
   try {
     const state = await readBoundedCapabilityJson(join(managedRoot, "state.json"));
     if (!isRecord(state) || !isRecord(state.rulesLoaderProjection)) return undefined;
+    const status = state.rulesLoaderProjection.status;
+    if (status !== "current" && status !== "installed" && status !== "updated") return undefined;
     const hash = state.rulesLoaderProjection.treeSha256;
     return typeof hash === "string" && /^[a-f0-9]{64}$/u.test(hash) ? hash : undefined;
   } catch {

@@ -10,7 +10,7 @@ export async function refreshWorkspaceConversations(workspace: WorkspaceDescript
 
 export async function importSessionIntoWorkspace(workspace: WorkspaceDescriptor): Promise<void> {
   if (useAppStore.getState().workspace !== workspace.identity.canonicalPath) {
-    await openRendererWorkspaceDescriptor(workspace);
+    if (!await openRendererWorkspaceDescriptor(workspace)) return;
   }
   await importRendererSessionFile();
 }

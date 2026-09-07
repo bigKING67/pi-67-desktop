@@ -91,7 +91,8 @@ export class SupportDiagnosticsAdmission {
       return new Response(null, { status: 400 });
     }
     const admitted = await this.#state.storage.transaction(async (transaction) => {
-      if (await transaction.get<string>("admittedMinute") === minute) return false;
+      const latest = await transaction.get<string>("admittedMinute");
+      if (latest !== undefined && minute <= latest) return false;
       await transaction.put("admittedMinute", minute);
       return true;
     });

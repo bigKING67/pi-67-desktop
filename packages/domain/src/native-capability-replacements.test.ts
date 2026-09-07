@@ -13,6 +13,14 @@ describe("native capability replacements", () => {
     expect(nativeCapabilityReplacement("npm:another-package@1.0.0")).toBeUndefined();
   });
 
+  it.each(["latest", "next", "beta", "1.2.3-beta.1"])("recognizes npm tag %s without matching another package", (tag) => {
+    expect(nativeCapabilityReplacement(`npm:@narumitw/pi-plan-mode@${tag}`)).toBe("native-plan");
+    expect(nativeCapabilityReplacement(`npm:pi-web-access@${tag}`)).toBe("native-web");
+    expect(nativeCapabilityReplacement(`npm:pi-smart-fetch@${tag}`)).toBe("native-web");
+    expect(nativeCapabilityReplacement(`npm:pi-web-access-other@${tag}`)).toBeUndefined();
+    expect(nativeCapabilityReplacement(`npm:@other/pi-plan-mode@${tag}`)).toBeUndefined();
+  });
+
   it("names the first-party replacement without conflating Plan and Search", () => {
     expect(nativeCapabilityReplacementLabel("native-plan")).toBe("由 Pi-67 原生 Plan Mode 替代");
     expect(nativeCapabilityReplacementLabel("native-web")).toBe("由 Pi-67 原生搜索替代");

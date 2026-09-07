@@ -31,6 +31,23 @@ describe("provider configuration store", () => {
     });
   });
 
+  it("advances the saved revision without discarding subsequent Provider edits", () => {
+    const store = useProviderConfigurationStore.getState();
+    store.beginLoad("workspace-a");
+    store.install("workspace-a", snapshot("1", "Initial"));
+    store.updateDraft((draft) => ({ ...draft, name: "Submitted" }));
+    const submitted = useProviderConfigurationStore.getState().draft;
+    store.updateDraft((draft) => ({ ...draft, name: "Newer draft" }));
+    const saved = snapshot("2", "Submitted");
+    store.installMutation("workspace-a", saved, submitted);
+    expect(useProviderConfigurationStore.getState()).toMatchObject({
+      snapshot: saved, baselineRevision: saved.revision,
+      draft: { name: "Newer draft" }, dirty: true, phase: "idle"
+    });
+    store.discardDraft();
+    expect(useProviderConfigurationStore.getState().draft?.name).toBe("Submitted");
+  });
+
   it("keeps a dirty draft and its old baseline when Pi files change externally", () => {
     const initial = snapshot("1", "Initial");
     const external = snapshot("2", "External");

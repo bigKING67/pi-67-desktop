@@ -130,6 +130,7 @@ describe("AgentHostServer replay-safe control mutations", () => {
       };
     }));
     const setSessionName = vi.fn(async () => undefined);
+    const importSession = vi.fn(async () => snapshot(sessionId));
     const rollback = vi.fn(async () => undefined);
     const runtime = {
       getSdkVersion: () => "0.81.1",
@@ -137,6 +138,7 @@ describe("AgentHostServer replay-safe control mutations", () => {
       getIdentity: () => ({ sessionId, sessionFileIdentity: `session-file-${sessionId}`, sessionGeneration }),
       createSession,
       setSessionName,
+      importSession,
       rollback,
       cancelInteractiveRequests: () => [],
       dispose: async () => undefined
@@ -171,11 +173,16 @@ describe("AgentHostServer replay-safe control mutations", () => {
       "rollback-session-a"
     );
 
+    const importRequest = commandEnvelopeForContext(
+      "session.import", { submissionId: "import-for-a", path: "/tmp/import-fixture.jsonl" },
+      originalAuthority, 5
+    );
     port.emit(create);
     await vi.waitFor(() => expect(createSession).toHaveBeenCalledOnce());
     port.emit(rename);
     port.emit(renameReplay);
     port.emit(rollbackRequest);
+    port.emit(importRequest);
     finishCreate();
 
     await expectResponse(port, create.requestId, { ok: true, type: "session.create" });
@@ -194,6 +201,10 @@ describe("AgentHostServer replay-safe control mutations", () => {
       type: "session.rollback",
       error: { code: "STALE_SESSION_GENERATION" }
     });
+    await expectResponse(port, importRequest.requestId, {
+      ok: false, type: "session.import", error: { code: "STALE_SESSION_GENERATION" }
+    });
+    expect(importSession).not.toHaveBeenCalled();
     expect(setSessionName).not.toHaveBeenCalled();
     expect(rollback).not.toHaveBeenCalled();
     await server.shutdown();

@@ -113,9 +113,9 @@ export const useContextFileStore = create<ContextFileState>((set, get) => ({
       catalog: result.files,
       selectedItem: result.item,
       baselineContent: content,
-      draft: content,
+      draft: state.draft,
       baselineRevision: result.revision,
-      dirty: false,
+      dirty: state.draft !== content,
       externalConflict: false,
       phase: "idle",
       error: undefined

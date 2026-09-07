@@ -251,6 +251,15 @@ describe("Desktop first-party capability bootstrap", () => {
       createToken: () => "preserve"
     });
     expect(preserved.rulesLoaderProjection).toMatchObject({ status: "user-owned" });
+    for (let launch = 0; launch < 2; launch += 1) {
+      const relaunched = await bootstrapDesktopCapabilities({
+        capabilitiesRoot, agentDir, environment: { PI67_DESKTOP: "1" },
+        createToken: () => `relaunch-${launch}`
+      });
+      expect(relaunched.rulesLoaderProjection).toMatchObject({ status: "user-owned" });
+      expect(await readFile(join(projectionRoot, "index.ts"), "utf8")).toBe("user modified Rules Loader\n");
+    }
+
     expect(await readFile(join(projectionRoot, "index.ts"), "utf8")).toBe("user modified Rules Loader\n");
   });
 

@@ -877,6 +877,12 @@ the only Runtime and behavior specification source.
 - Removing a custom Provider deletes only its `models.json` definition and does not
   silently remove a same-named `auth.json` credential. Persistent credential removal
   is an independent confirmed operation against `auth.json`.
+- Save acknowledgements advance the submitted Rules/Context or Provider baseline
+  while retaining any edits made during the request. An explicit file reload may
+  discard only the draft present when reload began; newer editor changes survive.
+- Workspace-targeted Session import stops if opening the target fails or the
+  Workspace changes while the native file picker is open. A queued import rechecks
+  its original Session authority immediately before execution.
 - Desktop watches those Pi files and publishes revisioned snapshots. A clean
   view adopts external TUI, script, or manual edits automatically; an unsaved
   draft remains intact and must explicitly adopt the newer revision before it

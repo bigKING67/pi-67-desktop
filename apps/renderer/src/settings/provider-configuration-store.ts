@@ -22,6 +22,7 @@ export interface ProviderConfigurationState {
   providerEditorRequest: { workspaceId: string; section: ProviderEditorSectionRequest } | undefined;
   beginLoad(workspaceId: string): void;
   install(workspaceId: string, snapshot: PiProviderConfigurationSnapshot): void;
+  installMutation(workspaceId: string, snapshot: PiProviderConfigurationSnapshot, draftAtStart: PiProviderConfigurationInput | undefined): void;
   installCatalog(workspaceId: string, snapshot: PiProviderConfigurationSnapshot): void;
   fail(workspaceId: string, error: string): void;
   selectProvider(providerId: string): void;
@@ -72,6 +73,17 @@ export const useProviderConfigurationStore = create<ProviderConfigurationState>(
       phase: "idle",
       error: undefined
     });
+  },
+
+  installMutation(workspaceId, snapshot, draftAtStart) {
+    const state = get();
+    if (state.workspaceId !== workspaceId) return;
+    if (state.draft === draftAtStart) {
+      state.install(workspaceId, snapshot);
+      return;
+    }
+    set({ snapshot, baselineRevision: snapshot.revision, dirty: state.draft !== undefined,
+      externalConflict: undefined, phase: "idle", error: undefined });
   },
 
   installCatalog(workspaceId, snapshot) {

@@ -77,6 +77,29 @@ describe("support diagnostics ingest", () => {
     ]);
   });
 
+  it("does not let a delayed older minute reset admission for the current minute", async () => {
+    const oldMinute = Date.UTC(2026, 8, 7, 9, 0, 59);
+    const objects = new Map<string, { value: string; customMetadata: Record<string, string> }>();
+    const environment = fixtureEnvironment(objects);
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    vi.mocked(environment.SUPPORT_DIAGNOSTICS_BUCKET.head).mockImplementation(async (key) => {
+      if (key.includes("A1B2C3D4E5F6")) await pending;
+      return null;
+    });
+    const submit = (now: number, reportId: string) => handleSupportDiagnosticsRequest(
+      request(JSON.stringify({ ...fixtureSubmission(now), reportId })), environment, now
+    );
+    const old = submit(oldMinute, "PI67-A1B2C3D4E5F6");
+    await vi.waitFor(() => expect(environment.SUPPORT_DIAGNOSTICS_BUCKET.head).toHaveBeenCalledOnce());
+    expect((await submit(oldMinute + 1000, "PI67-B1C2D3E4F5A6")).status).toBe(201);
+    release();
+    expect((await old).status).toBe(429);
+    expect((await submit(oldMinute + 1001, "PI67-C1D2E3F4A5B6")).status).toBe(429);
+    expect(objects.size).toBe(1);
+    expect((await submit(oldMinute + 61000, "PI67-D1E2F3A4B5C6")).status).toBe(201);
+  });
+
   it("rejects the wrong boundary, rate limits, stale time, invalid checksum, and sensitive fields", async () => {
     const now = Date.UTC(2026, 7, 29, 6, 0, 0);
     const submission = fixtureSubmission(now);

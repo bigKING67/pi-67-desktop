@@ -12,6 +12,25 @@ import type {
 } from "./sqlite-session-catalog.js";
 
 describe("Session Catalog lifecycle", () => {
+  it("keeps overlapping same-source queries bound to their requested Workspace", async () => {
+    let release!: (value: SessionCatalogDiscoveryResult) => void;
+    const pending = new Promise<SessionCatalogDiscoveryResult>((resolve) => { release = resolve; });
+    const discover = vi.fn(() => pending);
+    const catalog = createSessionCatalog();
+    const workspaceA = { sourceKey: "shared-source", workspaceCwd: "/workspace-a", discover };
+    try {
+      const first = catalog.query({ scope: "workspace", search: "needle" }, workspaceA);
+      await vi.waitFor(() => expect(discover).toHaveBeenCalledOnce());
+      await catalog.query({ scope: "workspace" }, { ...workspaceA, workspaceCwd: "/workspace-b" });
+      release({ records: ["a", "b"].map((id) => ({
+        fileIdentity: `file-${id}`, id, path: `/sessions/${id}.jsonl`,
+        cwd: `/workspace-${id}`, cwdKey: `/workspace-${id}`,
+        modifiedAt: 1, messageCount: 1, explicitName: `needle ${id}`
+      })), incomplete: false, skippedCount: 0 });
+      expect((await first).items.map((item) => item.id)).toEqual(["a"]);
+    } finally { await catalog.dispose(); }
+  });
+
   it("does not reuse an older SQLite revision when the active source returns to a cached dataset", async () => {
     const state: SqliteCatalogState = {
       sourceKey: "source-a",

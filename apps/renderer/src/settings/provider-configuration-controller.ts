@@ -283,8 +283,9 @@ async function mutateGlobal<T extends GlobalConfigurationMutationType>(
   successTitle: string
 ): Promise<boolean> {
   try {
+    const draftAtStart = useProviderConfigurationStore.getState().draft;
     const snapshot = await request(type, payload) as PiProviderConfigurationSnapshot;
-    useProviderConfigurationStore.getState().install(GLOBAL_PROVIDER_CONFIGURATION_KEY, snapshot);
+    useProviderConfigurationStore.getState().installMutation(GLOBAL_PROVIDER_CONFIGURATION_KEY, snapshot, draftAtStart);
     publishNotification({ level: "info", title: successTitle });
     return true;
   } catch (error) {
@@ -312,8 +313,9 @@ async function mutateProject<T extends ProjectConfigurationMutationType>(
 ): Promise<boolean> {
   const key = projectConfigurationKey(workspaceId);
   try {
+    const draftAtStart = useProviderConfigurationStore.getState().draft;
     const snapshot = await requestWorkspace(workspaceId, type, payload) as PiProviderConfigurationSnapshot;
-    useProviderConfigurationStore.getState().install(key, snapshot);
+    useProviderConfigurationStore.getState().installMutation(key, snapshot, draftAtStart);
     publishNotification({ level: "info", title: successTitle });
     return true;
   } catch (error) {

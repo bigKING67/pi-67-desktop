@@ -9,6 +9,7 @@ import {
 } from "@pi67/domain";
 import {
   createDesktopPackageOperationRuntime,
+  packageSourceKind,
   type DesktopPackageOperationRuntime
 } from "@pi67/pi-runtime";
 import { isProtocolErrorCode } from "@pi67/protocol";
@@ -230,18 +231,8 @@ function runGit(executable: string, arguments_: string[]): Promise<void> {
 }
 
 function classifyPackageSource(source: string): { npm: boolean; git: boolean } {
-  const normalized = source.trim();
-  if (
-    normalized.startsWith("git+")
-    || normalized.startsWith("git@")
-    || normalized.startsWith("github:")
-    || normalized.includes("github.com/")
-    || normalized.endsWith(".git")
-  ) return { npm: false, git: true };
-  if (isAbsolute(normalized) || normalized.startsWith("./") || normalized.startsWith("../")) {
-    return { npm: false, git: false };
-  }
-  return { npm: true, git: false };
+  const kind = packageSourceKind(source);
+  return { npm: kind === "npm", git: kind === "git" };
 }
 
 function workerError(error: unknown): Extract<PackageWorkerResponse, { ok: false }>["error"] {

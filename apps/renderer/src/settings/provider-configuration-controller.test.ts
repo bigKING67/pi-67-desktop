@@ -114,6 +114,25 @@ describe("provider configuration controller", () => {
     });
   });
 
+  it("keeps edits made while a successful Provider save is pending", async () => {
+    const store = useProviderConfigurationStore.getState();
+    store.beginLoad("app");
+    store.install("app", snapshot("1"));
+    store.updateDraft((draft) => ({ ...draft, name: "Submitted" }));
+    const pending = deferred<PiProviderConfigurationSnapshot>();
+    const request = vi.spyOn(agentConnectionController, "request").mockReturnValue(pending.promise as never);
+    const save = saveProviderConfiguration("workspace-a");
+    await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
+    store.updateDraft((draft) => ({ ...draft, name: "Newer draft" }));
+    const saved = snapshot("2");
+    saved.providers[0]!.name = "Submitted";
+    pending.resolve(saved);
+    await expect(save).resolves.toBe(true);
+    expect(useProviderConfigurationStore.getState()).toMatchObject({
+      baselineRevision: saved.revision, draft: { name: "Newer draft" }, dirty: true
+    });
+  });
+
   it("preserves the draft when a stale revision blocks saving", async () => {
     const initial = snapshot("1");
     useProviderConfigurationStore.getState().beginLoad("app");

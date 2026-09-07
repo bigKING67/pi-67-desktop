@@ -2,7 +2,6 @@ import {
   RuntimeError,
   type SessionCatalogChangedEvent,
   type SessionCatalogChangedReason,
-  type SessionCatalogDegradedReason,
   type SessionCatalogPage,
   type SessionCatalogQuery,
   type SessionCatalogStatus,
@@ -55,7 +54,6 @@ export function createSessionCatalog(options: CreateSessionCatalogOptions = {}):
 }
 class DefaultSessionCatalog implements SessionCatalog {
   private activeSourceKey: string | undefined;
-  private activeWorkspaceKey = "";
   private readonly sqliteLifecycle: SessionCatalogSqliteLifecycle;
   private fallbackRecords: SessionCatalogRecord[] = [];
   private fallbackReady = false;
@@ -130,9 +128,10 @@ class DefaultSessionCatalog implements SessionCatalog {
   query(query: SessionCatalogQuery, context: SessionCatalogContext): Promise<SessionCatalogPage> {
     const validated = validateSessionCatalogQuery(query);
     return this.withPreparedContext(context, async (contextGeneration) => {
+      const workspaceKey = normalizeSessionCatalogWorkspaceIdentity(context.workspaceCwd);
       const queryKey = createSessionCatalogQueryKey(
         context.sourceKey,
-        this.activeWorkspaceKey,
+        workspaceKey,
         validated.scope,
         validated.view ?? "active",
         normalizeSessionCatalogSearch(validated.search ?? "")
@@ -149,12 +148,12 @@ class DefaultSessionCatalog implements SessionCatalog {
         await this.indexes.awaitAutomaticTitles(context, contextGeneration);
       }
       assertSessionCatalogCursor(validated.cursor, this.current.revision, queryKey);
-      const result = this.readProjection(validated);
+      if (!this.isCurrentContext(context, contextGeneration)) {
+        throw new RuntimeError("STALE_SESSION_CATALOG", "Session Catalog source changed during the query.");
+      }
+      const result = this.readProjection(validated, workspaceKey);
       assertSessionCatalogCursor(validated.cursor, this.current.revision, queryKey);
-      const page = createBoundedSessionCatalogPage(
-        result, this.current, validated.limit, queryKey
-      );
-      return page;
+      return createBoundedSessionCatalogPage(result, this.current, validated.limit, queryKey);
     });
   }
   searchContent(
@@ -164,17 +163,21 @@ class DefaultSessionCatalog implements SessionCatalog {
     signal?: AbortSignal
   ): Promise<WorkspaceMessageSearchResult> {
     return this.withPreparedContext(context, async (contextGeneration) => {
+      const workspaceKey = normalizeSessionCatalogWorkspaceIdentity(context.workspaceCwd);
       const requestedReconcile = this.autoReconciledSource !== context.sourceKey
         ? this.startReconcile(context, "reconciled", contextGeneration)
         : undefined;
       await (requestedReconcile ?? (this.hasReadableProjection() ? undefined : this.reconcileFlight?.promise));
       await this.indexes.awaitAutomaticTitles(context, contextGeneration);
+      if (!this.isCurrentContext(context, contextGeneration)) {
+        throw new RuntimeError("STALE_SESSION_CATALOG", "Session Catalog source changed during the query.");
+      }
       const records = sortSessionCatalogRecords([...this.projectionRecords.values()].filter((record) => (
-        record.cwdKey === this.activeWorkspaceKey && record.archivedAt === undefined
+        record.cwdKey === workspaceKey && record.archivedAt === undefined
       )));
       return searchSessionCatalogContent({
         workspaceId,
-        workspaceKey: this.activeWorkspaceKey,
+        workspaceKey,
         query,
         context,
         contextGeneration,
@@ -216,22 +219,23 @@ class DefaultSessionCatalog implements SessionCatalog {
     context: SessionCatalogContext
   ): Promise<number> {
     return this.withPreparedContext(context, (generation) => organizeSessionCatalogRecord(
-      this.organizationHost(), path, mutation, context, generation
+      this.organizationHost(context), path, mutation, context, generation
     ));
   }
   reorderPinned(paths: readonly string[], context: SessionCatalogContext): Promise<number> {
     return this.withPreparedContext(context, (generation) => reorderPinnedSessionCatalogRecords(
-      this.organizationHost(), paths, context, generation
+      this.organizationHost(context), paths, context, generation
     ));
   }
-  private organizationHost(): SessionCatalogOrganizationHost {
+  private organizationHost(context: SessionCatalogContext): SessionCatalogOrganizationHost {
+    const workspaceKey = normalizeSessionCatalogWorkspaceIdentity(context.workspaceCwd);
     return {
       recordEnricher: this.recordEnricher,
       now: this.now,
       current: () => this.current,
       sqlite: () => this.sqlite,
       isCurrentContext: (context, generation) => this.isCurrentContext(context, generation),
-      readProjection: (query) => this.readProjection(query),
+      readProjection: (query) => this.readProjection(query, workspaceKey),
       applySqliteState: (state) => this.applySqliteState(state, false),
       demoteSqlite: () => this.demoteSqlite(true),
       fallbackRecords: () => this.fallbackRecords,
@@ -274,7 +278,6 @@ class DefaultSessionCatalog implements SessionCatalog {
     this.assertNotDisposed();
     this.activeContext = context;
     if (this.activeSourceKey === context.sourceKey) {
-      this.activeWorkspaceKey = normalizeSessionCatalogWorkspaceIdentity(context.workspaceCwd);
       return this.contextGeneration;
     }
     const changed = this.activeSourceKey !== undefined;
@@ -287,7 +290,6 @@ class DefaultSessionCatalog implements SessionCatalog {
     }
     this.activeSourceKey = context.sourceKey;
     this.contextGeneration += 1;
-    this.activeWorkspaceKey = normalizeSessionCatalogWorkspaceIdentity(context.workspaceCwd);
     this.fallbackRecords = [];
     this.projectionRecords.clear();
     this.fallbackReady = false;
@@ -310,7 +312,8 @@ class DefaultSessionCatalog implements SessionCatalog {
         itemCount: 0,
         incomplete: true,
         skippedCount: 0,
-        ...degradedReason(this.sqlite ? undefined : this.sqliteLifecycle.degradedReason)
+        ...(this.sqlite || this.sqliteLifecycle.degradedReason === undefined
+          ? {} : { degradedReason: this.sqliteLifecycle.degradedReason })
       };
     }
     if (changed) this.publish("source-changed");
@@ -366,7 +369,7 @@ class DefaultSessionCatalog implements SessionCatalog {
       publish: () => this.publish(reason)
     });
   }
-  private readProjection(query: ValidatedSessionCatalogQuery) {
+  private readProjection(query: ValidatedSessionCatalogQuery, workspaceKey: string) {
     if (this.sqlite && this.current.source === "sqlite") {
       try {
         const state = this.sqlite.getState();
@@ -374,7 +377,7 @@ class DefaultSessionCatalog implements SessionCatalog {
           return this.sqlite.query({
             scope: query.scope,
             view: query.view ?? "active",
-            cwdKey: this.activeWorkspaceKey,
+            cwdKey: workspaceKey,
             ...(query.search === undefined ? {} : { search: normalizeSessionCatalogSearch(query.search) }),
             ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
             limit: query.limit
@@ -385,7 +388,7 @@ class DefaultSessionCatalog implements SessionCatalog {
       }
     }
     if (!this.fallbackReady) return { records: [], total: 0, hasMore: false };
-    return querySessionCatalogFallback(this.fallbackRecords, this.activeWorkspaceKey, query);
+    return querySessionCatalogFallback(this.fallbackRecords, workspaceKey, query);
   }
   private hasReadableProjection(): boolean {
     if (this.sqlite && this.current.source === "sqlite") {
@@ -452,8 +455,4 @@ class DefaultSessionCatalog implements SessionCatalog {
   private assertNotDisposed(): void {
     if (this.disposed) throw new RuntimeError("RUNTIME_NOT_READY", "Session Catalog has been disposed.");
   }
-}
-
-function degradedReason(reason: SessionCatalogDegradedReason | undefined) {
-  return reason === undefined ? {} : { degradedReason: reason };
 }

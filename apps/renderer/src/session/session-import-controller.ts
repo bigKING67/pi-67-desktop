@@ -20,8 +20,9 @@ export async function importRendererSessionFile(): Promise<void> {
   const get: StoreGet = useAppStore.getState;
   const set: StoreSet = useAppStore.setState;
   if (get().sessionTransitionPending) return;
+  const workspace = get().workspace;
   const path = await window.pi67.system.selectSessionFile();
-  if (!path || get().sessionTransitionPending) return;
+  if (!path || get().sessionTransitionPending || get().workspace !== workspace) return;
   prepareRendererSessionTransaction("session-import");
   set({ sessionTransitionPending: true });
   const target = captureSessionImportSubmission(get());

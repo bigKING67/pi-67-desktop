@@ -16,6 +16,10 @@ describe("PackageTrustRegistry", () => {
   it("classifies bounded HTTP(S) and git-prefixed package sources as Git", () => {
     expect(packageSourceKind("https://gitlab.example.test/team/pi-extension")).toBe("git");
     expect(packageSourceKind("git:gitlab.example.test/team/pi-extension")).toBe("git");
+    for (const source of [
+      "github:example/extension", "github.com/example/extension", "git+https://github.com/example/extension",
+      "git@github.com:example/extension.git"
+    ]) expect(packageSourceKind(source)).toBe("git");
     expect(packageSourceKind("npm:@example/pi-extension")).toBe("npm");
   });
 

@@ -336,7 +336,10 @@ export class HostRequestRouter {
       this.handleControlMutation(origin, request, command, taskState, scheduler);
       return;
     }
-    void scheduler.run(command, () => this.options.dispatchTask(command, taskState, submission?.fingerprint))
+    void scheduler.run(command, () => {
+      if (command.type === "session.import") this.tasks.authorizeRequestContext(request);
+      return this.options.dispatchTask(command, taskState, submission?.fingerprint);
+    })
       .then((result) => sendSuccess(origin, request, result))
       .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
   }
@@ -442,10 +445,8 @@ function sendSuccess(
 
 function connectionClosed(): HostCommandError {
   return new HostCommandError(
-    "CONNECTION_CLOSED",
-    "The Pi runtime service is shutting down.",
-    true,
-    { shuttingDown: true }
+    "CONNECTION_CLOSED", "The Pi runtime service is shutting down.",
+    true, { shuttingDown: true }
   );
 }
 

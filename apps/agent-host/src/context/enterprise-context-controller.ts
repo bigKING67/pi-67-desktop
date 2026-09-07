@@ -15,7 +15,7 @@ import type { CommandResults } from "@pi67/protocol";
 import type { HostEventChannel } from "../host-event-channel.js";
 import { HostCommandError } from "../protocol-error.js";
 import type { WorkspaceContextRegistry } from "../workspace-context-registry.js";
-import { appContextAuthority } from "./context-memory-support.js";
+import { EnterpriseAuthorizationController } from "./enterprise-authorization-controller.js";
 import type { ContextMemoryConfigurationStore } from "./context-memory-configuration.js";
 import type { EnterpriseCredentialBrokerClient } from "./enterprise-credential-broker-client.js";
 import { EnterpriseContextGatewayClient } from "./enterprise-context-gateway-client.js";
@@ -23,16 +23,9 @@ import type { EnterpriseCandidateSubmissionReceipt } from "./enterprise-context-
 import { validateEnterpriseExperienceMethod } from "./experience-enterprise-method.js";
 import type { RecallObservationStore } from "./recall-observation-store.js";
 
-interface PendingEnterpriseAuthorization {
-  endpoint: string;
-  deviceSecret: string;
-  expiresAt: number;
-}
-
 export class EnterpriseContextController {
-  private identity: EnterpriseIdentityStatus = { state: "signed-out" };
   private readonly workspaceBindings = new Map<string, EnterpriseWorkspaceBinding>();
-  private readonly pendingAuthorizations = new Map<string, PendingEnterpriseAuthorization>();
+  private readonly authorization: EnterpriseAuthorizationController;
 
   constructor(
     private readonly configuration: ContextMemoryConfigurationStore,
@@ -40,92 +33,21 @@ export class EnterpriseContextController {
     private readonly events: HostEventChannel,
     private readonly credentials?: EnterpriseCredentialBrokerClient,
     private readonly recall?: RecallObservationStore
-  ) {}
-
-  shutdown(): void {
-    this.credentials?.shutdown();
+  ) {
+    this.authorization = new EnterpriseAuthorizationController(configuration, events, credentials);
   }
 
-  currentIdentity(): EnterpriseIdentityStatus {
-    const credential = this.credentials?.snapshot().credential;
-    if (!credential) return this.identity;
-    if (credential.expiresAt <= Date.now()) {
-      this.identity = {
-        state: "expired",
-        accountId: credential.accountId,
-        userId: credential.userId,
-        ...(credential.displayName === undefined ? {} : { displayName: credential.displayName }),
-        expiresAt: credential.expiresAt
-      };
-      return this.identity;
-    }
-    this.identity = identityForCredential(credential);
-    return this.identity;
+  shutdown(): void { this.authorization.shutdown(); }
+  currentIdentity(): EnterpriseIdentityStatus { return this.authorization.currentIdentity(); }
+  beginAuthorization(): Promise<CommandResults["enterprise.auth.begin"]> {
+    return this.authorization.beginAuthorization();
   }
-
-  async beginAuthorization(): Promise<CommandResults["enterprise.auth.begin"]> {
-    const configuration = await this.configuration.read();
-    const endpoint = configuration.enterpriseGatewayEndpoint;
-    if (!endpoint) {
-      throw new HostCommandError(
-        "UNSUPPORTED",
-        "Configure the Enterprise Context Gateway endpoint before signing in.",
-        true
-      );
-    }
-    if (this.credentials?.snapshot().storage !== "available") {
-      throw new HostCommandError(
-        "RUNTIME_NOT_READY",
-        "System secure storage is unavailable; enterprise sign-in is disabled.",
-        true
-      );
-    }
-    const authorization = await new EnterpriseContextGatewayClient(endpoint)
-      .startDeviceAuthorization();
-    this.pendingAuthorizations.set(authorization.authorizationId, {
-      endpoint,
-      deviceSecret: authorization.deviceSecret,
-      expiresAt: authorization.expiresAt
-    });
-    this.identity = { state: "pending", expiresAt: authorization.expiresAt };
-    this.emitIdentity();
-    return {
-      authorizationId: authorization.authorizationId,
-      verificationUri: authorization.verificationUri,
-      userCode: authorization.userCode,
-      expiresAt: authorization.expiresAt,
-      intervalSeconds: authorization.intervalSeconds
-    };
+  pollAuthorization(authorizationId: string): Promise<CommandResults["enterprise.auth.poll"]> {
+    return this.authorization.pollAuthorization(authorizationId);
   }
-
-  async pollAuthorization(
-    authorizationId: string
-  ): Promise<CommandResults["enterprise.auth.poll"]> {
-    const pending = this.pendingAuthorizations.get(authorizationId);
-    if (!pending) return this.currentIdentity();
-    if (pending.expiresAt <= Date.now()) {
-      this.pendingAuthorizations.delete(authorizationId);
-      this.identity = { state: "expired", expiresAt: pending.expiresAt };
-      this.emitIdentity();
-      return this.identity;
-    }
-    const exchange = await new EnterpriseContextGatewayClient(pending.endpoint)
-      .exchangeDeviceAuthorization(authorizationId, pending.deviceSecret);
-    if (exchange.state === "pending" || !exchange.credential) return this.identity;
-    await this.credentials!.store(exchange.credential);
-    this.pendingAuthorizations.delete(authorizationId);
-    this.identity = identityForCredential(exchange.credential);
-    this.emitIdentity();
-    return this.identity;
-  }
-
-  async disconnect(): Promise<EnterpriseIdentityStatus> {
-    await this.credentials?.clear();
-    this.identity = { state: "signed-out" };
-    this.pendingAuthorizations.clear();
+  disconnect(): Promise<EnterpriseIdentityStatus> {
     this.workspaceBindings.clear();
-    this.emitIdentity();
-    return this.identity;
+    return this.authorization.disconnect();
   }
 
   async listProjects(): Promise<{ items: EnterpriseProjectSummary[]; total: number }> {
@@ -421,9 +343,7 @@ export class EnterpriseContextController {
     return credential;
   }
 
-  private emitIdentity(): void {
-    this.events.sendFor({ type: "enterprise.authChanged", payload: this.identity }, appContextAuthority());
-  }
+
 }
 
 function workspaceFingerprint(workspaceId: string): string {
@@ -440,19 +360,4 @@ function evidenceHash(reference: string): string {
     );
   }
   return match[1]!;
-}
-
-function identityForCredential(credential: {
-  accountId: string;
-  userId: string;
-  displayName?: string;
-  expiresAt: number;
-}): EnterpriseIdentityStatus {
-  return {
-    state: "signed-in",
-    accountId: credential.accountId,
-    userId: credential.userId,
-    ...(credential.displayName === undefined ? {} : { displayName: credential.displayName }),
-    expiresAt: credential.expiresAt
-  };
 }

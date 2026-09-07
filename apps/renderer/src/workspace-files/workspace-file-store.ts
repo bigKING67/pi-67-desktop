@@ -20,7 +20,7 @@ interface WorkspaceFileStoreState {
   activateTab: (workspaceId: string, relativePath: string) => void;
   beginOpen: (workspaceId: string, entry: Pick<WorkspaceFileEntry, "id" | "name" | "relativePath" | "revision">) => void;
   installResolvedEntry: (workspaceId: string, entry: WorkspaceFileEntry) => void;
-  installOpenResult: (workspaceId: string, result: WorkspaceFileOpenResult, discardDraft?: boolean) => void;
+  installOpenResult: (workspaceId: string, result: WorkspaceFileOpenResult, discardDraft?: boolean, preserveCurrentContent?: boolean) => void;
   failOpen: (workspaceId: string, relativePath: string, message: string, missing?: boolean) => void;
   updateContent: (workspaceId: string, relativePath: string, content: string) => void;
   markSaved: (workspaceId: string, entry: WorkspaceFileEntry, snapshot: WorkspaceFileTab) => boolean;
@@ -154,12 +154,12 @@ export const workspaceFileStore = createStore<WorkspaceFileStoreState>((set) => 
     }));
   },
 
-  installOpenResult(workspaceId, result, discardDraft = false) {
+  installOpenResult(workspaceId, result, discardDraft = false, preserveCurrentContent = false) {
     set((state) => updateWorkspace(state, workspaceId, (workspace) => {
       const current = workspace.byPath[result.relativePath];
       if (!current) return workspace;
       if (result.kind !== "text") {
-        if (current.dirty && current.content !== undefined && !discardDraft) {
+        if ((current.dirty || preserveCurrentContent) && current.content !== undefined && !discardDraft) {
           return {
             ...workspace,
             byPath: {
@@ -170,6 +170,7 @@ export const workspaceFileStore = createStore<WorkspaceFileStoreState>((set) => 
                 phase: "ready",
                 revision: result.revision,
                 savedContent: "",
+                dirty: true,
                 conflict: true,
                 reason: result.reason ?? "磁盘文件当前无法作为文本编辑，草稿已保留。",
                 documentVersion: current.documentVersion + 1
@@ -197,7 +198,7 @@ export const workspaceFileStore = createStore<WorkspaceFileStoreState>((set) => 
         };
       }
       const diskContent = result.content ?? "";
-      const preserveDraft = current.dirty && current.content !== undefined && !discardDraft;
+      const preserveDraft = (current.dirty || preserveCurrentContent) && current.content !== undefined && !discardDraft;
       const content = preserveDraft ? current.content! : diskContent;
       const conflict = preserveDraft && current.revision !== undefined && current.revision !== result.revision;
       return {

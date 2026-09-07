@@ -26,7 +26,8 @@ import {
 } from "./plan-mode-controller.js";
 import {
   parseVisionAssistanceEvidence,
-  VISION_ASSISTANCE_ENTRY_TYPE
+  VISION_ASSISTANCE_ENTRY_TYPE,
+  VISION_ASSISTANCE_CONTEXT_TYPE
 } from "./vision-assistance.js";
 
 export const DEFAULT_MESSAGE_PAGE_SIZE = 100;
@@ -76,9 +77,25 @@ export function projectMessagePage(
   const collectedPage = direction === "older"
     ? collectOlder(entries, cursorEntryIndex ?? entries.length, limit, planStatuses)
     : collectNewer(entries, cursorEntryIndex === undefined ? 0 : cursorEntryIndex + 1, limit, planStatuses);
+  const contextRecords = collectedPage.filter(isContextMessageRecord).flatMap((record) => {
+    const entry = entries[record.entryIndex];
+    if (entry?.type !== "message" || entry.message.role !== "user") return [record];
+    const controls: ContextMessageEntryRecord[] = [];
+    for (let index = record.entryIndex - 1; index >= 0; index -= 1) {
+      const previous = entries[index];
+      if (previous?.type === "custom" && previous.customType === VISION_ASSISTANCE_ENTRY_TYPE) continue;
+      if (previous?.type === "custom_message" && previous.display === false
+        && previous.customType === VISION_ASSISTANCE_CONTEXT_TYPE) continue;
+      if (previous?.type !== "custom_message" || previous.display !== false
+        || previous.customType !== "pi67.desktop-attachments.v1") break;
+      const [message] = sessionEntryToContextMessages(previous);
+      if (message !== undefined) controls.unshift({ kind: "message", id: previous.id, message, entryIndex: index });
+    }
+    return [...controls, record];
+  });
   const normalizedMessages = normalizeMessagesWithAdapters(
-    collectedPage.filter(isContextMessageRecord).map((record) => record.message),
-    collectedPage.filter(isContextMessageRecord).map((record) => record.id),
+    contextRecords.map((record) => record.message),
+    contextRecords.map((record) => record.id),
     resolveToolAdapter,
     projectImageAsset,
     resolveToolExecution

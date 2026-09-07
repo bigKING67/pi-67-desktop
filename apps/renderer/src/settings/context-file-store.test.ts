@@ -66,6 +66,23 @@ describe("context file store", () => {
     });
   });
 
+  it("preserves edits made while a save is awaiting acknowledgement", () => {
+    installCatalog();
+    const store = useContextFileStore.getState();
+    store.beginRead("workspace-a", ITEM.id);
+    store.installRead("workspace-a", ITEM.id, readResult("baseline"));
+    store.updateDraft("submitted");
+    store.beginSave();
+    store.updateDraft("newer unsaved text");
+    store.installSave("workspace-a", ITEM.id, "submitted", saveResult());
+    expect(useContextFileStore.getState()).toMatchObject({
+      baselineContent: "submitted", baselineRevision: REVISION_B,
+      draft: "newer unsaved text", dirty: true, phase: "idle"
+    });
+    store.discardDraft();
+    expect(useContextFileStore.getState().draft).toBe("submitted");
+  });
+
   it("preserves a dirty draft across an external revision conflict", () => {
     installCatalog();
     useContextFileStore.getState().beginRead("workspace-a", ITEM.id);

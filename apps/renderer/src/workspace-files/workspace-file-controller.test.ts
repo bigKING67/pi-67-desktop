@@ -12,7 +12,7 @@ import {
   renameWorkspaceEntry,
   saveWorkspaceDraftAs
 } from "./workspace-file-controller.js";
-import { workspaceFileStore } from "./workspace-file-store.js";
+import { serializeWorkspaceFileState, workspaceFileStore } from "./workspace-file-store.js";
 
 vi.mock("../workbench/workspace-host-registration-controller.js", () => ({
   registerRendererWorkspaceWithHost: vi.fn()
@@ -227,6 +227,33 @@ describe("workspace file controller mutations", () => {
     ]);
     expect(workspaceFileStore.getState().workspaces["workspace-a"]?.byPath["src/main.ts"])
       .toMatchObject({ content: "disk content", dirty: false, revision: "revision-1" });
+  });
+
+  it.each([
+    { newContent: "new edit after reload", kind: "text" as const },
+    { newContent: "disk", kind: "text" as const },
+    { newContent: "disk", kind: "binary" as const }
+  ])("preserves $newContent during reload to $kind", async ({ newContent, kind }) => {
+    const entry = fileEntry();
+    const store = workspaceFileStore.getState();
+    const result = { id: entry.id, relativePath: entry.relativePath, kind: "text" as const,
+      totalBytes: 4, revision: entry.revision, content: "disk" };
+    store.beginOpen("workspace-a", entry);
+    store.installOpenResult("workspace-a", result);
+    store.updateContent("workspace-a", entry.relativePath, "approved discard");
+    let release!: (value: Omit<typeof result, "kind"> & { kind: "text" | "binary" }) => void;
+    const pending = new Promise<Omit<typeof result, "kind"> & { kind: "text" | "binary" }>((resolve) => { release = resolve; });
+    const request = vi.spyOn(agentConnectionController, "request").mockReturnValue(pending as never);
+    const reload = reloadWorkspaceFile(workspace(), entry.relativePath);
+    await vi.waitFor(() => expect(request).toHaveBeenCalled());
+    store.updateContent("workspace-a", entry.relativePath, newContent);
+    release({ ...result, kind, content: "new disk content", revision: "revision-2" });
+    await reload;
+    expect(workspaceFileStore.getState().workspaces["workspace-a"]?.byPath[entry.relativePath])
+      .toMatchObject({ content: newContent, dirty: true });
+    expect(serializeWorkspaceFileState().workspaces[0]?.tabs[0]).toMatchObject({
+      draft: newContent, baseRevision: "revision-2"
+    });
   });
 
   it("writes a conflict draft before opening the Save As file", async () => {

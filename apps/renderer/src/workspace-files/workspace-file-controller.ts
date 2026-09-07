@@ -9,6 +9,7 @@ import { ProtocolRequestError } from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { registerRendererWorkspaceWithHost } from "../workbench/workspace-host-registration-controller.js";
+import type { WorkspaceFileTab } from "./workspace-file-state.js";
 import { workspaceFileStore } from "./workspace-file-store.js";
 
 export type WorkspaceFileMutationUiResult<T> =
@@ -20,6 +21,7 @@ async function openWorkspaceFile(
   entry: WorkspaceFileEntry,
   options: {
     discardDraft?: boolean;
+    draftAtStart?: WorkspaceFileTab;
     hostRegistered?: boolean;
     notifyFailure?: boolean;
     preserveDraftOnFailure?: boolean;
@@ -35,6 +37,8 @@ async function openWorkspaceFile(
     });
     return false;
   }
+  const draftAtStart = options.draftAtStart
+    ?? workspaceFileStore.getState().workspaces[workspace.id]?.byPath[entry.relativePath];
   try {
     if (!options.hostRegistered) {
       await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
@@ -45,7 +49,11 @@ async function openWorkspaceFile(
       [],
       { context: { scope: "workspace", workspaceId: workspace.id } }
     );
-    workspaceFileStore.getState().installOpenResult(workspace.id, result, options.discardDraft);
+    const current = workspaceFileStore.getState().workspaces[workspace.id]?.byPath[entry.relativePath];
+    const changedDuringOpen = current?.content !== draftAtStart?.content
+      || current?.documentVersion !== draftAtStart?.documentVersion;
+    const discardDraft = options.discardDraft === true && !changedDuringOpen;
+    workspaceFileStore.getState().installOpenResult(workspace.id, result, discardDraft, changedDuringOpen);
     return true;
   } catch (error) {
     if (!options.preserveDraftOnFailure) {
@@ -220,6 +228,7 @@ export async function reloadWorkspaceFile(
   }
   return openWorkspaceFile(workspace, entry, {
     discardDraft: true,
+    draftAtStart: tab,
     hostRegistered,
     notifyFailure: true,
     preserveDraftOnFailure: tab.dirty

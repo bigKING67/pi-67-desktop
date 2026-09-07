@@ -8,7 +8,8 @@ const REPLACED_PACKAGE_SOURCES = new Map<string, NativeCapabilityReplacement>([
 ]);
 
 export function nativeCapabilityReplacement(source: string): NativeCapabilityReplacement | undefined {
-  const normalized = source.trim().replace(/@(?:\^|~)?\d[^/]*$/u, "");
+  const normalized = /^(npm:(?:@[^/]+\/)?[^@/]+)(?:@[^/]+)?$/u.exec(source.trim())?.[1];
+  if (!normalized) return undefined;
   return REPLACED_PACKAGE_SOURCES.get(normalized);
 }
 
