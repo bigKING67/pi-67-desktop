@@ -24,6 +24,8 @@
 
 ## 本地门禁
 
+以下为依赖安装及可用检查命令清单，并非每次任务都必须顺序执行。
+
 ```bash
 corepack pnpm install --frozen-lockfile
 corepack pnpm run typecheck
@@ -37,8 +39,11 @@ corepack pnpm run build
 corepack pnpm run test:e2e
 ```
 
-先跑与修改最相关的测试，再扩大到完整门禁。TypeScript、浏览器预览、真实 Electron、
-真实平台和安装包证据必须分别报告，不能互相替代。
+按 `AGENTS.md` 的 Validation routing 选择验证范围。先执行受影响包的检查和对应边界门禁；
+跨模块、高风险、候选发布或影响不明时执行聚合 `corepack pnpm run check`。
+输入未变且相关检查已通过时，仅因新失败、未解决疑点或明确门禁要求扩大或重复验证。
+
+TypeScript、浏览器预览、真实 Electron、真实平台和安装包证据必须分别报告，不能互相替代。
 
 ## Git 与发布
 
