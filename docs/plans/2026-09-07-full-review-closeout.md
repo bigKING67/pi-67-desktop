@@ -3,7 +3,7 @@
 Status: active
 Owner: Codex
 Started: 2026-09-07
-Last updated: 2026-09-07
+Last updated: 2026-09-08
 
 ## Goal
 
@@ -31,6 +31,11 @@ Last updated: 2026-09-07
 
 ## Current evidence
 
+- 截至2026-09-08，原42项CONFIRMED已在各自源码/组件/受控packaged范围内整改；不改写原封存报告、失败attempt或修复前74分。RC-BUILD-002由实际生产认证scenario的受控Provider全链路、唯一Session回执与独立复核关闭，不以真实付费认证为其代码缺陷关闭条件。
+- 065ad05 macOS候选的完整源码门禁3654 passed /5 skipped及packaged smoke通过；后续仅认证工具改动，按Provider专项验证，不能称旧候选包含新认证脚本。当前新增Provider专项43/43及独立目标12/12通过。
+- 仍有5项原调查缺口：GAP001-004的自动安全审查中止，GAP008真实Windows零dev/ino长路径。真实Provider对外认证与Computer Use额外窗口验收另列UNVERIFIED，不宣称全平台认证或全仓无风险。
+- 以下三条为审查起点证据，保留作历史基线。
+
 - 起点 HEAD 72cc9a3；现场存在独立的设置 UI、PRODUCT/DESIGN、预览脚本与 e2e WIP，必须保留。
 - 历史 canonical 全仓 inventory 2851 文件，最高一次 REVIEWED 666；后续局部审查没有闭合全仓分母。
 - 最近源码门禁 3563 passed / 5 skipped；不能代替逐文件审查。
@@ -43,7 +48,7 @@ Last updated: 2026-09-07
 
 - [x] 建立当前 inventory 与历史证据可复用映射。
 - [x] 分模块完成全仓文件处置；候选中 8 项验证受阻，尚未满足全部验证完成条件。
-- [ ] 完成必要修复、独立复核和相关门禁。
+- [x] 完成原42项确认问题的范围内修复、独立复核和相关门禁；未决验证缺口单列。
 - [x] 生成并校验源码审查报告，明确 provisional / E2 与运行证据缺口。
 
 ## Validation matrix
@@ -127,3 +132,7 @@ packaged/macOS/Windows：独立记录已验证与未验证，不由源码门禁�
 - dc3c79f85d4b34544a7bd31011060f08f5d3279c完整check通过3654/5 skipped，能力准备及实际app内browser67 MCP握手/19工具发现/精确版本SHA/文档闭包通过。unsigned DMG与ZIP构建成功，Electron smoke走到图片提交失败；原日志/tmp/pi67-dc3c79f-preview.log及18-projected-image-submission-failure.png证明图片已在会话消息正常绘制，DOM alt为pi67-restored-image.png。根因是旧smoke仍定位通用“会话图片”，未同步AssetImage既有真实文件名无障碍合同；修正为message-card内精确文件名，保留Blob、pending、runtime与warm/cold恢复检查。未把该失败记为图片丢失或smoke通过，candidate identity和普通预览open尚未执行。
 
 - 后续Provider验收复用065ad05候选的已核验app.asar（0c5370366ce3a58ee646101ec992806af55b6103ac804411d1d56da8e09ccd4c），不重建、不创建worktree。隔离Profile与本地受控SDK Provider实际走生产configureRuntimeProvider/selectProviderModel及首次Prompt回执：旧时序两次失败，Provider/模型/思考UI均成功、Operation身份一致，但controls缺失。凭据路径可能提前materialize草稿，模型/思考响应早于发送前armed；修正生产认证脚本为模型选择前armed，仍在accepted处冻结完整身份，不削弱校验。第三次实际packaged回归PASS，模型pi67-controlled/hold-open、thinking low与Prompt完整身份匹配，停止及隔离Profile清理成功。证据/tmp/pi67-provider-local-startup.json、同名PNG、log与attempt1/2；新增证据属于controlled Provider startup UI，不能外推真实Provider网络、长时Tool、Windows或签名认证。Provider模块41/41及受影响lint通过；仅工具时序与本plan纳入scoped commit，不改产品运行时或当前候选bytes。
+
+- 完整受控Provider认证继续暴露并修复三处工具问题：授权弹窗的tool-name kind同时用于名称/来源，改用精确“工具名称”accessible label并保留全部安全断言；expectedCwd在启动前realpath，严格匹配macOS /var→/private/var canonical路径；Session收集仅遍历agent/sessions且必须唯一匹配accepted Session ID，保留2000项/64KiB边界，禁止按mtime选另一个Session。回归覆盖更晚修改的错误Session、缺失/重复ID、能力目录排除及原边界拒绝；Provider43/43、lint通过。
+- 原mtime回执的结构PASS经主代理比对发现Session不同，明确保留为身份未绑定的无效验收样本；/tmp/pi67-session-candidates.json中的实际inode证明正确Session与Prompt物理身份一致。最终直接调用当前production scenario、identity reader和receipt contract的95秒受控SDK Provider全链PASS：accepted 40ms、Tool95001ms、Operation95926ms、operation.completed、completion marker=true、receipt Session与selection一致；隔离Profile finally清理成功。无真实Provider网络请求或付费。最终原始证据/tmp/pi67-controlled-full-certification.{json,log,mjs}；初次locator/路径/扫描/mtime失败证据分别保留。
+- full_engineering独立只读复核六文件无阻断，独立12/12目标测试通过，并现场核对最终日志、完整Session匹配、实际harness调用及先前停止路径，同意关闭RC-BUILD-002脚本缺陷范围；realProviderCertification=false保持。原42项CONFIRMED范围内整改收口，剩余5项原调查缺口不绕过或伪称已验证；本批不push、不改候选bytes或无关38项WIP。

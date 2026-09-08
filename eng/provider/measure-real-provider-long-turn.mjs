@@ -98,7 +98,9 @@ try {
     }
   });
   failureStage = "session-receipt";
-  const session = await readIsolatedSessionIdentity(directories.agentDir);
+  const session = await readIsolatedSessionIdentity(directories.agentDir, {
+    expectedSessionId: scenario.selection.authority.sessionId
+  });
   evidence.sessionReceiptVerified = true;
   failureStage = "build-receipt";
   const receipt = createRealProviderLongTurnReceipt({

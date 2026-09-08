@@ -7,26 +7,27 @@ const DEFAULT_DISCOVERY_LIMIT = 2_000;
 const DEFAULT_HEADER_LIMIT_BYTES = 64 * 1024;
 
 export async function readIsolatedSessionIdentity(agentDir, boundaries = {}) {
+  const expectedSessionId = boundaries.expectedSessionId;
+  if (typeof expectedSessionId !== "string" || !expectedSessionId || expectedSessionId.length > 512) {
+    throw new Error("Provider Session discovery requires the accepted Session identity.");
+  }
   const discoveryLimit = boundaries.discoveryLimit ?? DEFAULT_DISCOVERY_LIMIT;
   const headerLimitBytes = boundaries.headerLimitBytes ?? DEFAULT_HEADER_LIMIT_BYTES;
-  const paths = await findJsonlFiles(agentDir, discoveryLimit);
-  if (paths.length === 0) throw new Error("No Pi JSONL Session was created by the Provider turn.");
-  const candidates = await Promise.all(paths.map(async (path) => ({
-    path,
-    metadata: await stat(path)
-  })));
-  candidates.sort((left, right) => right.metadata.mtimeMs - left.metadata.mtimeMs);
-  const selected = candidates[0];
-  const header = await readBoundedSessionHeader(
-    selected.path,
-    selected.metadata.size,
-    headerLimitBytes
-  );
-  if (header?.type !== "session" || typeof header.id !== "string" || !header.id) {
-    throw new Error("Pi JSONL Session header is invalid.");
+  const paths = await findJsonlFiles(join(agentDir, "sessions"), discoveryLimit);
+  const candidates = [];
+  for (const path of paths) {
+    const metadata = await stat(path);
+    const header = await readBoundedSessionHeader(path, metadata.size, headerLimitBytes);
+    if (header?.type === "session" && header.id === expectedSessionId) {
+      candidates.push({ path, metadata });
+    }
   }
+  if (candidates.length !== 1) {
+    throw new Error("Accepted Pi Session identity must resolve to exactly one JSONL file.");
+  }
+  const selected = candidates[0];
   return {
-    id: header.id,
+    id: expectedSessionId,
     relativePath: relative(agentDir, selected.path).replaceAll("\\", "/"),
     byteLength: selected.metadata.size,
     sha256: await sha256File(selected.path)

@@ -78,7 +78,14 @@ function fakeDialog({ toolName, target, cwd, scope = "仅此 Tool Call" }) {
   const clicks = [];
   return {
     clicks,
+    getByLabel(label, options) {
+      if (label !== "工具名称" || options?.exact !== true) throw new Error("Tool identity requires its exact accessible label");
+      return { textContent: async () => toolName };
+    },
     locator(selector) {
+      if (selector.includes('data-security-literal="tool-name"')) {
+        throw new Error("Ambiguous tool-name literal: tool identity and source share this kind");
+      }
       const match = /data-security-literal="([^"]+)"/u.exec(selector);
       return { textContent: async () => values[match?.[1]] };
     },

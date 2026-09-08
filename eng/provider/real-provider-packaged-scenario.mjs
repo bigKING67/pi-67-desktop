@@ -1,3 +1,4 @@
+import { realpath } from "node:fs/promises";
 import { basename } from "node:path";
 import { configureRuntimeProvider, selectProviderModel } from "./real-provider-startup-ui.mjs";
 import { installProviderStartupReceipt, readProviderStartupSelection } from "./real-provider-startup-receipt.mjs";
@@ -36,6 +37,7 @@ export async function runRealProviderPackagedScenario({
 }) {
   let application;
   try {
+    const expectedCwd = await realpath(directories.workspace);
     onStage("packaged-launch");
     application = await electron.launch({
       executablePath: artifact.executablePath,
@@ -112,7 +114,7 @@ export async function runRealProviderPackagedScenario({
     const approvalProtocol = await readRealProviderProtocolProbe(page);
     await authorizeControlledProviderApproval({
       dialog: approval,
-      expectedCwd: directories.workspace,
+      expectedCwd,
       protocol: approvalProtocol
     });
     evidence.toolApproved = true;

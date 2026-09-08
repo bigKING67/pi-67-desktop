@@ -10,7 +10,7 @@ export async function authorizeControlledProviderApproval({
   protocol
 }) {
   const visible = {
-    toolName: await literalText(dialog, "tool-name"),
+    toolName: (await dialog.getByLabel("工具名称", { exact: true }).textContent())?.trim(),
     target: await literalText(dialog, "target"),
     cwd: await literalText(dialog, "cwd"),
     scope: await dialog.getByText(APPROVAL_SCOPE_LABEL, { exact: true }).textContent()
