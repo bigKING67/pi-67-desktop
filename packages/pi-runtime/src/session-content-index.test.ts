@@ -174,10 +174,11 @@ describe("indexed Workspace Session content search", () => {
     const fixture = await createFixture();
     fixture.manager.appendMessage({ role: "user", content: "bounded projection", timestamp: 1 });
     fixture.manager.appendMessage(assistantMessage("bounded response", 2));
-    // Construct the same SDK entries without 20,001 synchronous filesystem appends.
+    // Keep 20,003 real messages, but one bigram per tail message isolates the
+    // branch-entry bound from the independent token-budget and hashing workload.
     const tail = SessionManager.inMemory(fixture.workspace);
     for (let index = 0; index <= 20_000; index += 1) {
-      tail.appendMessage({ role: "user", content: `bounded projection ${index}`, timestamp: index + 3 });
+      tail.appendMessage({ role: "user", content: "ok", timestamp: index + 3 });
     }
     const entries = tail.getEntries();
     entries[0]!.parentId = fixture.manager.getLeafId();
@@ -190,6 +191,14 @@ describe("indexed Workspace Session content search", () => {
       sessionCount: 1,
       incompleteCount: 1
     });
+
+    const database = new DatabaseSync(join(fixture.root, SESSION_CATALOG_DATABASE_FILENAME), { readOnly: true });
+    try {
+      expect(database.prepare("SELECT indexed_entries, incomplete FROM session_content_versions WHERE file_identity = ?")
+        .get(record.fileIdentity)).toMatchObject({ indexed_entries: 20_000, incomplete: 1 });
+    } finally {
+      database.close();
+    }
 
     const originalOpen = SessionManager.open.bind(SessionManager);
     const open = vi.spyOn(SessionManager, "open").mockImplementation((...args) => originalOpen(...args));

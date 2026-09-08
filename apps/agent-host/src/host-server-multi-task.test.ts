@@ -296,20 +296,16 @@ describe("AgentHostServer multi-Task routing", () => {
       const context = task("workspace-soak", `task-soak-${index}`);
       expect((await initialize(fixture.port, context, workspace)).response).toMatchObject({ ok: true });
       expect((await submit(fixture.port, context, `run-soak-${index}`)).response).toMatchObject({ ok: true });
-      await vi.waitFor(
-        () => expect(fixture.runtimes[index]?.submitPrompt).toHaveBeenCalledOnce(),
-        { interval: 1, timeout: 1_000 }
-      );
+      await fixture.runtimes[index]!.waitForPromptStart();
+      expect(fixture.runtimes[index]?.submitPrompt).toHaveBeenCalledOnce();
+      const completed = fixture.port.waitForMessage((value) => (
+        isEventEnvelope(value)
+        && value.type === "operation.completed"
+        && value.context.scope === "task"
+        && value.context.taskId === context.taskId
+      ));
       fixture.runtimes[index]?.completePrompt();
-      await vi.waitFor(
-        () => expect(fixture.port.sent.some((value) => (
-          isEventEnvelope(value)
-          && value.type === "operation.completed"
-          && value.context.scope === "task"
-          && value.context.taskId === context.taskId
-        ))).toBe(true),
-        { interval: 1, timeout: 1_000 }
-      );
+      await completed;
 
       expect((await command(
         fixture.port,

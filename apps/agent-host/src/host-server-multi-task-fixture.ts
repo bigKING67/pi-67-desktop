@@ -21,10 +21,32 @@ import { commandEnvelopeForContext, testTaskContext } from "./protocol-test-fixt
 
 export class FakePort implements ProtocolPort {
   readonly sent: unknown[] = [];
-  readonly close = vi.fn();
+  readonly close = vi.fn(() => {
+    for (const waiter of this.waiters) waiter.reject(new Error("Host port closed before expected message."));
+  });
+  private readonly waiters = new Set<{ accept(message: unknown): void; reject(error: Error): void }>();
   private readonly listeners = new Map<string, Set<(event: unknown) => void>>();
 
-  postMessage(message: unknown): void { this.sent.push(message); }
+  postMessage(message: unknown): void {
+    this.sent.push(message);
+    for (const waiter of this.waiters) waiter.accept(message);
+  }
+
+  waitForMessage(predicate: (message: unknown) => boolean): Promise<unknown> {
+    const existing = this.sent.find(predicate);
+    if (existing !== undefined) return Promise.resolve(existing);
+    return new Promise((resolve, reject) => {
+      const cleanup = () => { clearTimeout(timer); this.waiters.delete(waiter); };
+      const waiter = {
+        accept: (message: unknown) => {
+          if (predicate(message)) { cleanup(); resolve(message); }
+        },
+        reject: (error: Error) => { cleanup(); reject(error); }
+      };
+      const timer = setTimeout(() => waiter.reject(new Error("Timed out waiting for correlated Host message.")), 1_000);
+      this.waiters.add(waiter);
+    });
+  }
 
   addEventListener(type: "message" | "messageerror" | "close", listener: (event: unknown) => void): void {
     const listeners = this.listeners.get(type) ?? new Set();
@@ -41,7 +63,7 @@ export class FakePort implements ProtocolPort {
   }
 }
 
-class FakeRuntime {
+export class FakeRuntime {
   private sessionGeneration = 0;
   private sessionPath: string | undefined;
   private cwd = "/tmp";
@@ -64,7 +86,10 @@ class FakeRuntime {
     this.sessionGeneration += 1;
     return this.snapshot();
   });
+  private markPromptStarted: (() => void) | undefined;
+  private readonly promptStarted = new Promise<void>((resolve) => { this.markPromptStarted = resolve; });
   readonly submitPrompt = vi.fn((_text: string, _attachments: unknown, signal?: AbortSignal) => {
+    this.markPromptStarted?.();
     signal?.addEventListener("abort", () => this.finishPrompt?.(), { once: true });
     return this.promptCompletion;
   });
@@ -74,6 +99,20 @@ class FakeRuntime {
   readonly dispose = vi.fn(async () => undefined);
 
   constructor(readonly id: string) {}
+
+  async waitForPromptStart(): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        this.promptStarted,
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => reject(new Error("Timed out waiting for Runtime prompt start.")), 1_000);
+        })
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   asRuntime(): AgentRuntime {
     return {
@@ -225,16 +264,11 @@ export async function command<T extends AgentCommandType>(
   idempotencyKey?: string
 ): Promise<{ response: ResponseEnvelope<T> }> {
   const request = commandEnvelopeForContext(type, payload, context, 7, idempotencyKey);
+  const pending = port.waitForMessage((value) => (
+    isResponseEnvelope(value) && value.requestId === request.requestId
+  ));
   port.emit(request);
-  let response: ResponseEnvelope<T> | undefined;
-  await vi.waitFor(() => {
-    const candidate = port.sent.find((value) => (
-      isResponseEnvelope(value) && value.requestId === request.requestId
-    ));
-    expect(candidate).toBeDefined();
-    response = candidate as ResponseEnvelope<T>;
-  }, { interval: 1, timeout: 1_000 });
-  if (!response) throw new Error("Expected a correlated Host response.");
+  const response = await pending as ResponseEnvelope<T>;
   return { response };
 }
 
