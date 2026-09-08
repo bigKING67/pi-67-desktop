@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, realpath, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   assertSingleShutdownQuitLifecycle,
@@ -35,6 +35,19 @@ export async function verifyPackagedWelcome({
       throw new Error("Packaged workspace action is unavailable before Agent Host demand.");
     }
     await window.getByLabel("当前状态：等待选择工作区").waitFor({ state: "visible", timeout: 15_000 });
+    if (await window.title() !== "New Money") throw new Error("Packaged product title is stale.");
+    const identity = await application.evaluate(({ app, Menu }) => ({
+      name: app.getName(),
+      userData: app.getPath("userData"),
+      menuLabel: process.platform === "darwin" ? Menu.getApplicationMenu()?.items[0]?.label : null
+    }));
+    if (identity.name !== "pi-67-desktop") throw new Error("Branding changed the storage/keychain application identity.");
+    if (await realpath(identity.userData) !== await realpath(userDataDirectory)) {
+      throw new Error("Branding changed the packaged profile directory.");
+    }
+    if (identity.menuLabel !== null && identity.menuLabel !== "New Money") {
+      throw new Error("Packaged macOS application menu branding is stale.");
+    }
     await verifyMainOnlyDiagnostics({
       agentDir,
       application,
@@ -380,7 +393,7 @@ export function captureRendererBootstrapFailures(window) {
 
 export async function openSettingsSection(window, sectionName) {
   await window.keyboard.press(process.platform === "darwin" ? "Meta+," : "Control+,");
-  const settings = window.getByLabel("π 设置");
+  const settings = window.getByLabel("New Money 设置");
   await settings.waitFor({ state: "visible", timeout: 15_000 });
   const settingsLayout = await settings.evaluate((element) => ({
     columns: getComputedStyle(element).gridTemplateColumns,

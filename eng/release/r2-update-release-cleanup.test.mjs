@@ -11,7 +11,7 @@ const runtimeVersion = "0.84.2";
 describe("R2 update cleanup and command contracts", () => {
   it("cleans only recognized old versions after explicit target-platform confirmation", async () => {
     const current = currentManifest();
-    const old = "Pi-67-Desktop-0.1.0-alpha.29-mac-arm64-unsigned-preview.zip";
+    const old = "New-Money-0.1.0-alpha.29-mac-arm64-unsigned-preview.zip";
     const unknown = "operator-notes.txt";
     let objects = [
       ...current.files.map((entry) => ({ key: entry.name, size: entry.bytes })),
@@ -51,10 +51,10 @@ describe("R2 update cleanup and command contracts", () => {
   });
 
   it("recognizes only exact Pi-67 SemVer artifact identities", () => {
-    expect(parseR2ArtifactKey(`Pi-67-Desktop-${version}-win-x64-unsigned-preview.exe`))
-      .toEqual({ key: `Pi-67-Desktop-${version}-win-x64-unsigned-preview.exe`, version });
-    expect(parseR2ArtifactKey(`Pi-67-Desktop-v${version}-win-x64-unsigned-preview.exe`)).toBeUndefined();
-    expect(parseR2ArtifactKey("Pi-67-Desktop-latest-win-x64-unsigned-preview.exe")).toBeUndefined();
+    expect(parseR2ArtifactKey(`New-Money-${version}-win-x64-unsigned-preview.exe`))
+      .toEqual({ key: `New-Money-${version}-win-x64-unsigned-preview.exe`, version });
+    expect(parseR2ArtifactKey(`New-Money-v${version}-win-x64-unsigned-preview.exe`)).toBeUndefined();
+    expect(parseR2ArtifactKey("New-Money-latest-win-x64-unsigned-preview.exe")).toBeUndefined();
     expect(parseR2ArtifactKey("notes-0.1.0-alpha.29.zip")).toBeUndefined();
   });
 
@@ -81,7 +81,7 @@ function currentManifest() {
     ["mac-arm64-unsigned-preview.dmg", "macos-arm64", 102, "b"],
     ["mac-arm64-unsigned-preview.zip", "macos-arm64", 103, "c"]
   ].map(([suffix, target, bytes, character]) => ({
-    name: `Pi-67-Desktop-${version}-${suffix}`,
+    name: `New-Money-${version}-${suffix}`,
     target,
     bytes,
     sha256: character.repeat(64)

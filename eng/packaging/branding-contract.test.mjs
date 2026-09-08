@@ -6,7 +6,7 @@ import { MACOS_ICON_CONTRACT } from "./macos-icon-contract.mjs";
 
 const repositoryRoot = resolve(import.meta.dirname, "../..");
 
-describe("π display branding contract", () => {
+describe("New Money display branding contract", () => {
   it("uses the locked production icon assets", async () => {
     await expectHash("eng/packaging/pi.ico", "0339a5399508232063654eeeb5ff6e962d85187c8e0637ca288eb6fa9549f70a");
     await expectHash("eng/packaging/pi.icns", "c90bbe84fa921915d2ed85a9ec55cf80c382a8a07e04c90450e1914388f94a87");
@@ -38,17 +38,17 @@ describe("π display branding contract", () => {
 
     for (const requiredLine of [
       "appId: com.pi67.desktop",
-      "productName: Pi-67 Desktop",
-      "  - name: π",
+      "productName: New Money",
+      "  - name: New Money",
       "      - pi67",
       "  icon: eng/packaging/pi.ico",
       "  icon: eng/packaging/pi.icns",
-      "  executableName: Pi-67 Desktop",
-      "  shortcutName: π",
-      "  uninstallDisplayName: π ${version}",
-      "    CFBundleDisplayName: π",
-      "  artifactName: Pi-67-Desktop-${version}-win-x64.${ext}",
-      "  artifactName: Pi-67-Desktop-${version}-mac-arm64.${ext}"
+      "  executableName: New Money",
+      "  shortcutName: New Money",
+      "  uninstallDisplayName: New Money ${version}",
+      "    CFBundleDisplayName: New Money",
+      "  artifactName: New-Money-${version}-win-x64.${ext}",
+      "  artifactName: New-Money-${version}-mac-arm64.${ext}"
     ]) expect(config, requiredLine).toContain(requiredLine);
   });
 });

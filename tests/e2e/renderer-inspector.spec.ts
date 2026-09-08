@@ -276,7 +276,7 @@ test("confirms before replacing a dirty draft with the disk version", async ({ p
   await editor.fill("# Keep this draft\n");
   await fileSurface.getByRole("button", { name: "重新读取", exact: true }).click();
   let reloadDialog = page.getByRole("dialog", { name: "重新读取 README.md" });
-  await expect(reloadDialog).toContainText("无法在 Pi-67 中撤销");
+  await expect(reloadDialog).toContainText("无法在 New Money 中撤销");
   await testInfo.attach("workspace-dirty-reload", {
     body: await reloadDialog.screenshot(),
     contentType: "image/png"

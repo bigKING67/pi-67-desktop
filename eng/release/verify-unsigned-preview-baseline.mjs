@@ -18,7 +18,8 @@ export async function verifyUnsignedPreviewBaseline(directory, tag) {
   const failures = runtimeMatch
     ? validateUnsignedPreviewManifest(manifest, version, runtimeMatch[1])
     : ["invalid runtime identity"];
-  const expectedName = `Pi-67-Desktop-${version}-win-x64-unsigned-preview.exe`;
+  const prefix = (typeof manifest?.files?.[0]?.name === "string" && manifest.files[0].name.startsWith("Pi-67-Desktop-")) ? "Pi-67-Desktop" : "New-Money";
+  const expectedName = `${prefix}-${version}-win-x64-unsigned-preview.exe`;
   const windowsEntries = Array.isArray(manifest?.files)
     ? manifest.files.filter((entry) => entry?.target === "windows-x64")
     : [];

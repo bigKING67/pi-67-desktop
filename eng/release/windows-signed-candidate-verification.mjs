@@ -37,7 +37,7 @@ export async function verifyWindowsSignedCandidateFiles({
     throw new Error("Windows signed candidate installer filename does not match its identity.");
   }
   if (packagedExecutablePath !== undefined
-    && basename(packagedExecutablePath) !== "Pi-67 Desktop.exe") {
+    && basename(packagedExecutablePath) !== basename(identity.packagedExecutable.fileName)) {
     throw new Error("Windows signed candidate packaged executable filename is invalid.");
   }
   const [installerIdentity, packagedExecutableIdentity] = await Promise.all([

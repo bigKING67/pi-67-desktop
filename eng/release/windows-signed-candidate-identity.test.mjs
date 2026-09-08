@@ -53,12 +53,12 @@ describe("Windows signed release candidate identity", () => {
 
   it("rejects installer traversal and packaged executable path drift", () => {
     const installerTraversal = fixtureIdentity();
-    installerTraversal.installer.fileName = "../Pi-67-Desktop-1.2.3-win-x64.exe";
+    installerTraversal.installer.fileName = "../New-Money-1.2.3-win-x64.exe";
     expect(() => assertWindowsSignedCandidateIdentity(installerTraversal))
       .toThrow("installer.fileName must be a basename");
 
     const executableDrift = fixtureIdentity();
-    executableDrift.packagedExecutable.fileName = "other/Pi-67 Desktop.exe";
+    executableDrift.packagedExecutable.fileName = "other/New Money.exe";
     expect(() => assertWindowsSignedCandidateIdentity(executableDrift))
       .toThrow("packagedExecutable.fileName is invalid");
   });
@@ -77,8 +77,8 @@ function fixtureIdentity() {
       architecture: "x64",
       runtime: "@earendil-works/pi-coding-agent@0.81.1"
     },
-    installer: signedFile("Pi-67-Desktop-1.2.3-win-x64.exe", "b".repeat(64)),
-    packagedExecutable: signedFile("win-unpacked/Pi-67 Desktop.exe", "c".repeat(64))
+    installer: signedFile("New-Money-1.2.3-win-x64.exe", "b".repeat(64)),
+    packagedExecutable: signedFile("win-unpacked/New Money.exe", "c".repeat(64))
   };
 }
 

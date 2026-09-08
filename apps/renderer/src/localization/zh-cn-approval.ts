@@ -1,9 +1,9 @@
 export const zhCNApprovalMessages = {
   dialogLabel: "工具单次授权",
-  eyebrow: "π 安全授权",
+  eyebrow: "New Money 安全授权",
   title: "需要单次授权",
   destructiveDialogLabel: "不可逆操作确认",
-  destructiveEyebrow: "π 危险操作",
+  destructiveEyebrow: "New Money 危险操作",
   destructiveTitle: "确认不可逆操作",
   suspiciousTitle: "检测到危险或不可见字符",
   suspiciousDescription: (count: number) => (

@@ -67,7 +67,7 @@ describe("Windows native release gate", () => {
     expect(validateWindowsNativeReleaseGateEvidence({
       expectedArtifact: expectedArtifact(),
       expectedCandidate: candidate,
-      expectedExecutableName: "Pi-67 Desktop.exe",
+      expectedExecutableName: "New Money.exe",
       receipts,
       summary
     })).toContain("certification summary sleep scale is invalid");
@@ -81,7 +81,7 @@ describe("Windows native release gate", () => {
       expectedSignerThumbprint: "E".repeat(40),
       expectedSourceCommit: "a".repeat(40),
       expectedSourceTag: "v1.2.3",
-      installerPath: "Pi-67-Desktop-1.2.3-win-x64.exe",
+      installerPath: "New-Money-1.2.3-win-x64.exe",
       outputPath: "gate.json"
     });
     expect(() => parseWindowsNativeReleaseGateArguments([]))
@@ -96,7 +96,7 @@ describe("Windows native release gate", () => {
 async function createFixture() {
   const directory = await temporaryDirectory();
   const certificationRoot = join(directory, "native-certification");
-  const installerPath = join(directory, "Pi-67-Desktop-1.2.3-win-x64.exe");
+  const installerPath = join(directory, "New-Money-1.2.3-win-x64.exe");
   const candidateIdentityPath = join(directory, "windows-signed-candidate-identity.json");
   const outputPath = join(directory, "windows-native-release-gate.json");
   const installer = Buffer.from("signed-installer-fixture");
@@ -148,7 +148,7 @@ function certificationSummary(candidate) {
     status: "passed",
     evidenceLevel: "windows-native-dpi-ime-sleep-certification-set",
     scales: [1.25, 1.5, 2],
-    executableName: "Pi-67 Desktop.exe",
+    executableName: "New Money.exe",
     executableByteLength: 123_456,
     executableSha256: "c".repeat(64),
     authenticodeSignerThumbprint: "E".repeat(40),
@@ -228,11 +228,11 @@ function candidateIdentity(installer) {
       runtime: "@earendil-works/pi-coding-agent@0.81.1"
     },
     installer: signedFile(
-      "Pi-67-Desktop-1.2.3-win-x64.exe",
+      "New-Money-1.2.3-win-x64.exe",
       installer.byteLength,
       sha256(installer)
     ),
-    packagedExecutable: signedFile("win-unpacked/Pi-67 Desktop.exe", 123_456, "c".repeat(64))
+    packagedExecutable: signedFile("win-unpacked/New Money.exe", 123_456, "c".repeat(64))
   };
 }
 
@@ -264,7 +264,7 @@ function cliArguments() {
   return [
     "--candidate-identity", "candidate.json",
     "--certification-root", "native-certification",
-    "--installer", "Pi-67-Desktop-1.2.3-win-x64.exe",
+    "--installer", "New-Money-1.2.3-win-x64.exe",
     "--expected-repository", "bigKING67/pi-67-desktop",
     "--expected-source-tag", "v1.2.3",
     "--expected-source-commit", "a".repeat(40),

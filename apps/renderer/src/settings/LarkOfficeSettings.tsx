@@ -20,6 +20,7 @@ import { beginLarkUserLogin, loadLarkAuthStatus } from "./lark-auth-controller.j
 import { installSkillPack, loadSkillPacks } from "./skill-pack-controller.js";
 import { useSkillPackStore } from "./skill-pack-store.js";
 import styles from "./LarkOfficeSettings.module.css";
+import tabStyles from "./SettingsPrimitives.module.css";
 
 const AUTH_POLL_INTERVAL_MS = 1_500;
 type LarkSettingsTab = "user" | "application";
@@ -151,16 +152,16 @@ export function LarkOfficeSettings() {
     selectedKey={selectedTab}
     onSelectionChange={(key) => setSelectedTab(key === "application" ? "application" : "user")}
   >
-    <TabList aria-label="飞书身份设置" className={styles.tabList!}>
-      <Tab className={styles.tab!} id="user">
+    <TabList aria-label="飞书身份设置" className={tabStyles.tabList!}>
+      <Tab className={tabStyles.tab!} id="user">
         <UserRound aria-hidden="true" size={15} />用户授权
       </Tab>
-      <Tab className={styles.tab!} id="application">
+      <Tab className={tabStyles.tab!} id="application">
         <Bot aria-hidden="true" size={15} />应用连接
       </Tab>
     </TabList>
 
-    <TabPanel className={styles.tabPanel!} id="user">
+    <TabPanel className={tabStyles.tabPanel!} id="user">
       <SettingsSectionBlock
         title="用户授权"
         description="使用你的飞书身份访问个人云空间、日历、消息、任务和邮箱；这是办公能力的主要授权入口。"
@@ -189,7 +190,7 @@ export function LarkOfficeSettings() {
           />
           <SettingsRow
             title="本机授权"
-            description="OAuth Token 仅由本机 lark-cli 保存；π、Renderer 与 Pi Session 不读取或持久化它。"
+            description="OAuth Token 仅由本机 lark-cli 保存；New Money、Renderer 与 Pi Session 不读取或持久化它。"
             value={tokenStatusLabel(snapshot?.tokenStatus)}
           />
           <SettingsRow
@@ -234,7 +235,7 @@ export function LarkOfficeSettings() {
       </SettingsSectionBlock>
     </TabPanel>
 
-    <TabPanel className={styles.tabPanel!} id="application">
+    <TabPanel className={tabStyles.tabPanel!} id="application">
       <LarkApplicationSettings
         canInstallLarkCli={larkPack?.canInstall === true}
         installingLarkCli={installingCli}

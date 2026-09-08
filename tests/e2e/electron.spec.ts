@@ -61,7 +61,7 @@ test("initializes and trusts a workspace through the on-demand real Agent Host",
     await window.getByRole("button", { name: "选择工作区" }).click();
     await expect(window.getByText("Pi SDK 已就绪", { exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(window.getByLabel("Pi conversation")).toBeVisible();
-    await expect(window.getByLabel("π 设置")).toHaveCount(0);
+    await expect(window.getByLabel("New Money 设置")).toHaveCount(0);
     await expect(window.locator('[data-testid="conversation-row"]')).toHaveCount(1);
     await expect(window.getByTestId("inspector-toggle")).toBeVisible();
 

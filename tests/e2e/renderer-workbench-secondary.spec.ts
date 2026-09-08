@@ -90,13 +90,13 @@ test("opens Settings, update, and help from the lower-left help menu", async ({ 
 
   await helpButton.click();
   await page.getByRole("menuitem", { name: "检查更新" }).click();
-  await expect(page.getByRole("dialog", { name: "Pi-67 更新" })).toBeVisible();
-  await page.getByRole("dialog", { name: "Pi-67 更新" })
+  await expect(page.getByRole("dialog", { name: "New Money 更新" })).toBeVisible();
+  await page.getByRole("dialog", { name: "New Money 更新" })
     .getByRole("button", { name: "关闭" }).click();
 
   await helpButton.click();
   await page.getByRole("menuitem", { name: "设置", exact: true }).click();
-  await expect(page.getByLabel("π 设置")).toBeVisible();
+  await expect(page.getByLabel("New Money 设置")).toBeVisible();
   await expect(page.getByRole("heading", { name: "外观", exact: true, level: 1 })).toBeVisible();
 
   await page.getByRole("button", { name: "返回工作台" }).click();

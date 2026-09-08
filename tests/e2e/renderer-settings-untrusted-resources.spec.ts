@@ -18,7 +18,7 @@ test("explains why project skills are unavailable for an untrusted workspace", a
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "技能", exact: true }).click();
   const workspace = settings.getByTestId("skill-settings-workspace");

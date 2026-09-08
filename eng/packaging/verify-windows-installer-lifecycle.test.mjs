@@ -95,20 +95,20 @@ describe("Windows installer lifecycle contract", () => {
 
   it("resolves the exact current-version x64 NSIS artifact", () => {
     expect(resolveWindowsInstallerPath("C:\\release", "0.1.0-alpha.3"))
-      .toBe(join("C:\\release", "Pi-67-Desktop-0.1.0-alpha.3-win-x64.exe"));
+      .toBe(join("C:\\release", "New-Money-0.1.0-alpha.3-win-x64.exe"));
     expect(() => resolveWindowsInstallerPath("C:\\release", "latest"))
       .toThrow("Invalid package version");
   });
 
   it("keeps the silent NSIS destination argument last and rejects control characters", () => {
-    expect(buildNsisInstallArguments("C:\\Pi-67 Desktop 中文"))
-      .toEqual(["/S", "/D=C:\\Pi-67 Desktop 中文"]);
-    expect(buildNsisUpdateArguments("C:\\Pi-67 Desktop 中文"))
+    expect(buildNsisInstallArguments("C:\\New Money 中文"))
+      .toEqual(["/S", "/D=C:\\New Money 中文"]);
+    expect(buildNsisUpdateArguments("C:\\New Money 中文"))
       .toEqual([
         "--updated",
         "--force-run",
         "/S",
-        "/D=C:\\Pi-67 Desktop 中文"
+        "/D=C:\\New Money 中文"
       ]);
     expect(() => buildNsisInstallArguments("C:\\Pi-67\nDesktop"))
       .toThrow("single-line path");
@@ -132,7 +132,7 @@ describe("Windows installer lifecycle contract", () => {
     await expect(prepareInitialDesktopShortcutEvidence({
       baseline: { version: "0.1.0-alpha.33" },
       desktopShortcutPath: shortcutPath,
-      installedExecutablePath: join(root, "Pi-67 Desktop.exe")
+      installedExecutablePath: join(root, "New Money.exe")
     })).resolves.toEqual({
       exists: false,
       repairScenario: "missing-before-cross-version-upgrade"
@@ -157,9 +157,9 @@ describe("Windows installer lifecycle contract", () => {
   it("allows bounded time for deferred NSIS self-cleanup", async () => {
     expect(WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS).toBe(90_000);
     const root = await createTemporaryDirectory();
-    const installDirectory = join(root, "Pi-67 Desktop");
+    const installDirectory = join(root, "New Money");
     await mkdir(installDirectory, { recursive: true });
-    await writeFile(join(installDirectory, "Uninstall Pi-67 Desktop.exe"), "pending");
+    await writeFile(join(installDirectory, "Uninstall New Money.exe"), "pending");
     const cleanup = setTimeout(() => {
       void rm(installDirectory, { recursive: true, force: true });
     }, 75);
@@ -346,15 +346,15 @@ describe("Windows installer lifecycle contract", () => {
 
   it("accepts only an older exact Windows x64 installer as the upgrade baseline", () => {
     expect(resolveUpgradeBaselineInstaller(
-      "C:\\release\\Pi-67-Desktop-0.1.0-alpha.2-win-x64.exe",
+      "C:\\release\\New-Money-0.1.0-alpha.2-win-x64.exe",
       "0.1.0-alpha.3"
     )).toMatchObject({ version: "0.1.0-alpha.2" });
     expect(resolveUpgradeBaselineInstaller(
-      "C:\\release\\Pi-67-Desktop-0.1.0-alpha.1-win-x64-unsigned-preview.exe",
+      "C:\\release\\New-Money-0.1.0-alpha.1-win-x64-unsigned-preview.exe",
       "0.1.0-alpha.3"
     )).toMatchObject({ version: "0.1.0-alpha.1" });
     expect(() => resolveUpgradeBaselineInstaller(
-      "C:\\release\\Pi-67-Desktop-0.1.0-alpha.3-win-x64.exe",
+      "C:\\release\\New-Money-0.1.0-alpha.3-win-x64.exe",
       "0.1.0-alpha.3"
     )).toThrow("must be an older");
     expect(() => resolveUpgradeBaselineInstaller("C:\\release\\other.exe", "0.1.0-alpha.3"))

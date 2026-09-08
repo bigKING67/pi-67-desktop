@@ -36,7 +36,7 @@ export function KeyboardShortcutSettings() {
   return (
     <SettingsSectionBlock
       title="键盘快捷键"
-      description="只可绑定 Pi-67 allowlist 中的应用动作；不会执行 Shell、Extension command 或项目脚本。"
+      description="只可绑定 New Money allowlist 中的应用动作；不会执行 Shell、Extension command 或项目脚本。"
       actions={<Button className={styles.resetAll!} onPress={() => {
         resetAllDesktopShortcuts();
         setMessage("已恢复全部默认快捷键。");

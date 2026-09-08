@@ -48,12 +48,12 @@ describe("signed stable release manifest contract", () => {
   it("rejects extra product-like files outside the exact stable allowlist", () => {
     expect(findUnexpectedSignedReleaseProductArtifacts("1.2.3", [
       ...files("1.2.3").map((entry) => entry.name),
-      "Pi-67-Desktop-debug-win-x64.exe",
-      "Pi-67-Desktop-1.2.2-mac-arm64.dmg",
+      "New-Money-debug-win-x64.exe",
+      "New-Money-1.2.2-mac-arm64.dmg",
       "windows-native-release-gate.json"
     ])).toEqual([
-      "Pi-67-Desktop-debug-win-x64.exe",
-      "Pi-67-Desktop-1.2.2-mac-arm64.dmg"
+      "New-Money-debug-win-x64.exe",
+      "New-Money-1.2.2-mac-arm64.dmg"
     ]);
   });
 });
@@ -61,19 +61,19 @@ describe("signed stable release manifest contract", () => {
 function files(version) {
   return [
     {
-      name: `Pi-67-Desktop-${version}-win-x64.exe`,
+      name: `New-Money-${version}-win-x64.exe`,
       bytes: 1,
       sha256: "1".repeat(64),
       target: "windows-x64"
     },
     {
-      name: `Pi-67-Desktop-${version}-mac-arm64.dmg`,
+      name: `New-Money-${version}-mac-arm64.dmg`,
       bytes: 1,
       sha256: "2".repeat(64),
       target: "macos-arm64"
     },
     {
-      name: `Pi-67-Desktop-${version}-mac-arm64.zip`,
+      name: `New-Money-${version}-mac-arm64.zip`,
       bytes: 1,
       sha256: "3".repeat(64),
       target: "macos-arm64"

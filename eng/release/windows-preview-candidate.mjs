@@ -93,11 +93,12 @@ export function assertWindowsPreviewCandidateIdentity(value, expected = {}) {
     || !value.application.runtime.startsWith("@earendil-works/pi-coding-agent@")) {
     failures.push("invalid application identity");
   }
-  const expectedInstaller = `Pi-67-Desktop-${value?.application?.version}-win-x64.exe`;
+  const legacy = value?.packagedExecutable?.fileName === "win-unpacked/Pi-67 Desktop.exe";
+  const expectedInstaller = `${legacy ? "Pi-67-Desktop" : "New-Money"}-${value?.application?.version}-win-x64.exe`;
   validateFileIdentity(value?.installer, expectedInstaller, "installer", failures);
   validateFileIdentity(
     value?.packagedExecutable,
-    "win-unpacked/Pi-67 Desktop.exe",
+    legacy ? "win-unpacked/Pi-67 Desktop.exe" : "win-unpacked/New Money.exe",
     "packaged executable",
     failures
   );
@@ -142,7 +143,7 @@ export async function verifyWindowsPreviewCandidateFiles({
   if (basename(installerPath) !== identity.installer.fileName) {
     throw new Error("Windows preview candidate installer filename does not match its identity.");
   }
-  if (basename(packagedExecutablePath) !== "Pi-67 Desktop.exe") {
+  if (basename(packagedExecutablePath) !== basename(identity.packagedExecutable.fileName)) {
     throw new Error("Windows preview candidate packaged executable filename is invalid.");
   }
   const [installer, packagedExecutable] = await Promise.all([

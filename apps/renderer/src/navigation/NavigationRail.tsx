@@ -80,9 +80,9 @@ export function NavigationRail({
       aria-label={messages.navigation.region}
     >
       <header className={styles.railHeader}>
-        <div className={styles.railBrand} aria-label="Pi-67 对话工作台" data-testid="navigation-brand">
+        <div className={styles.railBrand} aria-label="New Money 工作台" data-testid="navigation-brand">
           <img alt="" aria-hidden="true" src={piIconUrl} />
-          <strong>Pi-67</strong>
+          <strong>New Money</strong>
         </div>
         <Button
           className={styles.workspaceAdd!}

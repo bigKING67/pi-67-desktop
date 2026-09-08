@@ -20,7 +20,7 @@ afterEach(async () => {
 describe("Windows signed candidate file verification", () => {
   it("binds the downloaded installer bytes to source, workflow, and Publisher identity", async () => {
     const directory = await temporaryDirectory();
-    const installerPath = join(directory, "Pi-67-Desktop-1.2.3-win-x64.exe");
+    const installerPath = join(directory, "New-Money-1.2.3-win-x64.exe");
     const identityPath = join(directory, "windows-signed-candidate-identity.json");
     const installer = Buffer.from("signed-installer-fixture");
     await writeFile(installerPath, installer);
@@ -52,7 +52,7 @@ describe("Windows signed candidate file verification", () => {
       installerPath: wrongNamePath
     })).rejects.toThrow("filename");
 
-    const installerPath = join(directory, "Pi-67-Desktop-1.2.3-win-x64.exe");
+    const installerPath = join(directory, "New-Money-1.2.3-win-x64.exe");
     await writeFile(installerPath, "different bytes");
     await expect(verifyWindowsSignedCandidateFiles({
       ...expectedArguments(),
@@ -159,12 +159,12 @@ function identity(installer) {
       runtime: "@earendil-works/pi-coding-agent@0.81.1"
     },
     installer: signedFile(
-      "Pi-67-Desktop-1.2.3-win-x64.exe",
+      "New-Money-1.2.3-win-x64.exe",
       installer.byteLength,
       sha256(installer)
     ),
     packagedExecutable: signedFile(
-      "win-unpacked/Pi-67 Desktop.exe",
+      "win-unpacked/New Money.exe",
       100,
       "c".repeat(64)
     )

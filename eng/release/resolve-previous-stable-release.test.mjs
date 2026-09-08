@@ -83,7 +83,7 @@ function release(id, tagName, overrides = {}) {
     immutable: true,
     assets: [
       asset(id * 10 + 1, "release-manifest.json", 100),
-      asset(id * 10 + 2, `Pi-67-Desktop-${version}-win-x64.exe`, 1_000)
+      asset(id * 10 + 2, `New-Money-${version}-win-x64.exe`, 1_000)
     ],
     ...overrides
   };

@@ -13,17 +13,18 @@ describe("settings navigation", () => {
       items: group.items.map(({ id, label }) => ({ id, label }))
     }))).toEqual([
       {
-        label: "应用",
+        label: "通用",
         items: [
-          { id: "account", label: "账户" },
           { id: "general", label: "外观" },
-          { id: "context-memory", label: "上下文与记忆" }
+          { id: "account", label: "账户与数据" }
         ]
       },
       {
-        label: "Pi",
+        label: "AI 配置",
         items: [
           { id: "providers", label: "模型" },
+          { id: "context-memory", label: "上下文与记忆" },
+          { id: "vision", label: "视觉辅助" },
           { id: "extensions", label: "扩展" },
           { id: "skills", label: "技能" },
           { id: "prompts", label: "提示词模板" },
@@ -31,15 +32,9 @@ describe("settings navigation", () => {
         ]
       },
       {
-        label: "办公",
+        label: "连接与集成",
         items: [
-          { id: "lark", label: "飞书" }
-        ]
-      },
-      {
-        label: "能力与集成",
-        items: [
-          { id: "vision", label: "视觉辅助" },
+          { id: "lark", label: "飞书" },
           { id: "integrations", label: "浏览器集成" }
         ]
       },

@@ -212,7 +212,7 @@ async function expectNoHorizontalPageOverflow(page: Page): Promise<void> {
 }
 
 async function openSettingsSection(page: Page, sectionName: RegExp) {
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   if (await settings.count() === 0) {
     await page.getByRole("button", { name: "帮助与设置" }).click();
     await page.getByRole("menu", { name: "帮助与设置" })

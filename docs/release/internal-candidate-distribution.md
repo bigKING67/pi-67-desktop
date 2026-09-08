@@ -22,15 +22,28 @@ GitHub Release，也不触发 unsigned-preview promotion。签名、公证和公
 每轮只分发以下三个带精确 package version 的产品文件，不使用 `latest` 等模糊名称：
 
 ```text
-Pi-67-Desktop-<version>-win-x64.exe
-Pi-67-Desktop-<version>-mac-arm64.dmg
-Pi-67-Desktop-<version>-mac-arm64.zip
+New-Money-<version>-win-x64.exe
+New-Money-<version>-mac-arm64.dmg
+New-Money-<version>-mac-arm64.zip
 ```
 
 Windows candidate 还必须保留 `windows-preview-candidate-identity.json` 作为构建证据。macOS 构建必须保留
 `macos-preview-candidate-identity.json` 和 `macos-preview-packaged-smoke.json`，用于把 app、DMG、ZIP、
 packaged smoke、source SHA、version 和 Pi runtime 绑定为同一候选。上述 identity/receipt、`win-unpacked`、
 验证截图和日志都不上传到面向测试者的飞书产品目录。
+
+## First New Money installation
+
+首次名称迁移需要手动安装：旧版更新器固定识别旧安装包/应用包名称，不向其发布无法识别的新名称包。
+
+- macOS：先完全退出旧应用。若已安装的是 `Pi-67 Desktop.app`，将该应用包改名为
+  `New Money.app` 后，以新版同名应用替换；若目标位置已有同名包，先核对其版本与来源。
+  只替换应用包，不改动 Application Support 中的 `pi-67-desktop` 数据目录或 Pi Profile。
+- Windows：先完全退出旧应用，再运行新版 NSIS，沿用已有安装目录。应用 ID 和安装注册身份保持
+  不变；安装、旧快捷方式处理、重启及卸载后数据保留仍需 Windows 真机验收。
+- 安装后先检查原工作区、历史会话和设置，再进行功能测试。不要以空白新 Profile 的启动成功
+  替代已有数据兼容结论。macOS 当前已观察到正常用户 Profile 的工作区和会话目录加载；
+  未测试真实凭据解密/模型请求，Windows 本次仍未验证。
 
 ## Default development loop
 

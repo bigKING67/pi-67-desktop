@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const execFile = promisify(execFileCallback);
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 
-const PRODUCT_ARTIFACT_NAME = /^Pi-67-Desktop-\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?-(?:win-x64(?:-unsigned-preview)?\.exe|mac-arm64(?:-unsigned-preview)?\.(?:dmg|zip))(?:\.blockmap)?$/u;
+const PRODUCT_ARTIFACT_NAME = /^(?:New-Money|Pi-67-Desktop)-\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?-(?:win-x64(?:-unsigned-preview)?\.exe|mac-arm64(?:-unsigned-preview)?\.(?:dmg|zip))(?:\.blockmap)?$/u;
 const WINDOWS_CANDIDATE_DIRECTORY = /^windows-candidate-\d+-\d+$/u;
 const LEGACY_WINDOWS_CANDIDATE_DIRECTORY = /^windows-alpha\d+-\d+$/u;
 const VALIDATION_WINDOWS_CANDIDATE_DIRECTORY = /^alpha\d+-windows-candidate$/u;
@@ -247,27 +247,28 @@ async function optionalMetadata(path) {
 }
 
 async function probeMacosPreviewProcesses(root) {
-  const executable = join(
-    resolve(root),
-    "artifacts/release/mac-arm64/Pi-67 Desktop.app/Contents/MacOS/Pi-67 Desktop"
-  );
+  const executables = ["New Money", "Pi-67 Desktop"].map((name) => join(
+    resolve(root), `artifacts/release/mac-arm64/${name}.app/Contents/MacOS/${name}`
+  ));
   const { stdout } = await execFile("/bin/ps", ["-ww", "-axo", "pid=,command="], { maxBuffer: 4 * 1024 * 1024 });
   return stdout.split("\n").flatMap((line) => {
     const match = line.match(/^\s*(\d+)\s+(.+)$/u);
     if (!match) return [];
     const command = match[2];
-    return command === executable || command.startsWith(`${executable} `) ? [`pid=${match[1]}`] : [];
+    return executables.some((executable) => command === executable || command.startsWith(`${executable} `)) ? [`pid=${match[1]}`] : [];
   });
 }
 
 async function probeWindowsPreviewProcesses() {
-  const { stdout } = await execFile(
+  const results = await Promise.all(["New Money.exe", "Pi-67 Desktop.exe"].map((name) => execFile(
     "tasklist.exe",
-    ["/FI", "IMAGENAME eq Pi-67 Desktop.exe", "/FO", "CSV", "/NH"],
+    ["/FI", `IMAGENAME eq ${name}`, "/FO", "CSV", "/NH"],
     { maxBuffer: 1024 * 1024 }
-  );
-  const rows = stdout.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
-  return rows.filter((line) => !line.startsWith("INFO:")).map((line) => line.slice(0, 200));
+  )));
+  return results.flatMap(({ stdout }) => stdout.split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("INFO:"))
+    .map((line) => line.slice(0, 200)));
 }
 
 function formatBytes(bytes) {

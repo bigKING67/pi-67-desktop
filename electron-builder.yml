@@ -1,6 +1,6 @@
 appId: com.pi67.desktop
-# Keep the release/bundle filename stable while platform display metadata uses the π brand.
-productName: Pi-67 Desktop
+# Generate the app executable and Electron Helpers from the same public name.
+productName: New Money
 icon: eng/packaging/icon.png
 asar: true
 directories:
@@ -41,12 +41,12 @@ extraResources:
   - from: artifacts/capabilities/current
     to: capabilities
 protocols:
-  - name: π
+  - name: New Money
     schemes:
       - pi67
 win:
   icon: eng/packaging/pi.ico
-  executableName: Pi-67 Desktop
+  executableName: New Money
   extraResources:
     - from: artifacts/native/windows-x64/pi67-package-worker-job.exe
       to: native/pi67-package-worker-job.exe
@@ -54,18 +54,18 @@ win:
     - target: nsis
       arch:
         - x64
-  artifactName: Pi-67-Desktop-${version}-win-x64.${ext}
+  artifactName: New-Money-${version}-win-x64.${ext}
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
   include: eng/packaging/installer.nsh
   deleteAppDataOnUninstall: false
-  shortcutName: π
-  uninstallDisplayName: π ${version}
+  shortcutName: New Money
+  uninstallDisplayName: New Money ${version}
 mac:
   icon: eng/packaging/pi.icns
-  executableName: Pi-67 Desktop
+  executableName: New Money
   target:
     - target: dmg
       arch:
@@ -73,7 +73,7 @@ mac:
     - target: zip
       arch:
         - arm64
-  artifactName: Pi-67-Desktop-${version}-mac-arm64.${ext}
+  artifactName: New-Money-${version}-mac-arm64.${ext}
   category: public.app-category.developer-tools
   minimumSystemVersion: 12.0.0
   hardenedRuntime: true
@@ -82,7 +82,7 @@ mac:
   entitlements: eng/packaging/entitlements.mac.plist
   entitlementsInherit: eng/packaging/entitlements.mac.plist
   extendInfo:
-    CFBundleDisplayName: π
+    CFBundleDisplayName: New Money
 publish:
   provider: github
   owner: bigKING67

@@ -42,6 +42,7 @@ import {
   SettingsSectionBlock
 } from "./SettingsPrimitives.js";
 import styles from "./SkillSettingsWorkspace.module.css";
+import tabStyles from "./SettingsPrimitives.module.css";
 
 type CapabilityState = ReturnType<typeof useDesktopCapabilitySnapshot>;
 type GlobalSkillSelection =
@@ -60,18 +61,18 @@ export function SkillSettingsWorkspace() {
       defaultSelectedKey="global"
       data-testid="skill-settings-workspace"
     >
-      <TabList aria-label="技能可用范围" className={styles.tabList!}>
-        <Tab className={styles.tab!} id="global">
+      <TabList aria-label="技能可用范围" className={tabStyles.tabList!}>
+        <Tab className={tabStyles.tab!} id="global">
           <Globe2 aria-hidden="true" size={15} />全局可用
         </Tab>
-        <Tab className={styles.tab!} id="project">
+        <Tab className={tabStyles.tab!} id="project">
           <FolderOpen aria-hidden="true" size={15} />项目专属
         </Tab>
       </TabList>
-      <TabPanel className={styles.tabPanel!} id="global">
+      <TabPanel className={tabStyles.tabPanel!} id="global">
         <GlobalSkillPanel capability={capability} />
       </TabPanel>
-      <TabPanel className={styles.tabPanel!} id="project">
+      <TabPanel className={tabStyles.tabPanel!} id="project">
         <ProjectSkillPanel />
       </TabPanel>
     </Tabs>
@@ -271,7 +272,7 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
       title="内置技能套件"
       description={suites.length > 0
         ? `${suites.length} 个技能套件，共 ${skillCount} 个技能；随 Desktop 提供并对所有项目可用。`
-        : "随 Pi-67 Desktop 提供并对所有项目可用；不通过第三方扩展包重复安装。"}
+        : "随 New Money 提供并对所有项目可用；不通过第三方扩展包重复安装。"}
     >
       {capability.error ? <SettingsNotice tone="danger">{capability.error}</SettingsNotice> : null}
       {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
@@ -319,7 +320,7 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
       })}</SettingsCatalog> : (
         <SettingsNotice>
           {capability.snapshot === undefined || capability.phase === "loading"
-            ? "正在读取 Pi-67 Desktop 内置技能套件…"
+            ? "正在读取 New Money 内置技能套件…"
             : "当前版本没有可显示的内置技能套件。"}
         </SettingsNotice>
       )}

@@ -131,7 +131,7 @@ try {
   await nativeReplacedExtensionRow.click();
   await extensionDetail.waitFor({ state: "visible", timeout: 15_000 });
   await extensionList.waitFor({ state: "hidden", timeout: 15_000 });
-  await extensionDetail.getByText("旧的第三方子代理扩展；Pi-67 Desktop 使用原生子代理并不加载此包。", { exact: true })
+  await extensionDetail.getByText("旧的第三方子代理扩展；New Money 使用原生子代理并不加载此包。", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
   await extensionDetail.getByText("原生能力替代", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
@@ -242,7 +242,7 @@ try {
   await settingsNavigation.getByRole("button", { name: "工作规则", exact: true }).click();
   const ruleSettingsWorkspace = workspaceSettings.getByTestId("rule-settings-workspace");
   await ruleSettingsWorkspace.locator("details").first().locator("summary").click();
-  const managedRuleCatalog = ruleSettingsWorkspace.getByRole("list", { name: "Pi-67 内置规则", exact: true });
+  const managedRuleCatalog = ruleSettingsWorkspace.getByRole("list", { name: "New Money 内置规则", exact: true });
   const managedRuleRows = managedRuleCatalog.getByRole("listitem");
   await managedRuleRows.first().waitFor({ state: "visible", timeout: 15_000 });
   if (await managedRuleRows.count() !== 11) {

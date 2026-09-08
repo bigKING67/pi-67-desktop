@@ -77,11 +77,17 @@ completing a real session without learning terminal UI conventions first.
   empty states, low-contrast metadata, and generic AI visual motifs.
 - Light and dark modes share information architecture, spacing, type roles,
   component behavior, and motion.
-- The application mark uses the locked production asset: a pure white rotationally
-  symmetric `π` glyph on a pure black rounded square. Do not redraw, recolor,
-  decorate, or bake the display name into the icon. Product-facing text uses `π`;
-  the navigation rail pairs the mark with the compact `Pi-67` wordmark, while
-  technical release identifiers may retain `Pi-67 Desktop` where required.
+- The product wordmark is `New Money`; retain the existing locked production
+  graphical mark (`pi-icon-64.png`, the current 67 identity). Do not redraw,
+  recolor, decorate or replace it with a mode icon. Public brand copy expresses
+  `用 AI 创造新的价值。`
+- Brand identity and mode identity are separate: Work uses a bull and future
+  Chat uses a horse when those mode controls are designed. This naming change
+  adds neither mode controls nor mode assets. Do not explain private wordplay
+  in product copy or add financial symbols.
+- Native application assets remain the existing white rotationally symmetric
+  glyph on a black rounded square. Technical release identifiers retain
+  `Pi-67 Desktop` during this bounded in-product naming change.
 - The vector master, Windows icon, and in-product icons retain the full brand
   canvas. The macOS ICNS is a platform-calibrated derivative: the unchanged mark
   and black tile occupy `824px` inside a transparent `1024px` canvas, centered
@@ -121,13 +127,13 @@ completing a real session without learning terminal UI conventions first.
   and dialogs retain their stateful boundaries.
 - The navigation rail is the single persistent product-brand location inside
   the conversation workbench. Its brand lockup is one non-wrapping row containing
-  the locked π mark and `Pi-67`; `会话工作台` remains assistive context rather than
+  the existing brand mark and `New Money`; `会话工作台` remains assistive context rather than
   a visible subtitle. The TitleBar is current-context UI, not a second
   brand lockup: while navigation is visible it shows the selected conversation
   title, or the Workspace name when no conversation is selected; while navigation
   is hidden it shows `Workspace / conversation` so location remains recoverable.
   Catalog-only stopped conversations use their Catalog title before they are
-  opened. The π mark appears in the TitleBar only when no Workspace context exists.
+  opened. The brand mark appears in the TitleBar only when no Workspace context exists.
 - Settings uses the plain TitleBar context `设置`. Compact widths may omit the
   Workspace prefix, but preserve the current surface title until the existing
   narrow-window action layout requires hiding the whole context lockup. Settings
@@ -548,7 +554,7 @@ loading error where the operation can produce those states
   opaque Workspace file reference instead of copying a source body into Workbench.
 - Directory rows expand or collapse. Clicking an ordinary file opens or focuses
   its central Pi-67 file tab; source never gets squeezed into the Inspector.
-  The row menu presents `在 Pi-67 中打开`, system-default open, relative-path
+  The row menu presents `在 New Money 中打开`, system-default open, relative-path
   copy, absolute-path copy, Finder/Explorer reveal, rename, and confirmed trash
   in that order, and the native right-click menu keeps the same management actions.
   Successful path copy owns visible feedback. The toolbar combines file/folder
@@ -581,7 +587,7 @@ loading error where the operation can produce those states
   copy, and trash boundary rechecks persisted Workspace identity, trust, `lstat`,
   canonical containment, `.git` exclusion, and the allowed entry kind. Symlinks,
   sockets, devices, FIFOs, traversal, and platform-reserved names fail closed.
-- `在 Pi-67 中打开` deduplicates by Workspace and relative path. The central tab
+- `在 New Money 中打开` deduplicates by Workspace and relative path. The central tab
   row begins with fixed `对话`, followed by file tabs. Selecting Workspace or
   Conversation returns to `对话` without removing file tabs; a Settings round
   trip preserves the active tab. A file surface replaces Transcript and Composer
@@ -785,22 +791,39 @@ loading error where the operation can produce those states
   Settings document. The document begins with one category title and one bounded
   summary; global-only sections do not repeat a redundant `全局设置` label, while
   project-aware sections retain the explicit scope switch in the same header row.
-- Settings owns `账户`, `外观`, `模型`, `扩展`, `技能`,
-  `提示词模板`, `工作规则`, `飞书`, `视觉辅助`, `浏览器集成`, `运行服务`, `用量分析`,
-  `下载源与网络`, `更新与诊断`, and `关于`. The directory groups them as
-  `应用`, `Pi`, `办公`, `能力与集成`, and `系统与支持`. Account, Appearance,
-  Model Services, managed Rules, Lark, Browser Integration, Runtime, Usage,
-  Download Sources/Network, Updates, and About are global-only and do not show a
-  meaningless page-level scope control. Only the Extension workspace and Prompt
-  Templates use the generic global/current-project switch; Skills and Rules own
-  their explicit availability tabs instead.
-- Every Settings category uses one centered `min(1120px, 100%)` document flow and
-  the content region is its only vertical scroll owner. Page title, summary,
-  scope, section headings, and content share the same cross-category alignment;
-  lightweight pages create compactness through row density instead of recentering
-  a narrower document. The document keeps `32px` top,
-  `clamp(24px, 3vw, 32px)` inline, and `48px` bottom padding; narrow windows retain
-  full-width content without document-level horizontal overflow.
+- Settings keeps 16 stable category identities in four task-oriented groups:
+  `通用`: `外观`, `账户与数据`; `AI 配置`: `模型`, `上下文与记忆`,
+  `视觉辅助`, `扩展`, `技能`, `提示词模板`, `工作规则`;
+  `连接与集成`: `飞书`, `浏览器集成`; `系统与支持`: `运行服务`,
+  `用量分析`, `下载源与网络`, `更新与诊断`, `关于`.
+  Account retains its existing route and search aliases. First open defaults to
+  Appearance; subsequent opens retain the selected category. Groups use whitespace,
+  not full-width navigation separators. Selected navigation uses a stable neutral
+  fill and stronger weight; unselected hover is lighter and focus remains distinct.
+- Existing scope policy remains authoritative: only categories with meaningful
+  global/project configuration expose the generic scope switch; Skills and Rules
+  retain their own explicit availability tabs. No decorative scope controls.
+- Every category shares a centered `min(1120px, 100%)` outer alignment frame.
+  Account, Appearance, Memory, Lark, Vision, Browser, Runtime, Network, Updates and
+  About use a left-aligned `min(880px, 100%)` inner page; Model, Extension, Skill,
+  Prompt, Rule and Usage workspaces use the full frame. Headers, page actions and
+  content follow that inner measure without shifting the common left edge.
+  The content region is the only document vertical scroll owner, with `32px` top,
+  `clamp(24px, 3vw, 32px)` inline and `48px` bottom padding. Existing narrow
+  padding and the `720px` category-menu breakpoint remain in place.
+- One page title precedes content by `28px`; sections are separated by `32px`
+  and section heading/content by `12px`. Only one layer owns section spacing;
+  grid stacks must not also add sibling section margins. Actions may wrap and
+  standard forms never introduce document-level horizontal overflow.
+- Whole-page drafts keep Save in the page header. Provider detail and credential
+  edits retain local save/verify/cancel transactions. Test, refresh, install and
+  reset remain beside their affected section. No cross-capability master Save.
+- Account/Data shows compact `本地模式` and `数据与同步` rows, explaining that
+  account services/sync are not connected and that local storage is distinct from
+  content sent to requested model or connected services. No fake login action.
+- All page-level Tabs (Memory, Lark, Extensions, Skills and Rules) share the neutral
+  Settings Tab family: 36px minimum height, selection underline, neutral fill,
+  keyboard focus and horizontal overflow confined to the tab strip.
 - Settings uses three intentional content grammars. **Grouped Settings** places
   related `64px` minimum rows inside one `12px` rounded surface with only row
   dividers; a row is never an independent card. **Catalog** places tabs, search,
@@ -808,6 +831,25 @@ loading error where the operation can produce those states
   giant outline or floating cards. **Editor / Notice** lets a textarea, long
   editor, or semantic notice be the surface and forbids another ordinary card
   around it. Section headings remain outside all three surfaces.
+- `上下文与记忆` uses the shared neutral Settings Tabs: `记忆与隐私`
+  (default), `企业经验`, and `高级`. One document header owns `保存更改`
+  for the shared draft; switching tabs preserves it, and leaving the category
+  uses the standard unsaved-settings guard. Connection testing requires a saved
+  draft and remains beside the service status rather than beside Save.
+- `记忆与隐私` leads with one grouped radio list in this order: `私人学习`
+  (default), `完整学习`, `只读记忆`, `完全关闭`. Each minimum-64px row has
+  a visible radio indicator, one title and one concise description. Selection
+  uses neutral surface/text roles; keyboard focus is distinct. Do not use
+  independent promotional cards or an accent edge for these choices.
+- The memory service follows the mode group. Enterprise identity, gateway and
+  current-workspace binding belong to `企业经验`; engine and recall/archive
+  parameters belong to `高级`, with expandable lifecycle/security detail.
+  The standard section margin alone separates adjacent groups; do not add a
+  second parent grid gap. Both themes retain the same layout and focus order.
+- Current-session `立即归档` belongs to the workbench Memory panel, beside
+  current-session context, and remains disabled without a Workspace/Session or
+  while submitting. Acknowledgement means accepted for background processing,
+  never completed extraction. Settings owns defaults rather than this action.
 - `飞书` uses the same page-level Tab language as other Settings workspaces instead
   of stacking both identity workflows into one long page. `用户授权` is the first and
   default tab; `应用连接` is second. Each panel contains its own explicit Grouped
@@ -868,7 +910,7 @@ loading error where the operation can produce those states
   `工作规则` owns concise `全局` / `项目` tabs instead of the generic Settings
   scope control. The global scope shows `全局工作规则` directly. The project scope
   shows `项目工作规则` followed by `继承的工作规则`. A default-collapsed `高级`
-  disclosure contains `Pi-67 内置规则` and `系统提示词覆盖` globally, and only
+  disclosure contains `New Money 内置规则` and `系统提示词覆盖` globally, and only
   project system-prompt overrides in project scope. Pi-67 built-in Markdown remains
   visible per file but read-only. Controlled user-global files and regular files in
   a trusted Workspace are editable; Workspace-external inherited files are read-only.
@@ -2395,3 +2437,8 @@ loading error where the operation can produce those states
 - Unbounded transcript rendering or synchronous Markdown work in hot paths.
 - UI that directly edits Pi credential or session file formats.
 - Runtime, smoothness, or accessibility claims without observed evidence.
+
+Public product labels, accessibility region names, approval headings, native
+notifications and system-menu display text use New Money. Pi SDK/runtime names,
+resource paths and immutable technical/package identities remain exact. Native
+application bundles, Helpers, executables and installer filenames use New Money.

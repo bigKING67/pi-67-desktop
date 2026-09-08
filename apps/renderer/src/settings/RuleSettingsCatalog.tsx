@@ -56,19 +56,19 @@ export function GlobalRuleCatalog({
           title="全局工作规则"
         />
         <AdvancedDisclosure
-          description="Pi-67 内置规则与系统提示词覆盖"
+          description="New Money 内置规则与系统提示词覆盖"
           open={advancedOpen}
           statuses={[
-            `Pi-67 内置规则 · ${managedCount} 项`,
+            `New Money 内置规则 · ${managedCount} 项`,
             `系统提示词覆盖 · ${configuredCountLabel(systemCount)}`
           ]}
           onOpenChange={onAdvancedOpenChange}
         >
           <CatalogSection
-            description="随 Pi-67 Desktop 提供的只读内部规则；可查看源码和预览。"
+            description="随 New Money 提供的只读内部规则；可查看源码和预览。"
             items={groups.managed}
             onSelect={props.onSelect}
-            title="Pi-67 内置规则"
+            title="New Money 内置规则"
           />
           <CatalogSection
             description="高级设置。通常使用 AGENTS.md 即可；SYSTEM.md 替换默认系统提示词，APPEND_SYSTEM.md 追加默认系统提示词。"
@@ -253,7 +253,7 @@ function RefreshButton({ busy, onPress }: { busy: boolean; onPress: () => void }
 }
 
 export function contextFileScopeLabel(scope: ContextFileScope): string {
-  if (scope === "managed") return "Pi-67 内置";
+  if (scope === "managed") return "New Money 内置";
   if (scope === "global") return "全局";
   if (scope === "project") return "当前项目";
   return "父目录继承";

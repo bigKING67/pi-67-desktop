@@ -2,10 +2,10 @@
   <img src="./docs/assets/67-logo.webp" width="112" alt="67 Logo">
 </p>
 
-<h1 align="center">π · Pi-67 Desktop</h1>
+<h1 align="center">New Money</h1>
 
 <p align="center">
-  <strong>让 Pi 成为可看、可控、可恢复的桌面工作台。</strong>
+  <strong>用 AI 创造新的价值。</strong>
 </p>
 
 <p align="center">
@@ -23,12 +23,13 @@
 
 ---
 
-`π` 是 Pi / pi-67 的图形化桌面客户端。它复用用户已有的 Pi 配置、Provider、
+`New Money` 是基于 Pi 的本地优先桌面工作台。它复用用户已有的 Pi 配置、Provider、
 模型、Skills、Prompts、Extensions 和 JSONL Sessions，在一个安静、清晰的工作台中
 完成对话、编码、Tool 调用、任务切换与故障恢复。
 
-应用显示名称使用 `π`；`Pi-67 Desktop` 继续作为仓库、包、可执行文件、URL scheme
-和安装产物的技术身份。
+应用、可执行文件与安装包使用 `New Money`，保留现有 67 图形标识。仓库与 npm 包名
+`pi-67-desktop`、应用 ID `com.pi67.desktop`、`pi67` 协议及已有用户数据目录保持兼容。
+旧版固定名称的更新器需要通过手动安装完成首次品牌迁移；本仓库的名称调整不代表已发布新包。
 
 > [!WARNING]
 > 项目仍处于 Alpha 阶段。公开 Preview 未经过 Windows Authenticode、macOS

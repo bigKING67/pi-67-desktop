@@ -198,22 +198,22 @@ jobs:
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $candidateInstallers = @(Get-ChildItem artifacts/release/Pi-67-Desktop-*-win-x64.exe -File)
+          $candidateInstallers = @(Get-ChildItem artifacts/release/New-Money-*-win-x64.exe -File)
           if ($candidateInstallers.Count -ne 1) { throw "Expected one Windows candidate installer, found $($candidateInstallers.Count)." }
           pnpm run release:preview:candidate verify `
             --candidate-identity artifacts/release/windows-preview-candidate-identity.json `
             --installer $candidateInstallers[0].FullName `
-            --packaged-executable 'artifacts/release/win-unpacked/Pi-67 Desktop.exe' `
+            --packaged-executable 'artifacts/release/win-unpacked/New Money.exe' `
             --expected-repository $env:GITHUB_REPOSITORY `
             --expected-source-commit $env:SOURCE_SHA `
             --expected-run-id $env:SOURCE_RUN_ID `
             --expected-run-attempt $env:SOURCE_RUN_ATTEMPT
-          $baselineInstallers = @(Get-ChildItem artifacts/baseline/release/Pi-67-Desktop-*-win-x64.exe -File)
+          $baselineInstallers = @(Get-ChildItem artifacts/baseline/release/*-win-x64.exe -File)
           if ($baselineInstallers.Count -ne 1) { throw "Expected one previous-version installer, found $($baselineInstallers.Count)." }
           pnpm run release:preview:candidate verify `
             --candidate-identity artifacts/baseline/release/windows-preview-candidate-identity.json `
             --installer $baselineInstallers[0].FullName `
-            --packaged-executable 'artifacts/baseline/release/win-unpacked/Pi-67 Desktop.exe' `
+            --packaged-executable (Join-Path 'artifacts/baseline/release' ((Get-Content 'artifacts/baseline/release/windows-preview-candidate-identity.json' -Raw | ConvertFrom-Json).packagedExecutable.fileName)) `
             --expected-repository $env:GITHUB_REPOSITORY `
             --expected-source-commit $env:BASELINE_SOURCE_SHA `
             --expected-run-id $env:BASELINE_RUN_ID `

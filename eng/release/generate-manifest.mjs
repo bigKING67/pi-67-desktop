@@ -17,7 +17,7 @@ const { runtimeSpecifier } = await readPiRuntimeContract(root);
 const expected = [...expectedSignedReleaseArtifacts(version).keys()];
 const available = new Set(await readdir(releaseDirectory));
 const missing = expected.filter((name) => !available.has(name));
-if (missing.length > 0) throw new Error(`Incomplete Pi-67 Desktop ${version} release; missing: ${missing.join(", ")}`);
+if (missing.length > 0) throw new Error(`Incomplete New Money ${version} release; missing: ${missing.join(", ")}`);
 
 const files = [];
 for (const name of expected) {

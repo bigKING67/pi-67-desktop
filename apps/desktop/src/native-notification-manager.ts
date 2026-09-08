@@ -113,12 +113,12 @@ function nativeNotificationPresentation(kind: NativeNotificationKind): {
     case "completed":
       return {
         title: "Pi 任务已完成",
-        body: "后台会话已完成，可以返回 Pi-67 查看结果。"
+        body: "后台会话已完成，可以返回 New Money 查看结果。"
       };
     case "failed":
       return {
         title: "Pi 任务失败",
-        body: "后台会话未能完成，可以返回 Pi-67 查看详情并重试。"
+        body: "后台会话未能完成，可以返回 New Money 查看详情并重试。"
       };
     case "attention":
       return {

@@ -94,7 +94,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
   );
   const packagedExecutablePath = join(
     repositoryRoot,
-    "artifacts/release/win-unpacked/Pi-67 Desktop.exe"
+    "artifacts/release/win-unpacked/New Money.exe"
   );
   const packagedExecutableIdentity = await readLifecycleArtifactIdentity(
     packagedExecutablePath,
@@ -116,7 +116,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
   await mkdir(outputDirectory, { recursive: true });
 
   const root = await mkdtemp(join(tmpdir(), "pi67-windows-installer-"));
-  const installDirectory = join(root, "Pi-67 Desktop 中文安装路径");
+  const installDirectory = join(root, "New Money 中文安装路径");
   const desktopShortcutPath = await resolveWindowsDesktopShortcutPath("π");
   const userDataDirectory = join(root, "用户数据 含空格");
   const {

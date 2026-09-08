@@ -49,7 +49,7 @@ export function resolvePreviousStableRelease(releasePages, candidateTag, reposit
   };
   if (!latestStable) return { ...base, kind: "first-stable-release" };
 
-  const expectedInstallerName = [...expectedSignedReleaseArtifacts(latestStable.version).keys()]
+  const expectedInstallerName = [...expectedSignedReleaseArtifacts(latestStable.version, latestStable.assets.some((asset) => asset.name === `Pi-67-Desktop-${latestStable.version}-win-x64.exe`) ? "Pi-67-Desktop" : "New-Money").keys()]
     .find((name) => name.endsWith("-win-x64.exe"));
   const manifestAsset = resolveExactAsset(latestStable.assets, "release-manifest.json", MAX_MANIFEST_BYTES);
   const installerAsset = resolveExactAsset(latestStable.assets, expectedInstallerName, MAX_INSTALLER_BYTES);
@@ -96,7 +96,7 @@ export function validatePreviousStableResolution(result, repository, candidateTa
   if (!Number.isSafeInteger(result.baseline.releaseId) || result.baseline.releaseId < 1) {
     throw new Error("Signed release baseline resolution release ID is invalid.");
   }
-  const expectedInstallerName = [...expectedSignedReleaseArtifacts(baselineVersion).keys()]
+  const expectedInstallerName = [...expectedSignedReleaseArtifacts(baselineVersion, (typeof result.baseline.installerAsset?.name === "string" && result.baseline.installerAsset.name.startsWith("Pi-67-Desktop-")) ? "Pi-67-Desktop" : "New-Money").keys()]
     .find((name) => name.endsWith("-win-x64.exe"));
   validateResolvedAsset(result.baseline.manifestAsset, "release-manifest.json", MAX_MANIFEST_BYTES);
   validateResolvedAsset(result.baseline.installerAsset, expectedInstallerName, MAX_INSTALLER_BYTES);

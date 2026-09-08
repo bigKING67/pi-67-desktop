@@ -65,7 +65,7 @@ describe("direct previous signed release baseline", () => {
 
   it("rejects extra Windows installers and unsigned manifest identity", async () => {
     const fixture = await createFixture();
-    await writeFile(join(fixture.directory, "Pi-67-Desktop-0.9.0-win-x64.exe"), "other");
+    await writeFile(join(fixture.directory, "New-Money-0.9.0-win-x64.exe"), "other");
     await expect(verifySignedReleaseBaseline({
       candidateTag: "v2.0.0",
       directory: fixture.directory,
@@ -83,7 +83,7 @@ async function createFixture() {
   temporaryDirectories.push(directory);
   await mkdir(directory, { recursive: true });
   const version = "1.0.0";
-  const installerName = `Pi-67-Desktop-${version}-win-x64.exe`;
+  const installerName = `New-Money-${version}-win-x64.exe`;
   const installer = Buffer.from("signed Windows installer fixture");
   const sha256 = createHash("sha256").update(installer).digest("hex");
   await writeFile(join(directory, installerName), installer);
@@ -93,13 +93,13 @@ async function createFixture() {
     files: [
       { name: installerName, bytes: installer.length, sha256, target: "windows-x64" },
       {
-        name: `Pi-67-Desktop-${version}-mac-arm64.dmg`,
+        name: `New-Money-${version}-mac-arm64.dmg`,
         bytes: 1,
         sha256: "1".repeat(64),
         target: "macos-arm64"
       },
       {
-        name: `Pi-67-Desktop-${version}-mac-arm64.zip`,
+        name: `New-Money-${version}-mac-arm64.zip`,
         bytes: 1,
         sha256: "2".repeat(64),
         target: "macos-arm64"

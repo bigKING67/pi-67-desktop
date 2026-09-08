@@ -74,8 +74,8 @@ async function fileFixture() {
   const unpacked = join(releaseRoot, "win-unpacked");
   await mkdir(unpacked, { recursive: true });
   const version = "0.1.0-alpha.10";
-  const installerPath = join(releaseRoot, `Pi-67-Desktop-${version}-win-x64.exe`);
-  const executablePath = join(unpacked, "Pi-67 Desktop.exe");
+  const installerPath = join(releaseRoot, `New-Money-${version}-win-x64.exe`);
+  const executablePath = join(unpacked, "New Money.exe");
   await Promise.all([
     writeFile(installerPath, "installer"),
     writeFile(executablePath, "executable")

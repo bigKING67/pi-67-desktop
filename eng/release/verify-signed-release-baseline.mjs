@@ -47,7 +47,7 @@ export async function verifySignedReleaseBaseline({
   failures.push(...validateSignedReleaseManifest(manifest, version));
 
   const installerNames = (await readdir(directory))
-    .filter((name) => /^Pi-67-Desktop-.+-win-x64\.exe$/u.test(name));
+    .filter((name) => /^(?:New-Money|Pi-67-Desktop)-.+-win-x64\.exe$/u.test(name));
   if (installerNames.length !== 1 || installerNames[0] !== expectedInstallerName) {
     failures.push("baseline directory must contain exactly the resolved Windows installer");
   }

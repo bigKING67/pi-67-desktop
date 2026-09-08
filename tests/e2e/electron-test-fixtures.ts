@@ -37,7 +37,7 @@ export function nativeElectronAgentDirectory(fallback: string): string {
 
 export async function openRuntimeSettings(window: Page) {
   await window.keyboard.press(process.platform === "darwin" ? "Meta+," : "Control+,");
-  const settings = window.getByLabel("π 设置");
+  const settings = window.getByLabel("New Money 设置");
   await expect(settings).toBeVisible();
   await expect(window.getByRole("complementary", { name: "对话导航" })).toHaveCount(0);
   await expect(window.getByTestId("inspector-toggle")).toHaveCount(0);
@@ -49,7 +49,7 @@ export async function openRuntimeSettings(window: Page) {
 
 export async function openModelServiceSettings(window: Page) {
   await window.keyboard.press(process.platform === "darwin" ? "Meta+," : "Control+,");
-  const settings = window.getByLabel("π 设置");
+  const settings = window.getByLabel("New Money 设置");
   await expect(settings).toBeVisible();
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "模型", exact: true }).click();

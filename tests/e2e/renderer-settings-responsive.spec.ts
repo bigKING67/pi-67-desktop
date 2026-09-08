@@ -15,7 +15,7 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   const navigation = page.getByRole("navigation", { name: "设置分类" });
   const contentHeader = page.getByRole("heading", { name: "外观", exact: true, level: 1 }).locator("..");
   const layout = await settings.evaluate((element) => {
@@ -40,7 +40,7 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   await categoryTrigger.click();
   const categoryMenu = page.getByRole("menu", { name: "选择设置分类" });
   await expect(categoryMenu).toBeVisible();
-  for (const group of ["应用", "Pi", "办公", "能力与集成", "系统与支持"]) {
+  for (const group of ["通用", "AI 配置", "连接与集成", "系统与支持"]) {
     await expect(categoryMenu.getByText(group, { exact: true })).toBeVisible();
   }
   const categoryPopover = page.getByRole("dialog", { name: "选择设置分类" });
@@ -94,7 +94,7 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   expect(ruleCategoryBounds.left).toBeGreaterThanOrEqual(0);
   expect(ruleCategoryBounds.right).toBeLessThanOrEqual(520);
   await ruleAdvancedSummary.click();
-  await ruleWorkspace.getByRole("list", { name: "Pi-67 内置规则" })
+  await ruleWorkspace.getByRole("list", { name: "New Money 内置规则" })
     .getByRole("button", { name: /00-product\.md/u }).click();
   const contextDetail = ruleWorkspace.getByTestId("context-file-detail");
   await expect(contextDetail.getByRole("textbox", { name: "00-product.md Markdown 源码" })).toBeVisible();
@@ -140,8 +140,8 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   await selectMobileSettingsSection(settings, page, "更新与诊断");
   await expect.poll(async () => scrollRegion.evaluate((element) => element.scrollTop)).toBe(0);
   await page.getByRole("button", { name: "立即检查", exact: true }).click();
-  const updateDialog = page.getByRole("dialog", { name: "Pi-67 更新" });
-  await expect(updateDialog.getByText("发现 Pi-67 0.1.0-alpha.2", { exact: true })).toBeVisible();
+  const updateDialog = page.getByRole("dialog", { name: "New Money 更新" });
+  await expect(updateDialog.getByText("发现 New Money 0.1.0-alpha.2", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => (
     window as unknown as { __pi67UpdateTest: { checks: number } }
   ).__pi67UpdateTest.checks)).toBe(1);
@@ -182,7 +182,7 @@ test("keeps local Settings workspaces inside a 1040 pixel application surface", 
   await expect(page.getByRole("button", { name: "帮助与设置" })).toBeVisible();
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
   await navigation.getByRole("button", { name: "模型", exact: true }).click();
   const scope = page.getByRole("group", { name: "设置作用域" });
@@ -251,7 +251,7 @@ test("keeps every Settings category on one centered document measure without sid
   await expect(page.getByRole("button", { name: "帮助与设置" })).toBeVisible();
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   const scrollRegion = settings.getByTestId("settings-scroll-region");
   const measureDocument = () => scrollRegion.evaluate((element) => {
     const body = element.firstElementChild as HTMLElement;

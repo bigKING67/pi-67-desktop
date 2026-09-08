@@ -20,7 +20,7 @@ describe("Windows uninstall Registry guard", () => {
     expect(source).toContain("requires bounded GitHub run identity");
     expect(source).not.toContain("DisplayName");
     expect(source).not.toContain("UninstallString");
-    expect(source).not.toContain("Pi-67 Desktop");
+    expect(source).not.toContain("New Money");
   });
 
   it("diffs against the pre-install snapshot and removes only revalidated new entries", async () => {

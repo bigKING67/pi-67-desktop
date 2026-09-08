@@ -267,7 +267,7 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
       };
       const template: Electron.MenuItemConstructorOptions[] = entry.kind === "file"
         ? [
-            { label: "在 Pi-67 中打开", click: () => choose("pi67-open") },
+            { label: "在 New Money 中打开", click: () => choose("pi67-open") },
             { type: "separator" },
             { label: "使用系统默认应用打开", click: () => choose("open-default") },
             { label: "复制相对路径", click: () => choose("copy-relative") },
@@ -320,7 +320,7 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
       type: "warning",
       title: "移到废纸篓",
       message: `将“${entry.relativePath}”移到废纸篓？`,
-      detail: "可以从系统废纸篓恢复；Pi-67 不会执行永久删除。",
+      detail: "可以从系统废纸篓恢复；New Money 不会执行永久删除。",
       buttons: ["移到废纸篓", "取消"],
       defaultId: 1,
       cancelId: 1,

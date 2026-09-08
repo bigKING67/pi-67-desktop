@@ -31,7 +31,7 @@ test("restores an away-from-bottom reading anchor across a Settings round trip",
   if (!anchorId) throw new Error("Expected an away-from-bottom transcript anchor.");
 
   await page.keyboard.press(process.platform === "darwin" ? "Meta+," : "Control+,");
-  await expect(page.getByLabel("π 设置")).toBeVisible();
+  await expect(page.getByLabel("New Money 设置")).toBeVisible();
   await page.getByRole("button", { name: "返回工作台" }).click();
 
   await expect(transcript).toHaveAttribute("data-message-count", "72");

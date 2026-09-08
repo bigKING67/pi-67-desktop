@@ -61,10 +61,10 @@ export function UpdateDialog() {
       onOpenChange={setOpen}
     >
       <Modal className="modal-surface update-dialog">
-        <Dialog aria-label="Pi-67 更新">
+        <Dialog aria-label="New Money 更新">
           <div className="diagnostic-dialog-content">
             <span className="dialog-eyebrow">Internal Unsigned Update</span>
-            <Heading slot="title">Pi-67 更新</Heading>
+            <Heading slot="title">New Money 更新</Heading>
             <UpdateSummary update={update} initialized={initialized} pending={pending} action={action} />
             {update.phase === "downloading" ? (
               <div
@@ -156,9 +156,9 @@ function updateTitle(
   if (!initialized) return "正在读取更新状态";
   if (pending && action === "check") return "正在检查更新";
   if (update.phase === "checking") return "正在检查更新";
-  if (update.phase === "downloading") return `正在下载 Pi-67 ${update.version}`;
-  if (update.phase === "installing") return `正在安装 Pi-67 ${update.version}`;
-  if (update.phase === "available") return `发现 Pi-67 ${update.version}`;
+  if (update.phase === "downloading") return `正在下载 New Money ${update.version}`;
+  if (update.phase === "installing") return `正在安装 New Money ${update.version}`;
+  if (update.phase === "available") return `发现 New Money ${update.version}`;
   if (update.phase === "current") return "当前已是最新版本";
   if (update.phase === "disabled") return "开发构建不检查更新";
   if (update.phase === "error") return "更新操作未完成";

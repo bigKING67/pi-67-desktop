@@ -13,6 +13,7 @@ import { selectSessionId } from "../session/session-projection-selectors.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import {
+  commitContextSession,
   loadContextMemoryOverview,
   loadContextSession,
   loadRecallMetrics,
@@ -20,6 +21,7 @@ import {
   searchPrivateMemories,
   submitRecallFeedback
 } from "./context-memory-controller.js";
+import { publishNotification } from "../notifications/notification-store.js";
 import styles from "./MemoryInspectorPanel.module.css";
 
 export function MemoryInspectorPanel() {
@@ -38,6 +40,8 @@ function WorkspaceMemoryInspector({ workspaceId }: { workspaceId: string | undef
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [archiving, setArchiving] = useState(false);
+  const [archiveError, setArchiveError] = useState<string>();
   const [feedbackBusyId, setFeedbackBusyId] = useState<string>();
 
   useEffect(() => {
@@ -68,6 +72,20 @@ function WorkspaceMemoryInspector({ workspaceId }: { workspaceId: string | undef
     }).finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
   }, [workspaceId, sessionId]);
+
+  const archive = async (): Promise<void> => {
+    if (!workspaceId || !sessionId || archiving) return;
+    setArchiving(true);
+    setArchiveError(undefined);
+    try {
+      await commitContextSession(workspaceId, sessionId);
+      publishNotification({ level: "success", title: "会话归档已受理", message: "归档与记忆抽取将在后台继续执行。" });
+    } catch (cause) {
+      setArchiveError(cause instanceof Error ? cause.message : "归档请求未能受理。");
+    } finally {
+      setArchiving(false);
+    }
+  };
 
   const search = async (): Promise<void> => {
     if (!workspaceId || !query.trim()) return;
@@ -107,6 +125,14 @@ function WorkspaceMemoryInspector({ workspaceId }: { workspaceId: string | undef
       <p>{status?.owner === "pi67-openviking"
         ? "当前 Session 由 OpenViking 管理；Pi JSONL 保留完整事实。"
         : "当前使用 Pi 默认上下文回退；Memory 不会阻止对话。"}</p>
+    </section>
+
+    <section className={styles.section} aria-label="当前会话归档">
+      <header><span className="section-label">当前会话</span>
+        <Button className="secondary-button" isDisabled={!workspaceId || !sessionId || archiving} onPress={() => void archive()}>{archiving ? "正在提交…" : "立即归档"}</Button>
+      </header>
+      <p className={styles.metricNote}>{sessionId ? "归档当前会话，并在后台提取记忆。" : "打开会话后可归档。"}</p>
+      {archiveError ? <p className={styles.error} role="alert">{archiveError}</p> : null}
     </section>
 
     <dl className="metric-list">

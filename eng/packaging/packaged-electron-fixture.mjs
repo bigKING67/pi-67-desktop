@@ -94,7 +94,7 @@ export function resolvePackagedArtifact(platform = process.platform, arch = proc
   if (!supportedHost) throw new Error(`Packaged Electron fixture does not support ${platform}/${arch}.`);
 
   const packagedRoot = platform === "darwin"
-    ? join(repositoryRoot, "artifacts/release/mac-arm64/Pi-67 Desktop.app/Contents")
+    ? join(repositoryRoot, "artifacts/release/mac-arm64/New Money.app/Contents")
     : join(repositoryRoot, "artifacts/release/win-unpacked");
   const resourcesPath = platform === "darwin"
     ? join(packagedRoot, "Resources")
@@ -102,8 +102,8 @@ export function resolvePackagedArtifact(platform = process.platform, arch = proc
   return {
     arch,
     executablePath: platform === "darwin"
-      ? join(packagedRoot, "MacOS/Pi-67 Desktop")
-      : join(packagedRoot, "Pi-67 Desktop.exe"),
+      ? join(packagedRoot, "MacOS/New Money")
+      : join(packagedRoot, "New Money.exe"),
     platform,
     resourcesPath
   };

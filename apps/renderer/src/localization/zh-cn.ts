@@ -8,31 +8,30 @@ import { zhCNRuntimeMessages } from "./zh-cn-runtime.js";
 
 export const zhCNMessages = {
   common: {
-    appName: "π",
+    appName: "New Money",
     cancel: "取消",
     close: "关闭",
     stop: "停止"
   },
   settings: {
     groups: {
-      application: "应用",
-      pi: "Pi",
-      office: "办公",
-      capabilities: "能力与集成",
+      application: "通用",
+      pi: "AI 配置",
+      capabilities: "连接与集成",
       systemSupport: "系统与支持"
     },
     sections: {
       account: {
-        label: "账户",
-        summary: "查看登录状态、账户同步与本地数据边界。"
+        label: "账户与数据",
+        summary: "了解当前使用模式与数据存储方式。"
       },
       general: {
         label: "外观",
-        summary: "选择跟随系统、浅色或深色应用外观。"
+        summary: "设置应用主题，查看键盘快捷键。"
       },
       contextMemory: {
         label: "上下文与记忆",
-        summary: "配置 OpenViking、隐私模式、会话上下文与企业经验边界。"
+        summary: "管理记忆的使用方式、隐私边界与企业经验。"
       },
       providers: {
         label: "模型",
@@ -44,11 +43,11 @@ export const zhCNMessages = {
       },
       extensions: {
         label: "扩展",
-        summary: "安装扩展包，并管理 Pi-67 Desktop 内置扩展和本地扩展。"
+        summary: "安装扩展包，并管理 New Money 内置扩展和本地扩展。"
       },
       skills: {
         label: "技能",
-        summary: "按可用范围查看技能；全局页统一汇总内置、受管和本地技能，项目页只显示当前项目专属技能。"
+        summary: "查看全局可用与当前项目专属的技能。"
       },
       prompts: {
         label: "提示词模板",
@@ -68,11 +67,11 @@ export const zhCNMessages = {
       },
       integrations: {
         label: "浏览器集成",
-        summary: "准备并诊断 browser67 的依赖、扩展和真实受管浏览器连接。"
+        summary: "连接浏览器，管理扩展与运行状态。"
       },
       runtime: {
         label: "运行服务",
-        summary: "查看运行名额、会话写入边界与恢复诊断状态。"
+        summary: "查看任务运行状态，处理连接与恢复问题。"
       },
       usage: {
         label: "用量分析",
@@ -80,7 +79,7 @@ export const zhCNMessages = {
       },
       network: {
         label: "下载源与网络",
-        summary: "管理私有 Node/npm/Git、公共镜像、官方回退和源可达性。"
+        summary: "配置下载源，检查工具链与网络连接。"
       },
       updates: {
         label: "更新与诊断",
@@ -126,7 +125,7 @@ export const zhCNMessages = {
     actionUnavailable: "当前会话暂不可用"
   },
   workspace: {
-    eyebrow: "π",
+    eyebrow: "New Money",
     heading: "开始一个 Pi 对话",
     description: "选择一个工作区，继续已有对话或开始新对话。",
     openAction: "选择工作区",

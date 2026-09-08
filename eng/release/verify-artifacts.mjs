@@ -35,7 +35,7 @@ for (const name of findUnexpectedSignedReleaseProductArtifacts(
 }
 
 for (const entry of entries) {
-  if (typeof entry.name !== "string" || !/^Pi-67-Desktop-[0-9A-Za-z.-]+-(?:win-x64\.exe|mac-arm64\.(?:dmg|zip))$/u.test(entry.name)) {
+  if (typeof entry.name !== "string" || !/^(?:New-Money|Pi-67-Desktop)-[0-9A-Za-z.-]+-(?:win-x64\.exe|mac-arm64\.(?:dmg|zip))$/u.test(entry.name)) {
     failures.push(`unsupported artifact name: ${String(entry.name)}`);
     continue;
   }

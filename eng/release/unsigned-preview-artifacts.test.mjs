@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -53,17 +53,40 @@ describe("unsigned preview release artifacts", () => {
     expect(() => expectedStableVersionTag("1.2.3-alpha.1")).toThrow(/canonical MAJOR\.MINOR\.PATCH/u);
   });
 
-  it("rejects symbolic-link build inputs before preparing release artifacts", async () => {
+  it.each([0, 1, 2])("rejects symbolic-link input %i before moving any artifact", async (invalidIndex) => {
     const directory = await mkdtemp(join(tmpdir(), "pi67-unsigned-preview-symlink-"));
     temporaryDirectories.push(directory);
     const version = "0.1.0-alpha.1";
     const specs = unsignedPreviewArtifactSpecs(version);
     const target = join(directory, "outside.exe");
     await writeFile(target, "fixture");
-    await symlink(target, join(directory, specs[0].source));
-    await Promise.all(specs.slice(1).map((spec) => writeFile(join(directory, spec.source), "fixture")));
+    await symlink(target, join(directory, specs[invalidIndex].source));
+    const validSpecs = specs.filter((_, index) => index !== invalidIndex);
+    await Promise.all(validSpecs.map((spec) => writeFile(join(directory, spec.source), "fixture")));
 
     await expect(prepareUnsignedPreview(directory, version, "9.8.7"))
       .rejects.toThrow("source is not a regular file");
+    for (const spec of validSpecs) {
+      await expect(readFile(join(directory, spec.source), "utf8")).resolves.toBe("fixture");
+    }
+    for (const spec of specs) {
+      await expect(access(join(directory, spec.name))).rejects.toMatchObject({ code: "ENOENT" });
+    }
+    await expect(access(join(directory, "unsigned-preview-manifest.json"))).rejects.toMatchObject({ code: "ENOENT" });
   });
+
+  it("stops later moves after a rename failure and emits no success manifest", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "pi67-unsigned-preview-rename-"));
+    temporaryDirectories.push(directory);
+    const version = "0.1.0-alpha.1";
+    const specs = unsignedPreviewArtifactSpecs(version);
+    await Promise.all(specs.map((spec) => writeFile(join(directory, spec.source), "fixture")));
+    await mkdir(join(directory, specs[1].name));
+    await expect(prepareUnsignedPreview(directory, version, "9.8.7")).rejects.toThrow();
+    await expect(readFile(join(directory, specs[0].name), "utf8")).resolves.toBe("fixture");
+    await expect(readFile(join(directory, specs[2].source), "utf8")).resolves.toBe("fixture");
+    await expect(access(join(directory, specs[2].name))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(access(join(directory, "unsigned-preview-manifest.json"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
 });

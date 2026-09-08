@@ -76,7 +76,7 @@ describe("R2 update bundle", () => {
     await writeMacosProvenance(releaseDirectory, version, runtimeVersion);
     await prepareUnsignedPreview(releaseDirectory, version, runtimeVersion);
     await writeFile(
-      join(releaseDirectory, `Pi-67-Desktop-${version}-win-x64-unsigned-preview.exe`),
+      join(releaseDirectory, `New-Money-${version}-win-x64-unsigned-preview.exe`),
       "modified"
     );
 
@@ -119,7 +119,7 @@ describe("R2 update bundle", () => {
     await prepareR2UpdateBundle({ releaseDirectory, outputDirectory, version, runtimeVersion });
     const artifactPath = join(
       outputDirectory,
-      `Pi-67-Desktop-${version}-mac-arm64-unsigned-preview.zip`
+      `New-Money-${version}-mac-arm64-unsigned-preview.zip`
     );
     const targetPath = join(root, "outside.zip");
     await writeFile(targetPath, "macos-zip");
@@ -156,16 +156,16 @@ async function temporaryDirectory() {
 async function writeSources(directory, version) {
   await Promise.all([
     mkdir(join(directory, "win-unpacked"), { recursive: true }),
-    mkdir(join(directory, "mac-arm64/Pi-67 Desktop.app/Contents/MacOS"), { recursive: true }),
-    mkdir(join(directory, "mac-arm64/Pi-67 Desktop.app/Contents/Resources"), { recursive: true })
+    mkdir(join(directory, "mac-arm64/New Money.app/Contents/MacOS"), { recursive: true }),
+    mkdir(join(directory, "mac-arm64/New Money.app/Contents/Resources"), { recursive: true })
   ]);
   await Promise.all([
-    writeFile(join(directory, `Pi-67-Desktop-${version}-win-x64.exe`), "windows"),
-    writeFile(join(directory, "win-unpacked/Pi-67 Desktop.exe"), "windows-executable"),
-    writeFile(join(directory, `Pi-67-Desktop-${version}-mac-arm64.dmg`), "macos-dmg"),
-    writeFile(join(directory, `Pi-67-Desktop-${version}-mac-arm64.zip`), "macos-zip"),
-    writeFile(join(directory, "mac-arm64/Pi-67 Desktop.app/Contents/MacOS/Pi-67 Desktop"), "macos-executable"),
-    writeFile(join(directory, "mac-arm64/Pi-67 Desktop.app/Contents/Resources/app.asar"), "macos-asar")
+    writeFile(join(directory, `New-Money-${version}-win-x64.exe`), "windows"),
+    writeFile(join(directory, "win-unpacked/New Money.exe"), "windows-executable"),
+    writeFile(join(directory, `New-Money-${version}-mac-arm64.dmg`), "macos-dmg"),
+    writeFile(join(directory, `New-Money-${version}-mac-arm64.zip`), "macos-zip"),
+    writeFile(join(directory, "mac-arm64/New Money.app/Contents/MacOS/New Money"), "macos-executable"),
+    writeFile(join(directory, "mac-arm64/New Money.app/Contents/Resources/app.asar"), "macos-asar")
   ]);
 }
 
@@ -190,8 +190,8 @@ async function writeMacosProvenance(
 async function writeWindowsProvenance(directory, version, runtimeVersion) {
   const identity = await createWindowsPreviewCandidateIdentity({
     host: { platform: "win32", architecture: "x64" },
-    installerPath: join(directory, `Pi-67-Desktop-${version}-win-x64.exe`),
-    packagedExecutablePath: join(directory, "win-unpacked/Pi-67 Desktop.exe"),
+    installerPath: join(directory, `New-Money-${version}-win-x64.exe`),
+    packagedExecutablePath: join(directory, "win-unpacked/New Money.exe"),
     releaseRoot: directory,
     repository: "bigKING67/pi-67-desktop",
     runAttempt: "2",

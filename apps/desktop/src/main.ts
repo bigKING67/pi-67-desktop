@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { dirname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, safeStorage, screen } from "electron";
+import { app, BrowserWindow, Menu, safeStorage, screen } from "electron";
 import { AgentHostSupervisor } from "./agent-host-supervisor.js";
 import { createAgentHostStoragePaths } from "./agent-host-storage.js";
 import { createApplicationShutdownController } from "./application-shutdown.js";
@@ -150,6 +150,26 @@ app.on("second-instance", () => {
 
 if (hasSingleInstanceLock) {
   void app.whenReady().then(async () => {
+    app.setAboutPanelOptions({ applicationName: "New Money" });
+    if (process.platform === "darwin") {
+      Menu.setApplicationMenu(Menu.buildFromTemplate([
+        { label: "New Money", submenu: [
+          { role: "about", label: "关于 New Money" },
+          { type: "separator" },
+          { role: "services" },
+          { type: "separator" },
+          { role: "hide", label: "隐藏 New Money" },
+          { role: "hideOthers" },
+          { role: "unhide" },
+          { type: "separator" },
+          { role: "quit", label: "退出 New Money" }
+        ] },
+        { role: "fileMenu" },
+        { role: "editMenu" },
+        { role: "viewMenu" },
+        { role: "windowMenu" }
+      ]));
+    }
     registerApplicationProtocol(rendererDirectory);
     workbenchState = new WorkbenchStateStore(app.getPath("userData"));
     packageNetworkSettings = new PackageNetworkSettingsStore(app.getPath("userData"));

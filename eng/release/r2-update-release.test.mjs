@@ -16,13 +16,13 @@ describe("R2 update release", () => {
     const release = fixtureRelease();
     const plan = createR2ReleasePlan(release, [
       { key: release.artifacts[0].name, size: release.artifacts[0].bytes },
-      { key: "Pi-67-Desktop-0.1.0-alpha.29-win-x64-unsigned-preview.exe", size: 10 },
+      { key: "New-Money-0.1.0-alpha.29-win-x64-unsigned-preview.exe", size: 10 },
       { key: "operator-notes.txt", size: 20 }
     ], null);
 
     expect(plan.uploads).toEqual(release.artifacts.slice(1).map((entry) => entry.name));
     expect(plan.alreadyPresent).toEqual([release.artifacts[0].name]);
-    expect(plan.oldArtifacts).toEqual(["Pi-67-Desktop-0.1.0-alpha.29-win-x64-unsigned-preview.exe"]);
+    expect(plan.oldArtifacts).toEqual(["New-Money-0.1.0-alpha.29-win-x64-unsigned-preview.exe"]);
     expect(plan.unknownObjects).toEqual(["operator-notes.txt"]);
     expect(plan.retention).toEqual({
       retainedVersionLimit: 3,
@@ -362,9 +362,9 @@ describe("R2 update release", () => {
 
 function fixtureRelease() {
   const artifacts = [
-    artifact(`Pi-67-Desktop-${version}-win-x64-unsigned-preview.exe`, "windows-x64", 101, "a"),
-    artifact(`Pi-67-Desktop-${version}-mac-arm64-unsigned-preview.dmg`, "macos-arm64", 102, "b"),
-    artifact(`Pi-67-Desktop-${version}-mac-arm64-unsigned-preview.zip`, "macos-arm64", 103, "c")
+    artifact(`New-Money-${version}-win-x64-unsigned-preview.exe`, "windows-x64", 101, "a"),
+    artifact(`New-Money-${version}-mac-arm64-unsigned-preview.dmg`, "macos-arm64", 102, "b"),
+    artifact(`New-Money-${version}-mac-arm64-unsigned-preview.zip`, "macos-arm64", 103, "c")
   ];
   const manifest = {
     schemaVersion: 1,
@@ -396,8 +396,8 @@ function artifact(name, target, bytes, character) {
 
 function remoteVersion(remoteVersionName) {
   return [
-    `Pi-67-Desktop-${remoteVersionName}-win-x64-unsigned-preview.exe`,
-    `Pi-67-Desktop-${remoteVersionName}-mac-arm64-unsigned-preview.dmg`,
-    `Pi-67-Desktop-${remoteVersionName}-mac-arm64-unsigned-preview.zip`
+    `New-Money-${remoteVersionName}-win-x64-unsigned-preview.exe`,
+    `New-Money-${remoteVersionName}-mac-arm64-unsigned-preview.dmg`,
+    `New-Money-${remoteVersionName}-mac-arm64-unsigned-preview.zip`
   ].map((key, index) => ({ key, size: 100 + index }));
 }

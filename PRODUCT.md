@@ -24,8 +24,20 @@ session, configuration, resource, model, and extension contracts.
 
 ## Positioning
 
-`π` is the user-visible graphical surface for Pi/pi-67. `Pi-67 Desktop` remains
-the technical release, package, application ID, protocol, and artifact identity.
+`New Money` is the public-facing brand: use AI to create new value. The current
+workspace is Work. The existing 67 graphical mark remains the product identity
+alongside the New Money wordmark. Mode symbols are a separate layer: a bull
+represents Work and a horse represents future Chat. They must never replace the
+brand mark. Mode controls/icons and Chat are not added by this naming change.
+Public-facing renderer copy, window/menu labels and platform display metadata
+use New Money, including application bundles, executables, Helpers and installer
+filenames. The npm package name `pi-67-desktop`, application ID `com.pi67.desktop`,
+`pi67` protocol and machine-readable update product identity remain stable.
+Storage paths and existing install identities stay compatible; no user data is
+moved. Legacy clients require manual installation for the first renamed bundle
+because their updater expects the old archive name. New clients accept both
+legacy and New Money update artifacts under the same strict identity checks.
+Pi remains the name of the underlying runtime and its resources.
 The product is not a second agent,
 a provider marketplace, an RPC wrapper, or a full IDE. It favors truthful
 state, fast interaction, safe recovery, and Pi compatibility over feature
@@ -89,8 +101,8 @@ the only Runtime and behavior specification source.
 5. Diagnose shell, configuration, extension, update, and runtime failures
    without exposing credentials or private content.
 6. Move sequentially between Desktop and Pi TUI using the same Pi JSONL session.
-7. Open the singleton Settings surface across Application, Pi, Office,
-   Capabilities & Integrations, and System & Support categories without losing
+7. Open the singleton Settings surface across General, AI Configuration,
+   Connections & Integrations, and System & Support categories without losing
    drafts or background work.
 8. Install and operate Pi Extensions, Skills, Prompts, and Rules; configure
    external MCP services; and prepare supported browser integrations without
@@ -247,6 +259,13 @@ the only Runtime and behavior specification source.
   expiry, and SOP version before enforcing the final result limit. Revoked,
   cross-Project, and expired assets cannot become prompt context even when their
   vectors remain highly ranked.
+- Context/Memory Settings separates `记忆与隐私`, `企业经验`, and `高级`.
+  Private learning is the first/default mode; one explicit Save applies the
+  draft across tabs, and navigation protects unsaved changes. Testing checks
+  saved service configuration only. Enterprise setup remains optional and does
+  not expose private data; advanced details preserve lifecycle/security rules.
+  Manual current-session archive lives in the workbench Memory panel, using the
+  existing Session Commit command and reporting accepted background work.
 - Privacy changes inside a loaded Session are monotonic. `read-only` and `off`
   take effect at the next Pi lifecycle or OpenViking Tool boundary and remove
   later write/capture authority; enabling Memory, reopening learning, or changing
@@ -391,7 +410,7 @@ the only Runtime and behavior specification source.
   authorization UI. Their cancellation and timeout still terminate the owned group.
   This exception does not weaken Windows Job Object containment or claim containment
   of POSIX descendants that independently leave the owned process group.
-- Settings owns one global `办公 -> 飞书` surface with `用户授权` and `应用连接`
+- Settings owns one global `连接与集成 -> 飞书` surface with `用户授权` and `应用连接`
   page-level tabs. `用户授权` is first and selected by default because the user's
   personal identity is the primary office task. Both tabs first expose a missing
   Lark CLI as an explicit prerequisite with `安装 Lark CLI` and `前往技能` actions;
@@ -426,8 +445,8 @@ the only Runtime and behavior specification source.
   is not authorization expiry: `needs_refresh` remains usable and is described as
   automatic renewal on the next user API call; only an invalid or expired refresh
   grant requires a new browser authorization.
-- Visual assistance and browser capability readiness are the first-party tasks under
-  Settings' Capabilities & Integrations group. The separate Office group owns Lark identity;
+- Visual assistance belongs to Settings' AI Configuration group. Browser readiness
+  and Lark identity belong to Connections & Integrations;
   it is not a generic MCP endpoint or credential editor.
   `浏览器集成` owns browser-specific dependency preparation and runtime diagnostics.
   Pi user-owned MCP configuration remains visible through normal Runtime capability
@@ -701,13 +720,16 @@ the only Runtime and behavior specification source.
 - Settings opens or focuses one application-level selected surface. Global and project
   scope are explicit only where meaningful, and changing the current workspace
   retargets project scope instead of creating another Settings instance.
-- Settings navigation groups `账户` and `外观` under Application; Pi resources
-  under Pi; `飞书` under Office; visual assistance and browser work under
-  Capabilities & Integrations;
-  and runtime, network, updates, and About under System & Support. Category
-  search searches these navigation targets rather than arbitrary page content.
-  Narrow windows use the same grouped information architecture in a bounded
-  popover.
+- Settings navigation groups `外观` and `账户与数据` under General; models,
+  context/memory, vision and Pi resources under AI Configuration; Lark and browser
+  work under Connections & Integrations; and runtime, usage, network, updates and
+  About under System & Support. Account retains its route and describes local
+  mode and data storage without inventing account login/sync capabilities or
+  implying that requested external model/service calls cannot transmit content.
+  Category search searches these navigation targets rather than arbitrary page
+  content. Narrow windows use the same groups in a bounded popover. Existing
+  category identity, project scope, draft protection and local transaction
+  boundaries remain unchanged.
 - `恢复与诊断` combines three read-only authorities without creating another
   business source of truth: Pi runtime checks from `doctor.run`, bounded Agent
   Host recovery facts from `diagnostics.collect`, and Electron Main Workspace,
@@ -1248,7 +1270,7 @@ the only Runtime and behavior specification source.
   refresh remains a separate toolbar action in the same visual language. The filter
   row and action group remain visually unboxed rather than becoming one large capsule;
   only an individual icon action receives transient interaction feedback. The row
-  menu and native right-click menu order `在 Pi-67 中打开`, system-default open,
+  menu and native right-click menu order `在 New Money 中打开`, system-default open,
   relative-path copy, absolute-path copy, Finder/Explorer reveal, rename, and
   confirmed trash operations. Search results show the file name and relative
   path so duplicate names remain distinguishable. Dependency and generated
@@ -1283,7 +1305,7 @@ the only Runtime and behavior specification source.
   Windows-reserved basenames, and names over 255 characters fail before submit
   and are still revalidated by the Host. Enter never submits during IME
   composition, and a failed mutation preserves the typed name and focus.
-- `在 Pi-67 中打开` creates one Workspace-scoped file tab or focuses the existing
+- `在 New Money 中打开` creates one Workspace-scoped file tab or focuses the existing
   tab for the same relative path. The fixed `对话` tab remains available, file
   tabs survive Conversation and Settings navigation, and selecting a Conversation
   returns to `对话` without closing those tabs. File navigation never starts,

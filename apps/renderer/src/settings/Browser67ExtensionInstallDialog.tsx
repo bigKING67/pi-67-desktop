@@ -78,12 +78,12 @@ export function Browser67ExtensionInstallDialog({
           <span className="dialog-eyebrow">BROWSER67</span>
           <Heading slot="title">浏览器扩展连接</Heading>
           <p className={styles.installIntro}>
-            Pi-67 会准备受完整性保护的 unpacked extension；Chrome/Edge 首次加载仍需你在扩展管理页确认。
+            New Money 会准备受完整性保护的 unpacked extension；Chrome/Edge 首次加载仍需你在扩展管理页确认。
           </p>
 
           {repairRequired ? (
             <div className={styles.installWarning} role="status">
-              受管扩展文件已经是当前版本，但浏览器中的运行身份尚未同步。验证时 Pi-67 会先尝试原位重新加载；仅当验证后仍不匹配且加载目录不是下方 Pi-67 目录时，才需要移除旧条目并重新加载。
+              受管扩展文件已经是当前版本，但浏览器中的运行身份尚未同步。验证时 New Money 会先尝试原位重新加载；仅当验证后仍不匹配且加载目录不是下方 New Money 目录时，才需要移除旧条目并重新加载。
             </div>
           ) : null}
 
@@ -109,7 +109,7 @@ export function Browser67ExtensionInstallDialog({
               number="2"
               title={repairRequired ? "重新加载现有扩展" : "在浏览器中加载"}
               description={repairRequired
-                ? "先直接验证，Pi-67 会请求浏览器重新加载现有扩展。若仍失败，再打开扩展管理页核对 browser67 TMWD Bridge 的加载目录。"
+                ? "先直接验证，New Money 会请求浏览器重新加载现有扩展。若仍失败，再打开扩展管理页核对 browser67 TMWD Bridge 的加载目录。"
                 : "打开扩展管理页、开启开发者模式，然后选择“加载已解压的扩展”。"}
             >
               <div className={styles.browserActions}>
@@ -154,7 +154,7 @@ export function Browser67ExtensionInstallDialog({
               current={filesPrepared && !connected}
               number="3"
               title="启动并验证连接"
-              description="加载后保留一个普通网页标签页。Pi-67 将启动或复用本地 Hub，并核对 live extension identity。"
+              description="加载后保留一个普通网页标签页。New Money 将启动或复用本地 Hub，并核对 live extension identity。"
             >
               {connected ? <span className={styles.connectedState}><Check aria-hidden="true" size={14} />已安装并连接</span> : null}
             </InstallStep>

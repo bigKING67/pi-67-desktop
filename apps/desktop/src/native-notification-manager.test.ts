@@ -23,7 +23,7 @@ describe("native notification manager", () => {
     expect(notifications[0]).toMatchObject({
       presentation: {
         title: "Pi 任务已完成",
-        body: "后台会话已完成，可以返回 Pi-67 查看结果。"
+        body: "后台会话已完成，可以返回 New Money 查看结果。"
       },
       shown: true
     });

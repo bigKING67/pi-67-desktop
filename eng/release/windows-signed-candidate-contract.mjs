@@ -65,7 +65,7 @@ export function assertWindowsSignedCandidateIdentity(value, expected = {}) {
     || win32.basename(value.installer.fileName) !== value.installer.fileName) {
     throw new Error("Windows signed candidate installer.fileName must be a basename.");
   }
-  if (value.packagedExecutable.fileName !== "win-unpacked/Pi-67 Desktop.exe") {
+  if (!["win-unpacked/New Money.exe", "win-unpacked/Pi-67 Desktop.exe"].includes(value.packagedExecutable.fileName)) {
     throw new Error("Windows signed candidate packagedExecutable.fileName is invalid.");
   }
   if (value.installer.authenticode.signerThumbprint

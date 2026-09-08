@@ -353,22 +353,22 @@ test("keeps unsigned preview downloads explicit, observable, and cancellable", a
   await page.getByRole("menu", { name: "帮助与设置" })
     .getByRole("menuitem", { name: "检查更新", exact: true }).click();
 
-  const dialog = page.getByRole("dialog", { name: "Pi-67 更新" });
+  const dialog = page.getByRole("dialog", { name: "New Money 更新" });
   await expect(dialog.getByText(/updates\.52671314\.xyz/u)).toBeVisible();
   await expect(dialog.getByText("正在等待自动检查")).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __pi67UpdateTest: { checks: number } }).__pi67UpdateTest.checks)).toBe(0);
   await dialog.getByRole("button", { name: "检查更新" }).click();
-  await expect(dialog.getByText("发现 Pi-67 0.1.0-alpha.2")).toBeVisible();
+  await expect(dialog.getByText("发现 New Money 0.1.0-alpha.2")).toBeVisible();
   await expect(dialog.getByText(/自动下载、校验，并启动内部更新安装/u)).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __pi67UpdateTest: { checks: number } }).__pi67UpdateTest.checks)).toBe(1);
 
   await dialog.getByRole("button", { name: "下载并安装" }).click();
-  await expect(dialog.getByText("正在下载 Pi-67 0.1.0-alpha.2")).toBeVisible();
+  await expect(dialog.getByText("正在下载 New Money 0.1.0-alpha.2")).toBeVisible();
   await expect(dialog.getByRole("progressbar", { name: "更新下载进度" })).toHaveAttribute("aria-valuenow", "50");
   await expect(dialog.getByText(/50\.0 MB \/ 100\.0 MB（50%）/u)).toBeVisible();
   await expect(dialog.getByRole("button", { name: "取消下载" })).toBeEnabled();
   await dialog.getByRole("button", { name: "取消下载" }).click();
-  await expect(dialog.getByText("发现 Pi-67 0.1.0-alpha.2")).toBeVisible();
+  await expect(dialog.getByText("发现 New Money 0.1.0-alpha.2")).toBeVisible();
   expect(await page.evaluate(() => {
     const state = (window as unknown as {
       __pi67UpdateTest: { starts: number; cancellations: number; openedUrls: string[] };
@@ -402,8 +402,8 @@ test("projects an automatically discovered version into the help entry and menu"
     .getByRole("menuitem", { name: /发现新版本 0\.1\.0-alpha\.2/u });
   await expect(updateItem.getByText("新版本", { exact: true })).toBeVisible();
   await updateItem.click();
-  await expect(page.getByRole("dialog", { name: "Pi-67 更新" })
-    .getByText("发现 Pi-67 0.1.0-alpha.2")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "New Money 更新" })
+    .getByText("发现 New Money 0.1.0-alpha.2")).toBeVisible();
   expect(await page.evaluate(() => (
     window as unknown as { __pi67UpdateTest: { checks: number } }
   ).__pi67UpdateTest.checks)).toBe(0);
@@ -421,7 +421,7 @@ async function openWorkspace(page: Page): Promise<void> {
 
 async function openAppearanceSettings(page: Page) {
   await page.keyboard.press(process.platform === "darwin" ? "Meta+," : "Control+,");
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.waitFor({ state: "visible", timeout: 15_000 });
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: /^外观/u }).click();

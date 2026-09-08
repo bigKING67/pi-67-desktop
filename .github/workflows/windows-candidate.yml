@@ -169,9 +169,9 @@ jobs:
           SOURCE_COMMIT: ${{ needs.provenance.outputs.source_commit }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $installers = @(Get-ChildItem artifacts/release/Pi-67-Desktop-*-win-x64.exe -File)
+          $installers = @(Get-ChildItem artifacts/release/New-Money-*-win-x64.exe -File)
           if ($installers.Count -ne 1) { throw "Expected one Windows candidate installer, found $($installers.Count)." }
-          $executable = 'artifacts/release/win-unpacked/Pi-67 Desktop.exe'
+          $executable = 'artifacts/release/win-unpacked/New Money.exe'
           $identity = 'artifacts/release/windows-preview-candidate-identity.json'
           corepack pnpm run release:preview:candidate create `
             --installer $installers[0].FullName `
@@ -199,8 +199,8 @@ jobs:
         with:
           name: ${{ steps.names.outputs.internal }}
           path: |
-            artifacts/release/Pi-67-Desktop-*-win-x64.exe
-            artifacts/release/win-unpacked/Pi-67 Desktop.exe
+            artifacts/release/New-Money-*-win-x64.exe
+            artifacts/release/win-unpacked/New Money.exe
             artifacts/release/windows-preview-candidate-identity.json
             artifacts/validation/windows-packaged-ui/
           if-no-files-found: error
@@ -255,12 +255,12 @@ jobs:
           CANDIDATE_BUILD_ATTEMPT: ${{ needs.build-windows.outputs.candidate_run_attempt }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $installers = @(Get-ChildItem artifacts/release/Pi-67-Desktop-*-win-x64.exe -File)
+          $installers = @(Get-ChildItem artifacts/release/New-Money-*-win-x64.exe -File)
           if ($installers.Count -ne 1) { throw "Expected one Windows candidate installer, found $($installers.Count)." }
           corepack pnpm run release:preview:candidate verify `
             --candidate-identity artifacts/release/windows-preview-candidate-identity.json `
             --installer $installers[0].FullName `
-            --packaged-executable 'artifacts/release/win-unpacked/Pi-67 Desktop.exe' `
+            --packaged-executable 'artifacts/release/win-unpacked/New Money.exe' `
             --expected-repository $env:GITHUB_REPOSITORY `
             --expected-source-commit $env:SOURCE_COMMIT `
             --expected-run-id $env:GITHUB_RUN_ID `
@@ -273,12 +273,12 @@ jobs:
           BASELINE_SOURCE_SHA: ${{ inputs.baseline_source_sha }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $installers = @(Get-ChildItem artifacts/baseline/release/Pi-67-Desktop-*-win-x64.exe -File)
+          $installers = @(Get-ChildItem artifacts/baseline/release/*-win-x64.exe -File)
           if ($installers.Count -ne 1) { throw "Expected one previous-version installer, found $($installers.Count)." }
           corepack pnpm run release:preview:candidate verify `
             --candidate-identity artifacts/baseline/release/windows-preview-candidate-identity.json `
             --installer $installers[0].FullName `
-            --packaged-executable 'artifacts/baseline/release/win-unpacked/Pi-67 Desktop.exe' `
+            --packaged-executable (Join-Path 'artifacts/baseline/release' ((Get-Content 'artifacts/baseline/release/windows-preview-candidate-identity.json' -Raw | ConvertFrom-Json).packagedExecutable.fileName)) `
             --expected-repository $env:GITHUB_REPOSITORY `
             --expected-source-commit $env:BASELINE_SOURCE_SHA `
             --expected-run-id $env:BASELINE_RUN_ID `
@@ -299,8 +299,8 @@ jobs:
         with:
           name: windows-candidate-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            artifacts/release/Pi-67-Desktop-*-win-x64.exe
-            artifacts/release/win-unpacked/Pi-67 Desktop.exe
+            artifacts/release/New-Money-*-win-x64.exe
+            artifacts/release/win-unpacked/New Money.exe
             artifacts/release/windows-preview-candidate-identity.json
             artifacts/validation/windows-packaged-ui/
             artifacts/validation/windows-installer-lifecycle/

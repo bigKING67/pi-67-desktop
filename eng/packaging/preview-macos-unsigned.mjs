@@ -12,11 +12,11 @@ export function resolveMacosPreviewTarget(platform, arch, root = repositoryRoot)
   if (platform !== "darwin" || arch !== "arm64") {
     throw new Error(`macOS preview only supports darwin/arm64, received ${platform}/${arch}.`);
   }
-  const applicationPath = join(root, "artifacts/release/mac-arm64/Pi-67 Desktop.app");
+  const applicationPath = join(root, "artifacts/release/mac-arm64/New Money.app");
   return {
     applicationPath,
     asarPath: join(applicationPath, "Contents/Resources/app.asar"),
-    executablePath: join(applicationPath, "Contents/MacOS/Pi-67 Desktop")
+    executablePath: join(applicationPath, "Contents/MacOS/New Money")
   };
 }
 
@@ -37,6 +37,8 @@ export async function previewMacosUnsigned({
   root = repositoryRoot
 } = {}) {
   const target = resolveMacosPreviewTarget(platform, arch, root);
+  await quitRunningApplication(join(root,
+    "artifacts/release/mac-arm64/Pi-67 Desktop.app/Contents/MacOS/Pi-67 Desktop"));
   await quitRunningApplication(target.executablePath);
   await runPnpmScript("package:native:unsigned", root);
   await runPnpmScript("package:smoke", root);
@@ -52,7 +54,7 @@ export async function previewMacosUnsigned({
   const sha256 = createHash("sha256").update(asar).digest("hex");
   console.log(`Opened latest unsigned macOS preview: ${target.applicationPath}`);
   console.log(`app.asar modified=${metadata.mtime.toISOString()} size=${metadata.size} sha256=${sha256}`);
-  console.log(`Pi-67 Desktop pid=${processIds.join(",")}`);
+  console.log(`New Money pid=${processIds.join(",")}`);
   return { ...target, modifiedAt: metadata.mtime, processIds, sha256, size: metadata.size };
 }
 
@@ -64,7 +66,7 @@ async function quitRunningApplication(executablePath) {
     "-e", `tell application id "${APPLICATION_BUNDLE_ID}" to quit`,
     "-e", "end if"
   ]);
-  if (exitCode !== 0) throw new Error(`Failed to request Pi-67 Desktop quit; osascript exited ${exitCode}.`);
+  if (exitCode !== 0) throw new Error(`Failed to request New Money quit; osascript exited ${exitCode}.`);
   await waitForProcessState(executablePath, false, 10_000);
 }
 
@@ -96,7 +98,7 @@ async function waitForProcessState(executablePath, expectedRunning, timeoutMs) {
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
   }
   const expectation = expectedRunning ? "start" : "quit";
-  throw new Error(`Timed out waiting for Pi-67 Desktop to ${expectation}: ${executablePath}`);
+  throw new Error(`Timed out waiting for New Money to ${expectation}: ${executablePath}`);
 }
 
 async function processIds(executablePath) {

@@ -5,9 +5,9 @@
 唯一允许的产品产物：
 
 ```text
-Pi-67-Desktop-<version>-win-x64.exe
-Pi-67-Desktop-<version>-mac-arm64.dmg
-Pi-67-Desktop-<version>-mac-arm64.zip
+New-Money-<version>-win-x64.exe
+New-Money-<version>-mac-arm64.dmg
+New-Money-<version>-mac-arm64.zip
 ```
 
 Windows 使用 NSIS；macOS 使用 hardened runtime、Developer ID 签名和 notarization。
@@ -162,7 +162,7 @@ previous signed NSIS
 install、真实默认用户目录或 Windows“添加或删除程序”的人工体验。上述证据仍需在干净
 Windows 主机上使用签名 Release Candidate 单独认证。
 
-在 signed lifecycle 中，current installer、`win-unpacked/Pi-67 Desktop.exe`、previous installer、
+在 signed lifecycle 中，current installer、`win-unpacked/New Money.exe`、previous installer、
 baseline installed executable 和 upgraded installed executable 必须全部匹配受保护变量中的预期
 Publisher。升级后的 installed executable 还必须与同一次 build 的 `win-unpacked` executable 在
 byte length 和 SHA-256 上完全一致，避免只验证 installer 签名却运行另一份 EXE。
@@ -175,7 +175,7 @@ byte length 和 SHA-256 上完全一致，避免只验证 installer 签名却运
 ```powershell
 $candidate = 'C:\candidate\windows-signed-candidate-identity.json'
 $installer = 'C:\candidate\Pi-67-Desktop-1.2.3-win-x64.exe'
-$executable = 'C:\certification-install\Pi-67 Desktop.exe'
+$executable = 'C:\certification-install\New Money.exe'
 $repository = 'bigKING67/pi-67-desktop'
 $tag = 'v1.2.3'
 $commit = '<40-hex-tag-commit>'
@@ -308,7 +308,7 @@ artifacts/release/windows-native-release-gate.json
 ```
 
 同一 Signed Release run 的 `provider_long_turn_certify` Job 直接下载 build Job 的 Windows artifact，
-使用同一份 `windows-signed-candidate-identity.json` 和 `win-unpacked/Pi-67 Desktop.exe` 执行真实 Provider
+使用同一份 `windows-signed-candidate-identity.json` 和 `win-unpacked/New Money.exe` 执行真实 Provider
 Operation，不允许重新 build。Ubuntu gate 会严格校验 Provider summary 的 exact fields、accepted ACK、
 至少 90 秒受控 Tool、`operation.completed`、Pi JSONL identity、privacy flags，以及 candidate identity
 SHA-256/source/run/Publisher，生成：
@@ -414,7 +414,7 @@ macOS 用户只有在从本仓库下载并核对 Release SHA-256 后，才应在
 `/Applications` 后使用：
 
 ```bash
-xattr -dr com.apple.quarantine "/Applications/Pi-67 Desktop.app"
+xattr -dr com.apple.quarantine "/Applications/New Money.app"
 ```
 
 该通道不改变 `Signed release` workflow 的 fail-closed 规则；一旦配置签名与

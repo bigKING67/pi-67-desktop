@@ -147,7 +147,7 @@ export function WorkspaceFileTree({
                 <Popover className="inspector-file-menu-popover" placement="bottom end" offset={4}>
                   <Menu aria-label={`${entry.name} 文件管理`} className="inspector-file-menu">
                     {entry.kind === "file" ? (
-                      <MenuItem onAction={() => onEntryAction(entry, "pi67-open")}><FileText size={13} />在 Pi-67 中打开</MenuItem>
+                      <MenuItem onAction={() => onEntryAction(entry, "pi67-open")}><FileText size={13} />在 New Money 中打开</MenuItem>
                     ) : null}
                     <MenuItem onAction={() => onEntryAction(entry, "open-default")}><ExternalLink size={13} />使用系统默认应用打开</MenuItem>
                     <MenuItem onAction={() => onEntryAction(entry, "copy-relative")}><Copy size={13} />复制相对路径</MenuItem>

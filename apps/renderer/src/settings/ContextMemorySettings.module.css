@@ -1,11 +1,7 @@
 .workspace {
   display: grid;
-  gap: 24px;
-}
-
-.actions {
-  display: flex;
-  gap: 8px;
+  min-width: 0;
+  gap: 28px;
 }
 
 .input {
@@ -113,55 +109,55 @@
   background: color-mix(in srgb, var(--focus) 9%, var(--surface-raised));
 }
 
-.privacyGrid {
+.privacyGroup {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  padding: 14px;
-}
-
-.privacyCard {
-  display: grid;
-  min-height: 94px;
-  align-content: start;
-  gap: 6px;
-  padding: 14px;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--surface-raised);
-  color: var(--text-secondary);
-  text-align: left;
+  background: var(--surface);
 }
 
-.privacyCard strong {
-  color: var(--text-primary);
-  font-size: 13px;
+.privacyRow {
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
 }
 
-.privacyCard span {
-  font-size: 11px;
-  line-height: 1.55;
+.privacyRow:last-child { border-bottom: 0; }
+.privacyRow[data-hovered] { background: var(--surface-hover); }
+.privacyRow[data-selected] { background: var(--surface-muted); }
+.privacyRow[data-disabled] { cursor: default; opacity: 0.55; }
+.privacyRow[data-focus-visible] { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+.radioIndicator {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 1px solid var(--text-secondary);
+  border-radius: 50%;
 }
 
-.privacyCard[data-hovered] {
-  border-color: var(--border-strong);
-  background: var(--surface-hover);
+.privacyRow[data-selected] .radioIndicator {
+  border: 5px solid var(--text-primary);
 }
 
-.privacyCard[data-selected] {
-  border-color: color-mix(in srgb, var(--focus) 68%, var(--border));
-  background: color-mix(in srgb, var(--focus) 7%, var(--surface-raised));
-  box-shadow: inset 3px 0 0 var(--focus);
-}
-
-.privacyCard[data-focus-visible] {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
+.privacyIdentity { display: grid; min-width: 0; gap: 2px; }
+.privacyIdentity strong { color: var(--text-primary); font-size: 13px; font-weight: 630; }
+.privacyIdentity strong small { margin-left: 8px; color: var(--text-secondary); font-size: 12px; font-weight: 400; }
+.privacyIdentity > span, .note, .details { color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.note { margin: 0; }
+.details { margin-top: 24px; }
+.details summary { width: fit-content; cursor: pointer; color: var(--text-primary); }
+.details summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.details p { max-width: 720px; }
 
 @media (max-width: 840px) {
-  .privacyGrid { grid-template-columns: 1fr; }
-  .actions { flex-wrap: wrap; }
   .bindingActions { width: 100%; flex-wrap: wrap; }
   .projectSelect { min-width: min(100%, 280px); flex: 1; }
 }
+
+.tabs { display: grid; min-width: 0; gap: 28px; }

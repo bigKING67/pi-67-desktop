@@ -35,22 +35,16 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
     label: messages.settings.groups.application,
     items: [
       {
-        id: "account",
-        ...messages.settings.sections.account,
-        searchTerms: ["账户与本地数据", "登录", "未登录", "本地数据", "本地模式", "account", "sign in"],
-        icon: UserRound
-      },
-      {
         id: "general",
         ...messages.settings.sections.general,
         searchTerms: ["通用", "外观", "主题", "深色", "浅色", "跟随系统", "快捷键", "键盘", "shortcut", "keyboard", "appearance", "theme"],
         icon: SlidersHorizontal
       },
       {
-        id: "context-memory",
-        ...messages.settings.sections.contextMemory,
-        searchTerms: ["OpenViking", "上下文", "记忆", "经验", "隐私", "召回", "context", "memory", "experience"],
-        icon: BrainCircuit
+        id: "account",
+        ...messages.settings.sections.account,
+        searchTerms: ["账户与本地数据", "登录", "未登录", "本地数据", "本地模式", "account", "sign in"],
+        icon: UserRound
       }
     ]
   },
@@ -62,6 +56,27 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
         ...messages.settings.sections.providers,
         searchTerms: ["模型服务", "提供商", "服务商", "认证", "密钥", "思考级别", "provider", "model", "api key"],
         icon: Bot
+      },
+      {
+        id: "context-memory",
+        ...messages.settings.sections.contextMemory,
+        searchTerms: ["OpenViking", "上下文", "记忆", "经验", "隐私", "召回", "context", "memory", "experience"],
+        icon: BrainCircuit
+      },
+      {
+        id: "vision",
+        ...messages.settings.sections.vision,
+        searchTerms: [
+          "视觉模型",
+          "图片识别",
+          "图像识别",
+          "多模态",
+          "Qwen VL",
+          "豆包",
+          "vision",
+          "image"
+        ],
+        icon: Eye
       },
       {
         id: "extensions",
@@ -121,7 +136,7 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
     ]
   },
   {
-    label: messages.settings.groups.office,
+    label: messages.settings.groups.capabilities,
     items: [
       {
         id: "lark",
@@ -143,26 +158,6 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
           "邮箱"
         ],
         icon: Building2
-      }
-    ]
-  },
-  {
-    label: messages.settings.groups.capabilities,
-    items: [
-      {
-        id: "vision",
-        ...messages.settings.sections.vision,
-        searchTerms: [
-          "视觉模型",
-          "图片识别",
-          "图像识别",
-          "多模态",
-          "Qwen VL",
-          "豆包",
-          "vision",
-          "image"
-        ],
-        icon: Eye
       },
       {
         id: "integrations",
@@ -233,4 +228,10 @@ export function matchesSettingsQuery(item: SettingsNavigationItem, query: string
   if (!query) return true;
   return [item.label, item.summary, ...item.searchTerms]
     .some((value) => value.toLocaleLowerCase("zh-CN").includes(query));
+}
+
+
+export function settingsContentWidth(section: SettingsSection): "standard" | "wide" {
+  return ["providers", "packages", "extensions", "skills", "prompts", "rules", "usage"].includes(section)
+    ? "wide" : "standard";
 }

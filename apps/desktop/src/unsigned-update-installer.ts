@@ -17,7 +17,7 @@ import type { SupportedUpdatePlatform } from "./unsigned-preview-update.js";
 import { ensureUnsignedUpdateDirectory } from "./unsigned-update-directory.js";
 
 const execFileAsync = promisify(execFile);
-const macosBundleName = "Pi-67 Desktop.app";
+const macosBundleNames = ["New Money.app", "Pi-67 Desktop.app"];
 const macosBundleIdentifier = "com.pi67.desktop";
 
 interface SpawnedProcess {
@@ -76,7 +76,7 @@ export function buildWindowsUpdateInstallerArguments(executablePath: string): re
   const resolvedExecutable = windowsPath.resolve(executablePath);
   if (
     !windowsPath.isAbsolute(resolvedExecutable)
-    || windowsPath.basename(resolvedExecutable).toLowerCase() !== "pi-67 desktop.exe"
+    || !["new money.exe", "pi-67 desktop.exe"].includes(windowsPath.basename(resolvedExecutable).toLowerCase())
   ) {
     throw new Error("Pi-67 cannot bind the Windows update to the current installation.");
   }
@@ -129,13 +129,14 @@ async function prepareMacosUnsignedUpdate(options: InstallUnsignedUpdateOptions)
     const entries = await readdir(stagingRoot, { withFileTypes: true });
     if (
       entries.length !== 1
-      || entries[0]?.name !== macosBundleName
+      || !entries[0]
+      || !macosBundleNames.includes(entries[0]?.name ?? "")
       || !entries[0].isDirectory()
       || entries[0].isSymbolicLink()
     ) {
       throw new Error("The macOS update archive must contain exactly one Pi-67 application bundle.");
     }
-    const stagedBundlePath = join(stagingRoot, macosBundleName);
+    const stagedBundlePath = join(stagingRoot, entries[0]!.name);
     await assertMacosBundleIdentity(stagedBundlePath, options.version, runCommand);
     const [stagingDevice, targetDevice] = await Promise.all([
       stat(stagingRoot).then((metadata) => metadata.dev),
@@ -164,7 +165,11 @@ async function assertMacosBundleIdentity(
     throw new Error("The macOS update bundle is not a regular application directory.");
   }
   const infoPath = join(bundlePath, "Contents", "Info.plist");
-  const executablePath = join(bundlePath, "Contents", "MacOS", "Pi-67 Desktop");
+  const executableName = await runCommand("/usr/bin/plutil", ["-extract", "CFBundleExecutable", "raw", "-o", "-", infoPath]);
+  if (!["New Money", "Pi-67 Desktop"].includes(executableName.stdout.trim())) {
+    throw new Error("The macOS update bundle executable identity is invalid.");
+  }
+  const executablePath = join(bundlePath, "Contents", "MacOS", executableName.stdout.trim());
   const [identifier, version, executable] = await Promise.all([
     runCommand("/usr/bin/plutil", ["-extract", "CFBundleIdentifier", "raw", "-o", "-", infoPath]),
     runCommand("/usr/bin/plutil", ["-extract", "CFBundleShortVersionString", "raw", "-o", "-", infoPath]),

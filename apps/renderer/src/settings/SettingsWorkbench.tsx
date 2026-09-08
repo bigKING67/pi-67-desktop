@@ -6,7 +6,6 @@ import {
   Moon,
   Search,
   Sun,
-  UserRound,
   X
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -60,7 +59,8 @@ import {
   SETTINGS_GROUPS,
   SETTINGS_SECTIONS,
   matchesSettingsQuery,
-  sectionSupportsProjectScope
+  sectionSupportsProjectScope,
+  settingsContentWidth
 } from "./settings-navigation.js";
 
 export function SettingsWorkbench() {
@@ -160,7 +160,7 @@ export function SettingsWorkbench() {
 
   return (
     <>
-    <section aria-label="π 设置" className={styles.workbench} data-testid="settings-workbench">
+    <section aria-label="New Money 设置" className={styles.workbench} data-testid="settings-workbench">
       <aside className={styles.sidebar}>
         <div className={styles.sidebarControls}>
           <Button
@@ -212,7 +212,8 @@ export function SettingsWorkbench() {
           ref={scrollRegionRef}
         >
           <div className={styles.documentBody}>
-            <SettingsPageHeader
+            <div className={styles.pageLayout} data-content-width={settingsContentWidth(activeSection)}>
+            {activeSection !== "context-memory" && activeSection !== "network" ? <SettingsPageHeader
               title={currentSection.label}
               description={currentSection.summary}
               actions={projectScopeAvailable ? <div aria-label="设置作用域" className={styles.scope} role="group">
@@ -226,11 +227,12 @@ export function SettingsWorkbench() {
                   onPress={() => requestNavigation({ kind: "scope", scope: "project" })}
                 >{workspace ? `项目 · ${workspace.displayName}` : "当前项目"}</Button>
               </div> : undefined}
-            />
+            /> : null}
             <div className={styles.pageContent}>
               <SettingsDraftGuardContext.Provider value={registerDraft}>
                 <SettingsSectionContent section={activeSection} />
               </SettingsDraftGuardContext.Provider>
+            </div>
             </div>
           </div>
         </div>
@@ -273,18 +275,10 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
 
 function AccountSettings() {
   return (
-    <SettingsSectionBlock title="登录状态" description="π 当前以本地模式运行；工作区、会话和凭据不会因为未登录而离开本机。">
-      <SettingsRows>
-        <SettingsRow
-          leading={<UserRound aria-hidden="true" size={17} />}
-          title="未登录"
-          description="账户服务尚未连接，不影响本地使用 Pi。"
-          value="本地模式"
-        />
-        <SettingsRow title="账户同步" description="企业和团队同步将在接入真实账户服务后提供。" value="未连接" />
-        <SettingsRow title="本地数据" description="工作区、会话、模型配置和凭据继续保留在本机。" value="仅本机" />
-      </SettingsRows>
-    </SettingsSectionBlock>
+    <SettingsRows>
+      <SettingsRow title="本地模式" description="无需登录 New Money 账户即可使用本地工作台；账户服务尚未接入。" />
+      <SettingsRow title="数据与同步" description="工作区、会话和配置保存在本机，账户同步尚未提供。使用模型或已连接服务时，相关内容会按请求发送给对应服务。" />
+    </SettingsRows>
   );
 }
 

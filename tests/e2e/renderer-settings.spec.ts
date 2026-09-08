@@ -159,7 +159,7 @@ test("confirms install and path uninstall with scoped Host mutations", async ({ 
   await dialog.getByRole("button", { name: "确认安装" }).click();
 
   await expect(dialog).not.toBeVisible();
-  await expect(page.getByLabel("π 设置").getByText(npmSource, { exact: true })).toBeVisible();
+  await expect(page.getByLabel("New Money 设置").getByText(npmSource, { exact: true })).toBeVisible();
   expect((await recordedCommandDetails(page)).find((command) => (
     command.type === "extension.package.install"
   ))).toMatchObject({
@@ -295,7 +295,7 @@ test("uses one extension package workbench for third-party installed and discove
   await expect(workspace.getByText("原生替代", { exact: true })).toBeVisible();
   await workspace.getByRole("button", { name: /pi-subagents，npm:pi-subagents · 全局/u }).click();
   await expect(workspace.getByText("原生能力替代", { exact: true })).toBeVisible();
-  await expect(workspace.getByText("旧的第三方子代理扩展；Pi-67 Desktop 使用原生子代理并不加载此包。", { exact: true }))
+  await expect(workspace.getByText("旧的第三方子代理扩展；New Money 使用原生子代理并不加载此包。", { exact: true }))
     .toBeVisible();
   await expect(workspace.getByText("由 Pi-67 原生子代理替代", { exact: true })).toBeVisible();
   await expect(workspace.getByText(/现有用户配置保持不变，但 Desktop Task 不再加载该扩展/u)).toBeVisible();
@@ -331,7 +331,7 @@ test("keeps a dense resource-package catalog in the shared document scroll and e
   ));
   await openPackageSettings(page, entries);
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   const workspace = settings.getByTestId("extension-management-workspace");
   const list = workspace.getByTestId("extension-package-list-scroll");
   const detail = workspace.getByTestId("extension-package-detail-scroll");
@@ -350,7 +350,7 @@ test("keeps a dense resource-package catalog in the shared document scroll and e
   await workspace.getByRole("button", { name: "pi-subagents，npm:pi-subagents · 全局" }).click();
   await expect(list).toBeHidden();
   await expect(detail).toBeVisible();
-  await expect(workspace.getByText("旧的第三方子代理扩展；Pi-67 Desktop 使用原生子代理并不加载此包。"))
+  await expect(workspace.getByText("旧的第三方子代理扩展；New Money 使用原生子代理并不加载此包。"))
     .toBeVisible();
   await expect(workspace.getByText("原生能力替代", { exact: true })).toBeVisible();
   await expect(workspace.getByText("由 Pi-67 原生子代理替代", { exact: true })).toBeVisible();
@@ -372,11 +372,11 @@ test("uses compact grouped navigation and real Settings search", async ({ page }
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press(process.platform === "darwin" ? "Meta+," : "Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
   const search = settings.getByRole("searchbox", { name: "搜索设置分类" });
 
-  for (const group of ["应用", "Pi", "办公", "能力与集成", "系统与支持"]) {
+  for (const group of ["通用", "AI 配置", "连接与集成", "系统与支持"]) {
     await expect(navigation.getByRole("group", { name: group, exact: true })).toBeVisible();
   }
   await expect(settings.locator("aside img")).toHaveCount(0);
@@ -386,7 +386,7 @@ test("uses compact grouped navigation and real Settings search", async ({ page }
   await expect(search).toBeFocused();
   await search.fill("主题");
   await expect(navigation.getByRole("button", { name: "外观", exact: true })).toBeVisible();
-  await expect(navigation.getByRole("button", { name: "账户", exact: true })).toHaveCount(0);
+  await expect(navigation.getByRole("button", { name: "账户与数据", exact: true })).toHaveCount(0);
   await expect(navigation.getByRole("button", { name: "扩展", exact: true })).toHaveCount(0);
 
   await search.fill("卸载");
@@ -394,7 +394,7 @@ test("uses compact grouped navigation and real Settings search", async ({ page }
   await expect(settings.getByRole("heading", { name: "扩展", exact: true })).toBeVisible();
 
   await settings.getByRole("button", { name: "清除设置分类搜索" }).click();
-  await expect(navigation.getByRole("button", { name: "账户", exact: true })).toBeVisible();
+  await expect(navigation.getByRole("button", { name: "账户与数据", exact: true })).toBeVisible();
   await search.fill("不存在的设置");
   await expect(navigation.getByText("没有匹配的设置", { exact: true })).toBeVisible();
   await navigation.getByRole("button", { name: "清除搜索", exact: true }).click();

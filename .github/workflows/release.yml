@@ -282,8 +282,8 @@ jobs:
           EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
         run: |
           $artifacts = @(
-            Get-ChildItem artifacts/release/Pi-67-Desktop-*-win-x64.exe -File
-            Get-Item 'artifacts/release/win-unpacked/Pi-67 Desktop.exe'
+            Get-ChildItem artifacts/release/New-Money-*-win-x64.exe -File
+            Get-Item 'artifacts/release/win-unpacked/New Money.exe'
           )
           if ($artifacts.Count -ne 2) { throw "Expected one installer and one packaged executable." }
           foreach ($artifact in $artifacts) {
@@ -302,7 +302,7 @@ jobs:
           EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          $installer = @(Get-ChildItem artifacts/release/Pi-67-Desktop-*-win-x64.exe -File)
+          $installer = @(Get-ChildItem artifacts/release/New-Money-*-win-x64.exe -File)
           if ($installer.Count -ne 1) { throw "Expected one Windows installer, found $($installer.Count)." }
           $commit = (git rev-parse HEAD).Trim()
           if ($commit -notmatch '^[0-9a-f]{40}$') { throw 'Checked-out source commit is invalid.' }
@@ -313,7 +313,7 @@ jobs:
             --run-id $env:GITHUB_RUN_ID `
             --run-attempt $env:GITHUB_RUN_ATTEMPT `
             --installer $installer[0].FullName `
-            --packaged-executable 'artifacts/release/win-unpacked/Pi-67 Desktop.exe' `
+            --packaged-executable 'artifacts/release/win-unpacked/New Money.exe' `
             --expected-signer $env:EXPECTED_SIGNER_THUMBPRINT `
             --output artifacts/release/windows-signed-candidate-identity.json
       - name: Verify Windows NSIS installer lifecycle
@@ -339,7 +339,7 @@ jobs:
           MACOS_EXPECTED_TEAM_ID: ${{ vars.MACOS_EXPECTED_TEAM_ID }}
         run: |
           set -euo pipefail
-          app="artifacts/release/mac-arm64/Pi-67 Desktop.app"
+          app="artifacts/release/mac-arm64/New Money.app"
           codesign --verify --deep --strict "$app"
           team_id="$(codesign -dv --verbose=4 "$app" 2>&1 | sed -n 's/^TeamIdentifier=//p')"
           if [[ "$team_id" != "$MACOS_EXPECTED_TEAM_ID" ]]; then
@@ -347,12 +347,12 @@ jobs:
             exit 1
           fi
           spctl --assess --type execute --verbose "$app"
-          xcrun stapler validate artifacts/release/Pi-67-Desktop-*-mac-arm64.dmg
+          xcrun stapler validate artifacts/release/New-Money-*-mac-arm64.dmg
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release-${{ matrix.platform }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            artifacts/release/Pi-67-Desktop-*
+            artifacts/release/New-Money-*
             artifacts/release/windows-signed-candidate-identity.json
             artifacts/release/win-unpacked/
             artifacts/release/latest*.yml
@@ -436,9 +436,9 @@ jobs:
           $commit = (git rev-parse HEAD).Trim()
           if ($commit -notmatch '^[0-9a-f]{40}$') { throw 'Checked-out source commit is invalid.' }
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          $installer = "artifacts/release/Pi-67-Desktop-$version-win-x64.exe"
+          $installer = "artifacts/release/New-Money-$version-win-x64.exe"
           $identity = 'artifacts/release/windows-signed-candidate-identity.json'
-          $executable = 'artifacts/release/win-unpacked/Pi-67 Desktop.exe'
+          $executable = 'artifacts/release/win-unpacked/New Money.exe'
           corepack pnpm run release:candidate:verify `
             --candidate-identity $identity `
             --installer $installer `
@@ -482,7 +482,7 @@ jobs:
           corepack pnpm run release:candidate:verify `
             --candidate-identity artifacts/release/windows-signed-candidate-identity.json `
             --installer $env:PI67_RELEASE_PROVIDER_INSTALLER `
-            --packaged-executable 'artifacts/release/win-unpacked/Pi-67 Desktop.exe' `
+            --packaged-executable 'artifacts/release/win-unpacked/New Money.exe' `
             --expected-source-policy stable `
             --expected-repository $env:GITHUB_REPOSITORY `
             --expected-source-tag $env:RELEASE_TAG `
@@ -559,7 +559,7 @@ jobs:
           }
           $candidateRoot = Join-Path $env:RUNNER_TEMP 'pi67-windows-signed-candidate'
           $identityFiles = @(Get-ChildItem $candidateRoot -Recurse -Filter 'windows-signed-candidate-identity.json' -File)
-          $installerFiles = @(Get-ChildItem $candidateRoot -Recurse -Filter 'Pi-67-Desktop-*-win-x64.exe' -File)
+          $installerFiles = @(Get-ChildItem $candidateRoot -Recurse -Filter 'New-Money-*-win-x64.exe' -File)
           if ($identityFiles.Count -ne 1) { throw "Expected one Windows candidate identity, found $($identityFiles.Count)." }
           if ($installerFiles.Count -ne 1) { throw "Expected one Windows candidate installer, found $($installerFiles.Count)." }
           $commit = (git rev-parse HEAD).Trim()
@@ -602,7 +602,7 @@ jobs:
             -Action Observe `
             -InstallRoot $installRoot `
             -StatePath $env:PI67_WINDOWS_NATIVE_REGISTRY_GUARD_STATE
-          $executable = Join-Path $installRoot 'Pi-67 Desktop.exe'
+          $executable = Join-Path $installRoot 'New Money.exe'
           $deadline = [DateTime]::UtcNow.AddMinutes(2)
           while (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
             if ([DateTime]::UtcNow -ge $deadline) { throw 'Installed Windows candidate executable did not appear.' }
@@ -717,11 +717,11 @@ jobs:
                 if ($process.ExitCode -ne 0) { throw "Windows candidate uninstaller exited with code $($process.ExitCode)." }
               } elseif ($uninstallers.Count -gt 1) {
                 throw "Expected at most one Windows candidate uninstaller, found $($uninstallers.Count)."
-              } elseif (Test-Path -LiteralPath (Join-Path $installRoot 'Pi-67 Desktop.exe')) {
+              } elseif (Test-Path -LiteralPath (Join-Path $installRoot 'New Money.exe')) {
                 throw 'Installed Windows candidate has no uninstaller.'
               }
               $deadline = [DateTime]::UtcNow.AddMinutes(1)
-              while (Test-Path -LiteralPath (Join-Path $installRoot 'Pi-67 Desktop.exe')) {
+              while (Test-Path -LiteralPath (Join-Path $installRoot 'New Money.exe')) {
                 if ([DateTime]::UtcNow -ge $deadline) { throw 'Windows candidate executable remained after uninstall.' }
                 Start-Sleep -Milliseconds 250
               }
@@ -807,7 +807,7 @@ jobs:
             exit 1
           }
           commit="$(git rev-parse HEAD)"
-          installer="artifacts/release/Pi-67-Desktop-$(node -p "require('./package.json').version")-win-x64.exe"
+          installer="artifacts/release/New-Money-$(node -p "require('./package.json').version")-win-x64.exe"
           corepack pnpm run release:windows-native-gate \
             --candidate-identity artifacts/release/windows-signed-candidate-identity.json \
             --certification-root artifacts/certification/windows-native \
@@ -887,9 +887,9 @@ jobs:
           }
           VERSION="${RELEASE_TAG#v}"
           expected=(
-            "Pi-67-Desktop-$VERSION-win-x64.exe"
-            "Pi-67-Desktop-$VERSION-mac-arm64.dmg"
-            "Pi-67-Desktop-$VERSION-mac-arm64.zip"
+            "New-Money-$VERSION-win-x64.exe"
+            "New-Money-$VERSION-mac-arm64.dmg"
+            "New-Money-$VERSION-mac-arm64.zip"
             "provider-long-turn-release-gate.json"
             "provider-long-turn-summary.json"
             "release-manifest.json"
@@ -1019,9 +1019,9 @@ jobs:
         run: |
           VERSION="${RELEASE_TAG#v}"
           gh release create "$RELEASE_TAG" \
-            "artifacts/release/Pi-67-Desktop-$VERSION-win-x64.exe" \
-            "artifacts/release/Pi-67-Desktop-$VERSION-mac-arm64.dmg" \
-            "artifacts/release/Pi-67-Desktop-$VERSION-mac-arm64.zip" \
+            "artifacts/release/New-Money-$VERSION-win-x64.exe" \
+            "artifacts/release/New-Money-$VERSION-mac-arm64.dmg" \
+            "artifacts/release/New-Money-$VERSION-mac-arm64.zip" \
             artifacts/release/provider-long-turn-release-gate.json \
             artifacts/release/provider-long-turn-summary.json \
             artifacts/release/release-manifest.json \

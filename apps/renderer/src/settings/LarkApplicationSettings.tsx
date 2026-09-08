@@ -114,7 +114,7 @@ export function LarkApplicationSettings({
       /> : null}
       <SettingsRow
         title="App Secret"
-        description="编辑时可以显隐核对；保存后由 lark-cli 保管，Pi-67 不回读明文。"
+        description="编辑时可以显隐核对；保存后由 lark-cli 保管，New Money 不回读明文。"
         value={configured ? "已安全保存" : "未验证"}
       />
       <SettingsRow

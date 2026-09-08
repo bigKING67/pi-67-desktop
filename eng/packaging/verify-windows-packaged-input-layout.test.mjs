@@ -47,7 +47,7 @@ describe("Windows packaged synthetic-scale UI contract", () => {
       acknowledgementTimedOut: false,
       conversationRowCount: 0,
       runtimePhase: "starting",
-      title: "Pi-67 Desktop",
+      title: "New Money",
       url: "app://pi67/index.html",
       workspaceOpenFailed: false,
       workspacePickerVisible: false

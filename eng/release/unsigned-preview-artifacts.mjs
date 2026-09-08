@@ -8,42 +8,49 @@ import { readPiRuntimeContract } from "./pi-runtime-contract.mjs";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const defaultReleaseDirectory = join(root, "artifacts/release");
 
-export function unsignedPreviewArtifactSpecs(version) {
+export function unsignedPreviewArtifactSpecs(version, prefix = "New-Money") {
   return [
     {
-      source: `Pi-67-Desktop-${version}-win-x64.exe`,
-      name: `Pi-67-Desktop-${version}-win-x64-unsigned-preview.exe`,
+      source: `${prefix}-${version}-win-x64.exe`,
+      name: `${prefix}-${version}-win-x64-unsigned-preview.exe`,
       target: "windows-x64"
     },
     {
-      source: `Pi-67-Desktop-${version}-mac-arm64.dmg`,
-      name: `Pi-67-Desktop-${version}-mac-arm64-unsigned-preview.dmg`,
+      source: `${prefix}-${version}-mac-arm64.dmg`,
+      name: `${prefix}-${version}-mac-arm64-unsigned-preview.dmg`,
       target: "macos-arm64"
     },
     {
-      source: `Pi-67-Desktop-${version}-mac-arm64.zip`,
-      name: `Pi-67-Desktop-${version}-mac-arm64-unsigned-preview.zip`,
+      source: `${prefix}-${version}-mac-arm64.zip`,
+      name: `${prefix}-${version}-mac-arm64-unsigned-preview.zip`,
       target: "macos-arm64"
     }
   ];
 }
 
 export async function prepareUnsignedPreview(releaseDirectory, version, runtimeVersion) {
-  const files = await Promise.all(unsignedPreviewArtifactSpecs(version).map(async (spec) => {
+  // Validate the complete input set before moving any file. Sequential work also
+  // ensures rejection cannot leave sibling renames racing the caller's cleanup.
+  const sources = [];
+  for (const spec of unsignedPreviewArtifactSpecs(version)) {
     const source = join(releaseDirectory, spec.source);
-    const destination = join(releaseDirectory, spec.name);
     const metadata = await lstat(source);
     if (!metadata.isFile() || metadata.isSymbolicLink()) {
       throw new Error(`${spec.source}: source is not a regular file`);
     }
+    sources.push({ spec, source, bytes: metadata.size });
+  }
+  const files = [];
+  for (const { spec, source, bytes } of sources) {
+    const destination = join(releaseDirectory, spec.name);
     await rename(source, destination);
-    return {
+    files.push({
       name: spec.name,
-      bytes: metadata.size,
+      bytes,
       sha256: await hashFile(destination),
       target: spec.target
-    };
-  }));
+    });
+  }
 
   const manifest = {
     schemaVersion: 1,
@@ -102,7 +109,7 @@ function throwUnsignedPreviewFailures(failures) {
 
 export function validateUnsignedPreviewManifest(manifest, version, runtimeVersion) {
   const failures = [];
-  const specs = unsignedPreviewArtifactSpecs(version);
+  const specs = unsignedPreviewArtifactSpecs(version, (typeof manifest?.files?.[0]?.name === "string" && manifest.files[0].name.startsWith("Pi-67-Desktop-")) ? "Pi-67-Desktop" : "New-Money");
   const entries = Array.isArray(manifest?.files) ? manifest.files : [];
   if (manifest?.schemaVersion !== 1 || manifest?.product !== "Pi-67 Desktop") failures.push("invalid manifest identity");
   if (manifest?.version !== version) failures.push("manifest version mismatch");

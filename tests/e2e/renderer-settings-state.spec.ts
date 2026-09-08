@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import type { DesktopSystemBridge } from "@pi67/protocol";
 import {
   attachMockAgent,
   installMockDesktopBridge
@@ -11,14 +12,14 @@ test("keeps Network drafts in memory until the user saves or discards them", asy
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
   await navigation.getByRole("button", { name: "下载源与网络", exact: true }).click();
   const npmMode = settings.getByRole("combobox", { name: "npm", exact: true });
   const registry = settings.getByRole("textbox", { name: "自定义 Registry", exact: true });
   await npmMode.selectOption("custom");
   await registry.fill("https://registry.settings-draft.example.com");
-  const save = settings.getByRole("button", { name: "保存", exact: true });
+  const save = settings.getByRole("button", { name: "保存更改", exact: true });
   await expect(save).toBeEnabled();
 
   await settings.getByRole("button", { name: "检测全部源", exact: true }).click();
@@ -59,6 +60,36 @@ test("keeps Network drafts in memory until the user saves or discards them", asy
   expect((await settingsActionState(page)).packageResets).toBe(1);
 });
 
+test("keeps a failed Network save editable and retries the same draft from its header", async ({ page }) => {
+  await installMockDesktopBridge(page);
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.keyboard.press("Control+,");
+  const settings = page.getByLabel("New Money 设置");
+  await settings.getByRole("button", { name: "下载源与网络", exact: true }).click();
+  await page.evaluate(() => {
+    const system = (window as unknown as { pi67: { system: DesktopSystemBridge } }).pi67.system;
+    const original = system.savePackageNetworkSettings.bind(system);
+    system.savePackageNetworkSettings = async (...args) => {
+      system.savePackageNetworkSettings = original;
+      throw new Error(`无法保存下载源：${args[0].npmMode}`);
+    };
+  });
+  const npmMode = settings.getByRole("combobox", { name: "npm", exact: true });
+  await npmMode.selectOption("official-only");
+  const save = settings.getByRole("heading", { name: "下载源与网络", level: 1 })
+    .locator("../..").getByRole("button", { name: "保存更改", exact: true });
+  await save.click();
+  await expect(settings.getByRole("alert")).toContainText("无法保存下载源：official-only");
+  await expect(npmMode).toHaveValue("official-only");
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect(save).toBeDisabled();
+  await expect(settings.getByRole("alert")).toHaveCount(0);
+  expect((await settingsActionState(page)).packageSaves).toBe(1);
+});
+
 test("keeps update actions disabled until the Main update state is ready", async ({ page }) => {
   await installMockDesktopBridge(page, { deferInitialUpdateState: true });
   await page.goto("/");
@@ -66,7 +97,7 @@ test("keeps update actions disabled until the Main update state is ready", async
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "更新与诊断", exact: true }).click();
   const automaticRow = settings.getByText("自动检查更新", { exact: true }).locator("xpath=../..");
@@ -88,7 +119,7 @@ test("keeps update actions disabled until the Main update state is ready", async
   await page.getByRole("button", { name: "帮助与设置" }).click();
   await page.getByRole("menu", { name: "帮助与设置" })
     .getByRole("menuitem", { name: "检查更新", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Pi-67 更新" });
+  const dialog = page.getByRole("dialog", { name: "New Money 更新" });
   await expect(dialog.getByText("正在读取更新状态", { exact: true })).toBeVisible();
   await expect(dialog.getByText("正在确认当前版本和自动检查设置。", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "检查更新", exact: true })).toHaveCount(0);

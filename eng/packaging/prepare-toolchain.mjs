@@ -98,7 +98,7 @@ export async function prepareDesktopToolchain(platform = process.platform, archi
     }
   };
   await writeFile(join(stagingRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-  console.log(`Prepared Pi-67 Desktop toolchain ${target}: Node ${versions.node}, npm ${versions.npm}, Git ${versions.git}.`);
+  console.log(`Prepared New Money toolchain ${target}: Node ${versions.node}, npm ${versions.npm}, Git ${versions.git}.`);
   return manifest;
 }
 

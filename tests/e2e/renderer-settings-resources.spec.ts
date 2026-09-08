@@ -39,7 +39,7 @@ test("shows bounded Pi resource projection truth in Context and Settings", async
   )).toBeVisible();
 
   await page.keyboard.press("Control+,");
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "提示词模板", exact: true }).click();
   await expect(settings.getByText(
@@ -57,7 +57,7 @@ test("keeps Pi resource reload unavailable for a provisional task without a Sess
   await expect(page.getByTestId("new-session-intent")).toBeVisible();
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "提示词模板", exact: true }).click();
   const reload = settings.getByRole("button", {
@@ -84,7 +84,7 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
 
   await navigation.getByRole("button", { name: "扩展", exact: true }).click();
@@ -219,14 +219,14 @@ test("separates extension packages, extensions, skills, prompt templates, and co
     .toHaveAttribute("aria-selected", "true");
   await expect(ruleWorkspace.getByText("工作规则由 Pi 自动加载，并在会话中持续生效。", { exact: false })).toBeVisible();
   await expect(ruleWorkspace.getByRole("heading", { name: "全局工作规则", exact: true })).toBeVisible();
-  await expect(ruleWorkspace.getByRole("heading", { name: "Pi-67 内置规则", exact: true })).toHaveCount(0);
-  await expect(ruleWorkspace.getByText("Pi-67 内置规则 · 11 项", { exact: true })).toBeVisible();
+  await expect(ruleWorkspace.getByRole("heading", { name: "New Money 内置规则", exact: true })).toHaveCount(0);
+  await expect(ruleWorkspace.getByText("New Money 内置规则 · 11 项", { exact: true })).toBeVisible();
   await expect(ruleWorkspace.locator("summary").getByText("系统提示词覆盖 · 未配置", { exact: true })).toBeVisible();
   if (visualArtifactDirectory) {
     await page.screenshot({ path: resolve(visualArtifactDirectory, "settings-work-rules-global.png") });
   }
   await ruleWorkspace.getByText("高级", { exact: true }).click();
-  await expect(ruleWorkspace.getByRole("list", { name: "Pi-67 内置规则" }).getByRole("listitem"))
+  await expect(ruleWorkspace.getByRole("list", { name: "New Money 内置规则" }).getByRole("listitem"))
     .toHaveCount(11);
   await expect(ruleWorkspace.getByRole("list", { name: "系统提示词覆盖 · 未配置" }).getByRole("listitem"))
     .toHaveCount(2);
@@ -247,7 +247,7 @@ test("separates extension packages, extensions, skills, prompt templates, and co
     await page.screenshot({ path: resolve(visualArtifactDirectory, "settings-work-rules-project-advanced.png") });
   }
   await ruleTabs.getByRole("tab", { name: "全局", exact: true }).click();
-  await expect(ruleWorkspace.getByRole("list", { name: "Pi-67 内置规则" })).toBeVisible();
+  await expect(ruleWorkspace.getByRole("list", { name: "New Money 内置规则" })).toBeVisible();
 
   await navigation.getByRole("button", { name: "下载源与网络", exact: true }).click();
   for (const version of ["24.18.0", "12.0.1", "2.53.0"]) {
@@ -268,7 +268,7 @@ test("keeps browser integration as the only first-party connection surface", asy
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
   await expect(navigation.getByRole("button", { name: "MCP 服务", exact: true })).toHaveCount(0);
   await expect(settings.getByText("Tavily Bridge", { exact: true })).toHaveCount(0);
@@ -311,7 +311,7 @@ test("keeps the managed-source repair instructions after refreshing browser67 fi
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "浏览器集成", exact: true }).click();
   await expect(settings.getByText("需要重新加载验证", { exact: true })).toBeVisible();
@@ -342,14 +342,14 @@ test("opens, previews, edits, creates, and conflict-checks Context Markdown file
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "工作规则", exact: true }).click();
   const workspace = settings.getByTestId("rule-settings-workspace");
   const tabs = workspace.getByRole("tablist", { name: "工作规则范围" });
   await expect.poll(() => recordedCommands(page)).toContain("context.file.list");
   await workspace.getByText("高级", { exact: true }).click();
-  const managedCatalog = workspace.getByRole("list", { name: "Pi-67 内置规则" });
+  const managedCatalog = workspace.getByRole("list", { name: "New Money 内置规则" });
   await expect(managedCatalog.getByRole("listitem")).toHaveCount(11);
 
   await managedCatalog.getByRole("button", { name: /00-product\.md/u }).click();
@@ -435,7 +435,7 @@ test("refreshes an initializing capability snapshot without requiring a manual r
   await attachMockAgent(page);
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "扩展", exact: true }).click();
   await settings.getByRole("tab", { name: "内置扩展", exact: true }).click();

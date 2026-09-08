@@ -62,13 +62,21 @@ spacing, component states, and motion as `DESIGN.md`.
   low-contrast luminance fill rather than the green runtime accent, and the
   removed Settings brand/description hero must not reappear as dark-theme-only
   chrome. At narrow widths the grouped Popover uses the same raised neutral surface,
-  retains all five group labels, and remains bounded inside the viewport.
-- The right column uses the same centered `840px` compact and `1120px` standard
-  measures as light mode with a single vertical scroll owner. Grouped Settings use
+  retains all four group labels, and remains bounded inside the viewport.
+- The right column uses the same centered `min(1120px, 100%)` document
+  frame as light mode with a left-aligned 880px standard inner page or full-width
+  catalog/editor/usage page, and a single vertical scroll owner. Navigation hover
+  is lighter than persistent selection; all page Tabs share neutral fill and
+  underline. Grouped Settings use
   one quiet surface and row dividers;
   Catalogs have no enclosing frame; Editors and semantic Notices are their own
   surfaces. Dark mode must not reintroduce glowing cards, green selected Catalog
   rows, or repeated borders merely to manufacture depth.
+- Context/Memory uses the same neutral Settings Tabs and grouped radio rows as
+  light mode. Selected modes use neutral luminance and a filled radio indicator,
+  with a separate focus-visible outline; no blue card border or inset accent edge.
+  Page Save, local connection testing, and advanced disclosures retain their
+  light-mode hierarchy and shared component sizes.
 - Provider, model, and Extension navigation remains drill-down at every width.
   Ultra-wide dark windows do not automatically expose a second catalog or detail
   column, and returning restores the same search, filter, selection, scroll, and
@@ -185,3 +193,11 @@ spacing, component states, and motion as `DESIGN.md`.
   actions as light mode and never create an opaque patch over the answer text.
 - Avoid pure black, pure white, neon outlines, glowing cards, and transparent
   layers over busy transcript content.
+
+## New Money in-product brand trial
+
+Retain the existing production graphical mark beside the New Money wordmark in
+both themes. The wordmark inherits the primary text token; keep existing brand
+scale, spacing and context-title hierarchy. Mode symbols are separate from
+brand identity and are not introduced by this naming change. Native application
+assets remain unchanged.

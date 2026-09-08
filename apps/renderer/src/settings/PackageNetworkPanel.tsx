@@ -10,8 +10,10 @@ import { RefreshCw, RotateCcw, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "react-aria-components";
 import styles from "./PackageNetworkPanel.module.css";
+import { messages } from "../localization/message-catalog.js";
 import {
   SettingsNotice,
+  SettingsPageHeader,
   SettingsRow,
   SettingsRows,
   SettingsSectionBlock
@@ -122,6 +124,12 @@ export function PackageNetworkPanel() {
 
   return (
     <>
+    <div className={styles.page}>
+      <SettingsPageHeader
+        title={messages.settings.sections.network.label}
+        description={messages.settings.sections.network.summary}
+        actions={<Button className="primary-button" isDisabled={!canSave} onPress={() => void save()}><Save aria-hidden="true" size={14} />{phase === "saving" ? "保存中…" : "保存更改"}</Button>}
+      />
     <div className={styles.stack}>
       <SettingsSectionBlock
         actions={<span className={styles.readiness} data-ready={snapshot?.toolchain.ready ?? false}>
@@ -139,7 +147,6 @@ export function PackageNetworkPanel() {
 
       <SettingsSectionBlock
         actions={<>
-          <Button className="primary-button" isDisabled={!canSave} onPress={() => void save()}><Save aria-hidden="true" size={14} />{phase === "saving" ? "保存中…" : "保存"}</Button>
           <Button className="secondary-button" isDisabled={!validDraft || busy} onPress={() => void probe()}><RefreshCw aria-hidden="true" size={14} />{phase === "probing" ? "检测中…" : "检测全部源"}</Button>
           <Button className="secondary-button" isDisabled={busy} onPress={() => setResetOpen(true)}><RotateCcw aria-hidden="true" size={14} />恢复默认</Button>
         </>}
@@ -197,6 +204,7 @@ export function PackageNetworkPanel() {
           />)}
         </SettingsRows>
       </SettingsSectionBlock>
+    </div>
     </div>
     <SettingsDestructiveActionDialog
       busy={phase === "resetting"}

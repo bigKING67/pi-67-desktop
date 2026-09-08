@@ -12,7 +12,7 @@ test("keeps support upload pending, receipt, failure, retry, and local fallback 
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "更新与诊断", exact: true }).click();
   const row = settings.getByText("上传脱敏诊断", { exact: true }).locator("xpath=../..");

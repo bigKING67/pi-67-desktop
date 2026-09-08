@@ -47,10 +47,14 @@ describe("unsigned update platform installer", () => {
       .toThrow("path is invalid");
   });
 
-  it("stages and validates one macOS bundle before starting the rollback helper", async () => {
+  it.each([
+    ["Pi-67 Desktop", "Pi-67 Desktop"],
+    ["New Money", "New Money"],
+    ["Pi-67 Desktop", "New Money"]
+  ])("stages %s to %s before starting the rollback helper", async (brand, stagedBrand) => {
     const root = await temporaryDirectory();
-    const currentBundle = join(root, "Pi-67 Desktop.app");
-    const executablePath = await createApplicationBundle(currentBundle);
+    const currentBundle = join(root, `${brand}.app`);
+    const executablePath = await createApplicationBundle(currentBundle, brand);
     const archivePath = join(root, "update.zip");
     const updateRoot = join(root, "updates");
     await writeFile(archivePath, "fixture");
@@ -60,8 +64,11 @@ describe("unsigned update platform installer", () => {
       if (file === "/usr/bin/ditto") {
         const stagingRoot = arguments_.at(-1);
         if (!stagingRoot) throw new Error("Missing staging root");
-        await createApplicationBundle(join(stagingRoot, "Pi-67 Desktop.app"));
+        await createApplicationBundle(join(stagingRoot, `${stagedBrand}.app`), stagedBrand);
         return { stdout: "" };
+      }
+      if (file === "/usr/bin/plutil" && arguments_[1] === "CFBundleExecutable") {
+        return { stdout: arguments_.at(-1)?.startsWith(currentBundle) ? brand : stagedBrand };
       }
       if (file === "/usr/bin/plutil" && arguments_[1] === "CFBundleIdentifier") {
         return { stdout: "com.pi67.desktop\n" };
@@ -94,8 +101,8 @@ describe("unsigned update platform installer", () => {
       join(updateRoot, "install-fixture-id-1234.sh"),
       "42",
       currentBundle,
-      join(updateRoot, "macos-stage-fixture-id-1234", "Pi-67 Desktop.app"),
-      join(root, ".Pi-67 Desktop.app.pi67-backup-fixture-id-1234"),
+      join(updateRoot, "macos-stage-fixture-id-1234", `${stagedBrand}.app`),
+      join(root, `.${brand}.app.pi67-backup-fixture-id-1234`),
       join(updateRoot, "macos-stage-fixture-id-1234")
     ]);
     const script = await readFile(join(updateRoot, "install-fixture-id-1234.sh"), "utf8");
@@ -115,6 +122,7 @@ describe("unsigned update platform installer", () => {
         await createApplicationBundle(join(arguments_.at(-1)!, "Pi-67 Desktop.app"));
         return { stdout: "" };
       }
+      if (arguments_[1] === "CFBundleExecutable") return { stdout: "Pi-67 Desktop" };
       if (arguments_[1] === "CFBundleIdentifier") return { stdout: "com.pi67.desktop\n" };
       return { stdout: arguments_.at(-1)?.startsWith(currentBundle) ? "0.1.0-alpha.1\n" : "9.9.9\n" };
     });
@@ -144,6 +152,7 @@ describe("unsigned update platform installer", () => {
     await mkdir(target);
     await symlink(target, updateRoot);
     const runCommand = vi.fn(async (file: string, arguments_: readonly string[]) => {
+      if (file === "/usr/bin/plutil" && arguments_[1] === "CFBundleExecutable") return { stdout: "Pi-67 Desktop" };
       if (file === "/usr/bin/plutil" && arguments_[1] === "CFBundleIdentifier") {
         return { stdout: "com.pi67.desktop\n" };
       }
@@ -175,8 +184,8 @@ async function temporaryDirectory(): Promise<string> {
   return path;
 }
 
-async function createApplicationBundle(bundlePath: string): Promise<string> {
-  const executablePath = join(bundlePath, "Contents", "MacOS", "Pi-67 Desktop");
+async function createApplicationBundle(bundlePath: string, executableName = "Pi-67 Desktop"): Promise<string> {
+  const executablePath = join(bundlePath, "Contents", "MacOS", executableName);
   await mkdir(join(bundlePath, "Contents", "MacOS"), { recursive: true });
   await writeFile(join(bundlePath, "Contents", "Info.plist"), "fixture");
   await writeFile(executablePath, "fixture", { mode: 0o700 });

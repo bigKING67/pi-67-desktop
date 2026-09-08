@@ -226,7 +226,7 @@ test("keeps the committed transcript visible across a Settings round trip", asyn
 
   await expect(page.getByText("Settings round-trip transcript", { exact: true })).toBeVisible();
   await page.keyboard.press(process.platform === "darwin" ? "Meta+," : "Control+,");
-  await expect(page.getByLabel("π 设置")).toBeVisible();
+  await expect(page.getByLabel("New Money 设置")).toBeVisible();
   await page.getByRole("button", { name: "返回工作台" }).click();
 
   const transcript = page.locator('[data-transcript-region="true"]');

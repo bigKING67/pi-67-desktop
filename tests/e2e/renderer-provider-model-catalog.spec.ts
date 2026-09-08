@@ -21,7 +21,7 @@ test("refreshes Pi's official model catalog independently from configuration fil
   await page.goto("/");
   await attachMockAgent(page);
   await page.keyboard.press("Control+,");
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "模型", exact: true }).click();
   const panel = settings.getByTestId("provider-configuration-panel");
@@ -43,7 +43,7 @@ test("declares native search for every official DeepSeek catalog model", async (
     providerConfigurationSnapshot: createMockDeepSeekProviderConfigurationSnapshot(true)
   });
   await page.keyboard.press("Control+,");
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "模型", exact: true }).click();
   const panel = settings.getByTestId("provider-configuration-panel");

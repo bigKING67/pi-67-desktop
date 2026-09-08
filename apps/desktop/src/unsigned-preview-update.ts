@@ -129,7 +129,7 @@ export function parseUnsignedPreviewManifest(value: unknown): {
     throw new Error("Pi-67 update manifest identity is invalid.");
   }
 
-  const expected = expectedArtifactTargets(version);
+  const expected = expectedArtifactTargets(version, isRecord(value.files[0]) && typeof value.files[0].name === "string" && value.files[0].name.startsWith("New-Money-") ? "New-Money" : "Pi-67-Desktop");
   const names = new Set<string>();
   const artifacts = value.files.map((entry): TrustedUpdateArtifact => {
     if (!isRecord(entry) || !hasExactKeys(entry, ["name", "bytes", "sha256", "target"])) {
@@ -210,11 +210,11 @@ function selectPlatformArtifact(
   return artifact;
 }
 
-function expectedArtifactTargets(version: string): Map<string, TrustedUpdateArtifact["target"]> {
+function expectedArtifactTargets(version: string, prefix: "New-Money" | "Pi-67-Desktop"): Map<string, TrustedUpdateArtifact["target"]> {
   return new Map([
-    [`Pi-67-Desktop-${version}-win-x64-unsigned-preview.exe`, "windows-x64"],
-    [`Pi-67-Desktop-${version}-mac-arm64-unsigned-preview.dmg`, "macos-arm64"],
-    [`Pi-67-Desktop-${version}-mac-arm64-unsigned-preview.zip`, "macos-arm64"]
+    [`${prefix}-${version}-win-x64-unsigned-preview.exe`, "windows-x64"],
+    [`${prefix}-${version}-mac-arm64-unsigned-preview.dmg`, "macos-arm64"],
+    [`${prefix}-${version}-mac-arm64-unsigned-preview.zip`, "macos-arm64"]
   ]);
 }
 

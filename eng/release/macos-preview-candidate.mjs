@@ -24,13 +24,13 @@ const VERSION = /^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/u;
 
 export function resolveMacosPreviewEvidencePaths(version, releaseRoot = defaultReleaseRoot) {
   return {
-    applicationPath: join(releaseRoot, "mac-arm64/Pi-67 Desktop.app"),
-    appAsarPath: join(releaseRoot, "mac-arm64/Pi-67 Desktop.app/Contents/Resources/app.asar"),
+    applicationPath: join(releaseRoot, "mac-arm64/New Money.app"),
+    appAsarPath: join(releaseRoot, "mac-arm64/New Money.app/Contents/Resources/app.asar"),
     candidateIdentityPath: join(releaseRoot, "macos-preview-candidate-identity.json"),
-    dmgPath: join(releaseRoot, `Pi-67-Desktop-${version}-mac-arm64.dmg`),
-    executablePath: join(releaseRoot, "mac-arm64/Pi-67 Desktop.app/Contents/MacOS/Pi-67 Desktop"),
+    dmgPath: join(releaseRoot, `New-Money-${version}-mac-arm64.dmg`),
+    executablePath: join(releaseRoot, "mac-arm64/New Money.app/Contents/MacOS/New Money"),
     packagedSmokeReceiptPath: join(releaseRoot, "macos-preview-packaged-smoke.json"),
-    zipPath: join(releaseRoot, `Pi-67-Desktop-${version}-mac-arm64.zip`)
+    zipPath: join(releaseRoot, `New-Money-${version}-mac-arm64.zip`)
   };
 }
 
@@ -88,12 +88,12 @@ export async function writeMacosPreviewCandidateEvidence({
     dmg: fileIdentity(
       dmg,
       basename(evidencePaths.dmgPath),
-      `Pi-67-Desktop-${packageVersion}-mac-arm64-unsigned-preview.dmg`
+      `New-Money-${packageVersion}-mac-arm64-unsigned-preview.dmg`
     ),
     zip: fileIdentity(
       zip,
       basename(evidencePaths.zipPath),
-      `Pi-67-Desktop-${packageVersion}-mac-arm64-unsigned-preview.zip`
+      `New-Money-${packageVersion}-mac-arm64-unsigned-preview.zip`
     )
   };
   const receipt = {
@@ -259,31 +259,34 @@ function validateSharedMacosEvidence(value, expected) {
     failures.push("invalid application identity");
   }
   const version = value?.application?.version;
+  const legacy = value?.artifacts?.executable?.fileName === "mac-arm64/Pi-67 Desktop.app/Contents/MacOS/Pi-67 Desktop";
+  const name = legacy ? "Pi-67 Desktop" : "New Money";
+  const prefix = legacy ? "Pi-67-Desktop" : "New-Money";
   validateFileIdentity(
     value?.artifacts?.executable,
-    "mac-arm64/Pi-67 Desktop.app/Contents/MacOS/Pi-67 Desktop",
+    `mac-arm64/${name}.app/Contents/MacOS/${name}`,
     undefined,
     "packaged executable",
     failures
   );
   validateFileIdentity(
     value?.artifacts?.appAsar,
-    "mac-arm64/Pi-67 Desktop.app/Contents/Resources/app.asar",
+    `mac-arm64/${name}.app/Contents/Resources/app.asar`,
     undefined,
     "app.asar",
     failures
   );
   validateFileIdentity(
     value?.artifacts?.dmg,
-    `Pi-67-Desktop-${version}-mac-arm64.dmg`,
-    `Pi-67-Desktop-${version}-mac-arm64-unsigned-preview.dmg`,
+    `${prefix}-${version}-mac-arm64.dmg`,
+    `${prefix}-${version}-mac-arm64-unsigned-preview.dmg`,
     "DMG",
     failures
   );
   validateFileIdentity(
     value?.artifacts?.zip,
-    `Pi-67-Desktop-${version}-mac-arm64.zip`,
-    `Pi-67-Desktop-${version}-mac-arm64-unsigned-preview.zip`,
+    `${prefix}-${version}-mac-arm64.zip`,
+    `${prefix}-${version}-mac-arm64-unsigned-preview.zip`,
     "ZIP",
     failures
   );

@@ -103,7 +103,7 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
   const scaleLabel = String(Math.round(scaleFactor * 100));
   const directories = await createPackagedTestDirectories(
     `pi67-windows-ui-${scaleLabel}-`,
-    "中文长路径 包含空格的 Pi-67 Desktop 工作区验证"
+    "中文长路径 包含空格的 New Money 工作区验证"
   );
   const childPidPath = join(directories.userDataDirectory, "child.pid");
   const lifecyclePath = join(directories.userDataDirectory, "lifecycle.txt");

@@ -20,19 +20,19 @@ describe("local release artifact cleanup", () => {
     const plan = await planLocalArtifactCleanup({ root });
 
     expect(plan.targets.map((target) => target.relativePath)).toEqual([
-      "artifacts/candidates/windows-alpha37-123/candidate/release/Pi-67-Desktop-0.1.0-alpha.37-win-x64.exe",
+      "artifacts/candidates/windows-alpha37-123/candidate/release/New-Money-0.1.0-alpha.37-win-x64.exe",
       "artifacts/candidates/windows-alpha37-123/candidate/release/win-unpacked",
-      "artifacts/r2-update-bundle/Pi-67-Desktop-0.1.0-alpha.40-mac-arm64-unsigned-preview.dmg",
+      "artifacts/r2-update-bundle/New-Money-0.1.0-alpha.40-mac-arm64-unsigned-preview.dmg",
       "artifacts/release/.icon-icns",
       "artifacts/release/builder-debug.yml",
       "artifacts/release/latest-mac.yml",
       "artifacts/release/mac-arm64",
-      "artifacts/release/Pi-67-Desktop-0.1.0-alpha.40-mac-arm64.dmg",
+      "artifacts/release/New-Money-0.1.0-alpha.40-mac-arm64.dmg",
       "artifacts/release/win-unpacked",
-      "artifacts/validation/alpha29-windows-candidate/release/Pi-67-Desktop-0.1.0-alpha.29-win-x64.exe",
+      "artifacts/validation/alpha29-windows-candidate/release/New-Money-0.1.0-alpha.29-win-x64.exe",
       "artifacts/validation/alpha29-windows-candidate/release/win-unpacked",
-      "artifacts/verified-unsigned-preview/Pi-67-Desktop-0.1.0-alpha.40-win-x64-unsigned-preview.exe",
-      "artifacts/windows-candidate-456-1/release/Pi-67-Desktop-0.1.0-alpha.40-win-x64.exe",
+      "artifacts/verified-unsigned-preview/New-Money-0.1.0-alpha.40-win-x64-unsigned-preview.exe",
+      "artifacts/windows-candidate-456-1/release/New-Money-0.1.0-alpha.40-win-x64.exe",
       "artifacts/windows-candidate-456-1/release/win-unpacked"
     ]);
     expect(plan.bytes).toBeGreaterThan(0);
@@ -40,7 +40,7 @@ describe("local release artifact cleanup", () => {
       .resolves.toBe("manifest");
     await expect(readFile(join(root, "artifacts/r2-release-receipts/publish.json"), "utf8"))
       .resolves.toBe("receipt");
-    await expect(readFile(join(root, "artifacts/unrelated/Pi-67-Desktop-0.1.0-alpha.1-win-x64.exe"), "utf8"))
+    await expect(readFile(join(root, "artifacts/unrelated/New-Money-0.1.0-alpha.1-win-x64.exe"), "utf8"))
       .resolves.toBe("unrelated");
   });
 
@@ -71,7 +71,7 @@ describe("local release artifact cleanup", () => {
       .resolves.toBe("identity");
     await expect(readFile(join(root, "artifacts/windows-candidate-456-1/validation/summary.json"), "utf8"))
       .resolves.toBe("summary");
-    await expect(readFile(join(root, "artifacts/unrelated/Pi-67-Desktop-0.1.0-alpha.1-win-x64.exe"), "utf8"))
+    await expect(readFile(join(root, "artifacts/unrelated/New-Money-0.1.0-alpha.1-win-x64.exe"), "utf8"))
       .resolves.toBe("unrelated");
   });
 
@@ -81,7 +81,7 @@ describe("local release artifact cleanup", () => {
     const release = join(root, "artifacts/release");
     await mkdir(release, { recursive: true });
     await writeFile(outside, "outside");
-    await symlink(outside, join(release, "Pi-67-Desktop-0.1.0-alpha.40-win-x64.exe"));
+    await symlink(outside, join(release, "New-Money-0.1.0-alpha.40-win-x64.exe"));
 
     await expect(planLocalArtifactCleanup({ root })).rejects.toThrow("not a regular file");
     await expect(readFile(outside, "utf8")).resolves.toBe("outside");
@@ -102,29 +102,29 @@ describe("local release artifact cleanup", () => {
 async function fixtureRepository() {
   const root = await temporaryDirectory();
   const files = new Map([
-    ["artifacts/release/Pi-67-Desktop-0.1.0-alpha.40-mac-arm64.dmg", "macos"],
-    ["artifacts/release/mac-arm64/Pi-67 Desktop.app/Contents/Resources/app.asar", "asar"],
-    ["artifacts/release/win-unpacked/Pi-67 Desktop.exe", "windows"],
+    ["artifacts/release/New-Money-0.1.0-alpha.40-mac-arm64.dmg", "macos"],
+    ["artifacts/release/mac-arm64/New Money.app/Contents/Resources/app.asar", "asar"],
+    ["artifacts/release/win-unpacked/New Money.exe", "windows"],
     ["artifacts/release/.icon-icns/icon.icns", "icon"],
     ["artifacts/release/builder-debug.yml", "debug"],
     ["artifacts/release/latest-mac.yml", "latest"],
     ["artifacts/release/unsigned-preview-manifest.json", "manifest"],
     ["artifacts/release/macos-preview-candidate-identity.json", "identity"],
-    ["artifacts/verified-unsigned-preview/Pi-67-Desktop-0.1.0-alpha.40-win-x64-unsigned-preview.exe", "verified"],
+    ["artifacts/verified-unsigned-preview/New-Money-0.1.0-alpha.40-win-x64-unsigned-preview.exe", "verified"],
     ["artifacts/verified-unsigned-preview/windows-preview-candidate-identity.json", "identity"],
-    ["artifacts/r2-update-bundle/Pi-67-Desktop-0.1.0-alpha.40-mac-arm64-unsigned-preview.dmg", "bundle"],
+    ["artifacts/r2-update-bundle/New-Money-0.1.0-alpha.40-mac-arm64-unsigned-preview.dmg", "bundle"],
     ["artifacts/r2-update-bundle/unsigned-preview-manifest.json", "manifest"],
-    ["artifacts/candidates/windows-alpha37-123/candidate/release/Pi-67-Desktop-0.1.0-alpha.37-win-x64.exe", "candidate"],
-    ["artifacts/candidates/windows-alpha37-123/candidate/release/win-unpacked/Pi-67 Desktop.exe", "unpacked"],
+    ["artifacts/candidates/windows-alpha37-123/candidate/release/New-Money-0.1.0-alpha.37-win-x64.exe", "candidate"],
+    ["artifacts/candidates/windows-alpha37-123/candidate/release/win-unpacked/New Money.exe", "unpacked"],
     ["artifacts/candidates/windows-alpha37-123/candidate/validation/summary.json", "summary"],
-    ["artifacts/windows-candidate-456-1/release/Pi-67-Desktop-0.1.0-alpha.40-win-x64.exe", "candidate"],
-    ["artifacts/windows-candidate-456-1/release/win-unpacked/Pi-67 Desktop.exe", "unpacked"],
+    ["artifacts/windows-candidate-456-1/release/New-Money-0.1.0-alpha.40-win-x64.exe", "candidate"],
+    ["artifacts/windows-candidate-456-1/release/win-unpacked/New Money.exe", "unpacked"],
     ["artifacts/windows-candidate-456-1/validation/summary.json", "summary"],
-    ["artifacts/validation/alpha29-windows-candidate/release/Pi-67-Desktop-0.1.0-alpha.29-win-x64.exe", "candidate"],
-    ["artifacts/validation/alpha29-windows-candidate/release/win-unpacked/Pi-67 Desktop.exe", "unpacked"],
+    ["artifacts/validation/alpha29-windows-candidate/release/New-Money-0.1.0-alpha.29-win-x64.exe", "candidate"],
+    ["artifacts/validation/alpha29-windows-candidate/release/win-unpacked/New Money.exe", "unpacked"],
     ["artifacts/validation/alpha29-windows-candidate/validation/summary.json", "summary"],
     ["artifacts/r2-release-receipts/publish.json", "receipt"],
-    ["artifacts/unrelated/Pi-67-Desktop-0.1.0-alpha.1-win-x64.exe", "unrelated"]
+    ["artifacts/unrelated/New-Money-0.1.0-alpha.1-win-x64.exe", "unrelated"]
   ]);
   for (const [relativePath, content] of files) {
     const path = join(root, relativePath);

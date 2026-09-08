@@ -57,7 +57,7 @@ test("keeps global visual-model settings available without Workspace registratio
   await clearRecordedCommands(page);
 
   await page.keyboard.press("Control+,");
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "视觉辅助", exact: true }).click();
 
@@ -126,7 +126,7 @@ test("keeps an unavailable saved helper explicit when no configured visual model
   await attachMockAgent(page, [], {}, { providerConfigurationSnapshot });
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "视觉辅助", exact: true }).click();
   const vision = settings.getByTestId("vision-assistant-global");

@@ -121,7 +121,7 @@ export function TitleBar({
     sessionName,
     sessionId
   });
-  const currentTitle = settingsSelected ? "设置" : activeSessionName || workspaceName || "π";
+  const currentTitle = settingsSelected ? "设置" : activeSessionName || workspaceName || "New Money";
   const navigationDocked = navigationAvailable && navigationVisible && !navigationIsDrawer && !settingsSelected;
   const inspectorDocked = Boolean(selectedWorkspace) && contextVisible && !contextIsDrawer && !settingsSelected;
   const contextWorkspaceName = !settingsSelected && !navigationDocked && activeSessionName && workspaceName
@@ -130,7 +130,7 @@ export function TitleBar({
   const fullContextTitle = contextWorkspaceName
     ? `${contextWorkspaceName} / ${currentTitle}`
     : currentTitle;
-  const showBrandMark = !settingsSelected && !navigationAvailable && currentTitle === "π";
+  const showBrandMark = !settingsSelected && !navigationAvailable && currentTitle === "New Money";
   const navigationShortcut = desktopAction("toggle-navigation");
   const paletteShortcut = desktopAction("command-palette");
   const contextShortcut = desktopAction("toggle-context");

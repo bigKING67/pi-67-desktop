@@ -85,17 +85,17 @@ export function resolveWindowsInstallerPath(releaseDirectory, packageVersion) {
   if (typeof packageVersion !== "string" || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u.test(packageVersion)) {
     throw new Error(`Invalid package version for Windows installer resolution: ${String(packageVersion)}.`);
   }
-  return systemPath.join(releaseDirectory, `Pi-67-Desktop-${packageVersion}-win-x64.exe`);
+  return systemPath.join(releaseDirectory, `New-Money-${packageVersion}-win-x64.exe`);
 }
 
 export function resolveUpgradeBaselineInstaller(value, candidateVersion) {
   if (value === undefined || value === "") return undefined;
   const fileName = systemPath.win32.basename(value);
-  const match = /^Pi-67-Desktop-(.+)-win-x64(?:-unsigned-preview)?\.exe$/u.exec(fileName);
+  const match = /^(?:New-Money|Pi-67-Desktop)-(.+)-win-x64(?:-unsigned-preview)?\.exe$/u.exec(fileName);
   const baselineVersion = match ? validSemver(match[1]) : null;
   const normalizedCandidate = validSemver(candidateVersion);
   if (!baselineVersion || !normalizedCandidate || !semverLessThan(baselineVersion, normalizedCandidate)) {
-    throw new Error(`Windows upgrade baseline must be an older Pi-67 Desktop x64 installer: ${fileName}.`);
+    throw new Error(`Windows upgrade baseline must be an older New Money x64 installer: ${fileName}.`);
   }
   return { path: systemPath.resolve(value), version: baselineVersion };
 }
@@ -111,10 +111,17 @@ export async function readLifecycleArtifactIdentity(path, expectedSigner, label)
 }
 
 export async function resolveInstalledArtifact(installDirectory) {
-  const executablePath = systemPath.join(installDirectory, "Pi-67 Desktop.exe");
+  const candidates = await Promise.all(["New Money.exe", "Pi-67 Desktop.exe"].map(async (name) => {
+    const path = systemPath.join(installDirectory, name);
+    try { await lstat(path); return path; }
+    catch (error) { if (error?.code === "ENOENT") return undefined; throw error; }
+  }));
+  const existing = candidates.filter((path) => path !== undefined);
+  if (existing.length !== 1) throw new Error("Installed application executable identity is missing or ambiguous.");
+  const executablePath = existing[0];
   const executable = await lstat(executablePath);
   if (!executable.isFile() || executable.isSymbolicLink()) {
-    throw new Error("Installed Pi-67 Desktop executable is not a regular file.");
+    throw new Error("Installed New Money executable is not a regular file.");
   }
   return {
     arch: "x64",

@@ -90,7 +90,7 @@ test("restores persisted Workspace authority without asking for the Workspace ag
 test("uses the left workspace conversation list instead of horizontal task tabs", async ({ page }) => {
   await openWorkbench(page);
 
-  await expect(page.getByLabel("π 工作台")).toBeVisible();
+  await expect(page.getByLabel("New Money 工作台")).toBeVisible();
   await expect(page.getByRole("tablist", { name: "已打开的任务" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /关闭任务/u })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /未登录\s*本地模式/u })).toBeVisible();
@@ -100,8 +100,8 @@ test("uses the left workspace conversation list instead of horizontal task tabs"
   await expect(titleActions.locator("button").last()).toHaveAttribute("data-testid", "inspector-toggle");
 
   await page.getByRole("button", { name: /未登录\s*本地模式/u }).click();
-  await expect(page.getByLabel("π 设置")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "账户", exact: true, level: 1 })).toBeVisible();
+  await expect(page.getByLabel("New Money 设置")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "账户与数据", exact: true, level: 1 })).toBeVisible();
   await expect(page.getByRole("group", { name: "设置作用域" })).toHaveCount(0);
   await expect(page.getByLabel("Pi conversation")).toHaveCount(0);
   await expect(page.getByTestId("inspector-toggle")).toHaveCount(0);
@@ -263,7 +263,7 @@ test("supports new-task aliases and leaves Cmd/Ctrl+W to the native window", asy
   await expect(page.getByTestId("inspector-toggle")).toHaveAttribute("aria-expanded", "false");
 
   await page.keyboard.press(`${PRIMARY_MODIFIER}+,`);
-  await expect(page.getByLabel("π 设置")).toBeVisible();
+  await expect(page.getByLabel("New Money 设置")).toBeVisible();
   await expect(page.getByRole("button", { name: "返回工作台" })).toBeVisible();
 });
 

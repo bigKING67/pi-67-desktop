@@ -25,9 +25,9 @@ compromised. This is an accepted boundary for the internal team channel.
 For version `<version>`, R2 contains:
 
 ```text
-Pi-67-Desktop-<version>-win-x64-unsigned-preview.exe
-Pi-67-Desktop-<version>-mac-arm64-unsigned-preview.dmg
-Pi-67-Desktop-<version>-mac-arm64-unsigned-preview.zip
+New-Money-<version>-win-x64-unsigned-preview.exe
+New-Money-<version>-mac-arm64-unsigned-preview.dmg
+New-Money-<version>-mac-arm64-unsigned-preview.zip
 unsigned-preview-manifest.json
 ```
 
@@ -66,8 +66,8 @@ corepack pnpm run release:r2:windows-test:record -- \
   --candidate-run-id <candidate-run-id> \
   --candidate-run-attempt <candidate-run-attempt> \
   --candidate-run-metadata artifacts/release/windows-candidate-run.json \
-  --installer artifacts/release/Pi-67-Desktop-<version>-win-x64.exe \
-  --packaged-executable 'artifacts/release/win-unpacked/Pi-67 Desktop.exe' \
+  --installer artifacts/release/New-Money-<version>-win-x64.exe \
+  --packaged-executable 'artifacts/release/win-unpacked/New Money.exe' \
   --repository bigKING67/pi-67-desktop \
   --source-commit <40-char-source-sha> \
   --output artifacts/release/windows-preview-manual-test.json
@@ -240,7 +240,7 @@ bounded replacement helper instead:
 
 1. Download and verify the exact ZIP.
 2. Extract it with `/usr/bin/ditto --noqtn` into the user update directory.
-3. Require exactly one `Pi-67 Desktop.app` with bundle ID `com.pi67.desktop`, the manifest version,
+3. Require exactly one `New Money.app` (or legacy `Pi-67 Desktop.app`) with bundle ID `com.pi67.desktop`, the manifest version,
    and the expected executable.
 4. Require staging and installation to be on the same volume and the installed bundle parent to be
    writable.

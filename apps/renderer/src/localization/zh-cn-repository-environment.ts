@@ -25,7 +25,7 @@ export const zhCNRepositoryEnvironmentMessages = {
   submodulesNetworkRequiredDetail: "本地对象不足；只有点击后才允许 Git 发起网络或使用现有认证。",
   submodulesDivergentDetail: "Submodule checkout 与记录提交不一致；为避免覆盖本地状态，不提供自动修复。",
   submodulesConflicted: "Submodule 有冲突",
-  submodulesConflictedDetail: "Submodule 存在未合并状态；Pi-67 不会自动覆盖或重置。",
+  submodulesConflictedDetail: "Submodule 存在未合并状态；New Money 不会自动覆盖或重置。",
   initializeSubmodules: "联网补齐",
   initializeSubmodulesDetail: "明确允许 Git 为当前工作区获取并初始化缺失 Submodule；交互式认证保持关闭",
   actionPending: "处理中…",

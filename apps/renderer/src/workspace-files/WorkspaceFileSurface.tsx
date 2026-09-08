@@ -221,7 +221,7 @@ function FileDocumentSurface({
       ) : tab.phase === "missing" ? (
         <div className="workspace-file-state"><AlertTriangle size={20} /><strong>文件已不存在</strong><p>{tab.reason}</p>{tab.dirty ? <button onClick={onSaveAs} type="button">将草稿另存为</button> : null}</div>
       ) : tab.phase === "unavailable" ? (
-        <div className="workspace-file-state"><FileText size={20} /><strong>无法在 Pi-67 中编辑</strong><p>{tab.reason}</p><button type="button" onClick={() => void showFileEntryMenu(workspace, tabEntry(tab))}>选择系统打开方式</button></div>
+        <div className="workspace-file-state"><FileText size={20} /><strong>无法在 New Money 中编辑</strong><p>{tab.reason}</p><button type="button" onClick={() => void showFileEntryMenu(workspace, tabEntry(tab))}>选择系统打开方式</button></div>
       ) : tab.content !== undefined ? (
         <Suspense fallback={<div className="workspace-file-state" role="status"><LoaderCircle className="spin" size={18} />正在加载编辑器</div>}>
           <FileEditor
@@ -266,7 +266,7 @@ function DirtyFileCloseDialog({
         <Dialog aria-label={`关闭 ${tab.name}`} className="workspace-file-close-dialog">
           <span className="dialog-eyebrow">未保存文件</span>
           <Heading slot="title">保存“{tab.name}”的修改？</Heading>
-          <p>放弃后，本次草稿无法从 Pi-67 恢复。</p>
+          <p>放弃后，本次草稿无法从 New Money 恢复。</p>
           <div className="dialog-actions">
             <Button className="secondary-button" isDisabled={saving} onPress={onDismiss}>取消</Button>
             <Button className="workspace-file-discard-button" isDisabled={saving} onPress={() => {
@@ -311,7 +311,7 @@ function DirtyFileReloadDialog({
         <Dialog aria-label={`重新读取 ${tab.name}`} className="workspace-file-close-dialog">
           <span className="dialog-eyebrow">未保存文件</span>
           <Heading slot="title">放弃“{tab.name}”的修改？</Heading>
-          <p>重新读取会用磁盘中的最新内容替换当前草稿，此操作无法在 Pi-67 中撤销。</p>
+          <p>重新读取会用磁盘中的最新内容替换当前草稿，此操作无法在 New Money 中撤销。</p>
           <div className="dialog-actions">
             <Button className="secondary-button" isDisabled={reloading} onPress={onDismiss}>取消</Button>
             <Button className="workspace-file-discard-button" isDisabled={reloading} onPress={() => void discardAndReload()}>

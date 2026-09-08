@@ -5,7 +5,7 @@ export const REAL_USER_PROVIDER_TIMEOUT_MS = 10_000;
 export async function verifyProviderConfiguration(window) {
   const startedAt = performance.now();
   await window.keyboard.press("Control+,");
-  const settings = window.getByLabel("π 设置");
+  const settings = window.getByLabel("New Money 设置");
   await settings.waitFor({
     state: "visible",
     timeout: remainingTimeout(startedAt)

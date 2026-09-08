@@ -33,7 +33,7 @@ async function createFixture() {
   temporaryDirectories.push(directory);
   await mkdir(directory, { recursive: true });
   const version = "0.1.0-alpha.2";
-  const installerName = `Pi-67-Desktop-${version}-win-x64-unsigned-preview.exe`;
+  const installerName = `New-Money-${version}-win-x64-unsigned-preview.exe`;
   const installerPath = join(directory, installerName);
   const installer = Buffer.from("unsigned preview fixture");
   const sha256 = createHash("sha256").update(installer).digest("hex");
@@ -41,13 +41,13 @@ async function createFixture() {
   const files = [
     { name: installerName, bytes: installer.length, sha256, target: "windows-x64" },
     {
-      name: `Pi-67-Desktop-${version}-mac-arm64-unsigned-preview.dmg`,
+      name: `New-Money-${version}-mac-arm64-unsigned-preview.dmg`,
       bytes: 1,
       sha256: "1".repeat(64),
       target: "macos-arm64"
     },
     {
-      name: `Pi-67-Desktop-${version}-mac-arm64-unsigned-preview.zip`,
+      name: `New-Money-${version}-mac-arm64-unsigned-preview.zip`,
       bytes: 1,
       sha256: "2".repeat(64),
       target: "macos-arm64"

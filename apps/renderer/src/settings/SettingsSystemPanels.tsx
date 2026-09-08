@@ -59,7 +59,7 @@ export function AboutSettings() {
   useEffect(() => { void load(); }, [load]);
 
   return (
-    <SettingsSectionBlock title="π" description="一个 Pi-first、local-first 的 Windows 与 macOS 桌面工作台。">
+    <SettingsSectionBlock title="New Money" description="用 AI 创造新的价值。">
       {error ? <SettingsNotice
         tone="danger"
         actions={<Button className="secondary-button" isDisabled={loading} onPress={() => void load()}>重试</Button>}
@@ -67,9 +67,9 @@ export function AboutSettings() {
       <SettingsRows>
         <SettingsRow
           leading={<img alt="" aria-hidden="true" className={styles.aboutIcon} src={piIconUrl} />}
-          title="π"
-          description="Pi-first Desktop Workbench"
-          value="Pi-67 Desktop"
+          title="New Money"
+          description="AI 工作台"
+          value="Windows / macOS"
         />
         <SettingsRow title="当前版本" value={loading ? "正在读取…" : platformInfo?.version ?? "未知"} />
         <SettingsRow title="操作系统" value={platformLabel(platformInfo?.platform)} />

@@ -7,7 +7,7 @@ describe("Chinese Extension package copy", () => {
       "npm:pi-subagents@0.35.1",
       undefined,
       "Pi extension for delegating tasks to subagents."
-    )).toBe("旧的第三方子代理扩展；Pi-67 Desktop 使用原生子代理并不加载此包。");
+    )).toBe("旧的第三方子代理扩展；New Money 使用原生子代理并不加载此包。");
     expect(zhCNExtensionPackageMessages.purpose(
       "https://github.com/arpagon/pi-rewind.git",
       undefined,

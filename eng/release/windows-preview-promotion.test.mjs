@@ -182,8 +182,8 @@ async function promotionFixture() {
     mkdir(join(macosPaths.applicationPath, "Contents/MacOS"), { recursive: true }),
     mkdir(join(macosPaths.applicationPath, "Contents/Resources"), { recursive: true })
   ]);
-  const installerPath = join(releaseRoot, `Pi-67-Desktop-${version}-win-x64.exe`);
-  const executablePath = join(unpacked, "Pi-67 Desktop.exe");
+  const installerPath = join(releaseRoot, `New-Money-${version}-win-x64.exe`);
+  const executablePath = join(unpacked, "New Money.exe");
   await Promise.all([
     writeFile(installerPath, "installer"),
     writeFile(executablePath, "executable"),

@@ -41,6 +41,7 @@ import {
   SettingsToolbar
 } from "./SettingsPrimitives.js";
 import styles from "./RuleSettingsWorkspace.module.css";
+import tabStyles from "./SettingsPrimitives.module.css";
 
 type RuleScope = "global" | "project";
 type DetailMode = "source" | "preview";
@@ -138,15 +139,15 @@ export function RuleSettingsWorkspace() {
           setScope(key === "project" ? "project" : "global");
         })}
       >
-        <TabList aria-label="工作规则范围" className={styles.tabList!}>
-          <Tab className={styles.tab!} id="global">
+        <TabList aria-label="工作规则范围" className={tabStyles.tabList!}>
+          <Tab className={tabStyles.tab!} id="global">
             <Globe2 aria-hidden="true" size={15} />全局
           </Tab>
-          <Tab className={styles.tab!} id="project">
+          <Tab className={tabStyles.tab!} id="project">
             <FolderOpen aria-hidden="true" size={15} />项目
           </Tab>
         </TabList>
-        <TabPanel className={styles.tabPanel!} id="global">
+        <TabPanel className={tabStyles.tabPanel!} id="global">
           <GlobalRuleCatalog
             advancedOpen={globalAdvancedOpen}
             busy={state.phase === "loading-catalog"}
@@ -166,7 +167,7 @@ export function RuleSettingsWorkspace() {
             onSelect={selectItem}
           />
         </TabPanel>
-        <TabPanel className={styles.tabPanel!} id="project">
+        <TabPanel className={tabStyles.tabPanel!} id="project">
           <ProjectRuleCatalog
             advancedOpen={projectAdvancedOpen}
             busy={state.phase === "loading-catalog"}
@@ -307,7 +308,7 @@ function ContextFileDetail({ mode, onBack, onModeChange, onReload }: {
 }
 
 function originLabel(item: ContextFileSummary): string {
-  if (item.origin === "desktop") return "Pi-67 Desktop";
+  if (item.origin === "desktop") return "New Money";
   if (item.origin === "user") return "用户全局配置";
   if (item.origin === "workspace") return "当前 Workspace";
   return "Workspace 外父目录";

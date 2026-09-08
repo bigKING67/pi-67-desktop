@@ -38,8 +38,8 @@
 }
 
 .backButton[data-hovered],
-.navigationItem[data-hovered] {
-  background: var(--surface-hover);
+.navigationItem:not(.selected)[data-hovered] {
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
   color: var(--text-primary);
 }
 
@@ -159,7 +159,8 @@
 }
 
 .navigationItem.selected {
-  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+  font-weight: 650;
+  background: color-mix(in srgb, var(--text-primary) 9%, transparent);
   color: var(--text-primary);
 }
 
@@ -243,8 +244,18 @@
   display: grid;
   width: min(1120px, 100%);
   min-width: 0;
-  gap: 36px;
   margin-inline: auto;
+}
+
+.pageLayout {
+  display: grid;
+  width: min(880px, 100%);
+  min-width: 0;
+  gap: 28px;
+}
+
+.pageLayout[data-content-width="wide"] {
+  width: 100%;
 }
 
 .pageContent {
@@ -412,13 +423,13 @@
 }
 
 .mobileNavigationItem[data-current="true"] {
-  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+  background: color-mix(in srgb, var(--text-primary) 9%, transparent);
   color: var(--text-primary);
   font-weight: 650;
 }
 
-.mobileNavigationItem[data-focused],
-.mobileNavigationItem[data-hovered] {
+.mobileNavigationItem:not([data-current="true"])[data-focused],
+.mobileNavigationItem:not([data-current="true"])[data-hovered] {
   background: var(--surface-hover);
   color: var(--text-primary);
 }

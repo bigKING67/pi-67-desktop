@@ -114,7 +114,7 @@ describe("signed release workflow security", () => {
       "name: release-windows-x64-${{ github.run_id }}-${{ github.run_attempt }}"
     );
     expect(providerJob).toContain("path: artifacts/release");
-    expect(providerJob).toContain("artifacts/release/win-unpacked/Pi-67 Desktop.exe");
+    expect(providerJob).toContain("artifacts/release/win-unpacked/New Money.exe");
     expect(providerJob).toContain("PI67_REAL_PROVIDER_CANDIDATE_SOURCE_POLICY: stable");
     expect(providerJob).toContain(
       '"PI67_REAL_PROVIDER_SOURCE_COMMIT=$commit" >> $env:GITHUB_ENV'

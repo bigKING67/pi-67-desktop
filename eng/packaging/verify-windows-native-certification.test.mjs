@@ -34,11 +34,11 @@ describe("Windows native certification set", () => {
   it("binds the final verifier to source, workflow, Publisher, identity file, and executable", () => {
     expect(parseWindowsNativeVerificationArguments([
       "--expected-signer-thumbprint", "ab".repeat(20),
-      "--executable", "C:\\Pi-67 Desktop.exe",
+      "--executable", "C:\\New Money.exe",
       ...candidateArguments()
     ])).toEqual({
       candidateIdentityPath: "C:\\candidate.json",
-      executablePath: "C:\\Pi-67 Desktop.exe",
+      executablePath: "C:\\New Money.exe",
       expectedCandidateRunAttempt: "1",
       expectedCandidateRunId: "123",
       expectedRepository: "bigKING67/pi-67-desktop",

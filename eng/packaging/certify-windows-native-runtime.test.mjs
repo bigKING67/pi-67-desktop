@@ -21,11 +21,11 @@ describe("Windows native certification contract", () => {
     expect(parseWindowsNativeCertificationArguments([
       "--expected-scale", "1.5",
       "--sleep",
-      "--executable", "C:\\Pi-67 Desktop.exe",
+      "--executable", "C:\\New Money.exe",
       "--expected-signer-thumbprint", signer,
       ...candidateArguments()
     ])).toEqual(expectedArguments({
-      executablePath: "C:\\Pi-67 Desktop.exe",
+      executablePath: "C:\\New Money.exe",
       expectedScale: 1.5,
       signer,
       sleep: true

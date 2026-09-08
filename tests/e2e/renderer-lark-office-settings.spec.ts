@@ -371,7 +371,7 @@ async function openLarkSettings(page: Page) {
   await page.getByRole("button", { name: "帮助与设置" }).click();
   await page.getByRole("menu", { name: "帮助与设置" })
     .getByRole("menuitem", { name: "设置", exact: true }).click();
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await expect(settings).toBeVisible();
   await expect(settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("group", { name: "办公" })).toBeVisible();

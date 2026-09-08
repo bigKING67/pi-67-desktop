@@ -53,7 +53,7 @@ test("presents Groland vision and native-search capability without a per-turn se
   await attachMockAgent(page, [], {}, { providerConfigurationSnapshot });
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "模型", exact: true }).click();
   const panel = settings.getByTestId("provider-configuration-panel");
@@ -92,7 +92,7 @@ test("targets the Groland credential without starting a Session", async ({ page 
   });
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "模型", exact: true }).click();
   const panel = settings.getByTestId("provider-configuration-panel");
@@ -136,7 +136,7 @@ test("does not fall back to Anthropic when a targeted Provider is missing", asyn
   });
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "模型", exact: true }).click();
   const panel = settings.getByTestId("provider-configuration-panel");

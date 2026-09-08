@@ -145,11 +145,11 @@ jobs:
         run: |
           $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $sourcePolicy = if ($packageVersion.Contains('-')) { 'version-tag' } else { 'stable' }
-          $installer = "artifacts/release/Pi-67-Desktop-$packageVersion-win-x64.exe"
+          $installer = "artifacts/release/New-Money-$packageVersion-win-x64.exe"
           if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
             throw "Expected signed Windows installer is missing: $installer"
           }
-          $executable = 'artifacts/release/win-unpacked/Pi-67 Desktop.exe'
+          $executable = 'artifacts/release/win-unpacked/New Money.exe'
           $identityDirectory = 'artifacts/validation/provider-long-turn'
           New-Item -ItemType Directory -Path $identityDirectory -Force | Out-Null
           $identity = "$identityDirectory/windows-signed-candidate-identity.json"
@@ -209,7 +209,7 @@ jobs:
           corepack pnpm run release:candidate:verify `
             --candidate-identity artifacts/validation/provider-long-turn/windows-signed-candidate-identity.json `
             --installer $env:INSTALLER_PATH `
-            --packaged-executable 'artifacts/release/win-unpacked/Pi-67 Desktop.exe' `
+            --packaged-executable 'artifacts/release/win-unpacked/New Money.exe' `
             --expected-source-policy $env:SOURCE_POLICY `
             --expected-repository $env:GITHUB_REPOSITORY `
             --expected-source-tag $env:SOURCE_TAG `

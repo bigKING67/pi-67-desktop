@@ -50,7 +50,7 @@ export async function preparePackagedSmokeProfile({
     }, null, 2)}\n`, "utf8"),
     writeFile(
       join(nativeReplacedExtensionDirectory, "index.js"),
-      "throw new Error('pi-subagents must not load in a Pi-67 Desktop Task');\n",
+      "throw new Error('pi-subagents must not load in a New Money Task');\n",
       "utf8"
     ),
     writeFile(join(packagedSkillDirectory, "SKILL.md"), [

@@ -127,12 +127,14 @@ export async function loadLocalR2Release({ directory, version, runtimeVersion })
 }
 
 export function parseR2ArtifactKey(key) {
-  if (typeof key !== "string" || !key.startsWith("Pi-67-Desktop-")) return undefined;
+  if (typeof key !== "string") return undefined;
+  const prefix = ["New-Money-", "Pi-67-Desktop-"].find((item) => key.startsWith(item));
+  if (!prefix) return undefined;
   const suffix = ARTIFACT_SUFFIXES.find((candidate) => key.endsWith(candidate));
   if (!suffix) return undefined;
-  const version = key.slice("Pi-67-Desktop-".length, -suffix.length);
+  const version = key.slice(prefix.length, -suffix.length);
   if (validSemver(version) !== version) return undefined;
-  const expectedNames = new Set(unsignedPreviewArtifactSpecs(version).map((entry) => entry.name));
+  const expectedNames = new Set(unsignedPreviewArtifactSpecs(version, prefix.slice(0, -1)).map((entry) => entry.name));
   return expectedNames.has(key) ? { key, version } : undefined;
 }
 

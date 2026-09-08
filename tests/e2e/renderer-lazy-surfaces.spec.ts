@@ -30,13 +30,13 @@ test("loads Settings only on first open and restores the workbench", async ({ pa
 
   expect(settingsModuleRequests).toBe(0);
   await page.keyboard.press("Control+,");
-  await expect(page.getByLabel("π 设置")).toBeVisible();
+  await expect(page.getByLabel("New Money 设置")).toBeVisible();
   expect(settingsModuleRequests).toBe(1);
 
   await page.getByRole("button", { name: "返回工作台" }).click();
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
   await page.keyboard.press("Control+,");
-  await expect(page.getByLabel("π 设置")).toBeVisible();
+  await expect(page.getByLabel("New Money 设置")).toBeVisible();
   expect(settingsModuleRequests).toBe(1);
 });
 

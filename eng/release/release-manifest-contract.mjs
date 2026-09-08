@@ -18,12 +18,12 @@ export function parseCanonicalStableTag(value, label = "stable release tag") {
   return parseCanonicalStableVersion(value.slice(1), label);
 }
 
-export function expectedSignedReleaseArtifacts(version) {
+export function expectedSignedReleaseArtifacts(version, prefix = "New-Money") {
   const stableVersion = parseCanonicalStableVersion(version);
   return new Map([
-    [`Pi-67-Desktop-${stableVersion}-win-x64.exe`, "windows-x64"],
-    [`Pi-67-Desktop-${stableVersion}-mac-arm64.dmg`, "macos-arm64"],
-    [`Pi-67-Desktop-${stableVersion}-mac-arm64.zip`, "macos-arm64"]
+    [`${prefix}-${stableVersion}-win-x64.exe`, "windows-x64"],
+    [`${prefix}-${stableVersion}-mac-arm64.dmg`, "macos-arm64"],
+    [`${prefix}-${stableVersion}-mac-arm64.zip`, "macos-arm64"]
   ]);
 }
 
@@ -31,7 +31,7 @@ export function findUnexpectedSignedReleaseProductArtifacts(version, names) {
   const expected = expectedSignedReleaseArtifacts(version);
   return [...names].filter((name) => (
     typeof name === "string"
-    && /^Pi-67-Desktop-.*\.(?:exe|dmg|zip)$/iu.test(name)
+    && /^(?:New-Money|Pi-67-Desktop)-.*\.(?:exe|dmg|zip)$/iu.test(name)
     && !expected.has(name)
   ));
 }
@@ -80,7 +80,7 @@ export function validateSignedReleaseManifest(manifest, expectedVersion) {
     failures.push("invalid Pi runtime identity");
   }
 
-  const expectedFiles = version ? expectedSignedReleaseArtifacts(version) : new Map();
+  const expectedFiles = version ? expectedSignedReleaseArtifacts(version, (typeof manifest?.files?.[0]?.name === "string" && manifest.files[0].name.startsWith("Pi-67-Desktop-")) ? "Pi-67-Desktop" : "New-Money") : new Map();
   const entries = Array.isArray(manifest?.files) ? manifest.files : [];
   if (entries.length !== expectedFiles.size) failures.push("release manifest must contain exactly three artifacts");
   const names = new Set();

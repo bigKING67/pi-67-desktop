@@ -47,11 +47,11 @@ export function buildNsisUpdateArguments(installDirectory) {
 
 export async function installNsisPackage(installerPath, installDirectory) {
   await runExecutable(installerPath, buildNsisInstallArguments(installDirectory));
-  await waitForPathState(join(installDirectory, "Pi-67 Desktop.exe"), true);
+  await waitForPathState(join(installDirectory, basename(installerPath).startsWith("Pi-67-Desktop-") ? "Pi-67 Desktop.exe" : "New Money.exe"), true);
 }
 
 export async function installNsisUpdatePackage(installerPath, installDirectory, options = {}) {
-  const executablePath = join(installDirectory, "Pi-67 Desktop.exe");
+  const executablePath = join(installDirectory, "New Money.exe");
   const [execution, updateSurface] = await Promise.allSettled([
     runExecutable(installerPath, buildNsisUpdateArguments(installDirectory), {
       captureBeforeTimeout: options.evidenceDirectory
@@ -182,7 +182,7 @@ async function captureWindowsInstallerTimeoutSnapshot({
   processId
 }) {
   await mkdir(evidenceDirectory, { recursive: true });
-  const executablePath = join(installDirectory, "Pi-67 Desktop.exe");
+  const executablePath = join(installDirectory, "New Money.exe");
   const command = [
     "$installerPath = [Environment]::GetEnvironmentVariable('PI67_WINDOWS_INSTALLER_PATH', 'Process')",
     "$installDirectory = [Environment]::GetEnvironmentVariable('PI67_WINDOWS_INSTALL_DIRECTORY', 'Process')",

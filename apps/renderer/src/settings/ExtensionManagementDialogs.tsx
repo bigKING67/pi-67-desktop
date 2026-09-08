@@ -89,7 +89,7 @@ export function PromptOncePackageOnboardingDialog({ entry, failed, busy, onDecli
           <span className="dialog-eyebrow">可选扩展包 · 仅确认一次</span>
           <Heading slot="title">安装 {entry.id}？</Heading>
           <p className={styles.dialogIntro}>
-            这是目录中声明为仅确认一次的可选扩展包。Pi-67 不会静默下载；只有确认后才会联网安装到全局配置。
+            这是目录中声明为仅确认一次的可选扩展包。New Money 不会静默下载；只有确认后才会联网安装到全局配置。
           </p>
           <dl className={styles.dialogFacts}>
             <div><dt>来源</dt><dd className={styles.codeValue}>{entry.source}</dd></div>

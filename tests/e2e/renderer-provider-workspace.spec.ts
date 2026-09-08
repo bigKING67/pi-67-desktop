@@ -79,7 +79,7 @@ test("organizes Provider task views while search and drill-down preserve the act
   await page.goto("/");
   await attachMockAgent(page, [], {}, { providerConfigurationSnapshot });
   await page.keyboard.press("Control+,");
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "模型", exact: true }).click();
   const panel = settings.getByTestId("provider-configuration-panel");
@@ -178,7 +178,7 @@ test("defaults to configurable Providers when no service is currently configured
   await attachMockAgent(page, [], {}, { providerConfigurationSnapshot });
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "模型", exact: true }).click();
   const panel = settings.getByTestId("provider-configuration-panel");
@@ -194,7 +194,7 @@ test("uses a list-to-detail model flow in a narrow Settings workspace", async ({
   await attachMockAgent(page);
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("button", { name: "选择设置分类", exact: true }).click();
   await page.getByRole("menu", { name: "选择设置分类" })
     .getByRole("menuitem", { name: "模型", exact: true }).click();
@@ -234,7 +234,7 @@ test("persists a Provider credential through App authority without starting a Ta
   });
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "模型", exact: true }).click();
   await settings.getByTestId("provider-configuration-panel")
@@ -307,7 +307,7 @@ test("protects Provider drafts and confirms models.json definition removal", asy
   await attachMockAgent(page, [], {}, { providerConfigurationSnapshot });
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
   await navigation.getByRole("button", { name: "模型", exact: true }).click();
   const panel = settings.getByTestId("provider-configuration-panel");
@@ -353,7 +353,7 @@ test("edits Pi Provider files, selects built-in defaults, and preserves a stale 
   await attachMockAgent(page);
   await page.keyboard.press("Control+,");
 
-  const settings = page.getByLabel("π 设置");
+  const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "模型", exact: true }).click();
   const panel = settings.getByTestId("provider-configuration-panel");

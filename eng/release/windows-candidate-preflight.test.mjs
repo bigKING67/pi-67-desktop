@@ -10,8 +10,8 @@ function fixture() {
     repository: "owner/repo", workflow: { name: "Windows candidate", runId: "42", runAttempt: "1" },
     source: { policy: "main", commit: oldSha },
     application: { product: "Pi-67 Desktop", version, platform: "win32", architecture: "x64", runtime: "@earendil-works/pi-coding-agent@0.84.3" },
-    installer: { fileName: `Pi-67-Desktop-${version}-win-x64.exe`, byteLength: 10, sha256: "c".repeat(64) },
-    packagedExecutable: { fileName: "win-unpacked/Pi-67 Desktop.exe", byteLength: 10, sha256: "d".repeat(64) }
+    installer: { fileName: `New-Money-${version}-win-x64.exe`, byteLength: 10, sha256: "c".repeat(64) },
+    packagedExecutable: { fileName: "win-unpacked/New Money.exe", byteLength: 10, sha256: "d".repeat(64) }
   };
   const packageFile = (value) => ({ encoding: "base64", content: Buffer.from(JSON.stringify({ name: "pi-67-desktop", version: value })).toString("base64") });
   const responses = {
