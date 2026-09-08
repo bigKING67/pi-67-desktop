@@ -35,7 +35,8 @@ import {
 import { inspectRealUserSessionCatalogDiscovery } from "./windows-real-user-catalog-discovery.mjs";
 import {
   inspectRealUserRuntimeSurface,
-  realUserLifecycleFailureKind
+  realUserLifecycleFailureKind,
+  summarizeRealUserShutdown
 } from "./windows-real-user-failure-diagnostics.mjs";
 import { inspectRealUserSessionFile } from "./windows-real-user-session-creation.mjs";
 import { resolveRealUserWorkspaceAuthority } from "./windows-real-user-workspace-authority.mjs";
@@ -153,6 +154,7 @@ async function runRealUserLaunch({
   let failureWindow;
   let processOutput = () => "";
   let failureStage = "launch";
+  let shutdownMeasurement;
   try {
     const launchStartedAt = performance.now();
     application = await launchPackagedApplication({
@@ -279,22 +281,26 @@ async function runRealUserLaunch({
       throw new Error("Windows real-user lifecycle could not observe the Agent Host utility process.");
     }
 
-    failureStage = "shutdown";
-    const shutdownMeasurement = await measureElectronApplicationShutdown({
+    failureStage = "shutdown-measurement";
+    shutdownMeasurement = await measureElectronApplicationShutdown({
       application,
       budgetMs: INSTALLED_SHUTDOWN_BUDGET_MS,
       mainPid,
       utilityPids
     });
     application = undefined;
+    failureStage = "shutdown-contract";
     if (!productShutdownWithinBudget(shutdownMeasurement, INSTALLED_SHUTDOWN_BUDGET_MS)) {
       throw new Error(
         `Windows real-user product process shutdown exceeded ${INSTALLED_SHUTDOWN_BUDGET_MS}ms. `
         + `Shutdown diagnostics: ${JSON.stringify(shutdownMeasurement)}`
       );
     }
+    failureStage = "shutdown-main-exit";
     if (mainPid !== undefined) await waitForProcessExit(mainPid);
+    failureStage = "shutdown-utility-exit";
     for (const pid of utilityPids) await waitForProcessExit(pid);
+    failureStage = "initialization-verification";
     const initialization = parseInitializationObservations(processOutput());
     const modelRuntimeInitialization = assertModelRuntimeInitialization(initialization);
 
@@ -330,9 +336,10 @@ async function runRealUserLaunch({
     const diagnostic = {
       failure: realUserLifecycleFailureKind(error),
       stage: failureStage,
-      initialization: parseInitializationObservations(processOutput()),
       lane,
       launchIndex,
+      shutdown: summarizeRealUserShutdown(shutdownMeasurement, INSTALLED_SHUTDOWN_BUDGET_MS),
+      initialization: parseInitializationObservations(processOutput()),
       surface: failureWindow
         ? await inspectRealUserRuntimeSurface(failureWindow, systemPath.dirname(agentDir))
           .catch(() => ({ available: false }))

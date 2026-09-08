@@ -51,3 +51,33 @@ export function realUserLifecycleFailureKind(error) {
   if (error.name === "TimeoutError" || /timed? out|timeout/iu.test(error.message)) return "bounded-timeout";
   return "lifecycle-error";
 }
+
+// Only project known measurement fields. Driver errors can contain private
+// paths or arbitrary process output and must not enter uploaded diagnostics.
+export function summarizeRealUserShutdown(measurement, budgetMs) {
+  if (!measurement) return { available: false };
+  const { processes } = measurement;
+  return {
+    available: true,
+    budgetMs,
+    driverCloseDurationMs: measurement.driverCloseDurationMs,
+    driverCloseFailed: measurement.driverCloseError !== undefined,
+    driverCloseTimedOut: measurement.driverCloseTimedOut,
+    forcedTerminationRequested: measurement.forcedTerminationRequested,
+    productExitDurationMs: measurement.productExitDurationMs,
+    main: {
+      present: processes.main.present,
+      aliveBeforeClose: processes.main.aliveBeforeClose,
+      aliveAfterClose: processes.main.aliveAfterClose,
+      exitObservedMs: processes.main.exitObservedMs
+    },
+    utilities: {
+      count: processes.utilities.count,
+      aliveBeforeCloseCount: processes.utilities.aliveBeforeCloseCount,
+      aliveAfterCloseCount: processes.utilities.aliveAfterCloseCount,
+      observedExitCount: processes.utilities.observedExitCount,
+      firstExitObservedMs: processes.utilities.firstExitObservedMs,
+      lastExitObservedMs: processes.utilities.lastExitObservedMs
+    }
+  };
+}

@@ -1,10 +1,46 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   inspectRealUserRuntimeSurface,
-  realUserLifecycleFailureKind
+  realUserLifecycleFailureKind,
+  summarizeRealUserShutdown
 } from "./windows-real-user-failure-diagnostics.mjs";
 
 describe("Windows real-user failure diagnostics", () => {
+  it("distinguishes an unavailable shutdown measurement", () => {
+    expect(summarizeRealUserShutdown(undefined, 5_000)).toEqual({ available: false });
+  });
+
+  it.each([
+    { duration: 300, timedOut: false, alive: 0, error: undefined },
+    { duration: 5_100, timedOut: false, alive: 0, error: undefined },
+    { duration: null, timedOut: true, alive: 1, error: "private-path-and-driver-output" }
+  ])("retains shutdown evidence without raw errors: %j", ({ duration, timedOut, alive, error }) => {
+    const result = summarizeRealUserShutdown({
+      driverCloseDurationMs: 300,
+      driverCloseError: error,
+      driverCloseTimedOut: timedOut,
+      forcedTerminationRequested: timedOut,
+      productExitDurationMs: duration,
+      arbitraryOutput: "private-output",
+      processes: {
+        main: { present: true, aliveBeforeClose: true, aliveAfterClose: false,
+          exitObservedMs: 300, processId: 987654, arbitraryOutput: "private-main" },
+        utilities: { count: 2, aliveBeforeCloseCount: 2, aliveAfterCloseCount: alive,
+          observedExitCount: 2 - alive, firstExitObservedMs: 100, lastExitObservedMs: 200,
+          arbitraryOutput: "private-utility" }
+      }
+    }, 5_000);
+    expect(result).toEqual({
+      available: true, budgetMs: 5_000, driverCloseDurationMs: 300,
+      driverCloseFailed: error !== undefined, driverCloseTimedOut: timedOut,
+      forcedTerminationRequested: timedOut, productExitDurationMs: duration,
+      main: { present: true, aliveBeforeClose: true, aliveAfterClose: false, exitObservedMs: 300 },
+      utilities: { count: 2, aliveBeforeCloseCount: 2, aliveAfterCloseCount: alive,
+        observedExitCount: 2 - alive, firstExitObservedMs: 100, lastExitObservedMs: 200 }
+    });
+    expect(JSON.stringify(result)).not.toMatch(/private|987654/u);
+  });
+
   it("reports bounded and redacted runtime failure diagnostics", async () => {
     const observation = {
       acknowledgementTimedOut: false,
