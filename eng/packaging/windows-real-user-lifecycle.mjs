@@ -1,7 +1,5 @@
 import * as systemPath from "node:path";
-import {
-  waitForProcessExit
-} from "./controlled-shutdown-fixture.ts";
+import { waitForProcessExit } from "./controlled-shutdown-fixture.ts";
 import {
   measureElectronApplicationShutdown,
   productShutdownWithinBudget
@@ -50,17 +48,10 @@ import {
 export { REAL_USER_PROVIDER_TIMEOUT_MS } from "./windows-real-user-provider-configuration.mjs";
 export { inspectRealUserRuntimeSurface } from "./windows-real-user-failure-diagnostics.mjs";
 export { activateCatalogSession } from "./windows-real-user-catalog-activation.mjs";
-export {
-  assertModelRuntimeInitialization,
-  parseInitializationObservations,
-  REAL_USER_MODEL_RUNTIME_TIMEOUT_MS
-} from "./windows-real-user-initialization.mjs";
-export {
-  REAL_USER_CATALOG_TIMEOUT_MS,
-  shouldCreateInitialRealUserSession,
-  waitForCatalogRequestStart,
-  waitForCatalogState
-} from "./windows-real-user-catalog-state.mjs";
+export { assertModelRuntimeInitialization, parseInitializationObservations,
+  REAL_USER_MODEL_RUNTIME_TIMEOUT_MS } from "./windows-real-user-initialization.mjs";
+export { REAL_USER_CATALOG_TIMEOUT_MS, shouldCreateInitialRealUserSession,
+  waitForCatalogRequestStart, waitForCatalogState } from "./windows-real-user-catalog-state.mjs";
 
 export const REAL_USER_CREATE_TARGET_MS = 5_000;
 export const REAL_USER_CREATE_HARD_TIMEOUT_MS = 15_000;
