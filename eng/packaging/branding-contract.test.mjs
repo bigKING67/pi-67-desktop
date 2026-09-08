@@ -51,6 +51,14 @@ describe("New Money display branding contract", () => {
       "  artifactName: New-Money-${version}-mac-arm64.${ext}"
     ]) expect(config, requiredLine).toContain(requiredLine);
   });
+
+  it("checks the same Desktop shortcut name that NSIS installs", async () => {
+    const config = await readFile(resolve(repositoryRoot, "electron-builder.yml"), "utf8");
+    const lifecycle = await readFile(resolve(repositoryRoot, "eng/packaging/verify-windows-installer-lifecycle.mjs"), "utf8");
+    const shortcutName = config.match(/^  shortcutName: (.+)$/mu)?.[1];
+    expect(shortcutName).toBe("New Money");
+    expect(lifecycle).toContain(`resolveWindowsDesktopShortcutPath(${JSON.stringify(shortcutName)})`);
+  });
 });
 
 async function expectHash(path, expected) {

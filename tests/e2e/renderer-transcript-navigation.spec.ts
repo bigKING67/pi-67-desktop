@@ -20,6 +20,13 @@ test("restores an away-from-bottom reading anchor across a Settings round trip",
   const transcript = page.locator('[data-transcript-region="true"]');
   const scroller = transcript.getByTestId("virtuoso-scroller");
   const latestButton = transcript.getByRole("button", { name: /^回到最新/u });
+  // Establish the initial latest position before exercising navigation. The
+  // virtualized scroller can be visible before its initial measurement/scroll.
+  await expect(transcript).toHaveAttribute("data-message-count", "72");
+  await expect(transcript.locator('[data-message-id="settings-round-trip-71"]')).toBeVisible();
+  await expect.poll(() => scroller.evaluate((element) => (
+    element.scrollHeight - element.clientHeight - element.scrollTop
+  ))).toBeLessThanOrEqual(2);
   await scroller.hover();
   await page.mouse.wheel(0, -900);
   await expect(latestButton).toBeVisible();

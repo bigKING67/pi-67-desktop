@@ -117,7 +117,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
 
   const root = await mkdtemp(join(tmpdir(), "pi67-windows-installer-"));
   const installDirectory = join(root, "New Money 中文安装路径");
-  const desktopShortcutPath = await resolveWindowsDesktopShortcutPath("π");
+  const desktopShortcutPath = await resolveWindowsDesktopShortcutPath("New Money");
   const userDataDirectory = join(root, "用户数据 含空格");
   const {
     agentDir,
