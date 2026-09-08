@@ -77,12 +77,13 @@ export async function runRealProviderPackagedScenario({
     await configureRuntimeProvider(page, config);
     evidence.credentialInstalled = true;
     onStage("model-select");
+    // Credential setup may materialize the draft before model/thinking selection.
+    await page.evaluate(() => { globalThis.__pi67ProviderStartupReceipt.armed = true; });
     await selectProviderModel(page, config);
     evidence.modelSelected = true;
     onStage("prompt-submit");
     await page.getByLabel("给 Pi 发送消息", { exact: true }).fill(PROVIDER_PROMPT);
     await markProviderPromptSubmission(page);
-    await page.evaluate(() => { globalThis.__pi67ProviderStartupReceipt.armed = true; });
     await page.getByRole("button", { name: "发送", exact: true }).click();
     evidence.promptSubmitted = true;
     onStage("prompt-ack");
