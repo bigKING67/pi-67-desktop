@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, realpath, rename, rm } from "node:fs/promises";
+import { appendFile, mkdtemp, realpath, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -174,10 +174,16 @@ describe("indexed Workspace Session content search", () => {
     const fixture = await createFixture();
     fixture.manager.appendMessage({ role: "user", content: "bounded projection", timestamp: 1 });
     fixture.manager.appendMessage(assistantMessage("bounded response", 2));
+    // Construct the same SDK entries without 20,001 synchronous filesystem appends.
+    const tail = SessionManager.inMemory(fixture.workspace);
     for (let index = 0; index <= 20_000; index += 1) {
-      fixture.manager.appendMessage({ role: "user", content: `bounded projection ${index}`, timestamp: index + 3 });
+      tail.appendMessage({ role: "user", content: `bounded projection ${index}`, timestamp: index + 3 });
     }
+    const entries = tail.getEntries();
+    entries[0]!.parentId = fixture.manager.getLeafId();
+    await appendFile(fixture.manager.getSessionFile()!, `${entries.map((entry) => JSON.stringify(entry)).join("\n")}\n`);
     const record = await fixture.record(20_003, 20_003);
+    expect(SessionManager.open(record.path).getEntries()).toHaveLength(20_003);
     fixture.sqlite.replaceAll("source-a", [record], metadata(), 0);
     await indexSessionContentRecords(indexOptions(fixture, [record]));
     expect(fixture.sqlite.contentIndexCoverage(record.cwdKey)).toMatchObject({
