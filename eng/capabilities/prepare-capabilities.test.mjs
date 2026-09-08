@@ -121,11 +121,11 @@ describe("Desktop first-party capability source lock", () => {
       adapterSourceId: "pi-workspace-resources",
       repository: "https://github.com/xbtlin/ai-berkshire",
       ref: "refs/heads/main",
-      commit: "c0c4fb8b1045233492566a50b02cf762f43d42f0",
+      commit: "d9c124b73a0220d134741c9982a6e865c26931be",
       localSibling: "../ai-berkshire",
-      version: "1.1.2",
-      manifestSha256: "8d0882d5891f15cba399dd533b35c90fd66e619e17ffc15167e263b08e77f31f",
-      bundleSha256: "ed1a8c28b7cee7d9bd01f71ebbab52cd57870bafed094521383c7eb8b516870a"
+      version: "1.1.3",
+      manifestSha256: "240d8754c79be075d8a0edb131af7302734421600f237e00b18d8806a014bd5a",
+      bundleSha256: "aa58dbb46fe0c76e9caed6389529b59c80acc1b5423f5446c42f6b7d8f5a1e76"
     });
     expect(lock.skillPacks[0].skills).toHaveLength(22);
     expect(lock.skillPacks[0].skills.map((skill) => skill.name)).toEqual([
