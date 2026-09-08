@@ -7,6 +7,32 @@ import {
 } from "./renderer-browser-support-scope.mjs";
 
 describe("CI change scope classifier", () => {
+  it("keeps reviewed standalone unit tests on the quality lane", () => {
+    for (const path of [
+      "packages/pi-runtime/src/session-content-index.test.ts",
+      "eng/quality/check-source.test.mjs",
+      "eng/release/windows-candidate-preflight.test.mjs"
+    ]) {
+      expect(classifyChangedPaths([path, "CONTRIBUTING.md"])).toMatchObject({
+        reason: "quality-only", runQuality: true, runWindows: false, runMacos: false,
+        fullValidation: false, windowsInstallerMode: "none", reuseWindowsInstaller: false
+      });
+    }
+  });
+
+  it("does not infer a light lane from the test suffix or a mixed change", () => {
+    for (const path of [
+      "packages/pi-runtime/src/new-boundary.test.ts",
+      "eng/packaging/packaged-electron-fixture.test.mjs",
+      "eng/release/windows-candidate-preflight.mjs",
+      "packages/pi-runtime/src/session-content-index.ts"
+    ]) {
+      expect(classifyChangedPaths([
+        "packages/pi-runtime/src/session-content-index.test.ts", path
+      ]).fullValidation).toBe(true);
+    }
+  });
+
   it("skips product validation for documentation-only changes", () => {
     expect(classifyChangedPaths(["README.md", "docs/testing/ci.md"])).toMatchObject({
       reason: "docs-only",

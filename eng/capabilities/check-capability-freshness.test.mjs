@@ -12,6 +12,37 @@ const LATEST_COMMIT = "2".repeat(40);
 const TAG_OBJECT = "3".repeat(40);
 
 describe("first-party capability freshness", () => {
+  it("reports equivalent inputs distinctly and fails closed when proof cannot be obtained", async () => {
+    const lock = fixtureLock();
+    lock.sources = [source("current", "1.0.0")];
+    lock.skillPacks[0].repository = "https://github.com/xbtlin/ai-berkshire";
+    const options = {
+      lock,
+      resolveLatest: async () => ({ version: "1.0.0", tag: "v1.0.0", commit: CURRENT_COMMIT }),
+      resolveRef: async () => LATEST_COMMIT
+    };
+    const report = await createCapabilityFreshnessReport({
+      ...options, resolveInputEquivalence: async () => ({ equivalent: true })
+    });
+    expect(report).toMatchObject({ status: "passed", statuses: { current: 1, "input-equivalent": 1 } });
+    expect(report.skillPacks[0]).toMatchObject({ lockedCommit: CURRENT_COMMIT, latestCommit: LATEST_COMMIT });
+    const changed = await createCapabilityFreshnessReport({
+      ...options, resolveInputEquivalence: async () => ({ equivalent: false })
+    });
+    expect(changed.status).toBe("failed");
+    expect(changed.skillPacks[0].status).toBe("stale");
+    const offline = await createCapabilityFreshnessReport({
+      ...options, resolveInputEquivalence: async () => { throw new Error("offline"); }
+    });
+    expect(offline.status).toBe("failed");
+    expect(offline.skillPacks[0].status).toBe("unreachable");
+    const current = await createCapabilityFreshnessReport({
+      ...options, resolveRef: async () => CURRENT_COMMIT,
+      resolveInputEquivalence: async () => { throw new Error("must not request proof"); }
+    });
+    expect(current.status).toBe("passed");
+  });
+
   it("selects the highest stable tag and resolves annotated tags to their peeled commit", () => {
     const output = [
       `${CURRENT_COMMIT}\trefs/tags/v1.4.0`,

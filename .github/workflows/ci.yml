@@ -101,9 +101,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Quality gates
-        env:
-          VITEST_MAX_WORKERS: "2"
-        run: pnpm run check
+        run: pnpm run check:source
 
   renderer-e2e:
     name: Renderer E2E / macOS arm64

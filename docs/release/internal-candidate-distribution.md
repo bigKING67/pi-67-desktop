@@ -36,7 +36,13 @@ packaged smoke、source SHA、version 和 Pi runtime 绑定为同一候选。上
 
 1. **Freeze source**：完成相关测试后 scoped commit；push 必须有当前明确授权。记录完整 source SHA，
    并确认本地 HEAD 与目标远端分支的关系。运行 capability source reachability 与 freshness；包括
-   `browser67` 在内的分支跟踪能力必须让远端 ref 精确等于 lock commit。未提交的并发 WIP 不得进入本轮候选。
+   `browser67` 在内的分支跟踪能力必须让远端 ref 精确等于 lock commit。唯一例外是官方 AI Berkshire
+   的 `desktop-ai-berkshire-v1`：freshness 必须从两个精确提交的完整根树证明 `codex-skills/`、
+   `tools/` 和 `LICENSE` 的类型、模式与 Git 对象身份全部相同，才可报告 `input-equivalent` 并通过。
+   报告保留 locked/latest commit 和两组输入身份；该状态不表示上游 HEAD 等于 lock，也不更新 lock、
+   version、manifest 或 bundle。完整目录树身份覆盖新增/删除成员；输入变化仍为 stale，证据缺失、
+   截断或网络失败阻断门禁。其他适配器不继承此例外，适配器输入边界变化须同步更新此证明合同。
+   未提交的并发 WIP 不得进入本轮候选。
 2. **Build Windows**：使用 `Windows candidate` workflow 构建精确 source SHA。只有 provenance、
    packaged smoke、synthetic scale/IME、candidate identity 和完整 NSIS lifecycle 全部成功后，才下载
    `windows-candidate-<run-id>-<attempt>` 中的 NSIS EXE。NSIS lifecycle 必须在中文且带空格的受控 Pi
@@ -75,6 +81,30 @@ packaged smoke、source SHA、version 和 Pi runtime 绑定为同一候选。上
    New + Send 只新增一个 JSONL/侧栏行，完全退出并重启后仍恢复同一 Session identity。
 9. **Stop by default**：内部测试候选上传并复核后，本轮默认结束。不要因为测试通过而自动创建 Tag、
    GitHub Release、promotion、签名或公证任务。
+
+## Dispatch preflight
+
+调度 Windows candidate 前，使用上一版已保留的 `windows-preview-candidate-identity.json`
+运行只读预检。`source-sha` 必须是已推送且可从远端 main 到达的完整 SHA；源码版本从 GitHub
+该 SHA 的 `package.json` 读取，不读取当前 dirty checkout 的版本。构建 attempt 和源码身份由
+baseline identity 提供，artifact attempt 单独指定，以支持失败 job 重跑后才上传成功的基线。
+
+```bash
+corepack pnpm run release:windows:preflight --repository bigKING67/pi-67-desktop \
+  --source-sha <full-source-sha> \
+  --baseline-identity <retained-baseline-identity-path> \
+  --baseline-artifact-attempt <successful-upload-attempt>
+```
+
+预检复用现有 identity 合同，并检查远端 main 可达性、源码与基线版本、原始 build job、成功的
+认证 attempt，以及精确 artifact 是否存在、未过期且非空。只读 GitHub 查询需要可用的 `gh`
+认证；查询失败会停止，不以未知状态放行。成功输出的 `workflowInputs` 是本次调度的完整参数。
+预检不调用 `gh workflow run`，push/调度仍使用现有授权边界。
+
+此处是 metadata 预检，不证明远端安装包内容与本地 baseline identity 相同，也不能消除预检后
+artifact 过期或远端变化的可能。workflow 必须继续下载精确 artifact，复核 identity、文件哈希、
+版本和运行身份，保留所有现有 provenance、freshness、审计和安装认证门禁。Tag/Release 的
+版本占用检查也继续由 workflow 执行。候选完整源码前置检查统一使用 `corepack pnpm run check:candidate`。
 
 ## Failure and replacement rules
 

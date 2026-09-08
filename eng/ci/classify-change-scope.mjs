@@ -6,6 +6,12 @@ import { isWindowsInstallerVerifierProductPath } from "./windows-installer-verif
 import { isRendererBrowserSupportPath } from "./renderer-browser-support-scope.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
+// Reviewed standalone unit tests, not native fixtures or runtime entry points.
+const QUALITY_ONLY_UNIT_TEST_PATHS = new Set([
+  "packages/pi-runtime/src/session-content-index.test.ts",
+  "eng/quality/check-source.test.mjs",
+  "eng/release/windows-candidate-preflight.test.mjs"
+]);
 
 export function classifyChangedPaths(paths) {
   const changedPaths = [...new Set(paths.map(normalizeRepoPath).filter(Boolean))]
@@ -67,7 +73,8 @@ function isDocumentationPath(path) {
 }
 
 function isQualityOnlyPath(path) {
-  return /^tests\/e2e\/renderer(?:-[a-z-]+)?\.spec\.ts$/u.test(path)
+  return QUALITY_ONLY_UNIT_TEST_PATHS.has(path)
+    || /^tests\/e2e\/renderer(?:-[a-z-]+)?\.spec\.ts$/u.test(path)
     || isRendererBrowserSupportPath(path)
     || isDeveloperWorkflowPath(path);
 }

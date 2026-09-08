@@ -94,7 +94,10 @@
     "release:preview:candidate": "node eng/release/windows-preview-candidate.mjs",
     "release:preview:promotion:verify": "node eng/release/windows-preview-promotion.mjs",
     "release:preview:macos:candidate": "node eng/release/macos-preview-candidate.mjs create",
-    "release:preview:bundle:prepare": "node eng/release/prepare-unsigned-preview-bundle.mjs"
+    "release:preview:bundle:prepare": "node eng/release/prepare-unsigned-preview-bundle.mjs",
+    "check:source": "node eng/quality/check-source.mjs",
+    "check:candidate": "node eng/quality/check-source.mjs --candidate",
+    "release:windows:preflight": "node eng/release/windows-candidate-preflight.mjs"
   },
   "dependencies": {
     "@pi67/agent-host": "workspace:*",

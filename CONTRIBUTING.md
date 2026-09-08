@@ -43,6 +43,17 @@ corepack pnpm run test:e2e
 跨模块、高风险、候选发布或影响不明时执行聚合 `corepack pnpm run check`。
 输入未变且相关检查已通过时，仅因新失败、未解决疑点或明确门禁要求扩大或重复验证。
 
+本地与 CI 的统一源码验证入口为 `corepack pnpm run check:source`：调用原有完整 `check`，
+固定使用 2 个 Vitest worker，不改变断言、超时、覆盖率或测试范围。需要候选源码前置检查时，
+运行 `corepack pnpm run check:candidate`；它依次检查生产依赖审计、能力来源可达性、freshness、
+Extension Adapter provenance 和完整源码门禁，任一步失败立即停止。这两个入口都不打包、
+调度 workflow、上传或发布；候选仍需 clean exact-SHA 源码及平台打包/人工验收证据。
+
+CI 的轻量单元测试分类使用 `eng/ci/classify-change-scope.mjs` 中的明确路径清单，
+只纳入已核对的独立单元测试。`quality-only` 仍运行完整源码质量检查和 Renderer E2E，
+省去两平台原生打包；未知测试、原生测试夹具、生产实现或混合改动保留原有验证范围。
+新增清单成员前须核对调用关系，并保留未知路径及混合改动不能误入轻量分类的回归。
+
 TypeScript、浏览器预览、真实 Electron、真实平台和安装包证据必须分别报告，不能互相替代。
 
 ## Git 与发布

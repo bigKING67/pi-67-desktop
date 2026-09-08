@@ -5,6 +5,8 @@ import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { assertPi67SkillPackSource } from "./pi67-skill-pack-overlay.mjs";
 
+import { resolveAiBerkshireInputEquivalence, supportsInputEquivalence } from "./ai-berkshire-input-equivalence.mjs";
+
 const execFile = promisify(execFileCallback);
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const lockPath = join(repositoryRoot, "eng/capabilities/capability-sources.lock.json");
@@ -31,7 +33,8 @@ export async function createCapabilityFreshnessReport({
   lock,
   now = () => new Date(),
   resolveLatest = resolveLatestStableRelease,
-  resolveRef = resolveRemoteRef
+  resolveRef = resolveRemoteRef,
+  resolveInputEquivalence = resolveAiBerkshireInputEquivalence
 }) {
   assertCapabilityLock(lock);
   const sources = await Promise.all(lock.sources.map(async (source) => {
@@ -83,10 +86,13 @@ export async function createCapabilityFreshnessReport({
     };
     try {
       const latestCommit = await resolveRef(pack.repository, pack.ref);
+      const inputProof = latestCommit !== pack.commit && supportsInputEquivalence(pack)
+        ? await resolveInputEquivalence(pack, latestCommit) : undefined;
       return {
         ...base,
-        status: latestCommit === pack.commit ? "current" : "stale",
-        latestCommit
+        status: latestCommit === pack.commit ? "current" : inputProof?.equivalent === true ? "input-equivalent" : "stale",
+        latestCommit,
+        ...(inputProof ? { inputProof } : {})
       };
     } catch (error) {
       return { ...base, status: "unreachable", error: boundedError(error) };
@@ -102,7 +108,7 @@ export async function createCapabilityFreshnessReport({
     schemaVersion: 1,
     generatedAt: now().toISOString(),
     catalogVersion: lock.catalogVersion,
-    status: tracked.every((source) => source.status === "current") ? "passed" : "failed",
+    status: tracked.every((source) => source.status === "current" || source.status === "input-equivalent") ? "passed" : "failed",
     statuses,
     sources,
     skillPacks
