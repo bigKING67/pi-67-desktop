@@ -138,3 +138,5 @@ packaged/macOS/Windows：独立记录已验证与未验证，不由源码门禁�
 - full_engineering独立只读复核六文件无阻断，独立12/12目标测试通过，并现场核对最终日志、完整Session匹配、实际harness调用及先前停止路径，同意关闭RC-BUILD-002脚本缺陷范围；realProviderCertification=false保持。原42项CONFIRMED范围内整改收口，剩余5项原调查缺口不绕过或伪称已验证；本批不push、不改候选bytes或无关38项WIP。
 
 - 2026-09-08 Windows候选准备：用户截图证明Windows x64/Node24.18.0临时目录615字符路径读写与canonical身份比对通过；dev/ino非零，GAP008零身份分支仍未复现，不等同packaged证据。a23119d经明确授权推送后，freshness发现AI Berkshire上游新增5个commit，仅4篇reports文件变化。用户补充授权同步来源、scoped commit/push及新SHA Windows构建。锁更新至d9c124b73a0220d134741c9982a6e865c26931be，适配包1.1.3、22个Skill成员不变；实际生产overlay生成及manifest/bundle/member哈希校验通过，目标测试23/23，freshness六项current、4个来源commit可获取。证据/tmp/pi67-berkshire-refresh-P7GIK2/overlay-result.json及/tmp/pi67-d9c124b-{tests.log,freshness.json}。Windows candidate尚待运行，不改变原候选macOS证据或未提交WIP。
+
+- 2026-09-08 Windows运行34179907471在production dependency audit停止：直接undici7.28.0命中GHSA-4cwx-7wf7-3272，Windows打包未运行。用户明确授权修复/提交/推送/重建，直接依赖升7.29.0并更新冻结锁；网络请求/DNS绑定/取消清理等目标回归23/23、runtime typecheck及聚合check退出0，production audit为0 high/0 critical。证据/tmp/pi67-undici729-{tests,typecheck,audit,check}.log。首次运行34179849113误传短SHA而checkout失败，保留失败记录；后续候选必须使用本修复的新完整SHA。
