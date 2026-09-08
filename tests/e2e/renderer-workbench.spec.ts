@@ -90,7 +90,7 @@ test("restores persisted Workspace authority without asking for the Workspace ag
 test("uses the left workspace conversation list instead of horizontal task tabs", async ({ page }) => {
   await openWorkbench(page);
 
-  await expect(page.getByLabel("New Money 工作台")).toBeVisible();
+  await expect(page.getByRole("main", { name: "New Money 工作台" })).toBeVisible();
   await expect(page.getByRole("tablist", { name: "已打开的任务" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /关闭任务/u })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /未登录\s*本地模式/u })).toBeVisible();
