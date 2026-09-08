@@ -1,13 +1,7 @@
 import * as systemPath from "node:path";
 import { waitForProcessExit } from "./controlled-shutdown-fixture.ts";
-import {
-  measureElectronApplicationShutdown,
-  productShutdownWithinBudget
-} from "./electron-shutdown-measurement.mjs";
-import {
-  installWorkspaceDialogResult,
-  launchPackagedApplication
-} from "./packaged-electron-fixture.mjs";
+import { measureElectronApplicationShutdown, productShutdownWithinBudget } from "./electron-shutdown-measurement.mjs";
+import { installWorkspaceDialogResult, launchPackagedApplication } from "./packaged-electron-fixture.mjs";
 import { captureProcessOutput } from "./packaged-electron-smoke-scenarios.mjs";
 import {
   assertHealthyWorkbench,
@@ -20,10 +14,7 @@ import {
   waitForInstalledStartupSurface
 } from "./windows-installed-application-lifecycle.mjs";
 import { bootstrapFreshProfileLaunch } from "./windows-clean-profile-bootstrap.mjs";
-import {
-  activateCatalogSession,
-  REAL_USER_RUNTIME_TIMEOUT_MS
-} from "./windows-real-user-catalog-activation.mjs";
+import { activateCatalogSession, REAL_USER_RUNTIME_TIMEOUT_MS } from "./windows-real-user-catalog-activation.mjs";
 import { createControlledConversation } from "./windows-real-user-conversation.mjs";
 import {
   shouldCreateInitialRealUserSession,
@@ -65,6 +56,7 @@ export async function verifyInstalledRealUserLifecycle({
   artifact,
   environmentDriftAgentDir,
   initializeFirstLaunch,
+  onProgress = async () => {},
   lane,
   userDataDirectory,
   verifyInitialProfileState,
@@ -79,6 +71,7 @@ export async function verifyInstalledRealUserLifecycle({
   let expectedWorkspaceCwd;
   let create;
   let initialProfileVerification;
+  if (initializeFirstLaunch) await onProgress(`${lane}:bootstrap-started`);
   const bootstrap = initializeFirstLaunch
     ? await bootstrapFreshProfileLaunch({
       agentDir,
@@ -91,11 +84,14 @@ export async function verifyInstalledRealUserLifecycle({
     })
     : undefined;
 
+  if (bootstrap) await onProgress(`${lane}:bootstrap-completed`, bootstrap);
   for (let launchIndex = 0; launchIndex <= REAL_USER_RESTART_COUNT; launchIndex += 1) {
+    await onProgress(`${lane}:launch-${launchIndex}:started`);
     const result = await runRealUserLaunch({
       agentDir,
       artifact,
       environmentDriftAgentDir,
+      onShutdown: () => onProgress(`${lane}:launch-${launchIndex}:shutdown`),
       expectedSessionIdentity,
       expectedSessionPath,
       expectedWorkspaceCwd,
@@ -111,6 +107,7 @@ export async function verifyInstalledRealUserLifecycle({
     create ??= result.create;
     initialProfileVerification ??= result.initialProfileVerification;
     launches.push(result.report);
+    await onProgress(`${lane}:launch-${launchIndex}:completed`, result.report);
   }
 
   if (!create || !expectedSessionIdentity) {
@@ -129,6 +126,7 @@ export async function verifyInstalledRealUserLifecycle({
 }
 
 async function runRealUserLaunch({
+  onShutdown,
   agentDir,
   artifact,
   environmentDriftAgentDir,
@@ -273,6 +271,7 @@ async function runRealUserLaunch({
     }
 
     failureStage = "shutdown-measurement";
+    await onShutdown();
     shutdownMeasurement = await measureElectronApplicationShutdown({
       application,
       budgetMs: INSTALLED_SHUTDOWN_BUDGET_MS,

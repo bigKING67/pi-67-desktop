@@ -20,7 +20,7 @@ import {
   resolvePackagedRuntimeAssetContract,
   repositoryRoot
 } from "./packaged-electron-fixture.mjs";
-import { boundedErrorMessage, outputDirectory, summaryPath, timedPhase, writeReport } from "./windows-installer-lifecycle-report.mjs";
+import { boundedErrorMessage, recordPhase, recordProgress, outputDirectory, summaryPath, timedPhase, writeReport } from "./windows-installer-lifecycle-report.mjs";
 import { assertSameArtifactBytes } from "./windows-artifact-identity.mjs";
 import {
   launchInstalledApplication,
@@ -212,11 +212,12 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
 
     const initialInstallerPath = baseline?.path ?? installerPath;
     const initialVersion = baseline?.version ?? packageJson.version;
+    await recordProgress(report, baseline ? "baseline-install:started" : "install:started");
     const firstInstall = await timedPhase(
       baseline ? "baseline-install" : "install",
       () => installNsisPackage(initialInstallerPath, installDirectory)
     );
-    report.phases.push(firstInstall);
+    await recordPhase(report, firstInstall);
     const installedArtifact = await resolveInstalledArtifact(installDirectory);
     const initialRuntimeAssetContract = resolvePackagedRuntimeAssetContract(initialVersion);
     await assertPackagedRuntimeAssets(installedArtifact, initialRuntimeAssetContract);
@@ -249,6 +250,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
     });
 
     await resetControlledShutdownLifecycle(lifecyclePath);
+    await recordProgress(report, baseline ? "baseline-launch:started" : "first-launch:started");
     const firstLaunch = await launchInstalledApplication({
       activeControlledOperation: !baseline,
       agentDir,
@@ -266,7 +268,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
     if (!baseline) {
       await assertSingleShutdownQuitLifecycle(lifecyclePath, "Initially installed Pi Runtime");
     }
-    report.phases.push({
+    await recordPhase(report, {
       name: baseline ? "baseline-launch" : "first-launch",
       ...firstLaunch,
       sessionShutdownLifecycle: baseline ? "legacy-baseline-not-required" : "verified"
@@ -278,6 +280,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
         await writeControlledShutdownExtension({ extensionPath, childPidPath, lifecyclePath });
       }
 
+      await recordProgress(report, baseline ? "upgrade:started" : "reinstall:started");
       const update = await verifyWindowsInstallerUpdateLifecycle({
         desktopShortcutPath,
         expectedSigner,
@@ -287,12 +290,13 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
         phaseName: baseline ? "upgrade" : "reinstall",
         shortcutEvidenceDirectory: outputDirectory
       });
-      report.phases.push(update.phase);
+      await recordPhase(report, update.phase);
       finalInstalledArtifact = update.installedArtifact;
       report.finalInstalledExecutable = update.installedExecutableIdentity;
       report.updateHandoff = update.updateHandoff;
 
       await resetControlledShutdownLifecycle(lifecyclePath);
+      await recordProgress(report, baseline ? "post-upgrade-launch:started" : "post-reinstall-launch:started");
       const secondLaunch = await launchInstalledApplication({
         activeControlledOperation: Boolean(baseline),
         agentDir,
@@ -308,7 +312,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       });
       assertRuntimeVersion(secondLaunch, packageJson.version);
       await assertSingleShutdownQuitLifecycle(lifecyclePath, "Upgraded Pi Runtime");
-      report.phases.push({
+      await recordPhase(report, {
         name: baseline ? "post-upgrade-launch" : "post-reinstall-launch",
         ...secondLaunch,
         sessionShutdownLifecycle: "verified"
@@ -328,12 +332,13 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
           lifecyclePath
         })
       }),
+      onProgress: (stage, result) => recordProgress(report, stage, result),
       lane: "clean-profile",
       userDataDirectory: cleanLifecycleUserDataDirectory,
       workspace
     });
     const cleanProfileProvisioning = await inspectCleanWindowsRealUserProfile(cleanLifecycleAgentDir);
-    report.phases.push({
+    await recordPhase(report, {
       name: "clean-profile-lifecycle",
       provisioning: cleanProfileProvisioning,
       ...cleanProfileLifecycle
@@ -343,6 +348,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       agentDir: lifecycleAgentDir,
       artifact: finalInstalledArtifact,
       environmentDriftAgentDir: lifecycleEnvironmentDriftAgentDir,
+      onProgress: (stage, result) => recordProgress(report, stage, result),
       lane: "existing-pi-profile",
       userDataDirectory: lifecycleUserDataDirectory,
       verifyInitialProfileState: () => assertWindowsExistingProfilePreserved(
@@ -355,12 +361,13 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       lifecycleAgentDir,
       existingProfileBefore
     );
-    report.phases.push({
+    await recordPhase(report, {
       name: "existing-pi-profile-lifecycle",
       preservation: existingProfilePreservation,
       ...existingProfileLifecycle
     });
 
+    await recordProgress(report, "uninstall:started");
     const uninstallPath = await resolveUninstallerPath(installDirectory);
     const uninstall = await timedPhase("uninstall", async () => {
       await runExecutable(uninstallPath, ["/S"]);
@@ -368,7 +375,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       await waitForPathState(desktopShortcutPath, false);
       await waitForInstallationRemoval(installDirectory);
     });
-    report.phases.push(uninstall);
+    await recordPhase(report, uninstall);
     const [preservedEntries, preservedLifecycleEntries, preservedCleanLifecycleEntries] = await Promise.all([
       assertPreservedUserData(userDataDirectory),
       assertPreservedUserData(lifecycleUserDataDirectory),

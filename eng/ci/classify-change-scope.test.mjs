@@ -7,6 +7,20 @@ import {
 } from "./renderer-browser-support-scope.mjs";
 
 describe("CI change scope classifier", () => {
+  it("admits lifecycle diagnostics and report changes for verified artifact reuse", () => {
+    const paths = [
+      "eng/packaging/windows-real-user-failure-diagnostics.mjs",
+      "eng/packaging/windows-real-user-failure-diagnostics.test.mjs",
+      "eng/packaging/windows-installer-lifecycle-report.mjs",
+      "eng/packaging/windows-installer-lifecycle-report.test.mjs"
+    ];
+    expect(classifyChangedPaths(paths)).toMatchObject({
+      reason: "windows-installer-verifier-only", reuseWindowsInstaller: true,
+      windowsInstallerMode: "full"
+    });
+    expect(classifyChangedPaths([...paths, "apps/desktop/src/main.ts"]))
+      .toMatchObject({ reuseWindowsInstaller: false, fullValidation: true });
+  });
   it("keeps reviewed standalone unit tests on the quality lane", () => {
     for (const path of [
       "packages/pi-runtime/src/session-content-index.test.ts",

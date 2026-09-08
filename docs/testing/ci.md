@@ -100,6 +100,15 @@ Changes limited to the Windows installer verifier allowlist may reuse an install
 from the exact base commit instead of rebuilding Electron and NSIS. Documentation may accompany
 the verifier change without disabling reuse.
 
+The allowlist includes the real-user failure diagnostics and lifecycle report modules and
+their tests. Changes to packaged application code still disable this reuse path.
+Lifecycle execution prints bounded stage names for installation, reinstall, launch, shutdown,
+and uninstall. `summary.json` is replaced after each completed phase and each real-user launch
+checkpoint; `progress` identifies the latest checkpoint, and `completedLaunches` preserves
+finished launch evidence even if a later launch fails. These checkpoints do not set a passing
+status: only completion of all required checks does. Report replacement is atomic within its
+directory; abrupt runner loss may leave the latest checkpoint rather than a final result.
+
 Reuse is selected only when all of the following are true:
 
 1. the base SHA has a completed failed `CI` run;

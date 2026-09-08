@@ -167,6 +167,8 @@ describe("Windows installer debug artifact reuse", () => {
     expect(workflow).toContain("BASELINE_RUN_ATTEMPT: ${{ inputs.baseline_run_attempt }}");
     expect(workflow).toContain("PI67_WINDOWS_BASELINE_INSTALLER");
     expect(workflow).toContain("eng/ci/verify-windows-installer-debug-scope.test.mjs");
+    expect(workflow).toContain("eng/packaging/windows-real-user-failure-diagnostics.test.mjs");
+    expect(workflow).toContain("eng/packaging/windows-installer-lifecycle-report.test.mjs");
     expect(workflow).toContain("eng/packaging/windows-artifact-identity.test.mjs");
   });
 
