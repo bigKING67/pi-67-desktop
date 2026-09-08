@@ -78,11 +78,10 @@ export async function activateSharedProfile(options: {
     for (const entry of options.packages) {
       const destination = containedCapabilityPath(staging, entry.packagePath, "Shared profile Package path");
       await copyCapabilityDirectory(entry.source, destination, entry.source, entry.includeNodeModules);
-      if (await capabilityTreeSha256(destination, entry.includeNodeModules) !== entry.treeSha256) {
-        throw new Error(`Desktop shared profile ${entry.id} failed staging integrity verification.`);
-      }
     }
     await writeFile(join(staging, "receipt.json"), `${JSON.stringify(expected, null, 2)}\n`, { mode: 0o600 });
+    // Receipt inspection hashes every staged Package before activation. Keep that
+    // as the single staging integrity pass, including for newly copied content.
     const stagedInspection = await inspectSharedProfile(staging);
     if (
       stagedInspection.status !== "valid"
