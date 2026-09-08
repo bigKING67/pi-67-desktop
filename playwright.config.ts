@@ -14,6 +14,7 @@ const rendererUrl = `http://127.0.0.1:${rendererPort}`;
 export default defineConfig({
   testDir: "./tests/e2e",
   outputDir: "test-results",
+  forbidOnly: Boolean(process.env.CI),
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,

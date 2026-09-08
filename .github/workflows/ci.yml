@@ -102,6 +102,16 @@ jobs:
           retention-days: 14
       - name: Quality gates
         run: pnpm run check:source
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: source-test-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/quality/vitest-results.json
+            artifacts/quality/vitest-results.xml
+            coverage/coverage-summary.json
+          if-no-files-found: ignore
+          retention-days: 7
 
   renderer-e2e:
     name: Renderer E2E / macOS arm64
@@ -203,7 +213,7 @@ jobs:
         env:
           PI67_E2E_SHARED_AGENT_ROOT: ${{ runner.temp }}/pi67-native-electron
           PI67_TEST_CAPTURE_AGENT_INIT: "1"
-        run: pnpm exec playwright test --project=electron --workers=1
+        run: pnpm exec playwright test --config=playwright.electron.config.ts --project=electron --workers=1
       - name: Build fast unsigned Windows smoke package
         run: pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources --ci-fast
       - name: Smoke packaged Electron runtime
@@ -314,7 +324,7 @@ jobs:
         env:
           PI67_E2E_SHARED_AGENT_ROOT: ${{ runner.temp }}/pi67-native-electron
           PI67_TEST_CAPTURE_AGENT_INIT: "1"
-        run: pnpm exec playwright test --project=electron --workers=1
+        run: pnpm exec playwright test --config=playwright.electron.config.ts --project=electron --workers=1
       - name: Build unsigned macOS smoke package
         run: pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources
       - name: Smoke packaged Electron runtime

@@ -19,6 +19,12 @@ export default defineConfig({
     }
   },
   test: {
+    allowOnly: !process.env.CI,
+    reporters: process.env.CI ? ["default", "json", "junit"] : ["default"],
+    outputFile: {
+      json: "artifacts/quality/vitest-results.json",
+      junit: "artifacts/quality/vitest-results.xml"
+    },
     environment: "node",
     include: ["packages/**/*.test.ts", "apps/**/*.test.ts", "tests/**/*.test.ts", "eng/**/*.test.mjs"],
     coverage: {

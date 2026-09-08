@@ -94,7 +94,7 @@ describe("release performance workflow gates", () => {
     expect(windowsSource).toContain("~/AppData/Local/electron-builder/Cache");
     expect(windowsSource).toContain("pi67-electron-packaging-${{ runner.os }}-${{ runner.arch }}-");
     expect(windowsSource).toContain(
-      "run: pnpm exec playwright test --project=electron --workers=1"
+      "run: pnpm exec playwright test --config=playwright.electron.config.ts --project=electron --workers=1"
     );
     expect(windowsSource).toContain("--prepared-resources --ci-fast");
     expect(windowsSource).toContain("run: pnpm run package:smoke:windows-ui");

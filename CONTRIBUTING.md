@@ -54,6 +54,21 @@ CI 的轻量单元测试分类使用 `eng/ci/classify-change-scope.mjs` 中的�
 省去两平台原生打包；未知测试、原生测试夹具、生产实现或混合改动保留原有验证范围。
 新增清单成员前须核对调用关系，并保留未知路径及混合改动不能误入轻量分类的回归。
 
+CI 显式禁止 Vitest/Playwright 的 `.only` 聚焦测试。Vitest 在 CI 同时输出终端、JSON 和
+JUnit 结果；源码质量 job 无论成功失败都会尝试保留结果及覆盖率摘要。静态门禁先失败时
+测试报告可能不存在，不能将缺失报告解释为测试通过。
+
+仅运行原生 Electron 时使用以下命令；该配置复用原有断言、重试及证据设置，
+移除 Vite webServer 和 HTTP baseURL：
+
+```bash
+pnpm exec playwright test --config=playwright.electron.config.ts --project=electron --workers=1
+```
+
+默认 `playwright.config.ts` 仍支持 Renderer 与完整组合测试。
+Renderer CI 使用预构建资源、2 workers、0 retries；Electron CI 使用 1 worker、1 retry。
+直接 `pnpm test` 使用 Vitest 默认并发，复现完整源码 CI 时使用固定 2 workers 的 `check:source`。
+
 TypeScript、浏览器预览、真实 Electron、真实平台和安装包证据必须分别报告，不能互相替代。
 
 ## Git 与发布
