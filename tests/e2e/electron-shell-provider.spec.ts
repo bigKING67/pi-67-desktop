@@ -39,7 +39,7 @@ test("boots the real sandboxed Electron shell over app://", async () => {
     forwardElectronDebugOutput(activeApplication);
     const window = await activeApplication.firstWindow();
     await window.waitForLoadState("domcontentloaded");
-    await expect(window).toHaveTitle("π");
+    await expect(window).toHaveTitle("New Money");
     expect(window.url()).toBe("app://pi67/index.html");
     await expect(window.getByRole("heading", { name: "开始一个 Pi 对话" })).toBeVisible();
     await expect(window.getByText("选择一个工作区，继续已有对话或开始新对话。")).toBeVisible();
