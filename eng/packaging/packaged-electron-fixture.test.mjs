@@ -199,6 +199,13 @@ describe("packaged Electron launch environment", () => {
       "node_modules/heic-decode/index.js",
       "node_modules/libheif-js/libheif-wasm/libheif-bundle.js"
     ]));
+    expect(resolvePackagedRuntimeAssetContract("0.1.0-alpha.39").requiredCapabilityPaths)
+      .toEqual([
+        "packages/pi67-core/package.json",
+        "managed-packages/bundled/packages/pi-observational-memory/package.json"
+      ]);
+    expect(resolvePackagedRuntimeAssetContract("0.1.0-alpha.40").requiredCapabilityPaths)
+      .toEqual(["packages/pi-workspace-resources/package.json"]);
     expect(resolvePackagedRuntimeAssetContract("0.1.0-alpha.24"))
       .toMatchObject({ packageWorkerIsolated: true });
     expect(() => resolvePackagedRuntimeAssetContract("not-a-version"))

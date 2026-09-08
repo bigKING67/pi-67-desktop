@@ -70,7 +70,14 @@ export function resolvePackagedRuntimeAssetContract(version) {
     version,
     HEIC_NORMALIZATION_ASSET_VERSION
   );
+  const unifiedCapabilities = semverGreaterThanOrEqual(version, "0.1.0-alpha.40");
   return {
+    requiredCapabilityPaths: unifiedCapabilities
+      ? ["packages/pi-workspace-resources/package.json"]
+      : [
+        "packages/pi67-core/package.json",
+        "managed-packages/bundled/packages/pi-observational-memory/package.json"
+      ],
     heicNormalizationAssetsIncluded,
     packageWorkerIsolated,
     requiredAsarPaths: packagedAttachmentRequiredAsarPaths.filter((path) =>
@@ -104,6 +111,7 @@ export function resolvePackagedArtifact(platform = process.platform, arch = proc
 
 export async function assertPackagedRuntimeAssets(artifact, {
   requiredAsarPaths = packagedAttachmentRequiredAsarPaths,
+  requiredCapabilityPaths = ["packages/pi-workspace-resources/package.json"],
   requireWindowsPackageWorkerJob = true
 } = {}) {
   const clipboardModule = artifact.platform === "darwin"
@@ -121,7 +129,7 @@ export async function assertPackagedRuntimeAssets(artifact, {
     access(join(artifact.resourcesPath, "toolchain/manifest.json")),
     access(join(artifact.resourcesPath, "capabilities/manifest.json")),
     access(join(artifact.resourcesPath, "capabilities/catalog.json")),
-    access(join(artifact.resourcesPath, "capabilities/packages/pi-workspace-resources/package.json")),
+    ...requiredCapabilityPaths.map((path) => access(join(artifact.resourcesPath, "capabilities", path))),
     access(join(artifact.resourcesPath, "capabilities/packages/browser67/package.json")),
     access(join(artifact.resourcesPath, "capabilities/packages/browser67/node_modules/ajv/package.json")),
     access(join(artifact.resourcesPath, "capabilities/packages/browser67/node_modules/ws/package.json")),
