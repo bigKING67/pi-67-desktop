@@ -12,6 +12,8 @@
   `docs/architecture/processes-and-protocol.md`.
 - Architecture decisions: the applicable records under `docs/adr/`.
 - Development commands and contribution rules: `CONTRIBUTING.md`.
+- Validation routing and runner configuration: `docs/testing/ci.md`; coverage
+  scope and performance budgets: `docs/testing/coverage.md` and `docs/testing/performance.md`.
 - L2 execution plans: `PLANS.md`. Candidate distribution, R2 updates, and support
   diagnostics: follow the dedicated sections below before those operations.
 - Reading only relevant sections does not reduce their authority. Behavior,

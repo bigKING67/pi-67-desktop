@@ -66,9 +66,14 @@ for (const path of requiredPaths) {
 }
 
 const files = await walk(root);
+const sourceFiles = new Set(files);
 for (const file of files) {
   const path = toRepoPath(file);
   const extension = extname(file).toLowerCase();
+  if (/^(?:apps|packages)\/[^/]+\/src\//u.test(path) && path.endsWith(".d.ts")
+    && sourceFiles.has(file.slice(0, -5) + ".ts")) {
+    failures.push(`generated declaration shadows source: ${path}; fix the emitting build, output belongs in dist`);
+  }
   if ([".cs", ".csproj", ".sln", ".slnx", ".wxs", ".wixproj"].includes(extension)) {
     failures.push(`stale native implementation file: ${path}`);
   }

@@ -14,7 +14,7 @@
   },
   "scripts": {
     "build": "corepack pnpm run build:runtime && corepack pnpm run build:performance",
-    "build:runtime": "tsdown src/index.ts --format esm --dts --deps.never-bundle @earendil-works/pi-coding-agent --deps.never-bundle @earendil-works/pi-agent-core --deps.never-bundle @earendil-works/pi-ai",
+    "build:runtime": "tsdown src/index.ts --format esm --dts --tsconfig ../../tsconfig.pi-runtime-build.json --deps.never-bundle @earendil-works/pi-coding-agent --deps.never-bundle @earendil-works/pi-agent-core --deps.never-bundle @earendil-works/pi-ai",
     "build:performance": "tsdown src/session-jsonl-tail-performance-entry.ts --format esm --dts false --out-dir dist/performance --deps.never-bundle @earendil-works/pi-coding-agent --deps.never-bundle @earendil-works/pi-agent-core --deps.never-bundle @earendil-works/pi-ai",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
