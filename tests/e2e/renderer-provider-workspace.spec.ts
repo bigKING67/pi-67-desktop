@@ -1,11 +1,9 @@
 import { expect, test } from "@playwright/test";
 import {
-  attachMockAgent,
-  clearRecordedCommands,
+  attachMockAgent, clearRecordedCommands,
   createMockProviderConfigurationSnapshot,
   emitMockAgentEvent,
-  installMockDesktopBridge,
-  recordedCommandDetails
+  installMockDesktopBridge, recordedCommandDetails
 } from "./pi67-renderer-fixture.js";
 import { DEFAULT_MOCK_WORKSPACE } from "./pi67-renderer-desktop-bridge.js";
 import { createMockDeepSeekProviderConfigurationSnapshot } from "./pi67-provider-configuration-snapshot-fixture.js";
@@ -372,7 +370,9 @@ test("edits Pi Provider files, selects built-in defaults, and preserves a stale 
   await panel.getByLabel("Provider ID").fill("host-custom");
   await panel.getByLabel("显示名称").fill("Host Custom");
   await panel.getByLabel("Base URL").fill("https://example.invalid/v1");
-  await panel.getByLabel("API 协议").fill("openai-responses");
+  await panel.getByText(/^兼容 Provider 默认协议/u).click();
+  await panel.getByRole("button", { name: "兼容 Provider 默认 API 协议" }).click();
+  await page.getByRole("option", { name: /OpenAI Responses/u }).click();
   await panel.getByText(/^自定义 Headers/u).click();
   await panel.getByLabel("Header 名称").fill("X-Provider-Secret");
   await panel.getByLabel("Header 值").fill("provider-header-secret-value");

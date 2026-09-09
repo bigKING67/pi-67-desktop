@@ -1,0 +1,351 @@
+.discovery {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-muted) 68%, var(--surface));
+}
+
+.heading,
+.results > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.heading > span,
+.results > header > span,
+.protocolOption > span:last-child,
+.groupSelector > span:last-child,
+.modelOption > span:last-child,
+.openAiChoices label > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.heading strong,
+.results > header strong {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.heading small,
+.results > header small,
+.credentialField small,
+.protocolGroup > label small,
+.protocolOption small,
+.groupSelector small,
+.modelOption small,
+.openAiChoices small {
+  color: var(--text-tertiary);
+  font-size: 9px;
+  font-weight: 450;
+  line-height: 1.45;
+}
+
+.credentialField,
+.protocolGroup {
+  display: grid;
+  gap: 6px;
+}
+
+.credentialField > label,
+.protocolGroup > label {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.secretInput {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.secretInput input {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 38px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.secretInput input:focus {
+  border-color: var(--focus);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 16%, transparent);
+}
+
+.secretInput button {
+  position: absolute;
+  right: 5px;
+  display: inline-flex;
+  width: 27px;
+  height: 27px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
+.secretInput button[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.secretInput button[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.protocolOptions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.protocolOption,
+.groupSelector,
+.modelOption,
+.openAiChoices label {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.protocolOption {
+  min-height: 64px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.protocolOption[data-hovered],
+.protocolOption[data-selected] {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+}
+
+.groupSelector[data-disabled] {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.protocolOption[data-focus-visible],
+.groupSelector[data-focus-visible],
+.modelOption[data-focus-visible],
+.openAiChoices label[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.protocolOption strong,
+.groupSelector strong,
+.modelOption strong,
+.openAiChoices strong {
+  color: var(--text-primary);
+  font-size: 10px;
+}
+
+.checkIndicator,
+.radioIndicator {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-muted);
+  color: transparent;
+}
+
+.checkIndicator {
+  border-radius: 4px;
+}
+
+.radioIndicator {
+  border-radius: 999px;
+}
+
+.protocolOption[data-selected] .checkIndicator,
+.groupSelector[data-selected] .checkIndicator,
+.modelOption[data-selected] .checkIndicator {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.groupSelector[data-indeterminate] .checkIndicator {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.groupSelector[data-indeterminate] .checkIndicator::after {
+  width: 8px;
+  height: 1px;
+  background: var(--accent-contrast);
+  content: "";
+}
+
+.groupSelector[data-indeterminate] .checkIndicator svg {
+  display: none;
+}
+
+.openAiDetails {
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+}
+
+.openAiDetails > summary {
+  padding-top: 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.openAiChoices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 9px;
+}
+
+.openAiChoices label {
+  padding: 8px;
+  border-radius: 7px;
+  background: var(--surface);
+}
+
+.openAiChoices label[data-selected] .radioIndicator {
+  border: 4px solid var(--accent);
+  background: var(--surface);
+}
+
+.pending,
+.applied,
+.error,
+.warning {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.pending {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+}
+
+.pending svg {
+  animation: provider-discovery-spin 800ms linear infinite;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.applied {
+  color: var(--success);
+}
+
+.warning {
+  color: var(--warning);
+}
+
+.results {
+  display: grid;
+  gap: 9px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.resultGroup {
+  display: grid;
+  gap: 6px;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.groupSelector {
+  align-items: center;
+}
+
+.modelOptions {
+  display: grid;
+  gap: 2px;
+  padding-left: 24px;
+}
+
+.modelOption {
+  align-items: center;
+  padding: 6px;
+  border-radius: 6px;
+}
+
+.modelOption[data-hovered] {
+  background: var(--surface-hover);
+}
+
+.modelOption small {
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+}
+
+.conflicts {
+  display: grid;
+  gap: 4px;
+  padding: 9px;
+  border: 1px solid color-mix(in srgb, var(--warning) 32%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warning) 7%, var(--surface));
+  color: var(--warning);
+}
+
+.conflicts strong {
+  font-size: 10px;
+}
+
+.conflicts small {
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+@keyframes provider-discovery-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 920px) {
+  .protocolOptions,
+  .openAiChoices {
+    grid-template-columns: 1fr;
+  }
+
+  .heading,
+  .results > header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pending svg { animation: none; }
+}

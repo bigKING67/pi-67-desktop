@@ -1,20 +1,12 @@
 import { join, resolve } from "node:path";
-import {
-  ModelRuntime,
-  SettingsManager,
-  type SettingsManager as PiSettingsManager
-} from "@earendil-works/pi-coding-agent";
+import { ModelRuntime, SettingsManager, type SettingsManager as PiSettingsManager } from "@earendil-works/pi-coding-agent";
 import { RuntimeError } from "@pi67/domain";
 import type {
-  PiConfigurationChangeSource,
-  PiConfigurationReloadState,
-  PiCredentialRevealResult,
-  PiDefaultModelSelection,
-  PiModelCatalogRefreshResult,
-  PiProviderConfigurationChanged,
-  PiProviderConfigurationInput,
-  PiProviderConfigurationSnapshot,
-  PiVisionAssistantOverride
+  PiConfigurationChangeSource, PiConfigurationReloadState,
+  PiCredentialRevealResult, PiDefaultModelSelection,
+  PiModelCatalogRefreshResult, PiProviderConfigurationChanged,
+  PiProviderConfigurationInput, PiProviderConfigurationSnapshot,
+  PiProviderModelDiscoveryInput, PiVisionAssistantOverride
 } from "@pi67/protocol";
 import { PiAuthCredentialStore } from "./pi-auth-credential-store.js";
 import {
@@ -37,6 +29,7 @@ import { normalizeSessionCatalogWorkspaceIdentity as workspaceIdentity } from ".
 import { installFirstPartyModelProviders } from "./first-party-model-providers.js";
 import { PiConfigurationMutations } from "./pi-configuration-mutations.js";
 import { PiModelCatalogRefreshCoordinator } from "./pi-model-catalog-refresh.js";
+import { createConfiguredProviderModelDiscovery, PiProviderModelDiscovery } from "./pi-provider-model-discovery.js";
 
 export type { PiConfigurationServiceOptions } from "./pi-configuration-service-options.js";
 export interface PiConfigurationReloadTarget {
@@ -68,6 +61,7 @@ export class PiConfigurationService {
   private readonly limits: ResolvedPiConfigurationServiceOptions;
   private readonly mutations: PiConfigurationMutations;
   private readonly modelCatalogRefresh: PiModelCatalogRefreshCoordinator;
+  private readonly providerModelDiscovery: PiProviderModelDiscovery;
   private modelRuntime: ModelRuntime | undefined;
   private taskModelRuntimeCandidate: TaskModelRuntimeCandidate | undefined;
   private taskModelRuntimeLoad: Promise<TaskModelRuntimeCandidate> | undefined;
@@ -124,6 +118,7 @@ export class PiConfigurationService {
       timeoutMs: this.limits.modelCatalogRefreshWaitMs,
       createRuntime: (signal) => this.createPiModelRuntime(signal)
     });
+    this.providerModelDiscovery = createConfiguredProviderModelDiscovery(this.credentials);
     this.watcher.start();
   }
 
@@ -243,6 +238,9 @@ export class PiConfigurationService {
     });
   }
   cancelModelCatalogRefresh(): void { this.modelCatalogRefresh.cancel(); }
+  discoverGlobalProviderModels(input: PiProviderModelDiscoveryInput) {
+    this.assertActive(); return this.providerModelDiscovery.inspect(input); }
+  cancelGlobalProviderModelDiscovery(): boolean { return this.providerModelDiscovery.cancel(); }
   saveGlobalProvider(expectedRevision: string, provider: PiProviderConfigurationInput): Promise<PiProviderConfigurationSnapshot> {
     return this.mutations.saveGlobalProvider(expectedRevision, provider); }
   removeGlobalProvider(expectedRevision: string, providerId: string): Promise<PiProviderConfigurationSnapshot> {
@@ -269,6 +267,7 @@ export class PiConfigurationService {
     this.disposed = true;
     this.watcher.dispose();
     await this.modelCatalogRefresh.dispose();
+    this.providerModelDiscovery.cancel();
     const activeTaskModelRuntimeLoad = this.taskModelRuntimeLoad;
     if (activeTaskModelRuntimeLoad) {
       await withPiConfigurationBudget(

@@ -178,6 +178,9 @@ export function installMockCommandResponseHandler({
         failedProviders: []
       };
     }
+    if (type === "provider.modelDiscovery.cancel") {
+      return { cancelled: true };
+    }
     if (type === "provider.credential.reveal") {
       return payload.provider === "openai"
         ? { provider: "openai", status: "revealed", apiKey: "fixture-persisted-openai-key" }

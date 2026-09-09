@@ -16,6 +16,7 @@ import {
 import {
   PiConfigurationExpectedRevisionSchema,
   PiConfigurationProviderIdSchema,
+  PiProviderModelDiscoveryInputSchema,
   PiProviderConfigurationInputSchema
 } from "./provider-configuration-schemas.js";
 import { LarkAppConfigurationInputSchema } from "./lark-auth-schemas.js";
@@ -233,6 +234,8 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   ]),
   "provider.configuration.reload": EmptyPayloadSchema,
   "provider.modelCatalog.refresh": EmptyPayloadSchema,
+  "provider.modelDiscovery.inspect": PiProviderModelDiscoveryInputSchema,
+  "provider.modelDiscovery.cancel": EmptyPayloadSchema,
   "provider.projectConfiguration.get": EmptyPayloadSchema,
   "provider.projectConfiguration.reload": EmptyPayloadSchema,
   "model.projectDefault.set": Type.Union([

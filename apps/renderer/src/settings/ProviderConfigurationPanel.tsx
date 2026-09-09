@@ -1,10 +1,6 @@
-import type {
-  PiProviderConfigurationInput,
-  PiProviderConfigurationView
-} from "@pi67/protocol";
 import { KeyRound, Save, Trash2 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Button, Input, TextArea } from "react-aria-components";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Button } from "react-aria-components";
 import { useShellStore } from "../shell/shell-store.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { ProviderDefaultModelEditor } from "./ProviderDefaultModelEditor.js";
@@ -20,7 +16,7 @@ import {
   ProviderCatalog,
   type ProviderCatalogView
 } from "./ProviderCatalog.js";
-import { ProviderHeaderMutationEditor } from "./ProviderHeaderMutationEditor.js";
+import { ProviderConfigurationEditor } from "./ProviderConfigurationEditor.js";
 import { ProviderModelWorkspace } from "./ProviderModelWorkspace.js";
 import { SettingsDestructiveActionDialog } from "./SettingsActionDialogs.js";
 import { useSettingsDraftRegistration } from "./SettingsDraftGuard.js";
@@ -33,7 +29,7 @@ import {
   refreshProviderModelCatalog,
   reloadProviderConfiguration,
   removeProviderConfiguration,
-  saveProviderConfiguration
+  saveProviderConfigurationWithCredential
 } from "./provider-configuration-controller.js";
 import { useProviderConfigurationStore } from "./provider-configuration-store.js";
 import styles from "./ProviderConfigurationPanel.module.css";
@@ -71,6 +67,7 @@ function GlobalProviderConfigurationPanel() {
   const [pendingProviderId, setPendingProviderId] = useState<string | null>();
   const [removalTarget, setRemovalTarget] = useState<string>();
   const [catalogRefreshing, setCatalogRefreshing] = useState(false);
+  const [providerApiKey, setProviderApiKey] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
   const catalogScrollTopRef = useRef(0);
   const catalogViewWorkspaceRef = useRef<string | undefined>(undefined);
@@ -114,10 +111,13 @@ function GlobalProviderConfigurationPanel() {
     ?? selectedProviderId
     ?? "新建模型服务";
   useSettingsDraftRegistration({
-    dirty,
+    dirty: dirty || providerApiKey.length > 0,
     busy: phase === "saving",
     subject: draftSubject,
-    discard: () => useProviderConfigurationStore.getState().discardDraft()
+    discard: () => {
+      setProviderApiKey("");
+      useProviderConfigurationStore.getState().discardDraft();
+    }
   });
 
   if (phase === "loading" && (!snapshot || storeWorkspaceId !== workspaceId)) {
@@ -134,12 +134,16 @@ function GlobalProviderConfigurationPanel() {
   const selectedView = snapshot.providers.find((provider) => provider.id === selectedProviderId);
   const editable = selectedView?.origin === "models.json" || selectedProviderId === undefined;
   const canSave = editable
-    && dirty
+    && (dirty || providerApiKey.length > 0)
     && phase !== "saving"
     && Boolean(draft?.id.trim())
     && Boolean(draft?.models.length)
     && draft!.models.every((model) => model.id.trim().length > 0);
   const enterProvider = (providerId: string | null) => {
+    const changesProvider = providerId === null
+      ? selectedProviderId !== undefined
+      : providerId !== selectedProviderId;
+    if (changesProvider) setProviderApiKey("");
     setPendingProviderId(undefined);
     if (providerId === null) {
       if (selectedProviderId !== undefined || !draft) {
@@ -164,7 +168,7 @@ function GlobalProviderConfigurationPanel() {
     const switchesDraft = providerId === null
       ? selectedProviderId !== undefined
       : providerId !== selectedProviderId;
-    if (dirty && switchesDraft) {
+    if ((dirty || providerApiKey.length > 0) && switchesDraft) {
       setPendingProviderId(providerId);
       return;
     }
@@ -263,7 +267,11 @@ function GlobalProviderConfigurationPanel() {
                       </Button>
                     ) : null}
                     {editable ? (
-                      <Button className="primary-button" isDisabled={!canSave} onPress={() => void saveProviderConfiguration(workspaceId)}>
+                      <Button className="primary-button" isDisabled={!canSave} onPress={() => {
+                        void saveProviderConfigurationWithCredential(workspaceId, providerApiKey || undefined).then((saved) => {
+                          if (saved) setProviderApiKey("");
+                        });
+                      }}>
                         <Save aria-hidden="true" size={14} />{phase === "saving" ? "保存中…" : "保存到 Pi"}
                       </Button>
                     ) : null}
@@ -278,7 +286,13 @@ function GlobalProviderConfigurationPanel() {
                 <div className={styles.editorBody} data-section={section}>
                   {section === "configuration" ? (
                     editable ? (
-                      <ProviderConfigurationEditor draft={draft} selectedView={selectedView} />
+                      <ProviderConfigurationEditor
+                        apiKey={providerApiKey}
+                        draft={draft}
+                        hasStoredCredential={snapshot.credentials.some((credential) => credential.provider === draft.id)}
+                        onApiKeyChange={setProviderApiKey}
+                        selectedView={selectedView}
+                      />
                     ) : selectedView ? (
                       <BuiltInProviderConnection
                         provider={selectedView}
@@ -365,80 +379,4 @@ function ProviderSectionTabs({
       ))}
     </nav>
   );
-}
-
-function ProviderConfigurationEditor({
-  draft,
-  selectedView
-}: {
-  draft: PiProviderConfigurationInput;
-  selectedView: PiProviderConfigurationView | undefined;
-}) {
-  const update = (mutation: (draft: PiProviderConfigurationInput) => PiProviderConfigurationInput) => (
-    useProviderConfigurationStore.getState().updateDraft(mutation)
-  );
-  return (
-    <section className={styles.formSection}>
-      <header className={styles.sectionIntro}>
-        <strong>基本配置</strong>
-        <small>Provider ID、Endpoint 与协议直接写入 Desktop 与 Pi TUI 共用的 Pi models.json。新服务保存后再单独配置 API Key。</small>
-      </header>
-      <div className={styles.fieldGrid}>
-        <Field label="Provider ID" detail="写入 providers.<id>">
-          <Input disabled={selectedView !== undefined} value={draft.id} onChange={(event) => update((current) => ({ ...current, id: event.target.value }))} />
-        </Field>
-        <Field label="显示名称">
-          <Input value={draft.name ?? ""} onChange={(event) => updateOptionalProvider("name", event.target.value)} />
-        </Field>
-        <Field label="Base URL">
-          <Input value={draft.baseUrl ?? ""} onChange={(event) => updateOptionalProvider("baseUrl", event.target.value)} />
-        </Field>
-        <Field label="API 协议" detail="如 openai-responses / anthropic-messages">
-          <Input value={draft.api ?? ""} onChange={(event) => updateOptionalProvider("api", event.target.value)} />
-        </Field>
-      </div>
-      <div className={styles.checkRow}>
-        <label><input checked={draft.authHeader ?? false} onChange={(event) => update((current) => ({ ...current, authHeader: event.target.checked }))} type="checkbox" />使用 Authorization header</label>
-        <label><input checked={draft.oauth === "radius"} onChange={(event) => update((current) => {
-          const next = { ...current };
-          if (event.target.checked) next.oauth = "radius";
-          else delete next.oauth;
-          return next;
-        })} type="checkbox" />启用 Radius OAuth</label>
-      </div>
-      <details className={styles.advancedDetails}>
-        <summary>自定义 Headers{selectedView?.headerNames.length ? ` · ${selectedView.headerNames.length} 项` : ""}</summary>
-        <ProviderHeaderMutationEditor existingNames={selectedView?.headerNames ?? []} readOnly={false} showTitle={false} />
-      </details>
-      <details className={styles.advancedDetails}>
-        <summary>Provider 高级 JSON{hasAdvancedJson(draft.advancedJson) ? " · 已配置" : ""}</summary>
-        <p>仅接受 compat 与 modelOverrides；apiKey 和 headers 必须走专用写入路径。</p>
-        <TextArea
-          aria-label="Provider 高级 JSON"
-          className={styles.codeArea!}
-          spellCheck={false}
-          value={draft.advancedJson ?? "{}"}
-          onChange={(event) => update((current) => ({ ...current, advancedJson: event.target.value }))}
-        />
-      </details>
-    </section>
-  );
-}
-
-function Field({ label, detail, children }: { label: string; detail?: string; children: ReactNode }) {
-  return <label className={styles.field}><span>{label}</span>{children}{detail ? <small>{detail}</small> : null}</label>;
-}
-
-function updateOptionalProvider(key: "name" | "baseUrl" | "api", value: string): void {
-  useProviderConfigurationStore.getState().updateDraft((draft) => {
-    const next = { ...draft };
-    if (value.trim()) next[key] = value;
-    else delete next[key];
-    return next;
-  });
-}
-
-function hasAdvancedJson(value: string | undefined): boolean {
-  const normalized = value?.trim();
-  return Boolean(normalized && normalized !== "{}");
 }

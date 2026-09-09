@@ -61,6 +61,22 @@ path escape、invalid payload 和其他错误不重试。Pi 配置仍在 path-sc
 Context/Provider validation 或 Runtime reload 失败时，只有当前文件仍等于本次写入版本才允许回滚，外部
 再次修改会保留冲突而不是覆盖。该合同不把多个独立用户操作伪装成不存在的多文件事务。
 
+Custom Provider 模型发现使用 App-scoped `provider.modelDiscovery.inspect`，不复用
+`provider.modelCatalog.refresh`：后者只刷新 Pi Runtime 已注册且实现 `refreshModels` 的动态
+Provider。Renderer 只提交 Provider ID、Base URL、默认选中的 OpenAI/Anthropic/Gemini 协议族、
+OpenAI 导入 API 选择、默认开启的 aggregate Bearer 认证标志，以及可选的一次性 API Key。
+Agent Host/Pi Runtime 的默认路径只对同一 `/models` 目录执行一次有界 Bearer GET，再把规范目录
+按所选协议族分类；显式关闭 `authHeader` 时才按 OpenAI Bearer、Anthropic `x-api-key`、Gemini
+`x-goog-api-key` 的认证语义执行有界并行 GET。两条路径都禁止跨 origin redirect，最多读取
+2 MiB 并最多投影 512 个模型；response body、credential 和网络错误对象均不返回 Renderer 或日志。
+`provider.modelDiscovery.cancel` 只取消当前内存请求，不产生持久 mutation 或 replay ledger。
+
+发现结果按模型的真实请求 ID 合并，输出协议族、精确 Pi API、可选 supplier、catalog-only
+证据、各协议结果和 bounded collision。新模型由 Renderer 明确加入草稿后，仍通过已有
+revision-fenced `provider.configuration.save` 写 `models.json`；可选新凭据随后通过独立
+`provider.credential.store` 写 `auth.json`。后一步失败时前一步保持为可见的未认证 Provider，
+不能伪装成多文件原子成功。已有模型、未知自定义 API 和 write-only Header 不因发现被覆盖。
+
 ## Startup and recovery
 
 1. Main 注册 secure `app` scheme 并创建窗口；Welcome 不启动 Agent Host。

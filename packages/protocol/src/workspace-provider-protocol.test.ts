@@ -31,6 +31,8 @@ describe("Provider configuration protocol", () => {
       "provider.configuration.get",
       "provider.configuration.reload",
       "provider.modelCatalog.refresh",
+      "provider.modelDiscovery.inspect",
+      "provider.modelDiscovery.cancel",
       "provider.credential.reveal"
     ] as const;
     const appMutations = [
@@ -125,6 +127,47 @@ describe("Provider configuration protocol", () => {
       ...response,
       result: [{ ...response.result[0], apiKey: "runtime-secret" }]
     })).toBe(false);
+  });
+
+  it("validates read-only multi-protocol discovery without returning its credential", () => {
+    const request = commandEnvelope("provider.modelDiscovery.inspect", {
+      provider: "gateway",
+      baseUrl: "http://127.0.0.1:8317/v1",
+      protocols: ["openai", "anthropic", "gemini"],
+      openAiApi: "openai-responses",
+      apiKey: "transient-discovery-secret"
+    }, APP_PROTOCOL_CONTEXT, 4);
+    expect(isRequestEnvelope(request)).toBe(true);
+    expect(isReplaySafeControlMutation(request.type)).toBe(false);
+    expect(isRequestEnvelope({
+      ...request,
+      payload: { ...request.payload, protocols: [] }
+    })).toBe(false);
+
+    const response = responseEnvelope("discover-provider", 4, APP_PROTOCOL_CONTEXT, {
+      ok: true,
+      type: "provider.modelDiscovery.inspect",
+      result: {
+        status: "current",
+        models: [{
+          id: "vendor-a/gpt-5",
+          supplier: "vendor-a",
+          protocol: "openai",
+          api: "openai-responses",
+          discoveredBy: ["openai", "anthropic", "gemini"],
+          verification: "catalog"
+        }],
+        families: [
+          { protocol: "openai", status: "current", modelCount: 1 },
+          { protocol: "anthropic", status: "empty", modelCount: 0 },
+          { protocol: "gemini", status: "empty", modelCount: 0 }
+        ],
+        conflicts: [],
+        truncated: false
+      }
+    });
+    expect(isResponseEnvelope(response)).toBe(true);
+    expect(JSON.stringify(response)).not.toContain("transient-discovery-secret");
   });
 
   it("validates configuration mutations, revisions, and write-only credentials", () => {

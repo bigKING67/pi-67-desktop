@@ -14,7 +14,9 @@ export type AppConfigurationCommandType =
   | "model.default.set"
   | "vision.assistant.global.set"
   | "provider.configuration.reload"
-  | "provider.modelCatalog.refresh";
+  | "provider.modelCatalog.refresh"
+  | "provider.modelDiscovery.inspect"
+  | "provider.modelDiscovery.cancel";
 
 type AppConfigurationCommand = AgentCommand<AppConfigurationCommandType>;
 type AppConfigurationResult = CommandResults[AppConfigurationCommandType];
@@ -22,6 +24,8 @@ type AppConfigurationMutationType = Exclude<AppConfigurationCommandType,
   | "provider.configuration.get"
   | "provider.configuration.reload"
   | "provider.modelCatalog.refresh"
+  | "provider.modelDiscovery.inspect"
+  | "provider.modelDiscovery.cancel"
   | "provider.credential.reveal">;
 type AppConfigurationMutation = AgentCommand<AppConfigurationMutationType>;
 
@@ -63,6 +67,7 @@ export class AppConfigurationCommandRouter {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.configuration.cancelModelCatalogRefresh();
+    this.configuration.cancelGlobalProviderModelDiscovery();
     await Promise.allSettled(this.pending);
   }
 
@@ -74,6 +79,12 @@ export class AppConfigurationCommandRouter {
     if (command.type === "provider.configuration.reload") return this.configuration.reloadGlobal();
     if (command.type === "provider.modelCatalog.refresh") {
       return this.track(this.configuration.refreshModelCatalogs(true));
+    }
+    if (command.type === "provider.modelDiscovery.inspect") {
+      return this.track(this.configuration.discoverGlobalProviderModels(command.payload));
+    }
+    if (command.type === "provider.modelDiscovery.cancel") {
+      return Promise.resolve({ cancelled: this.configuration.cancelGlobalProviderModelDiscovery() });
     }
     if (command.type === "provider.credential.reveal") {
       return this.configuration.revealGlobalCredential(
@@ -215,5 +226,7 @@ export function isAppConfigurationCommand(type: AgentCommandType): type is AppCo
     || type === "model.default.set"
     || type === "vision.assistant.global.set"
     || type === "provider.configuration.reload"
-    || type === "provider.modelCatalog.refresh";
+    || type === "provider.modelCatalog.refresh"
+    || type === "provider.modelDiscovery.inspect"
+    || type === "provider.modelDiscovery.cancel";
 }

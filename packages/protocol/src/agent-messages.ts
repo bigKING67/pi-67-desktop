@@ -52,10 +52,9 @@ import type {
 import type { LarkCommandPayloads, LarkCommandResults } from "./lark-command-messages.js";
 import type { ContextMemoryCommandPayloads, ContextMemoryCommandResults } from "./context-memory-messages.js";
 import type {
-  PiCredentialRevealResult,
-  PiModelCatalogRefreshResult,
-  PiProviderConfigurationInput,
-  PiProviderConfigurationSnapshot
+  PiCredentialRevealResult, PiModelCatalogRefreshResult,
+  PiProviderConfigurationInput, PiProviderConfigurationSnapshot,
+  PiProviderModelDiscoveryInput, PiProviderModelDiscoveryResult
 } from "./provider-configuration-schemas.js";
 import type { ProtocolError } from "./protocol-error.js";
 import type {
@@ -274,6 +273,8 @@ export interface CommandPayloads extends WorkspaceFileCommandPayloads,
   };
   "provider.configuration.reload": Record<string, never>;
   "provider.modelCatalog.refresh": Record<string, never>;
+  "provider.modelDiscovery.inspect": PiProviderModelDiscoveryInput;
+  "provider.modelDiscovery.cancel": Record<string, never>;
   "provider.projectConfiguration.get": Record<string, never>;
   "provider.projectConfiguration.reload": Record<string, never>;
   "model.projectDefault.set": { expectedRevision: string; provider?: string; model?: string };
@@ -391,6 +392,8 @@ export interface CommandResults extends WorkspaceFileCommandResults,
   "model.default.set": PiProviderConfigurationSnapshot;
   "provider.configuration.reload": PiProviderConfigurationSnapshot;
   "provider.modelCatalog.refresh": PiModelCatalogRefreshResult;
+  "provider.modelDiscovery.inspect": PiProviderModelDiscoveryResult;
+  "provider.modelDiscovery.cancel": { cancelled: boolean };
   "provider.projectConfiguration.get": PiProviderConfigurationSnapshot;
   "provider.projectConfiguration.reload": PiProviderConfigurationSnapshot;
   "model.projectDefault.set": PiProviderConfigurationSnapshot;

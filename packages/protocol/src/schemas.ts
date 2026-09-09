@@ -93,10 +93,8 @@ import {
   NativeSubagentWaitResultSchema
 } from "./native-subagent-schemas.js";
 import {
-  PiCredentialRevealResultSchema,
-  PiProviderConfigurationChangedSchema,
-  PiModelCatalogRefreshResultSchema,
-  PiProviderConfigurationSnapshotSchema
+  PiCredentialRevealResultSchema, PiModelCatalogRefreshResultSchema,
+  PiProviderConfigurationChangedSchema, PiProviderModelDiscoveryResultSchema, PiProviderConfigurationSnapshotSchema
 } from "./provider-configuration-schemas.js";
 import { WorkspaceRegisterResultSchema, WorkspaceUnregisterResultSchema } from "./workspace-registration-schemas.js";
 import { RuntimeDiagnosticsSchema } from "./runtime-diagnostics-schema.js";
@@ -312,6 +310,8 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "model.default.set": PiProviderConfigurationSnapshotSchema,
   "provider.configuration.reload": PiProviderConfigurationSnapshotSchema,
   "provider.modelCatalog.refresh": PiModelCatalogRefreshResultSchema,
+  "provider.modelDiscovery.inspect": PiProviderModelDiscoveryResultSchema,
+  "provider.modelDiscovery.cancel": strictObject({ cancelled: Type.Boolean() }),
   "provider.projectConfiguration.get": PiProviderConfigurationSnapshotSchema,
   "provider.projectConfiguration.reload": PiProviderConfigurationSnapshotSchema,
   "model.projectDefault.set": PiProviderConfigurationSnapshotSchema,

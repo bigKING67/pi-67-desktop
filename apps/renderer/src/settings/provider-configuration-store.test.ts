@@ -135,6 +135,7 @@ describe("provider configuration store", () => {
     provider.models[0]!.headerNames = ["X-Model-Secret"];
 
     const input = providerInputFromView(provider);
+    expect(input.authHeader).toBe(true);
     expect(input).not.toHaveProperty("headers");
     expect(input.models[0]).not.toHaveProperty("headers");
     expect(JSON.stringify(input)).not.toMatch(/Authorization|X-Custom|X-Model-Secret/u);
@@ -147,6 +148,26 @@ describe("provider configuration store", () => {
     expect(store.consumeProviderEditorRequest("project:workspace-a")).toBeUndefined();
     expect(store.consumeProviderEditorRequest("app")).toBe("configuration");
     expect(store.consumeProviderEditorRequest("app")).toBeUndefined();
+  });
+
+  it("starts a blank custom Provider with aggregate Bearer authentication enabled", () => {
+    const store = useProviderConfigurationStore.getState();
+    store.startProvider();
+
+    expect(useProviderConfigurationStore.getState().draft).toMatchObject({
+      id: "",
+      authHeader: true,
+      models: []
+    });
+  });
+
+  it("normalizes a new Provider preset to aggregate Bearer unless native headers are explicit", () => {
+    const store = useProviderConfigurationStore.getState();
+    store.startProvider({ id: "aggregate", models: [], advancedJson: "{}" });
+    expect(useProviderConfigurationStore.getState().draft?.authHeader).toBe(true);
+
+    store.startProvider({ id: "native", authHeader: false, models: [], advancedJson: "{}" });
+    expect(useProviderConfigurationStore.getState().draft?.authHeader).toBe(false);
   });
 
   it("ignores a late snapshot from a configuration scope that is no longer current", () => {

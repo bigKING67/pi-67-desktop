@@ -963,7 +963,28 @@ the only Runtime and behavior specification source.
   marks the reload pending and applies it after the current Operation settles.
   Removing the selected model clears the selection and blocks the next Prompt
   until the user chooses an available model.
-- Common Provider and model fields use bounded forms. Advanced JSON cannot carry
+- A custom Provider can use one Base URL and one credential to discover OpenAI,
+  Anthropic, and Gemini protocol families. All three discovery families start
+  enabled. OpenAI discovery assigns `openai-responses` by default and exposes
+  `openai-completions` only as an explicit compatibility choice; Anthropic and
+  Gemini assign `anthropic-messages` and `google-generative-ai`. Aggregate services
+  default to one shared catalog read with `Authorization: Bearer`; the selected
+  families classify and filter that canonical result instead of issuing duplicate
+  protocol-header reads that may expose proxy aliases. An explicit compatibility
+  switch restores protocol-native `x-api-key` and `x-goog-api-key` catalog reads
+  for services that require them. Discovery reads bounded model catalogs only,
+  never sends a hidden generation request, and labels catalog results as unverified
+  by a real completion. In protocol-native mode, one family may fail without
+  discarding successful families. Existing models are preserved until the user
+  explicitly removes them.
+- Newly discovered mixed services omit the Provider-level API and persist one exact
+  Pi API on every imported model. Distinct upstream model IDs remain distinct even
+  when they share a display family or supplier. The same raw request ID from
+  different suppliers is a visible conflict unless the gateway supplies a real
+  routable alias; Desktop never fabricates a suffix or silently overwrites a model.
+  Existing Provider defaults and Extension-registered custom API IDs remain visible
+  and unchanged until the user explicitly edits them. Common Provider and model
+  fields use bounded forms. Advanced JSON cannot carry
   `apiKey` or header values; credential and header mutations are write-only.
   Stored API keys remain absent from snapshots, events, projections, logs, and
   diagnostics, with only the bounded one-shot reveal response exempted.

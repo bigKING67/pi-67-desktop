@@ -1,6 +1,5 @@
 import type {
-  PiDefaultModelConfiguration,
-  PiModelConfigurationInput,
+  PiDefaultModelConfiguration, PiModelConfigurationInput,
   PiModelConfigurationView,
   PiProviderConfigurationInput,
   PiProviderConfigurationView
@@ -8,6 +7,7 @@ import type {
 import { Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button, Input, TextArea } from "react-aria-components";
+import { ProviderApiSelect } from "./ProviderApiSelect.js";
 import { ProviderHeaderMutationEditor } from "./ProviderHeaderMutationEditor.js";
 import {
   SettingsBackAction,
@@ -254,6 +254,7 @@ export function ProviderModelWorkspace({
               model={activeRow.model}
               onBack={closeDetail}
               onRemove={() => removeModel(activeRow.index)}
+              providerApi={draft.api}
             />
           ) : (
             <div className={styles.modelDetailEmpty}>
@@ -274,7 +275,8 @@ function ModelDetailEditor({
   index,
   model,
   onBack,
-  onRemove
+  onRemove,
+  providerApi
 }: {
   editable: boolean;
   existingHeaderNames: string[];
@@ -283,6 +285,7 @@ function ModelDetailEditor({
   model: PiModelConfigurationInput;
   onBack: () => void;
   onRemove: () => void;
+  providerApi: string | undefined;
 }) {
   const modelIdInputRef = useRef<HTMLInputElement>(null);
   const update = (mutation: (draft: PiProviderConfigurationInput) => PiProviderConfigurationInput) => (
@@ -328,9 +331,17 @@ function ModelDetailEditor({
         <ModelField label="显示名称">
           <Input disabled={!editable} value={model.name ?? ""} onChange={(event) => patchOptionalModel(patch, "name", event.target.value)} />
         </ModelField>
-        <ModelField label="API 覆盖">
-          <Input disabled={!editable} value={model.api ?? ""} onChange={(event) => patchOptionalModel(patch, "api", event.target.value)} />
-        </ModelField>
+        <div className={styles.field}>
+          <span>API 协议覆盖</span>
+          <ProviderApiSelect
+            ariaLabel={`模型 ${title} API 协议覆盖`}
+            disabled={!editable}
+            onChange={(value) => patchOptionalModel(patch, "api", value ?? "")}
+            unsetDetail={providerApi ? `使用 Provider 默认值 ${providerApi}` : "当前 Provider 未设置默认协议"}
+            unsetLabel="继承 Provider 默认"
+            value={model.api}
+          />
+        </div>
         <ModelField label="Base URL 覆盖">
           <Input disabled={!editable} value={model.baseUrl ?? ""} onChange={(event) => patchOptionalModel(patch, "baseUrl", event.target.value)} />
         </ModelField>

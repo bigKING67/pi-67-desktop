@@ -591,7 +591,8 @@
 }
 
 .advancedDetails .codeArea,
-.advancedDetails .headersEditor {
+.advancedDetails .headersEditor,
+.legacyApiField {
   margin: 0 10px 10px;
 }
 

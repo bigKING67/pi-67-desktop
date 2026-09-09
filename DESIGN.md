@@ -1345,8 +1345,33 @@ loading error where the operation can produce those states
   and explicitly preserves `auth.json`. Removing a persistent credential is a
   separate cancel-first confirmation scoped only to the selected Provider's
   `auth.json` entry; neither confirmation reveals a secret.
-- Provider identity, name, Base URL, API protocol, model identity, input types,
-  reasoning, context window, and token limit use labeled bounded controls.
+- Provider identity, name, Base URL, model identity, input types, reasoning,
+  context window, and token limit use labeled bounded controls. Custom Provider
+  basic configuration presents one quiet `协议与模型发现` surface after identity and
+  Base URL. Its React Aria CheckboxGroup contains `OpenAI 兼容`, `Anthropic
+  Messages`, and `Google Gemini`; all three start selected. OpenAI shows Responses
+  as the default import route and keeps Chat Completions in a subordinate advanced
+  choice. `统一使用 Authorization: Bearer（聚合服务推荐）` starts selected for a
+  new custom Provider and for legacy definitions without an explicit `authHeader`;
+  clearing it is the deliberate compatibility path for protocol-native
+  `x-api-key` / `x-goog-api-key` authentication. The API Key input is transient,
+  masked, and may defer to an existing Pi `auth.json` credential without reading
+  that value back into the page.
+- `检测并加载模型` produces an in-place, grouped preview rather than writing Pi
+  configuration immediately. The default Bearer path reads one canonical shared
+  catalog, while the opt-in protocol-native path may read one catalog per selected
+  family. Each protocol group and model row is independently selectable and starts
+  selected. Rows show exact Model ID, optional supplier, the assigned Pi API, and
+  that the evidence is catalog-only. Partial protocol failure, truncation, empty
+  groups, and same-ID supplier conflicts stay visible. Applying selection appends
+  only new model IDs to the Provider draft; it never replaces existing rows or
+  treats catalog discovery as a successful completion.
+- Model-level API editing uses the React Aria selector that names all four protocols
+  supported by Pi `models.json` and shows exact persisted IDs. The Provider-level
+  selector moves under a compatibility disclosure for existing single-protocol
+  configurations; newly discovered mixed Providers leave it unset. Existing
+  non-standard API IDs remain visible as a separate current-value section and are
+  never normalized or discarded implicitly.
   Advanced JSON owns uncommon non-secret fields and rejects `apiKey`, `headers`,
   malformed JSON, and duplicate model IDs with a specific recovery message.
 - Header names may be shown, but existing values are never read back. Adding,

@@ -44,6 +44,8 @@ export type RuntimeLoadedCommand = Exclude<
       | "model.default.set"
       | "provider.configuration.reload"
       | "provider.modelCatalog.refresh"
+      | "provider.modelDiscovery.inspect"
+      | "provider.modelDiscovery.cancel"
       | "provider.projectConfiguration.get" | "provider.projectConfiguration.reload"
       | "model.projectDefault.set" | "vision.assistant.global.set" | "vision.assistant.project.set"
       | "context.file.list"

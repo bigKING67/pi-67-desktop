@@ -1,4 +1,4 @@
-import { ProtocolRequestError, type AgentCommandType, type CommandPayloads, type CommandResults, type PiCredentialRevealResult, type PiModelCatalogRefreshResult, type PiProviderConfigurationChanged, type PiProviderConfigurationSnapshot } from "@pi67/protocol";
+import { ProtocolRequestError, type AgentCommandType, type CommandPayloads, type CommandResults, type PiCredentialRevealResult, type PiModelCatalogRefreshResult, type PiProviderConfigurationChanged, type PiProviderConfigurationSnapshot, type PiProviderModelDiscoveryInput, type PiProviderModelDiscoveryResult } from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
 import { publishNotification } from "../notifications/notification-store.js";
@@ -9,6 +9,7 @@ import { useProviderConfigurationStore } from "./provider-configuration-store.js
 const providerLoadFlights = new Map<string, Promise<boolean>>();
 const PROVIDER_CONFIGURATION_LOAD_ACK_TIMEOUT_MS = 12_000;
 const MODEL_CATALOG_REFRESH_ACK_TIMEOUT_MS = 35_000;
+const PROVIDER_MODEL_DISCOVERY_ACK_TIMEOUT_MS = 20_000;
 export const GLOBAL_PROVIDER_CONFIGURATION_KEY = "app";
 
 export function loadProviderConfiguration(_workspaceId?: string): Promise<boolean> {
@@ -90,6 +91,18 @@ export async function saveProviderConfiguration(_workspaceId?: string): Promise<
     expectedRevision: state.baselineRevision,
     provider: state.draft
   }, "Pi Provider 配置已保存");
+}
+
+export async function saveProviderConfigurationWithCredential(
+  workspaceId: string,
+  apiKey?: string
+): Promise<boolean> {
+  const provider = useProviderConfigurationStore.getState().draft?.id.trim();
+  if (!provider) return false;
+  if (!await saveProviderConfiguration(workspaceId)) return false;
+  if (!apiKey) return true;
+  useProviderConfigurationStore.getState().beginSave();
+  return storePersistentCredential(workspaceId, provider, apiKey);
 }
 
 export async function removeProviderConfiguration(
@@ -240,6 +253,26 @@ export async function refreshProviderModelCatalog(): Promise<boolean> {
   } catch (error) {
     const message = error instanceof Error ? error.message : "未知错误";
     publishNotification({ level: "error", title: "Pi 模型目录刷新失败", message });
+    return false;
+  }
+}
+
+export async function inspectProviderModelDiscovery(
+  input: PiProviderModelDiscoveryInput
+): Promise<PiProviderModelDiscoveryResult> {
+  await ensureAgentConnection();
+  return request(
+    "provider.modelDiscovery.inspect",
+    input,
+    PROVIDER_MODEL_DISCOVERY_ACK_TIMEOUT_MS
+  );
+}
+
+export async function cancelProviderModelDiscovery(): Promise<boolean> {
+  try {
+    const result = await request("provider.modelDiscovery.cancel", {});
+    return result.cancelled;
+  } catch {
     return false;
   }
 }

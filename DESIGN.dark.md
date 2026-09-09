@@ -88,6 +88,13 @@ spacing, component states, and motion as `DESIGN.md`.
   every other Provider. Protocol, image/reasoning, and `原生搜索 · 已声明` or
   `原生搜索 · 不可用` remain legible secondary text; they never become a glowing capability
   badge pile, and `已声明` never changes color to imply live verification.
+- Custom Provider discovery uses the same quiet neutral surface, masked credential
+  field, default-selected protocol-family controls, grouped result rows, and
+  catalog-only evidence text as light mode. The default aggregate-Bearer checkbox
+  uses the ordinary selected-control treatment and protocol-native compatibility
+  does not gain a warning or brand color. Model protocol selectors retain the neutral
+  trigger, grouped list, muted exact API IDs, and visible selected check; `Google
+  Gemini` never receives a provider-brand accent color.
 - Provider file status, revision conflict, invalid-file, pending reload, and
   model-reselection states use the same semantic success, warning, and danger
   roles as light mode. The API-key eye control may reveal only the current user

@@ -21,6 +21,7 @@ export function installMockPayloadSanitizer(): void {
       type === "model.setRuntimeKey"
       || type === "provider.setRuntimeKey"
       || type === "provider.credential.store"
+      || type === "provider.modelDiscovery.inspect"
     ) return { ...payload, apiKey: "[redacted]" };
     if (type === "lark.app.configuration.save") {
       return { ...payload, appSecret: "[redacted]" };

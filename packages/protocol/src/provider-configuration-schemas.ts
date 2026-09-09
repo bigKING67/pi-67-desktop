@@ -9,6 +9,13 @@ export type PiModelCatalogRefreshStatus =
   | "timed-out"
   | "offline"
   | "unconfigured";
+export type PiProviderDiscoveryProtocolFamily = "openai" | "anthropic" | "gemini";
+export type PiProviderDiscoveryApi =
+  | "openai-responses"
+  | "openai-completions"
+  | "anthropic-messages"
+  | "google-generative-ai";
+export type PiProviderDiscoveryFamilyStatus = "current" | "shared" | "empty" | "failed";
 
 export interface PiConfigurationDiagnostic {
   file: PiConfigurationFileKind;
@@ -145,11 +152,62 @@ export interface PiModelCatalogRefreshResult {
   failedProviders: string[];
 }
 
+export interface PiProviderModelDiscoveryInput {
+  provider: string;
+  baseUrl: string;
+  protocols: PiProviderDiscoveryProtocolFamily[];
+  openAiApi: "openai-responses" | "openai-completions";
+  authHeader?: boolean;
+  apiKey?: string;
+}
+
+export interface PiProviderDiscoveredModel {
+  id: string;
+  name?: string;
+  supplier?: string;
+  protocol: PiProviderDiscoveryProtocolFamily;
+  api: PiProviderDiscoveryApi;
+  discoveredBy: PiProviderDiscoveryProtocolFamily[];
+  verification: "catalog";
+}
+
+export interface PiProviderDiscoveryFamilyResult {
+  protocol: PiProviderDiscoveryProtocolFamily;
+  status: PiProviderDiscoveryFamilyStatus;
+  modelCount: number;
+  message?: string;
+}
+
+export interface PiProviderDiscoveryConflict {
+  id: string;
+  suppliers: string[];
+  reason: "supplier-id-collision";
+}
+
+export interface PiProviderModelDiscoveryResult {
+  status: "current" | "partial" | "failed";
+  models: PiProviderDiscoveredModel[];
+  families: PiProviderDiscoveryFamilyResult[];
+  conflicts: PiProviderDiscoveryConflict[];
+  truncated: boolean;
+}
+
 const IdentifierSchema = Type.String({ minLength: 1, maxLength: 512 });
 const RevisionSchema = Type.String({ minLength: 64, maxLength: 64, pattern: "^[0-9a-f]{64}$" });
 const OptionalTextSchema = Type.Optional(Type.String({ minLength: 1, maxLength: 16_384 }));
 const AdvancedJsonSchema = Type.Optional(Type.String({ maxLength: 262_144 }));
 const InputKindSchema = Type.Union([Type.Literal("text"), Type.Literal("image")]);
+const PiProviderDiscoveryProtocolFamilySchema = Type.Union([
+  Type.Literal("openai"),
+  Type.Literal("anthropic"),
+  Type.Literal("gemini")
+]);
+const PiProviderDiscoveryApiSchema = Type.Union([
+  Type.Literal("openai-responses"),
+  Type.Literal("openai-completions"),
+  Type.Literal("anthropic-messages"),
+  Type.Literal("google-generative-ai")
+]);
 
 export const PiConfigurationHeaderMutationSchema = strictObject({
   name: Type.String({ minLength: 1, maxLength: 256 }),
@@ -180,6 +238,22 @@ export const PiProviderConfigurationInputSchema = strictObject({
   headers: Type.Optional(Type.Array(PiConfigurationHeaderMutationSchema, { maxItems: 128 })),
   models: Type.Array(PiModelConfigurationInputSchema, { maxItems: 512 }),
   advancedJson: AdvancedJsonSchema
+});
+
+export const PiProviderModelDiscoveryInputSchema = strictObject({
+  provider: IdentifierSchema,
+  baseUrl: Type.String({ minLength: 1, maxLength: 32_768 }),
+  protocols: Type.Array(PiProviderDiscoveryProtocolFamilySchema, {
+    minItems: 1,
+    maxItems: 3,
+    uniqueItems: true
+  }),
+  openAiApi: Type.Union([
+    Type.Literal("openai-responses"),
+    Type.Literal("openai-completions")
+  ]),
+  authHeader: Type.Optional(Type.Boolean()),
+  apiKey: Type.Optional(Type.String({ minLength: 1, maxLength: 16_384 }))
 });
 
 const PiConfigurationFileKindSchema = Type.Union([
@@ -328,6 +402,46 @@ export const PiModelCatalogRefreshResultSchema = strictObject({
   snapshot: PiProviderConfigurationSnapshotSchema,
   providers: Type.Array(IdentifierSchema, { maxItems: 512, uniqueItems: true }),
   failedProviders: Type.Array(IdentifierSchema, { maxItems: 512, uniqueItems: true })
+});
+
+const PiProviderDiscoveredModelSchema = strictObject({
+  id: IdentifierSchema,
+  name: OptionalTextSchema,
+  supplier: OptionalTextSchema,
+  protocol: PiProviderDiscoveryProtocolFamilySchema,
+  api: PiProviderDiscoveryApiSchema,
+  discoveredBy: Type.Array(PiProviderDiscoveryProtocolFamilySchema, {
+    minItems: 1,
+    maxItems: 3,
+    uniqueItems: true
+  }),
+  verification: Type.Literal("catalog")
+});
+
+const PiProviderDiscoveryFamilyResultSchema = strictObject({
+  protocol: PiProviderDiscoveryProtocolFamilySchema,
+  status: Type.Union([
+    Type.Literal("current"),
+    Type.Literal("shared"),
+    Type.Literal("empty"),
+    Type.Literal("failed")
+  ]),
+  modelCount: Type.Integer({ minimum: 0, maximum: 512 }),
+  message: Type.Optional(Type.String({ minLength: 1, maxLength: 4_096 }))
+});
+
+const PiProviderDiscoveryConflictSchema = strictObject({
+  id: IdentifierSchema,
+  suppliers: Type.Array(IdentifierSchema, { minItems: 2, maxItems: 16, uniqueItems: true }),
+  reason: Type.Literal("supplier-id-collision")
+});
+
+export const PiProviderModelDiscoveryResultSchema = strictObject({
+  status: Type.Union([Type.Literal("current"), Type.Literal("partial"), Type.Literal("failed")]),
+  models: Type.Array(PiProviderDiscoveredModelSchema, { maxItems: 512 }),
+  families: Type.Array(PiProviderDiscoveryFamilyResultSchema, { minItems: 1, maxItems: 3 }),
+  conflicts: Type.Array(PiProviderDiscoveryConflictSchema, { maxItems: 128 }),
+  truncated: Type.Boolean()
 });
 
 export const PiConfigurationExpectedRevisionSchema = RevisionSchema;

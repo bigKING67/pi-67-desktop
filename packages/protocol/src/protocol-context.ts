@@ -87,6 +87,8 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "model.default.set": "app",
   "provider.configuration.reload": "app",
   "provider.modelCatalog.refresh": "app",
+  "provider.modelDiscovery.inspect": "app",
+  "provider.modelDiscovery.cancel": "app",
   "provider.projectConfiguration.get": "workspace",
   "provider.projectConfiguration.reload": "workspace",
   "model.projectDefault.set": "workspace",

@@ -25,6 +25,7 @@ export * from "./package-mutation-receipt-store.js";
 export * from "./package-trust-registry.js";
 export * from "./pi-configuration-service.js";
 export * from "./pi-configuration-service-registry.js";
+export * from "./pi-provider-model-discovery.js";
 export * from "./pi-sdk-runtime.js";
 export type * from "./pi-sdk-types.js";
 export * from "./prompt-attachment.js";

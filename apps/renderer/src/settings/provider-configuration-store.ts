@@ -118,7 +118,9 @@ export const useProviderConfigurationStore = create<ProviderConfigurationState>(
     const snapshot = get().snapshot;
     set({
       selectedProviderId: undefined,
-      draft: preset ?? { id: "", models: [], advancedJson: "{}" },
+      draft: preset
+        ? { ...preset, authHeader: preset.authHeader !== false }
+        : { id: "", authHeader: true, models: [], advancedJson: "{}" },
       baselineRevision: snapshot?.revision,
       dirty: true,
       externalConflict: undefined,
@@ -198,7 +200,7 @@ export function providerInputFromView(
     ...(provider.baseUrl === undefined ? {} : { baseUrl: provider.baseUrl }),
     ...(provider.api === undefined ? {} : { api: provider.api }),
     ...(provider.oauth === undefined ? {} : { oauth: provider.oauth }),
-    ...(provider.authHeader === undefined ? {} : { authHeader: provider.authHeader }),
+    authHeader: provider.authHeader !== false,
     models: provider.models.map((model) => ({
       id: model.id,
       ...(model.name === undefined ? {} : { name: model.name }),
