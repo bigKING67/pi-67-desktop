@@ -1689,8 +1689,12 @@ loading error where the operation can produce those states
   Git, and runtime evidence; `plan_ask` is reserved for materially blocking intent
   with two or three mutually exclusive choices. Before `plan_complete`, every
   material requirement must trace to a concrete change and observable acceptance
-  evidence, with non-goals, concrete locations, dependency order, failure/recovery,
-  compatibility, risks, tests, and assumptions covered without fixed headings.
+  evidence, with scope, non-goals, concrete locations, risks, tests and acceptance,
+  and assumptions covered. Interfaces/types, data flow, dependency order,
+  failure/recovery, and compatibility/migration are detailed where affected by
+  the change, proportionally and sufficiently for implementation without fixed
+  headings. The hidden context owns this quality contract; Tool guidance refers
+  to it instead of repeating the checklist.
 - `plan_complete` appends one complete Plan proposal card to the Timeline. The
   Timeline card owns expanded/collapsed state, bounded Markdown scrolling, copy
   feedback, historical status, and focus rings; it never owns an execution action.
@@ -2387,6 +2391,13 @@ loading error where the operation can produce those states
 - Unavailable Session images explain that the format or size was not projected;
   transport failures keep the message in place and expose a focused retry action.
 - Partial resource failure remains visible rather than silently disappearing.
+
+### Grouped choice implementation
+
+- Build grouped choices with React Aria `ListBoxSection` and `Header`, not
+  disabled heading options. Derive grouping from authoritative identity,
+  preserve source order and stable option identity, and test section semantics,
+  keyboard traversal, recovery selection, and exactly-once dispatch.
 
 ## Frontend ownership and styles
 

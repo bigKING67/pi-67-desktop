@@ -1014,9 +1014,12 @@ the only Runtime and behavior specification source.
   one-shot approval decision. Pi must ground discoverable facts in live evidence,
   ask only for materially blocking intent, and audit that every material requirement
   maps to a concrete change and observable acceptance evidence before `plan_complete`.
-  The Plan covers non-goals, concrete locations where discoverable, dependency order,
-  failure/recovery, compatibility, risks, tests, and explicit assumptions without a
-  mandatory heading template. `plan_complete` stores the complete Markdown Plan
+  The Plan covers scope, non-goals, concrete locations where discoverable, risks,
+  tests and acceptance, and explicit assumptions. Interfaces/types, data flow,
+  dependency order, failure/recovery, and compatibility/migration are addressed
+  where affected by the change. Detail is proportional to the task and sufficient
+  for another engineer to implement, without a mandatory heading template.
+  `plan_complete` stores the complete Markdown Plan
   in the current Pi JSONL and publishes a persistent Timeline review card; it never
   starts work. Only the active proposal owns a compact action bar above the Composer
   with `复制` plus one contextual primary action: a non-empty Composer shows

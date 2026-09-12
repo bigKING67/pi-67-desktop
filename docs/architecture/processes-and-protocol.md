@@ -819,6 +819,23 @@ Safety Extension，并按 `commands`、`tools`、`ui-primitives`、`tui-custom` 
 默认标记 `native`、`headless` 或 `adapter`。`projection.resync` 同时恢复该目录，避免 sequence
 gap 后保留旧 Host 或旧 Session 的 Extension 状态。
 
+## Desktop capability implementation contracts
+
+- Renderer-owned Pi Desktop Slash actions must call the existing feature
+  Controllers. Do not send `/new`, `/model`, `/compact`, `/resume`, `/tree`,
+  `/reload`, `/settings`, `/plan`, or `/default` through `command.invoke` or as
+  model Prompts.
+- Plan and Search are first-party Pi SDK capabilities. Desktop Tasks must not load
+  `@narumitw/pi-plan-mode`, `pi-web-access`, or `pi-smart-fetch`; preserve existing
+  user settings until an explicit uninstall. Renderer Plan implementation requests
+  contain only `planId + submissionId`, never Plan Markdown.
+- `Groland` is one built-in mixed-protocol Provider with one credential. Keep
+  authoritative model membership and protocol mapping in `packages/domain`:
+  Claude-family members use Anthropic Messages and GPT-family members use OpenAI
+  Responses. All Groland members support text, image, and reasoning. Native-search
+  UI is a declaration, not live verification, and a sent native request must never
+  silently fall back.
+
 ## Source layout
 
 - Desktop Main：`app-protocol`、`main-window`、`agent-host-supervisor`、`system-bridge` 分别拥有

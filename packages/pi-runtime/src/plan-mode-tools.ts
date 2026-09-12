@@ -29,7 +29,7 @@ export function createDesktopPlanModeExtension(
         return {
           message: {
             customType: PLAN_MODE_CONTEXT_TYPE,
-            content: `[PI-67 PLAN MODE ACTIVE]\nYou are preparing a decision-complete implementation plan, not implementing it.\n\nWorkflow:\n1. Ground the plan in live evidence. Read applicable instructions, then inspect the real files, configuration, Git state, and runtime evidence with read-only tools. Resolve facts that the environment can answer instead of asking the user.\n2. Ask only for intent that cannot be discovered and would materially change the implementation. Use plan_ask with 2-3 mutually exclusive choices, put the recommended choice first, and explain its tradeoff. If the user cancels, do not guess.\n3. Specify the implementation completely enough for another engineer to execute: scope and non-goals, concrete files/modules/symbols where discoverable, interfaces and types, data flow, dependency order, failure and recovery behavior, compatibility or migration, risks, tests and acceptance, and explicit assumptions. Use the structure that best fits the task rather than fixed headings.\n4. Audit the Plan before completion. Every material requirement must map to a concrete change and observable acceptance evidence; avoid vague steps such as "update the code", unresolved placeholders, invented facts, and silent scope expansion.\n\nRules:\n- Use read-only tools only.\n- Do not edit files, install dependencies, run builds/tests, publish, upload, or cause external side effects.\n- When the plan is complete, call plan_complete with the full Markdown plan.\n- Never begin implementation until the user explicitly chooses Start implementation in Pi-67 Desktop.`,
+            content: `[PI-67 PLAN MODE ACTIVE]\nYou are preparing a decision-complete implementation plan, not implementing it.\n\nPlan contract:\n- Ground discoverable facts in live evidence: read applicable instructions and inspect the real files, configuration, Git state, and runtime evidence relevant to this task with read-only tools. Resolve facts that the environment can answer instead of asking the user.\n- Ask only for non-discoverable intent that materially changes implementation. Use plan_ask with 2-3 mutually exclusive choices, recommended choice first and its tradeoff in the label. If the user cancels, do not guess.\n- Specify scope and non-goals, concrete files/modules/symbols where discoverable, tests and acceptance, risks, and explicit assumptions. Address interfaces and types, data flow, dependency order, failure and recovery, and compatibility or migration where affected by this change. Keep detail proportional to the task, sufficient for another engineer to implement, without fixed headings.\n- Every material requirement must map to a concrete change and observable acceptance evidence. Before submission, resolve placeholders and remove vague steps, invented facts, and silent scope expansion.\n\nRules:\n- Use read-only tools only.\n- Do not edit files, install dependencies, run builds/tests, publish, upload, or cause external side effects.\n- When the plan is complete, call plan_complete with the full Markdown plan.\n- Never begin implementation until the user explicitly chooses Start implementation in Pi-67 Desktop.`,
             display: false
           }
         };
@@ -53,8 +53,7 @@ function createPlanAskTool(controller: PlanModeToolController): ToolDefinition {
     description: "Ask one materially blocking intent question that cannot be answered from the workspace or runtime. Use only in Plan Mode.",
     promptSnippet: "Ask one non-discoverable planning decision with a recommended choice.",
     promptGuidelines: [
-      "Use plan_ask only when the answer materially changes the proposed Plan.",
-      "Offer 2-3 mutually exclusive choices, put the recommended choice first, and include its tradeoff in the label."
+      "Follow the active Plan contract for question scope, choices, and cancellation."
     ],
     parameters: {
       type: "object",
@@ -98,8 +97,7 @@ function createPlanCompleteTool(controller: PlanModeToolController): ToolDefinit
     promptSnippet: "Finish Plan Mode with a grounded, decision-complete Plan for explicit user review.",
     promptGuidelines: [
       "Call plan_complete once with the complete implementation Plan; do not implement it yourself.",
-      "Cover scope and non-goals, concrete locations, interfaces and types, data flow and dependency order, failure recovery, compatibility or migration, risks, tests and acceptance, and explicit assumptions without forcing fixed headings.",
-      "Before completion, trace every material requirement to a concrete change and observable acceptance evidence; remove vague steps and unresolved placeholders."
+      "Submit the full Markdown after satisfying the active Plan contract; this tool proposes a Plan and never authorizes implementation."
     ],
     parameters: {
       type: "object",

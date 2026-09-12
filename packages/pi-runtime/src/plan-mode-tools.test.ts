@@ -25,6 +25,9 @@ describe("Plan Mode tools", () => {
     expect(content).toContain("2-3 mutually exclusive choices");
     expect(content).toContain("If the user cancels, do not guess");
     expect(content).toContain("scope and non-goals, concrete files/modules/symbols");
+    expect(content).toContain("where affected by this change");
+    expect(content).toContain("Keep detail proportional to the task");
+    expect(content).toContain("sufficient for another engineer to implement");
     expect(content).toContain("Every material requirement must map to a concrete change");
     expect(content).toContain("observable acceptance evidence");
     expect(content).toContain("Do not edit files, install dependencies, run builds/tests");

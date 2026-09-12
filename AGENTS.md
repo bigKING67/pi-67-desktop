@@ -10,6 +10,10 @@
 - UI, interaction, and visual tokens: `DESIGN.md` and `DESIGN.dark.md`.
 - Process boundaries and cross-process commands/events:
   `docs/architecture/processes-and-protocol.md`.
+- Before changing grouped choices, read `Grouped choice implementation` in
+  `DESIGN.md`. Before changing Desktop Slash dispatch, Plan/Search integration,
+  or Groland membership/protocols, read `Desktop capability implementation contracts`
+  in `docs/architecture/processes-and-protocol.md`.
 - Architecture decisions: the applicable records under `docs/adr/`.
 - Development commands and contribution rules: `CONTRIBUTING.md`.
 - Validation routing and runner configuration: `docs/testing/ci.md`; coverage
@@ -107,6 +111,16 @@
 
 ## Execution plans and lightweight development workflow
 
+- For an authorized implementation or fix, continue through the scoped changes,
+  relevant validation, and correction of failures caused by those changes. Do not
+  stop at a first implementation or ask again for local steps already authorized.
+  Pause dependent work only for a material decision that live evidence cannot
+  resolve, a genuine blocker, or a step beyond current authorization; continue
+  independent authorized work. This does not turn advice/review into implementation
+  or authorize commit, push, distribution, or publishing.
+- Follow `CONTRIBUTING.md` validation routing and stopping conditions: do not repeat
+  passed checks with unchanged inputs unless a gate, new failure, or unresolved
+  concern requires it. Report actual results and unverified acceptance items.
 - L0 and L1 work stays in the current CLI context and Git diff. Do not create a
   persistent task runtime, task pointer, journal, or generated workflow artifact
   for routine work.
@@ -211,24 +225,6 @@ authorization and the repository's separate operation and distribution rules.
 - Keep streaming batched, transcripts virtualized, and async work cancellable.
 - Add targeted tests for protocol, policy, Pi SDK, recovery, and visible UI
   changes. Do not infer runtime quality from source alone.
-- Build grouped choices with React Aria `ListBoxSection` and `Header`, not
-  disabled heading options. Derive grouping from authoritative identity,
-  preserve source order and stable option identity, and test section semantics,
-  keyboard traversal, recovery selection, and exactly-once dispatch.
-- Renderer-owned Pi Desktop Slash actions must call the existing feature
-  Controllers. Do not send `/new`, `/model`, `/compact`, `/resume`, `/tree`,
-  `/reload`, `/settings`, `/plan`, or `/default` through `command.invoke` or as
-  model Prompts.
-- Plan and Search are first-party Pi SDK capabilities. Desktop Tasks must not load
-  `@narumitw/pi-plan-mode`, `pi-web-access`, or `pi-smart-fetch`; preserve existing
-  user settings until an explicit uninstall. Renderer Plan implementation requests
-  contain only `planId + submissionId`, never Plan Markdown.
-- `Groland` is one built-in mixed-protocol Provider with one credential. Keep
-  authoritative model membership and protocol mapping in `packages/domain`:
-  Claude-family members use Anthropic Messages and GPT-family members use OpenAI
-  Responses. All Groland members support text, image, and reasoning. Native-search
-  UI is a declaration, not live verification, and a sent native request must never
-  silently fall back.
 - Windows claims require real Windows evidence; macOS claims require real
   Apple Silicon evidence. Browser previews do not prove packaged Electron
   behavior.
