@@ -1,4 +1,4 @@
-import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -135,7 +135,7 @@ async function fixtureRepository() {
 }
 
 async function temporaryDirectory() {
-  const path = await mkdtemp(join(tmpdir(), "pi67-local-artifact-cleanup-"));
+  const path = await realpath(await mkdtemp(join(tmpdir(), "pi67-local-artifact-cleanup-")));
   temporaryDirectories.push(path);
   return path;
 }

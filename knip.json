@@ -50,6 +50,7 @@
     "@pi67/desktop",
     "@pi67/renderer",
     "electron",
+    "electron-builder",
     "pnpm"
   ],
   "ignoreBinaries": [

@@ -1,0 +1,10 @@
+{
+  "schema": "pi67.local-storage-policy.v2",
+  "warningBytes": 8000000000,
+  "strongWarningBytes": 10000000000,
+  "reserveBytes": {
+    "nativePreparation": 1500000000,
+    "nativeSigning": 1000000000,
+    "desktopPackaging": 2500000000
+  }
+}

@@ -94,6 +94,12 @@ corepack pnpm run test:e2e
 跨模块、高风险、候选发布或影响不明时执行聚合 `corepack pnpm run check`。
 输入未变且相关检查已通过时，仅因新失败、未解决疑点或明确门禁要求扩大或重复验证。
 
+`knip.json` 对 `electron-builder` 保留精确的依赖检查例外：
+`eng/packaging/package-native-unsigned.mjs` 与 `package-with-retention.mjs` 通过当前
+仓库的 `node_modules/electron-builder/out/cli/cli.js` 子进程调用它，静态依赖扫描
+不能识别这条文件路径。此例外不允许删除该依赖或改用全局 CLI；移除这两个调用方
+时须重新核对例外，而不是扩大忽略范围。
+
 本地与 CI 的统一源码验证入口为 `corepack pnpm run check:source`：调用原有完整 `check`，
 固定使用 2 个 Vitest worker，不改变断言、超时、覆盖率或测试范围。需要候选源码前置检查时，
 运行 `corepack pnpm run check:candidate`；它依次检查生产依赖审计、能力来源可达性、freshness、

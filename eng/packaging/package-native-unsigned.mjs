@@ -1,7 +1,10 @@
 import { spawn } from "node:child_process";
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { assertReleaseArchiveCapacity, recordReleaseBuildState, withReleaseArchiveLock } from "../release/release-archive-retention.mjs";
+import { withRepositoryStorageBudget } from "./local-storage-budget.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const electronBuilderCli = resolve(root, "node_modules/electron-builder/out/cli/cli.js");
@@ -55,6 +58,26 @@ export async function packageUnsignedNative(
   arch = process.arch,
   options = {}
 ) {
+  return withRepositoryStorageBudget({ sourceRoot: root, operation: "desktopPackaging" }, () =>
+    withReleaseArchiveLock(resolve(root, "artifacts/release"), async retain => {
+      const { version } = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+      resolveUnsignedNativeTarget(platform, arch, options);
+      await assertReleaseArchiveCapacity(resolve(root, "artifacts/release"), version, platform === "darwin" ? "mac-arm64" : "win-x64");
+      const archivePlatform = platform === "darwin" ? "mac-arm64" : "win-x64";
+      await recordReleaseBuildState(resolve(root, "artifacts/release"), version, archivePlatform, "BUILDING");
+      try { await buildUnsignedNative(platform, arch, options); }
+      catch (error) {
+        await recordReleaseBuildState(resolve(root, "artifacts/release"), version, archivePlatform, "FAILED");
+        await retain({ currentVersion: version });
+        throw error;
+      }
+      await recordReleaseBuildState(resolve(root, "artifacts/release"), version, archivePlatform, "COMPLETE");
+      const retained = await retain({ currentVersion: version });
+      console.log(`Release archives: removed=${retained.removed.length}; retained=${retained.retained.length}; unpacked applications preserved.`);
+    }));
+}
+
+async function buildUnsignedNative(platform, arch, options) {
   const target = resolveUnsignedNativeTarget(platform, arch, options);
   await access(electronBuilderCli);
   if (options.preparedResources) {

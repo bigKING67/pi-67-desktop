@@ -4,6 +4,8 @@ import { promisify } from "node:util";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { withReleaseArchiveLock } from "./release-archive-retention.mjs";
+
 const execFile = promisify(execFileCallback);
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -52,6 +54,11 @@ export async function applyLocalArtifactCleanup({
     throw new Error("Local artifact cleanup requires --confirm-local-artifact-cleanup.");
   }
 
+  return withReleaseArchiveLock(join(resolve(root), "artifacts/release"),
+    () => applyUnlockedLocalArtifactCleanup({ root, probeRunningProcesses }));
+}
+
+async function applyUnlockedLocalArtifactCleanup({ root, probeRunningProcesses }) {
   const plan = await planLocalArtifactCleanup({ root });
   if (plan.targets.length === 0) return { after: plan, before: plan, removed: [] };
 

@@ -153,6 +153,73 @@ corepack pnpm run release:local:cleanup -- apply --confirm-local-artifact-cleanu
 GitHub Actions artifact、Tag、Release 或 CDN 缓存。`preview:mac:unsigned` 必须从仓库 artifact 启动应用，
 因此只能在预览退出后运行本地清理。
 
+### Automatic archive retention
+
+`package:native:unsigned`、`package:mac`、`package:win` 在打包成功后执行
+`release-archive-retention.mjs`。按平台保留当前构建版本与最近另一个版本的本地
+EXE/DMG/ZIP/Blockmap。`archive-build-status.json` 记录新流程的 BUILDING/FAILED/COMPLETE；
+成功版本与失败版本分别选择，最多保留两个成功版本和一个失败版本集合，失败残包不得
+挤掉成功的回退包。未指定当前构建时按 SemVer 选择；历史无状态归档沿用原版本选择。此策略针对本地
+可重建的旧归档，与上面的整批手动清理及远端镜像保留策略分开，不执行任何远端操作。
+
+只扫描 `artifacts/release` 顶层规范命名的普通归档文件，不清理 `.app`、解包目录、
+JSON/文本收据或未知目录。因此预览正在运行时也可以回收不再需要的旧归档。任意归档
+旁的 `<完整文件名>.keep` 会保护同平台、同版本的全部归档；固定保留版本属于显式上限
+例外。归档仍被打开/执行，或在计划后被修改、替换、固定保留时，执行会报错停止。
+
+打包与两种本地清理共用 `.archive-retention.lock`。失败打包不回收前一可用版本；
+保留策略失败不能报告为成功。同平台已有三个成功版本或两个失败版本集合时，拒绝开始
+新的不同版本，防止固定保留、占用或回收失败导致持续增长；可重试原版本，或先核对并
+执行归档保留计划。一次构建允许临时多一个版本，结束后恢复上述成功/失败保留数量。
+进程异常退出后的遗留锁需要先核对 PID 再人工恢复。
+
+```bash
+# 只读查看；不会关闭正在运行的应用
+corepack pnpm run release:local:retain
+# 显式执行当前保留策略
+corepack pnpm run release:local:retain -- apply --confirm-local-artifact-retention
+```
+
+此处两版本自动策略不限制旧的 candidates/上传 staging 或未知目录；这些仍由上面的
+精确整批清理流程管理。小型历史证据保留也不等于全仓有固定字节上限。
+
+### Repository storage budget
+
+`eng/packaging/local-storage-policy.json` 定义本仓库的容量保护：十进制 8 GB
+开始提醒，达到 10 GB 时强提醒。总量和预计总量都只用于诊断，不阻止构建，
+也不把已经完成的构建判为失败。10 GB 是排查参考线，不是项目异常的判定标准。
+只读检查命令：
+
+```bash
+corepack pnpm run storage:check
+corepack pnpm run storage:check --for desktopPackaging
+corepack pnpm run storage:check --json
+```
+
+统计整个 checkout，包括 `.git`、依赖、ignored 产物及未知目录；不跟随符号链接，
+硬链接仅计一次。每项按内容长度和已分配块大小的较大值计量，因此是保守估算，
+与 `du`、Finder 或 APFS 克隆/压缩后的物理独占空间可能不同。
+
+上述三个打包入口共用
+`artifacts/.storage-budget.lock`，避免它们同时启动、各自误以为剩余空间充足。
+打包预检在当前占用上增加 2.5 GB 的估计余量，
+用于提前提醒；它不扣除旧文件覆盖或完成后的回收，因此可能高估实际增长。
+打包资源复制在同一检查范围内。
+
+构建成功或失败后都会重新统计；实际达到 10 GB 时输出 `HIGH_WARNING`，保留产物
+和原始构建结果。只读命令在两级提醒下均返回成功，便于串联开发脚本；无效配置、
+不安全路径、扫描失败和锁冲突仍明确报错，真实构建错误不会被提醒吞掉。
+不新增自动删除或强退应用行为。已有的归档保留规则独立继续生效，固定保留或
+运行中产物导致数量无法安全回收时，仍可能拒绝新产物；需要核对实际占用关系，不能
+通过空间提醒规则绕过这些保护。
+异常退出遗留锁需先核对 PID、进程和当前构建再人工恢复，不能自动抢锁。
+
+日常 `dev`、`build`、测试和已安装应用更新未接入总量检查。此处是构建前后提醒，
+不是文件系统硬配额或磁盘可用空间保证。直接运行
+electron-builder、独立资源准备/性能脚本、外部写入及未接入的命令不受锁限制，
+但写入 checkout 的内容会计入下次检查。仓库外输出和系统缓存不在该预算内。
+本次未据此扩大清理范围，也不提供真实 Windows 打包或空间核算认证。
+
 ## Formal release boundary
 
 小团队的未签名应用内更新是候选测试之后的独立分发层，使用 Cloudflare R2，并遵循
