@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertMacosMinimumSystemVersion,
   parseUnsignedPackagingArguments,
   resolveUnsignedNativeTarget,
   unsignedPackagingEnvironment
 } from "./package-native-unsigned.mjs";
 
 describe("unsigned native packaging policy", () => {
+  it("rejects packaged metadata that drifts from the macOS 14 baseline", () => {
+    expect(() => assertMacosMinimumSystemVersion("14.0.0\n")).not.toThrow();
+    expect(() => assertMacosMinimumSystemVersion("14.0")).not.toThrow();
+    for (const value of ["", "12.0.0", "13.0", "14.1", "15.0", "14.0.0junk"]) {
+      expect(() => assertMacosMinimumSystemVersion(value)).toThrow(/LSMinimumSystemVersion/u);
+    }
+  });
+
   it("accepts only the two supported native release targets", () => {
     expect(resolveUnsignedNativeTarget("win32", "x64")).toEqual({
       label: "windows-x64",

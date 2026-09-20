@@ -57,7 +57,7 @@
 | 平台 | 系统 | 安装产物 |
 | --- | --- | --- |
 | Windows x64 | Windows 10 22H2 / Windows 11 | NSIS `.exe` |
-| macOS arm64 | macOS 12+ · Apple Silicon | `.dmg` / `.zip` |
+| macOS arm64 | macOS 14+ · Apple Silicon | `.dmg` / `.zip` |
 
 暂不构建 Windows x86/ARM64、macOS Intel/Universal 或 Linux 版本。公开 Preview 与
 内部日常候选是两条独立分发链路；内部候选可能比 GitHub Releases 更新。

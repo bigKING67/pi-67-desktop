@@ -1,13 +1,21 @@
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { access, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 import { assertReleaseArchiveCapacity, recordReleaseBuildState, withReleaseArchiveLock } from "../release/release-archive-retention.mjs";
 import { withRepositoryStorageBudget } from "./local-storage-budget.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const electronBuilderCli = resolve(root, "node_modules/electron-builder/out/cli/cli.js");
+const execFileAsync = promisify(execFile);
+
+export function assertMacosMinimumSystemVersion(value) {
+  if (!/^14\.0(?:\.0)?$/u.test(value.trim())) {
+    throw new Error("Packaged Desktop must declare LSMinimumSystemVersion 14.0.0.");
+  }
+}
 
 export function resolveUnsignedNativeTarget(platform, arch, options = {}) {
   if (platform === "win32" && arch === "x64") {
@@ -100,6 +108,13 @@ async function buildUnsignedNative(platform, arch, options) {
     env: unsignedPackagingEnvironment(process.env)
   });
   if (exitCode !== 0) throw new Error(`Unsigned ${target.label} packaging failed with exit code ${exitCode}.`);
+  if (platform === "darwin") {
+    const { stdout } = await execFileAsync("/usr/bin/plutil", [
+      "-extract", "LSMinimumSystemVersion", "raw", "-o", "-",
+      resolve(root, "artifacts/release/mac-arm64/New Money.app/Contents/Info.plist")
+    ]);
+    assertMacosMinimumSystemVersion(stdout);
+  }
   console.log(`Built unsigned native smoke package for ${target.label}.`);
 }
 

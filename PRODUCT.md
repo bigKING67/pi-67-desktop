@@ -7,7 +7,7 @@ Developer product and local-first cross-platform desktop application.
 ## Platforms
 
 - Windows 10 22H2 and Windows 11, x64 only.
-- macOS 12 or newer, Apple Silicon arm64 only.
+- macOS 14 or newer, Apple Silicon arm64 only.
 
 ## Users
 
