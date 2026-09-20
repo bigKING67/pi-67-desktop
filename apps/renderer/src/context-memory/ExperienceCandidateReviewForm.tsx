@@ -65,9 +65,9 @@ export function ExperienceCandidateReviewForm({ busy, draft, onCancel, onChange,
       <label className={styles.field}>
         <span>共享敏感级别</span>
         <select disabled={busy} value={draft.sensitivity} onChange={(event) => update("sensitivity", event.currentTarget.value as CandidateReviewDraft["sensitivity"])}>
-          <option value="project">仅当前企业项目</option>
+          <option value="project">仅当前团队项目</option>
           <option value="team">团队</option>
-          <option value="company">企业</option>
+          <option value="company">公司范围</option>
         </select>
       </label>
       <ReviewTextField label="置信度（0–1）" type="number" value={draft.confidence} onChange={(value) => update("confidence", value)} />

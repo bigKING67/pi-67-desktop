@@ -23,7 +23,7 @@ export const zhCNMessages = {
     sections: {
       account: {
         label: "账户与数据",
-        summary: "了解当前使用模式与数据存储方式。"
+        summary: "管理 New Money 登录、团队入口与本地数据边界。"
       },
       general: {
         label: "外观",
@@ -31,7 +31,7 @@ export const zhCNMessages = {
       },
       contextMemory: {
         label: "上下文与记忆",
-        summary: "管理记忆的使用方式、隐私边界与企业经验。"
+        summary: "管理记忆的使用方式、隐私边界与 New Money 团队经验。"
       },
       providers: {
         label: "模型",

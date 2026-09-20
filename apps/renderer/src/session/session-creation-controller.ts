@@ -1,4 +1,5 @@
 import { createMessageId, ProtocolRequestError } from "@pi67/protocol";
+import type { TeamSessionScope } from "@pi67/domain";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { messages } from "../localization/message-catalog.js";
 import { useAppStore } from "../app/app-store.js";
@@ -33,7 +34,7 @@ export type RendererSessionMaterializationResult =
 
 export function beginRendererSessionIntent(
   workspaceId?: string,
-  options: { environmentIntent?: RendererTaskEnvironmentIntent } = {}
+  options: { environmentIntent?: RendererTaskEnvironmentIntent; teamScope?: TeamSessionScope } = {}
 ): string | undefined {
   const state = useAppStore.getState();
   if (state.sessionTransitionPending || state.workspaceOpenPending) return undefined;
@@ -47,6 +48,7 @@ export function beginRendererSessionIntent(
     selected?.workspaceId === targetWorkspaceId
     && selected.conversation.kind === "provisional"
     && selected.creationStatus === undefined
+    && sameTeamScope(selected.teamScope, options.teamScope)
     && !selectedDraft?.text.trim()
     && (selectedDraft?.attachments.length ?? 0) === 0
     && (selectedDraft?.workspaceFiles.length ?? 0) === 0
@@ -54,11 +56,15 @@ export function beginRendererSessionIntent(
   return beginPendingTask(undefined, {
     workspaceId: targetWorkspaceId,
     intent: true,
+    ...(options.teamScope ? { teamScope: options.teamScope } : {}),
     ...(options.environmentIntent ? { environmentIntent: options.environmentIntent } : {})
   })?.id;
 }
 
-export async function createRendererSession(): Promise<void> {
+export async function createRendererSession(options: { teamScope?: TeamSessionScope } = {}): Promise<void> {
+  const teamScope = options.teamScope
+    ? { teamId: options.teamScope.teamId, projectId: options.teamScope.projectId }
+    : undefined;
   const get: StoreGet = useAppStore.getState;
   const set: StoreSet = useAppStore.setState;
   if (!get().workspace || get().sessionTransitionPending || get().workspaceOpenPending) return;
@@ -82,9 +88,9 @@ export async function createRendererSession(): Promise<void> {
     || selectPendingRendererSessionCreation()
   ) return;
   const creationId = createMessageId("session-creation");
-  const task = beginPendingTask(undefined, { creationId });
+  const task = beginPendingTask(undefined, { creationId, ...(teamScope ? { teamScope } : {}) });
   if (!task) return;
-  await runRendererSessionCreation(task, creationId, get, set);
+  await runRendererSessionCreation(task, creationId, get, set, teamScope);
 }
 
 export async function materializeRendererSessionIntent(
@@ -93,6 +99,7 @@ export async function materializeRendererSessionIntent(
   const get: StoreGet = useAppStore.getState;
   const set: StoreSet = useAppStore.setState;
   const before = rendererWorkbenchStore.getState().tasks[taskId];
+  const teamScope = before?.teamScope ? { ...before.teamScope } : undefined;
   if (
     !before
     || before.conversation.kind !== "provisional"
@@ -116,6 +123,7 @@ export async function materializeRendererSessionIntent(
     || current.taskGeneration !== before.taskGeneration
     || current.conversation.kind !== "provisional"
     || current.creationStatus !== undefined
+    || !sameTeamScope(current.teamScope, teamScope)
     || selectedWorkbenchTask(workbench)?.id !== taskId
     || get().sessionTransitionPending
     || get().workspaceOpenPending
@@ -129,7 +137,8 @@ export async function materializeRendererSessionIntent(
       prepared.task,
       prepared.creationId,
       get,
-      set
+      set,
+      teamScope
     );
     if (materialized.status !== "materialized") return materialized;
     const committed = await commitWorktreeSessionEnvironment(taskId, prepared.creationId);
@@ -151,14 +160,19 @@ export async function materializeRendererSessionIntent(
   });
   const pending = rendererWorkbenchStore.getState().tasks[taskId];
   if (!pending) return { status: "failed", error: messages.runtime.session.createFailed };
-  return runRendererSessionCreation(pending, creationId, get, set);
+  return runRendererSessionCreation(pending, creationId, get, set, teamScope);
+}
+
+function sameTeamScope(left: TeamSessionScope | undefined, right: TeamSessionScope | undefined): boolean {
+  return left?.teamId === right?.teamId && left?.projectId === right?.projectId;
 }
 
 async function runRendererSessionCreation(
   task: RendererWorkbenchTask,
   creationId: string,
   get: StoreGet,
-  set: StoreSet
+  set: StoreSet,
+  teamScope?: TeamSessionScope
 ): Promise<RendererSessionMaterializationResult> {
   let outcome: RendererSessionMaterializationResult | undefined;
   const committed = await runSessionBootstrapTransition(get, set, {
@@ -212,7 +226,10 @@ async function runRendererSessionCreation(
       markRendererSessionCreationUnconfirmed(task, creationId);
       outcome = { status: "unconfirmed", error: messages.runtime.session.creationOutcomeUnknown };
     },
-    request: () => agentConnectionController.request("session.create", { creationId }, [], {
+    request: () => agentConnectionController.request("session.create", {
+      creationId,
+      ...(teamScope ? { teamScope } : {})
+    }, [], {
       context: workbenchProtocolContextForTask(task),
       onAcknowledgementDelayed: () => {
         const current = rendererWorkbenchStore.getState().tasks[task.id];

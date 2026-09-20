@@ -3,6 +3,13 @@ import type {
   ContextMemoryCommandPayloads
 } from "@pi67/protocol";
 
+/** Transient replay record for a Context/Memory mutation, not durable Session truth. */
+export interface ContextMemoryMutationRecord {
+  fingerprint: string;
+  promise: Promise<unknown>;
+  settledAt?: number;
+}
+
 export type ContextMemoryAppCommandType =
   | "context.status.get"
   | "context.config.get"
@@ -12,11 +19,13 @@ export type ContextMemoryAppCommandType =
   | "enterprise.auth.begin"
   | "enterprise.auth.poll"
   | "enterprise.auth.disconnect"
+  | "enterprise.team.list"
+  | "enterprise.knowledge.sync"
   | "enterprise.project.list";
 
 export type ContextMemoryWorkspaceCommandType = Exclude<
   keyof ContextMemoryCommandPayloads,
-  ContextMemoryAppCommandType
+  ContextMemoryAppCommandType | "enterprise.knowledge.index"
 >;
 
 export function isContextMemoryAppCommand(
@@ -30,6 +39,8 @@ export function isContextMemoryAppCommand(
     || type === "enterprise.auth.begin"
     || type === "enterprise.auth.poll"
     || type === "enterprise.auth.disconnect"
+    || type === "enterprise.team.list"
+    || type === "enterprise.knowledge.sync"
     || type === "enterprise.project.list";
 }
 

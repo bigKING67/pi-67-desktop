@@ -8,6 +8,8 @@ import type { WorkspaceContextRegistry } from "../workspace-context-registry.js"
 import { ContextMemoryCommandRouter } from "./context-memory-command-router.js";
 import { deriveWorkspacePeerId } from "./context-memory-support.js";
 import type { EnterpriseCredentialBrokerClient } from "./enterprise-credential-broker-client.js";
+import type { PrivateSessionCommit } from "./context-session-commit-controller.js";
+import type { ManagedMemoryInspection } from "./managed-memory-inspection.js";
 
 const roots: string[] = [];
 
@@ -27,6 +29,8 @@ export async function createRouter(
     secureStorage?: "available" | "unavailable";
     credential?: EnterpriseAccessCredential;
     workspaceTrusted?: boolean;
+    commitPrivateSession?: PrivateSessionCommit | null;
+    managedMemory?: ManagedMemoryInspection;
   } = {}
 ) {
   const root = await mkdtemp(join(tmpdir(), "pi67-context-router-"));
@@ -83,12 +87,16 @@ export async function createRouter(
         clear: async () => { credential = undefined; },
         shutdown: () => undefined
       } as unknown as EnterpriseCredentialBrokerClient;
+  const commitPrivateSession = vi.fn<PrivateSessionCommit>(options.commitPrivateSession
+    ?? (async () => ({ status: "accepted", archived: true, task_id: "task-1" })));
   return {
     root,
     sessionPath,
     events,
+    commitPrivateSession,
     credentialSnapshot: () => enterpriseCredentials?.snapshot(),
-    router: new ContextMemoryCommandRouter(root, workspaces, eventChannel, enterpriseCredentials)
+    router: new ContextMemoryCommandRouter(root, workspaces, eventChannel, enterpriseCredentials,
+      options.commitPrivateSession === null ? undefined : commitPrivateSession, options.managedMemory)
   };
 }
 
@@ -100,12 +108,11 @@ export function candidateFlowFetch(expiresAt: number) {
     const url = requestUrl(input);
     if (url.includes("/workspace-bindings/current")) {
       return jsonResponse({
-        state: "bound",
-        workspaceId: "binding-1",
-        enterpriseProjectId: "project-1",
-        enterpriseProjectName: "Desktop",
-        accountId: "account-1",
-        boundAt: "2026-08-31T00:00:00Z"
+        teamId: "account-1",
+        workspaceId: "f".repeat(64),
+        projectId: "project-1",
+        projectName: "Desktop",
+        updatedAt: "2026-08-31T00:00:00Z"
       });
     }
     if (url.endsWith("/sessions/session%2Fone/commit")) {
@@ -158,9 +165,8 @@ export function candidateFlowFetch(expiresAt: number) {
       }
       return jsonResponse({
         id: "candidate-remote-1",
-        status: "candidate",
-        createdAt: new Date(expiresAt - 1_000).toISOString(),
-        updatedAt: new Date(expiresAt - 1_000).toISOString()
+        status: "pending",
+        createdAt: new Date(expiresAt - 1_000).toISOString()
       });
     }
     throw new Error(`Unexpected candidate-flow request: ${url}`);
@@ -203,8 +209,8 @@ export function enterpriseFetch(expiresAt: number) {
     if (url.endsWith("/device-authorizations")) {
       return jsonResponse({
         authorizationId: "device-1",
-        deviceSecret: "a".repeat(64),
-        verificationUri: "https://datahub.example.test/agent?section=device-authorization",
+        deviceCode: "a".repeat(64),
+        verificationUri: "https://newmoney.example.test/device",
         userCode: "A1B2C3D4",
         expiresAt: new Date(expiresAt).toISOString(),
         intervalSeconds: 1
@@ -213,141 +219,71 @@ export function enterpriseFetch(expiresAt: number) {
     if (url.endsWith("/device-authorizations/device-1/exchange")) {
       exchangeCount += 1;
       return jsonResponse(exchangeCount === 1 ? { state: "pending" } : {
-        state: "signed-in",
         accessToken: "agent-access-token",
-        accountId: "account-1",
-        userId: "user-1",
-        displayName: "Employee 67",
+        refreshToken: "refresh-token",
+        tokenType: "Bearer",
+        activeTeamId: "account-1",
+        user: {
+          id: "user-1",
+          email: "employee@example.test",
+          displayName: "Employee 67"
+        },
         expiresAt: new Date(expiresAt).toISOString()
       });
     }
+    if (url.endsWith("/teams") && init?.method === "GET") {
+      return jsonResponse({ teams: [{
+        id: "account-1",
+        name: "Product",
+        slug: "product",
+        role: "owner",
+        entitlementStatus: "trialing",
+        planCode: "team-trial",
+        trialEndsAt: new Date(expiresAt).toISOString(),
+        maxMembers: 5,
+        memberCount: 1,
+        projectCount: 1
+      }] });
+    }
     if (url.endsWith("/projects") && init?.method === "GET") {
       return jsonResponse({
-        items: [{
+        projects: [{
           id: "project-1",
-          accountId: "account-1",
+          teamId: "account-1",
           name: "Desktop",
-          slug: "desktop",
+          description: "",
           status: "active",
-          bindingCount: 0,
-          candidateCount: 0,
-          sharedAssetCount: 0,
+          createdAt: "2026-08-31T00:00:00Z",
           updatedAt: "2026-08-31T00:00:00Z"
-        }],
-        total: 1
+        }]
       });
     }
-    if (url.includes("/workspace-bindings/current")) return jsonResponse({ state: "unbound" });
-    if (url.endsWith("/projects/project-1/bindings")) {
-      if (typeof init?.body !== "string") throw new Error("Expected JSON binding body");
-      const body = JSON.parse(init.body) as Record<string, unknown>;
-      if (body.idempotencyKey !== "bind-1" || !/^[a-f0-9]{64}$/u.test(String(body.workspaceFingerprint))) {
-        throw new Error("Expected idempotent fingerprint-bound request");
-      }
+    if (url.includes("/workspace-bindings/current") && init?.method === "GET") return jsonResponse(null);
+    if (url.includes("/workspace-bindings/current") && init?.method === "PUT") {
       return jsonResponse({
-        state: "bound",
-        workspaceId: "binding-1",
-        enterpriseProjectId: "project-1",
-        enterpriseProjectName: "Desktop",
-        accountId: "account-1",
-        boundAt: "2026-08-31T00:00:00Z"
-      });
-    }
-    if (url.endsWith("/shared-experiences/search")) {
-      return jsonResponse({
-        items: [{
-          id: "shared-1",
-          projectId: "project-1",
-          title: "Host recovery",
-          taskType: "electron-recovery",
-          summary: "Discard stale Host epochs.",
-          score: 0.91,
-          applicableWhen: ["Host epoch changes"],
-          notApplicableWhen: ["Ordinary render"],
-          externalRevision: "e".repeat(64),
-          publishedAt: "2026-08-31T00:00:00Z"
-        }],
-        total: 1
-      });
-    }
-    if (url.includes("/shared-experiences/shared-1?")) {
-      return jsonResponse({
-        id: "shared-1",
+        teamId: "account-1",
+        workspaceId: "f".repeat(64),
         projectId: "project-1",
-        title: "Host recovery",
-        taskType: "electron-recovery",
-        problem: "Old events remain visible",
-        strategy: "Discard stale epochs",
-        result: "success",
-        confidence: 0.9,
-        sensitivity: "team",
-        applicableWhen: ["Host epoch changes"],
-        notApplicableWhen: ["Ordinary render"],
-        evidence: [{
-          kind: "test",
-          label: "42 tests passed",
-          hash: "d".repeat(64),
-          verifiedAt: "2026-08-31T00:00:00Z"
-        }],
-        externalRevision: "e".repeat(64),
-        publishedAt: "2026-08-31T00:00:00Z"
+        projectName: "Desktop",
+        updatedAt: "2026-08-31T00:00:00Z"
       });
     }
-    if (url.endsWith("/shared-sops/search")) {
-      if (typeof init?.body !== "string" || JSON.parse(init.body).limit !== 2) {
+    if (url.endsWith("/projects/project-1/authorization")) return jsonResponse({
+      userId: "user-1", teamId: "account-1", projectId: "project-1", role: "owner",
+      permissionRevision: "a".repeat(64), issuedAt: new Date().toISOString(),
+      leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+      modelPolicy: { teamId: "account-1", revision: "0", allowedModels: [] }
+    });
+    if (url.endsWith("/shared-assets/search")) {
+      if (typeof init?.body !== "string") throw new Error("Expected JSON search body");
+      const body = JSON.parse(init.body) as { kind: string; limit: number };
+      if (body.kind === "sop" && body.limit !== 2) {
         throw new Error("Expected two-candidate SOP search contract before local feedback");
       }
-      return jsonResponse({ items: [{
-        id: "sop-1",
-        projectId: "project-1",
-        stableKey: "host-epoch-recovery",
-        semanticVersion: 2,
-        title: "Host recovery SOP",
-        taskType: "electron-recovery",
-        summary: "Apply the governed recovery workflow.",
-        score: 0.95,
-        applicableWhen: ["Host epoch changes"],
-        notApplicableWhen: ["Ordinary render"],
-        expiresAt: "2026-12-01T00:00:00Z",
-        externalRevision: "e".repeat(64),
-        publishedAt: "2026-08-31T00:00:00Z"
-      }], total: 1 });
+      return jsonResponse({ results: [sharedAsset(body.kind)] });
     }
-    if (url.includes("/shared-sops/sop-1?")) {
-      return jsonResponse({
-        id: "sop-1",
-        projectId: "project-1",
-        stableKey: "host-epoch-recovery",
-        semanticVersion: 2,
-        ownerUserIdHash: "f".repeat(64),
-        title: "Host recovery SOP",
-        taskType: "electron-recovery",
-        problem: "Old events remain visible",
-        strategy: "Discard stale epochs",
-        method: {
-          preconditions: ["The Host epoch changed"],
-          steps: ["Discard stale events"],
-          tools: ["packaged smoke"],
-          validationGates: ["No stale Projection remains"],
-          completionCriteria: ["The active Session resumes"],
-          failureModes: ["An old approval remains visible"],
-          rollback: "Restore the previous Host build."
-        },
-        confidence: 0.94,
-        sensitivity: "team",
-        applicableWhen: ["Host epoch changes"],
-        notApplicableWhen: ["Ordinary render"],
-        evidence: [{
-          kind: "test",
-          label: "42 tests passed",
-          hash: "d".repeat(64),
-          verifiedAt: "2026-08-31T00:00:00Z"
-        }],
-        expiresAt: "2026-12-01T00:00:00Z",
-        externalRevision: "e".repeat(64),
-        publishedAt: "2026-08-31T00:00:00Z"
-      });
-    }
+    if (url.endsWith("/shared-assets/shared-1")) return jsonResponse(sharedAsset("experience"));
+    if (url.endsWith("/shared-assets/sop-1")) return jsonResponse(sharedAsset("sop"));
     throw new Error(`Unexpected enterprise request: ${url}`);
   });
 }
@@ -355,6 +291,68 @@ export function enterpriseFetch(expiresAt: number) {
 export function requestUrl(input: string | URL | Request): string {
   if (typeof input === "string") return input;
   return input instanceof URL ? input.href : input.url;
+}
+
+function sharedAsset(kind: string) {
+  const method = {
+    preconditions: ["The Host epoch changed"],
+    steps: ["Discard stale events"],
+    tools: ["packaged smoke"],
+    validationGates: ["No stale Projection remains"],
+    completionCriteria: ["The active Session resumes"],
+    failureModes: ["An old approval remains visible"],
+    rollback: "Restore the previous Host build."
+  };
+  const content = kind === "sop" ? {
+    stableKey: "host-epoch-recovery",
+    semanticVersion: 2,
+    ownerUserIdHash: "f".repeat(64),
+    taskType: "electron-recovery",
+    problem: "Old events remain visible",
+    strategy: "Discard stale epochs",
+    method,
+    confidence: 0.94,
+    sensitivity: "team",
+    applicableWhen: ["Host epoch changes"],
+    notApplicableWhen: ["Ordinary render"],
+    evidence: [{
+      kind: "test",
+      label: "42 tests passed",
+      hash: "d".repeat(64),
+      verifiedAt: "2026-08-31T00:00:00Z"
+    }],
+    expiresAt: "2026-12-01T00:00:00Z"
+  } : {
+    taskType: "electron-recovery",
+    problem: "Old events remain visible",
+    strategy: "Discard stale epochs",
+    method,
+    result: "success",
+    confidence: 0.9,
+    sensitivity: "team",
+    applicableWhen: ["Host epoch changes"],
+    notApplicableWhen: ["Ordinary render"],
+    evidence: [{
+      kind: "test",
+      label: "42 tests passed",
+      hash: "d".repeat(64),
+      verifiedAt: "2026-08-31T00:00:00Z"
+    }]
+  };
+  return {
+    id: kind === "sop" ? "sop-1" : "shared-1",
+    teamId: "account-1",
+    projectId: "project-1",
+    kind,
+    title: kind === "sop" ? "Host recovery SOP" : "Host recovery",
+    summary: kind === "sop" ? "Apply the governed recovery workflow." : "Discard stale Host epochs.",
+    status: "active",
+    publishedAt: "2026-08-31T00:00:00Z",
+    revokedAt: null,
+    content,
+    externalRevision: "e".repeat(64),
+    score: kind === "sop" ? 0.95 : 0.91
+  };
 }
 
 function jsonResponse(value: unknown): Response {

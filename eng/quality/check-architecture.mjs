@@ -222,7 +222,8 @@ function resolveSourceImport(file, specifier, knownFiles) {
   if (!specifier.startsWith(".")) return undefined;
   const unresolved = resolve(dirname(file), specifier);
   const candidates = extname(unresolved)
-    ? [unresolved.replace(/\.js$/u, ".ts"), unresolved.replace(/\.js$/u, ".tsx"), unresolved]
+    ? [unresolved.replace(/\.js$/u, ".ts"), unresolved.replace(/\.js$/u, ".tsx"),
+      unresolved.replace(/\.mjs$/u, ".mts"), unresolved.replace(/\.cjs$/u, ".cts"), unresolved]
     : [`${unresolved}.ts`, `${unresolved}.tsx`, join(unresolved, "index.ts")];
   return candidates.find((candidate) => knownFiles.has(candidate));
 }

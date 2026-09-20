@@ -6,6 +6,7 @@ import type {
   ContextSessionStatus,
   EnterpriseIdentityStatus,
   EnterpriseProjectSummary,
+  EnterpriseTeamSummary,
   EnterpriseWorkspaceBinding,
   ExperienceCandidateSummary,
   MemoryEntrySummary,
@@ -17,8 +18,10 @@ import type {
 } from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
+import { invalidateNewMoneyIdentity, publishNewMoneyIdentity, refreshNewMoneyIdentity } from "./new-money-account-store.js";
 
 const APP_CONTEXT = { scope: "app" as const };
+let accountMutationGeneration = 0;
 
 export interface ContextMemoryOverview {
   status: ContextRuntimeStatus;
@@ -35,18 +38,25 @@ export function selectEnterpriseProjectId(
     ?? projects.find((project) => project.status === "active")?.id;
 }
 
-export async function loadContextMemoryOverview(workspaceId?: string): Promise<ContextMemoryOverview> {
+export async function loadContextMemoryOverview(workspaceId?: string, probeRemote = true): Promise<ContextMemoryOverview> {
   await ensureAgentConnection();
-  const [status, configuration, identity, binding] = await Promise.all([
-    agentConnectionController.request("context.status.get", {}, [], { context: APP_CONTEXT }),
+  const [status, configuration, identity] = await Promise.all([
+    probeRemote
+      ? agentConnectionController.request("context.status.get", {}, [], { context: APP_CONTEXT })
+      : agentConnectionController.request("context.runtime.doctor", { probeRemote: false }, [], { context: APP_CONTEXT }).then((report) => report.status),
     agentConnectionController.request("context.config.get", {}, [], { context: APP_CONTEXT }),
-    agentConnectionController.request("enterprise.identity.get", {}, [], { context: APP_CONTEXT }),
-    workspaceId === undefined
-      ? Promise.resolve(undefined)
-      : agentConnectionController.request("enterprise.workspace.get", {}, [], {
-          context: { scope: "workspace", workspaceId }
-        }).catch(() => undefined)
+    loadEnterpriseIdentity()
   ]);
+  const binding = workspaceId !== undefined
+    && identity.state === "signed-in"
+    && identity.accountId !== undefined
+    ? await agentConnectionController.request(
+        "enterprise.workspace.get",
+        { teamId: identity.accountId },
+        [],
+        { context: { scope: "workspace", workspaceId } }
+      ).catch(() => undefined)
+    : undefined;
   return { status, configuration, identity, ...(binding === undefined ? {} : { binding }) };
 }
 
@@ -58,38 +68,92 @@ export async function saveContextMemoryConfiguration(
 }
 
 export async function beginEnterpriseAuthorization() {
+  const generation = ++accountMutationGeneration;
+  invalidateNewMoneyIdentity();
   await ensureAgentConnection();
-  return agentConnectionController.request("enterprise.auth.begin", {}, [], { context: APP_CONTEXT });
+  const authorization = await agentConnectionController.request("enterprise.auth.begin", {}, [], { context: APP_CONTEXT });
+  if (generation === accountMutationGeneration) publishNewMoneyIdentity({ state: "pending", expiresAt: authorization.expiresAt });
+  return authorization;
 }
 
 export async function pollEnterpriseAuthorization(authorizationId: string) {
+  const generation = accountMutationGeneration;
   await ensureAgentConnection();
-  return agentConnectionController.request("enterprise.auth.poll", { authorizationId }, [], {
+  const identity = await agentConnectionController.request("enterprise.auth.poll", { authorizationId }, [], {
     context: APP_CONTEXT
   });
+  if (generation === accountMutationGeneration) publishNewMoneyIdentity(identity);
+  return identity;
 }
 
 export async function disconnectEnterpriseAccount(): Promise<EnterpriseIdentityStatus> {
+  const generation = ++accountMutationGeneration;
+  invalidateNewMoneyIdentity();
   await ensureAgentConnection();
-  return agentConnectionController.request("enterprise.auth.disconnect", {}, [], {
+  const identity = await agentConnectionController.request("enterprise.auth.disconnect", {}, [], {
     context: APP_CONTEXT
+  });
+  if (generation === accountMutationGeneration) publishNewMoneyIdentity(identity);
+  return identity;
+}
+
+export function loadEnterpriseIdentity(refresh = false): Promise<EnterpriseIdentityStatus> {
+  if (refresh) invalidateNewMoneyIdentity();
+  return refreshNewMoneyIdentity(async () => {
+    await ensureAgentConnection();
+    return agentConnectionController.request("enterprise.identity.get", refresh ? { refresh: true } : {}, [], { context: APP_CONTEXT });
   });
 }
 
-export async function loadEnterpriseProjects(): Promise<EnterpriseProjectSummary[]> {
+export async function loadEnterpriseTeams(): Promise<EnterpriseTeamSummary[]> {
   await ensureAgentConnection();
-  const result = await agentConnectionController.request("enterprise.project.list", {}, [], {
+  const result = await agentConnectionController.request("enterprise.team.list", {}, [], {
     context: APP_CONTEXT
   });
   return result.items;
 }
 
+export async function loadEnterpriseProjects(teamId: string): Promise<EnterpriseProjectSummary[]> {
+  await ensureAgentConnection();
+  const result = await agentConnectionController.request("enterprise.project.list", { teamId }, [], {
+    context: APP_CONTEXT
+  });
+  return result.items;
+}
+
+export async function syncEnterpriseKnowledge(teamId: string, projectId: string | undefined, signal: AbortSignal) {
+  await ensureAgentConnection();
+  signal.throwIfAborted();
+  return agentConnectionController.request("enterprise.knowledge.sync", {
+    teamId, ...(projectId === undefined ? {} : { projectId })
+  }, [], { context: APP_CONTEXT, signal });
+}
+
+export async function buildEnterpriseKnowledgeIndex(teamId: string, projectId: string | undefined, signal: AbortSignal) {
+  await ensureAgentConnection();
+  signal.throwIfAborted();
+  return agentConnectionController.request("enterprise.knowledge.index", {
+    teamId, ...(projectId === undefined ? {} : { projectId })
+  }, [], { context: APP_CONTEXT, signal });
+}
+
+export async function loadEnterpriseWorkspaceBinding(
+  workspaceId: string,
+  teamId: string
+): Promise<EnterpriseWorkspaceBinding> {
+  await ensureAgentConnection();
+  return agentConnectionController.request("enterprise.workspace.get", { teamId }, [], {
+    context: { scope: "workspace", workspaceId }
+  });
+}
+
 export async function bindEnterpriseWorkspace(
   workspaceId: string,
+  teamId: string,
   enterpriseProjectId: string
 ): Promise<EnterpriseWorkspaceBinding> {
   await ensureAgentConnection();
-  return agentConnectionController.request("enterprise.workspace.bind", { enterpriseProjectId }, [], {
+  return agentConnectionController.request("enterprise.workspace.bind", { teamId, enterpriseProjectId }, [], {
     context: { scope: "workspace", workspaceId }
   });
 }

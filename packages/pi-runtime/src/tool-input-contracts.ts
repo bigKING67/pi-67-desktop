@@ -47,6 +47,12 @@ export function hasPi67SharedExperienceReadContract(
   toolName: string,
   record: Record<string, unknown>
 ): boolean {
+  if (toolName === "viking_team_search") {
+    return hasOnlyKeys(record, ["query", "scope", "limit"]) && stringField(record, "query") !== undefined
+      && (record.scope === "team" || record.scope === "project")
+      && (record.limit === undefined || typeof record.limit === "number" && Number.isInteger(record.limit) && record.limit >= 1 && record.limit <= 5);
+  }
+  if (toolName === "viking_team_read") return hasOnlyKeys(record, ["assetId"]) && stringField(record, "assetId") !== undefined;
   if (toolName === "viking_shared_search") {
     if (!hasOnlyKeys(record, ["query", "limit"])) return false;
     const limit = record.limit;

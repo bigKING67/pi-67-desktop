@@ -72,6 +72,14 @@ export class SessionProjectionIndex {
   observe(manager: SessionManager, event: AgentSessionEvent): void {
     if (event.type !== "entry_appended") return;
     const state = this.requireState(manager);
+    // Extension checkpoints can follow SDK message writes not observed here.
+    // A known checkpoint leaf must not hide its missing message ancestry.
+    if (event.entry.parentId !== null && !state.entriesById.has(event.entry.parentId)) {
+      const refreshed = buildState(manager, manager.getEntries());
+      refreshed.revision = state.revision + 1;
+      this.state = refreshed;
+      return;
+    }
     appendEntry(state, event.entry, manager.getLeafId());
   }
 
@@ -170,6 +178,7 @@ export class SessionProjectionIndex {
     const nextLeafId = state.manager.getLeafId();
     if (nextLeafId !== null && !state.entriesById.has(nextLeafId)) {
       const refreshed = buildState(state.manager, state.manager.getEntries());
+      refreshed.revision = state.revision + 1;
       this.state = refreshed;
       return refreshed;
     }

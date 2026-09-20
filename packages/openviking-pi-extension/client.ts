@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import type { OVConfig } from "./config.js";
+import { readContextServerTiming } from "./recall-timing.js";
+import { snapshotManagedMemoryConnection, type ManagedMemoryConnection } from "./managed-connection.js";
 import type {
   OVCommitResponse,
   OVCommitResult,
@@ -22,6 +24,7 @@ export class OVClient {
   private account: string;
   private user: string;
   private peerId: string;
+  private readonly localProfileId: string | undefined;
   private connectionState = false;
   private lastHealthAttemptAt = 0;
   private healthPromise: Promise<boolean> | null = null;
@@ -35,7 +38,14 @@ export class OVClient {
   /** Read-only access to config (for value access across modules). */
   readonly cfg: OVConfig;
 
-  constructor(config: OVConfig) {
+  constructor(config: OVConfig, managedConnection?: ManagedMemoryConnection) {
+    const managed = managedConnection === undefined ? undefined : snapshotManagedMemoryConnection(managedConnection);
+    if (managed) {
+      // Keep existing config identity/peer binding while replacing transport only.
+      config.endpoint = managed.endpoint; config.apiKey = managed.apiKey;
+      config.account = managed.account; config.user = managed.user;
+    }
+    this.localProfileId = managed?.localProfileId;
     this.cfg = config;
     this.baseUrl = config.endpoint.replace(/\/+$/, "");
     this.apiKey = config.apiKey;
@@ -48,7 +58,14 @@ export class OVClient {
     this.peerId = peerId;
   }
 
+  get usesManagedConnection(): boolean { return this.localProfileId !== undefined; }
+
   get memoryScopeKey(): string {
+    if (this.localProfileId) {
+      return createHash("sha256").update(JSON.stringify([
+        "pi67-managed-memory-outbox-v1", this.localProfileId, this.account, this.user, this.peerId,
+      ])).digest("hex");
+    }
     // Missing actor headers require conservative credential partitioning, not an inferred server identity.
     return createHash("sha256").update(JSON.stringify([
       "pi67-memory-outbox-v1", this.baseUrl, this.account, this.user, this.peerId,
@@ -86,6 +103,7 @@ export class OVClient {
     try {
       const resp = await fetch(`${this.baseUrl}${path}`, {
         ...init,
+        ...(this.localProfileId ? { redirect: "error" as const } : {}),
         headers: { ...this.headers(), ...(init?.headers as Record<string, string> | undefined) },
         signal: controller.signal,
       });
@@ -102,7 +120,9 @@ export class OVClient {
         };
       }
       this.setConnected(true);
-      return { ok: true, result: (body.result ?? body) as T, traceId };
+      const contextTiming = this.usesManagedConnection && path === "/api/v1/search/search"
+        ? readContextServerTiming(body.telemetry) : undefined;
+      return { ok: true, result: (body.result ?? body) as T, traceId, ...(contextTiming ? { contextTiming } : {}) };
     } catch (err: any) {
       this.setConnected(false);
       return { ok: false, result: null, status: 0, error: { message: err?.message || String(err) } };

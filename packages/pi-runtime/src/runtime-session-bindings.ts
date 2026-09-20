@@ -14,7 +14,7 @@ import {
   RuntimeError,
   type ExtensionUiCancellationReason,
   type NativeSubagentLineage,
-  type PlanImplementationRequestLineage
+  type PlanImplementationRequestLineage, type SessionInteractionMode, type SessionInteractionState
 } from "@pi67/domain";
 import type { AgentEvent } from "@pi67/protocol";
 import type { RuntimeProjectionController } from "./runtime-projection-controller.js";
@@ -37,22 +37,24 @@ import type { PromptAttachmentAccess } from "./prompt-attachment.js";
 import { resolveExistingSessionFileIdentity } from "./session-path-identity.js";
 import { createFirstPartyWebTools } from "./first-party-web-tools.js";
 import { PlanModeController } from "./plan-mode-controller.js";
-import type { SessionInteractionMode, SessionInteractionState } from "@pi67/domain";
 import {
   NativeSubagentCoordinator,
   type NativeSubagentSessionFactoryInput,
   type NativeSubagentSessionHandle
 } from "./native-subagent-coordinator.js";
 import { createNativeSubagentTools } from "./native-subagent-tools.js";
-import {
-  createSharedExperienceTools,
-  type SharedExperienceAccess
-} from "./shared-experience-tools.js";
-import { createSharedSopTools, type SharedSopAccess } from "./shared-sop-tools.js";
-
+import type { SharedExperienceAccess } from "./shared-experience-tools.js";
+import type { SharedSopAccess } from "./shared-sop-tools.js";
+import { createSessionSharedKnowledgeTools } from "./session-shared-knowledge-tools.js";
+import { initializePrivateMemoryProvenance, assertPrivateMemoryProvenance } from "./session-memory-provenance.js";
+import { bindSharedHistoryModelGuard } from "./shared-history-model-guard.js";
+import type { LocalMemoryAccess } from "./local-memory-extension-bridge.js";
+import { requestPrivateMemoryCommit, inspectPrivateMemorySession } from "./private-memory-commit.js";
 const DESKTOP_EXCLUDED_SDK_TOOLS = ["powershell"];
 
 interface RuntimeSessionBindingsOptions {
+  authorizeTeamSession?: import("./pi-sdk-runtime-options.js").PiSdkRuntimeOptions["authorizeTeamSession"];
+  localMemory?: LocalMemoryAccess;
   cancelInteractiveRequests: (reason: ExtensionUiCancellationReason) => void;
   emit: (event: AgentEvent) => void;
   externalChangeGuard: SessionExternalChangeGuard;
@@ -70,6 +72,7 @@ interface RuntimeSessionBindingsOptions {
   subagents: NativeSubagentCoordinator;
   sharedExperienceAccess: SharedExperienceAccess | undefined;
   sharedSopAccess: SharedSopAccess | undefined;
+  teamKnowledgeAccess?: import("./team-knowledge-access.js").TeamKnowledgeAccess;
 }
 
 /** Owns the mutable Pi SDK session runtime and all bindings tied to its current session. */
@@ -99,6 +102,19 @@ export class RuntimeSessionBindings {
   get interactionMode(): SessionInteractionMode { return this.planMode.interactionMode; }
   get interactionState(): SessionInteractionState { return this.planMode.snapshot(); }
 
+  commitPrivateMemory(sessionId: string) { return this.privateMemoryOperation(sessionId, true, requestPrivateMemoryCommit); }
+  inspectPrivateMemory(sessionId: string) { return this.privateMemoryOperation(sessionId, false, inspectPrivateMemorySession); }
+  private privateMemoryOperation<T>(sessionId: string, idle: boolean,
+    operation: (services: AgentSessionServices, id: string, current: () => boolean) => Promise<T>) {
+    const session = this.requireSession(), services = this.activeServices, generation = this.generation;
+    assertPrivateMemoryProvenance(session.sessionManager);
+    if (!services) throw new RuntimeError("RUNTIME_NOT_READY", "Open the Session before accessing private memory.");
+    return operation(services, sessionId, () => {
+      assertPrivateMemoryProvenance(session.sessionManager);
+      return !this.transition && this.session === session && this.generation === generation
+        && session.sessionId === sessionId && (!idle || session.isIdle);
+    });
+  }
   setInteractionMode(mode: SessionInteractionMode): void { this.planMode.setInteractionMode(mode); }
   implementPlan(planId: string, lineage: PlanImplementationRequestLineage): Promise<void> {
     const session = this.session;
@@ -125,15 +141,16 @@ export class RuntimeSessionBindings {
   async createInitial(
     cwd: string,
     sessionManager?: SessionManager,
-    observeStage?: RuntimeInitializationObserver
+    observeStage?: RuntimeInitializationObserver,
+    setup?: (manager: SessionManager) => Promise<void>
   ): Promise<void> {
     const services = await this.createServices(cwd, observeStage);
     await runRuntimeInitializationStage(observeStage, "activate-session", async () => {
       const toolAliases = createDesktopToolAliasBinding();
+      let sharedManager = sessionManager;
       const customTools = [
         ...createFirstPartyWebTools(),
-        ...createSharedExperienceTools(this.options.sharedExperienceAccess),
-        ...createSharedSopTools(this.options.sharedSopAccess),
+        ...createSessionSharedKnowledgeTools(this.options.sharedExperienceAccess, this.options.sharedSopAccess, () => sharedManager, this.options.teamKnowledgeAccess),
         ...this.planMode.createTools(),
         ...createNativeSubagentTools(this.options.subagents),
         ...toolAliases.tools
@@ -154,6 +171,12 @@ export class RuntimeSessionBindings {
           customTools,
           excludeTools: DESKTOP_EXCLUDED_SDK_TOOLS
         });
+      sharedManager = result.session.sessionManager;
+      if (setup) {
+        try {
+          await setup(sharedManager);
+        } catch (error) { result.session.dispose(); throw error; }
+      }
       toolAliases.bind(result.session);
       this.activeToolAliases = toolAliases;
       const runtime = new AgentSessionRuntime(
@@ -226,8 +249,7 @@ export class RuntimeSessionBindings {
       const toolAliases = createDesktopToolAliasBinding();
       const customTools = [
         ...createFirstPartyWebTools(),
-        ...createSharedExperienceTools(this.options.sharedExperienceAccess),
-        ...createSharedSopTools(this.options.sharedSopAccess),
+        ...createSessionSharedKnowledgeTools(this.options.sharedExperienceAccess, this.options.sharedSopAccess, () => sessionManager, this.options.teamKnowledgeAccess),
         ...this.planMode.createTools(),
         ...createNativeSubagentTools(this.options.subagents),
         ...toolAliases.tools
@@ -272,6 +294,7 @@ export class RuntimeSessionBindings {
     const [modelRuntime] = await Promise.all([modelRuntimeLoad, packageTrustLoad]);
     return runRuntimeInitializationStage(observeStage, "load-session-resources", () => (
       createDesktopSessionServices({
+        ...(this.options.localMemory === undefined ? {} : { localMemory: this.options.localMemory }),
         cwd,
         agentDir: this.options.getAgentDir(),
         runtimeCredentialOverrides: this.options.getRuntimeCredentialOverrides(),
@@ -315,8 +338,7 @@ export class RuntimeSessionBindings {
     const toolAliases = createDesktopToolAliasBinding();
     const customTools = [
       ...createFirstPartyWebTools(),
-      ...createSharedExperienceTools(this.options.sharedExperienceAccess),
-      ...createSharedSopTools(this.options.sharedSopAccess),
+      ...createSessionSharedKnowledgeTools(this.options.sharedExperienceAccess, this.options.sharedSopAccess, () => input.sessionManager, this.options.teamKnowledgeAccess),
       ...createNativeSubagentTools(this.options.subagents, {
         parentChildId: input.lineage.childId,
         depth: input.lineage.depth
@@ -333,6 +355,7 @@ export class RuntimeSessionBindings {
       thinkingLevel: input.thinkingLevel
     });
     toolAliases.bind(result.session);
+    bindSharedHistoryModelGuard(result.session, this.options);
     await this.options.bindChildExtensionUi(result.session, input.lineage);
     const runtime = new AgentSessionRuntime(
       result.session,
@@ -350,6 +373,8 @@ export class RuntimeSessionBindings {
   }
 
   private async bindSession(session: AgentSession): Promise<void> {
+    bindSharedHistoryModelGuard(session, this.options);
+    initializePrivateMemoryProvenance(session.sessionManager);
     await this.materializeSession(session.sessionManager);
     this.activeSessionFileIdentity = await this.resolveSessionFileIdentity(session.sessionManager);
     // Advance authority before extension hooks run so no event is attributed to the previous session.

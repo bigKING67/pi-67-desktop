@@ -1,4 +1,5 @@
 import type { AgentSession, SessionEntry } from "@earendil-works/pi-coding-agent";
+import { assertPrivateMemoryProvenance } from "./session-memory-provenance.js";
 import {
   RuntimeError,
   conversationTitleCandidate,
@@ -41,7 +42,7 @@ export interface SessionSemanticTitleGeneratorOptions {
 
 export type SessionSemanticTitleGenerationResult =
   | { kind: "generated"; title: string }
-  | { kind: "skipped"; reason: "attempted" | "explicit" | "insufficient-context" | "model-unavailable" }
+  | { kind: "skipped"; reason: "attempted" | "explicit" | "insufficient-context" | "model-unavailable" | "unverified-memory" }
   | { kind: "cancelled" };
 
 export class SessionSemanticTitleGenerator {
@@ -76,6 +77,10 @@ export class SessionSemanticTitleGenerator {
     controller: AbortController
   ): Promise<SessionSemanticTitleGenerationResult> {
     const manager = session.sessionManager;
+    try { assertPrivateMemoryProvenance(manager); } catch {
+      if (mode === "automatic") return { kind: "skipped", reason: "unverified-memory" };
+      throw new RuntimeError("INVALID_PAYLOAD", "Model-generated titles require verified private Session provenance. This history remains available for local reading and manual naming.", { recoverable: true });
+    }
     const branch = manager.getBranch();
     const state = semanticTitleState(branch);
     if (mode === "automatic" && state.attempted) return { kind: "skipped", reason: "attempted" };
@@ -177,6 +182,7 @@ export class SessionSemanticTitleGenerator {
     model: NonNullable<AgentSession["model"]>,
     mode: "automatic" | "manual"
   ): boolean {
+    try { assertPrivateMemoryProvenance(session.sessionManager); } catch { return false; }
     if (!this.options.isCurrent(session, generation)) return false;
     if (session.model?.provider !== model.provider || session.model.id !== model.id) return false;
     if (mode === "automatic" && session.sessionManager.getSessionName()?.trim()) return false;

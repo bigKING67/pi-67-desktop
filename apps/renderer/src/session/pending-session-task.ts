@@ -1,4 +1,5 @@
 import { createMessageId } from "@pi67/protocol";
+import type { TeamSessionScope } from "@pi67/domain";
 import { messages } from "../localization/message-catalog.js";
 import {
   rendererWorkbenchStore,
@@ -14,6 +15,7 @@ export function beginPendingTask(
     creationId?: string;
     intent?: boolean;
     environmentIntent?: RendererTaskEnvironmentIntent;
+    teamScope?: TeamSessionScope;
   } = {}
 ): RendererWorkbenchTask | undefined {
   const workbench = rendererWorkbenchStore.getState();
@@ -33,6 +35,7 @@ export function beginPendingTask(
     title: options.title ?? messages.runtime.workbench.unnamedSession,
     ...(options.title ? { pendingTitle: options.title } : {}),
     ...(options.creationId ? { creationId: options.creationId } : {}),
+    ...(options.teamScope ? { teamScope: { teamId: options.teamScope.teamId, projectId: options.teamScope.projectId } } : {}),
     ...(options.environmentIntent && options.environmentIntent !== "local"
       ? { environmentIntent: options.environmentIntent }
       : {}),

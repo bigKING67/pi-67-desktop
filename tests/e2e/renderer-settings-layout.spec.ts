@@ -15,6 +15,10 @@ for (const theme of ["light", "dark"] as const) {
       await page.goto("/");
       await attachMockAgent(page, [], {}, { responseResults: {
         "context.config.get": { ...DEFAULT_CONTEXT_MEMORY_CONFIGURATION, revision: "fixture-1" },
+        "context.runtime.doctor": { checkedAt: 1, effectiveConfiguration: { ...DEFAULT_CONTEXT_MEMORY_CONFIGURATION, revision: "fixture-1" }, checks: [], status: {
+          provider: "openviking", health: "degraded", owner: "pi67-openviking", effectivePrivacyMode: "private-learning",
+          endpoint: "http://127.0.0.1:1933", configured: true, conflictExtensions: [], lastCheckedAt: 1
+        } },
         "context.status.get": { provider: "openviking", health: "healthy", owner: "pi67-openviking", effectivePrivacyMode: "private-learning", endpoint: "http://127.0.0.1:1933", configured: true, conflictExtensions: [], lastCheckedAt: 1 },
         "enterprise.identity.get": { state: "signed-out" },
         "enterprise.workspace.get": { state: "unbound", workspaceId: DEFAULT_MOCK_WORKSPACE.id },

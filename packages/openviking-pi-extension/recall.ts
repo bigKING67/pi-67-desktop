@@ -2,8 +2,13 @@ import type { OVClient } from "./client.js";
 import type { OVConfig } from "./config.js";
 import { hashDiagnosticValue } from "./diagnostics.js";
 import { buildRecallBlock } from "./shared/recall-core.mjs";
+import { withContextTiming, type ContextServerTiming } from "./recall-timing.js";
 
 export type RecallState = "idle" | "pending" | "running" | "ready" | "empty";
+export interface RecallRequestTiming {
+  contextRequestMs: number; otherRequestMs: number; requestCount: number;
+  server?: ContextServerTiming;
+}
 
 export interface RecallSearchResult {
   block: string | null;
@@ -27,6 +32,9 @@ export class RecallManager {
   private completed = false;
   private sessionId: () => string | null;
   private alignedSessionId = "";
+  private requestTiming: RecallRequestTiming | undefined;
+
+  get timing(): RecallRequestTiming | undefined { return this.requestTiming ? { ...this.requestTiming } : undefined; }
 
   constructor(client: OVClient, private config: OVConfig, sessionId: () => string | null = () => null) {
     this.client = client;
@@ -112,13 +120,26 @@ export class RecallManager {
   }
 
   private async search(userQuery: string, signal: AbortSignal): Promise<string | null> {
-    return buildRecallBlock(
-      (path: string, init?: any, options?: any) =>
-        this.client.fetchJSON(
+    const timing: RecallRequestTiming = { contextRequestMs: 0, otherRequestMs: 0, requestCount: 0 };
+    const block = await buildRecallBlock(
+      async (path: string, init?: any, options?: any) => {
+        const startedAt = performance.now();
+        const contextRequest = path === "/api/v1/search/search";
+        const request = contextRequest && this.client.usesManagedConnection ? withContextTiming(init) : init;
+        try {
+          const response = await this.client.fetchJSON(
           path,
-          { ...init, signal },
+          { ...request, signal },
           options?.timeoutMs ?? this.config.recallTimeoutMs,
-        ),
+          );
+          if (contextRequest && response.ok && response.contextTiming) timing.server = response.contextTiming;
+          return response;
+        } finally {
+          timing.requestCount++;
+          const key = path === "/api/v1/search/search" ? "contextRequestMs" : "otherRequestMs";
+          timing[key] += Math.max(0, Math.round(performance.now() - startedAt));
+        }
+      },
       {
         ...this.config,
         recallMaxTokens: this.config.recallTokenBudget,
@@ -130,6 +151,8 @@ export class RecallManager {
         sessionId: this.sessionId() ?? "",
       },
     );
+    if (!signal.aborted) this.requestTiming = timing;
+    return block;
   }
 
   injectContext(messages: any[], supplementalBlocks: string[] = []): any[] {
@@ -167,6 +190,7 @@ export class RecallManager {
   }
 
   private cancelInFlight(): void {
+    this.requestTiming = undefined;
     this.generation++;
     this.searchController?.abort();
     this.searchController = null;

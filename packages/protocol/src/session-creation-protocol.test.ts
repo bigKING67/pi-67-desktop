@@ -29,6 +29,12 @@ describe("Session creation identity protocol", () => {
       "create-session-1"
     );
     expect(isRequestEnvelope(create)).toBe(true);
+    expect(isRequestEnvelope({ ...create, payload: { creationId: "team-create", teamScope: { teamId: "team", projectId: "project" } } })).toBe(true);
+    for (const teamScope of [{ teamId: "team" }, { teamId: "", projectId: "project" },
+      { teamId: "team", projectId: "project", userId: "spoofed" },
+      { teamId: "team", projectId: "project", endpoint: "https://spoofed.invalid" }]) {
+      expect(isRequestEnvelope({ ...create, payload: { creationId: "team-create", teamScope } })).toBe(false);
+    }
     for (const payload of [
       {},
       { creationId: "" },

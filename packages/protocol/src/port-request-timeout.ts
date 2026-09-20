@@ -15,6 +15,10 @@ export const CONTROL_MUTATION_ACK_TIMEOUT_MS = 60_000;
 export const OPERATION_ABORT_ACK_TIMEOUT_MS = 30_000;
 
 function timeoutFor(type: AgentCommandType, fallback: number): number {
+  // 60-second sync run, up to 8 seconds of handle cleanup, then reply margin.
+  if (type === "enterprise.knowledge.sync") return 75_000;
+  // Eight-minute index owner plus bounded cleanup/reply margin; never replayed.
+  if (type === "enterprise.knowledge.index") return 510_000;
   if (isWorkerBackedExtensionPackageCommand(type)) return EXTENSION_PACKAGE_REQUEST_TIMEOUT_MS;
   if (isReplaySafeControlMutation(type)) return CONTROL_MUTATION_ACK_TIMEOUT_MS;
   if (type === "operation.abort") return OPERATION_ABORT_ACK_TIMEOUT_MS;

@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import type {
-  ContextMemoryConfiguration,
   MemoryEntrySummary,
   MemoryScope
 } from "@pi67/domain";
@@ -15,12 +14,13 @@ import { HostCommandError } from "../protocol-error.js";
 import type { WorkspaceContextRegistry } from "../workspace-context-registry.js";
 import { mutationFingerprint } from "../workspace-mutation-fingerprint.js";
 import { ContextMemoryConfigurationStore } from "./context-memory-configuration.js";
-import { ContextSessionCommitController } from "./context-session-commit-controller.js";
+import { ContextSessionCommitController, type PrivateSessionCommit } from "./context-session-commit-controller.js";
 import type { EnterpriseCredentialBrokerClient } from "./enterprise-credential-broker-client.js";
 import { EnterpriseContextController } from "./enterprise-context-controller.js";
 import {
   readContextRuntimeDoctor,
-  readContextRuntimeStatus
+  readContextRuntimeStatus,
+  readLegacySessionStatus
 } from "./context-memory-runtime-diagnostics.js";
 import {
   appContextAuthority,
@@ -33,26 +33,18 @@ import {
   titleForUri
 } from "./context-memory-support.js";
 import { OpenVikingClient } from "./openviking-client.js";
-import {
-  ExperienceCandidateStore
-} from "./experience-candidate-store.js";
+import { ExperienceCandidateStore } from "./experience-candidate-store.js";
 import { ExperienceGovernanceController } from "./experience-governance-controller.js";
 import type {
   ContextMemoryAppCommandType,
-  ContextMemoryWorkspaceCommandType
+  ContextMemoryWorkspaceCommandType,
+  ContextMemoryMutationRecord
 } from "./context-memory-command-types.js";
 import { RecallObservationStore } from "./recall-observation-store.js";
+import type { ManagedMemoryInspection } from "./managed-memory-inspection.js";
 export * from "./context-memory-command-types.js";
-
 type ContextAppCommand = AgentCommand<ContextMemoryAppCommandType>;
 type ContextWorkspaceCommand = AgentCommand<ContextMemoryWorkspaceCommandType>;
-
-
-interface MutationRecord {
-  fingerprint: string;
-  promise: Promise<unknown>;
-  settledAt?: number;
-}
 
 const FORGET_PREVIEW_TTL_MS = 5 * 60_000;
 const MUTATION_RETENTION_MS = 10 * 60_000;
@@ -61,7 +53,7 @@ const MAX_MUTATIONS = 128;
 export class ContextMemoryCommandRouter {
   private readonly configuration: ContextMemoryConfigurationStore;
   private readonly forgetPreviews = new Map<string, PendingForget>();
-  private readonly mutations = new Map<string, MutationRecord>();
+  private readonly mutations = new Map<string, ContextMemoryMutationRecord>();
   private readonly pending = new Set<Promise<unknown>>();
   private readonly enterprise: EnterpriseContextController;
   private readonly experience: ExperienceGovernanceController;
@@ -72,7 +64,9 @@ export class ContextMemoryCommandRouter {
     private readonly agentDir: string,
     private readonly workspaces: WorkspaceContextRegistry,
     private readonly events: HostEventChannel,
-    enterpriseCredentials?: EnterpriseCredentialBrokerClient
+    enterpriseCredentials?: EnterpriseCredentialBrokerClient,
+    commitPrivateSession?: PrivateSessionCommit,
+    private readonly managedMemory?: ManagedMemoryInspection
   ) {
     this.configuration = new ContextMemoryConfigurationStore(agentDir);
     this.recall = new RecallObservationStore(agentDir);
@@ -90,7 +84,8 @@ export class ContextMemoryCommandRouter {
       workspaces,
       this.enterprise,
       experienceCandidates,
-      events
+      events,
+      commitPrivateSession
     );
   }
 
@@ -98,36 +93,41 @@ export class ContextMemoryCommandRouter {
     await Promise.allSettled(this.pending);
     this.enterprise.shutdown();
   }
-
+  authorizeTeamSession(scope: import("@pi67/domain").TeamSessionScope, model?: { baseUrl: string; id: string }, signal?: AbortSignal) { return this.enterprise.authorizeTeamSession(scope, model, signal); }
+  get teamKnowledge(): Pick<EnterpriseContextController, "indexKnowledge" | "embedKnowledgeQuery" | "searchKnowledge" | "readKnowledge" | "searchSessionKnowledge" | "readSessionKnowledge" | "observeIndexHead"> { return this.enterprise; }
   sharedExperienceAccess(workspaceId: string): SharedExperienceAccess {
     return {
-      search: (query, limit, signal) => this.enterprise.searchSharedExperiences(
-        workspaceId, query, limit, signal
+      search: (query, limit, signal, model) => this.enterprise.searchSharedExperiences(
+        workspaceId, query, limit, signal, model ?? null
       ),
-      read: (id, signal) => this.enterprise.getSharedExperience(workspaceId, id, signal)
+      read: (id, signal, model) => this.enterprise.getSharedExperience(workspaceId, id, signal, model ?? null)
     };
   }
 
   sharedSopAccess(workspaceId: string): SharedSopAccess {
     return {
-      search: (query, signal) => this.enterprise.searchSharedSops(workspaceId, query, signal),
-      read: (id, signal) => this.enterprise.getSharedSop(workspaceId, id, signal)
+      search: (query, signal, model) => this.enterprise.searchSharedSops(workspaceId, query, signal, model ?? null),
+      read: (id, signal, model) => this.enterprise.getSharedSop(workspaceId, id, signal, model ?? null)
     };
   }
-
   async dispatchApp(
     command: ContextAppCommand,
-    idempotencyKey?: string
+    idempotencyKey?: string, signal?: AbortSignal
   ): Promise<CommandResults[ContextMemoryAppCommandType]> {
     if (command.type === "context.config.get") return this.configuration.read();
     if (command.type === "context.status.get") return this.status();
     if (command.type === "context.runtime.doctor") return this.doctor(command.payload.probeRemote !== false);
-    if (command.type === "enterprise.identity.get") return this.enterprise.currentIdentity();
+    if (command.type === "enterprise.identity.get") return command.payload.refresh
+      ? this.enterprise.refreshIdentity() : this.enterprise.currentIdentity();
     if (command.type === "enterprise.auth.begin") return this.enterprise.beginAuthorization();
     if (command.type === "enterprise.auth.poll") {
       return this.enterprise.pollAuthorization(command.payload.authorizationId);
     }
-    if (command.type === "enterprise.project.list") return this.enterprise.listProjects();
+    if (command.type === "enterprise.team.list") return this.enterprise.listTeams();
+    if (command.type === "enterprise.knowledge.sync") return this.enterprise.syncKnowledge(command.payload, signal);
+    if (command.type === "enterprise.project.list") {
+      return this.enterprise.listProjects(command.payload.teamId);
+    }
     if (command.type === "enterprise.auth.disconnect") {
       return this.runMutation(
         idempotencyKey,
@@ -136,9 +136,11 @@ export class ContextMemoryCommandRouter {
       ) as Promise<CommandResults[ContextMemoryAppCommandType]>;
     }
     return this.runMutation(idempotencyKey, command, async () => {
-      const result = await this.configuration.update(command.payload);
-      this.events.sendFor({ type: "context.configChanged", payload: result }, appContextAuthority());
-      return result;
+      try {
+        const result = await this.configuration.update(command.payload);
+        this.events.sendFor({ type: "context.configChanged", payload: result }, appContextAuthority());
+        return result;
+      } finally { this.enterprise.retireTeamModelChannels(); }
     }) as Promise<CommandResults[ContextMemoryAppCommandType]>;
   }
 
@@ -149,19 +151,22 @@ export class ContextMemoryCommandRouter {
   ): Promise<CommandResults[ContextMemoryWorkspaceCommandType]> {
     const workspace = this.workspaces.require(context.workspaceId);
     const configuration = await this.configuration.read();
-    const client = new OpenVikingClient(configuration, deriveWorkspacePeerId(workspace.cwd));
+    const client = () => this.managedMemory
+      ? this.managedMemory.client(configuration, deriveWorkspacePeerId(workspace.cwd))
+      : Promise.resolve(new OpenVikingClient(configuration, deriveWorkspacePeerId(workspace.cwd)));
 
     switch (command.type) {
       case "context.session.get":
-        return this.sessionStatus(client, configuration, command.payload.sessionId);
+        return this.managedMemory
+          ? this.managedMemory.sessionStatus(context.workspaceId, command.payload.sessionId)
+          : readLegacySessionStatus(await client(), configuration, command.payload.sessionId, await this.status());
       case "context.session.commit":
         return this.acceptAsyncMutation(idempotencyKey, command, (operationId) => this.sessionCommit.commit({
           workspaceId: context.workspaceId,
           submissionId: command.payload.submissionId,
           sessionId: command.payload.sessionId,
           operationId,
-          configuration,
-          client
+          configuration
         }));
       case "context.recall.list":
         return this.recall.list({
@@ -187,7 +192,7 @@ export class ContextMemoryCommandRouter {
         });
       case "memory.search":
         return this.searchPrivateMemory(
-          client,
+          await client(),
           command.payload.query,
           command.payload.scope,
           command.payload.limit ?? 20,
@@ -195,20 +200,20 @@ export class ContextMemoryCommandRouter {
           deriveWorkspacePeerId(workspace.cwd)
         );
       case "memory.get":
-        return this.getPrivateMemory(client, command.payload.id, context.workspaceId, deriveWorkspacePeerId(workspace.cwd));
+        return this.getPrivateMemory(await client(), command.payload.id, context.workspaceId, deriveWorkspacePeerId(workspace.cwd));
       case "memory.forget.preview":
-        return this.previewForget(client, command.payload.id, context.workspaceId, deriveWorkspacePeerId(workspace.cwd));
+        return this.previewForget(await client(), command.payload.id, context.workspaceId, deriveWorkspacePeerId(workspace.cwd));
       case "memory.forget.confirm":
-        return this.confirmForget(context.workspaceId, client, command, idempotencyKey);
+        return this.confirmForget(context.workspaceId, await client(), command, idempotencyKey);
       case "experience.private.list":
         return this.experience.list(
-          client,
+          await client(),
           context.workspaceId,
           command.payload.status,
           command.payload.limit ?? 20
         );
       case "experience.candidate.get":
-        return this.experience.get(client, context.workspaceId, command.payload.id);
+        return this.experience.get(await client(), context.workspaceId, command.payload.id);
       case "experience.candidate.review":
         return this.runMutation(
           idempotencyKey,
@@ -241,10 +246,11 @@ export class ContextMemoryCommandRouter {
       case "sop.shared.get":
         return this.enterprise.getSharedSop(context.workspaceId, command.payload.id);
       case "enterprise.workspace.get":
-        return this.enterprise.getWorkspaceBinding(context.workspaceId);
+        return this.enterprise.getWorkspaceBinding(context.workspaceId, command.payload.teamId);
       case "enterprise.workspace.bind":
         return this.runMutation(idempotencyKey, command, () => this.enterprise.bindWorkspace(
           context.workspaceId,
+          command.payload.teamId,
           command.payload.enterpriseProjectId,
           idempotencyKey!
         )) as Promise<CommandResults[ContextMemoryWorkspaceCommandType]>;
@@ -258,7 +264,9 @@ export class ContextMemoryCommandRouter {
   }
 
   private async status() {
-    return readContextRuntimeStatus(await this.configuration.read(), this.agentDir);
+    const configuration = await this.configuration.read();
+    return readContextRuntimeStatus(this.managedMemory ? { ...configuration, endpoint: "managed:private" } : configuration,
+      this.agentDir, undefined, this.managedMemory ? () => this.managedMemory!.client(configuration) : undefined);
   }
 
   private async doctor(probeRemote: boolean) {
@@ -267,37 +275,6 @@ export class ContextMemoryCommandRouter {
       this.agentDir,
       probeRemote
     );
-  }
-
-  private async sessionStatus(
-    client: OpenVikingClient,
-    configuration: ContextMemoryConfiguration,
-    sessionId: string
-  ): Promise<CommandResults["context.session.get"]> {
-    const status = await this.status();
-    if (status.owner !== "pi67-openviking") {
-      return {
-        sessionId,
-        owner: status.owner,
-        privacyMode: configuration.defaultPrivacyMode,
-        capturedTurns: 0,
-        pendingTokens: 0,
-        liveTailTurns: configuration.takeover.keepRecentTurns,
-        takeoverActive: false
-      };
-    }
-    const meta = await client.getSession(sessionId);
-    const lastCommitAt = meta.last_commit_at ? Date.parse(meta.last_commit_at) : Number.NaN;
-    return {
-      sessionId,
-      owner: status.owner,
-      privacyMode: configuration.defaultPrivacyMode,
-      capturedTurns: meta.total_message_count ?? meta.message_count ?? 0,
-      pendingTokens: meta.pending_tokens ?? 0,
-      liveTailTurns: configuration.takeover.keepRecentTurns,
-      takeoverActive: configuration.takeover.enabled,
-      ...(Number.isFinite(lastCommitAt) ? { lastCommitAt } : {})
-    };
   }
 
   private async searchPrivateMemory(
@@ -429,7 +406,7 @@ export class ContextMemoryCommandRouter {
       throw new HostCommandError("RESOURCE_LIMIT_EXCEEDED", "Too many memory mutations are pending.", true);
     }
     const promise = execute();
-    const record: MutationRecord = { fingerprint, promise };
+    const record: ContextMemoryMutationRecord = { fingerprint, promise };
     this.mutations.set(idempotencyKey, record);
     void promise.finally(() => { record.settledAt = Date.now(); }).catch(() => undefined);
     return promise;

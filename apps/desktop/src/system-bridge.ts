@@ -11,8 +11,7 @@ import type { PromptAttachmentStagingService } from "./prompt-attachment-staging
 import {
   parsePackageNetworkSettings,
   type DesktopRecoverySnapshot,
-  type PreviousRunExitStatus,
-  type WorkspaceEntryContextAction
+  type PreviousRunExitStatus, type WorkspaceEntryContextAction
 } from "@pi67/protocol";
 import { createDesktopRecoverySnapshot } from "./desktop-recovery-snapshot.js";
 import {
@@ -33,8 +32,7 @@ import {
   asExternalUrl,
   asNativeNotificationId,
   asNativeNotificationRequest,
-  assertWorkspaceId,
-  assertWorkspaceIds
+  assertWorkspaceId, assertWorkspaceIds
 } from "./system-bridge-policy.js";
 import type { AgentHostSupervisorDiagnostics } from "./agent-host-supervisor.js";
 import { registerSupportDiagnosticsBridge } from "./support-diagnostics.js";
@@ -50,8 +48,8 @@ import { registerPromptInputBridge } from "./prompt-input-bridge.js";
 import type { BoundedPrivateGitRunner } from "./worktree-git-runner.js";
 import type { RepositoryWorktreeActionService } from "./repository-worktree-action-service.js";
 import type { DesktopSafeStorageAccess } from "./desktop-safe-storage.js";
-
-export interface SystemBridgeOptions {
+import { registerLocalMemoryBridge, type LocalMemoryBridgeOptions } from "./local-memory-bridge.js";
+export interface SystemBridgeOptions extends LocalMemoryBridgeOptions {
   connectAgentHost: (replaceCurrent?: boolean) => void;
   restartAgentHost?: () => void;
   getMainWindow: () => BrowserWindow | undefined;
@@ -76,9 +74,11 @@ export interface SystemBridgeOptions {
   agentDirectory: string;
   agentDirectorySource: "default" | "environment";
   getAgentHostDiagnostics: () => AgentHostSupervisorDiagnostics;
+  rendererUrl?: string;
 }
 export interface SystemBridgeRegistration { handlePowerResume(): void; dispose(): void; }
 export function registerSystemBridge(options: SystemBridgeOptions): SystemBridgeRegistration {
+  const disposeLocalMemory = registerLocalMemoryBridge(options);
   const workbenchState = options.workbenchState;
   const nativeNotifications = new NativeNotificationManager({
     isSupported: () => Notification.isSupported(),
@@ -433,6 +433,7 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
   return {
     handlePowerResume: () => updateController.checkIfDue(),
     dispose: () => {
+      disposeLocalMemory();
       nativeNotifications.dispose();
       updateController.dispose();
       options.worktreeCreation.dispose?.();
@@ -443,12 +444,10 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     }
   };
 }
-
 async function openSystemPath(path: string): Promise<void> {
   const failure = await shell.openPath(path);
   if (failure) throw new Error(failure);
 }
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -6,6 +6,7 @@ import type {
   ContextSessionStatus,
   EnterpriseIdentityStatus,
   EnterpriseProjectSummary,
+  EnterpriseTeamSummary,
   EnterpriseWorkspaceBinding,
   ExperienceCandidateSummary,
   ExperienceEvidenceSummary,
@@ -115,13 +116,16 @@ export interface ContextMemoryCommandPayloads {
   "experience.shared.get": { id: string };
   "sop.shared.search": { query: string };
   "sop.shared.get": { id: string };
-  "enterprise.identity.get": Record<string, never>;
+  "enterprise.identity.get": { refresh?: boolean };
   "enterprise.auth.begin": Record<string, never>;
   "enterprise.auth.poll": { authorizationId: string };
   "enterprise.auth.disconnect": Record<string, never>;
-  "enterprise.project.list": Record<string, never>;
-  "enterprise.workspace.get": Record<string, never>;
-  "enterprise.workspace.bind": { enterpriseProjectId: string };
+  "enterprise.team.list": Record<string, never>;
+  "enterprise.project.list": { teamId: string };
+  "enterprise.knowledge.sync": { teamId: string; projectId?: string; maxPages?: number };
+  "enterprise.knowledge.index": { teamId: string; projectId?: string };
+  "enterprise.workspace.get": { teamId: string };
+  "enterprise.workspace.bind": { teamId: string; enterpriseProjectId: string };
   "enterprise.workspace.unbind": Record<string, never>;
 }
 
@@ -152,7 +156,10 @@ export interface ContextMemoryCommandResults {
   "enterprise.auth.begin": EnterpriseDeviceAuthorization;
   "enterprise.auth.poll": EnterpriseIdentityStatus;
   "enterprise.auth.disconnect": EnterpriseIdentityStatus;
+  "enterprise.team.list": { items: EnterpriseTeamSummary[]; total: number };
   "enterprise.project.list": { items: EnterpriseProjectSummary[]; total: number };
+  "enterprise.knowledge.sync": { progress: { epoch: string | null; cursor: string }; pages: number; headCursor: string };
+  "enterprise.knowledge.index": { state: "published-local"; snapshot: { epoch: string; cursor: string } };
   "enterprise.workspace.get": EnterpriseWorkspaceBinding;
   "enterprise.workspace.bind": EnterpriseWorkspaceBinding;
   "enterprise.workspace.unbind": EnterpriseWorkspaceBinding;
@@ -166,7 +173,8 @@ export interface ContextMemoryEventPayloads {
   "context.recallCompleted": { sessionId: string; completedAt: number; count: number; degraded: boolean };
   "context.captureQueued": { sessionId: string; turnId: string; queuedAt: number };
   "context.captureFailed": { sessionId: string; turnId: string; failedAt: number; detail: string };
-  "context.commitCompleted": { operationId: string; sessionId: string; diff?: MemoryDiffSummary };
+  "context.commitCompleted": { operationId: string; sessionId: string; diff?: MemoryDiffSummary;
+    outcome?: "retained" | "empty" | "skipped" | "extracted" | "extraction-failed" | "unconfirmed" };
   "context.commitFailed": { operationId: string; sessionId: string; detail: string };
   "memory.diffAvailable": MemoryDiffSummary;
   "memory.forgetCompleted": { operationId: string; memoryId: string; completedAt: number };

@@ -9,6 +9,45 @@ import type { PromptAttachmentAccessOwner } from "./prompt-attachment-access.js"
 import { TaskRuntimeRegistry } from "./task-runtime-registry.js";
 
 describe("TaskRuntimeRegistry", () => {
+  it("passes Workspace-bound canonical knowledge access through the real runtime loader", async () => {
+    const access = { search: vi.fn(), read: vi.fn() }, factory = vi.fn(() => access), options: PiSdkRuntimeOptions[] = [];
+    const registry = new TaskRuntimeRegistry(async input => { options.push(input!); return runtime(); },
+      createRuntimeCredentialOverrideStore(), { teamKnowledgeAccessForWorkspace: factory });
+    await registry.load(context("task-a"));
+    expect(factory).toHaveBeenCalledExactlyOnceWith("workspace-1"); expect(options[0]!.teamKnowledgeAccess).toBe(access);
+    expect(access.search).not.toHaveBeenCalled(); expect(access.read).not.toHaveBeenCalled(); await registry.disposeAll();
+  });
+  it("commits only one initialized, open Task with the exact Workspace and Session", async () => {
+    const commit = vi.fn(async () => ({ status: "accepted", archived: false }));
+    const registry = new TaskRuntimeRegistry(async () => Object.assign(
+      runtime(() => ({ sessionId: "session", sessionGeneration: 1 })), { commitPrivateMemory: commit }
+    ), createRuntimeCredentialOverrideStore());
+    await expect(registry.commitPrivateMemory("workspace-1", "session")).rejects.toThrow();
+    await registry.load(context("task-a"));
+    await expect(registry.commitPrivateMemory("workspace-1", "session")).rejects.toThrow();
+    registry.admit(context("task-a")).initialized = true;
+    await expect(registry.commitPrivateMemory("other-workspace", "session")).rejects.toThrow();
+    await expect(registry.commitPrivateMemory("workspace-1", "other-session")).rejects.toThrow();
+    expect(commit).not.toHaveBeenCalled();
+    await expect(registry.commitPrivateMemory("workspace-1", "session")).resolves.toMatchObject({ archived: false });
+    await registry.load(context("task-b"));
+    registry.admit(context("task-b")).initialized = true;
+    await expect(registry.commitPrivateMemory("workspace-1", "session")).rejects.toThrow();
+    expect(commit).toHaveBeenCalledOnce();
+    registry.admit(context("task-b")).closed = true;
+    await expect(registry.commitPrivateMemory("workspace-1", "session")).resolves.toMatchObject({ archived: false });
+    await registry.disposeAll();
+    await expect(registry.commitPrivateMemory("workspace-1", "session")).rejects.toThrow();
+  });
+  it("passes an explicitly selected private memory port to each Task without connecting during load", async () => {
+    const localMemory = { connect: vi.fn() };
+    const options: PiSdkRuntimeOptions[] = [];
+    const registry = new TaskRuntimeRegistry(async (input) => { options.push(input!); return runtime(); },
+      createRuntimeCredentialOverrideStore(), { localMemory });
+    await registry.load(context("task-a")); await registry.load(context("task-b"));
+    expect(options.map((input) => input.localMemory)).toEqual([localMemory, localMemory]);
+    expect(localMemory.connect).not.toHaveBeenCalled(); await registry.disposeAll();
+  });
   it("loads one independent Runtime per Task with shared Host credentials and Workspace services", async () => {
     const loadedOptions: PiSdkRuntimeOptions[] = [];
     const runtimes = [runtime(), runtime()];

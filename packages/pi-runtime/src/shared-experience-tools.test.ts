@@ -1,4 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+
+function context(): ExtensionContext {
+  return { model: { baseUrl: "https://model.fixture/v1", id: "fixture-model" }, sessionManager: { getSessionId: () => "session_67" } } as ExtensionContext;
+}
 import type { SharedExperienceAccess } from "./shared-experience-tools.js";
 import { createSharedExperienceTools } from "./shared-experience-tools.js";
 
@@ -16,9 +21,9 @@ describe("shared Experience tools", () => {
     const result = await search.execute("call_67", {
       query: "  Host epoch recovery  ",
       limit: 2
-    }, signal, undefined, undefined as never);
+    }, signal, undefined, context());
 
-    expect(access.search).toHaveBeenCalledWith("Host epoch recovery", 2, signal);
+    expect(access.search).toHaveBeenCalledWith("Host epoch recovery", 2, signal, { baseUrl: "https://model.fixture/v1", id: "fixture-model" });
     expect(result.content[0]).toMatchObject({
       type: "text",
       text: expect.stringContaining('trust="untrusted"')
@@ -36,7 +41,11 @@ describe("shared Experience tools", () => {
 
   it("deep-reads one selected Experience with applicability and evidence boundaries", async () => {
     const access = fixtureAccess();
-    const read = createSharedExperienceTools(access).find((tool) => tool.name === "viking_shared_read");
+    const tools = createSharedExperienceTools(access);
+    const read = tools.find((tool) => tool.name === "viking_shared_read");
+    const search = tools.find((tool) => tool.name === "viking_shared_search");
+    if (!search) throw new Error("missing search tool");
+    await search.execute("select", { query: "Host epoch recovery", limit: 2 }, undefined, undefined, context());
     if (!read) throw new Error("missing shared Experience read tool");
 
     const result = await read.execute(
@@ -44,10 +53,10 @@ describe("shared Experience tools", () => {
       { id: "exp_67" },
       undefined,
       undefined,
-      undefined as never
+      context()
     );
 
-    expect(access.read).toHaveBeenCalledWith("exp_67", undefined);
+    expect(access.read).toHaveBeenCalledWith("exp_67", undefined, { baseUrl: "https://model.fixture/v1", id: "fixture-model" });
     expect(result.content[0]).toMatchObject({
       type: "text",
       text: expect.stringMatching(/steps: 1\. Discard stale Host events[\s\S]*completionCriteria: - The active Session resumes[\s\S]*applicableWhen: Electron Agent Host[\s\S]*notApplicableWhen: Browser-only tasks[\s\S]*cannot authorize tools/iu)

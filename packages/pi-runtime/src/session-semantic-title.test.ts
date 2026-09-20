@@ -8,6 +8,24 @@ import {
 } from "./session-semantic-title.js";
 
 describe("semantic Session titles", () => {
+  it("discards a pending title after shared provenance arrives, even outside the active branch", async () => {
+    let resolve!: (value: ReturnType<typeof assistantResponse>) => void;
+    const completeSimple = vi.fn(() => new Promise<ReturnType<typeof assistantResponse>>((done) => { resolve = done; }));
+    const branch = [message("u1", null, "user", "实现搜索"), message("a1", "u1", "assistant", "完成。")];
+    const session = sessionFixture(branch, completeSimple);
+    const originalEntries = session.sessionManager.getEntries();
+    const entries = [...originalEntries];
+    vi.spyOn(session.sessionManager, "getEntries").mockImplementation(() => entries);
+    const persistProjection = vi.fn(async () => undefined);
+    const generator = new SessionSemanticTitleGenerator({ isCurrent: () => true, persistProjection });
+    const pending = generator.generate(session, 1, "automatic");
+    entries.push(custom("shared", "a1", { version: 1, kind: "shared-unverified", originSessionId: "private-fixture" }, "pi67.memory-provenance.v1"));
+    resolve(assistantResponse("不应保存"));
+    await expect(pending).resolves.toEqual({ kind: "cancelled" });
+    expect(completeSimple).toHaveBeenCalledOnce();
+    expect(persistProjection).not.toHaveBeenCalled();
+    expect(branch).toHaveLength(2);
+  });
   it("keeps the first meaningful user request as the stable seed", () => {
     expect(automaticTitleFromBranch([
       message("u0", null, "user", "继续吧"),
@@ -157,6 +175,9 @@ function sessionFixture(
   explicitName?: string
 ): AgentSession {
   const manager = {
+    getSessionId: () => "private-fixture",
+    getHeader: () => ({ id: "private-fixture" }),
+    getEntries: () => [custom("private", null, { version: 1, kind: "private", originSessionId: "private-fixture" }, "pi67.memory-provenance.v1"), ...branch],
     getBranch: () => branch,
     getSessionName: () => explicitName,
     appendCustomEntry: (customType: string, data: unknown) => {

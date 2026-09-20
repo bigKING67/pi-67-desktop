@@ -15,6 +15,7 @@ import {
   worktreeIntentAvailability
 } from "../worktree/worktree-environment-intent-controller.js";
 import styles from "./WorkspaceShell.module.css";
+import { SessionScopePicker } from "./SessionScopePicker.js";
 
 export function NewSessionIntentSurface({ task, workspace }: {
   task: RendererWorkbenchTask;
@@ -104,6 +105,7 @@ export function NewSessionIntentSurface({ task, workspace }: {
             ) : null}
           </div>
         </fieldset>
+        <SessionScopePicker key={task.id} task={task} />
         {task.hasDraft ? <small>草稿会使用系统安全存储跨应用重启恢复。</small> : null}
       </div>
       <Composer />

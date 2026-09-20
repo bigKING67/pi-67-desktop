@@ -12,7 +12,8 @@ import { OpenVikingClient } from "./openviking-client.js";
 export async function readContextRuntimeStatus(
   configuration: ContextMemoryConfiguration,
   agentDir: string,
-  ownerInspection?: MemoryOwnerRuntimeInspection
+  ownerInspection?: MemoryOwnerRuntimeInspection,
+  managedClient?: () => Promise<OpenVikingClient>
 ): Promise<ContextRuntimeStatus> {
   const inspection = ownerInspection ?? await inspectMemoryOwnerRuntime(agentDir);
   const conflicts = inspection.state === "conflict" ? inspection.blockedOwners : [];
@@ -24,7 +25,7 @@ export async function readContextRuntimeStatus(
     };
   }
   try {
-    const health = await new OpenVikingClient(configuration).health();
+    const health = await (managedClient ? await managedClient() : new OpenVikingClient(configuration)).health();
     return {
       ...contextStatusResult(configuration, conflicts, "healthy"),
       ...(health.version === undefined ? {} : { version: health.version }),
@@ -33,7 +34,7 @@ export async function readContextRuntimeStatus(
   } catch (error) {
     return {
       ...contextStatusResult(configuration, conflicts, "unavailable"),
-      detail: error instanceof Error ? error.message : "OpenViking is unavailable."
+      detail: managedClient ? "Managed private memory is unavailable; no manual endpoint was used." : error instanceof Error ? error.message : "OpenViking is unavailable."
     };
   }
 }
@@ -73,4 +74,16 @@ export async function readContextRuntimeDoctor(
       }
     ]
   };
+}
+
+export async function readLegacySessionStatus(client: OpenVikingClient, configuration: ContextMemoryConfiguration,
+  sessionId: string, status: ContextRuntimeStatus): Promise<CommandResults["context.session.get"]> {
+  if (status.owner !== "pi67-openviking") throw new Error("Private memory Session metadata is unavailable.");
+  const meta = await client.getSession(sessionId);
+  const lastCommitAt = meta.last_commit_at ? Date.parse(meta.last_commit_at) : Number.NaN;
+  return { sessionId, owner: status.owner, privacyMode: configuration.defaultPrivacyMode,
+    capturedTurns: meta.total_message_count ?? meta.message_count ?? 0,
+    pendingTokens: meta.pending_tokens ?? 0, liveTailTurns: configuration.takeover.keepRecentTurns,
+    takeoverActive: configuration.takeover.enabled,
+    ...(Number.isFinite(lastCommitAt) ? { lastCommitAt } : {}) };
 }

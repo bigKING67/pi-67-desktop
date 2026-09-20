@@ -12,6 +12,7 @@ import {
   recentSessionRuntimePreference
 } from "../session/recent-session-runtime-preferences.js";
 import { useTaskDraftStore } from "../workbench/task-draft-store.js";
+import { visibleModelChoices } from "../session/model-choice-visibility.js";
 import {
   ComposerRuntimeSelect,
   type ComposerRuntimeSelectOptionGroup
@@ -88,7 +89,11 @@ export function ComposerIntentRuntimeControls({
     .map((provider) => ({
       id: provider.id,
       label: provider.name ?? provider.id,
-      options: provider.models.map((model) => ({
+      options: visibleModelChoices(
+        provider.id,
+        provider.models,
+        effectiveModel?.provider === provider.id ? effectiveModel.model : undefined
+      ).map((model) => ({
         id: `${provider.id}/${model.id}`,
         label: model.name ?? model.id,
         detail: `${provider.id}/${model.id}${provider.configured ? "" : ` ${messages.composer.unauthenticatedModel}`}`

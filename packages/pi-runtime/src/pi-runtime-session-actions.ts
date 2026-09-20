@@ -61,7 +61,8 @@ export class PiRuntimeSessionActions {
   async rollback(entryId: string, summarize: boolean): Promise<void> {
     await this.options.assertWritable();
     const session = this.options.sessionBindings.requireSession();
-    await session.navigateTree(entryId, { summarize });
+    const result = await session.navigateTree(entryId, { summarize });
+    if (result.cancelled) throw new Error("A Pi extension cancelled the session tree transition.");
     this.options.emit(conversationChangedEvent(session, "rolled-back"));
     this.options.emit({ type: "tree.changed", payload: { reason: "rollback" } });
     this.options.emit(usageChangedEvent(this.options.projections.getStats(session)));

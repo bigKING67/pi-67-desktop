@@ -43,6 +43,25 @@ describe("OVClient connection authority", () => {
     await expect(request).resolves.toMatchObject({ ok: false, status: 0 });
     expect(observedSignal?.aborted).toBe(true);
   });
+
+  it("projects safe summary timings only for successful managed context transport", async () => {
+    const body = { status: "ok", result: { rendered: "synthetic" }, telemetry: {
+      id: "do-not-expose", summary: { operation: "search.context", status: "ok", duration_ms: 23,
+        errors: { message: "do-not-expose" }, search: { embed_query: { duration_ms: 8 } } }
+    } };
+    const fetch = vi.fn(async () => new Response(JSON.stringify(body), { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    const localProfileId = "00000000-0000-4000-8000-000000000001";
+    const managed = new OVClient(config(), { endpoint: "http://127.0.0.1:1933", apiKey: "synthetic-test",
+      localProfileId, account: `private-${localProfileId}`, user: "desktop" });
+    const result = await managed.fetchJSON("/api/v1/search/search");
+    expect(result.contextTiming).toEqual({ durationMs: 23, embedQueryMs: 8 });
+    expect(JSON.stringify(result)).not.toContain("do-not-expose");
+    expect((await managed.fetchJSON("/health")).contextTiming).toBeUndefined();
+    expect((await new OVClient(config()).fetchJSON("/api/v1/search/search")).contextTiming).toBeUndefined();
+    fetch.mockImplementation(async () => new Response(JSON.stringify(body), { status: 503 }));
+    expect((await managed.fetchJSON("/api/v1/search/search")).contextTiming).toBeUndefined();
+  });
 });
 
 function config(): OVConfig {

@@ -23,6 +23,26 @@ function broker(overrides: Partial<EnterpriseCredentialBrokerPort> = {}): Enterp
 }
 
 describe("EnterpriseCredentialSupervisor", () => {
+  it("persists a profile-only change without invalidating receipt bindings", async () => {
+    const updateDisplayName = vi.fn().mockResolvedValue(undefined);
+    const store = vi.fn().mockResolvedValue(undefined);
+    const credentialBroker = broker({ load: async () => ({ storage: "available", credential }), updateDisplayName, store });
+    const invalidate = vi.fn();
+    const supervisor = new EnterpriseCredentialSupervisor(() => credentialBroker,
+      () => ({ invalidate, operation: () => undefined }));
+    await supervisor.bootstrapMessage();
+    invalidate.mockClear();
+    const next = { ...credential, displayName: "whois67" };
+    await expect(supervisor.operation({ type: "enterprise-credential-store", requestId: "profile",
+      profileOnly: true, credential: next })).resolves.toMatchObject({ ok: true });
+    expect(updateDisplayName).toHaveBeenCalledWith(next);
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(store).not.toHaveBeenCalled();
+    await expect(supervisor.operation({ type: "enterprise-credential-store", requestId: "wrong",
+      profileOnly: true, credential: { ...next, userId: "other" } })).resolves.toMatchObject({ ok: false });
+    expect(updateDisplayName).toHaveBeenCalledTimes(1);
+  });
+
   it("reports unavailable storage and ignores unrelated parent messages without a broker", async () => {
     const supervisor = new EnterpriseCredentialSupervisor(() => undefined);
     expect(supervisor.requiresBootstrap()).toBe(false);

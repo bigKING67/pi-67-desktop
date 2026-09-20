@@ -8,10 +8,8 @@ import {
   type SessionCatalogPage, type SessionCatalogQuery, type SessionCatalogStatus,
   type SessionControlResult, type SessionModelCatalogResult, type SessionResourceCatalogResult,
   type SessionSnapshot, type SessionTreeProjection, type SessionInteractionMode,
-  type PlanImplementationRequestLineage,
-  type TaskToolMode,
-  type ToolExecutionView,
-  type WorkspaceTrust,
+  type PlanImplementationRequestLineage, type TaskToolMode,
+  type ToolExecutionView, type WorkspaceTrust,
   type NativeSubagentMode,
   type NativeSubagentView,
   type NativeSubagentWaitResult
@@ -143,8 +141,9 @@ export class PiSdkRuntime implements AgentRuntime {
       },
       setSessionCwd: (cwd) => this.toolSafety.setCwd(cwd),
       subagents: this.subagents,
-      sharedExperienceAccess: options.sharedExperienceAccess,
-      sharedSopAccess: options.sharedSopAccess
+      sharedExperienceAccess: options.sharedExperienceAccess, ...(options.teamKnowledgeAccess ? { teamKnowledgeAccess: options.teamKnowledgeAccess } : {}),
+      ...(options.localMemory === undefined ? {} : { localMemory: options.localMemory }),
+      sharedSopAccess: options.sharedSopAccess, ...(options.authorizeTeamSession ? { authorizeTeamSession: options.authorizeTeamSession } : {})
     });
     this.configurationReload = new PiRuntimeConfigurationReload({
       getSession: () => this.sessionBindings.session,
@@ -186,6 +185,7 @@ export class PiSdkRuntime implements AgentRuntime {
       }
     });
     this.sessionLifecycle = new PiSdkRuntimeSessionLifecycle({
+      ...(options.authorizeTeamSession ? { authorizeTeamSession: options.authorizeTeamSession } : {}),
       sessionBindings: this.sessionBindings,
       sessionCatalog: this.sessionCatalog,
       configurationReload: this.configurationReload,
@@ -307,8 +307,8 @@ export class PiSdkRuntime implements AgentRuntime {
     length?: number;
   }): AssetReadResult { return this.projections.readAsset(options); }
 
-  async createSession(creationId: string): Promise<SessionSnapshot> {
-    return this.conversationActions.create(creationId);
+  async createSession(creationId: string, teamScope?: import("@pi67/domain").TeamSessionScope): Promise<SessionSnapshot> {
+    return this.conversationActions.create(creationId, teamScope);
   }
 
   async openSession(path: string, cwdOverride?: string): Promise<SessionSnapshot> {
@@ -400,10 +400,12 @@ export class PiSdkRuntime implements AgentRuntime {
     return this.sessionLifecycle.reloadResources();
   }
 
-  async invokeCommand(command: string): Promise<void> {
-    await this.promptActions.invokeCommand(command);
+  async invokeCommand(command: string): Promise<void> { await this.promptActions.invokeCommand(command); }
+  async commitPrivateMemory(sessionId: string) {
+    await this.assertSessionWritable();
+    return this.sessionBindings.commitPrivateMemory(sessionId);
   }
-
+  async inspectPrivateMemory(sessionId: string) { return this.sessionBindings.inspectPrivateMemory(sessionId); }
   getCommands(): SlashCommandCatalogResult { return this.projections.getCommands(); }
   getExtensionCatalog(): ExtensionCatalogResult { return this.projections.getCatalog(); }
   getWorkspaceChanges() {
@@ -449,9 +451,7 @@ export class PiSdkRuntime implements AgentRuntime {
   getResources(): ResourceCatalogProjection {
     return projectSessionResourceCatalog(this.sessionBindings.services, this.sessionBindings.extensions);
   }
-  getIdentity(): RuntimeIdentity {
-    return getPiRuntimeIdentity(this.sessionBindings);
-  }
+  getIdentity(): RuntimeIdentity { return getPiRuntimeIdentity(this.sessionBindings); }
   flushStream(): void { this.streamBatcher.flush(); }
   private assertSessionWritable(): Promise<void> {
     return this.externalSessionChangeGuard.assertUnchanged(this.sessionBindings.session);

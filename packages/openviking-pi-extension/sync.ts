@@ -60,6 +60,7 @@ export class SyncManager {
   private queue: ScopedQueue | null = null;
   private scopeUnverified = false;
   private scopeAnchored = false;
+  private committing = false;
 
   constructor(
     private client: OVClient,
@@ -82,7 +83,10 @@ export class SyncManager {
     return !this.blockedReason && this.config.enabled && this.config.privateWriteEnabled;
   }
 
-  restore(branch: any[], piSessionId: string, legacyWatermark = 0): void {
+  restore(branch: any[], piSessionId: string, legacyWatermark = 0, sessionEntries = branch): void {
+    // Scan the complete Pi history, not only the active branch: compaction or
+    // branch navigation must not reopen private capture after shared knowledge.
+    if (sessionEntries.some(hasSharedKnowledgeCall) || hasUnverifiedMemoryProvenance(sessionEntries, piSessionId)) this.scopeUnverified = true;
     const scopeKey = this.client.memoryScopeKey;
     if (this.queue && this.queue.scopeKey !== scopeKey) { this.scopeUnverified = true; return; }
     this.queue ??= createScopedPendingQueue(scopeKey);
@@ -90,7 +94,12 @@ export class SyncManager {
     const base = deriveHarnessSessionId("pi-", piSessionId);
     const latest = findLatestSyncState(branch);
     const restored = validSyncState(latest, piSessionId, base, scopeKey) ? latest : null;
-    if (!restored && (latest !== undefined || legacyWatermark > 0 || branch.some((entry) => entry?.type === "message"))) {
+    // Pi context can survive without a normal message entry (compaction, branch
+    // summaries and Extension messages). Such history is not a fresh private
+    // session and must never acquire ownership merely because messages vanished.
+    const hasContextHistory = branch.some((entry) =>
+      ["message", "compaction", "branch_summary", "custom_message"].includes(entry?.type));
+    if (!restored && (latest !== undefined || legacyWatermark > 0 || hasContextHistory)) {
       this.scopeUnverified = true;
       this.ovSessionId = null;
       return;
@@ -118,6 +127,12 @@ export class SyncManager {
     return true;
   }
 
+  observeSharedToolCall(toolName: string): void {
+    // The attempt is enough. Block before execution so parallel remember/replay
+    // cannot race the shared result; a failed Tool does not reopen authority.
+    if (SHARED_KNOWLEDGE_TOOLS.has(toolName)) this.scopeUnverified = true;
+  }
+
   async ensureSession(piSessionId: string): Promise<boolean> {
     if (!this.canWrite() || !this.queue) return false;
     if (!this.sourcePiSessionId) this.sourcePiSessionId = piSessionId;
@@ -135,13 +150,15 @@ export class SyncManager {
   }
 
   async replayPending(): Promise<ReplayResult> {
-    if (!this.client.connected || !this.canWrite() || !this.queue) return emptyReplayResult();
+    const sessionId = this.ovSessionId;
+    if (!sessionId || !this.scopeAnchored || !this.client.connected || !this.canWrite() || !this.queue) return emptyReplayResult();
     return this.queue.replayPending(
       (path: string, init?: any) => init?.method === "POST"
         ? this.client.writeJSON(path, init, 10000)
         : this.client.fetchJSON(path, init, 10000),
       (stage: string, data: unknown) => debugLog(`${stage}: ${JSON.stringify(data)}`),
-      () => this.canWrite(),
+      () => this.canWrite() && this.ovSessionId === sessionId,
+      sessionId,
     );
   }
 
@@ -149,11 +166,12 @@ export class SyncManager {
     if (!this.ovSessionId || !this.canWrite() || !this.queue) return false;
     await this.replayPending();
     if (!this.canWrite()) return false;
-    const pending = await this.queue.listPending();
+    const pending = await this.queue.listPending(this.ovSessionId);
     return countUndeliveredForSession(pending, this.ovSessionId) === 0;
   }
 
   async syncBranch(branch: any[]): Promise<SyncBranchResult> {
+    if (branch.some(hasSharedKnowledgeCall) || hasUnverifiedMemoryProvenance(branch, this.sourcePiSessionId)) this.scopeUnverified = true;
     if (this.blockedReason) return { added: 0, tokens: 0, allDelivered: false, lineageChanged: false, blockedReason: this.blockedReason };
     if (!this.ovSessionId || !this.sourcePiSessionId) {
       return { added: 0, tokens: 0, allDelivered: true, lineageChanged: false };
@@ -230,21 +248,27 @@ export class SyncManager {
   }
 
   async commit(opts: { queueOnFailure?: boolean; keepRecentCount?: number; keepRecentTurns?: number } = {}): Promise<OVCommitResult | null> {
-    if (!this.ovSessionId || !this.canWrite() || !this.queue || !this.scopeAnchored) return null;
-    const retention = opts.keepRecentTurns === undefined
-      ? (opts.keepRecentCount ?? this.config.commitKeepRecentCount)
-      : { keepRecentTurns: opts.keepRecentTurns };
-    const response = await this.client.commitSessionResponse(this.ovSessionId, retention);
-    const result = response.result;
-    if (!result) {
-      debugLog(`commit: session=${this.ovSessionId} ok=false status=${response.status ?? 0} trace_id=${response.traceId || "none"} error=${response.error?.message || response.error?.code || "unknown"}`);
-      if (opts.queueOnFailure !== false && this.canWrite()) {
-        await this.queue.enqueue("commitSession", this.ovSessionId, buildCommitRequestBody(retention));
+    if (this.committing || !this.ovSessionId || !this.canWrite() || !this.queue || !this.scopeAnchored) return null;
+    const sessionId = this.ovSessionId;
+    this.committing = true;
+    try {
+      const retention = opts.keepRecentTurns === undefined
+        ? (opts.keepRecentCount ?? this.config.commitKeepRecentCount)
+        : { keepRecentTurns: opts.keepRecentTurns };
+      const response = await this.client.commitSessionResponse(sessionId, retention);
+      const result = response.result;
+      if (!result) {
+        debugLog(`commit: session=${sessionId} ok=false status=${response.status ?? 0} trace_id=${response.traceId || "none"} error=${response.error?.message || response.error?.code || "unknown"}`);
+        if (opts.queueOnFailure !== false && this.canWrite() && this.ovSessionId === sessionId) {
+          await this.queue.enqueue("commitSession", sessionId, buildCommitRequestBody(retention));
+        }
+        return null;
       }
-      return null;
+      debugLog(`commit: session=${sessionId} ok=true status=${result.status || "unknown"} archived=${result.archived === true} trace_id=${result.trace_id || "none"}`);
+      return result;
+    } finally {
+      this.committing = false;
     }
-    debugLog(`commit: session=${this.ovSessionId} ok=true status=${result.status || "unknown"} archived=${result.archived === true} trace_id=${result.trace_id || "none"}`);
-    return result;
   }
 
   async shutdown(): Promise<void> {
@@ -279,6 +303,25 @@ export class SyncManager {
 
 function emptyReplayResult(): ReplayResult {
   return { replayed: 0, failed: 0, skipped: 0, deferred: 0, outcomes: {} };
+}
+
+const SHARED_KNOWLEDGE_TOOLS = new Set([
+  "viking_shared_search", "viking_shared_read", "viking_sop_search", "viking_sop_read"
+]);
+
+function hasSharedKnowledgeCall(entry: any): boolean {
+  if (entry?.type !== "message") return false;
+  const message = entry.message;
+  if (message?.role === "toolResult") return SHARED_KNOWLEDGE_TOOLS.has(message.toolName);
+  return message?.role === "assistant" && Array.isArray(message.content)
+    && message.content.some((part: any) => part?.type === "toolCall" && SHARED_KNOWLEDGE_TOOLS.has(part.name));
+}
+
+function hasUnverifiedMemoryProvenance(entries: any[], piSessionId: string | null): boolean {
+  const markers = entries.filter((entry) => entry?.type === "custom" && entry.customType === "pi67.memory-provenance.v1");
+  if (markers.length === 0) return false; // External compatibility still uses its own OV scope anchor.
+  const data = markers[0]?.data;
+  return markers.length !== 1 || data?.version !== 1 || data.kind !== "private" || data.originSessionId !== piSessionId;
 }
 
 function findLatestSyncState(branch: any[]): unknown {

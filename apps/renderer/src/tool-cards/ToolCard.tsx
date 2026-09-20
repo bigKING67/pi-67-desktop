@@ -1,3 +1,4 @@
+import { newMoneyErrorMessage } from "../context-memory/new-money-error-message.js";
 import type {
   SessionMessageView,
   ToolAuthorizationProjection,
@@ -174,7 +175,8 @@ export function ToolCard({
 
           {effectiveStatus === "failed" ? (
             <p className={styles.failureDetail}>
-              {failureMessage ?? "该步骤失败，但 Pi 结果中没有可显示的错误详情。"}
+              {newMoneyErrorMessage(failureMessage ? new Error(failureMessage) : undefined,
+                "该步骤失败，但 Pi 结果中没有可显示的错误详情。")}
             </p>
           ) : effectiveStatus === "unreconciled" ? (
             <p className={styles.warningDetail}>该步骤未找到可核对的 Tool Result，结果未能确认。</p>

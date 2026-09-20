@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { sharedHistoryNeedsAuthorization } from "./session-memory-provenance.js";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -186,6 +187,7 @@ export class NativeSubagentCoordinator implements NativeSubagentOperations {
   }
 
   async steer(id: string, text: string): Promise<NativeSubagentView> {
+    this.requireParent();
     const record = this.requireLiveRecord(id);
     const activation = record.active;
     const session = activation?.handle.session;
@@ -429,6 +431,7 @@ export class NativeSubagentCoordinator implements NativeSubagentOperations {
 
   private requireParent(): BoundParent {
     if (!this.parent) throw new RuntimeError("RUNTIME_NOT_READY", "No parent Pi Session is bound for native subagents.");
+    if (sharedHistoryNeedsAuthorization(this.parent.session.sessionManager)) throw new RuntimeError("UNSUPPORTED", "Team-derived native subagents require inherited asset authorization and are not available yet.");
     return this.parent;
   }
 

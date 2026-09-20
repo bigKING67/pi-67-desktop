@@ -78,8 +78,8 @@ export function ExperienceInspectorPanel() {
         setItems((current) => upsertCandidate(current, event.payload.candidate));
         publishNotification({
           level: "success",
-          title: "经验候选已提交企业审核",
-          message: "提交不等于共享；只有企业审核通过并发布后，其他成员才能召回。"
+          title: "经验候选已提交团队审核",
+          message: "提交不等于共享；只有 New Money 团队审核并发布后，其他成员才能召回。"
         });
       } else if (event.type === "experience.candidatePromotionFailed") {
         setError(`候选提交失败：${event.payload.detail}`);
@@ -100,7 +100,7 @@ export function ExperienceInspectorPanel() {
   return <div className={styles.panel} data-testid="experience-inspector">
     <section className={styles.hero}>
       <span className="section-label">Experience Governance</span>
-      <strong>{identity.state === "signed-in" ? "Case 与企业经验已连接" : "本地 Case 与私人经验"}</strong>
+      <strong>{identity.state === "signed-in" ? "Case 与 New Money 团队经验已连接" : "本地 Case 与私人经验"}</strong>
       <p>{identity.state === "signed-in"
         ? `项目${binding?.state === "bound" ? "已绑定" : "未绑定"}；一次成功只形成任务 Case，经过验证才成为经验，多个独立 Case 才可能晋升 SOP。`
         : "无需登录即可保留私人经验；一次任务不会自动成为 SOP，登录也不会公开已有记忆。"}</p>
@@ -177,7 +177,7 @@ function ExperienceCandidateCard({
       const saved = await reviewExperienceCandidate(workspaceId, review);
       onChanged(saved);
       setReviewOpen(false);
-      setNotice("人工审核已记录；尚未提交企业。请再次确认后提交审核。");
+      setNotice("人工审核已记录；尚未提交团队。请再次确认后提交审核。");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "经验候选审核失败。");
     } finally {
@@ -192,7 +192,7 @@ function ExperienceCandidateCard({
     setNotice(undefined);
     try {
       await submitExperienceCandidate(workspaceId, item.id);
-      setNotice("提交已被 Agent Host 接收；正在等待企业 Gateway 回执。");
+      setNotice("提交已被 Agent Host 接收；正在等待 New Money 回执。");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "经验候选提交失败。");
     } finally {
@@ -207,7 +207,7 @@ function ExperienceCandidateCard({
     try {
       onChanged(await rejectExperienceCandidate(workspaceId, item.id, "User chose to keep this Experience private"));
       setReviewOpen(false);
-      setNotice("该候选不会提交企业；OpenViking 私人经验保持不变。");
+      setNotice("该候选不会提交团队；OpenViking 私人经验保持不变。");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "无法更新候选状态。");
     } finally {
@@ -241,7 +241,7 @@ function ExperienceCandidateCard({
     <div className={styles.sopReadiness} data-ready={sopReadiness.state === "candidate-ready"}>
       <strong>{sopReadiness.state === "candidate-ready" ? "具备 SOP 候选条件" : "尚不是 SOP"}</strong>
       <small>{sopReadiness.state === "candidate-ready"
-        ? `已汇总 ${sopReadiness.caseCount} 个 Case；仍需企业 Owner、版本和发布审核。`
+        ? `已汇总 ${sopReadiness.caseCount} 个 Case；仍需 New Money 团队所有者、版本和发布审核。`
         : sopReadinessText(sopReadiness.reasons)}</small>
     </div>
 
@@ -258,10 +258,10 @@ function ExperienceCandidateCard({
 
     {item.status === "validated" ? <div className={styles.candidateActions}>
       <Button className="primary-button" isDisabled={!canSubmit || busy !== undefined} onPress={() => void submit()}>
-        <Send aria-hidden="true" size={13} />{busy === "submit" ? "正在提交…" : "提交企业审核"}
+        <Send aria-hidden="true" size={13} />{busy === "submit" ? "正在提交…" : "提交团队审核"}
       </Button>
       {!enterpriseReady
-        ? <small>请先登录企业账户并绑定当前项目。</small>
+        ? <small>请先连接 New Money、选择团队并绑定当前项目。</small>
         : item.result !== "success"
           ? <small>只有已确认成功的经验可以提交。</small>
           : !experienceMethodComplete(item.method)
@@ -270,10 +270,10 @@ function ExperienceCandidateCard({
     </div> : null}
 
     {item.status === "submitted" ? <div className={styles.submittedNotice}>
-      <Check aria-hidden="true" size={13} />已提交企业审核，尚未进入共享经验池。
+      <Check aria-hidden="true" size={13} />已提交团队审核，尚未进入共享经验池。
     </div> : null}
     {item.status === "private" ? <div className={styles.privateNotice}>仅存在于当前用户的 OpenViking 私人空间。</div> : null}
-    {item.status === "rejected" ? <div className={styles.privateNotice}>已从企业候选流程移除，私人 Experience 不受影响。</div> : null}
+    {item.status === "rejected" ? <div className={styles.privateNotice}>已从团队候选流程移除，私人 Experience 不受影响。</div> : null}
     {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
     {error ? <p className={styles.error} role="alert">{error}</p> : null}
     {reviewOpen ? <ExperienceCandidateReviewForm
@@ -298,7 +298,7 @@ function statusLabel(value: ExperienceCandidateSummary["status"]): string {
   if (value === "private") return "私人经验";
   if (value === "candidate") return "待人工审核";
   if (value === "validated") return "已验证";
-  if (value === "submitted") return "企业审核中";
+  if (value === "submitted") return "团队审核中";
   if (value === "shared") return "已共享";
   if (value === "rejected") return "仅保留私人";
   return "已撤回";
@@ -313,9 +313,9 @@ function resultLabel(value: ExperienceCandidateSummary["result"]): string {
 
 function sensitivityLabel(value: ExperienceCandidateSummary["sensitivity"]): string {
   if (value === "private") return "私人";
-  if (value === "project") return "企业项目";
+  if (value === "project") return "团队项目";
   if (value === "team") return "团队";
-  return "企业";
+  return "团队";
 }
 
 function redactionLabel(value: ExperienceCandidateSummary["redactionStatus"]): string {

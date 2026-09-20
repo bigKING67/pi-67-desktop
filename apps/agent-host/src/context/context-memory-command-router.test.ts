@@ -153,11 +153,11 @@ describe("ContextMemoryCommandRouter", () => {
       payload: { id: "missing", reason: "invalid" }
     }, "reject-missing")).rejects.toMatchObject({ code: "RESOURCE_NOT_FOUND" });
 
-    await expect(fixture.router.dispatchWorkspace(workspaceContext, { type: "enterprise.workspace.get", payload: {} }))
+    await expect(fixture.router.dispatchWorkspace(workspaceContext, { type: "enterprise.workspace.get", payload: { teamId: "account-1" } }))
       .resolves.toEqual({ state: "unbound", workspaceId: "workspace-1" });
     await expect(fixture.router.dispatchWorkspace(workspaceContext, {
       type: "enterprise.workspace.bind",
-      payload: { enterpriseProjectId: "project-1" }
+      payload: { teamId: "account-1", enterpriseProjectId: "project-1" }
     }, "bind-signed-out")).rejects.toMatchObject({ code: "RUNTIME_NOT_READY" });
     await expect(fixture.router.dispatchWorkspace(workspaceContext, {
       type: "enterprise.workspace.unbind",
@@ -215,7 +215,7 @@ describe("ContextMemoryCommandRouter", () => {
   });
 
   it("keeps device credentials in the Host and binds a trusted Workspace through the Gateway", async () => {
-    const endpoint = "https://datahub.example.test";
+    const endpoint = "https://newmoney.example.test";
     const expiresAt = Date.now() + 10 * 60_000;
     const fetchMock = enterpriseFetch(expiresAt);
     vi.stubGlobal("fetch", fetchMock);
@@ -231,7 +231,7 @@ describe("ContextMemoryCommandRouter", () => {
     if (!("authorizationId" in authorization)) throw new Error("Expected enterprise device authorization");
     expect(authorization).toMatchObject({
       authorizationId: "device-1",
-      verificationUri: "https://datahub.example.test/agent?section=device-authorization",
+      verificationUri: "https://newmoney.example.test/device",
       userCode: "A1B2C3D4"
     });
     expect(authorization).not.toHaveProperty("deviceSecret");
@@ -251,7 +251,16 @@ describe("ContextMemoryCommandRouter", () => {
       expiresAt
     });
 
-    const projects = await fixture.router.dispatchApp({ type: "enterprise.project.list", payload: {} });
+    const teams = await fixture.router.dispatchApp({ type: "enterprise.team.list", payload: {} });
+    expect(teams).toEqual({
+      total: 1,
+      items: [expect.objectContaining({ id: "account-1", name: "Product", maxMembers: 5 })]
+    });
+
+    const projects = await fixture.router.dispatchApp({
+      type: "enterprise.project.list",
+      payload: { teamId: "account-1" }
+    });
     expect(projects).toEqual({
       total: 1,
       items: [expect.objectContaining({ id: "project-1", accountId: "account-1", status: "active" })]
@@ -260,11 +269,11 @@ describe("ContextMemoryCommandRouter", () => {
 
     await expect(fixture.router.dispatchWorkspace(workspaceContext, {
       type: "enterprise.workspace.get",
-      payload: {}
+      payload: { teamId: "account-1" }
     })).resolves.toEqual({ state: "unbound", workspaceId: "workspace-1" });
     await expect(fixture.router.dispatchWorkspace(workspaceContext, {
       type: "enterprise.workspace.bind",
-      payload: { enterpriseProjectId: "project-1" }
+      payload: { teamId: "account-1", enterpriseProjectId: "project-1" }
     }, "bind-1")).resolves.toEqual({
       state: "bound",
       workspaceId: "workspace-1",
@@ -319,7 +328,8 @@ describe("ContextMemoryCommandRouter", () => {
     const authenticatedRequests = fetchMock.mock.calls.filter(([, init]) =>
       new Headers(init?.headers).has("Authorization")
     );
-    expect(authenticatedRequests).toHaveLength(7);
+    expect(authenticatedRequests).toHaveLength(12);
+    expect(authenticatedRequests.filter(([url]) => (url instanceof Request ? url.url : String(url)).endsWith("/projects/project-1/authorization"))).toHaveLength(4);
     for (const [, init] of authenticatedRequests) {
       expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer agent-access-token");
     }
@@ -341,7 +351,7 @@ describe("ContextMemoryCommandRouter", () => {
     await expect(disabled.router.dispatchWorkspace(workspaceContext, {
       type: "context.session.get",
       payload: { sessionId: "disabled" }
-    })).resolves.toMatchObject({ owner: "pi-default-compaction", takeoverActive: false });
+    })).rejects.toThrow("Private memory Session metadata is unavailable.");
     await expect(disabled.router.dispatchWorkspace(workspaceContext, {
       type: "context.session.commit",
       payload: { submissionId: "disabled", sessionId: "disabled" }

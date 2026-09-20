@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { extname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { productionTransportViolations } from "./production-transport-policy.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const scanRoots = [
@@ -13,25 +14,11 @@ const scanRoots = [
 const files = (await Promise.all(scanRoots.map((path) => collect(join(root, path))))).flat();
 files.push(join(root, "apps/renderer/index.html"));
 
-const forbidden = [
-  ["WebSocket API", /\bWebSocket\b/u],
-  ["local HTTP server", /\bcreateServer\s*\(/u],
-  ["listening socket", /\.listen\s*\(/u],
-  ["WebSocket URL", /\bwss?:\/\//u]
-];
-const localUrlPattern = /https?:\/\/(?:127\.0\.0\.1|localhost|0\.0\.0\.0)[^"'\s]*/gu;
 const failures = [];
 
 for (const file of files) {
   const source = await readFile(file, "utf8");
-  for (const [label, pattern] of forbidden) {
-    if (pattern.test(source)) failures.push(`${toRepoPath(file)} contains ${label}`);
-  }
-  for (const match of source.matchAll(localUrlPattern)) {
-    const isAllowedViteUrl = toRepoPath(file) === "apps/desktop/src/renderer-security.ts"
-      && (match[0] === "http://127.0.0.1:5173/" || match[0] === "http://127.0.0.1:5173");
-    if (!isAllowedViteUrl) failures.push(`${toRepoPath(file)} contains localhost production URL`);
-  }
+  failures.push(...productionTransportViolations(toRepoPath(file), source));
 }
 
 const main = await readFile(join(root, "apps/desktop/src/main.ts"), "utf8");
@@ -60,7 +47,7 @@ if (failures.length > 0) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
-console.log(`Production transport check passed: ${files.length} files, app:// assets, MessagePort IPC, no local listener/WebSocket.`);
+console.log(`Production transport check passed: ${files.length} files, app:// assets, MessagePort IPC, no business listener/WebSocket; bounded native sidecar reservation.`);
 
 async function collect(directory) {
   const output = [];
@@ -68,7 +55,7 @@ async function collect(directory) {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) output.push(...await collect(path));
     else if (
-      [".ts", ".tsx", ".html"].includes(extname(entry.name))
+      [".ts", ".tsx", ".mts", ".cts", ".html"].includes(extname(entry.name))
       && !entry.name.includes(".test.")
       && !entry.name.includes(".spec.")
     ) output.push(path);

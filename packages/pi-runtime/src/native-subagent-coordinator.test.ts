@@ -5,6 +5,7 @@ import { SessionManager, type AgentSession } from "@earendil-works/pi-coding-age
 import type { NativeSubagentView } from "@pi67/domain";
 import { describe, expect, it, vi } from "vitest";
 import { NativeSubagentAdmission } from "./native-subagent-admission.js";
+import { markTeamSessionBirth } from "./team-session-birth.js";
 import {
   NativeSubagentCoordinator,
   SUBAGENT_LIFECYCLE_ENTRY_TYPE,
@@ -12,6 +13,18 @@ import {
 } from "./native-subagent-coordinator.js";
 
 describe("NativeSubagentCoordinator", () => {
+  it("blocks team-derived spawn, resume and steer before acquiring or publishing a child", async () => {
+    const fixture = await coordinatorFixture("complete");
+    markTeamSessionBirth(fixture.parent.sessionManager, { userId: "user", teamId: "team", projectId: "project", endpoint: "https://fixture.invalid" });
+    await fixture.coordinator.bindParent(fixture.parent);
+    const entries = fixture.parent.sessionManager.getEntries();
+    await expect(fixture.coordinator.spawn({ task: "team task", role: "worker", mode: "background" })).rejects.toThrow("inherited asset authorization");
+    await expect(fixture.coordinator.resume("unknown")).rejects.toThrow("inherited asset authorization");
+    await expect(fixture.coordinator.steer("unknown", "team task")).rejects.toThrow("inherited asset authorization");
+    expect(fixture.admission.snapshot().global).toBe(0);
+    expect(fixture.coordinator.list()).toEqual([]);
+    expect(fixture.parent.sessionManager.getEntries()).toEqual(entries);
+  });
   it("persists an independent child Pi JSONL and terminal result", async () => {
     const fixture = await coordinatorFixture("complete");
     await fixture.coordinator.bindParent(fixture.parent);

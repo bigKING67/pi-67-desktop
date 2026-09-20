@@ -21,6 +21,7 @@ describe("Context Memory enterprise Experience flow", () => {
       {
         secureStorage: "available",
         workspaceTrusted: true,
+        commitPrivateSession: async () => ({ status: "accepted", archived: true, task_id: "task-candidate-1" }),
         credential: {
           endpoint,
           accessToken: "agent-access-token",
@@ -40,6 +41,8 @@ describe("Context Memory enterprise Experience flow", () => {
         expect.objectContaining({ type: "context.commitCompleted" })
       ]));
     });
+    expect(fixture.commitPrivateSession).toHaveBeenCalledWith("workspace-1", "session/one");
+    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/commit"))).toBe(false);
 
     const listed = await fixture.router.dispatchWorkspace(workspaceContext, {
       type: "experience.private.list",
@@ -114,6 +117,13 @@ describe("Context Memory enterprise Experience flow", () => {
     const candidateBody = JSON.parse(body) as Record<string, unknown>;
     expect(candidateBody).toMatchObject({
       projectId: "project-1",
+      kind: "experience",
+      title: "Host epoch recovery"
+    });
+    if (typeof candidateBody.content !== "string") throw new Error("Expected serialized candidate content");
+    const candidateContent = JSON.parse(candidateBody.content) as Record<string, unknown>;
+    expect(candidateContent).toMatchObject({
+      projectId: "project-1",
       workspaceFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u),
       sourceSessionIdHash: expect.stringMatching(/^[a-f0-9]{64}$/u),
       result: "success",
@@ -129,8 +139,8 @@ describe("Context Memory enterprise Experience flow", () => {
         rollback: "Restore the previous Host build."
       }
     });
-    expect(JSON.stringify(candidateBody)).not.toContain("session/one");
-    expect(JSON.stringify(candidateBody)).not.toContain(fixture.sessionPath);
+    expect(JSON.stringify(candidateContent)).not.toContain("session/one");
+    expect(JSON.stringify(candidateContent)).not.toContain(fixture.sessionPath);
     await fixture.router.shutdown();
   });
 });

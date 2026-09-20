@@ -429,6 +429,7 @@ function normalizeMaterializedTask(task: RendererWorkbenchTask): RendererWorkben
   return task.conversation.kind === "session"
     ? {
         ...task,
+        teamScope: undefined,
         sessionFileIdentity: task.conversation.sessionFileIdentity,
         sessionPath: task.conversation.sessionPath
       }

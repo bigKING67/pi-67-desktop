@@ -1,5 +1,6 @@
 import type { ModelSummary, ProviderSummary } from "@pi67/domain";
 import type { SessionProjectionState } from "./session-projection-state.js";
+import { visibleModelChoices } from "./model-choice-visibility.js";
 
 export interface SessionModelProviderGroup {
   id: string;
@@ -58,18 +59,22 @@ export function groupVisibleSessionModelsByProvider(
     else modelsByProvider.set(model.provider, [model]);
   }
 
+  const choices = (provider: string, group: ModelSummary[]) => visibleModelChoices(
+    provider, group, selectedModel?.provider === provider ? selectedModel.id : undefined
+  );
+
   const groups: SessionModelProviderGroup[] = [];
   const projectedProviderIds = new Set<string>();
   for (const provider of providers ?? []) {
     if (projectedProviderIds.has(provider.id)) continue;
     projectedProviderIds.add(provider.id);
     const group = modelsByProvider.get(provider.id);
-    if (group) groups.push({ id: provider.id, label: provider.label, models: group });
+    if (group) groups.push({ id: provider.id, label: provider.label, models: choices(provider.id, group) });
   }
 
   // Preserve runtime order for any model whose projected Provider is unavailable.
   for (const [id, group] of modelsByProvider) {
-    if (!projectedProviderIds.has(id)) groups.push({ id, label: id, models: group });
+    if (!projectedProviderIds.has(id)) groups.push({ id, label: id, models: choices(id, group) });
   }
   return groups;
 }

@@ -210,14 +210,96 @@ the only Runtime and behavior specification source.
   Other recommended third-party Packages remain user-initiated. `pi-hy-memory`,
   `@ff-labs/pi-fff`, and `@victor-software-house/pi-curated-themes` are retired from
   the default catalog.
-- OpenViking private Memory and Experience remain usable without enterprise login.
-  Enterprise login and Workspace binding only make the current trusted project
+- OpenViking private Memory and Experience remain usable without New Money login.
+  New Money account presentation is shared by the navigation footer, Account & Data
+  settings and memory settings, using the Host identity result without credentials.
+  Account & Data owns device login, logout and the service endpoint; memory settings
+  link there and retain team/project binding and knowledge controls. Signed-in users
+  may still create private Sessions. Unknown/offline state is never shown as signed-out.
+  Manual account refresh reads the hosted profile and updates all account surfaces.
+  Passive identity reads remain local. A successful explicit refresh persists only
+  the display name through Main's encrypted credential store for restart continuity.
+  This is not an authorization grant or a credential replacement; stale credentials
+  cannot update the name and cosmetic changes never retire team work.
+  Resumed history requires a verifiable memory ownership anchor, including history
+  represented only by compaction, branch summaries or Extension context messages.
+  Missing ownership blocks private capture, remember and commit rather than silently
+  adopting that history; original Pi history remains intact. Non-context metadata
+  alone does not make an otherwise fresh session historical. This guard is not a
+  substitute for the pending immutable team/project provenance contract.
+  Explicit `--user-data-dir` profiles keep their own `openviking/` tree; they never
+  adopt the normal `Application Support/New Money` memory tree. Normal launches
+  retain the canonical layout unchanged; no automatic data migration occurs.
+  Local storage does not imply offline model inference: extraction and embeddings
+  use explicitly configured, user-paid providers. Missing providers leave data
+  intact and report unavailable processing; they never trigger a silent fallback.
+  Managed memory model settings hide saved API keys by default. Ordinary settings
+  readback remains secret-free; an explicit eye action may reveal the user's saved
+  embedding key for the selected endpoint. Hide, window blur, page hiding or leaving
+  the form clears display references and ignores late reveal results. This does not
+  expose runtime-signing private keys or change other credential surfaces. Retaining
+  a key is explicit and limited to the exact same protocol/endpoint; changing the
+  endpoint requires a replacement key. Saving configuration alone neither calls
+  models nor starts/restarts memory, and takes effect on the next service start.
+  A separate local-runtime section opens a Main-owned native directory picker.
+  Private memory, team indexing and team queries have separate labeled installation
+  rows and fixed destinations; they never substitute for one another. The three
+  purposes share one pending/cancel transaction and do not grant team access.
+  Installation verifies the signed source and staged copy, never overwrites an
+  existing version, and supports cancellation. Presence is not proof of admission;
+  startup still verifies the runtime. Installation neither starts memory nor calls
+  models. This local import does not yet provide a download/distribution channel.
+  Private managed memory has a separate explicit opt-in. It defaults off and
+  persists only a non-secret preference, separately from model settings and login.
+  Enabling requires a detected private runtime and saved model configuration, but
+  neither detection nor saving consent certifies runtime admission. Enablement
+  applies after quitting and reopening New Money; no active Session is silently
+  restarted. The supported macOS Main always selects the managed connection route,
+  with Main-owned consent gating, so disabled consent cannot fall back to a legacy
+  external OpenViking endpoint. Disabling fences new/in-flight connections, waits
+  for owned service cleanup and saves the preference without deleting private data.
+  Failed persistence is explicitly unknown; failed cleanup is not reported stopped.
+  Re-enabling after a stop requires another application launch. Host recovery alone
+  cannot bypass this boundary. Settings distinguishes saved preference, restart
+  requirements and observed service lifecycle; running does not prove Session
+  capture or successful model processing. Team knowledge remains independent.
+  With saved launch consent, Main prepares the private service once in the
+  background after Agent Host readiness, without awaiting it before renderer
+  handoff. This uses normal full admission and the same single-flight as Session
+  startup; no Session, capture, recall or model request is created by preparation.
+  Disabled/unknown consent and enablement awaiting restart never warm up. Failure
+  remains visible in lifecycle state, with no automatic background retry. A first
+  Session arriving during preparation still waits for its real connection.
+  Workbench private health, reads and search use the current Main-admitted scoped
+  connection in managed mode, never saved manual/CLI/environment credentials.
+  Observation cannot start a sidecar. Session statistics come from the loaded
+  private owner's exact Pi-to-OpenViking lineage, not a guessed Session ID.
+  Missing ownership or metadata is unavailable/unknown, not fabricated zero counts.
+  The inspector refreshes after turn/archive completion and connection recovery;
+  its captured count measures messages, not conversational rounds. Background
+  refresh only reads diagnostics; it never retries Commit or starts model work.
+  Manual archive preserves recent-turn retention and distinguishes no eligible
+  messages from accepted work. Only an exact owner task/Session/archive receipt
+  confirms processing completion; bounded observation failure stays unconfirmed,
+  never an automatic Commit retry. Completion does not guarantee new memories.
+  Explicit legacy diagnostics remain confined to the Advanced manual-address action.
+  The default memory page reads Main's managed lifecycle, not a manually configured
+  endpoint. An explicit local health check probes only the already running admitted
+  handle, with a three-second timeout and no redirects, credentials or model calls.
+  It never enables, starts or restarts memory; stale success after stop/revocation
+  is withheld. Legacy manual endpoint configuration and its separate explicit probe
+  remain under Advanced, labeled as unrelated to managed private memory. Opening
+  Settings does not automatically probe that legacy endpoint.
+  Full signed-runtime delivery and platform/end-to-end acceptance remain subject
+  to ADR 0002; Windows activation is unavailable until its native boundary is certified.
+  New Money login, explicit team selection, and Workspace binding only make the
+  current trusted project
   eligible to create a separate redacted candidate. A candidate is assembled from
   one exact Pi JSONL snapshot and its exact OpenViking Session Commit memory diff,
   then requires whole-value credential redaction, a residual credential scan,
   explicit local outcome/redaction review, and a separate submit
-  action. Submission means `enterprise review pending`, never `shared`; publishing
-  remains a distinct DataHub governance action and never exposes the private source
+  action. Submission means `team review pending`, never `shared`; publishing
+  remains a distinct New Money governance action and never exposes the private source
   Session or private Memory URI.
 - Recall follows OpenViking's official current-prompt lifecycle: every current
   Prompt submission synchronously asks the server for one actor/Workspace-scoped context block
@@ -236,13 +318,17 @@ the only Runtime and behavior specification source.
   canonical URI ownership before dispatch; forget previews bind Workspace, peer,
   user and exact target and revalidate them before execution. The default peer is
   derived from the Pi Session cwd, not the shared Host process cwd; direct account
-  Resource ingestion remains an enterprise-governed Gateway action. Every
+  Resource ingestion remains a New Money team-governed action. Every
   returned body is bounded and untrusted, including archived Session messages.
 - OpenViking capture is outbox-first and lineage-aware. Stable source-message
   identities plus remote preflight prevent crash-window duplicate appends;
   Branch/Fork/Rewind starts a separate OpenViking Session lineage rather than
   mixing replaced history. Queue directories, entries and the latest restore
-  watermark bind an immutable Endpoint/Account/User/effective-peer scope. An
+  watermark bind an immutable scope: external compatibility uses
+  Endpoint/Account/User/effective-peer; the explicit Main-managed private connection
+  uses localProfileId/Account/User/effective-peer in a separate namespace, so
+  rotating loopback ports and keys do not orphan its queue. Managed connections
+  cannot adopt external or legacy queues and cannot select a team account. An
   incomplete actor uses the credential only as an input to the combined scope
   digest; no credential or separate credential hash is stored. Unscoped legacy
   queues remain isolated. Historical Sessions with unverified or mismatched
@@ -252,33 +338,256 @@ the only Runtime and behavior specification source.
   automatic Recall and Capture after a transient outage without user refresh.
   Environment, `ovcli.conf`, and local server credentials are never field-wise
   combined, and a file credential is accepted only for its matching endpoint.
-- Enterprise Experience and SOP retrieval asks OpenViking for a bounded candidate
-  set, intersects it with DataHub's current Account/Project active allowlist, then
+  Host-managed mode is explicit: broker availability alone does not select it.
+  Main owns the startup selection; an inherited shell flag cannot enable it.
+  Its single admitted memory Extension obtains a scoped connection through Pi's
+  session-local resource bus. Missing managed setup leaves Pi available but Memory
+  unavailable, without contacting an external fallback. Disabled Memory does not
+  request local startup. Default application activation still requires cutover validation.
+- Shared Experience and SOP retrieval searches Desktop's local OpenViking projection
+  of New Money PostgreSQL content for a bounded candidate set, intersects it with the selected Team/Project active
+  allowlist, then
   deterministically reranks eligible assets using semantic relevance, task and
   applicability overlap, negative applicability, evidence, confidence, freshness,
   expiry, and SOP version before enforcing the final result limit. Revoked,
   cross-Project, and expired assets cannot become prompt context even when their
   vectors remain highly ranked.
-- Context/Memory Settings separates `记忆与隐私`, `企业经验`, and `高级`.
+- Team-wide knowledge requires active team membership; restricted project content
+  additionally requires explicit project membership, including administrator reads.
+  Hosted credential renewal is bound to the current sign-in generation. Starting
+  sign-in, disconnecting or shutting down blocks old credential access and rejects
+  late renewal results; disconnect does not renew credentials just to revoke them.
+  Secure-storage writes are serialized with obsolete-write cleanup and sign-out.
+  This credential guard does not by itself certify team history revocation.
+  In-flight shared Experience/SOP search and read results are rejected after
+  sign-in changes, disconnect, Host shutdown or Workspace rebinding. Late binding
+  responses cannot refill an invalidated cache. Scope is rechecked after local
+  asynchronous feedback/observation work before returning content to the Tool.
+  These request guards do not persist immutable Session provenance or revoke
+  content already admitted to an earlier conversation.
+  Host shared Experience/SOP reads now obtain an exact user/team/project
+  authorization snapshot before content access and recheck its immutable deadline
+  before returning results. Invalid scope, policy shape, revision or expiry fails
+  closed; an older server without this endpoint has no permissive fallback. Lease
+  time is bounded from request start, not extended by response latency. Wall-clock
+  and monotonic elapsed-time limits both apply; observed clock rollback invalidates
+  the snapshot, and an invalidated snapshot never revives when the clock changes.
+  A fresh server authorization is required after invalidation. This is
+  read admission only. Model-facing shared Tools pass Pi's current model base URL
+  and model ID to Host; content transport requires an exact canonical endpoint/ID
+  match for the policy's agent purpose. Missing models and empty policies deny
+  access without model switching. User governance reads retain scope authorization
+  without claiming model processing. Recurring refresh, immutable team Session
+  provenance, historical-context model admission and projection freshness remain pending.
+  Desktop now records a bounded `pi67.memory-provenance.v1` custom entry in Pi
+  JSONL for newly bound, empty, non-forked private Sessions. Existing context is
+  not auto-adopted. First-party shared Tool execution records a monotonic
+  `shared-unverified` entry before access, including failed attempts. Workbench
+  private Commit checks the entire entry set, not only the active branch, and
+  refuses shared, unknown, malformed or inherited provenance before and during
+  owner admission. This conservative record contains no knowledge bodies or
+  credentials. It is not a verified team/project identity and does not yet enforce
+  read-only model continuation for shared history; automatic capture retains its
+  separate OpenViking privacy/source guard.
+  Model-generated navigation titles require verified private provenance across
+  the full Pi entry set. Automatic generation skips shared, unknown, malformed or
+  inherited history without a model call; explicit regeneration reports the
+  restriction. Existing/local seed titles, reading history and manual naming remain
+  available. A pending title cannot persist after provenance becomes unverified.
+  This blocks the independent title-model path, not the main agent continuation loop.
+  A shared-history migration fence explicitly cancels Pi compaction (manual,
+  threshold and overflow), new-file forks and tree transitions when the full entry
+  set contains shared Tool history or non-private/invalid/inherited Desktop markers.
+  Cross-runtime forks check the source JSONL before creating a child file. Cancelled
+  tree transitions do not emit successful rollback events. Unmarked legacy history
+  retains existing transition behavior; that compatibility is not verified private
+  ownership. Ordinary history reading remains available. This fence does not yet
+  authorize verified team Sessions or stop the main Agent continuation loop.
+  The main and child Agent streamFunction now additionally checks the full Session
+  provenance before each transport invocation. Identified shared or invalid/inherited
+  Desktop history stops with a Pi error event, including the next iteration after a
+  shared Tool; the original model and transport are unchanged. A birth-bound team
+  Session may continue only after current identity/project/model authorization and
+  revalidation of every distinct shared asset revision in all Pi entries, including
+  inactive branches. Missing/malformed references, unresolved shared calls, shared
+  error results and derived summaries without asset provenance fail closed. Checks
+  deduplicate identical references but never replace old content with newer content.
+  History changes or cancellation during admission prevent transport. Current detail
+  reads enforce active state and access; their revisions must match persisted details.
+  Shared Tool results also require the same active Session manager, birth identity
+  and request model at completion. Stale results are withheld; invalidated or reopened
+  Session bindings must search again before reading shared content. This check does
+  not replace current model policy or authorize the new canonical-body transport.
+  Canonical local team knowledge now has separate `viking_team_search/read` tools
+  selected by Main on macOS arm64 after establishing the local profile. This route
+  is independent of private memory service activation; other platforms remain off.
+  Tool discovery alone grants no team access, model permission or index readiness.
+  Disabled memory or the `off` privacy mode blocks team embedding, search and body
+  reads before credential access or model processing; read-only mode still permits reads.
+  Search chooses team
+  or birth-project scope explicitly and returns at most five ranked asset versions;
+  read requires the latest Session-local selection and returns the canonical
+  experience/SOP title, summary and body without invented legacy fields. Pi JSONL
+  retains untrusted source details. Each subsequent model request revalidates the
+  same asset revision in the current authorized index, including inactive branches;
+  unrelated index updates do not substitute or invalidate that revision. Changed,
+  revoked or unverifiable content blocks processing. Private memory capture stays
+  denied for these tools. A runtime with the canonical local team port exposes only
+  `viking_team_search/read`, not the legacy shared Experience/SOP tools alongside
+  them. Failed local access never selects or reveals hosted fallback tools. Runtimes
+  without that port retain their explicit legacy compatibility tool set; old history
+  readers remain available solely under the existing current-authorization checks.
+  Missing configuration, signed query runtime, published index or current authority
+  fails explicitly at use, without private/external runtime fallback or automatic
+  download, synchronization, index building or model switching.
+  Unmarked legacy history keeps compatibility, not a verified-private grant. An
+  admitted team stream retains its current grant and SOP expiry checks: every incoming
+  Pi event and a one-second idle timer revalidate them and the Session identity.
+  Known invalidation aborts the transport and settles Pi with an error; late events
+  and Tool calls cannot revive it, even if the provider ignores abort. Caller abort
+  remains an aborted result. Terminal results remove timers/listeners. This cannot
+  recall transmitted content or guarantee that the remote provider stops computing;
+  credential resolution before transport and arbitrary extension-owned calls remain
+  outside this guard. While the model stream remains active, a single-flight refresh
+  starts every minute using monotonic elapsed time, rechecking identity/model policy
+  and every historical asset revision. Only a complete successful refresh replaces
+  a still-valid old grant. Explicit denial, changed assets or malformed responses
+  terminate the request. Classified transport outages (network/timeout, HTTP 408/429/5xx)
+  retain only the old unexpired grant, never extend it. Request completion/abort
+  cancels the refresh; late success cannot revive the request. HTTP denials are
+  classified before reading an error body. This polling is not push revocation.
+  Tool preparation additionally checks the current model request's team grant before
+  and after Pi's existing Tool-call hooks, including a pending approval. It preserves
+  existing safety decisions and rejects grants from another Agent run or Session.
+  The exact prepared Pi Tool also checks that grant immediately before execution,
+  including already-prepared calls in a parallel batch. During execution it checks
+  every second and before updates/results, latches invalidation and aborts the Tool's
+  signal. Late updates/success are withheld. A Tool that ignores cancellation stays
+  pending until its underlying execution settles; no false idle or rollback is claimed.
+  Cancellation cannot undo prior external side effects. Active Tools and pending
+  Tool-call hooks/approvals from the same
+  model request now share one single-flight renewal each minute. Renewal rechecks
+  current identity/model policy and every asset revision in that model's admitted
+  history basis; it allows appended Tool records but not branching away from that
+  basis. Unfinished new shared calls do not invalidate the old basis or authorize
+  new model input: the next model request still validates the full current history.
+  Only complete success replaces a still-valid old grant. Classified transport
+  failures retain its original deadline; other failures latch denial for the run,
+  including the next model continuation. When the last active Tool or approval hook
+  settles, pending renewal is cancelled; abort and expiry also cancel it. Late success
+  cannot revive it. An approval hook that ignores cancellation remains pending until
+  it settles, but an invalidated grant cannot authorize execution after approval.
+  Idle Sessions do not renew, and a new user-initiated run must authorize afresh.
+  Model-facing shared Experience/SOP Tools now require one valid birth-bound team
+  identity in the full Pi entries and carry it with the selected model to Host.
+  Host verifies the birth identity's user/service against current credentials and
+  service configuration, then authorizes its exact team/project and selected model
+  before content transport. Shared recall feedback keys include hashed canonical
+  service/user/team/project identity in addition to Workspace and asset identity,
+  so same-ID assets in another scope do not inherit feedback. Legacy unscoped
+  feedback is preserved but not adopted into scoped reads; identity fields are not
+  persisted in plaintext in observation records. Model-facing reads neither require nor modify Workspace
+  binding. Governance reads still require that binding. Workspace rebinding fences
+  in-flight reads conservatively, but subsequent team reads retain birth scope
+  rather than retargeting it. Valid team tools preserve the
+  single team marker, including on failure; private/unverified attempts remain
+  conservatively restricted. Governance reads keep their separate scope checks.
+  This enables per-request admission and active-model-stream renewal, not team
+  creation UI, whole-Task/idle authorization, explicit wake-before-resume fencing or
+  immutable synchronization. A new request still requires fresh authorization.
+  Main now forwards native suspend/resume events directly to Host, independently of
+  renderer recovery. Pending startup retains the last state and delivers it before
+  renderer handoff. On receipt, Host invalidates prior team grants and pending shared
+  reads; suspend also rejects new team admission. Resume never revives an old grant:
+  a new request reauthorizes. Login credentials and private data are not cleared.
+  This is a receipt-driven fence, not proof of OS/IPC ordering before every resumed
+  provider packet; real sleep/wake race testing and whole-Task fencing remain pending.
+  Team compaction/forks, title generation and private-memory writes remain restricted.
+  Team-derived native subagent spawn/resume/steer is also blocked until child
+  identity and inherited asset authorization are implemented; status/stop remain available.
+  Shared Experience/SOP search and detail admission requires the expected asset
+  kind, explicit active status and a null revocation timestamp. Missing or
+  contradictory lifecycle metadata fails closed. SOP expiry is checked on parsing
+  and again before Host returns content after asynchronous work; expiry at the
+  current time is already invalid. These checks do not reauthorize historical
+  revisions or revoke content already returned to a caller.
+  OpenViking restore now also reads Desktop provenance from the full Pi entry
+  set. A shared, malformed, duplicate or foreign-Session marker blocks private
+  capture, remember, commit and outbox replay even with a valid OV anchor. Branch
+  synchronization observes restrictive markers monotonically. External-mode
+  histories without Desktop markers retain their existing OV ownership checks;
+  absence is not a new Desktop private-origin grant.
+  Team sessions may use private memory but never automatically write private
+  long-term memory. Conversation provenance survives summaries, forks and
+  compaction. Membership loss, logout or asset revocation retains read-only local
+  history and blocks continuation, fork, extraction and model replay. Downloaded
+  copies cannot be remotely recalled. See ADR 0002 for the accepted synchronization,
+  model-policy and lifecycle contract; its migration is not yet runtime-verified.
+- Context/Memory Settings separates `记忆与隐私`, `团队经验`, and `高级`.
+  Explicit internal index construction first catches up the selected team/project's
+  content; incomplete sync or unconfirmed persistence blocks construction before
+  model execution. This does not make startup/login build indexes or change the
+  settings sync action into a paid indexing action. Team Experience now offers
+  separate explicit team/current-project index-build actions, disclosing configured
+  model costs and required team runtime. The scoped control prevents duplicate sync
+  or build work, cancels on unmount and ignores late replies. A confirmed build is
+  a historical publication observation, not current authorization or search readiness.
+  Cancelled/failed communication reports an unconfirmed outcome, never rollback or
+  automatic retry. Default tool rollout remains pending.
+  Team Experience offers explicit team-content sync and current-bound-project sync
+  after login and team selection with saved configuration. Progress means receipt
+  persistence only, never searchable-index readiness; private memory is not uploaded.
+  Users can cancel, and leaving the surface or changing identity/scope cancels its run.
   Private learning is the first/default mode; one explicit Save applies the
   draft across tabs, and navigation protects unsaved changes. Testing checks
-  saved service configuration only. Enterprise setup remains optional and does
+  saved service configuration only. New Money setup remains optional and does
   not expose private data; advanced details preserve lifecycle/security rules.
   Manual current-session archive lives in the workbench Memory panel, using the
-  existing Session Commit command and reporting accepted background work.
+  existing Session Commit command and reporting accepted background work. It
+  requires exactly one initialized, open Task in the requested Workspace and the
+  matching idle Pi Session. Host dispatches through that Session's admitted
+  OpenViking owner, not a direct HTTP fallback. The owner resolves its actual OV
+  lineage and rechecks privacy/source authority before submission. Missing or
+  duplicate owners, stale/busy Sessions, read-only/off modes and unverified/shared
+  history fail explicitly. A completed command means the Commit was accepted,
+  not that background extraction finished. Managed sidecar task ids are not sent
+  to legacy external candidate tracking; that candidate cutover remains pending.
 - Privacy changes inside a loaded Session are monotonic. `read-only` and `off`
   take effect at the next Pi lifecycle or OpenViking Tool boundary and remove
   later write/capture authority; enabling Memory, reopening learning, or changing
   Owner/Endpoint requires a new Session. Actor scope is a hard boundary: a server
   that rejects `peer_scope` receives no unscoped retry or wider raw-search fallback
   for that Prompt.
+- Shared Experience and SOP deep reads require an exact id from that tool family's
+  latest successful search in the current Pi Session. Starting another search
+  invalidates previous selections, including when that search fails. A changed
+  project or content revision, Session switch, tool-instance replacement, or
+  cancellation blocks stale admission and requires a fresh search. These transient
+  selections do not replace hosted authorization or the pending immutable
+  team/project Session provenance contract.
+- The OpenViking Extension stops private capture, remember, commit and its pending
+  replay when any first-party shared Experience/SOP Tool is attempted. This is
+  monotonic within the loaded Session, even if the Tool fails. Restore checks the
+  full Pi entry history for these Tool calls/results, including inactive branches;
+  a pre-existing private ownership anchor does not override shared-source evidence.
+  Merely mentioning a Tool name in ordinary text does not trigger this guard.
+  This conservative migration guard also covers the routed workbench Commit;
+  it does not implement immutable team identity, revoked history or certify
+  provenance of older queued data.
+- Managed and external Extension outbox replay requires the current anchored OV
+  Session/lineage as well as the memory scope. Other Sessions' pending records,
+  expired records and abandoned processing claims stay untouched; a new private
+  Session cannot adopt them. Resume the original verified Session to replay its
+  own work. Session/lineage changes during replay stop further dispatch.
+  This isolates replay ownership; it does not certify old payload contents or
+  replace the pending immutable team provenance/revocation contract.
 - Recall observations are local, bounded, and privacy-safe: only route, duration,
   counts, scores, configuration detail, and SHA-256 identifiers are retained; raw
   queries, recalled bodies, local paths, identities, and credentials are excluded.
   The Memory Inspector reports sample count, p50/p95, automatic-current-prompt and
   on-demand-Tool search rates,
   and accepts `有用 / 无关 / 过期 / 错范围 / 错误` feedback. Feedback adjusts or
-  suppresses later local results within the same Workspace boundary; enterprise
+  suppresses later local results within the same Workspace boundary; team
   aggregation remains a separate future governance contract.
 - One exact Session Commit creates one pseudonymous task Case, not an SOP. A
   reviewed Experience must add reusable preconditions, ordered steps, Tool
@@ -286,7 +595,7 @@ the only Runtime and behavior specification source.
   rollback or non-applicability explanation. Desktop labels an Experience as
   eligible for an SOP candidate only after at least three successful independent
   Cases across two Workspaces carry a complete method. Eligibility never publishes
-  an SOP. DataHub owns organization Owner, immutable versions, approval,
+  an SOP. New Money owns team roles, immutable versions, approval,
   supersession, expiry, rollback and release. A published SOP uses its own versioned
   OpenViking resource and exactly one active version per Account/Project/stable key;
   deprecated versions are never recalled unless an authorized restore makes one
@@ -785,10 +1094,15 @@ the only Runtime and behavior specification source.
   their own bounded navigation, use a two-column shell on wide windows, and
   provide an explicit `返回工作台` action that restores the prior conversation or
   Workspace without stopping background tasks.
-- The footer shows a signed-out account entry and a help menu. Account opens the
-  Settings account section; local Pi, Workspace, and Session use does not require
-  login. Enterprise and team capabilities remain unavailable until a real
-  account service is integrated.
+- The footer account entry and help menu remain compact. Local Pi, Workspace,
+  Session, private Memory, and private Experience use never require login. New Money
+  sign-in lives under Context/Memory, uses browser-approved device authorization,
+  and adds only team, project, shared-knowledge, entitlement, and audit capabilities.
+- Team quota presentation follows the server's optional `quotasExempt` boolean
+  (absent means false), never a team name or locally inferred plan. Exempt teams
+  show member count without a finite commercial cap; active exempt teams are
+  labeled internal use. Suspended, expired and other entitlement states remain
+  visible. This flag grants no team/project access or model-processing authority.
 - The user-visible application name and icon are `π` with the locked black-square
   and white-mark assets. `com.pi67.desktop`, the `pi67` URL scheme, package names,
   GitHub repository, executable names, and `Pi-67-Desktop-*` release artifacts
@@ -1101,6 +1415,12 @@ the only Runtime and behavior specification source.
 - The collapsed Composer model control shows only the readable model name. Its
   open list keeps Provider ownership and the complete `provider/model-id`
   visible for disambiguation without consuming permanent Composer width.
+  When Pi supplies `deepseek-flash`, Composer choices omit the official DeepSeek
+  retired aliases `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp`, except
+  for an already selected identity. This applies to drafts and live Sessions;
+  it never changes Pi's catalog, saved defaults, historical IDs, or active model.
+  Without the canonical model in Pi's available choices, legacy choices remain.
+  `deepseek-v4-pro` and other Providers are unaffected.
 - Long-running work has an explicit accepted/running/waiting/terminal lifecycle,
   and Host replacement cannot make a stale response or extension request current.
 - Visible Turn activity is derived from real Pi SDK events and owned by the Agent
@@ -1165,6 +1485,11 @@ the only Runtime and behavior specification source.
   prompt stash is discarded directly; a content-bearing draft requires confirmation.
   Runtime selectors alone do not make the draft content-bearing. This action removes only
   the Renderer task and encrypted draft checkpoint, never a Pi Session or JSONL.
+- Session creation reports delayed confirmation after five seconds and allows
+  one same-key acknowledgement retry for up to another 25 seconds, accommodating
+  signed local-memory cold startup within the 30-second creation test window.
+  This does not start another creation, switch Host authority, submit a Prompt
+  before the exact acknowledgement, or extend generic transport deadlines.
 - If `session.create` still ends with an unknown acknowledgement outcome, Desktop
   never submits a second create automatically. It keeps one provisional conversation
   in persisted Workbench state and reconciles it by the stable `creationId` written as
@@ -1182,7 +1507,42 @@ the only Runtime and behavior specification source.
   removes only the empty Renderer placeholder and never deletes or rewrites Pi JSONL.
   A draft or attachment blocks dismissal so unsent user content cannot be discarded.
 - Session creation intent is durably journaled before Pi receives a creation side
-  effect. `reserved` must complete a bounded exact-marker scan before advancing to
+  effect. For a fresh Task with a creationId, private provenance and the exact
+  creation marker are persisted before Desktop binding and extension session startup,
+  not after activation. Setup failure disposes the unbound Session while preserving
+  journal/marker recovery. This ordering is not a verified team Session identity.
+  `session.create` request may explicitly include teamId/projectId. Host authorizes
+  that exact project using current credentials and derives userId/service endpoint;
+  neither is accepted from Renderer. Initial and subsequent creation persist a
+  birth-only team provenance marker before startup. Identity assignment cannot adopt
+  existing message history or replace another provenance marker. Creation grants
+  are checked during setup and before publication; they are not persisted as leases.
+  Renderer immediate creation now accepts an explicit team scope, snapshots only its
+  teamId/projectId before connection recovery and sends it with the creationId in a
+  distinct Task. It never adopts the current private draft, infers scope from login
+  or binding, or retries a rejected team creation as private. Ambiguous creation
+  retains the existing exact-creation recovery fence. Provisional creation intent now
+  carries explicit team scope through non-empty draft persistence, recovery and first
+  send. Main accepts only bounded teamId/projectId on provisional records, never a
+  user identity or reusable grant; malformed scope rejects the record envelope rather
+  than converting it to private. Empty drafts are reused only within the same scope.
+  Stale recovery cannot overwrite a different current scope; scope drift during
+  connection recovery stops materialization. Materialized drafts omit this creation
+  intent and defer to Pi JSONL provenance. Session snapshots project memoryOrigin
+  from the full Pi history as private, team (teamId/projectId only), or unverified.
+  Missing, malformed, contradictory or inherited provenance is never displayed as
+  verified private. This describes origin, not current membership or authorization;
+  old snapshots without this optional field are unverified, not implicitly private.
+  The provisional surface now exposes explicit team/project selection. Applying it
+  opens a separate empty draft, preserving the original draft and attachments;
+  returning to private also opens separate work and never reclassifies a Session.
+  Lists load only on disclosure, expose loading/error/empty/retry states, and do not
+  auto-select a project. Materialized live conversations show projected origin,
+  not current permission; stopped history does not yet expose this label.
+  Omitted scope stays private; team model processing still requires the separate history authorization
+  above, and forks, compaction and private capture remain restricted.
+  The journal's
+  `reserved` must complete a bounded exact-marker scan before advancing to
   `materializing`; only a proven missing result may call Pi `newSession()`. An exact
   marker plus the physical JSONL identity commits `materialized`, and a constructed
   authoritative bootstrap advances `published`. After restart, `materializing`

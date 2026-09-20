@@ -19,6 +19,25 @@ afterEach(async () => {
 });
 
 describe("EnterpriseCredentialStore", () => {
+  it("persists cosmetic names across store recreation without changing credentials; stale writes cannot resurrect sign-in", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-enterprise-profile-"));
+    roots.push(root);
+    const encryption = { isAvailable: () => true, encrypt: (value: string) => Buffer.from(value),
+      decrypt: (value: Buffer) => value.toString() };
+    const store = new EnterpriseCredentialStore(root, { encryption });
+    await store.store(credential);
+    await store.updateDisplayName({ ...credential, displayName: "whois67" });
+    await expect(new EnterpriseCredentialStore(root, { encryption }).load()).resolves.toEqual({
+      storage: "available", credential: { ...credential, displayName: "whois67" }
+    });
+    await store.store({ ...credential, accessToken: "rotated" });
+    await expect(store.updateDisplayName({ ...credential, displayName: "stale" })).rejects.toThrow("obsolete");
+    await expect(store.load()).resolves.toMatchObject({ credential: { accessToken: "rotated" } });
+    await store.clear();
+    await expect(store.updateDisplayName({ ...credential, displayName: "stale" })).rejects.toThrow("obsolete");
+    await expect(store.load()).resolves.toEqual({ storage: "available" });
+  });
+
   it("rejects invalid Electron userData roots", () => {
     const encryption = {
       isAvailable: () => true,

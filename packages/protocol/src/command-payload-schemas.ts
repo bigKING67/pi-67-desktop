@@ -133,7 +133,9 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
     query: Type.String({ minLength: 1, maxLength: MAX_MESSAGE_SEARCH_QUERY_CHARS })
   }),
   "message.locate": strictObject({ id: Type.String({ minLength: 1, maxLength: 512 }) }),
-  "session.create": strictObject({ creationId: SessionCreationIdSchema }),
+  "session.create": strictObject({ creationId: SessionCreationIdSchema, teamScope: Type.Optional(strictObject({
+    teamId: Type.String({ minLength: 1, maxLength: 128 }), projectId: Type.String({ minLength: 1, maxLength: 128 })
+  })) }),
   "session.creation.resolve": strictObject({ creationId: SessionCreationIdSchema }),
   "session.open": strictObject({ path: PathSchema, cwdOverride: Type.Optional(PathSchema) }),
   "session.import": strictObject({ submissionId: SubmissionIdSchema, path: PathSchema }),

@@ -21,12 +21,25 @@ export async function dispatchHostAppCommand(
   options: {
     appConfiguration: AppConfigurationCommandRouter;
     contextMemory: ContextMemoryCommandRouter;
+    indexKnowledge(input: { teamId: string; projectId: string | null; signal: AbortSignal }): Promise<CommandResults["enterprise.knowledge.index"]>;
     idempotencyKey?: string;
+    signal?: AbortSignal;
     larkAuth: LarkAuthManagementPort;
     loadRuntime(): Promise<AgentRuntime>;
     collectDiagnostics(runtime: AgentRuntime): Promise<CommandResults["diagnostics.collect"]>;
   }
 ): Promise<CommandResults[AgentCommandType]> {
+  if (command.type === "enterprise.knowledge.index") {
+    try {
+      return await options.indexKnowledge({ teamId: command.payload.teamId, projectId: command.payload.projectId ?? null,
+        signal: options.signal ?? new AbortController().signal });
+    } catch (error) {
+      if (error instanceof Error && "outcome" in error && error.outcome === "indeterminate") {
+        throw new HostCommandError("RUNTIME_NOT_READY", "索引构建结果尚未确认，请勿立即重复构建。", false, { outcome: "indeterminate" });
+      }
+      throw error;
+    }
+  }
   if (isAppConfigurationCommand(command.type)) {
     return options.appConfiguration.dispatch(
       command as AgentCommand<AppConfigurationCommandType>,
@@ -36,7 +49,7 @@ export async function dispatchHostAppCommand(
   if (isContextMemoryAppCommand(command.type)) {
     return options.contextMemory.dispatchApp(
       command as AgentCommand<import("./context/context-memory-command-router.js").ContextMemoryAppCommandType>,
-      options.idempotencyKey
+      options.idempotencyKey, options.signal
     );
   }
   if (command.type === "lark.auth.status") return options.larkAuth.status();

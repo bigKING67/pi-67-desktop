@@ -188,6 +188,14 @@ Application-level surfaces use a separate wide-window shell:
   selected for Worktree restores that selection after restart; switching back
   to Local checkpoints the removal of Worktree intent immediately. Environment
   intent never appears on an already materialized Pi Session.
+- Below environment selection, `会话范围` shows the current draft intent and a quiet
+  team/project disclosure. Reuse the Settings React Aria team/project Select family,
+  with no new primitive or palette. Selection never changes the current draft:
+  `另开团队草稿` / `另开私人草稿` preserve it and create separate empty work. No default
+  team/project is inferred. Loading, empty, error/retry and creation-locked states
+  are explicit. Live materialized conversations show a compact, wrapping origin row
+  above Transcript; unknown origins never appear private, and team origin explicitly
+  does not certify current permission. No credential identity is rendered.
 - Clicking a conversation selects both that conversation and its Workspace.
   Switching conversations, collapsing a Workspace, or opening Settings never
   stops or reorders background tasks.
@@ -711,6 +719,19 @@ loading error where the operation can produce those states
 
 ### Workspaces, conversations, account, and Settings
 
+- The footer account button opens `账户与数据` and reflects the shared New Money
+  identity: login action when signed out, display name when signed in, explicit
+  pending/expired/unconfirmed states otherwise. It never derives account status
+  from private/team Session scope. Account settings owns device authorization,
+  logout, service address and team-management entry using existing Settings rows,
+  buttons and notices. Memory settings shows the same identity and an account
+  settings link, not a duplicate login flow. No navigation action itself logs out.
+  `刷新状态` explicitly fetches the latest hosted display name; loading/errors use
+  the shared unconfirmed account state. Passive footer reads do not fetch a profile.
+  Successful explicit refresh retains the name across restart without interrupting
+  team work. Team settings explain known permission/model/runtime failures in Chinese,
+  preserve unknown diagnostics and never automatically retry or relax authorization.
+
 - A Workspace is a project/configuration/Session Catalog container. A live Task
   is bound to one Workspace, one Pi JSONL Session, and one independent Pi Runtime.
   A Conversation is the navigation identity for either that live Task, an idle
@@ -832,7 +853,7 @@ loading error where the operation can produce those states
   editor, or semantic notice be the surface and forbids another ordinary card
   around it. Section headings remain outside all three surfaces.
 - `上下文与记忆` uses the shared neutral Settings Tabs: `记忆与隐私`
-  (default), `企业经验`, and `高级`. One document header owns `保存更改`
+  (default), `团队经验`, and `高级`. One document header owns `保存更改`
   for the shared draft; switching tabs preserves it, and leaving the category
   uses the standard unsaved-settings guard. Connection testing requires a saved
   draft and remains beside the service status rather than beside Save.
@@ -841,15 +862,86 @@ loading error where the operation can produce those states
   a visible radio indicator, one title and one concise description. Selection
   uses neutral surface/text roles; keyboard focus is distinct. Do not use
   independent promotional cards or an accent edge for these choices.
-- The memory service follows the mode group. Enterprise identity, gateway and
-  current-workspace binding belong to `企业经验`; engine and recall/archive
+- The memory service follows the mode group. Explicit team content-sync actions
+  and current-bound-project sync use the existing grouped
+  SettingsRow/secondary-button family under Team Experience, with inline polite
+  progress/error feedback and cancellation. Success copy says received locally,
+  never index-ready. Unsaved configuration or identity/scope changes unmount and
+  cancel this scoped control; an unbound project cannot be synchronized from it.
+  A sibling `本地共享索引` row provides explicit team/project build actions using
+  the same secondary buttons, not a new card or primary CTA. Description discloses
+  configured-model costs and team runtime requirements. Sync and build share one
+  pending owner; progress, stop, failure and publication notices remain inline and
+  polite. Cancellation says outcome unconfirmed, not rolled back. Success says
+  this build completed but search is not enabled by default; never use a green
+  ready badge or persist this observation as current readiness. Leaving the scoped
+  control clears transient feedback and cancels work; no unsolicited startup build.
+  New Money identity, explicit team selection, hosted endpoint, and
+  current-workspace project binding belong to
+  `团队经验`; engine and recall/archive
   parameters belong to `高级`, with expandable lifecycle/security detail.
   The standard section margin alone separates adjacent groups; do not add a
   second parent grid gap. Both themes retain the same layout and focus order.
+- Team selection keeps the existing secondary description and neutral option
+  styling in both themes. Server-confirmed quota exemption shows `N 人 · 不限额`
+  instead of `N/M 人`; only an active exempt team says `内部自用`. Other states
+  retain their actual entitlement label, including `已暂停` and `已到期`.
+  Missing exemption metadata retains ordinary quota display; names and plan codes
+  never select this presentation. No special badge or new interaction is added.
+- A quiet `私人记忆启用` group is the default managed service authority; no legacy
+  workbench health fallback may contradict it using a saved manual address.
+  Memory inspector counters show `未知` when Session metadata is unavailable;
+  loading/replacement clears old statistics instead of presenting zero or another
+  Session's counts. Existing metric typography, error styling and both themes remain.
+  No new status badge, color or interaction primitive is introduced. No legacy
+  endpoint health row precedes it. Saved preference and the
+  current service lifecycle occupy separate SettingsRows. Explicit enable/disable
+  uses the existing secondary-button family, discloses restart and model costs,
+  and never auto-restarts the app. Restart-required, missing runtime/model settings,
+  unknown persistence and failed cleanup use inline semantic notices, not a green
+  ready badge. Pending changes participate in the shared navigation guard and
+  disable conflicting install/model transactions. Status observation is bounded
+  to one in-flight request and pauses periodic reads while the page is hidden.
+  Both themes preserve labels, layout and keyboard focus order.
+  `检测本地服务` is a secondary action on the lifecycle row, enabled only for a
+  running service without a pending restart. It reports a bounded explicit health
+  result, not model or recall readiness. Failure leaves the observed lifecycle
+  intact. Unmounted views ignore late replies. Advanced separately labels
+  `兼容服务（手动地址）`; its address and probe never imply managed-service routing
+  or override the default lifecycle, and are not probed on initial page load.
+- A quiet `本地运行包` group follows the activation group, before model configuration.
+  Three neutral rows distinguish private memory, team indexing and team queries,
+  with concise purpose descriptions and individually named install actions. One
+  installation disables the other actions; only its row shows cancellation, and
+  result feedback names the affected purpose without claiming activation.
+  Its native directory picker, pending/cancel action and result notice use existing
+  Settings primitives. Missing, detected and verified-this-install states stay
+  distinct from service activation. No detected runtime is labeled ready; existing
+  versions are not overwritten. Pending installation participates in the standard
+  settings navigation guard; cancellation waits for owned staging cleanup.
+- Local memory model configuration follows the runtime group, with its own local
+  Save/Discard transaction and the standard unsaved-settings guard. The embedding
+  key is hidden by default; an adjacent eye button explicitly reveals the saved
+  key without marking the draft dirty. Hide, blur, document hiding and unmount
+  clear displayed saved-key references; cancellation ignores late replies. A draft
+  replacement can also be shown/hidden, but is never filled from a reveal response.
+  The compact eye stays beside its input at narrow widths, has an action label and
+  visible keyboard focus, and follows the existing Provider credential-eye family.
+  A dirty or saving model transaction disables switching to the other Memory tabs
+  until saved/discarded. Leaving Settings uses the combined guard for all active
+  transactions, so a clean form never masks another dirty or busy form.
 - Current-session `立即归档` belongs to the workbench Memory panel, beside
   current-session context, and remains disabled without a Workspace/Session or
-  while submitting. Acknowledgement means accepted for background processing,
-  never completed extraction. Settings owns defaults rather than this action.
+  while awaiting its bounded result. Inline live status distinguishes request
+  acceptance, retained recent messages, no messages, confirmed processing and
+  failed/unconfirmed processing. Acknowledgement never means completed extraction.
+  Unknown outcomes do not invite blind resubmission. Session changes discard stale
+  feedback. Settings owns defaults rather than this action.
+- The Memory inspector refreshes current-session statistics after a settled turn,
+  compaction/rollback, archive result and connection recovery, without polling or
+  model calls. Coalesce overlapping reads and discard stale Session/generation
+  results. Disconnection/read failure clears stale statistics to unknown. Label
+  the owner total-message count `已捕获消息数`, not conversational turns.
 - `飞书` uses the same page-level Tab language as other Settings workspaces instead
   of stacking both identity workflows into one long page. `用户授权` is the first and
   default tab; `应用连接` is second. Each panel contains its own explicit Grouped
@@ -1103,7 +1195,7 @@ loading error where the operation can produce those states
   The zh-CN Settings surface names this category `上下文与记忆` and uses Chinese
   product language for user-facing concepts such as sessions, owners, runtime
   state, service addresses, recall, and archives. `OpenViking`, `Pi`, `Pi JSONL`,
-  `DataHub`, protocols, and units remain unchanged as proper nouns or technical
+  `New Money`, protocols, and units remain unchanged as proper nouns or technical
   identifiers; English aliases stay searchable without becoming visible labels.
   A loaded Session may only tighten its Memory privacy authority: `read-only` and
   `off` are re-read at the next Pi lifecycle or OpenViking Tool boundary, while
@@ -1123,7 +1215,7 @@ loading error where the operation can produce those states
 - The `Experience` Inspector discards refresh and mutation results belonging to a
   previous Workspace; switching Workspace clears old candidates and binding state.
   It presents private records, exact task Cases, and
-  enterprise candidates in one dense governance list. Its hero and metrics teach
+  team candidates in one dense governance list. Its hero and metrics teach
   the progression `Case -> Experience -> SOP candidate` without presenting a new
   navigation tier. Every card shows its Case count and one compact SOP-readiness
   explanation; a single successful Case is explicitly `尚不是 SOP`. A candidate
@@ -1134,8 +1226,8 @@ loading error where the operation can produce those states
   remain optional. Outcome plus redaction use independent explicit confirmations.
   Credential handling replaces the complete credential-bearing expression, then
   runs a second residual scan. A field that remains credential-like cannot receive
-  `redactionStatus=passed` or enter enterprise submission.
-  `保存人工审核` and `提交企业审核` remain two separate actions.
+  `redactionStatus=passed` or enter New Money submission.
+  `保存人工审核` and `提交团队审核` remain two separate actions.
   `已提交` is visibly labeled as awaiting review and must never look equivalent to
   `已共享`; asynchronous Gateway failure stays visible beside the list and never
   resolves as success from the accepted operation alone.
@@ -1150,7 +1242,7 @@ loading error where the operation can produce those states
   pretending the feedback succeeded. The interface explicitly states that metrics
   retain hashes and bounded metadata, never query or Memory bodies. No extra modal,
   toast loop, or blocking prompt is introduced.
-- DataHub presents `候选`, `经验库`, and `SOP 库` as different governance stages.
+- New Money Web presents `候选`, `经验库`, and `SOP 库` as different governance stages.
   A formal SOP row shows its stable key, version, active/deprecated/revoked or
   expired retrieval state, optional expiry, immutable locator, and explicit revoke
   action. Only a deprecated, unexpired version exposes `恢复此版本`; restoring it
@@ -1158,7 +1250,8 @@ loading error where the operation can produce those states
   candidate uses the dedicated `发布 SOP` action and cannot fall through the
   ordinary Experience publication path.
 - Pi exposes separate `viking_sop_search` and `viking_sop_read` Tools after an
-  enterprise Workspace is bound. Search returns at most one active, unexpired SOP.
+  New Money Team/Project Workspace is bound. Search returns at most one active,
+  unexpired SOP.
   Both Tool Results use the existing untrusted Context envelope, escape injected
   markup, and state that an approved SOP still cannot authorize or auto-execute a
   Tool. The normal first-party Tool identity, schema, safety mode, and approval
@@ -2394,6 +2487,10 @@ loading error where the operation can produce those states
 
 ### Grouped choice implementation
 
+- Composer model groups omit retired official DeepSeek Flash aliases when Pi's
+  canonical `deepseek-flash` choice is available. Keep any already selected alias
+  visible with its exact ID; never silently select its replacement. Draft and
+  live Session menus use the same presentation rule, without changing Pi's catalog.
 - Build grouped choices with React Aria `ListBoxSection` and `Header`, not
   disabled heading options. Derive grouping from authoritative identity,
   preserve source order and stable option identity, and test section semantics,

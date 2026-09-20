@@ -4,6 +4,19 @@
     ".": {
       "entry": [
         "eng/capabilities/ai-berkshire-skill-pack-sync.mjs",
+        "eng/capabilities/probe-agent-host-session-electron.mjs",
+        "eng/capabilities/agent-host-session-electron-probe.ts",
+        "eng/capabilities/local-memory-settings-electron-probe.ts",
+        "eng/capabilities/probe-shared-knowledge-live-electron.mjs",
+        "eng/capabilities/shared-knowledge-live-electron-probe.ts",
+        "eng/capabilities/shared-knowledge-live-utility-probe.ts",
+        "eng/capabilities/team-model-port-electron-probe.ts",
+        "eng/capabilities/team-model-port-utility-probe.ts",
+        "eng/capabilities/team-worker-electron-probe.ts",
+        "eng/capabilities/team-worker-utility-probe.ts",
+        "eng/capabilities/team-index-deadline-probe.ts",
+        "eng/packaging/probe-packaged-team-runtimes.mjs",
+        "eng/packaging/probe-packaged-team-session.mjs",
         "eng/evals/openviking-agent-pilot/evaluation-extension.mjs"
       ]
     },
@@ -11,6 +24,7 @@
       "project": ["src/**/*.ts"]
     },
     "apps/desktop": {
+      "entry": ["src/openviking-runtime-installer.ts"],
       "project": ["src/**/*.ts"]
     },
     "apps/renderer": {
@@ -54,6 +68,7 @@
     "pnpm"
   ],
   "ignoreBinaries": [
+    "mkfifo",
     "pwsh"
   ]
 }

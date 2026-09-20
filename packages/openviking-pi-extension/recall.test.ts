@@ -30,6 +30,7 @@ describe("RecallManager official current-prompt lifecycle", () => {
     manager.queueSearch("first task");
     expect(manager.state).toBe("pending");
     expect((await manager.searchPending()).state).toBe("ready");
+    expect(manager.timing).toEqual({ contextRequestMs: expect.any(Number), otherRequestMs: 0, requestCount: 1 });
     const firstMessages = [
       { role: "user", content: "first task" },
       { role: "assistant", content: "first answer" },
@@ -40,6 +41,7 @@ describe("RecallManager official current-prompt lifecycle", () => {
     expect(firstMessages[2]?.content).toContain("memory:first task");
 
     manager.queueSearch("second task");
+    expect(manager.timing).toBeUndefined();
     expect((await manager.searchPending()).state).toBe("ready");
     const secondMessages = [
       { role: "user", content: "first task" },
@@ -53,6 +55,7 @@ describe("RecallManager official current-prompt lifecycle", () => {
     expect(searchBodies(fetchJSON).map((body) => body.query)).toEqual(["first task", "second task"]);
     expect(searchBodies(fetchJSON).every((body) =>
       body.session_id === "ov-session-1"
+      && body.telemetry === undefined
       && body.peer_scope === "actor"
       && body.query_expansion === "auto"
       && body.dedup_turns === 5)).toBe(true);
@@ -72,6 +75,23 @@ describe("RecallManager official current-prompt lifecycle", () => {
 
     expect(fetchJSON).toHaveBeenCalledTimes(1);
     expect(first[0]?.content).toEqual(continuation[0]?.content);
+  });
+
+  it("includes a sanitized server timing in the current managed recall without extra requests", async () => {
+    const fetchJSON = contextFetch();
+    const measured = { ...response("synthetic"), contextTiming: { durationMs: 50, embedQueryMs: 20 } };
+    fetchJSON.mockResolvedValueOnce(measured);
+    const managed = Object.assign(client(fetchJSON), { usesManagedConnection: true });
+    const manager = new RecallManager(managed, config(), () => "ov-session-1");
+    manager.queueSearch("measured prompt");
+    expect((await manager.searchPending()).state).toBe("ready");
+    expect(searchBodies(fetchJSON)[0]?.telemetry).toEqual({ summary: true });
+    expect(manager.timing?.server).toEqual({ durationMs: 50, embedQueryMs: 20 });
+    expect(fetchJSON).toHaveBeenCalledOnce();
+    manager.queueSearch("unmeasured prompt");
+    expect(manager.timing).toBeUndefined();
+    await manager.searchPending();
+    expect(manager.timing?.server).toBeUndefined();
   });
 
   it("skips short continuation prompts and clears stale Recall after a failed request", async () => {
@@ -106,15 +126,16 @@ describe("RecallManager official current-prompt lifecycle", () => {
     manager.queueSearch("current prompt");
     const current = manager.searchPending();
     await vi.waitFor(() => expect(fetchJSON).toHaveBeenCalledTimes(2));
-    pending.pop()?.(response("memory:current prompt"));
+    pending.pop()?.({ ...response("memory:current prompt"), contextTiming: { durationMs: 30 } });
     await current;
-    pending.shift()?.(response("memory:older prompt"));
+    pending.shift()?.({ ...response("memory:older prompt"), contextTiming: { durationMs: 90 } });
     await older;
 
     const messages = [{ role: "user", content: "current prompt" }];
     manager.injectContext(messages);
     expect(messages[0]?.content).toContain("memory:current prompt");
     expect(messages[0]?.content).not.toContain("memory:older prompt");
+    expect(manager.timing?.server).toEqual({ durationMs: 30 });
   });
 
   it("keeps a late, abort-ignoring search from writing into a replacement Session", async () => {

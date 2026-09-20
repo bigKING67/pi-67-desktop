@@ -22,6 +22,35 @@ describe("OpenViking SyncManager lineage and identity", () => {
     await rm(root, { recursive: true, force: true });
   });
 
+  it("keeps ordinary Tools and textual mentions eligible for private capture", async () => {
+    const transport = fakeTransport();
+    const sync = manager(transport.client, []);
+    sync.restore([], "pi-session");
+    await sync.ensureSession("pi-session");
+    sync.observeSharedToolCall("read");
+    await expect(sync.syncBranch([
+      message("user", "user", "Explain viking_shared_search without calling it."),
+      { type: "message", message: { role: "assistant", content: [
+        { type: "text", text: "I will read the local documentation." },
+        { type: "toolCall", name: "read", arguments: {} }
+      ] } }
+    ])).resolves.toMatchObject({ added: 2 });
+    expect(sync.blockedReason).toBeUndefined();
+  });
+
+  it("rejects shared-call history before extracting any part of a branch without a live Tool hook", async () => {
+    const transport = fakeTransport();
+    const sync = manager(transport.client, []);
+    sync.restore([], "pi-session");
+    await sync.ensureSession("pi-session");
+    await expect(sync.syncBranch([
+      message("private", "user", "earlier private prompt"),
+      { type: "message", message: { role: "toolResult", toolName: "viking_shared_read", content: [{ type: "text", text: "shared" }] } },
+      message("derived", "assistant", "derived answer")
+    ])).resolves.toMatchObject({ added: 0, blockedReason: "memory-scope-unverified" });
+    expect(transport.messages.get(sync.sessionId!)).toEqual([]);
+  });
+
   it("keeps the raw Pi Session identity separate from the derived OpenViking Session ID", async () => {
     const transport = fakeTransport();
     const sync = new SyncManager(transport.client, config(), { persistEntry: vi.fn() });

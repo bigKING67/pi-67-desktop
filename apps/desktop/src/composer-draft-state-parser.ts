@@ -18,12 +18,12 @@ import {
 } from "@pi67/protocol";
 import type { DesktopTextEncryption } from "./desktop-text-encryption.js";
 import { isBoundedSessionFileIdentity } from "./workbench-state-value-contract.js";
+import { parseDraftTeamScope, parseStartupModel } from "./composer-draft-creation-intent.js";
 
 export const MAX_STORED_COMPOSER_DRAFT_STATE_BYTES = 8 * 1024 * 1024;
 const MAX_ID_CHARS = 1_024;
 const MAX_DRAFT_ID_CHARS = 200;
 const MAX_SESSION_PATH_CHARS = 32_768;
-const MAX_RUNTIME_IDENTIFIER_CHARS = 512;
 const MAX_THINKING_LEVEL_CHARS = 64;
 export interface StoredComposerDraftState {
   version: 1;
@@ -48,12 +48,14 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
       candidate,
       [
         "conversation", "text", "streamBehavior", "updatedAt", "workspaceFiles", "reviewComments",
-        "promptStash", "environmentIntent", "interactionMode", "startupModel", "startupThinkingLevel"
+        "promptStash", "environmentIntent", "interactionMode", "startupModel", "startupThinkingLevel", "teamScope"
       ],
       ["conversation", "text", "streamBehavior", "updatedAt"]
     )) return undefined;
     const conversation = parseConversation(candidate.conversation);
     if (!conversation || typeof candidate.text !== "string") return undefined;
+    const teamScope = parseDraftTeamScope(candidate.teamScope);
+    if (candidate.teamScope !== undefined && (!teamScope || conversation.kind !== "provisional")) return undefined;
     const workspaceFiles = parseWorkspaceFileReferences(candidate.workspaceFiles);
     if (candidate.workspaceFiles !== undefined && !workspaceFiles) return undefined;
     const reviewComments = parseReviewComments(candidate.reviewComments);
@@ -121,6 +123,7 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
       ...(reviewComments?.length ? { reviewComments } : {}),
       ...(promptStash?.length ? { promptStash } : {}),
       ...(candidate.environmentIntent ? { environmentIntent: candidate.environmentIntent } : {}),
+      ...(teamScope ? { teamScope } : {}),
       ...(candidate.interactionMode ? { interactionMode: candidate.interactionMode } : {}),
       ...(startupModel ? { startupModel } : {}),
       ...(startupThinkingLevel ? { startupThinkingLevel } : {})
@@ -136,16 +139,6 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
     drafts,
     ...(selectedConversation ? { selectedConversation } : {})
   };
-}
-
-function parseStartupModel(value: unknown): ComposerDraftRecord["startupModel"] | undefined {
-  if (value === undefined) return undefined;
-  if (!isRecord(value) || !hasExactKeys(value, ["provider", "model"])) return undefined;
-  if (
-    !isBoundedString(value.provider, MAX_RUNTIME_IDENTIFIER_CHARS)
-    || !isBoundedString(value.model, MAX_RUNTIME_IDENTIFIER_CHARS)
-  ) return undefined;
-  return { provider: value.provider, model: value.model };
 }
 
 export function parseStoredComposerDraftState(value: unknown): StoredComposerDraftState | undefined {

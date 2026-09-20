@@ -15,9 +15,86 @@ vi.mock("electron", () => ({
 }));
 
 import { AgentHostSupervisor } from "./agent-host-supervisor.js";
-import type { EnterpriseCredentialBrokerPort } from "./enterprise-credential-supervisor.js";
+import { EnterpriseCredentialSupervisor, type EnterpriseCredentialBrokerPort } from "./enterprise-credential-supervisor.js";
 
 describe("AgentHostSupervisor readiness", () => {
+  it("starts background work only after OS and Host readiness, once and after port handoff", () => {
+    const host = fakeUtilityProcess(), window = fakeWindow();
+    electronMocks.fork.mockReturnValue(host as unknown as UtilityProcess);
+    const onReady = vi.fn(() => expect(window.postMessage).toHaveBeenCalledOnce());
+    const supervisor = createSupervisor(window.value, undefined, onReady);
+    supervisor.connect();
+    host.emit("message", readyMessage());
+    expect(onReady).not.toHaveBeenCalled();
+    host.emit("spawn");
+    host.emit("message", readyMessage());
+    expect(onReady).toHaveBeenCalledOnce();
+  });
+  it.each(["power", "exit", "stop"])("routes head observations only through a ready Host and retires them on %s", async action => {
+    vi.useFakeTimers(); const host = fakeUtilityProcess();
+    electronMocks.fork.mockReturnValue(host as unknown as UtilityProcess);
+    const supervisor = createSupervisor(fakeWindow().value), caller = new AbortController();
+    const id = "00000000-0000-4000-8000-000000000001";
+    const input = { owner: { userId: "user", endpoint: "https://service.invalid", teamId: id, scopeKind: "team" as const, scopeId: id },
+      models: { embedding: { endpoint: "https://model.invalid/v1", model: "embed", dimension: 4 }, extraction: { endpoint: "https://model.invalid/v1", model: "extract" } },
+      snapshot: { epoch: id, cursor: "7" }, permissionRevision: "a".repeat(64) };
+    supervisor.connect();
+    await expect(supervisor.teamIndexHeads.verify(input, caller.signal)).rejects.toThrow();
+    host.emit("spawn"); host.emit("message", readyMessage());
+    const pending = supervisor.teamIndexHeads.verify(input, caller.signal);
+    const request = host.postMessage.mock.calls.at(-1)![0];
+    expect(request.type).toBe("team-index-head-check");
+    host.emit("message", { type: "team-index-head-result", requestId: request.requestId, ok: true, validUntil: Date.now() + 60_000 });
+    const check = await pending; check();
+    let stopping: ReturnType<typeof supervisor.stop> | undefined;
+    if (action === "power") supervisor.notifyPowerTransition("suspend");
+    if (action === "exit") host.emit("exit", 1);
+    if (action === "stop") stopping = supervisor.stop();
+    expect(check).toThrow();
+    expect(host.postMessage).toHaveBeenCalledWith({ type: "team-index-head-cancel", requestId: request.requestId });
+    await expect(supervisor.teamIndexHeads.verify(input, caller.signal)).rejects.toThrow();
+    stopping ??= supervisor.stop(); host.emit("exit", 0); await stopping;
+  });
+  it("answers a receipt request through the actual Main dispatcher without opening access before sign-in", async () => {
+    const host = fakeUtilityProcess();
+    electronMocks.fork.mockReturnValue(host as unknown as UtilityProcess);
+    const supervisor = createSupervisor(fakeWindow().value);
+    supervisor.connect();
+    const id = "00000000-0000-4000-8000-000000000001";
+    host.emit("message", { type: "shared-knowledge-receipt-open", requestId: "receipt-open",
+      scope: { teamId: id, scopeKind: "team", scopeId: id } });
+    await Promise.resolve(); await Promise.resolve();
+    expect(host.postMessage).toHaveBeenCalledWith({ type: "shared-knowledge-receipt-open-result",
+      requestId: "receipt-open", ok: false, errorCode: "NOT_SIGNED_IN" });
+  });
+  it("invalidates receipt bindings on start, exact Host exit and stop", async () => {
+    vi.useFakeTimers();
+    const invalidation = vi.spyOn(EnterpriseCredentialSupervisor.prototype, "invalidateReceiptBindings");
+    const host = fakeUtilityProcess();
+    electronMocks.fork.mockReturnValue(host as unknown as UtilityProcess);
+    const supervisor = createSupervisor(fakeWindow().value);
+    supervisor.connect();
+    expect(invalidation).toHaveBeenCalledTimes(1);
+    host.emit("exit", 1);
+    expect(invalidation).toHaveBeenCalledTimes(2);
+    await supervisor.stop();
+    expect(invalidation).toHaveBeenCalledTimes(3);
+    host.emit("exit", 1);
+    expect(invalidation).toHaveBeenCalledTimes(3);
+  });
+  it("retains power state without starting a Host and sends it before renderer handoff", () => {
+    const host = fakeUtilityProcess();
+    electronMocks.fork.mockReturnValue(host as unknown as UtilityProcess);
+    const supervisor = createSupervisor(fakeWindow().value);
+    supervisor.notifyPowerTransition("suspend");
+    expect(electronMocks.fork).not.toHaveBeenCalled();
+    supervisor.connect();
+    expect(host.postMessage).not.toHaveBeenCalled();
+    host.emit("spawn"); host.emit("message", readyMessage());
+    expect(host.postMessage.mock.calls[0]?.[0]).toEqual({ type: "enterprise-power-transition", state: "suspend" });
+    supervisor.notifyPowerTransition("resume");
+    expect(host.postMessage).toHaveBeenLastCalledWith({ type: "enterprise-power-transition", state: "resume" });
+  });
   beforeEach(() => {
     electronMocks.fork.mockReset();
   });
@@ -175,7 +252,8 @@ describe("AgentHostSupervisor readiness", () => {
 
 function createSupervisor(
   window: BrowserWindow,
-  enterpriseCredentials?: EnterpriseCredentialBrokerPort
+  enterpriseCredentials?: EnterpriseCredentialBrokerPort,
+  onReady?: () => void
 ): AgentHostSupervisor {
   return new AgentHostSupervisor({
     agentHostEntry: "/app/agent-host.mjs",
@@ -187,6 +265,7 @@ function createSupervisor(
       sessionCatalogDirectory: "/private/user-data/projections/session-catalog"
     }),
     getMainWindow: () => window,
+    ...(onReady === undefined ? {} : { onReady }),
     ...(enterpriseCredentials === undefined
       ? {}
       : { getEnterpriseCredentials: () => enterpriseCredentials }),

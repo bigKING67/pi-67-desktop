@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ContextMemoryConfiguration } from "@pi67/domain";
+import type { PrivateMemoryCommitResult } from "@pi67/pi-runtime";
 import type { HostEventChannel } from "../host-event-channel.js";
 import { HostCommandError } from "../protocol-error.js";
 import type { WorkspaceContextRegistry } from "../workspace-context-registry.js";
@@ -7,7 +8,7 @@ import type { EnterpriseContextController } from "./enterprise-context-controlle
 import { captureSessionCommitProvenance } from "./experience-candidate-provenance.js";
 import type { CandidateCommitReceipt, ExperienceCandidateStore } from "./experience-candidate-store.js";
 import { detectMemoryOwnerConflicts } from "./memory-conflict-detector.js";
-import type { OpenVikingClient } from "./openviking-client.js";
+export type PrivateSessionCommit = (workspaceId: string, sessionId: string) => Promise<PrivateMemoryCommitResult>;
 
 export class ContextSessionCommitController {
   constructor(
@@ -15,7 +16,8 @@ export class ContextSessionCommitController {
     private readonly workspaces: WorkspaceContextRegistry,
     private readonly enterprise: EnterpriseContextController,
     private readonly candidates: ExperienceCandidateStore,
-    private readonly events: HostEventChannel
+    private readonly events: HostEventChannel,
+    private readonly commitPrivateSession?: PrivateSessionCommit
   ) {}
 
   async commit(input: {
@@ -24,11 +26,11 @@ export class ContextSessionCommitController {
     sessionId: string;
     operationId: string;
     configuration: ContextMemoryConfiguration;
-    client: OpenVikingClient;
   }): Promise<void> {
     let candidateReceipt: CandidateCommitReceipt | undefined;
     try {
       await this.assertLocalMemoryAvailable(input.configuration);
+      if (!this.commitPrivateSession) throw new HostCommandError("RUNTIME_NOT_READY", "Open the Session with its private memory owner before Commit.", true);
       candidateReceipt = await this.prepareCandidateCommit(input);
       if (candidateReceipt && candidateReceipt.state !== "prepared") {
         if (["tracking", "completed", "skipped"].includes(candidateReceipt.state)) {
@@ -41,17 +43,17 @@ export class ContextSessionCommitController {
           true
         );
       }
-      const result = await input.client.commitSession(input.sessionId);
+      const result = await this.commitPrivateSession(input.workspaceId, input.sessionId);
       if (candidateReceipt) {
         candidateReceipt = result.archived && result.task_id
           ? await this.candidates.markCommitTracking(candidateReceipt.submissionId, result.task_id)
           : await this.candidates.markCommitTerminal(
               candidateReceipt.submissionId,
               "skipped",
-              result.reason ?? "OpenViking did not archive new messages."
+              "OpenViking did not return an external candidate task receipt."
             );
       }
-      this.emitCompleted(input);
+      this.emitCompleted(input, result);
     } catch (error) {
       if (candidateReceipt?.state === "prepared") {
         await this.candidates.markCommitTerminal(
@@ -73,6 +75,9 @@ export class ContextSessionCommitController {
   }
 
   private async assertLocalMemoryAvailable(configuration: ContextMemoryConfiguration): Promise<void> {
+    if (configuration.defaultPrivacyMode === "off" || configuration.defaultPrivacyMode === "read-only") {
+      throw new HostCommandError("RUNTIME_NOT_READY", "Private memory Commit is unavailable in read-only or off mode.", true);
+    }
     const conflicts = await detectMemoryOwnerConflicts(this.agentDir);
     if (!configuration.enabled || conflicts.length > 0) {
       throw new HostCommandError(
@@ -94,8 +99,9 @@ export class ContextSessionCommitController {
     const workspace = this.workspaces.require(input.workspaceId);
     if (input.configuration.defaultPrivacyMode !== "full-learning") return undefined;
     if (workspace.initialization.trust !== "trusted") return undefined;
-    if (this.enterprise.currentIdentity().state !== "signed-in") return undefined;
-    const binding = await this.enterprise.getWorkspaceBinding(input.workspaceId);
+    const identity = this.enterprise.currentIdentity();
+    if (identity.state !== "signed-in" || !identity.accountId) return undefined;
+    const binding = await this.enterprise.getWorkspaceBinding(input.workspaceId, identity.accountId);
     if (binding.state !== "bound") return undefined;
     try {
       const provenance = await captureSessionCommitProvenance(
@@ -117,10 +123,15 @@ export class ContextSessionCommitController {
     }
   }
 
-  private emitCompleted(input: { workspaceId: string; operationId: string; sessionId: string }): void {
+  private emitCompleted(input: { workspaceId: string; operationId: string; sessionId: string }, result?: PrivateMemoryCommitResult): void {
+    const outcome = result?.archived
+      ? result.extraction === "completed" ? "extracted" : result.extraction === "failed" ? "extraction-failed" : "unconfirmed"
+      : result?.status === "skipped"
+        ? result.reason === "all_within_keep_window" ? "retained" : result.reason === "no_messages" ? "empty" : "skipped"
+        : "unconfirmed";
     this.emit(input.workspaceId, {
       type: "context.commitCompleted",
-      payload: { operationId: input.operationId, sessionId: input.sessionId }
+      payload: { operationId: input.operationId, sessionId: input.sessionId, outcome }
     });
   }
 

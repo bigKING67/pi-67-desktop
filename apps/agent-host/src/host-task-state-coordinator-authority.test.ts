@@ -15,6 +15,20 @@ const LIFECYCLE_TYPES = new Set<AgentCommandType>([
 ]);
 
 describe("HostTaskStateCoordinator Workspace authority", () => {
+  it("admits explicit knowledge sync through App authority without a Task", () => {
+    const fixture = coordinatorFixture();
+    const sync = { ...appRequest("enterprise.knowledge.sync"), payload: {
+      teamId: "00000000-0000-4000-8000-000000000001",
+      projectId: "00000000-0000-4000-8000-000000000002"
+    } } as RequestEnvelope;
+    expect(fixture.coordinator.authorizeRequestContext(sync)).toBeUndefined();
+    expect(() => fixture.coordinator.authorizeRequestContext({ ...sync,
+      context: { scope: "workspace", workspaceId: WORKSPACE_ID }
+    })).toThrow("Command context scope is invalid");
+    expect(fixture.taskRuntimes.admit).not.toHaveBeenCalled();
+    expect(fixture.workspaces.require).not.toHaveBeenCalled();
+  });
+
   it("uses the Protocol scope requirement as the App authority classification", () => {
     const fixture = coordinatorFixture();
     const appTypes = Object.entries(COMMAND_CONTEXT_SCOPE_REQUIREMENTS)

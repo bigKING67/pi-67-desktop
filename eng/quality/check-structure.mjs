@@ -77,7 +77,7 @@ for (const file of files) {
   if ([".cs", ".csproj", ".sln", ".slnx", ".wxs", ".wixproj"].includes(extension)) {
     failures.push(`stale native implementation file: ${path}`);
   }
-  if ([".ts", ".tsx", ".mjs", ".cjs", ".css"].includes(extension)) {
+  if ([".ts", ".tsx", ".mts", ".cts", ".mjs", ".cjs", ".css"].includes(extension)) {
     const lineCount = (await readFile(file, "utf8")).split("\n").length;
     const limit = preservedUpstreamSourceLineLimits.get(path) ?? (extension === ".css" ? 1_100 : 460);
     if (lineCount > limit) failures.push(`${path} has ${lineCount} lines; limit is ${limit}`);

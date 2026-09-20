@@ -74,6 +74,7 @@ function piFixture() {
   return {
     handlers,
     pi: {
+      events: { emit() {}, on: () => () => {} },
       on(type: string, handler: Handler) { handlers.set(type, handler); },
       registerCommand() {},
       appendEntry() {}

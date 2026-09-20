@@ -16,6 +16,10 @@ export interface AgentHostRuntimeEnvironment {
   readonly promptAttachmentRoot: string;
   readonly packaged: boolean;
   readonly electronExecutable: string;
+  /** Explicit Main deployment selection, independent of broker/service readiness. */
+  readonly managedLocalMemory?: boolean;
+  /** Independent Main-selected team Tool route; never starts private memory. */
+  readonly canonicalTeamKnowledgeTools?: boolean;
   /** Main-owned native containment helper; never accepted from the parent shell. */
   readonly windowsPackageWorkerJobController?: string;
 }
@@ -29,6 +33,8 @@ export function agentHostEnvironment(
   const environment: NodeJS.ProcessEnv = {
     ...source,
     PI67_DESKTOP: "1",
+    PI67_MANAGED_LOCAL_MEMORY: runtime?.managedLocalMemory === true ? "1" : "0",
+    PI67_CANONICAL_TEAM_KNOWLEDGE: runtime?.canonicalTeamKnowledgeTools === true ? "1" : "0",
     PI_TELEMETRY: "0",
     PI67_STORAGE_ROOT: storage.storageRoot,
     PI67_CAPABILITY_PROBE_DIR: storage.capabilityProbeDirectory,

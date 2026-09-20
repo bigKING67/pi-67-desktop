@@ -17,7 +17,7 @@ export function createTakeoverManager(opts: {
       flush: () => sync.flushForTakeover(),
       commit: (commitOpts?: { queueOnFailure?: boolean; keepRecentCount?: number; keepRecentTurns?: number }) => sync.commit(commitOpts),
       fetchOverview: async (tokenBudget?: number) => {
-        if (!sync.sessionId) return "";
+        if (sync.blockedReason || !sync.sessionId) return "";
         const ctx = await client.getSessionContext(
           sync.sessionId,
           tokenBudget ?? config.takeoverOverviewBudget * 4,
@@ -25,7 +25,7 @@ export function createTakeoverManager(opts: {
         return ctx?.latest_archive_overview ?? "";
       },
       persistEntry: (customType: string, data: any) => {
-        if (typeof pi?.appendEntry === "function") {
+        if (!sync.blockedReason && typeof pi?.appendEntry === "function") {
           pi.appendEntry(customType, data);
         }
       },

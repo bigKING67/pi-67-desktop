@@ -39,6 +39,22 @@
   runtime lifecycle, recovery, tests, and engineering quality. Neither is a
   merge upstream or overrides Pi-67 product and security contracts.
 
+## New Money service and memory boundary
+
+- New Money Desktop and `newmoney.52671314.xyz` form one product. The sibling
+  `/Users/gaoqian/Documents/sixseven/codeproject/new-money-server` owns accounts,
+  teams, project membership, entitlements and versioned shared knowledge in VPS
+  PostgreSQL. Do not import sibling source or make it a filesystem build dependency.
+- Desktop owns the local OpenViking runtime and private profile. The service must
+  not host OpenViking or receive private memory implicitly. No local PostgreSQL is
+  required. Model processing uses explicitly configured user-paid providers.
+- Read `docs/adr/0002-new-money-local-memory.md` before modifying memory, team
+  synchronization, session provenance or hosted authorization. Its accepted target
+  is not evidence that the runtime has already passed migration and packaged tests.
+- Team/project content must never be automatically captured into private memory.
+  Revoked team sessions retain read-only history; replay, fork and model processing
+  require current authorization. Local file copies cannot be remotely recalled.
+
 ## Harness contract
 
 - Treat Pi as the only harness and agentic-loop authority. Use supported Pi SDK,

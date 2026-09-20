@@ -252,6 +252,20 @@ export interface EnterpriseIdentityStatus {
   expiresAt?: number;
 }
 
+export interface EnterpriseTeamSummary {
+  id: string;
+  name: string;
+  role: "owner" | "admin" | "member" | "viewer";
+  entitlementStatus: "trialing" | "active" | "past_due" | "suspended" | "expired";
+  planCode: string;
+  trialEndsAt?: number;
+  /** Server-owned commercial quota exemption; absence means ordinary quotas. */
+  quotasExempt?: boolean;
+  maxMembers: number;
+  memberCount: number;
+  projectCount: number;
+}
+
 export interface EnterpriseProjectSummary {
   id: string;
   accountId: string;
@@ -303,7 +317,7 @@ export interface EnterpriseCandidateEligibility {
 export const DEFAULT_CONTEXT_MEMORY_CONFIGURATION: Omit<ContextMemoryConfiguration, "revision"> = {
   enabled: true,
   endpoint: "http://127.0.0.1:1933",
-  enterpriseGatewayEndpoint: "",
+  enterpriseGatewayEndpoint: "https://newmoney.52671314.xyz",
   defaultPrivacyMode: "private-learning",
   recallTokenBudget: 1_200,
   scoreThreshold: 0.35,
@@ -410,3 +424,5 @@ export function assessSopReadiness(
 function isValidatedExperience(status: ExperienceCandidateStatus): boolean {
   return status === "validated" || status === "submitted" || status === "shared";
 }
+export interface TeamSessionScope { teamId: string; projectId: string }
+export interface TeamSessionIdentity extends TeamSessionScope { userId: string; endpoint: string }

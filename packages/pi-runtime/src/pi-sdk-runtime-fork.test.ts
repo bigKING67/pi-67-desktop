@@ -5,6 +5,7 @@ import { SessionManager } from "@earendil-works/pi-coding-agent";
 import type { AgentEvent } from "@pi67/protocol";
 import { afterEach, describe, expect, it } from "vitest";
 import { PiSdkRuntime } from "./pi-sdk-runtime.js";
+import { markSharedMemoryProvenance } from "./session-memory-provenance.js";
 
 const temporaryDirectories: string[] = [];
 const zeroUsage = {
@@ -23,6 +24,28 @@ afterEach(async () => {
 });
 
 describe("PiSdkRuntime Session fork", () => {
+  it("cancels shared-history fork and rollback without changing identity or reporting success", async () => {
+    const fixture = await createForkFixture();
+    markSharedMemoryProvenance(SessionManager.open(fixture.sessionPath));
+    const runtime = new PiSdkRuntime();
+    const events: AgentEvent[] = [];
+    runtime.subscribe((event) => events.push(event));
+    try {
+      await runtime.initialize({ cwd: fixture.cwd, agentDir: fixture.agentDir,
+        sessionPath: fixture.sessionPath, trust: "unknown", approvalMode: "guided" });
+      const identity = runtime.getIdentity();
+      const before = await readFile(fixture.sessionPath, "utf8");
+      const filesBefore = await readdir(join(fixture.agentDir, "sessions"));
+      events.length = 0;
+      await expect(runtime.forkSession(fixture.firstAssistantEntryId, "at")).rejects.toThrow("cancelled");
+      await expect(runtime.rollback(fixture.firstUserEntryId, true)).rejects.toThrow("cancelled");
+      await expect(runtime.forkSessionFrom(fixture.sessionPath, fixture.firstAssistantEntryId)).rejects.toThrow("requires current authorization");
+      expect(await readdir(join(fixture.agentDir, "sessions"))).toEqual(filesBefore);
+      expect(runtime.getIdentity()).toEqual(identity);
+      expect(await readFile(fixture.sessionPath, "utf8")).toBe(before);
+      expect(events.filter((event) => ["conversation.changed", "tree.changed"].includes(event.type))).toEqual([]);
+    } finally { await runtime.dispose(); }
+  }, 15_000);
   it("separates new-file fork authority from same-file incremental navigation", async () => {
     const fixture = await createForkFixture();
 

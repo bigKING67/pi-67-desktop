@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { PrivacyMode } from "./config.js";
+import type { ContextServerTiming } from "./recall-timing.js";
 
 const MAX_DIAGNOSTIC_BYTES = 256 * 1_024;
 const RETAIN_DIAGNOSTIC_BYTES = 128 * 1_024;
@@ -22,6 +23,7 @@ export interface ContextDiagnosticEvent {
   privacyMode: PrivacyMode;
   state: string;
   durationMs?: number;
+  requestTiming?: { contextRequestMs: number; otherRequestMs: number; requestCount: number; server?: ContextServerTiming };
   count?: number;
   reason?: string;
   route?: "prompt-context" | "startup-context" | "official-find" | "scoped-find" | "find-fast" | "session-context" | "find-fallback" | "cache";

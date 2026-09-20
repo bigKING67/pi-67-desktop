@@ -172,10 +172,11 @@
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
     "trust"
+    "origin"
     "transcript"
     "plan"
     "composer";
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   background: var(--surface);
 }
 

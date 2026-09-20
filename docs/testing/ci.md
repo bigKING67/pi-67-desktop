@@ -43,7 +43,11 @@ pnpm exec playwright test --config=playwright.electron.config.ts --project=elect
 
 默认 `playwright.config.ts` 仍支持 Renderer 与完整组合测试。
 Renderer CI 使用预构建资源、2 workers、0 retries；Electron CI 使用 1 worker、1 retry。
-直接 `pnpm test` 使用 Vitest 默认并发，复现完整源码 CI 时使用固定 2 workers 的 `check:source`。
+直接 `pnpm test`、`test:coverage` 或 `check` 未设置 worker 数时使用 Vitest 默认并发；
+复现完整源码 CI 时使用固定 2 workers 的 `check:source`。该入口调用原有 `check`，
+不减少测试、改变超时/覆盖率阈值或增加重试。真实 Git/文件系统用例在默认并发下
+超时、定向运行通过时，保留首次失败证据，再使用 `check:source` 核对完整门禁；
+不能仅凭定向通过宣称全量通过，也不能仅凭固定并发通过认定产品性能问题已修复。
 
 ## Configuration and command ownership
 

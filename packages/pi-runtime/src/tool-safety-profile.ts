@@ -19,6 +19,7 @@ const PI_WEB_ACCESS_TOOLS = new Set([
 ]);
 const PI67_PLAN_TOOLS = new Set(["plan_ask", "plan_complete"]);
 const PI67_SHARED_EXPERIENCE_TOOLS = new Set([
+  "viking_team_search", "viking_team_read",
   "viking_shared_search",
   "viking_shared_read",
   "viking_sop_search",

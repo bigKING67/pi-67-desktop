@@ -5,6 +5,7 @@ import type {
   TaskId,
   TaskLifecycle,
   TaskToolMode,
+  TeamSessionScope,
   WorkbenchStateV5,
   WorkbenchSurface,
   WorkspaceDescriptor,
@@ -41,6 +42,7 @@ export interface RendererWorkbenchTask {
   creationId?: string | undefined;
   creationStatus?: "pending" | "confirming" | "unconfirmed" | undefined;
   environmentIntent?: RendererTaskEnvironmentIntent | undefined;
+  teamScope?: TeamSessionScope | undefined;
   environmentCreationId?: string | undefined;
   environmentSourceWorkspaceId?: WorkspaceId | undefined;
   environmentCreationState?: RendererTaskEnvironmentCreationState | undefined;

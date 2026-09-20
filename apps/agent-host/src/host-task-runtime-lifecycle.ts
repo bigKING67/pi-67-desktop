@@ -128,7 +128,7 @@ export class HostTaskRuntimeLifecycle {
         await this.initializeRuntime(state, runtime, {
           ...workspace.initialization,
           ...(command.type === "session.create"
-            ? { creationId: command.payload.creationId }
+            ? { creationId: command.payload.creationId, ...(command.payload.teamScope ? { teamScope: command.payload.teamScope } : {}) }
             : {})
         });
       }

@@ -1,5 +1,5 @@
 import { createRuntimeCredentialOverrideStore, PiConfigurationServiceRegistry, type AgentRuntime, type RuntimeCredentialOverrideStore } from "@pi67/pi-runtime";
-import { createMessageId, type AgentCommand, type AgentCommandType, type CommandResults, type ProtocolPort, type RequestEnvelope } from "@pi67/protocol";
+import type { AgentCommand, AgentCommandType, CommandResults, ProtocolPort, RequestEnvelope } from "@pi67/protocol";
 import { HostConnectionContext, type HostConnectionIdentity } from "./connection-context.js";
 import { forkSessionFromTask } from "./cross-task-session-fork.js";
 import { commandRequiresRunAdmission, isSettledRunAdmissionResult } from "./global-run-admission.js";
@@ -9,7 +9,7 @@ import { HostEventChannel } from "./host-event-channel.js";
 import { HostDiagnosticEvidence } from "./host-diagnostic-evidence.js";
 import { HostRequestRouter } from "./host-request-router.js";
 import { collectHostRuntimeDiagnostics } from "./host-runtime-diagnostics.js";
-import { defaultRuntimeLoader, parseHostEpoch } from "./host-runtime-loader.js";
+import { defaultRuntimeLoader, initialHostIdentity } from "./host-runtime-loader.js";
 import type { AgentHostServerOptions, AgentHostShutdownResult, AgentRuntimeLoader, AttachPortOptions } from "./host-server-contract.js";
 import { HostSdkVersionLoader } from "./host-sdk-version-loader.js";
 import { createHostSessionWriterLeaseRegistry } from "./host-session-writer-leases.js";
@@ -25,16 +25,24 @@ import { WorkspaceCommandRouter } from "./workspace-command-router.js";
 import { WorkspaceContextRegistry } from "./workspace-context-registry.js";
 import { WorkspaceFileCommandRouter } from "./workspace-file-command-router.js";
 import { AppConfigurationCommandRouter } from "./app-configuration-command-router.js";
-import { ContextMemoryCommandRouter } from "./context/context-memory-command-router.js";
+import { LocalMemoryModelBroker } from "./context/local-memory-model-broker.js";
+import { managedLocalMemoryOptions } from "./context/local-memory-broker-client.js";
+import { createHostContextMemory, type HostContextMemory } from "./host-context-memory.js";
+import { TeamModelPortAdmission } from "./context/team-model-port-admission.js";
+import { createHostTeamKnowledge } from "./context/host-team-knowledge.js";
 export type { AgentHostServerOptions, AgentHostShutdownResult, AgentRuntimeLoader, AttachPortOptions } from "./host-server-contract.js";
 export class AgentHostServer {
+  readonly teamModelPorts = new TeamModelPortAdmission();
+  readonly localMemoryModels: LocalMemoryModelBroker;
+  readonly teamKnowledge: ReturnType<typeof createHostTeamKnowledge>;
+  observeIndexHead(...args: Parameters<HostContextMemory["teamKnowledge"]["observeIndexHead"]>) { return this.contextMemory.teamKnowledge.observeIndexHead(...args); }
   private currentConnection: HostConnectionContext | undefined;
   private compatibilityRuntime: AgentRuntime | undefined;
   private compatibilityRuntimeLoad: Promise<AgentRuntime> | undefined;
   private compatibilityRuntimeUnsubscribe: (() => void) | undefined;
   private readonly workspaces: WorkspaceContextRegistry;
   private readonly appConfiguration: AppConfigurationCommandRouter;
-  private readonly contextMemory: ContextMemoryCommandRouter;
+  private readonly contextMemory: HostContextMemory;
   private readonly sessionWriterLeases: SessionWriterLeaseRegistry;
   private readonly workspaceCommands: WorkspaceCommandRouter;
   private readonly workspaceFiles: WorkspaceFileCommandRouter;
@@ -61,6 +69,7 @@ export class AgentHostServer {
     const configurationServices = options.configurationServices ?? new PiConfigurationServiceRegistry();
     const agentDir = options.agentDir ?? resolveAgentDirectory(undefined);
     const configuration = configurationServices.acquire(agentDir);
+    this.localMemoryModels = new LocalMemoryModelBroker(configuration);
     configuration.prewarmModelRuntime();
     this.workspaces = new WorkspaceContextRegistry({ configurationServices });
     this.appConfiguration = new AppConfigurationCommandRouter(configuration);
@@ -73,8 +82,10 @@ export class AgentHostServer {
       this.runtimeCredentialOverrides,
       {
         onRuntimeLoaded: (record, runtime) => this.tasks.bindRuntime(record, runtime),
-        sharedExperienceAccessForWorkspace: (workspaceId) => this.contextMemory.sharedExperienceAccess(workspaceId),
-        sharedSopAccessForWorkspace: (workspaceId) => this.contextMemory.sharedSopAccess(workspaceId)
+        authorizeTeamSession: (scope, model, signal) => this.contextMemory.authorizeTeamSession(scope, model, signal), sharedExperienceAccessForWorkspace: (workspaceId) => this.contextMemory.sharedExperienceAccess(workspaceId),
+        sharedSopAccessForWorkspace: (workspaceId) => this.contextMemory.sharedSopAccess(workspaceId),
+        ...(options.canonicalTeamKnowledgeTools === true && options.teamIndexSettings ? { teamKnowledgeAccessForWorkspace: (workspaceId: string) => this.teamKnowledge.forWorkspace(workspaceId) } : {}),
+        ...managedLocalMemoryOptions(this.options.managedLocalMemory, this.options.localMemoryBroker)
       },
       this.options.promptAttachments
     );
@@ -126,9 +137,9 @@ export class AgentHostServer {
       getRuntime: () => this.tasks.activeState()?.record.runtime ?? this.compatibilityRuntime,
       getProtocolContext: () => this.tasks.eventProtocolContext()
     });
-    this.contextMemory = new ContextMemoryCommandRouter(
-      agentDir, this.workspaces, this.events, this.options.enterpriseCredentialBroker
-    );
+    this.contextMemory = createHostContextMemory(agentDir, this.workspaces, this.events, this.taskRuntimes, options);
+    this.teamKnowledge = createHostTeamKnowledge({ configuration, settings: options.teamIndexSettings, workers: options.teamWorkers,
+      admission: this.teamModelPorts, owner: this.contextMemory.teamKnowledge, isAvailable: () => !this.shuttingDown });
     this.appConfiguration.bindEvents(this.events);
     this.workspaceCommands = new WorkspaceCommandRouter(
       this.workspaces,
@@ -165,9 +176,9 @@ export class AgentHostServer {
       {
         isShuttingDown: () => this.shuttingDown,
         runtimeStatus: () => this.tasks.runtimeStatus(this.compatibilityRuntime !== undefined),
-        dispatchAppCommand: (command, idempotencyKey) => dispatchHostAppCommand(command, {
+        dispatchAppCommand: (command, idempotencyKey, signal) => dispatchHostAppCommand(command, { ...(signal === undefined ? {} : { signal }),
           appConfiguration: this.appConfiguration,
-          contextMemory: this.contextMemory,
+          contextMemory: this.contextMemory, indexKnowledge: input => this.teamKnowledge.index(input),
           ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
           larkAuth: this.larkAuth,
           loadRuntime: async () => this.tasks.activeState()?.record.runtime ?? this.loadCompatibilityRuntime(),
@@ -235,9 +246,8 @@ export class AgentHostServer {
   }
   shutdown(deadlineMs = DEFAULT_HOST_SHUTDOWN_DEADLINE_MS): Promise<AgentHostShutdownResult> {
     if (this.shutdownPromise) return this.shutdownPromise;
-    this.shuttingDown = true;
-    this.shutdownPromise = this.performShutdown(shutdownDeadline(deadlineMs));
-    return this.shutdownPromise;
+    this.shuttingDown = true; this.localMemoryModels.shutdown(); this.teamModelPorts.shutdown(); this.options.teamWorkers?.shutdown(); this.options.teamIndexSettings?.shutdown();
+    return this.shutdownPromise = this.performShutdown(shutdownDeadline(deadlineMs));
   }
   private async dispatch(
     command: AgentCommand, state: TaskHostState, submissionFingerprint?: string
@@ -440,18 +450,10 @@ export class AgentHostServer {
     origin.sendSuccess(request.requestId, request.type, this.captureProjectionResync(runtime, state));
   }
   private captureProjectionResync(runtime: AgentRuntime, state: TaskHostState): CommandResults["projection.resync"] {
-    const hostEpoch = this.hostIdentity?.hostEpoch ?? 1;
-    return captureProjectionResync(runtime, this.events.eventSequence, hostEpoch, state.operations);
+    return captureProjectionResync(runtime, this.events.eventSequence, this.hostIdentity?.hostEpoch ?? 1, state.operations);
   }
   private resolveHostIdentity(options: AttachPortOptions): HostConnectionIdentity {
-    if (!this.hostIdentity) {
-      this.hostIdentity = {
-        ...(options.appInstanceId === undefined ? {} : { appInstanceId: options.appInstanceId }),
-        hostInstanceId: options.hostInstanceId ?? process.env.PI67_HOST_INSTANCE_ID ?? createMessageId("host"),
-        hostEpoch: options.hostEpoch ?? parseHostEpoch(process.env.PI67_HOST_EPOCH)
-      };
-      return this.hostIdentity;
-    }
+    if (!this.hostIdentity) this.hostIdentity = initialHostIdentity(options);
     return this.hostIdentity;
   }
 }

@@ -32,6 +32,7 @@ import { sanitizeRuntimeText } from "./runtime-redaction.js";
 import { runtimeDisplayLabel } from "./runtime-display-label.js";
 import type { SessionProjectionIndex } from "./session-projection-index.js";
 import { projectSessionTree } from "./session-tree-projection.js";
+import { projectSessionMemoryOrigin } from "./session-memory-origin.js";
 
 export function projectSessionSnapshot(
   session: AgentSession,
@@ -49,6 +50,7 @@ export function projectSessionSnapshot(
   const resourceCatalog = projectSessionResourceCatalog(services, extensionsResult);
   return {
     sessionId: session.sessionId,
+    memoryOrigin: projectSessionMemoryOrigin(session.sessionManager),
     ...(sessionFileIdentity ? { sessionFileIdentity } : {}),
     ...(session.sessionFile ? { sessionPath: session.sessionFile } : {}),
     ...(session.sessionName ? { sessionName: session.sessionName } : {}),

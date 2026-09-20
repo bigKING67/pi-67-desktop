@@ -1,4 +1,8 @@
 import type { BrowserWindow } from "electron";
+import type { AgentHostRuntimeEnvironment, AgentHostStoragePaths } from "./agent-host-environment.js";
+import type { EnterpriseCredentialSupervisor, EnterpriseCredentialBrokerPort, SharedKnowledgeReceiptPort } from "./enterprise-credential-supervisor.js";
+import type { LocalMemoryServicePort } from "./local-memory-supervisor.js";
+import type { LocalMemoryModelSettingsStore } from "./local-memory-model-settings.js";
 import type {
   AgentHostLifecyclePhase,
   AgentHostProfileMode,
@@ -6,6 +10,22 @@ import type {
   AgentHostStartupIssue,
   AgentHostStartupState
 } from "@pi67/protocol";
+
+export interface AgentHostSupervisorOptions {
+  agentHostEntry: string;
+  appInstanceId: string;
+  expectedRendererOrigin: string;
+  getStoragePaths: () => AgentHostStoragePaths;
+  getRuntimeEnvironment?: () => AgentHostRuntimeEnvironment;
+  getMainWindow: () => BrowserWindow | undefined;
+  rendererUrl: string;
+  shutdownDeadlineMs?: number;
+  getEnterpriseCredentials?: () => EnterpriseCredentialBrokerPort | undefined;
+  getSharedKnowledgeReceipts?: (owner: EnterpriseCredentialSupervisor) => SharedKnowledgeReceiptPort | undefined;
+  getLocalMemoryService?: () => LocalMemoryServicePort | undefined;
+  getTeamIndexSettings?: () => Pick<LocalMemoryModelSettingsStore, "load" | "signal"> | undefined;
+  onReady?: () => void;
+}
 
 export interface AgentHostStopResult {
   graceful: boolean;

@@ -1,4 +1,5 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { SharedKnowledgeSelection } from "./shared-knowledge-selection.js";
 import type {
   SharedExperienceDetail,
   SharedExperienceSearchItem
@@ -6,23 +7,32 @@ import type {
 
 const MAX_SHARED_EXPERIENCE_RESULTS = 5;
 
+export type SharedKnowledgeModel = { baseUrl: string; id: string; scope?: import("@pi67/domain").TeamSessionIdentity } | null;
+
 export interface SharedExperienceAccess {
   search(
     query: string,
     limit: number,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    model?: SharedKnowledgeModel
   ): Promise<{ items: SharedExperienceSearchItem[]; total: number }>;
-  read(id: string, signal?: AbortSignal): Promise<SharedExperienceDetail>;
+  read(id: string, signal?: AbortSignal, model?: SharedKnowledgeModel): Promise<SharedExperienceDetail>;
 }
 
 export function createSharedExperienceTools(
-  access?: SharedExperienceAccess
+  access?: SharedExperienceAccess,
+  getScope?: () => import("@pi67/domain").TeamSessionIdentity
 ): ToolDefinition[] {
   if (!access) return [];
-  return [createSearchTool(access), createReadTool(access)];
+  const selection = new SharedKnowledgeSelection();
+  const scoped = getScope ? {
+    search: (query: string, limit: number, signal?: AbortSignal, model?: SharedKnowledgeModel) => access.search(query, limit, signal, model ? { ...model, scope: getScope() } : null),
+    read: (id: string, signal?: AbortSignal, model?: SharedKnowledgeModel) => access.read(id, signal, model ? { ...model, scope: getScope() } : null)
+  } : access;
+  return [createSearchTool(scoped, selection), createReadTool(scoped, selection)];
 }
 
-function createSearchTool(access: SharedExperienceAccess): ToolDefinition {
+function createSearchTool(access: SharedExperienceAccess, selection: SharedKnowledgeSelection): ToolDefinition {
   return {
     name: "viking_shared_search",
     label: "Search team experience",
@@ -43,11 +53,12 @@ function createSearchTool(access: SharedExperienceAccess): ToolDefinition {
       }
     } as ToolDefinition["parameters"],
     executionMode: "parallel",
-    async execute(_toolCallId, rawInput, signal) {
+    async execute(_toolCallId, rawInput, signal, _onUpdate, context) {
       const input = asRecord(rawInput);
       const query = requiredString(input.query, "query", 2_048);
       const limit = optionalInteger(input.limit, 1, MAX_SHARED_EXPERIENCE_RESULTS) ?? 2;
-      const result = await access.search(query, limit, signal);
+      const model = context.model ? { baseUrl: context.model.baseUrl, id: context.model.id } : null;
+      const result = await selection.search(context, signal, limit, () => access.search(query, limit, signal, model));
       return toolResult(formatSearchResult(result.items), {
         provider: "openviking-enterprise",
         trust: "untrusted",
@@ -59,7 +70,7 @@ function createSearchTool(access: SharedExperienceAccess): ToolDefinition {
   };
 }
 
-function createReadTool(access: SharedExperienceAccess): ToolDefinition {
+function createReadTool(access: SharedExperienceAccess, selection: SharedKnowledgeSelection): ToolDefinition {
   return {
     name: "viking_shared_read",
     label: "Read team experience",
@@ -79,9 +90,10 @@ function createReadTool(access: SharedExperienceAccess): ToolDefinition {
       }
     } as ToolDefinition["parameters"],
     executionMode: "parallel",
-    async execute(_toolCallId, rawInput, signal) {
+    async execute(_toolCallId, rawInput, signal, _onUpdate, context) {
       const id = requiredString(asRecord(rawInput).id, "id", 512);
-      const item = await access.read(id, signal);
+      const model = context.model ? { baseUrl: context.model.baseUrl, id: context.model.id } : null;
+      const item = await selection.read(context, signal, id, () => access.read(id, signal, model));
       return toolResult(formatDetail(item), {
         provider: "openviking-enterprise",
         trust: "untrusted",

@@ -1,6 +1,7 @@
 import { rm } from "node:fs/promises";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { resolveManagedSessionPath } from "./session-import.js";
+import { sharedHistoryNeedsAuthorization } from "./session-memory-provenance.js";
 
 interface CrossRuntimeSessionForkOptions<Result> {
   sourcePath: string;
@@ -23,6 +24,9 @@ export async function runCrossRuntimeSessionFork<Result>(
     options.agentDir
   );
   const source = SessionManager.open(managedSourcePath, undefined, options.cwd);
+  if (sharedHistoryNeedsAuthorization(source)) {
+    throw new Error("Shared or unverified Session provenance requires current authorization before forking.");
+  }
   const forkedPath = source.createBranchedSession(options.entryId);
   if (!forkedPath) throw new Error("Pi did not persist the forked Session.");
 

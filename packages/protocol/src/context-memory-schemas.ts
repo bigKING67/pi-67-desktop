@@ -181,6 +181,30 @@ export const EnterpriseIdentityStatusSchema = strictObject({
   expiresAt: Type.Optional(TimestampSchema)
 });
 
+export const EnterpriseTeamSummarySchema = strictObject({
+  id: IdentifierSchema,
+  name: Type.String({ minLength: 1, maxLength: 512 }),
+  role: Type.Union([
+    Type.Literal("owner"),
+    Type.Literal("admin"),
+    Type.Literal("member"),
+    Type.Literal("viewer")
+  ]),
+  entitlementStatus: Type.Union([
+    Type.Literal("trialing"),
+    Type.Literal("active"),
+    Type.Literal("past_due"),
+    Type.Literal("suspended"),
+    Type.Literal("expired")
+  ]),
+  planCode: Type.String({ minLength: 1, maxLength: 128 }),
+  trialEndsAt: Type.Optional(TimestampSchema),
+  quotasExempt: Type.Optional(Type.Boolean()),
+  maxMembers: Type.Integer({ minimum: 1 }),
+  memberCount: Type.Integer({ minimum: 0 }),
+  projectCount: Type.Integer({ minimum: 0 })
+});
+
 export const EnterpriseProjectSummarySchema = strictObject({
   id: IdentifierSchema,
   accountId: IdentifierSchema,
@@ -292,13 +316,16 @@ export const ContextMemoryCommandPayloadSchemas: Record<keyof ContextMemoryComma
     query: Type.String({ minLength: 1, maxLength: 2_048 })
   }),
   "sop.shared.get": strictObject({ id: IdentifierSchema }),
-  "enterprise.identity.get": strictObject({}),
+  "enterprise.identity.get": strictObject({ refresh: Type.Optional(Type.Boolean()) }),
   "enterprise.auth.begin": strictObject({}),
   "enterprise.auth.poll": strictObject({ authorizationId: IdentifierSchema }),
   "enterprise.auth.disconnect": strictObject({}),
-  "enterprise.project.list": strictObject({}),
-  "enterprise.workspace.get": strictObject({}),
-  "enterprise.workspace.bind": strictObject({ enterpriseProjectId: IdentifierSchema }),
+  "enterprise.team.list": strictObject({}),
+  "enterprise.knowledge.index": strictObject({ teamId: Type.String({ pattern: "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$" }), projectId: Type.Optional(Type.String({ pattern: "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$" })) }),
+  "enterprise.project.list": strictObject({ teamId: IdentifierSchema }),
+  "enterprise.knowledge.sync": strictObject({ teamId: Type.String({ pattern: "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$" }), projectId: Type.Optional(Type.String({ pattern: "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$" })), maxPages: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })) }),
+  "enterprise.workspace.get": strictObject({ teamId: IdentifierSchema }),
+  "enterprise.workspace.bind": strictObject({ teamId: IdentifierSchema, enterpriseProjectId: IdentifierSchema }),
   "enterprise.workspace.unbind": strictObject({})
 };
 
@@ -355,6 +382,7 @@ export const ContextMemoryCommandResultSchemas: Record<keyof ContextMemoryComman
   "sop.shared.search": strictObject({ items: Type.Array(SharedSopSearchItemSchema, { maxItems: 1 }), total: Type.Integer({ minimum: 0, maximum: 1 }) }),
   "sop.shared.get": SharedSopDetailSchema,
   "enterprise.identity.get": EnterpriseIdentityStatusSchema,
+  "enterprise.knowledge.index": strictObject({ state: Type.Literal("published-local"), snapshot: strictObject({ epoch: Type.String({ pattern: "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$" }), cursor: Type.String({ pattern: "^[1-9][0-9]{0,18}$" }) }) }),
   "enterprise.auth.begin": strictObject({
     authorizationId: IdentifierSchema,
     verificationUri: EndpointSchema,
@@ -364,11 +392,16 @@ export const ContextMemoryCommandResultSchemas: Record<keyof ContextMemoryComman
   }),
   "enterprise.auth.poll": EnterpriseIdentityStatusSchema,
   "enterprise.auth.disconnect": EnterpriseIdentityStatusSchema,
+  "enterprise.team.list": strictObject({
+    items: Type.Array(EnterpriseTeamSummarySchema, { maxItems: 1_000 }),
+    total: Type.Integer({ minimum: 0 })
+  }),
   "enterprise.project.list": strictObject({
     items: Type.Array(EnterpriseProjectSummarySchema, { maxItems: 1_000 }),
     total: Type.Integer({ minimum: 0 })
   }),
   "enterprise.workspace.get": EnterpriseWorkspaceBindingSchema,
+  "enterprise.knowledge.sync": strictObject({ progress: strictObject({ epoch: Type.Union([Type.String({ pattern: "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$" }), Type.Null()]), cursor: Type.String({ pattern: "^(0|[1-9][0-9]{0,18})$" }) }), pages: Type.Integer({ minimum: 1, maximum: 100 }), headCursor: Type.String({ pattern: "^(0|[1-9][0-9]{0,18})$" }) }),
   "enterprise.workspace.bind": EnterpriseWorkspaceBindingSchema,
   "enterprise.workspace.unbind": EnterpriseWorkspaceBindingSchema
 };
@@ -381,7 +414,8 @@ export const ContextMemoryEventPayloadSchemas: Record<keyof ContextMemoryEventPa
   "context.recallCompleted": strictObject({ sessionId: IdentifierSchema, completedAt: TimestampSchema, count: Type.Integer({ minimum: 0 }), degraded: Type.Boolean() }),
   "context.captureQueued": strictObject({ sessionId: IdentifierSchema, turnId: IdentifierSchema, queuedAt: TimestampSchema }),
   "context.captureFailed": strictObject({ sessionId: IdentifierSchema, turnId: IdentifierSchema, failedAt: TimestampSchema, detail: Type.String({ maxLength: 2_048 }) }),
-  "context.commitCompleted": strictObject({ operationId: IdentifierSchema, sessionId: IdentifierSchema, diff: Type.Optional(MemoryDiffSummarySchema) }),
+  "context.commitCompleted": strictObject({ operationId: IdentifierSchema, sessionId: IdentifierSchema, diff: Type.Optional(MemoryDiffSummarySchema),
+    outcome: Type.Optional(Type.Union([Type.Literal("retained"), Type.Literal("empty"), Type.Literal("skipped"), Type.Literal("extracted"), Type.Literal("extraction-failed"), Type.Literal("unconfirmed")])) }),
   "context.commitFailed": strictObject({ operationId: IdentifierSchema, sessionId: IdentifierSchema, detail: Type.String({ maxLength: 2_048 }) }),
   "memory.diffAvailable": MemoryDiffSummarySchema,
   "memory.forgetCompleted": strictObject({ operationId: IdentifierSchema, memoryId: IdentifierSchema, completedAt: TimestampSchema }),

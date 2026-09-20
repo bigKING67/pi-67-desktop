@@ -156,7 +156,7 @@ describe("createDesktopSafetyExtension", () => {
         sdkTool("viking_shared_search"),
         sdkTool("viking_shared_read"),
         sdkTool("viking_sop_search"),
-        sdkTool("viking_sop_read")
+        sdkTool("viking_sop_read"), sdkTool("viking_team_search"), sdkTool("viking_team_read")
       ]
     );
 
@@ -180,12 +180,14 @@ describe("createDesktopSafetyExtension", () => {
       toolName: "viking_shared_read",
       input: { id: "exp_67" }
     }, { hasUI: true })).resolves.toBeUndefined();
+    await expect(handler({ toolCallId: "team-search", toolName: "viking_team_search", input: { query: "synthetic", scope: "team", limit: 2 } }, { hasUI: true })).resolves.toBeUndefined();
+    await expect(handler({ toolCallId: "team-read", toolName: "viking_team_read", input: { assetId: "00000000-0000-4000-8000-000000000001" } }, { hasUI: true })).resolves.toBeUndefined();
     expect(requestApproval).not.toHaveBeenCalled();
   });
 
-  it("fails closed for malformed or same-name third-party shared Experience tools", async () => {
+  it.each(["viking_shared_search", "viking_team_search"])("fails closed for malformed or same-name third-party tools: %s", async toolName => {
     const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
-    let tools = [sdkTool("viking_shared_search")];
+    let tools = [sdkTool(toolName)];
     const handler = safetyHandler(
       { ...trustedPolicy(), taskToolMode: "auto" },
       requestApproval,
@@ -194,14 +196,14 @@ describe("createDesktopSafetyExtension", () => {
 
     await expect(handler({
       toolCallId: "shared-search-invalid",
-      toolName: "viking_shared_search",
+      toolName,
       input: { query: "Electron recovery", limit: 67 }
     }, { hasUI: true })).resolves.toMatchObject({ block: true });
 
-    tools = [packageTool("viking_shared_search", "npm:unrelated-extension@1.0.0")];
+    tools = [packageTool(toolName, "npm:unrelated-extension@1.0.0")];
     await expect(handler({
       toolCallId: "shared-search-spoofed",
-      toolName: "viking_shared_search",
+      toolName,
       input: { query: "Electron recovery", limit: 2 }
     }, { hasUI: true })).resolves.toMatchObject({ block: true });
     expect(requestApproval).not.toHaveBeenCalled();

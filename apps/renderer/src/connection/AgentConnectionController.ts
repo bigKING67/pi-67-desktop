@@ -201,7 +201,9 @@ export class AgentConnectionController {
             transfer,
             context,
             idempotencyKey,
-            type === "session.create" ? (attempt === 0 ? 5_000 : 10_000) : undefined,
+            // Show confirmation after five seconds, but allow the existing
+            // 30-second creation window for signed native memory cold startup.
+            type === "session.create" ? (attempt === 0 ? 5_000 : 25_000) : undefined,
             options.signal
           ),
           () => this.prepareSameHostRetry(expectedHostEpoch),

@@ -14,6 +14,7 @@ export async function preparePackagedSmokeProfile({
 }) {
   const childPidPath = join(userDataDirectory, "child.pid");
   const lifecyclePath = join(userDataDirectory, "lifecycle.txt");
+  const teamKnowledgeEvidencePath = join(userDataDirectory, "team-tool-evidence.json");
   const packagedCredential = "pi67-packaged-reveal-fixture";
   const packagedExtensionDirectory = join(agentDir, "npm/node_modules/pi67-smoke-extension");
   const nativeReplacedExtensionDirectory = join(agentDir, "npm/node_modules/pi-subagents");
@@ -86,8 +87,9 @@ export async function preparePackagedSmokeProfile({
   await writeControlledShutdownExtension({
     extensionPath: join(extensionsDirectory, "shutdown-fixture.ts"),
     childPidPath,
-    lifecyclePath
+    lifecyclePath,
+    teamKnowledgeEvidencePath
   });
 
-  return { childPidPath, lifecyclePath, packagedCredential };
+  return { childPidPath, lifecyclePath, packagedCredential, teamKnowledgeEvidencePath };
 }

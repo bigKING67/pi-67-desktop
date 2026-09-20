@@ -5,6 +5,17 @@ import { ensurePackagedNewSessionIntent } from "./packaged-electron-smoke-scenar
 const SESSION_CREATION_TIMEOUT_MS = 30_000;
 const SESSION_CREATION_PROMPT = "Create the packaged smoke Session.";
 
+export function assertPackagedTeamToolSelection(evidence, expectsTeamRoute) {
+  const canonical = ["viking_team_search", "viking_team_read"];
+  const legacy = ["viking_shared_search", "viking_shared_read", "viking_sop_search", "viking_sop_read"];
+  if (!evidence || evidence.privateMode !== (expectsTeamRoute ? "1" : "0")
+      || evidence.canonicalMode !== (expectsTeamRoute ? "1" : "0") || !Array.isArray(evidence.tools)
+      || canonical.some(name => evidence.tools.filter(tool => tool === name).length !== (expectsTeamRoute ? 1 : 0))
+      || (expectsTeamRoute && legacy.some(name => evidence.tools.includes(name)))) {
+    throw new Error("Packaged Main/Host team Tool selection did not reach the actual Pi model context.");
+  }
+}
+
 export async function verifyPackagedSessionCreation({ agentDir, window }) {
   const startedAt = Date.now();
   const deadline = startedAt + SESSION_CREATION_TIMEOUT_MS;

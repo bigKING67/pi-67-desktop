@@ -44,9 +44,9 @@ export class PiRuntimeConversationActions {
     ).catch(() => undefined);
   }
 
-  async create(creationId: string): Promise<SessionSnapshot> {
+  async create(creationId: string, teamScope?: import("@pi67/domain").TeamSessionScope): Promise<SessionSnapshot> {
     this.cancelSemanticTitle();
-    return this.options.sessionLifecycle.create(creationId);
+    return this.options.sessionLifecycle.create(creationId, teamScope);
   }
 
   async open(path: string, cwdOverride?: string): Promise<SessionSnapshot> {

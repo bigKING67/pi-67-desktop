@@ -69,7 +69,8 @@ export class OpenVikingClient {
     private readonly actorPeerId?: string,
     private readonly credentials: OpenVikingClientCredentials = resolveOpenVikingClientCredentials(
       configuration.endpoint
-    )
+    ),
+    private readonly verifyConnection?: () => Promise<void>
   ) {}
 
   get currentUser(): string | undefined { return this.credentials.user; }
@@ -257,22 +258,26 @@ export class OpenVikingClient {
     if (this.credentials.user) headers.set("X-OpenViking-User", this.credentials.user);
     if (this.actorPeerId) headers.set("X-OpenViking-Actor-Peer", this.actorPeerId);
     try {
+      await this.verifyConnection?.();
       const response = await fetch(`${this.configuration.endpoint.replace(/\/+$/, "")}${path}`, {
         ...init,
+        ...(this.credentials.source === "managed" ? { redirect: "error" as const } : {}),
         headers,
         signal: controller.signal
       });
       const body = await response.json().catch(() => ({})) as OpenVikingEnvelope<T>;
+      await this.verifyConnection?.();
       if (!response.ok || body.status === "error") {
         throw new HostCommandError(
           "RUNTIME_NOT_READY",
-          body.error?.message ?? `OpenViking returned HTTP ${response.status}.`,
+          this.credentials.source === "managed" ? "Managed private memory request failed." : body.error?.message ?? `OpenViking returned HTTP ${response.status}.`,
           true,
           { status: response.status }
         );
       }
       return (body.result ?? body) as T;
     } catch (error) {
+      if (this.credentials.source === "managed") throw new HostCommandError("RUNTIME_NOT_READY", "Managed private memory is unavailable.", true);
       if (error instanceof HostCommandError) throw error;
       const message = error instanceof Error && error.name === "AbortError"
         ? `OpenViking exceeded the ${timeoutMs} ms timeout.`

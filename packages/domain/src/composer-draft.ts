@@ -1,5 +1,6 @@
 import type { ConversationKey } from "./workbench.js";
 import type { SessionInteractionMode } from "./plan-mode.js";
+import type { TeamSessionScope } from "./context-memory.js";
 
 export const MAX_COMPOSER_DRAFTS = 200;
 export const MAX_COMPOSER_DRAFT_TEXT_BYTES = 256 * 1024;
@@ -86,6 +87,7 @@ export interface ComposerDraftRecord {
   reviewComments?: ComposerReviewComment[];
   promptStash?: PromptStashItem[];
   environmentIntent?: ComposerDraftEnvironmentIntent;
+  teamScope?: TeamSessionScope;
   interactionMode?: SessionInteractionMode;
   startupModel?: ComposerDraftModelSelection;
   startupThinkingLevel?: string;

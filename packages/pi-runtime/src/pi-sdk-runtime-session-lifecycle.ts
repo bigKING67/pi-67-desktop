@@ -26,8 +26,12 @@ import {
 } from "./session-snapshot.js";
 import { RuntimeToolSafetyController } from "./runtime-tool-safety-controller.js";
 import type { PiWorkspaceRuntimeServices } from "./workspace-runtime-services.js";
+import type { PiSdkRuntimeOptions } from "./pi-sdk-runtime-options.js";
+import { markTeamSessionBirth } from "./team-session-birth.js";
+import { initializePrivateMemoryProvenance } from "./session-memory-provenance.js";
 
 interface PiSdkRuntimeSessionLifecycleOptions {
+  authorizeTeamSession?: PiSdkRuntimeOptions["authorizeTeamSession"];
   sessionBindings: RuntimeSessionBindings;
   sessionCatalog: RuntimeSessionCatalog;
   configurationReload: PiRuntimeConfigurationReload;
@@ -52,6 +56,8 @@ export class PiSdkRuntimeSessionLifecycle {
     observeStage?: RuntimeInitializationObserver
   ): Promise<SessionSnapshot> {
     return this.options.sessionBindings.runTransition(async () => {
+      if (input.teamScope && (!input.creationId || input.sessionPath)) throw new Error("Team scope requires a fresh explicit Session creation.");
+      const grant = input.teamScope ? await this.authorizeTeamBirth(input.teamScope) : undefined;
       let creationStarted = false;
       try {
         const nextAgentDir = input.agentDir ?? getAgentDir();
@@ -88,10 +94,15 @@ export class PiSdkRuntimeSessionLifecycle {
             if (start.status !== "started") throw sessionCreationOutcomeUnknown(input.creationId);
             creationStarted = true;
           }
-          await this.options.sessionBindings.createInitial(workspaceCwd, sessionManager, observeStage);
+          await this.options.sessionBindings.createInitial(workspaceCwd, sessionManager, observeStage,
+            input.creationId ? async (manager) => {
+              if (grant) { grant.assertValid(); markTeamSessionBirth(manager, grant.identity); }
+              else initializePrivateMemoryProvenance(manager);
+              await appendSessionCreationMarker(manager, input.creationId!);
+              grant?.assertValid();
+            } : undefined);
           if (!input.creationId) return;
           const manager = this.options.sessionBindings.requireSession().sessionManager;
-          await appendSessionCreationMarker(manager, input.creationId);
           await creationJournal!.record(input.creationId, manager);
         });
         await runRuntimeInitializationStage(
@@ -106,6 +117,7 @@ export class PiSdkRuntimeSessionLifecycle {
         );
         if (input.creationId) {
           const manager = this.options.sessionBindings.requireSession().sessionManager;
+          grant?.assertValid();
           const sessionPath = manager.getSessionFile();
           if (!sessionPath) throw new Error("The created Pi Session does not have a persisted JSONL path.");
           await creationJournal!.markPublished(input.creationId, {
@@ -123,8 +135,14 @@ export class PiSdkRuntimeSessionLifecycle {
     });
   }
 
-  async create(creationId: string): Promise<SessionSnapshot> {
+  private authorizeTeamBirth(scope: import("@pi67/domain").TeamSessionScope) {
+    if (!this.options.authorizeTeamSession) throw new Error("Team Session authorization is unavailable.");
+    return this.options.authorizeTeamSession(scope);
+  }
+
+  async create(creationId: string, teamScope?: import("@pi67/domain").TeamSessionScope): Promise<SessionSnapshot> {
     return this.options.sessionBindings.runTransition(async () => {
+      const grant = teamScope ? await this.authorizeTeamBirth(teamScope) : undefined;
       let creationStarted = false;
       try {
         const journal = this.creationReceipts(
@@ -139,7 +157,10 @@ export class PiSdkRuntimeSessionLifecycle {
         let createdManager: SessionCreationManager | undefined;
         const result = await this.options.sessionBindings.requireRuntime().newSession({
           setup: async (manager) => {
+            if (grant) { grant.assertValid(); markTeamSessionBirth(manager, grant.identity); }
+            else initializePrivateMemoryProvenance(manager);
             await appendSessionCreationMarker(manager, creationId);
+            grant?.assertValid();
             createdManager = manager;
           }
         });
@@ -148,6 +169,7 @@ export class PiSdkRuntimeSessionLifecycle {
         const identity = await journal.record(creationId, createdManager);
         await this.options.configurationReload.apply();
         const snapshot = this.options.getSnapshot();
+        grant?.assertValid();
         await journal.markPublished(creationId, identity);
         this.queueCatalogUpsert("session-created");
         return snapshot;

@@ -15,6 +15,17 @@ const providers: ProviderSummary[] = [
 ];
 
 describe("groupVisibleSessionModelsByProvider", () => {
+  it("hides retired Flash choices but retains Pro and the exact selected legacy identity", () => {
+    const deepseek = ["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-flash"].map((id) => ({
+      provider: "deepseek", id, label: id, configured: true, reasoning: true
+    }));
+    expect(groupVisibleSessionModelsByProvider(deepseek, [], undefined)[0]?.models)
+      .toEqual(deepseek.slice(1));
+    expect(groupVisibleSessionModelsByProvider(deepseek, [], {
+      provider: "deepseek", id: "deepseek-v4-flash"
+    })[0]?.models).toEqual(deepseek);
+  });
+
   it("returns no sections when neither a configured nor recovery model is visible", () => {
     expect(groupVisibleSessionModelsByProvider([
       { provider: "missing", id: "hidden", label: "Hidden", configured: false, reasoning: false }

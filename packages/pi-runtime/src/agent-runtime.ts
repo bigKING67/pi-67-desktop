@@ -42,6 +42,8 @@ import type {
 } from "@pi67/protocol";
 import type { RuntimeQueueClearResult } from "./session-queue.js";
 import type { PreparedPromptAttachmentSet } from "./prompt-attachment.js";
+import type { PrivateMemoryCommitResult } from "./private-memory-commit.js";
+export type { PrivateMemoryCommitResult } from "./private-memory-commit.js";
 
 export interface RuntimeInitializeOptions {
   cwd: string;
@@ -49,6 +51,7 @@ export interface RuntimeInitializeOptions {
   sessionPath?: string;
   /** Internal Host bootstrap identity used only when session.create initializes a fresh Task. */
   creationId?: string;
+  teamScope?: import("@pi67/domain").TeamSessionScope;
   trust: WorkspaceTrust;
   approvalMode: ApprovalMode;
 }
@@ -97,7 +100,7 @@ export interface AgentRuntime {
   searchMessages(query: string): MessageSearchResult;
   locateMessage(id: string): LocatedMessageWindow;
   readAsset(options: { assetId: string; sessionGeneration: number; offset: number; length?: number }): AssetReadResult;
-  createSession(creationId: string): Promise<SessionSnapshot>;
+  createSession(creationId: string, teamScope?: import("@pi67/domain").TeamSessionScope): Promise<SessionSnapshot>;
   openSession(path: string, cwdOverride?: string): Promise<SessionSnapshot>;
   importSession(path: string): Promise<SessionSnapshot>;
   forkSession(entryId: string, position?: "before" | "at"): Promise<SessionSnapshot>;
@@ -126,6 +129,8 @@ export interface AgentRuntime {
   setThinkingLevel(level: string): Promise<SessionControlResult>;
   reloadResources(): Promise<SessionResourceCatalogResult>;
   invokeCommand(command: string): Promise<void>;
+  commitPrivateMemory?(sessionId: string): Promise<PrivateMemoryCommitResult>;
+  inspectPrivateMemory?(sessionId: string): Promise<import("@pi67/domain").ContextSessionStatus>;
   flushStream(): void;
   getIdentity(): RuntimeIdentity;
   getSnapshot(): SessionSnapshot;

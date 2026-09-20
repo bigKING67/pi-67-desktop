@@ -1,8 +1,10 @@
 export * from "./agent-runtime.js";
+export * from "./local-memory-extraction-model.js";
 export * from "./first-party-model-providers.js";
 export * from "./first-party-web-tools.js";
 export * from "./shared-experience-tools.js";
 export * from "./shared-sop-tools.js";
+export type * from "./team-knowledge-access.js";
 export * from "./conversation-organization-store.js";
 export * from "./context-file-management.js";
 export * from "./desktop-package-toolchain.js";

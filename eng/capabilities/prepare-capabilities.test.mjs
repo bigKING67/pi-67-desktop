@@ -25,6 +25,7 @@ describe("Desktop first-party capability source lock", () => {
       const definition = lock.sources.find((source) => source.id === "openviking-pi-extension");
       await prepareOpenVikingPiExtension(resolve(root, definition.internalPath), definition, destination);
       await assertPreparedLocalModuleClosure(destination, "index.ts");
+      await assertPreparedLocalModuleClosure(destination, "managed-extension.ts");
     } finally {
       await rm(destination, { recursive: true, force: true });
     }

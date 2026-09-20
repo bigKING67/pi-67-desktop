@@ -9,9 +9,12 @@ describe("enterprise authorization lifetime", () => {
   vi.stubGlobal("fetch", async (url: unknown, _options: {body?: string}) => {
    if (String(url).endsWith("/exchange")) {
     if (String(url).includes("/auth-1/")) { entered.resolve(); await release.promise; }
-    return Response.json({state:"signed-in", accessToken:"synthetic-fixture", accountId:"account-fixture", userId:"user-fixture", expiresAt});
+    return Response.json({
+      accessToken:"synthetic-fixture", refreshToken:"refresh-fixture", activeTeamId:"account-fixture",
+      user:{id:"user-fixture",email:"fixture@example.test",displayName:"Fixture"}, expiresAt
+    });
    }
-   return Response.json({authorizationId:`auth-${++starts}`,deviceSecret:"a".repeat(64),verificationUri:"https://fixture.invalid/verify",userCode:"fixture",expiresAt,intervalSeconds:1});
+   return Response.json({authorizationId:`auth-${++starts}`,deviceCode:"a".repeat(64),verificationUri:"https://fixture.invalid/verify",userCode:"fixture",expiresAt,intervalSeconds:1});
   });
   const broker = new EnterpriseCredentialBrokerClient({postMessage(message) { operations.push(message.type); queueMicrotask(() => broker.handleOperationResult({type:"enterprise-credential-operation-result",requestId:message.requestId,ok:true} as never)); }});
   broker.applyBootstrap({storage:"available"} as never);
@@ -33,9 +36,10 @@ it.each(["begin", "disconnect"] as const)("serializes obsolete store cleanup wit
   let starts = 0;
   const expiresAt = new Date(Date.now() + 60_000).toISOString();
   vi.stubGlobal("fetch", async (url: unknown) => String(url).endsWith("/exchange")
-    ? Response.json({ state: "signed-in", accessToken: "synthetic-fixture",
-      accountId: "account-fixture", userId: "user-fixture", expiresAt })
-    : Response.json({ authorizationId: `auth-${++starts}`, deviceSecret: "a".repeat(64),
+    ? Response.json({ accessToken: "synthetic-fixture", refreshToken: "refresh-fixture",
+      activeTeamId: "account-fixture",
+      user: { id: "user-fixture", email: "fixture@example.test", displayName: "Fixture" }, expiresAt })
+    : Response.json({ authorizationId: `auth-${++starts}`, deviceCode: "a".repeat(64),
       verificationUri: "https://fixture.invalid/verify", userCode: "fixture", expiresAt, intervalSeconds: 1 }));
   const operations: string[] = [];
   let acknowledgeStore!: () => void;

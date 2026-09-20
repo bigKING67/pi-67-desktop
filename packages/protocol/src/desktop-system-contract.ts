@@ -19,6 +19,7 @@ import type {
   WorkspaceFileStateSnapshot
 } from "@pi67/domain";
 import type { SupportDiagnosticsUploadReceipt } from "@pi67/support-contract";
+import type { LocalMemorySettingsBridge } from "./local-memory-settings.js";
 import type { StagedPromptAttachment } from "./agent-messages.js";
 import type {
   AgentHostStartupFailedMessage,
@@ -225,6 +226,10 @@ export interface DesktopSystemBridge {
   copyWorkspaceEntryPath(entry: WorkspaceEntryRequest, mode: "absolute" | "relative"): Promise<boolean>;
   trashWorkspaceEntry(entry: WorkspaceEntryRequest): Promise<boolean>;
   getPackageNetworkSnapshot(): Promise<PackageNetworkSnapshot>;
+  /** Optional during the local-memory rollout; never returns stored credentials. */
+  localMemoryModels?: LocalMemorySettingsBridge;
+  localMemoryRuntime?: import("./local-memory-runtime.js").LocalMemoryRuntimeBridge;
+  localMemoryActivation?: import("./local-memory-activation.js").LocalMemoryActivationBridge;
   savePackageNetworkSettings(settings: PackageNetworkSettings): Promise<PackageNetworkSnapshot>;
   resetPackageNetworkSettings(): Promise<PackageNetworkSnapshot>;
   probePackageSources(settings: PackageNetworkSettings): Promise<PackageNetworkSnapshot>;

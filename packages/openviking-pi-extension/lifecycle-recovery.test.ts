@@ -99,6 +99,7 @@ describe("OpenViking Pi lifecycle recovery", () => {
     const registeredTools: string[] = [];
     const persistedEntries: Array<{ customType: string; data: unknown }> = [];
     const pi = {
+      events: { emit() {}, on: () => () => {} },
       on: (name: string, handler: (event: any, context: any) => Promise<any>) => handlers.set(name, handler),
       registerTool: (tool: { name: string }) => registeredTools.push(tool.name),
       registerCommand: vi.fn(),
@@ -175,6 +176,7 @@ describe("OpenViking Pi lifecycle recovery", () => {
     }));
     const handlers = new Map<string, (event: any, context: any) => Promise<any>>();
     const pi = {
+      events: { emit() {}, on: () => () => {} },
       on: (name: string, handler: (event: any, context: any) => Promise<any>) => handlers.set(name, handler),
       registerTool: vi.fn(),
       registerCommand: vi.fn(),

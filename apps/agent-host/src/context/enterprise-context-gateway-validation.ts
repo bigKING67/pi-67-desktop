@@ -1,5 +1,37 @@
-import type { ExperienceMethodSummary, SharedSopDetail } from "@pi67/domain";
+import type { EnterpriseTeamSummary, ExperienceMethodSummary, SharedSopDetail } from "@pi67/domain";
 import { HostCommandError } from "../protocol-error.js";
+
+export function parseTeamSummary(value: unknown): EnterpriseTeamSummary {
+  const record = asRecord(value);
+  const role = record.role;
+  if (role !== "owner" && role !== "admin" && role !== "member" && role !== "viewer") {
+    throw invalidResponse("team.role");
+  }
+  const entitlementStatus = record.entitlementStatus;
+  if (
+    entitlementStatus !== "trialing"
+    && entitlementStatus !== "active"
+    && entitlementStatus !== "past_due"
+    && entitlementStatus !== "suspended"
+    && entitlementStatus !== "expired"
+  ) throw invalidResponse("team.entitlementStatus");
+  const trialEndsAt = optionalTimestamp(record.trialEndsAt, "team.trialEndsAt");
+  if (record.quotasExempt !== undefined && typeof record.quotasExempt !== "boolean") {
+    throw invalidResponse("team.quotasExempt");
+  }
+  return {
+    id: boundedString(record.id, "team.id"),
+    name: boundedString(record.name, "team.name", 512),
+    role,
+    entitlementStatus,
+    planCode: boundedString(record.planCode, "team.planCode", 128),
+    ...(trialEndsAt === undefined ? {} : { trialEndsAt }),
+    quotasExempt: record.quotasExempt ?? false,
+    maxMembers: boundedInteger(record.maxMembers, "team.maxMembers", 1),
+    memberCount: boundedInteger(record.memberCount, "team.memberCount", 0),
+    projectCount: boundedInteger(record.projectCount, "team.projectCount", 0)
+  };
+}
 
 export function asRecord(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw invalidResponse("object");
@@ -113,7 +145,7 @@ export function secureUrl(value: unknown, field: string): string {
 export function invalidResponse(field: string): HostCommandError {
   return new HostCommandError(
     "INVALID_PAYLOAD",
-    `Enterprise Context Gateway returned an invalid ${field} field.`,
+    `New Money returned an invalid ${field} field.`,
     false
   );
 }

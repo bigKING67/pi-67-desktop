@@ -49,6 +49,10 @@ import { PromptStashImageStore } from "./prompt-stash-image-store.js";
 import { ensureMainWindowContextRoom } from "./main-window-context-room.js";
 import { DesktopSafeStorage } from "./desktop-safe-storage.js";
 import { EnterpriseCredentialStore } from "./enterprise-credential-store.js";
+import { SharedKnowledgeReceiptBroker } from "./shared-knowledge-receipt-broker.js";
+import { authorizeSharedKnowledge } from "./shared-knowledge-authorization.js";
+import { loadLocalMemoryIdentity } from "./local-memory-identity.mjs";
+import { createApplicationLocalMemory } from "./application-local-memory.js";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const rendererDirectory = normalize(join(currentDirectory, "../../renderer/dist"));
@@ -93,6 +97,9 @@ let composerDraftState: ComposerDraftStateStore | undefined;
 let promptStashImages: PromptStashImageStore | undefined;
 let workspaceFileState: WorkspaceFileStateStore | undefined;
 let enterpriseCredentialStore: EnterpriseCredentialStore | undefined;
+let sharedReceiptProfile: { root: string; localProfileId: string } | undefined;
+let sharedReceiptBroker: SharedKnowledgeReceiptBroker | undefined;
+let localMemory: ReturnType<typeof createApplicationLocalMemory>;
 let systemBridgeRegistration: SystemBridgeRegistration | undefined;
 let rendererShutdownCheckpoint: RendererShutdownCheckpointRegistration | undefined;
 const appInstanceId = randomUUID();
@@ -112,6 +119,12 @@ const agentHostSupervisor = new AgentHostSupervisor({
       promptAttachmentRoot: promptAttachments.root,
       packaged: app.isPackaged,
       electronExecutable: process.execPath,
+      // Route availability is not a permission or runtime-readiness grant. Every
+      // team Tool still admits its current Session, model, index and signed worker.
+      canonicalTeamKnowledgeTools: localMemory !== undefined && sharedReceiptProfile !== undefined,
+      // The managed route is always authoritative on the supported platform;
+      // consent remains separately fenced by activation, never external fallback.
+      managedLocalMemory: localMemory !== undefined,
       ...(windowsPackageWorkerJobController === undefined
         ? {}
         : { windowsPackageWorkerJobController })
@@ -119,6 +132,28 @@ const agentHostSupervisor = new AgentHostSupervisor({
   },
   getMainWindow: () => mainWindow,
   getEnterpriseCredentials: () => enterpriseCredentialStore,
+  getSharedKnowledgeReceipts: (owner) => {
+    const profile = sharedReceiptProfile, store = enterpriseCredentialStore;
+    if (!profile || !store) return undefined;
+    return sharedReceiptBroker ??= new SharedKnowledgeReceiptBroker({
+      createBinding: (scope) => owner.createReceiptBinding(profile.root, profile.localProfileId, scope),
+      authorize: (scope, identity, signal) => authorizeSharedKnowledge(store, scope, identity, signal),
+      revalidateIndex: (input, signal) => agentHostSupervisor.teamIndexHeads.verify(input, signal),
+      queryConfiguration: () => {
+        const memory = localMemory;
+        return memory ? { memoryRoot: memory.memoryRoot, prepareRuntime: signal => memory.teamQuery.prepareRuntime(signal) } : undefined;
+      },
+      prepareIndex: (input) => {
+        if (!localMemory) return Promise.reject(new Error("Team index runtime is unavailable."));
+        return agentHostSupervisor.teamWorkers.indexJobs.prepare(localMemory.teamPreparation, input);
+      }
+    });
+  },
+  getLocalMemoryService: () => localMemory?.activation,
+  onReady: () => {
+    if (!applicationShutdown.isShuttingDown()) void localMemory?.activation.warmup();
+  },
+  getTeamIndexSettings: () => localMemory?.settings,
   rendererUrl
 });
 const applicationShutdown = createApplicationShutdownController({
@@ -127,7 +162,11 @@ const applicationShutdown = createApplicationShutdownController({
   ),
   stopAgentHost: (deadlineMs) => agentHostSupervisor.stop(deadlineMs),
   afterAgentHostStop: async () => {
-    await promptAttachments?.cleanup();
+    try {
+      const results = await Promise.allSettled([localMemory?.activation.stop(), localMemory?.runtime.stop(), agentHostSupervisor.stopLocalMemory()]);
+      if (results.some(result => result.status === "rejected")) throw new Error("Local memory shutdown did not complete.");
+    }
+    finally { await promptAttachments?.cleanup(); }
   },
   markCleanExit: async () => {
     if (workbenchState) await workbenchState.update(finishWorkbenchRun);
@@ -195,9 +234,21 @@ if (hasSingleInstanceLock) {
       console.info("Prompt attachment cleanup removed=0 errors=1 classes=UnknownError");
     });
     const desktopSafeStorage = new DesktopSafeStorage(safeStorage);
+    localMemory = createApplicationLocalMemory({
+      appData: app.getPath("appData"), platform: process.platform, arch: process.arch,
+      ...(app.commandLine.hasSwitch("user-data-dir") ? { isolatedUserData: app.getPath("userData") } : {}),
+      encryption: desktopSafeStorage, models: agentHostSupervisor.localMemoryModels
+    });
     enterpriseCredentialStore = new EnterpriseCredentialStore(app.getPath("userData"), {
       encryption: desktopSafeStorage
     });
+    if (localMemory) {
+      try {
+        sharedReceiptProfile = { root: join(localMemory.memoryRoot, "team-projections", "receipts"),
+          localProfileId: await loadLocalMemoryIdentity(localMemory.memoryRoot) };
+      } catch { console.warn("Shared receipt profile unavailable; synchronization remains disabled."); }
+      await localMemory.activation.initialize();
+    }
     workspaceFileState = new WorkspaceFileStateStore(app.getPath("userData"), {
       encryption: desktopSafeStorage
     });
@@ -297,6 +348,10 @@ if (hasSingleInstanceLock) {
       desktopToolchain,
       desktopCapabilities,
       packageNetworkSettings,
+      getLocalMemorySettings: () => localMemory?.modelSettings,
+      getLocalMemoryRuntime: () => localMemory?.runtime,
+      getLocalMemoryActivation: () => localMemory?.activation,
+      rendererUrl,
       promptAttachments,
       promptStashImages,
       secureStorage: desktopSafeStorage,
@@ -319,7 +374,8 @@ if (hasSingleInstanceLock) {
     });
     unregisterPowerResumeRecovery = registerPowerResumeRecovery({
       getMainWindow: () => mainWindow,
-      onResume: () => systemBridgeRegistration?.handlePowerResume()
+      onSuspend: () => agentHostSupervisor.notifyPowerTransition("suspend"),
+      onResume: () => { agentHostSupervisor.notifyPowerTransition("resume"); systemBridgeRegistration?.handlePowerResume(); }
     });
     // Create the renderer target before macOS safeStorage restoration can wait on Keychain.
     const mainWindowReady = observeStartupStage("main-window", openMainWindow);

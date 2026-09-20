@@ -9,6 +9,8 @@ describe("Agent Host environment", () => {
       PI67_SESSION_CATALOG_DIR: "/also-untrusted",
       PI67_STORAGE_ROOT: "/also-untrusted-root",
       PI67_DESKTOP: "0",
+      PI67_MANAGED_LOCAL_MEMORY: "1",
+      PI67_CANONICAL_TEAM_KNOWLEDGE: "1",
       PI_TELEMETRY: "1"
     }, {
       storageRoot: "/app/user-data",
@@ -19,6 +21,8 @@ describe("Agent Host environment", () => {
       PI67_SESSION_CATALOG_DIR: "/app/user-data/projections/session-catalog",
       PI67_STORAGE_ROOT: "/app/user-data",
       PI67_DESKTOP: "1",
+      PI67_MANAGED_LOCAL_MEMORY: "0",
+      PI67_CANONICAL_TEAM_KNOWLEDGE: "0",
       PI_TELEMETRY: "0"
     });
   });
@@ -37,7 +41,7 @@ describe("Agent Host environment", () => {
     })).toThrow("Main-owned userData layout");
   });
 
-  it("hands only the verified private toolchain and package settings path to the Host", () => {
+  it.each([false, true])("hands Main-owned paths and independent team mode %s to the Host", (canonical) => {
     const toolchainRoot = join(process.platform === "win32" ? "C:\\app" : "/app", "resources", "toolchain");
     const nodeExecutable = join(toolchainRoot, "node", process.platform === "win32" ? "node.exe" : "bin/node");
     const npmCli = join(toolchainRoot, "npm", "bin", "npm-cli.js");
@@ -84,12 +88,16 @@ describe("Agent Host environment", () => {
       packageNetworkSettingsPath: "/app/user-data/package-manager/network-settings.json",
       packaged: true,
       electronExecutable: "/app/Pi-67 Desktop",
+      managedLocalMemory: !canonical,
+      canonicalTeamKnowledgeTools: canonical,
       windowsPackageWorkerJobController
     });
 
     expect(environment).toMatchObject({
       PI_CODING_AGENT_DIR: "/Users/test/.pi/agent",
       PI67_PACKAGED: "1",
+      PI67_MANAGED_LOCAL_MEMORY: canonical ? "0" : "1",
+      PI67_CANONICAL_TEAM_KNOWLEDGE: canonical ? "1" : "0",
       PI67_NODE_EXECUTABLE: nodeExecutable,
       PI67_NPM_CLI: npmCli,
       PI67_GIT_EXECUTABLE: gitExecutable,

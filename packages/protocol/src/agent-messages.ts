@@ -227,7 +227,7 @@ export interface CommandPayloads extends WorkspaceFileCommandPayloads,
   "message.index": { offset?: number; limit?: number };
   "message.search": { query: string };
   "message.locate": { id: string };
-  "session.create": { creationId: string };
+  "session.create": { creationId: string; teamScope?: import("@pi67/domain").TeamSessionScope };
   "session.creation.resolve": { creationId: string };
   "session.open": { path: string; cwdOverride?: string };
   "session.import": { submissionId: string; path: string };

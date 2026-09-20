@@ -5,6 +5,7 @@ const BoundedString = Type.String({ minLength: 1, maxLength: 2_048 });
 export const EnterpriseAccessCredentialSchema = Type.Object({
   endpoint: BoundedString,
   accessToken: Type.String({ minLength: 1, maxLength: 16_384 }),
+  refreshToken: Type.Optional(Type.String({ minLength: 1, maxLength: 16_384 })),
   accountId: BoundedString,
   userId: BoundedString,
   displayName: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })),
@@ -32,6 +33,7 @@ export type EnterpriseCredentialBootstrapMessage = Static<
 export const EnterpriseCredentialStoreRequestSchema = Type.Object({
   type: Type.Literal("enterprise-credential-store"),
   requestId: BoundedString,
+  profileOnly: Type.Optional(Type.Literal(true)),
   credential: EnterpriseAccessCredentialSchema
 }, { additionalProperties: false });
 

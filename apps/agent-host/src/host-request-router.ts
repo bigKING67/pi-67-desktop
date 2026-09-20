@@ -35,7 +35,7 @@ import { WorkspaceUsageReportCoordinator } from "./workspace-usage-report-coordi
 export interface HostRequestRouterOptions {
   isShuttingDown(): boolean;
   runtimeStatus(): CommandResults["runtime.getStatus"];
-  dispatchAppCommand(command: AgentCommand, idempotencyKey?: string): Promise<CommandResults[AgentCommandType]>;
+  dispatchAppCommand(command: AgentCommand, idempotencyKey?: string, signal?: AbortSignal): Promise<CommandResults[AgentCommandType]>;
   handleProjectionResync(
     origin: HostConnectionContext,
     request: RequestEnvelope<"projection.resync">,
@@ -160,7 +160,7 @@ export class HostRequestRouter {
     }
     if (request.context.scope === "app") {
       const command = { type: request.type, payload: request.payload } as AgentCommand;
-      void this.options.dispatchAppCommand(command, request.idempotencyKey)
+      void this.options.dispatchAppCommand(command, request.idempotencyKey, origin.signalForRequest(request.requestId))
         .then((result) => sendSuccess(origin, request, result))
         .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
       return;

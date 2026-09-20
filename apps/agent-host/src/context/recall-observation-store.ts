@@ -9,6 +9,7 @@ import {
   type RecallRoute,
   type RecallSource
 } from "@pi67/domain";
+import type { TeamSessionIdentity } from "@pi67/domain";
 import { HostCommandError } from "../protocol-error.js";
 
 const MAX_OBSERVATIONS = 500;
@@ -188,13 +189,14 @@ export class RecallObservationStore {
   async applyEnterpriseFeedback<T extends { id: string; score: number }>(
     workspaceId: string,
     provider: "enterprise-experience" | "enterprise-sop",
-    items: readonly T[]
+    items: readonly T[],
+    identity?: TeamSessionIdentity
   ): Promise<T[]> {
     const feedback = await this.readFeedback();
     const scopeHash = opaqueHash(workspaceId);
     return items
       .flatMap((item) => {
-        const id = `${scopeHash}.${opaqueHash(`${provider}:${item.id}`)}`;
+        const id = `${scopeHash}.${enterpriseItemHash(provider, item.id, identity)}`;
         const entry = feedback.records.findLast((candidate) => candidate.id === id);
         if (entry && ["outdated", "wrong-scope", "incorrect"].includes(entry.feedback)) return [];
         const adjustment = entry?.feedback === "helpful" ? 0.08 : entry?.feedback === "irrelevant" ? -0.25 : 0;
@@ -205,6 +207,7 @@ export class RecallObservationStore {
 
   async recordEnterprise(input: {
     workspaceId: string;
+    identity?: TeamSessionIdentity;
     sessionId?: string;
     query: string;
     route: "enterprise-experience" | "enterprise-sop";
@@ -227,7 +230,7 @@ export class RecallObservationStore {
         scopeHash,
         ...(input.sessionId === undefined ? {} : { sessionIdHash: opaqueHash(input.sessionId) }),
         items: input.items.slice(0, 8).map((item) => ({
-          id: opaqueHash(`${input.route}:${item.id}`),
+          id: enterpriseItemHash(input.route, item.id, input.identity),
           source,
           score: clampScore(item.score)
         }))
@@ -270,6 +273,11 @@ export class RecallObservationStore {
       return emptyFeedback();
     }
   }
+}
+
+function enterpriseItemHash(provider: string, id: string, identity?: TeamSessionIdentity): string {
+  return opaqueHash(identity ? JSON.stringify(["enterprise-scope-v1", provider, id,
+    new URL(identity.endpoint).href, identity.userId, identity.teamId, identity.projectId]) : `${provider}:${id}`);
 }
 
 function parseObservation(line: string): SafeDiagnosticRecord[] {

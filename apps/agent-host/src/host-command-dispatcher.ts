@@ -77,7 +77,10 @@ export type RuntimeLoadedCommand = Exclude<
       | "enterprise.auth.begin"
       | "enterprise.auth.poll"
       | "enterprise.auth.disconnect"
+      | "enterprise.team.list"
       | "enterprise.project.list"
+      | "enterprise.knowledge.sync"
+      | "enterprise.knowledge.index"
       | "enterprise.workspace.get"
       | "enterprise.workspace.bind"
       | "enterprise.workspace.unbind"
@@ -215,7 +218,7 @@ export async function dispatchHostCommand(
     case "session.create": {
       const snapshot = context.reuseInitializedSessionForCreate
         ? runtime.getSnapshot()
-        : await runtime.createSession(command.payload.creationId);
+        : await runtime.createSession(command.payload.creationId, command.payload.teamScope);
       if (!context.reuseInitializedSessionForCreate) await context.commitSessionWriter(runtime);
       context.sendEvent({ type: "session.bootstrap", payload: { snapshot, reason: "session-create" } });
       return context.captureProjectionMutationAcknowledgement(runtime);

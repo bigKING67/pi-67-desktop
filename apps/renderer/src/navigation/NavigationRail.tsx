@@ -26,6 +26,8 @@ import {
   useSessionCatalogSearch
 } from "./SessionCatalogSearch.js";
 import { useNavigationMessageSearch } from "./use-navigation-message-search.js";
+import { useNewMoneyAccount } from "../context-memory/use-new-money-account.js";
+import { newMoneyAccountLabel } from "../context-memory/new-money-account-store.js";
 
 const WorkspaceRemovalDialog = lazy(async () => {
   const module = await import("./WorkspaceRemovalDialog.js");
@@ -47,6 +49,7 @@ export function NavigationRail({
   containerRef?: RefObject<HTMLElement | null>;
 }) {
   const connected = useAppStore((state) => state.connected);
+  const accountLabel = newMoneyAccountLabel(useNewMoneyAccount());
   const workspaces = useWorkbenchStore((state) => state.workspaces);
   const workspaceOrder = useWorkbenchStore((state) => state.workspaceOrder);
   const expandedWorkspaceIds = useWorkbenchStore((state) => state.expandedWorkspaceIds);
@@ -117,7 +120,7 @@ export function NavigationRail({
           onPress={() => rendererWorkbenchStore.getState().openSettings("account")}
         >
           <UserRound aria-hidden="true" size={15} />
-          <span><strong>未登录</strong><small>本地模式</small></span>
+          <span><strong>{accountLabel.title}</strong><small>{accountLabel.detail}</small></span>
         </Button>
         <HelpMenu />
       </footer>

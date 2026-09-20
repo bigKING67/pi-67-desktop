@@ -16,9 +16,9 @@ import { createTakeoverManager } from "./takeover.js";
 import { emitContextDiagnostic, hashDiagnosticValue } from "./diagnostics.js";
 import { detectMemoryOwnerConflict } from "./memory-owner-policy.js";
 import { createRuntimePrivacyGuard } from "./runtime-privacy.js";
-
-export default async function (pi: ExtensionAPI) {
-  // --- Load config ---
+import { resolveManagedMemoryConnection, type ManagedMemoryConnection } from "./managed-connection.js";
+import { registerDesktopMemoryCommit } from "./desktop-memory-commit.js";
+export default async function initializeOpenViking(pi: ExtensionAPI, managedConnection?: ManagedMemoryConnection) {
   const config = loadConfigFromModuleUrl(import.meta.url);
   if (!config.enabled) return;
 
@@ -48,7 +48,7 @@ export default async function (pi: ExtensionAPI) {
     state: "locked",
   });
 
-  const client = new OVClient(config);
+  const client = new OVClient(config, managedConnection ?? await resolveManagedMemoryConnection(pi.events));
   client.onConnectionChange((connected) => {
     emitContextDiagnostic({
       kind: "context.healthChanged",
@@ -84,7 +84,7 @@ export default async function (pi: ExtensionAPI) {
     archiveOverview = "";
   };
   const refreshRuntimePrivacy = createRuntimePrivacyGuard(config, import.meta.url, invalidateMemoryContext);
-
+  registerDesktopMemoryCommit(pi, client, sync, refreshRuntimePrivacy);
   const start = async (ctx: any): Promise<void> => {
     const sessionCwd = typeof ctx?.sessionManager?.getCwd === "function" ? ctx.sessionManager.getCwd() : "";
     // Rebind reused Extension instances before lifecycle fast paths.
@@ -123,7 +123,7 @@ export default async function (pi: ExtensionAPI) {
         ? ctx.sessionManager.getBranch()
         : [];
       if (config.takeoverEnabled) takeover.restore(branch);
-      sync.restore(branch, piSessionId, config.takeoverEnabled ? takeover.state.syncedEntryCount : 0);
+      sync.restore(branch, piSessionId, config.takeoverEnabled ? takeover.state.syncedEntryCount : 0, ctx.sessionManager.getEntries?.() ?? branch);
       if (config.privateWriteEnabled) sync.anchorScope();
 
       // Health check
@@ -236,6 +236,7 @@ export default async function (pi: ExtensionAPI) {
         state: recallResult.state === "ready" ? "prompt-ready" : "empty-or-degraded",
         route: "prompt-context",
         durationMs: Date.now() - recallStartedAt,
+        ...(recall.timing === undefined ? {} : { requestTiming: recall.timing }),
         count: recallResult.block ? 1 : 0,
         selectedCount: recallResult.block ? 1 : 0,
         tokenBudget: config.recallTokenBudget,
@@ -262,9 +263,8 @@ export default async function (pi: ExtensionAPI) {
 
   // --- tool_call ---
   pi.on("tool_call", async (event, _ctx) => {
-    const decision = guardVikingUriToolCall(event);
-    if (!decision) return;
-    return decision;
+    sync.observeSharedToolCall(event.toolName);
+    return guardVikingUriToolCall(event) ?? undefined;
   });
 
   // --- turn_end ---

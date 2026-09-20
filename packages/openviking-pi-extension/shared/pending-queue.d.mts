@@ -1,4 +1,4 @@
-export interface PendingQueueContext { readonly directory: string; readonly scopeKey: string; }
+export interface PendingQueueContext { readonly directory: string; readonly scopeKey: string; readonly sessionId?: string; }
 export function enqueue(
   type: string,
   sessionId: string,

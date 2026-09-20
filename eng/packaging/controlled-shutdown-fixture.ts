@@ -11,6 +11,8 @@ interface ControlledShutdownExtensionOptions {
   extensionPath: string;
   childPidPath: string;
   lifecyclePath: string;
+  /** Optional isolated packaged proof; records only mode flags and Tool names. */
+  teamKnowledgeEvidencePath?: string;
 }
 
 interface ShutdownLifecycleExtensionOptions {
@@ -36,7 +38,8 @@ export async function writeShutdownLifecycleExtension({
 export async function writeControlledShutdownExtension({
   extensionPath,
   childPidPath,
-  lifecyclePath
+  lifecyclePath,
+  teamKnowledgeEvidencePath
 }: ControlledShutdownExtensionOptions): Promise<void> {
   await writeFile(extensionPath, `
     import { appendFileSync, writeFileSync } from "node:fs";
@@ -83,6 +86,11 @@ export async function writeControlledShutdownExtension({
           maxTokens: 256
         }],
         streamSimple: (model, _context, options) => {
+          ${teamKnowledgeEvidencePath ? `writeFileSync(${JSON.stringify(teamKnowledgeEvidencePath)}, JSON.stringify({
+            canonicalMode: process.env.PI67_CANONICAL_TEAM_KNOWLEDGE,
+            privateMode: process.env.PI67_MANAGED_LOCAL_MEMORY,
+            tools: (_context.tools ?? []).map(tool => tool.name)
+          }), { mode: 0o600 });` : ""}
           const stream = createAssistantMessageEventStream();
           const output = {
             role: "assistant",

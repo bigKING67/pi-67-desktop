@@ -6,6 +6,30 @@ import { RecallObservationStore } from "./recall-observation-store.js";
 
 const roots: string[] = [];
 
+it.each(["enterprise-experience", "enterprise-sop"] as const)("isolates %s feedback by service user team and project", async (route) => {
+  const root = await mkdtemp(join(tmpdir(), "pi67-recall-scope-")); roots.push(root);
+  const store = new RecallObservationStore(root);
+  const identity = { endpoint: "https://service.fixture", userId: "user-secret", teamId: "team-secret", projectId: "project-secret" };
+  const items = [{ id: "same-asset", score: 0.5 }];
+  const observe = (scope?: typeof identity) => store.recordEnterprise({ workspaceId: "workspace", query: "query", route,
+    durationMs: 1, candidateCount: 1, items, ...(scope ? { identity: scope } : {}) });
+  await observe(identity);
+  const listed = await store.list({ workspaceId: "workspace", actorPeerId: "peer", limit: 20 });
+  await store.recordFeedback({ workspaceId: "workspace", actorPeerId: "peer", id: listed.items[0]!.id, feedback: "incorrect" });
+  expect(await store.applyEnterpriseFeedback("workspace", route, items, identity)).toEqual([]);
+  expect(await store.applyEnterpriseFeedback("workspace", route, items, { ...identity, endpoint: "https://service.fixture/" })).toEqual([]);
+  for (const patch of [{ userId: "other" }, { teamId: "other" }, { projectId: "other" }, { endpoint: "https://other.fixture" }]) {
+    const scope = { ...identity, ...patch };
+    expect(await store.applyEnterpriseFeedback("workspace", route, items, scope)).toEqual(items);
+    await observe(scope);
+  }
+  expect(await store.applyEnterpriseFeedback("workspace", route, items)).toEqual(items);
+  await observe();
+  expect((await store.list({ workspaceId: "workspace", actorPeerId: "peer", limit: 20 })).items).toHaveLength(6);
+  const raw = await readFile(store.observationPath, "utf8");
+  for (const value of [...Object.values(identity), "same-asset"]) expect(raw).not.toContain(value);
+});
+
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });

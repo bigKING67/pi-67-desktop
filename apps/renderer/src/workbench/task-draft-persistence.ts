@@ -11,11 +11,10 @@ import {
   type ComposerDraftPersistedState,
   type ComposerDraftRecord
 } from "@pi67/domain";
-import { createMessageId } from "@pi67/protocol";
+import { restoredTask } from "./restored-draft-task.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import {
-  rendererWorkbenchStore, selectedWorkbenchTask, taskForConversation,
-  type RendererWorkbenchTask
+  rendererWorkbenchStore, selectedWorkbenchTask, taskForConversation
 } from "./workbench-store.js";
 import { taskDraftHasContent, useTaskDraftStore, type TaskDraft } from "./task-draft-store.js";
 import { captureDraftRestoreSelectionGuard } from "./task-draft-restore-selection.js";
@@ -112,6 +111,8 @@ export function restorePersistedDrafts(
     const workbench = rendererWorkbenchStore.getState();
     if (!workbench.workspaces[record.conversation.workspaceId]) continue;
     const existing = taskForConversation(workbench.tasks, record.conversation);
+    if (existing && (existing.teamScope?.teamId !== record.teamScope?.teamId
+      || existing.teamScope?.projectId !== record.teamScope?.projectId)) continue;
     const taskId = existing?.id ?? workbench.restoreTask(restoredTask(record));
     if (!taskId) continue;
     const identity = conversationKeyIdentity(record.conversation);
@@ -128,7 +129,8 @@ export function restorePersistedDrafts(
         || draft.promptStash.length > 0
       )),
       attachmentCount: draft?.attachments.length ?? 0,
-      ...(record.environmentIntent ? { environmentIntent: record.environmentIntent } : {})
+      ...(record.environmentIntent ? { environmentIntent: record.environmentIntent } : {}),
+      ...(record.teamScope ? { teamScope: { ...record.teamScope } } : {})
     });
     restoredTaskByConversation.set(identity, taskId);
   }
@@ -137,38 +139,6 @@ export function restorePersistedDrafts(
     ? restoredTaskByConversation.get(conversationKeyIdentity(state.selectedConversation))
     : undefined;
   if (selected && options.restoreSelection) rendererWorkbenchStore.getState().selectTask(selected);
-}
-
-function restoredTask(record: ComposerDraftRecord): RendererWorkbenchTask {
-  const conversation = record.conversation;
-  const taskId = conversation.kind === "provisional"
-    ? conversation.draftId
-    : createMessageId("draft-task");
-  return {
-    id: taskId,
-    conversation,
-    workspaceId: conversation.workspaceId,
-    sessionId: `pending:${taskId}`,
-    taskGeneration: 1,
-    ...(conversation.kind === "session"
-      ? {
-          sessionFileIdentity: conversation.sessionFileIdentity,
-          sessionPath: conversation.sessionPath
-        }
-      : {}),
-    lifecycle: conversation.kind === "provisional" ? "draft" : "stopped",
-    runtime: {
-      phase: "stopped",
-      detail: conversation.kind === "provisional" ? "首条消息尚未发送" : "对话草稿等待恢复",
-      recoverable: true
-    },
-    title: "未命名会话",
-    titleSource: "fallback",
-    ...(record.environmentIntent ? { environmentIntent: record.environmentIntent } : {}),
-    hasDraft: true,
-    attachmentCount: 0,
-    toolMode: "auto"
-  };
 }
 
 function synchronizeTaskDraftFlags(drafts: Record<string, TaskDraft>): void {
@@ -294,7 +264,7 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
       continue;
     }
     const identity = conversationKeyIdentity(task.conversation);
-    const fingerprint = taskDraftFingerprint(draft, task.environmentIntent);
+    const fingerprint = taskDraftFingerprint(draft, task.environmentIntent, task.teamScope);
     if (contentFingerprintByConversation.get(identity) !== fingerprint) {
       contentFingerprintByConversation.set(identity, fingerprint);
       updatedAtByConversation.set(identity, now);
@@ -319,6 +289,7 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
       ...(task.conversation.kind === "provisional" && task.environmentIntent === "worktree"
         ? { environmentIntent: "worktree" as const }
         : {}),
+      ...(task.conversation.kind === "provisional" && task.teamScope ? { teamScope: { ...task.teamScope } } : {}),
       ...(task.conversation.kind === "provisional" && draft.interactionMode === "plan"
         ? { interactionMode: "plan" as const }
         : {}),
@@ -392,7 +363,7 @@ function serializedStateIncludesTaskDraft(
   }
   return Boolean(
     record
-    && draftContentFingerprint(record) === taskDraftFingerprint(draft, task.environmentIntent)
+    && draftContentFingerprint(record) === taskDraftFingerprint(draft, task.environmentIntent, task.teamScope)
   );
 }
 

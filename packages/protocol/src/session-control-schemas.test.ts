@@ -1,5 +1,8 @@
 import type { SessionSnapshot } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
+import { Value } from "typebox/value";
+import type { TObject } from "typebox";
+import { CommandResultSchemas } from "./schemas.js";
 import { isResponseEnvelope, responseEnvelope, type ProtocolContext } from "./envelope.js";
 
 const TASK_CONTEXT: ProtocolContext = {
@@ -13,6 +16,22 @@ const TASK_CONTEXT: ProtocolContext = {
 };
 
 describe("Session control response schemas", () => {
+  it("accepts legacy snapshots and bounded origin without authority fields", () => {
+    const schema = (CommandResultSchemas["projection.resync"] as TObject).properties.snapshot!;
+    const snapshot = legacySnapshot();
+    expect(Value.Check(schema, snapshot)).toBe(true);
+    for (const memoryOrigin of [{ kind: "private" }, { kind: "unverified" },
+      { kind: "team", teamId: "team", projectId: "project" }]) {
+      expect(Value.Check(schema, { ...snapshot, memoryOrigin })).toBe(true);
+    }
+    for (const memoryOrigin of [{ kind: "team" }, { kind: "private", authorized: true },
+      { kind: "team", teamId: "", projectId: "project" },
+      { kind: "team", teamId: "team", projectId: "p".repeat(129) },
+      { kind: "team", teamId: "team", projectId: "project", userId: "user" }]) {
+      expect(Value.Check(schema, { ...snapshot, memoryOrigin })).toBe(false);
+    }
+  });
+
   it("requires model selection to return its catalog while thinking stays narrow", () => {
     const controls = {
       sessionId: "session-1",

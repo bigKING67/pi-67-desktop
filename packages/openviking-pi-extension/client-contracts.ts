@@ -1,3 +1,5 @@
+import type { ContextServerTiming } from "./recall-timing.js";
+
 export interface OVSearchResult {
   uri: string;
   context_type: string;
@@ -104,4 +106,5 @@ export interface OVResponse<T> {
   error?: { message?: string; code?: string };
   status?: number;
   traceId?: string;
+  contextTiming?: ContextServerTiming;
 }

@@ -38,3 +38,15 @@ function methodLimitError(field: string): HostCommandError {
     true
   );
 }
+
+export function enterpriseEvidenceHash(reference: string): string {
+  const match = /^sha256:([a-f0-9]{64})$/u.exec(reference);
+  if (!match) {
+    throw new HostCommandError(
+      "INVALID_PAYLOAD",
+      "New Money evidence references must use sha256:<64 lowercase hex>.",
+      false
+    );
+  }
+  return match[1]!;
+}

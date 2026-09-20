@@ -43,7 +43,7 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
       {
         id: "account",
         ...messages.settings.sections.account,
-        searchTerms: ["账户与本地数据", "登录", "未登录", "本地数据", "本地模式", "account", "sign in"],
+        searchTerms: ["账户与本地数据", "登录", "退出登录", "New Money", "团队", "未登录", "本地数据", "本地模式", "account", "sign in"],
         icon: UserRound
       }
     ]

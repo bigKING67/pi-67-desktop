@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { utilityProcess, type BrowserWindow, type UtilityProcess } from "electron";
+import { utilityProcess, type UtilityProcess } from "electron";
 import {
   isAgentHostReadyMessage,
   isAgentHostRuntimePoisonedMessage,
@@ -10,44 +10,35 @@ import {
   type AgentHostShutdownCompleteMessage,
   type AgentHostShutdownRequest
 } from "@pi67/protocol";
-import {
-  agentHostEnvironment,
-  type AgentHostRuntimeEnvironment,
-  type AgentHostStoragePaths
-} from "./agent-host-environment.js";
+import { agentHostEnvironment } from "./agent-host-environment.js";
 import { planAgentHostRestart } from "./agent-host-restart.js";
 import { handoffAgentHostPort } from "./agent-host-port-handoff.js";
 import { AgentHostInitializationOutputForwarder } from "./agent-host-initialization-output.js";
 import { redact } from "./redaction.js";
+import { LocalMemorySupervisor } from "./local-memory-supervisor.js";
+import { LocalMemoryModelClient } from "./local-memory-model-client.js";
+import { TeamIndexSettingsBroker } from "./team-index-settings-broker.js";
+import { TeamIndexHeadClient } from "./team-index-head-client.js";
+import { TeamWorkerSupervisor } from "./team-worker-supervisor.js";
+import { routePrivateHostOperation } from "./agent-host-private-operation.js";
 import { sendAgentHostStartupFailure } from "./agent-host-startup-notification.js";
-import {
-  EnterpriseCredentialSupervisor,
-  type EnterpriseCredentialBrokerPort
-} from "./enterprise-credential-supervisor.js";
+import { EnterpriseCredentialSupervisor } from "./enterprise-credential-supervisor.js";
 import { completedAgentHostStopResult, emptyAgentHostStopResult, resolveAgentHostShutdownDeadline,
-  type AgentHostStopResult, type AgentHostSupervisorDiagnostics, type AgentHostSupervisorPhase
+  type AgentHostStopResult, type AgentHostSupervisorDiagnostics, type AgentHostSupervisorPhase, type AgentHostSupervisorOptions
 } from "./agent-host-supervisor-contract.js";
 export type { AgentHostStopResult, AgentHostSupervisorDiagnostics, AgentHostSupervisorPhase } from "./agent-host-supervisor-contract.js";
 interface AgentHostIdentity {
   hostEpoch: number;
   hostInstanceId: string;
 }
-
-interface AgentHostSupervisorOptions {
-  agentHostEntry: string;
-  appInstanceId: string;
-  expectedRendererOrigin: string;
-  getStoragePaths: () => AgentHostStoragePaths;
-  getRuntimeEnvironment?: () => AgentHostRuntimeEnvironment;
-  getMainWindow: () => BrowserWindow | undefined;
-  rendererUrl: string;
-  shutdownDeadlineMs?: number;
-  getEnterpriseCredentials?: () => EnterpriseCredentialBrokerPort | undefined;
-}
-
 const DEFAULT_SHUTDOWN_DEADLINE_MS = 4_000;
-
 export class AgentHostSupervisor {
+  notifyPowerTransition(state: "suspend" | "resume"): void { this.#powerState = state; this.#teamIndexSettings.retire(); this.teamIndexHeads.retire(); this.teamWorkers.invalidate(); if (this.#hostReadyReceived && !this.#stopping) this.#agentHost?.postMessage({ type: "enterprise-power-transition", state }); }
+  #powerState: "suspend" | "resume" | undefined;
+  readonly localMemoryModels = new LocalMemoryModelClient(() => this.#stopping || !this.#hostReadyReceived ? undefined : this.#agentHost);
+  readonly teamWorkers = new TeamWorkerSupervisor(() => this.#stopping || !this.#hostReadyReceived || this.#powerState === "suspend" || this.#phase !== "running" || this.#enterpriseCredentialBootstrapState !== "complete" || this.#poisonedRuntimeTimer ? undefined : this.#agentHost);
+  readonly teamIndexHeads = new TeamIndexHeadClient(() => this.#stopping || !this.#hostReadyReceived || this.#powerState === "suspend" || this.#phase !== "running" || this.#enterpriseCredentialBootstrapState !== "complete" || this.#poisonedRuntimeTimer ? undefined : this.#agentHost);
+  get teamModelPorts() { return this.teamWorkers.ports; }
   readonly #options: AgentHostSupervisorOptions;
   #agentHost: UtilityProcess | undefined;
   #identity: AgentHostIdentity | undefined;
@@ -87,18 +78,23 @@ export class AgentHostSupervisor {
   #lastPortHandoffAt: number | undefined;
   #poisonedRuntimeReplacementCount = 0;
   readonly #enterpriseCredentials: EnterpriseCredentialSupervisor;
-
+  readonly #localMemory: LocalMemorySupervisor;
+  readonly #teamIndexSettings: TeamIndexSettingsBroker;
   constructor(options: AgentHostSupervisorOptions) {
     this.#options = options;
-    this.#enterpriseCredentials = new EnterpriseCredentialSupervisor(
-      () => this.#options.getEnterpriseCredentials?.()
+    this.#localMemory = new LocalMemorySupervisor(() => options.getLocalMemoryService?.());
+    this.#enterpriseCredentials = new EnterpriseCredentialSupervisor(() => options.getEnterpriseCredentials?.(), () => options.getSharedKnowledgeReceipts?.(this.#enterpriseCredentials));
+    this.#teamIndexSettings = new TeamIndexSettingsBroker(
+      () => this.#stopping || !this.#hostReadyReceived || this.#powerState === "suspend" || this.#phase !== "running"
+        || this.#enterpriseCredentialBootstrapState !== "complete" || this.#poisonedRuntimeTimer ? undefined : this.#agentHost,
+      () => options.getTeamIndexSettings?.(),
+      () => { this.teamIndexHeads.retire(); this.teamWorkers.invalidate(); this.#enterpriseCredentials.invalidateReceiptBindings(); }
     );
     this.#shutdownDeadlineMs = resolveAgentHostShutdownDeadline(
       options.shutdownDeadlineMs,
       DEFAULT_SHUTDOWN_DEADLINE_MS
     );
   }
-
   diagnostics(): AgentHostSupervisorDiagnostics {
     return {
       phase: this.#phase,
@@ -130,7 +126,7 @@ export class AgentHostSupervisor {
       poisonedRuntimeReplacementPending: this.#poisonedRuntimeTimer !== undefined
     };
   }
-
+  stopLocalMemory(): Promise<void> { return this.#localMemory.stop(); }
   connect(replaceCurrent = false): void {
     if (this.#stopping || this.#restartBudgetExhausted) return;
     if (this.#startupBlocked) {
@@ -143,10 +139,12 @@ export class AgentHostSupervisor {
     }
     this.#startAgentHost();
   }
-
   /** Re-read Main-owned env while running; application quit uses stop(). */
   restart(): void {
     if (this.#stopping) return;
+    this.#teamIndexSettings.retire();
+    this.teamIndexHeads.retire();
+    this.teamWorkers.invalidate(); this.#hostReadyReceived = false;
     this.#startupBlocked = false;
     this.#restartBudgetExhausted = false;
     this.#restartHistory = [];
@@ -172,6 +170,10 @@ export class AgentHostSupervisor {
   }
   stop(shutdownDeadlineMs = this.#shutdownDeadlineMs): Promise<AgentHostStopResult> {
     if (this.#stopPromise) return this.#stopPromise;
+    this.#teamIndexSettings.stop();
+    this.teamIndexHeads.retire();
+    this.teamWorkers.invalidate();
+    this.#enterpriseCredentials.invalidateReceiptBindings();
     const resolvedShutdownDeadlineMs = resolveAgentHostShutdownDeadline(shutdownDeadlineMs, this.#shutdownDeadlineMs);
     this.#stopping = true;
     this.#phase = "stopping";
@@ -181,14 +183,13 @@ export class AgentHostSupervisor {
     this.#poisonedRuntimeTimer = undefined;
     const host = this.#agentHost;
     if (!host) {
-      this.#stopPromise = Promise.resolve(emptyAgentHostStopResult(true, false));
+      this.#stopPromise = this.teamWorkers.shutdown().then(() => emptyAgentHostStopResult(true, false));
       return this.#stopPromise;
     }
-
     this.#stopHost = host;
     this.#stopPromise = new Promise<AgentHostStopResult>((resolve) => {
       this.#resolveStop = resolve;
-    });
+    }).then(async result => { await this.teamWorkers.shutdown(); return result; });
     this.#stopTimer = setTimeout(() => this.#forceStop(host), resolvedShutdownDeadlineMs);
     const request: AgentHostShutdownRequest = {
       type: "agent-host-shutdown",
@@ -226,9 +227,9 @@ export class AgentHostSupervisor {
     this.#portHandoffCount += 1;
     this.#lastPortHandoffAt = Date.now();
   }
-
   #startAgentHost(): void {
     if (this.#agentHost || this.#restartTimer || this.#stopping || this.#restartBudgetExhausted) return;
+    this.#enterpriseCredentials.invalidateReceiptBindings();
     const identity = { hostEpoch: ++this.#nextHostEpoch, hostInstanceId: randomUUID() };
     this.#phase = "starting";
     this.#processStartRequestedAt = Date.now();
@@ -280,9 +281,11 @@ export class AgentHostSupervisor {
       if (message) console.error(`[agent-host] ${message}`);
     });
   }
-
   #handleExit(host: UtilityProcess, code: number): void {
     if (this.#agentHost !== host) return;
+    this.#teamIndexSettings.retire();
+    this.teamIndexHeads.retire();
+    this.#enterpriseCredentials.invalidateReceiptBindings();
     const structuredStartupFailure = this.#structuredStartupFailure?.host === host
       ? this.#structuredStartupFailure
       : undefined;
@@ -339,17 +342,13 @@ export class AgentHostSupervisor {
       this.#startAgentHost();
     }, restart.delay);
   }
-
   #handleMessage(host: UtilityProcess, message: unknown): void {
-    if (this.#agentHost === host) {
-      const enterpriseOperation = this.#enterpriseCredentials.operation(message);
-      if (enterpriseOperation) {
-        void enterpriseOperation.then((result) => {
-          if (this.#agentHost === host && !this.#stopping) host.postMessage(result);
-        });
-        return;
-      }
-    }
+    if (this.#teamIndexSettings.handleMessage(host, message)) return;
+    if (this.teamIndexHeads.handleMessage(host, message)) return;
+    if (this.teamWorkers.handleMessage(host, message)) return;
+    if (routePrivateHostOperation(host, message,
+      () => this.#agentHost === host && !this.#stopping,
+      [this.#localMemory, this.#enterpriseCredentials])) return;
     if (
       this.#agentHost === host
       && this.#stopping
@@ -376,6 +375,7 @@ export class AgentHostSupervisor {
       };
       this.#startupBlocked = false;
       this.#hostReadyReceived = true;
+      if (this.#powerState) this.notifyPowerTransition(this.#powerState);
       this.#promoteReadyHost(host);
       if (this.#enterpriseCredentialBootstrapState === "idle") {
         this.#enterpriseCredentialBootstrapState = "loading";
@@ -409,12 +409,14 @@ export class AgentHostSupervisor {
       || !isAgentHostRuntimePoisonedMessage(message)
     ) return;
     this.#poisonedRuntimeReplacementCount += 1;
+    this.#teamIndexSettings.retire();
+    this.teamIndexHeads.retire();
+    this.teamWorkers.invalidate();
     this.#poisonedRuntimeTimer = setTimeout(() => {
       this.#poisonedRuntimeTimer = undefined;
       if (this.#agentHost === host && !this.#stopping) host.kill();
     }, 50);
   }
-
   #promoteReadyHost(host: UtilityProcess): void {
     if (
       this.#agentHost !== host || this.#stopping || this.#phase !== "starting"
@@ -422,8 +424,8 @@ export class AgentHostSupervisor {
     ) return;
     this.#phase = "running";
     this.attachPort();
+    this.#options.onReady?.();
   }
-
   async #bootstrapEnterpriseCredentials(host: UtilityProcess): Promise<void> {
     const message = await this.#enterpriseCredentials.bootstrapMessage();
     if (this.#agentHost !== host || this.#stopping
@@ -432,7 +434,6 @@ export class AgentHostSupervisor {
     host.postMessage(message);
     this.#enterpriseCredentialBootstrapState = "complete";
   }
-
   #sendStructuredStartupFailure(): void {
     const failure = this.#structuredStartupFailure;
     if (!failure) return;
@@ -442,7 +443,6 @@ export class AgentHostSupervisor {
       lastNotificationKey: this.#lastFailureNotificationKey, failure
     });
   }
-
   #forceStop(host: UtilityProcess): void {
     if (this.#stopHost !== host || !this.#resolveStop) return;
     try { host.kill(); } finally { this.#completeStop(false, true); }

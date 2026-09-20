@@ -247,13 +247,18 @@ export async function prepareOpenVikingPiExtension(
     "client-contracts.ts",
     "config.json",
     "config.ts",
+    "desktop-commit-outcome.ts",
+    "desktop-memory-commit.ts",
     "diagnostics.ts",
     "index.ts",
     "lib",
+    "managed-connection.ts",
+    "managed-extension.ts",
     "memory-owner-policy.ts",
     "package.json",
     "private-uri-policy.ts",
     "recall.ts",
+    "recall-timing.ts",
     "recall-feedback.ts",
     "recall-tool-policy.ts",
     "recall-tool-support.ts",
@@ -266,6 +271,7 @@ export async function prepareOpenVikingPiExtension(
     "tools.ts"
   ]);
   await assertPreparedLocalModuleClosure(destination, "index.ts");
+  await assertPreparedLocalModuleClosure(destination, "managed-extension.ts");
   const packageManifest = JSON.parse(await readFile(join(destination, "package.json"), "utf8"));
   if (packageManifest.version !== source.version || packageManifest.pi?.extensions?.[0] !== "./index.ts") {
     throw new Error("Bundled OpenViking Pi Extension does not match its Desktop source lock.");

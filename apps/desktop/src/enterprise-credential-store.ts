@@ -35,7 +35,10 @@ export class EnterpriseCredentialStore {
   }
 
   load(): Promise<EnterpriseCredentialStoreSnapshot> {
-    return this.#enqueue(async () => {
+    return this.#enqueue(() => this.#load());
+  }
+
+  async #load(): Promise<EnterpriseCredentialStoreSnapshot> {
       const directoryState = await this.#directoryState(false);
       if (directoryState === "unsafe") return { storage: "unavailable" };
       if (directoryState === "missing") return { storage: "available" };
@@ -69,11 +72,25 @@ export class EnterpriseCredentialStore {
       } catch {
         return { storage: "available" };
       }
-    });
   }
 
   store(credential: EnterpriseAccessCredential): Promise<void> {
+    return this.#enqueue(() => this.#store(credential));
+  }
+
+  updateDisplayName(credential: EnterpriseAccessCredential): Promise<void> {
     return this.#enqueue(async () => {
+      const current = (await this.#load()).credential;
+      if (!current || !credential.displayName || Object.keys({ ...current, ...credential })
+        .some(key => key !== "displayName" && current[key as keyof EnterpriseAccessCredential]
+          !== credential[key as keyof EnterpriseAccessCredential])) {
+        throw new Error("New Money profile belongs to an obsolete credential.");
+      }
+      await this.#store({ ...current, displayName: credential.displayName });
+    });
+  }
+
+  async #store(credential: EnterpriseAccessCredential): Promise<void> {
       if (!isEnterpriseAccessCredential(credential)) throw new Error("Enterprise credential is invalid.");
       if (!this.#encryption.isAvailable()) throw unavailableError();
       const encryptedCredential = this.#encryption.encrypt(JSON.stringify(credential)).toString("base64");
@@ -104,7 +121,6 @@ export class EnterpriseCredentialStore {
       } finally {
         if (temporaryExists) await unlink(temporaryPath).catch(() => undefined);
       }
-    });
   }
 
   clear(): Promise<void> {

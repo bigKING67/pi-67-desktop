@@ -1,14 +1,17 @@
 import {
   isAgentHostShutdownRequest,
+  isEnterprisePowerTransitionMessage,
   isEnterpriseCredentialBootstrapMessage,
   isEnterpriseCredentialOperationResult,
+  type LocalMemoryConnectRequest,
+  type LocalMemoryModelResult,
   type AgentHostReadyMessage,
   type AgentHostRuntimePoisonedMessage,
   type AgentHostShutdownCompleteMessage,
   type AgentHostStartupFailedMessage,
   type EnterpriseCredentialClearRequest,
   type EnterpriseCredentialStoreRequest,
-  type ProtocolPort
+  type TeamModelRelayPort
 } from "@pi67/protocol";
 import {
   AgentHostStartupError,
@@ -19,10 +22,16 @@ import { AgentHostServer } from "./host-server.js";
 import { resolveAgentDirectory } from "./host-task-runtime-lifecycle.js";
 import { createPromptAttachmentAccessOwner } from "./prompt-attachment-access.js";
 import { EnterpriseCredentialBrokerClient } from "./context/enterprise-credential-broker-client.js";
+import { LocalMemoryBrokerClient, managedLocalMemoryFromEnvironment } from "./context/local-memory-broker-client.js";
+import { canonicalTeamKnowledgeFromEnvironment } from "./context/host-team-knowledge.js";
+import { enterprisePowerEpoch } from "./context/enterprise-power-epoch.js";
+import { TeamWorkerBrokerClient } from "./context/team-worker-broker-client.js";
+import { TeamIndexSettingsClient } from "./context/team-index-settings-client.js";
+import { TeamIndexHeadResponder } from "./context/team-index-head-responder.js";
 
 interface ParentMessageEvent {
   data: unknown;
-  ports: ProtocolPort[];
+  ports: TeamModelRelayPort[];
 }
 
 interface UtilityParentPort {
@@ -35,12 +44,20 @@ interface UtilityParentPort {
       | AgentHostStartupFailedMessage
       | EnterpriseCredentialStoreRequest
       | EnterpriseCredentialClearRequest
+      | LocalMemoryConnectRequest
+      | LocalMemoryModelResult
+      | import("@pi67/protocol").TeamWorkerRequest
+      | import("@pi67/protocol").TeamIndexSettingsRequest
+      | import("@pi67/protocol").SharedKnowledgeIndexHeadResult
   ): void;
 }
 
 const parentPort = (process as NodeJS.Process & { parentPort?: UtilityParentPort }).parentPort;
 if (!parentPort) throw new Error("Pi-67 Agent Host must run as an Electron utility process.");
 const enterpriseCredentialBroker = new EnterpriseCredentialBrokerClient(parentPort);
+const localMemoryBroker = new LocalMemoryBrokerClient(parentPort);
+const teamWorkers = new TeamWorkerBrokerClient(parentPort);
+const teamIndexSettings = new TeamIndexSettingsClient(parentPort);
 
 let poisonedRuntimeExitScheduled = false;
 
@@ -64,7 +81,12 @@ async function startAgentHost(): Promise<void> {
           onRuntimeInitializationObservation: (observation) => {
             process.stderr.write(`[agent-host:init] ${JSON.stringify(observation)}\n`);
           },
-          enterpriseCredentialBroker
+          enterpriseCredentialBroker,
+          localMemoryBroker,
+          teamWorkers,
+          teamIndexSettings,
+          managedLocalMemory: managedLocalMemoryFromEnvironment(process.env),
+          canonicalTeamKnowledgeTools: canonicalTeamKnowledgeFromEnvironment(process.env)
         });
       }
     });
@@ -82,10 +104,16 @@ async function startAgentHost(): Promise<void> {
   }
 
   const { server, startup } = started;
+  const teamIndexHeads = new TeamIndexHeadResponder(parentPort!, (input, signal) =>
+    server.observeIndexHead(input, AbortSignal.any([signal, teamIndexSettings.signal])));
   let shutdownPromise: Promise<void> | undefined;
   const shutdown = (deadlineMs = 1_000, notifyParent = false): Promise<void> => {
     if (shutdownPromise) return shutdownPromise;
     shuttingDown = true;
+    teamIndexHeads.shutdown();
+    localMemoryBroker.shutdown();
+    teamIndexSettings.shutdown();
+    enterpriseCredentialBroker.shutdown();
     shutdownPromise = server.shutdown(deadlineMs)
       .then((result) => {
         if (notifyParent) {
@@ -100,6 +128,14 @@ async function startAgentHost(): Promise<void> {
   };
 
   parentPort!.on("message", (event) => {
+    if (teamIndexHeads.handleMessage(event.data)) return;
+    if (teamIndexSettings.handleMessage(event.data)) return;
+    if (teamWorkers.handleMessage(event.data)) return;
+    if (server.teamModelPorts.handleMessage(event)) return;
+    if (isEnterprisePowerTransitionMessage(event.data)) { enterprisePowerEpoch.transition(event.data.state); return; }
+    if (server.localMemoryModels.handleMessage(event.data, (result) => parentPort!.postMessage(result))) return;
+    if (localMemoryBroker.handleResult(event.data)) return;
+    if (enterpriseCredentialBroker.handleReceiptResult(event.data)) return;
     if (isEnterpriseCredentialBootstrapMessage(event.data)) {
       enterpriseCredentialBroker.applyBootstrap(event.data);
       return;

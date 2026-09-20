@@ -77,6 +77,28 @@ spacing, component states, and motion as `DESIGN.md`.
   with a separate focus-visible outline; no blue card border or inset accent edge.
   Page Save, local connection testing, and advanced disclosures retain their
   light-mode hierarchy and shared component sizes.
+- The local runtime install/pending/cancel/result group uses the same neutral rows,
+  focus order and semantic notices as light mode, without treating presence as readiness.
+  Its private/index/query rows share light-mode purpose labels, mutually exclusive
+  installation actions and purpose-specific result feedback.
+- The private activation group keeps light-mode preference/lifecycle rows, secondary
+  actions, restart/cost disclosure, pending guards and semantic failure notices.
+  Neither saved consent nor a detected runtime receives a green readiness badge.
+- The local memory model form and saved-key eye retain light-mode layout, neutral
+  field/focus roles and lifecycle behavior. No secret value is present by default;
+  revealing it is an explicit local action, not a colored security status.
+- The `团队经验` panel keeps the New Money account summary, team selector, and
+  project binding in one quiet grouped Settings surface. The account summary links
+  to `账户与数据`, which owns device login and logout. Footer identity uses the same
+  neutral text roles as light mode, with explicit unknown/pending/expired states
+  rather than a false signed-out label. Team role, member quota, trial state, and
+  project selection remain readable without colored brand cards or glowing status.
+  Its explicit local-index row shares the content-sync secondary-button and inline
+  notice grammar. Pending/stop/disabled/focus states match light mode; confirmed
+  publication never gains an authorization-green ready badge.
+- Conversation scope reuses these neutral team/project controls in dark mode;
+  draft scope and the live origin row use semantic secondary text and wrapping,
+  never a green authorization badge. Focus, pending and disabled states keep parity.
 - Provider, model, and Extension navigation remains drill-down at every width.
   Ultra-wide dark windows do not automatically expose a second catalog or detail
   column, and returning restores the same search, filter, selection, scroll, and

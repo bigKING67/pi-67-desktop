@@ -18,6 +18,9 @@ import type { PackageWorkerPort } from "./package-worker-client.js";
 import type { SessionWriterLeaseRegistry } from "./session-writer-lease-registry.js";
 import type { LarkAuthManagementPort } from "./lark-auth-management.js";
 import type { EnterpriseCredentialBrokerClient } from "./context/enterprise-credential-broker-client.js";
+import type { LocalMemoryBrokerClient } from "./context/local-memory-broker-client.js";
+import type { TeamWorkerBrokerClient } from "./context/team-worker-broker-client.js";
+import type { TeamIndexSettingsClient } from "./context/team-index-settings-client.js";
 
 export interface AttachPortOptions {
   expectedOrigin?: string;
@@ -48,6 +51,13 @@ export interface AgentHostServerOptions {
   sessionWriterLeaseRegistry?: SessionWriterLeaseRegistry;
   modelCatalogRefreshOnStartup?: boolean;
   enterpriseCredentialBroker?: EnterpriseCredentialBrokerClient;
+  localMemoryBroker?: LocalMemoryBrokerClient;
+  teamWorkers?: TeamWorkerBrokerClient;
+  teamIndexSettings?: TeamIndexSettingsClient;
+  /** Explicit cutover only; broker presence alone never selects a memory mode. */
+  managedLocalMemory?: boolean;
+  /** Main-selected canonical Tool route; independent of private memory activation. */
+  canonicalTeamKnowledgeTools?: boolean;
 }
 
 export type AgentHostShutdownResult = Omit<AgentHostShutdownCompleteMessage, "type">;

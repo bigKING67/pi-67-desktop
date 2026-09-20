@@ -10,6 +10,8 @@ import type {
   DesktopPlatformInfo,
   DesktopRecoverySnapshot,
   DesktopSystemBridge,
+  LocalMemorySettingsRequest,
+  LocalMemorySettingsSnapshot,
   NativeNotificationActivation,
   NativeNotificationRequest,
   PackageNetworkSettings,
@@ -280,6 +282,21 @@ const systemBridge = {
   getPackageNetworkSnapshot: (): Promise<PackageNetworkSnapshot> => (
     ipcRenderer.invoke("pi67:package-network-snapshot")
   ),
+  localMemoryModels: {
+    get: (): Promise<LocalMemorySettingsSnapshot> => ipcRenderer.invoke("pi67:local-memory-settings-get"),
+    revealKey: (value: { endpoint: string }): Promise<string> => ipcRenderer.invoke("pi67:local-memory-settings-reveal-key", value),
+    save: (value: LocalMemorySettingsRequest): Promise<LocalMemorySettingsSnapshot> => ipcRenderer.invoke("pi67:local-memory-settings-save", value)
+  },
+  localMemoryRuntime: {
+    getStatus: (purpose) => ipcRenderer.invoke("pi67:local-memory-runtime-status", ...(purpose === undefined ? [] : [purpose])),
+    install: (purpose) => ipcRenderer.invoke("pi67:local-memory-runtime-install", ...(purpose === undefined ? [] : [purpose])),
+    cancel: () => ipcRenderer.invoke("pi67:local-memory-runtime-cancel")
+  },
+  localMemoryActivation: {
+    get: () => ipcRenderer.invoke("pi67:local-memory-activation-get"),
+    check: () => ipcRenderer.invoke("pi67:local-memory-activation-check"),
+    setEnabled: (enabled) => ipcRenderer.invoke("pi67:local-memory-activation-set", { enabled })
+  },
   savePackageNetworkSettings: (settings: PackageNetworkSettings): Promise<PackageNetworkSnapshot> => (
     ipcRenderer.invoke("pi67:package-network-save", settings)
   ),

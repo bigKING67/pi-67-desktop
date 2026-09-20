@@ -8,6 +8,7 @@ import type {
 } from "@pi67/domain";
 
 export interface SessionIdentityProjection {
+  memoryOrigin?: SessionSnapshot["memoryOrigin"];
   sessionFileIdentity: string | undefined;
   sessionPath: string | undefined;
   sessionName: string | undefined;
@@ -32,6 +33,7 @@ export function identityProjectionFromSnapshot(
   snapshot: SessionSnapshot
 ): SessionIdentityProjection {
   return {
+    memoryOrigin: snapshot.memoryOrigin ?? { kind: "unverified" },
     sessionFileIdentity: snapshot.sessionFileIdentity,
     sessionPath: snapshot.sessionPath,
     sessionName: snapshot.sessionName,

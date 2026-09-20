@@ -12,6 +12,16 @@ afterEach(async () => {
 });
 
 describe("ComposerDraftStateStore", () => {
+  it("roundtrips provisional team scope through the encrypted storage envelope on cold load", async () => {
+    const root = await userData();
+    const conversation = { kind: "provisional" as const, workspaceId: "workspace-a", draftId: "team-draft" };
+    const state = { version: 1 as const, drafts: [{ conversation, text: "team draft", streamBehavior: "followUp" as const,
+      updatedAt: 10, teamScope: { teamId: "team", projectId: "project" } }], selectedConversation: conversation };
+    const store = new ComposerDraftStateStore(root, { encryption: reversibleEncryption() });
+    await store.update(state);
+    expect(JSON.parse(await readFile(store.requestedStatePath, "utf8"))).toHaveProperty("encryptedState");
+    expect((await new ComposerDraftStateStore(root, { encryption: reversibleEncryption() }).load()).state).toEqual(state);
+  });
   it.each(["cold", "warm"] as const)("rejects unpersisted removal and preserves unrelated drafts (%s)", async (mode) => {
     const root = await userData();
     let available = true;

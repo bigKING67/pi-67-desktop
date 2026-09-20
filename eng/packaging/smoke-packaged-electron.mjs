@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { CONTROLLED_PROMPT_TEXT, isProcessAlive } from "./controlled-shutdown-fixture.ts";
 import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
@@ -27,7 +27,8 @@ import { createPackagedVisualEvidence } from "./packaged-electron-visual-evidenc
 import { verifyPackagedLarkSettings } from "./packaged-lark-settings-smoke.mjs";
 import { verifyPackagedExtensionUpdateCheck, verifyPackagedSkillUpdateCheck } from "./packaged-package-update-smoke.mjs";
 import { verifyPackagedProviderSettings } from "./packaged-provider-settings-smoke.mjs";
-import { verifyPackagedSessionCreation } from "./packaged-session-creation-smoke.mjs";
+import { runPackagedLocalMemorySettingsSmoke } from "./packaged-local-memory-settings-smoke.mjs";
+import { assertPackagedTeamToolSelection, verifyPackagedSessionCreation } from "./packaged-session-creation-smoke.mjs";
 import {
   preparePackagedProjectedImage,
   verifyPackagedHeicAttachment,
@@ -53,7 +54,8 @@ const {
 const {
   childPidPath,
   lifecyclePath,
-  packagedCredential
+  packagedCredential,
+  teamKnowledgeEvidencePath
 } = await preparePackagedSmokeProfile({
   agentDir,
   extensionsDirectory,
@@ -97,6 +99,15 @@ try {
   let sessionCreation;
   try {
     sessionCreation = await verifyPackagedSessionCreation({ agentDir, window });
+    const teamEvidence = JSON.parse(await readFile(teamKnowledgeEvidencePath, "utf8"));
+    const expectsTeamRoute = process.platform === "darwin" && process.arch === "arm64";
+    assertPackagedTeamToolSelection(teamEvidence, expectsTeamRoute);
+    if (expectsTeamRoute) {
+      const privateState = await window.evaluate(() => window.pi67.system.localMemoryActivation.get());
+      if (!privateState.available || privateState.preference !== "disabled" || privateState.selectedAtLaunch
+        || privateState.lifecycle !== "idle") throw new Error("Private memory started without consent.");
+    }
+    console.info(`Packaged team Tool startup passed: canonical=${expectsTeamRoute}, managedRoute=${expectsTeamRoute}, privateConsent=false; exact Pi model-context Tool identities.`);
   } catch (error) {
     throw new Error(
       `Packaged Session creation failed: ${JSON.stringify(await inspectRendererSurface(window))}\n${packagedProcessOutput() || "No packaged process diagnostics were emitted."}`,
@@ -385,6 +396,7 @@ try {
     window
   });
   childPid = shutdownState.childPid;
+  await runPackagedLocalMemorySettingsSmoke(artifact);
   console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, packaged-direct Agent Host startup (${startupDiagnostics.totalDurationMs}ms), private toolchain + first-party capabilities, Desktop browser67 packaged-direct dependency resolution, packaged GUI Extension/Skill update checks with bounded worker cleanup, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, Lark user-first Tabs + persisted Main layout, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), projected image assets after submission plus warm/cold Restore Task, cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt product shutdown (${shutdown.productExitDurationMs}ms; Playwright driver close ${shutdown.driverCloseDurationMs}ms).`);
 } finally {
   try {

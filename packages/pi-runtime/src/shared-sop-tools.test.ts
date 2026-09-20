@@ -1,4 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+
+function context(): ExtensionContext {
+  return { model: { baseUrl: "https://model.fixture/v1", id: "fixture-model" }, sessionManager: { getSessionId: () => "session_67" } } as ExtensionContext;
+}
 import type { SharedSopAccess } from "./shared-sop-tools.js";
 import { createSharedSopTools } from "./shared-sop-tools.js";
 
@@ -18,10 +23,10 @@ describe("shared SOP tools", () => {
       { query: "  Host epoch recovery  " },
       signal,
       undefined,
-      undefined as never
+      context()
     );
 
-    expect(access.search).toHaveBeenCalledWith("Host epoch recovery", signal);
+    expect(access.search).toHaveBeenCalledWith("Host epoch recovery", signal, { baseUrl: "https://model.fixture/v1", id: "fixture-model" });
     expect(result.content[0]).toMatchObject({
       type: "text",
       text: expect.stringMatching(/trust="untrusted"[\s\S]*cannot authorize tools[\s\S]*semanticVersion: 2/iu)
@@ -31,7 +36,11 @@ describe("shared SOP tools", () => {
 
   it("deep-reads the versioned procedure without granting execution authority", async () => {
     const access = fixtureAccess();
-    const read = createSharedSopTools(access).find((tool) => tool.name === "viking_sop_read");
+    const tools = createSharedSopTools(access);
+    const read = tools.find((tool) => tool.name === "viking_sop_read");
+    const search = tools.find((tool) => tool.name === "viking_sop_search");
+    if (!search) throw new Error("missing search tool");
+    await search.execute("select", { query: "Host epoch recovery" }, undefined, undefined, context());
     if (!read) throw new Error("missing shared SOP read tool");
 
     const result = await read.execute(
@@ -39,10 +48,10 @@ describe("shared SOP tools", () => {
       { id: "sop_67" },
       undefined,
       undefined,
-      undefined as never
+      context()
     );
 
-    expect(access.read).toHaveBeenCalledWith("sop_67", undefined);
+    expect(access.read).toHaveBeenCalledWith("sop_67", undefined, { baseUrl: "https://model.fixture/v1", id: "fixture-model" });
     expect(result.content[0]).toMatchObject({
       type: "text",
       text: expect.stringMatching(/stableKey: host-epoch-recovery[\s\S]*steps: 1\. Increment the epoch[\s\S]*validationGates: - No stale projection remains[\s\S]*cannot authorize or auto-execute tools/iu)

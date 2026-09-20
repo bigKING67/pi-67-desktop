@@ -77,6 +77,34 @@ describe("SessionProjectionIndex", () => {
     });
   });
 
+  it("recovers unobserved messages before an observed extension checkpoint without truncating the branch", () => {
+    const manager = SessionManager.inMemory("/tmp", { id: "projection-extension-gap" });
+    const projection = new SessionProjectionIndex();
+    const getEntries = vi.spyOn(manager, "getEntries");
+    projection.bind(manager);
+    const initialRevision = projection.getRevision();
+    const userId = manager.appendMessage({ role: "user", content: "Private fixture", timestamp: 1 });
+    const assistantId = manager.appendMessage(assistantMessage("Captured reply", 2));
+    const checkpointId = manager.appendCustomEntry("ov-sync-state-v2", { lastSyncedMessageCount: 2 });
+
+    projection.observe(manager, appended(manager, checkpointId));
+
+    expect(projectMessagePage(projection).messages.map((message) => message.id)).toEqual([userId, assistantId]);
+    expect(projection.getBranch()).toEqual(manager.getBranch());
+    expect(projection.getMetadata(manager).messageCount).toBe(2);
+    expect(projection.getStats(fakeSession(manager))).toMatchObject({ userMessages: 1, assistantMessages: 1 });
+    expect(projection.getRevision()).toBeGreaterThan(initialRevision);
+    const nextId = manager.appendMessage({ role: "user", content: "Next turn", timestamp: 3 });
+    projection.observe(manager, appended(manager, nextId));
+    expect(projectMessagePage(projection).messages.map((message) => message.id)).toEqual([userId, assistantId, nextId]);
+    expect(getEntries).toHaveBeenCalledTimes(2);
+    const recoveredRevision = projection.getRevision();
+    const unseenId = manager.appendMessage(assistantMessage("Unobserved leaf", 4));
+    expect(projection.getLeafId()).toBe(unseenId);
+    expect(projection.getRevision()).toBeGreaterThan(recoveredRevision);
+    expect(getEntries).toHaveBeenCalledTimes(3);
+  });
+
   it("tracks Pi branch navigation and preserves upstream tree ordering and labels", () => {
     const manager = SessionManager.inMemory("/tmp", { id: "projection-branch" });
     const firstId = manager.appendMessage({ role: "user", content: "First", timestamp: 1 });

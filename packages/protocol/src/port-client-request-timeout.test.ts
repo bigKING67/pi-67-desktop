@@ -7,6 +7,24 @@ import { type RendererHello } from "./envelope.js";
 import { FakePort, hostWelcome } from "./port-client-test-fixtures.js";
 
 describe("AgentPortClient request acknowledgement overrides", () => {
+  it.each(["enterprise.knowledge.sync", "enterprise.knowledge.index"] as const)("allows the %s run and cleanup margin, then cancels at its bounded deadline", async type => {
+    vi.useFakeTimers();
+    try {
+      const port = new FakePort(), client = new AgentPortClient(port);
+      port.emit("message", hostWelcome(port.sent[0] as RendererHello, 4));
+      const pending = client.request(type, { teamId: "00000000-0000-4000-8000-000000000001" });
+      let failure: unknown;
+      void pending.catch((error: unknown) => { failure = error; });
+      const deadline = type === "enterprise.knowledge.sync" ? 75_000 : 510_000;
+      await vi.advanceTimersByTimeAsync(deadline - 7_000);
+      expect(failure).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(6_999);
+      expect(failure).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(failure).toMatchObject({ code: "REQUEST_TIMEOUT" });
+      expect(client.isClosed).toBe(false);
+    } finally { vi.useRealTimers(); }
+  });
   it("honors a bounded per-request acknowledgement timeout without closing the Port", async () => {
     vi.useFakeTimers();
     try {

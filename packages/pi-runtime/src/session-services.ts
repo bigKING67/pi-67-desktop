@@ -34,8 +34,12 @@ import type { PackageTrustRegistry } from "./package-trust-registry.js";
 import { installFirstPartyModelProviders } from "./first-party-model-providers.js";
 import { createDesktopPlanModeExtension } from "./plan-mode-controller.js";
 import type { SessionInteractionMode } from "@pi67/domain";
+import { createLocalMemoryEventBus, type LocalMemoryAccess } from "./local-memory-extension-bridge.js";
+import { bindPrivateMemoryCommitBus } from "./private-memory-commit.js";
+import { createSharedHistoryTransitionExtension } from "./shared-history-transition-extension.js";
 
 interface DesktopSessionServicesOptions {
+  localMemory?: LocalMemoryAccess;
   cwd: string;
   agentDir: string;
   runtimeApiKeys?: ReadonlyMap<string, string>;
@@ -93,12 +97,14 @@ export async function createDesktopSessionServices(
     agentDir: options.agentDir,
     settingsManager
   });
+  const eventBus = createLocalMemoryEventBus(options.localMemory);
   const services = await createAgentSessionServices({
     cwd: options.cwd,
     agentDir: options.agentDir,
     settingsManager,
     ...(options.modelRuntime === undefined ? {} : { modelRuntime: options.modelRuntime }),
     resourceLoaderOptions: {
+      eventBus,
       ...(options.noThirdPartyExtensions
         ? {
             noExtensions: true,
@@ -109,6 +115,7 @@ export async function createDesktopSessionServices(
           }
         : {}),
       extensionFactories: [
+        createSharedHistoryTransitionExtension(),
         createDesktopToolRoutingExtension(),
         ...(options.promptAttachmentAccess === undefined
           ? []
@@ -126,6 +133,7 @@ export async function createDesktopSessionServices(
       ]
     }
   });
+  bindPrivateMemoryCommitBus(services, eventBus);
   recordDesktopMemoryOwnerLoadReceipt(
     options.agentDir,
     memoryOwnerPreflight,

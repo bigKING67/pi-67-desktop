@@ -19,11 +19,13 @@ describe("EnterpriseCredentialBrokerClient", () => {
     const postMessage = vi.fn();
     const client = new EnterpriseCredentialBrokerClient({ postMessage });
     client.applyBootstrap({ type: "enterprise-credential-bootstrap", storage: "available" });
+    expect(client.signal.aborted).toBe(true);
 
     const storing = client.store(credential);
     const storeRequest = postMessage.mock.calls[0]?.[0] as EnterpriseCredentialStoreRequest;
     expect(storeRequest).toMatchObject({ type: "enterprise-credential-store", credential });
     expect(client.snapshot()).toEqual({ storage: "available" });
+    expect(client.signal.aborted).toBe(true);
     expect(client.handleOperationResult({
       type: "enterprise-credential-operation-result",
       requestId: storeRequest.requestId,
@@ -31,8 +33,11 @@ describe("EnterpriseCredentialBrokerClient", () => {
     })).toBe(true);
     await expect(storing).resolves.toBeUndefined();
     expect(client.snapshot()).toEqual({ storage: "available", credential });
+    const storedLifetime = client.signal;
+    expect(storedLifetime.aborted).toBe(false);
 
     const clearing = client.clear();
+    expect(storedLifetime.aborted).toBe(true);
     const clearRequest = postMessage.mock.calls[1]?.[0] as EnterpriseCredentialClearRequest;
     expect(clearRequest.type).toBe("enterprise-credential-clear");
     client.handleOperationResult({
@@ -42,6 +47,7 @@ describe("EnterpriseCredentialBrokerClient", () => {
     });
     await expect(clearing).resolves.toBeUndefined();
     expect(client.snapshot()).toEqual({ storage: "available" });
+    expect(client.signal.aborted).toBe(true);
   });
 
   it("fails enterprise persistence closed while leaving the Host process usable", async () => {

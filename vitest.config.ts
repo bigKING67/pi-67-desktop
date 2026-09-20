@@ -34,6 +34,7 @@ export default defineConfig({
         "packages/*/src/**/*.ts",
         "apps/agent-host/src/**/*.ts",
         "apps/desktop/src/**/*.ts",
+        "apps/desktop/src/**/*.mts",
         "apps/renderer/src/**/*.ts"
       ],
       exclude: [

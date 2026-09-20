@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
+import { AgentSession, SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PiSdkRuntime } from "./pi-sdk-runtime.js";
 import type { RuntimeSessionCatalogOwner } from "./runtime-session-catalog.js";
@@ -35,6 +35,15 @@ describe("PiSdkRuntime Session creation identity", () => {
       sessionCatalogOwner
     });
     const runtime = new PiSdkRuntime({ workspaceServices: services });
+    // oxlint-disable-next-line typescript/unbound-method -- The observer below applies this method to its original Session receiver.
+    const originalBind = AgentSession.prototype.bindExtensions;
+    const beforeExtensionBinding: boolean[] = [];
+    const bindingSpy = vi.spyOn(AgentSession.prototype, "bindExtensions").mockImplementation(function (this: AgentSession, ...args) {
+      beforeExtensionBinding.push(this.sessionManager.getEntries().some((entry) => entry.type === "custom"
+        && entry.customType === SESSION_CREATION_MARKER_TYPE
+        && (entry.data as { creationId?: string }).creationId === "session-creation-initial-task"));
+      return originalBind.apply(this, args);
+    });
     const catalogEvents: string[] = [];
     runtime.subscribe((event) => {
       if (event.type === "session.catalog.changed") catalogEvents.push(event.payload.reason);
@@ -48,7 +57,10 @@ describe("PiSdkRuntime Session creation identity", () => {
         creationId: "session-creation-initial-task"
       });
       expect(await jsonlFiles(root)).toHaveLength(1);
+      expect(beforeExtensionBinding.length).toBeGreaterThan(0);
+      expect(beforeExtensionBinding.every(Boolean)).toBe(true);
       expect(snapshot.sessionId).toBe(runtime.getIdentity().sessionId);
+      expect(snapshot.memoryOrigin).toEqual({ kind: "private" });
       await vi.waitFor(() => expect(catalogEvents).toContain("session-created"));
 
       const identity = runtime.getIdentity();
@@ -72,6 +84,7 @@ describe("PiSdkRuntime Session creation identity", () => {
         sessionPath: identity.sessionPath
       });
     } finally {
+      bindingSpy.mockRestore();
       await runtime.dispose();
       await services.dispose();
       await sessionCatalogOwner.dispose();

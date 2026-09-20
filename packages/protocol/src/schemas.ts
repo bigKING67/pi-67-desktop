@@ -1,9 +1,9 @@
+import { SessionSnapshotSchema } from "./session-snapshot-schema.js";
 import { strictObject, Type, type TSchema } from "./typebox-schema.js";
 import {
   MAX_SLASH_COMMAND_DESCRIPTION_CHARS,
   MAX_SLASH_COMMAND_ITEMS,
   MAX_SLASH_COMMAND_NAME_CHARS,
-  MAX_RESOURCE_CATALOG_ITEMS,
   MAX_SESSION_FILE_IDENTITY_CHARS
 } from "@pi67/domain";
 import type { AgentCommandType, AgentEventType } from "./agent-messages.js";
@@ -37,7 +37,6 @@ import {
   SessionCatalogStatusSchema
 } from "./session-catalog-schemas.js";
 import { SessionCreationResolutionSchema } from "./session-creation-schemas.js";
-import { SessionCompatibilityViewSchema } from "./session-compatibility-schemas.js";
 import { SessionExternalChangeSchema } from "./session-external-change-schema.js";
 import { SessionTreeProjectionSchema } from "./session-tree-schemas.js";
 import {
@@ -55,8 +54,6 @@ import {
   ConversationPageSchema,
   LocatedMessageWindowSchema,
   MessageSearchResultSchema,
-  MessagePageMetadataSchema,
-  SessionMessageSchema,
   UserMessageIndexPageSchema,
   WorkspaceMessageSearchResultSchema
 } from "./message-schemas.js";
@@ -75,9 +72,7 @@ import {
   SessionModelCatalogResultSchema
 } from "./session-control-schemas.js";
 import {
-  ResourceCatalogDispositionSchema,
   ResourceCatalogProjectionSchema,
-  ResourceSummarySchema,
   SessionResourceCatalogResultSchema
 } from "./session-resource-schemas.js";
 import { LarkCommandResultSchemas } from "./lark-auth-schemas.js";
@@ -106,38 +101,6 @@ import {
 } from "./session-plan-schemas.js";
 export { ProtocolErrorSchema } from "./protocol-error-schema.js";
 export { CommandPayloadSchemas } from "./command-payload-schemas.js";
-const SessionSnapshotSchema = strictObject({
-  sessionId: Type.String(),
-  sessionFileIdentity: Type.Optional(Type.String({
-    minLength: 1,
-    maxLength: MAX_SESSION_FILE_IDENTITY_CHARS
-  })),
-  sessionPath: Type.Optional(Type.String()),
-  sessionName: Type.Optional(Type.String()),
-  cwd: Type.String(),
-  streaming: Type.Boolean(),
-  messages: Type.Array(SessionMessageSchema, { maxItems: 100 }),
-  messagePage: MessagePageMetadataSchema,
-  models: Type.Array(ModelSummarySchema),
-  providers: Type.Array(ProviderSummarySchema),
-  selectedModel: Type.Optional(strictObject({ provider: Type.String(), id: Type.String() })),
-  thinkingLevel: Type.String(),
-  availableThinkingLevels: Type.Array(Type.String()),
-  steeringQueue: Type.Array(Type.String()),
-  followUpQueue: Type.Array(Type.String()),
-  tree: SessionTreeProjectionSchema,
-  resources: Type.Array(ResourceSummarySchema, { maxItems: MAX_RESOURCE_CATALOG_ITEMS }),
-  resourceCatalog: Type.Optional(ResourceCatalogDispositionSchema),
-  interactionMode: Type.Optional(SessionInteractionModeSchema),
-  activeProposedPlan: Type.Optional(ActiveProposedPlanSchema),
-  planLifecycle: Type.Optional(PlanLifecycleChangeSchema),
-  compatibility: Type.Optional(SessionCompatibilityViewSchema),
-  stats: Type.Optional(strictObject({
-    tokens: Type.Number(),
-    cost: Type.Number(),
-    contextPercent: Type.Optional(Type.Number())
-  }))
-});
 const RuntimeStatusSchema = strictObject({
   phase: Type.Union([
     Type.Literal("idle"),

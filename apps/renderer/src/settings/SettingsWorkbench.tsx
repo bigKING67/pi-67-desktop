@@ -39,6 +39,7 @@ import { SupportDiagnosticsUploadRow } from "./SupportDiagnosticsUploadRow.js";
 import { SettingsCategoryNavigation } from "./SettingsCategoryNavigation.js";
 import {
   SettingsDraftGuardContext,
+  combineSettingsDrafts,
   type SettingsDraftRegistration,
   type SettingsDraftRegistrar
 } from "./SettingsDraftGuard.js";
@@ -48,6 +49,7 @@ import { LarkOfficeSettings } from "./LarkOfficeSettings.js";
 import { UsageSettings } from "./UsageSettings.js";
 import { VisionAssistantSettings } from "./VisionAssistantSettings.js";
 import { ContextMemorySettings } from "./ContextMemorySettings.js";
+import { NewMoneyAccountSettings } from "./NewMoneyAccountSettings.js";
 import {
   SettingsNotice,
   SettingsPageHeader,
@@ -85,6 +87,7 @@ export function SettingsWorkbench() {
   const projectScopeAvailable = sectionSupportsProjectScope(activeSection);
   const [draftRegistration, setDraftRegistration] = useState<SettingsDraftRegistration>();
   const draftRegistrationRef = useRef<SettingsDraftRegistration | undefined>(undefined);
+  const drafts = useRef(new Set<SettingsDraftRegistration>());
   const [pendingNavigation, setPendingNavigation] = useState<
     | { kind: "close" }
     | { kind: "section"; section: SettingsSection }
@@ -92,12 +95,14 @@ export function SettingsWorkbench() {
   >();
 
   const registerDraft = useCallback<SettingsDraftRegistrar>((registration) => {
-    draftRegistrationRef.current = registration;
-    setDraftRegistration(registration);
+    const publish = () => {
+      const combined = combineSettingsDrafts([...drafts.current]);
+      draftRegistrationRef.current = combined;
+      setDraftRegistration(combined);
+    };
+    drafts.current.add(registration); publish();
     return () => {
-      if (draftRegistrationRef.current !== registration) return;
-      draftRegistrationRef.current = undefined;
-      setDraftRegistration(undefined);
+      drafts.current.delete(registration); publish();
     };
   }, []);
 
@@ -255,7 +260,7 @@ export function SettingsWorkbench() {
 }
 
 function SettingsSectionContent({ section }: { section: SettingsSection }) {
-  if (section === "account") return <AccountSettings />;
+  if (section === "account") return <NewMoneyAccountSettings />;
   if (section === "general") return <GeneralSettings />;
   if (section === "context-memory") return <ContextMemorySettings />;
   if (section === "providers") return <ProviderSettings />;
@@ -271,15 +276,6 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
   if (section === "network") return <PackageNetworkPanel />;
   if (section === "updates") return <UpdateSettings />;
   return <AboutSettings />;
-}
-
-function AccountSettings() {
-  return (
-    <SettingsRows>
-      <SettingsRow title="本地模式" description="无需登录 New Money 账户即可使用本地工作台；账户服务尚未接入。" />
-      <SettingsRow title="数据与同步" description="工作区、会话和配置保存在本机，账户同步尚未提供。使用模型或已连接服务时，相关内容会按请求发送给对应服务。" />
-    </SettingsRows>
-  );
 }
 
 function GeneralSettings() {

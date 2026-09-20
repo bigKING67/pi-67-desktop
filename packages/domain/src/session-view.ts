@@ -174,8 +174,15 @@ export interface SessionCompatibilityView {
   mutationSafe: boolean;
 }
 
+/** Persisted provenance only; never a current authorization grant. Absence is unverified. */
+export type SessionMemoryOrigin =
+  | { kind: "private" }
+  | { kind: "team"; teamId: string; projectId: string }
+  | { kind: "unverified" };
+
 export interface SessionSnapshot {
   sessionId: string;
+  memoryOrigin?: SessionMemoryOrigin;
   sessionFileIdentity?: string;
   sessionPath?: string;
   sessionName?: string;

@@ -79,8 +79,14 @@ async function readEntry(dir, filename) {
 
 async function ownedEntry(dir, filename, context) {
   if (!context) return true;
-  try { return (await readEntry(dir, filename))?.scopeKey === context.scopeKey; }
+  try { return matchesContext(await readEntry(dir, filename), context); }
   catch { return false; }
+}
+
+function matchesContext(entry, context) {
+  return !context || (entry?.scopeKey === context.scopeKey
+    && (context.sessionId === undefined || (entry.sessionId === context.sessionId
+      && (entry.type !== "createSession" || entry.payload?.session_id === context.sessionId))));
 }
 
 async function findExistingByDedupKey(dir, dedupKey, context) {
@@ -215,7 +221,7 @@ export async function listPending(context) {
     if (!f.endsWith(".json")) continue;
     try {
       const entry = await readEntry(dir, f);
-      if (!context || entry?.scopeKey === context.scopeKey) entries.push({ filename: f, entry });
+      if (matchesContext(entry, context)) entries.push({ filename: f, entry });
     } catch {
       // Corrupted file - skip.
     }

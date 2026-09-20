@@ -26,9 +26,12 @@ export interface TaskRuntimeRecord {
 }
 
 export interface TaskRuntimeRegistryOptions {
+  localMemory?: PiSdkRuntimeOptions["localMemory"];
+  authorizeTeamSession?: PiSdkRuntimeOptions["authorizeTeamSession"];
   onRuntimeLoaded?: (record: TaskRuntimeRecord, runtime: AgentRuntime) => void;
   sharedExperienceAccessForWorkspace?: (workspaceId: string) => SharedExperienceAccess;
   sharedSopAccessForWorkspace?: (workspaceId: string) => SharedSopAccess;
+  teamKnowledgeAccessForWorkspace?: (workspaceId: string) => NonNullable<PiSdkRuntimeOptions["teamKnowledgeAccess"]>;
 }
 
 export class TaskRuntimeRegistry {
@@ -117,6 +120,9 @@ export class TaskRuntimeRegistry {
     if (record.runtimeLoad) return record.runtimeLoad;
     record.workspaceServices = workspaceServices;
     const runtimeOptions: PiSdkRuntimeOptions = {
+      ...(this.options.teamKnowledgeAccessForWorkspace ? { teamKnowledgeAccess: this.options.teamKnowledgeAccessForWorkspace(record.context.workspaceId) } : {}),
+      ...(this.options.authorizeTeamSession ? { authorizeTeamSession: this.options.authorizeTeamSession } : {}),
+      ...(this.options.localMemory === undefined ? {} : { localMemory: this.options.localMemory }),
       runtimeCredentialOverrides: this.runtimeCredentialOverrides,
       subagentAdmission: this.subagentAdmission,
       subagentParentKey: record.taskKey,
@@ -193,6 +199,24 @@ export class TaskRuntimeRegistry {
 
   values(): TaskRuntimeRecord[] {
     return [...this.records.values()];
+  }
+
+  async commitPrivateMemory(workspaceId: string, sessionId: string) {
+    const matches = this.recordsForWorkspace(workspaceId).filter((record) =>
+      !record.closed && record.initialized && record.runtime?.getIdentity().sessionId === sessionId);
+    const runtime = matches.length === 1 ? matches[0]!.runtime : undefined;
+    if (!runtime?.commitPrivateMemory) {
+      throw new HostCommandError("RUNTIME_NOT_READY", "Open the exact Session in one Task before committing private memory.", true);
+    }
+    return runtime.commitPrivateMemory(sessionId);
+  }
+
+  async inspectPrivateMemory(workspaceId: string, sessionId: string) {
+    const matches = this.recordsForWorkspace(workspaceId).filter((record) =>
+      !record.closed && record.initialized && record.runtime?.getIdentity().sessionId === sessionId);
+    const runtime = matches.length === 1 ? matches[0]!.runtime : undefined;
+    if (!runtime?.inspectPrivateMemory) throw new HostCommandError("RUNTIME_NOT_READY", "Open the exact Session in one Task before inspecting private memory.", true);
+    return runtime.inspectPrivateMemory(sessionId);
   }
 
   async disposeTask(context: TaskProtocolContext): Promise<boolean> {

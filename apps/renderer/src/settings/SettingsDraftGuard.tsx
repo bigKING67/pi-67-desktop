@@ -16,6 +16,14 @@ export type SettingsDraftRegistrar = (
   registration: SettingsDraftRegistration
 ) => () => void;
 
+export function combineSettingsDrafts(drafts: SettingsDraftRegistration[]): SettingsDraftRegistration | undefined {
+  if (!drafts.length) return undefined;
+  return { dirty: drafts.some((draft) => draft.dirty), busy: drafts.some((draft) => draft.busy),
+    subject: [...new Set(drafts.filter((draft) => draft.dirty || draft.busy).map((draft) => draft.subject))].join("、") || drafts[0]!.subject,
+    discard: () => { for (const draft of drafts) if (draft.dirty) draft.discard(); }
+  };
+}
+
 export const SettingsDraftGuardContext = createContext<SettingsDraftRegistrar | undefined>(undefined);
 
 export function useSettingsDraftRegistration({

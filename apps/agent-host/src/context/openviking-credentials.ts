@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 
 export interface OpenVikingClientCredentials {
-  source: "environment" | "ovcli" | "none";
+  source: "environment" | "ovcli" | "none" | "managed";
   bearerToken?: string;
   account?: string;
   user?: string;

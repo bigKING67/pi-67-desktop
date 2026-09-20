@@ -1,0 +1,35 @@
+.scope {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.scope legend { color: var(--text-primary); font-weight: 600; }
+.scope p { overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.fields { display: grid; gap: 10px; min-width: 0; }
+.actions > button,
+.fields > button {
+  justify-self: start;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.actions > button:hover,
+.fields > button:hover { background: var(--surface-hover); color: var(--text-primary); }
+.actions > button:focus-visible,
+.fields > button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.actions > button:disabled,
+.fields > button:disabled { background: var(--surface-disabled); color: var(--text-disabled); cursor: not-allowed; }
+.origin { grid-area: origin; margin: 0; padding: 8px 16px; color: var(--text-secondary); font-size: 12px; overflow-wrap: anywhere; }
