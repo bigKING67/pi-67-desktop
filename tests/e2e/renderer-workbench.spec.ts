@@ -93,13 +93,13 @@ test("uses the left workspace conversation list instead of horizontal task tabs"
   await expect(page.getByRole("main", { name: "New Money 工作台" })).toBeVisible();
   await expect(page.getByRole("tablist", { name: "已打开的任务" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /关闭任务/u })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /未登录\s*本地模式/u })).toBeVisible();
+  await expect(page.getByRole("button", { name: /登录 New Money\s*未登录也可使用私人会话/u })).toBeVisible();
   await expect(page.getByRole("button", { name: "帮助与设置" })).toBeVisible();
 
   const titleActions = page.locator(".title-actions");
   await expect(titleActions.locator("button").last()).toHaveAttribute("data-testid", "inspector-toggle");
 
-  await page.getByRole("button", { name: /未登录\s*本地模式/u }).click();
+  await page.getByRole("button", { name: /登录 New Money\s*未登录也可使用私人会话/u }).click();
   await expect(page.getByLabel("New Money 设置")).toBeVisible();
   await expect(page.getByRole("heading", { name: "账户与数据", exact: true, level: 1 })).toBeVisible();
   await expect(page.getByRole("group", { name: "设置作用域" })).toHaveCount(0);

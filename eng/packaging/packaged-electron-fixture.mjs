@@ -115,8 +115,8 @@ export async function assertPackagedRuntimeAssets(artifact, {
   requireWindowsPackageWorkerJob = true
 } = {}) {
   const clipboardModule = artifact.platform === "darwin"
-    ? "@mariozechner/clipboard-darwin-arm64/clipboard.darwin-arm64.node"
-    : "@mariozechner/clipboard-win32-x64-msvc/clipboard.win32-x64-msvc.node";
+    ? "@earendil-works/pi-tui/native/darwin/prebuilds/darwin-arm64/darwin-platform.node"
+    : "@earendil-works/pi-tui/native/win32/prebuilds/win32-x64/win32-platform.node";
   const unpackedModules = join(artifact.resourcesPath, "app.asar.unpacked/node_modules");
   const canvasModule = artifact.platform === "darwin"
     ? "@napi-rs/canvas-darwin-arm64/skia.darwin-arm64.node"

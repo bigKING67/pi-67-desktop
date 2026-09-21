@@ -381,7 +381,7 @@ describe("PiSdkRuntime", () => {
       const diagnostics = await runtime.collectDiagnostics();
       expect(diagnostics).toMatchObject({
         application: "π",
-        piSdkVersion: "0.84.3",
+        piSdkVersion: "0.86.1",
         sessionConfigured: true,
         toolExecutionReceiptFailureCount: 0
       });

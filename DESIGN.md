@@ -719,6 +719,10 @@ loading error where the operation can produce those states
 
 ### Workspaces, conversations, account, and Settings
 
+- While Session initialization is pending, a provisional task shows central
+  loading feedback; it does not mount the new-conversation intent form before
+  the authoritative transition settles. Navigation remains available.
+
 - The footer account button opens `账户与数据` and reflects the shared New Money
   identity: login action when signed out, display name when signed in, explicit
   pending/expired/unconfirmed states otherwise. It never derives account status

@@ -12,6 +12,25 @@ import { projectSessionTree } from "./session-tree-projection.js";
 import { projectWorkspaceChanges } from "./workspace-change-projection.js";
 
 describe("SessionProjectionIndex", () => {
+  it("keeps transcript control state in Pi while projecting only conversation messages and all usage", () => {
+    const manager = SessionManager.inMemory("/tmp");
+    const systemId = manager.appendMessage({ role: "system", content: "private-system-marker", timestamp: 1 });
+    const userId = manager.appendMessage({ role: "user", content: "Hello", timestamp: 2 });
+    manager.appendMessage({ role: "system", content: "", sections: { rules: "private-rules-marker" }, timestamp: 3 });
+    const usage = { input: 2, output: 1, cacheRead: 3, cacheWrite: 0, totalTokens: 6,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.01 } };
+    manager.appendUsage("cache_warm", "fixture", "fixture", usage);
+    const projection = new SessionProjectionIndex();
+    projection.bind(manager);
+    expect(projectMessagePage(projection).messages.map(message => message.id)).toEqual([userId]);
+    expect(projection.getStats(fakeSession(manager))).toMatchObject({ totalMessages: 1, tokens: { total: 6 }, cost: 0.01 });
+    expect(projection.getMetadata(manager).messageCount).toBe(3);
+    expect(JSON.stringify(projectSessionTree(projection))).not.toContain("private-system-marker");
+    expect(JSON.stringify(projectSessionTree(projection))).not.toContain("private-rules-marker");
+    expect(manager.getEntries().find(entry => entry.id === systemId)).toMatchObject({ message: { content: "private-system-marker" } });
+  });
+
+
   it("scans the append-only entries once and shares the result across desktop projections", () => {
     const manager = SessionManager.inMemory("/tmp", { id: "projection-index" });
     const timestamp = Date.now() + 1_000;

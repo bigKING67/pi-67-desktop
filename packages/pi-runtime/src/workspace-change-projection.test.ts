@@ -1,3 +1,4 @@
+import type { JsonObject, JsonValue } from "@earendil-works/pi-ai";
 import { mkdirSync, readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -218,7 +219,7 @@ describe("projectWorkspaceChanges", () => {
   });
 });
 
-function assistantToolCall(id: string, name: string, args: Record<string, unknown>) {
+function assistantToolCall(id: string, name: string, args: JsonObject) {
   return {
     role: "assistant" as const,
     content: [{ type: "toolCall" as const, id, name, arguments: args }],
@@ -238,13 +239,13 @@ function assistantToolCall(id: string, name: string, args: Record<string, unknow
   };
 }
 
-function toolResult(id: string, name: string, isError: boolean, details: unknown) {
+function toolResult(id: string, name: string, isError: boolean, details: JsonValue | undefined) {
   return {
     role: "toolResult" as const,
     toolCallId: id,
     toolName: name,
     content: [{ type: "text" as const, text: isError ? "failed" : "complete" }],
-    details,
+    ...(details === undefined ? {} : { details }),
     isError,
     timestamp: Date.now()
   };

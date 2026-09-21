@@ -3,7 +3,7 @@ import { createServer } from "node:net";
 export function packagedCompactionProviderSource(observationPath, apiKey) {
   return `
     import { appendFileSync, existsSync, readFileSync } from "node:fs";
-    import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
+    import { createAssistantMessageEventStream, getCurrentSystemPrompt } from "@earendil-works/pi-ai";
 
     const observationPath = ${JSON.stringify(observationPath)};
     function observations() {
@@ -52,11 +52,11 @@ export function packagedCompactionProviderSource(observationPath, apiKey) {
         }],
         streamSimple: (model, context) => {
           const serialized = JSON.stringify(context.messages ?? []);
-          if (context.systemPrompt?.includes("stable navigation title")) {
+          if (getCurrentSystemPrompt(context.messages).includes("stable navigation title")) {
             appendFileSync(observationPath, JSON.stringify({ kind: "title" }) + "\\n");
             return response(model, "Synthetic Compaction Fixture", 32);
           }
-          if (context.systemPrompt?.includes("context summarization assistant") || serialized.includes("<conversation>")) {
+          if (getCurrentSystemPrompt(context.messages).includes("context summarization assistant") || serialized.includes("<conversation>")) {
             appendFileSync(observationPath, JSON.stringify({ kind: "summary" }) + "\\n");
             return response(model, "Synthetic Pi default compaction summary.", 96);
           }

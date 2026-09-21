@@ -234,6 +234,11 @@ function usageEntry(
     } else return undefined;
     usage = message.usage;
     timestamp = timestampValue(message.timestamp) ?? timestamp;
+  } else if (entry.type === "usage") {
+    source = "usage-entry";
+    provider = boundedLabel(entry.provider);
+    model = boundedLabel(entry.model);
+    usage = entry.usage;
   } else if (entry.type === "compaction") {
     source = "compaction";
     usage = entry.usage;

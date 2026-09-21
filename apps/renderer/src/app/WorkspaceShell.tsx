@@ -26,8 +26,8 @@ import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-con
 import { beginRendererSessionIntentInWorkspace } from "../workspace/workspace-session-controller.js";
 import { useWorkspaceFileStore } from "../workspace-files/workspace-file-store.js";
 import { LazySurfaceBoundary } from "./LazySurfaceBoundary.js";
-import { NewSessionIntentSurface } from "./NewSessionIntentSurface.js";
 import styles from "./WorkspaceShell.module.css";
+import { NewSessionIntentBoundary } from "./NewSessionIntentBoundary.js";
 
 const SettingsWorkbench = lazy(() => import("../settings/SettingsWorkbench.js").then((module) => ({
   default: module.SettingsWorkbench
@@ -112,7 +112,7 @@ export function WorkspaceShell({
   ) : selectedTask?.conversation.kind === "provisional"
     && selectedTask.creationStatus === undefined
     && selectedWorkspace ? (
-      <NewSessionIntentSurface task={selectedTask} workspace={selectedWorkspace} />
+      <NewSessionIntentBoundary pending={sessionTransitionPending} task={selectedTask} workspace={selectedWorkspace} />
   ) : selectedTask?.conversation.kind === "provisional" && selectedWorkspace ? (
     <ProvisionalTaskState task={selectedTask} workspace={selectedWorkspace} />
   ) : selectedTask?.conversation.kind === "session" && selectedWorkspace ? (

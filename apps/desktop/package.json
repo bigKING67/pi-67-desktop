@@ -18,12 +18,12 @@
     "semver": "7.7.4"
   },
   "peerDependencies": {
-    "electron": "43.2.0"
+    "electron": "43.7.3"
   },
   "devDependencies": {
     "@types/node": "24.10.1",
     "@types/semver": "7.7.1",
-    "electron": "43.2.0",
+    "electron": "43.7.3",
     "tsdown": "0.22.13",
     "typescript": "7.0.2"
   }

@@ -280,6 +280,8 @@ function projectEntryRecord(
       }
     };
   }
+  // SDK transcript control messages carry prompts/tools, not conversation bubbles.
+  if (entry.type === "message" && entry.message.role === "system") return undefined;
   if (entry.type === "custom_message" && !entry.display) return undefined;
   const [message] = sessionEntryToContextMessages(entry);
   return message === undefined ? undefined : {

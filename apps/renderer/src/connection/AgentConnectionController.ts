@@ -1,5 +1,6 @@
+import { DeferredAgentPort } from "./deferred-agent-port.js";
 import {
-  AgentPortClient,
+  type AgentPortClient,
   isReplaySafeControlMutation,
   isReplaySafeOperationAck,
   ProtocolRequestError,
@@ -33,11 +34,7 @@ import {
   positiveInteger,
   prepareSameHostTransportRetry
 } from "./agent-connection-controller-utilities.js";
-import {
-  createBrowserAgentPortHandoffTarget,
-  isAgentPortHandoff,
-  type AgentPortHandoff
-} from "./agent-port-handoff.js";
+import { createBrowserAgentPortHandoffTarget, admitAgentPortHandoff, type AgentPortHandoff } from "./agent-port-handoff.js";
 import {
   diagnosticActionForCommand,
   RendererDiagnosticEvidence
@@ -51,6 +48,7 @@ const DEFAULT_SLOW_ACKNOWLEDGEMENT_THRESHOLD_MS = 2_000;
 export class AgentConnectionController {
   private readonly subscribers = new Set<ConnectionSubscriber>();
   private client: AgentPortClient | undefined;
+  private readonly deferredPort: DeferredAgentPort;
   private identityValue: AgentConnectionIdentity | undefined;
   private portAttachedAt: number | undefined;
   private generation = 0;
@@ -70,6 +68,8 @@ export class AgentConnectionController {
     private readonly handoffTarget = createBrowserAgentPortHandoffTarget(),
     options: AgentConnectionControllerOptions = {}
   ) {
+    this.deferredPort = new DeferredAgentPort(options.loadPortClient
+      ?? (() => import("@pi67/protocol/port-client").then(module => module.AgentPortClient)));
     this.now = options.now ?? Date.now;
     this.recoveryDiagnostics = new AgentConnectionRecoveryDiagnostics(this.now);
     this.diagnosticEvidence = new RendererDiagnosticEvidence(this.now);
@@ -375,25 +375,19 @@ export class AgentConnectionController {
     this.identityValue = undefined;
     this.portAttachedAt = undefined;
     client?.dispose();
+    this.deferredPort.cancel();
     const error = disposedError();
     for (const subscriber of this.subscribers) subscriber.onTeardown?.(error);
     this.subscribers.clear();
   }
 
   private readonly onWindowMessage = (event: MessageEvent) => {
-    if (
-      this.disposed
-      || !this.handoffTarget
-      || event.source !== this.handoffTarget.source
-      || event.origin !== this.handoffTarget.origin
-      || !isAgentPortHandoff(event.data)
-    ) return;
-    const port = event.ports[0];
-    if (!port) return;
-    this.attachPort(port, event.data);
+    if (this.disposed) return;
+    const admitted = admitAgentPortHandoff(event, this.handoffTarget);
+    if (admitted) void this.attachPort(admitted.port, admitted.handoff);
   };
 
-  private attachPort(port: MessagePort, handoff: AgentPortHandoff): void {
+  private async attachPort(port: MessagePort, handoff: AgentPortHandoff): Promise<void> {
     if (this.disposed) {
       port.close();
       return;
@@ -406,7 +400,13 @@ export class AgentConnectionController {
     this.portAttachedAt = this.now();
     this.diagnosticEvidence.recordPortAttached(generation, handoff.hostEpoch);
 
-    const client = new AgentPortClient(port, {
+    const PortClient = await this.deferredPort.load(port, () => {
+      this.portAttachedAt = undefined;
+      const error = connectionError("Pi protocol client failed to load. Reconnect to retry.");
+      for (const subscriber of this.subscribers) subscriber.onTeardown?.(error);
+    });
+    if (!PortClient || this.disposed || generation !== this.generation) { port.close(); return; }
+    const client = new PortClient(port, {
       appInstanceId: handoff.appInstanceId,
       expectedHostEpoch: handoff.hostEpoch
     });

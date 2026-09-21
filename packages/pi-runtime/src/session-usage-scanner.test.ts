@@ -13,6 +13,20 @@ afterEach(async () => {
 });
 
 describe("scanSessionUsage", () => {
+  it("accounts for standalone SDK usage from restored TUI history", async () => {
+    const session = await writeSession("usage-session", [
+      { type: "session", version: 3, id: "usage-session", cwd: "/workspace" },
+      { type: "usage", id: "u1", parentId: null, kind: "cache_warm", provider: "fixture", model: "fixture-model",
+        timestamp: "2026-08-09T01:00:00.000Z", note: "private-note-marker",
+        usage: { input: 2, output: 1, cacheRead: 3, cacheWrite: 0, totalTokens: 6, cost: { total: 0.01 } } }
+    ]);
+    const report = await scanSessionUsage({ workspaceId: "workspace-1", sessions: [session],
+      discoveredSessions: 1, catalogIncomplete: false, catalogSkippedCount: 0, window: "7d", now: Date.UTC(2026, 7, 9, 12) });
+    expect(report.totals).toMatchObject({ total: 6, recordedCost: 0.01 });
+    expect(report.buckets).toContainEqual(expect.objectContaining({ source: "usage-entry", provider: "fixture", model: "fixture-model" }));
+    expect(JSON.stringify(report)).not.toContain("private-note-marker");
+  });
+
   it("rebuilds Provider/model/date totals from Pi JSONL without projecting content", async () => {
     const now = Date.UTC(2026, 7, 9, 12);
     const session = await writeSession("session-1", [

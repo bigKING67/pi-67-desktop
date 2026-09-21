@@ -54,9 +54,9 @@ for (const theme of ["light", "dark"] as const) {
         if (category === "上下文与记忆") await expect(settings.getByRole("radio")).toHaveCount(4);
         if (category === "用量分析") await expect(settings.getByText("Pi 记录 token", { exact: true })).toBeVisible();
         if (category === "账户与数据") {
-          await expect(settings.getByText("本地模式", { exact: true })).toBeVisible();
-          await expect(settings.getByText("数据与同步", { exact: true })).toBeVisible();
-          await expect(settings.getByText("未登录", { exact: true })).toHaveCount(0);
+          await expect(settings.getByRole("textbox", { name: "New Money 服务地址" })).toBeVisible();
+          await expect(settings.getByRole("button", { name: "登录 New Money", exact: true })).toBeVisible();
+          await expect(settings.getByRole("button", { name: "打开管理网页", exact: true })).toBeDisabled();
         }
         if (category === "下载源与网络") {
           const header = settings.getByRole("heading", { level: 1 }).locator("../..");

@@ -69,8 +69,12 @@ describe("Pi Workspace runtime services", () => {
 
       const internalsA = runtimeInternals(runtimeA);
       const internalsB = runtimeInternals(runtimeB);
-      expect(internalsA.services.settingsManager).toBe(settingsManager);
-      expect(internalsB.services.settingsManager).toBe(settingsManager);
+      // Session views suppress paid warming while forwarding the shared settings.
+      internalsA.services.settingsManager.setDefaultModel("shared-model");
+      expect(settingsManager.getDefaultModel()).toBe("shared-model");
+      expect(internalsB.services.settingsManager.getDefaultModel()).toBe("shared-model");
+      expect(internalsA.services.settingsManager.getCacheWarmingMode()).toBe("off");
+      expect(internalsB.services.settingsManager.getCacheWarmingMode()).toBe("off");
       expect(internalsA.services.resourceLoader).not.toBe(internalsB.services.resourceLoader);
       expect(workspaceServices.packageManager).toBeInstanceOf(DefaultPackageManager);
 

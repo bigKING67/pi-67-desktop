@@ -1,5 +1,5 @@
 export type UsageWindow = "7d" | "30d" | "90d";
-export type UsageSource = "assistant-message" | "tool-result" | "compaction" | "branch-summary";
+export type UsageSource = "assistant-message" | "tool-result" | "compaction" | "branch-summary" | "usage-entry";
 
 const UTC_DAY_MS = 24 * 60 * 60 * 1_000;
 

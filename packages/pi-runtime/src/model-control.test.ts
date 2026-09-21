@@ -6,7 +6,7 @@ import { selectSessionModel, setSessionThinkingLevel } from "./model-control.js"
 
 describe("model control", () => {
   it("exposes the Pi 0.84 DeepSeek Flash thinking levels without renderer-owned aliases", () => {
-    const model = getBuiltinModel("deepseek", "deepseek-v4-flash");
+    const model = getBuiltinModel("deepseek", "deepseek-flash");
 
     expect(getSupportedThinkingLevels(model)).toEqual(["off", "low", "high", "max"]);
   });
@@ -15,12 +15,12 @@ describe("model control", () => {
     const getModel = vi.fn();
     const setModel = vi.fn();
     const session = {
-      model: { provider: "deepseek", id: "deepseek-v4-flash" },
+      model: { provider: "deepseek", id: "deepseek-flash" },
       modelRuntime: { getModel },
       setModel
     } as unknown as AgentSession;
 
-    await selectSessionModel(session, "deepseek", "deepseek-v4-flash");
+    await selectSessionModel(session, "deepseek", "deepseek-flash");
 
     expect(getModel).not.toHaveBeenCalled();
     expect(setModel).not.toHaveBeenCalled();

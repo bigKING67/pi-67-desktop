@@ -1,3 +1,4 @@
+import type { JsonValue } from "@earendil-works/pi-ai";
 import { SessionManager, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -29,7 +30,7 @@ function fixture(privateSession = false) {
     history: { teamKnowledgeAccess: access, authorizeTeamSession }, authorizeTeamSession };
 }
 function append(f: ReturnType<typeof fixture>, toolName: string, result: Awaited<ReturnType<typeof f.load>>) {
-  f.manager.appendMessage({ role: "toolResult", toolCallId: "call", toolName, isError: false, timestamp: 1, ...result });
+  f.manager.appendMessage({ role: "toolResult", toolCallId: "call", toolName, isError: false, timestamp: 1, ...result, details: result.details as JsonValue });
 }
 it.each(["team", "project"])("searches and reads the exact selected %s version with canonical details", async scope => {
   const f = fixture(); await f.select(scope);

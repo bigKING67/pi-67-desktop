@@ -33,7 +33,8 @@ export const WorkspaceUsageReportSchema = strictObject({
       Type.Literal("assistant-message"),
       Type.Literal("tool-result"),
       Type.Literal("compaction"),
-      Type.Literal("branch-summary")
+      Type.Literal("branch-summary"),
+      Type.Literal("usage-entry")
     ]),
     sessions: Type.Integer({ minimum: 0 }),
     turns: Type.Integer({ minimum: 0 }),

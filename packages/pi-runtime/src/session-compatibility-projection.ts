@@ -10,6 +10,7 @@ const KNOWN_ENTRY_TYPES = new Set([
   "message",
   "thinking_level_change",
   "model_change",
+  "usage",
   "compaction",
   "branch_summary",
   "custom",
@@ -56,6 +57,6 @@ export function projectSessionCompatibility(
 }
 
 function isExpectedVisibleMessageEntry(entry: SessionEntry): boolean {
-  if (entry.type === "message") return true;
+  if (entry.type === "message") return entry.message.role !== "system";
   return entry.type === "custom_message" && entry.display === true;
 }

@@ -1,3 +1,5 @@
+import { createMessageId } from "./message-id.js";
+export { createMessageId } from "./message-id.js";
 import { strictObject, Type, Value, type Static } from "./typebox-schema.js";
 import {
   MAX_SESSION_CATALOG_PAGE_JSON_BYTES
@@ -287,12 +289,6 @@ export function correlateInvalidResponse(value: unknown): {
   };
 }
 
-let localCounter = 0;
-
-export function createMessageId(prefix: string): string {
-  localCounter = (localCounter + 1) % Number.MAX_SAFE_INTEGER;
-  return `${prefix}-${Date.now().toString(36)}-${localCounter.toString(36)}`;
-}
 
 export function commandEnvelope<T extends AgentCommandType>(
   type: T,

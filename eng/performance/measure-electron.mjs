@@ -124,7 +124,9 @@ for (let index = 0; index < samples; index += 1) {
     cleanProfileWorkspaceActionVisibleSamples.push(cleanLaunch.phases.workspaceActionVisibleMs);
     const resourceCollector = await createRendererResourceCollector(cleanLaunch.window, join(root, "apps/renderer/dist"));
     recordWelcomeMemory(await measureWorkingSet(cleanLaunch.application, false));
-    await connectAgentHost(cleanLaunch.application, cleanLaunch.window);
+    const connectedStage = await resourceCollector.measureStage("agentConnection", () => (
+      connectAgentHost(cleanLaunch.application, cleanLaunch.window)
+    ));
     const connectedMemory = await measureWorkingSet(cleanLaunch.application, true);
     recordConnectedMemory(connectedMemory);
     const initializedStage = await resourceCollector.measureStage("runtimeInitialization", () => (
@@ -152,6 +154,7 @@ for (let index = 0; index < samples; index += 1) {
     realPiSessionProjectionSamples.push(restoredStage.result);
     const rendererResourceTransition = {
       welcome: resourceCollector.welcome,
+      agentConnection: connectedStage.resources,
       runtimeInitialization: initializedStage.resources,
       sessionRestore: restoredStage.resources
     };
@@ -278,10 +281,10 @@ await writeElectronPerformanceReport({
 
 function resolvePackagedExecutable() {
   if (process.platform === "darwin" && process.arch === "arm64") {
-    return join(root, "artifacts/release/mac-arm64/Pi-67 Desktop.app/Contents/MacOS/Pi-67 Desktop");
+    return join(root, "artifacts/release/mac-arm64/New Money.app/Contents/MacOS/New Money");
   }
   if (process.platform === "win32" && process.arch === "x64") {
-    return join(root, "artifacts/release/win-unpacked/Pi-67 Desktop.exe");
+    return join(root, "artifacts/release/win-unpacked/New Money.exe");
   }
   throw new Error(`Packaged performance harness does not support ${process.platform}/${process.arch}.`);
 }

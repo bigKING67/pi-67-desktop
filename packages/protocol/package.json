@@ -27,10 +27,14 @@
     "./worktree-creation-result-validation": {
       "types": "./src/worktree-creation-result-validation.ts",
       "import": "./dist/worktree-creation-result-validation.mjs"
+    },
+    "./port-client": {
+      "types": "./src/port-client.ts",
+      "import": "./dist/port-client.mjs"
     }
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/prompt-attachment-limits.ts src/prompt-stash-images.ts src/repository-environment-snapshot-validation.ts src/repository-environment-action-result-validation.ts src/worktree-creation-result-validation.ts --format esm --dts",
+    "build": "tsdown src/index.ts src/prompt-attachment-limits.ts src/prompt-stash-images.ts src/repository-environment-snapshot-validation.ts src/repository-environment-action-result-validation.ts src/worktree-creation-result-validation.ts --format esm --dts --unbundle",
     "build:revision-inputs": "pnpm --filter @pi67/protocol... run build",
     "check:revision": "pnpm run build:revision-inputs && node scripts/generate-protocol-revision.mjs --check",
     "generate:revision": "pnpm run build:revision-inputs && node scripts/generate-protocol-revision.mjs",
@@ -46,5 +50,6 @@
     "tsdown": "0.22.13",
     "typescript": "7.0.2",
     "vitest": "4.1.10"
-  }
+  },
+  "sideEffects": false
 }

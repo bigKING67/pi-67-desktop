@@ -10,6 +10,7 @@ export async function runPackagedLocalMemorySettingsSmoke(artifact) {
   if (process.platform !== "darwin" || process.arch !== "arm64") return;
   const profile = await createPackagedTestDirectories("pi67-packaged-memory-");
   let application;
+  let scenarioError;
   const launch = () => launchPackagedApplication({ ...profile, artifact, isolateNativeWindow: true, hideNativeWindow: false,
     environment: { PI67_MEMORY_PRIVACY_MODE: "off" } });
   const close = async () => {
@@ -45,10 +46,17 @@ export async function runPackagedLocalMemorySettingsSmoke(artifact) {
       throw new Error("Private activation disable did not survive restart.");
     }
     console.info("Packaged private activation passed: default off, explicit save only, cold enable/disable, no native launch or paid model.");
-  } finally {
+  } catch (error) {
+    scenarioError = error;
+  }
+  try {
     await close();
     await cleanupPackagedTestDirectories(profile.userDataDirectory);
+  } catch (error) {
+    if (scenarioError) throw new AggregateError([scenarioError, error], "Memory smoke scenario and cleanup both failed.");
+    throw error;
   }
+  if (scenarioError) throw scenarioError;
 }
 
 /** Synthetic-only packaged UI → preload → Main → OS storage regression. */

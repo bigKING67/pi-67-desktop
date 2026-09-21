@@ -45,11 +45,10 @@ describe("Desktop tool routing Extension integration", () => {
       const beforeStart = await session.extensionRunner.emitBeforeAgentStart(
         "inspect the workspace",
         undefined,
-        "base prompt",
-        { cwd: fixture.cwd }
+        { customPrompt: "base prompt", cwd: fixture.cwd }
       );
-      expect(beforeStart?.systemPrompt).toContain("`Bash`→`bash`");
-      expect(beforeStart?.systemPrompt).not.toContain("`WebSearch`→`web_search`");
+      expect(beforeStart.systemPromptOptions.forceSystemPrompt).toContain("`Bash`→`bash`");
+      expect(beforeStart.systemPromptOptions.forceSystemPrompt).not.toContain("`WebSearch`→`web_search`");
 
       const bashAlias = session.getToolDefinition("Bash");
       if (!bashAlias?.prepareArguments) throw new Error("Expected the verified Bash alias.");

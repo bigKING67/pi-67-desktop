@@ -44,7 +44,7 @@ export async function writeControlledShutdownExtension({
   await writeFile(extensionPath, `
     import { appendFileSync, writeFileSync } from "node:fs";
     import { spawn } from "node:child_process";
-    import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
+    import { createAssistantMessageEventStream, getCurrentTools } from "@earendil-works/pi-ai";
 
     export default function controlledShutdownFixture(pi) {
       let child;
@@ -89,7 +89,7 @@ export async function writeControlledShutdownExtension({
           ${teamKnowledgeEvidencePath ? `writeFileSync(${JSON.stringify(teamKnowledgeEvidencePath)}, JSON.stringify({
             canonicalMode: process.env.PI67_CANONICAL_TEAM_KNOWLEDGE,
             privateMode: process.env.PI67_MANAGED_LOCAL_MEMORY,
-            tools: (_context.tools ?? []).map(tool => tool.name)
+            tools: getCurrentTools(_context.messages).map(tool => tool.name)
           }), { mode: 0o600 });` : ""}
           const stream = createAssistantMessageEventStream();
           const output = {

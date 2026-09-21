@@ -1,8 +1,20 @@
-import type { SessionEntry, SessionHeader } from "@earendil-works/pi-coding-agent";
+import { SessionManager, type SessionEntry, type SessionHeader } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 import { projectSessionCompatibility } from "./session-compatibility-projection.js";
 
 describe("projectSessionCompatibility", () => {
+  it("accepts transcript system messages and independent usage entries", () => {
+    const session = SessionManager.inMemory("/tmp");
+    session.appendMessage({ role: "system", content: "instructions", timestamp: 1 });
+    session.appendUsage("cache_warm", "fixture", "fixture", {
+      input: 0, output: 1, cacheRead: 2, cacheWrite: 0, totalTokens: 3,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
+    });
+    expect(projectSessionCompatibility(session, session.getEntries())).toMatchObject({
+      status: "compatible", unknownEntryCount: 0, unrenderableMessageCount: 0
+    });
+  });
+
   it("reports compatible current-format Sessions", () => {
     expect(projectSessionCompatibility(manager(3), [userEntry()])).toEqual({
       status: "compatible",

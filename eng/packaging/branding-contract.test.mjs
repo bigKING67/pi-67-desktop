@@ -59,6 +59,17 @@ describe("New Money display branding contract", () => {
     expect(shortcutName).toBe("New Money");
     expect(lifecycle).toContain(`resolveWindowsDesktopShortcutPath(${JSON.stringify(shortcutName)})`);
   });
+
+  it("measures the executable names produced by the packager", async () => {
+    const config = await readFile(resolve(repositoryRoot, "electron-builder.yml"), "utf8");
+    const harness = await readFile(resolve(repositoryRoot, "eng/performance/measure-electron.mjs"), "utf8");
+    const productName = config.match(/^productName: (.+)$/mu)?.[1];
+    const executableName = config.match(/^  executableName: (.+)$/mu)?.[1];
+    expect(productName).toBeDefined();
+    expect(executableName).toBeDefined();
+    expect(harness).toContain(`mac-arm64/${productName}.app/Contents/MacOS/${productName}`);
+    expect(harness).toContain(`win-unpacked/${executableName}.exe`);
+  });
 });
 
 async function expectHash(path, expected) {

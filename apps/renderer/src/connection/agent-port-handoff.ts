@@ -12,7 +12,7 @@ export interface AgentPortHandoffTarget {
   removeMessageListener(listener: (event: MessageEvent) => void): void;
 }
 
-export function isAgentPortHandoff(value: unknown): value is AgentPortHandoff {
+function isAgentPortHandoff(value: unknown): value is AgentPortHandoff {
   if (typeof value !== "object" || value === null) return false;
   const handoff = value as Partial<AgentPortHandoff>;
   return handoff.source === "pi67-preload"
@@ -32,4 +32,11 @@ export function createBrowserAgentPortHandoffTarget(): AgentPortHandoffTarget | 
     addMessageListener: (listener) => window.addEventListener("message", listener),
     removeMessageListener: (listener) => window.removeEventListener("message", listener)
   };
+}
+
+export function admitAgentPortHandoff(event: MessageEvent, target: AgentPortHandoffTarget | undefined) {
+  if (!target || event.source !== target.source || event.origin !== target.origin
+    || !isAgentPortHandoff(event.data)) return undefined;
+  const port = event.ports[0];
+  return port ? { port, handoff: event.data } : undefined;
 }

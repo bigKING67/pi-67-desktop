@@ -2,13 +2,13 @@
 
 ## Locked contract
 
-当前唯一支持版本：
+当前源码锁定版本（本地升级候选；不代表 Windows/真实模型认证已完成）：
 
 ```text
-@earendil-works/pi-coding-agent 0.84.3
-@earendil-works/pi-agent-core   0.84.3
-@earendil-works/pi-ai           0.84.3
-@earendil-works/pi-tui          0.84.3 (transitive override)
+@earendil-works/pi-coding-agent 0.86.1
+@earendil-works/pi-agent-core   0.86.1
+@earendil-works/pi-ai           0.86.1
+@earendil-works/pi-tui          0.86.1 (transitive override)
 ```
 
 根依赖和 `pnpm-workspace.yaml#overrides` 双重固定，避免上游内部 caret dependency 在重新
@@ -17,6 +17,25 @@
 `eng/release/pi-runtime-contract.mjs` 从 `packages/pi-runtime/package.json` 读取版本并验证三个
 Pi suite 直接依赖与 workspace overrides 完整一致。Release manifest、artifact verify 和
 unsigned preview 共用该 contract，不维护另一份运行时版本常量。
+
+## 0.86.1 adaptation and evidence boundary
+
+- `pi-agent-core`、`pi-ai`、`pi-coding-agent` 和传递 `pi-tui` 同步精确锁定；
+  Chord/telemetry 来自上游依赖闭包，不创建 Desktop 的第二个运行时。
+- Pi 默认 `cacheWarming: streaming`。Desktop 的 Session SettingsManager view
+  返回 `off`，重载后仍生效，不调用持久 setter，也不改用户全局/TUI 设置。
+  普通 `applyOverrides` 不适用：上游 getter 直接读取 global settings。
+- Provider stream 输入为 `TranscriptContext`。合成 Provider 通过上游
+  `getCurrentSystemPrompt/getCurrentTools` 读取声明；不另建 prompt/tool parser。
+- Pi 持久化 structured system sections 与 tool loadout；返回 `systemPrompt` 的
+  Extension 全文覆盖仍为 run-local projection。Desktop 原有 inline Extensions
+  在 resume 时重新应用，不将该全文覆盖冒充已持久化的 structured sections。
+- SDK `message/system` 控制记录保留给 Pi replay，不投影为聊天气泡或消息数；
+  Catalog metadata 的 message-entry count 仍与 Pi cold discovery 一致。
+  Session tree 只显示固定描述，不投影系统提示正文。独立 `usage` 记录计入
+  Session 与 Workspace 用量，协议 source 为 `usage-entry`，不传原始 note。
+- 本轮验证记录见 `docs/plans/2026-09-20-dependency-upgrade.md`。离线合成模型、
+  本机测试和打包结果不等于付费模型、Windows 或正式发布认证。
 
 ## Desktop coverage
 
@@ -28,7 +47,7 @@ unsigned preview 共用该 contract，不维护另一份运行时版本常量。
   ResourceLoader reload，不消费 SDK 可选的 pre-trust Extension import pass；
 - accepted prompt Operation、steer、follow-up、abort；
 - 最近 100 条 bootstrap、稳定 entry cursor 分页、有界 flat session tree 和增量 projection；
-- model list/select、thinking levels；SDK `0.84.3` 的 `AgentSession.setModel()` 默认只更新
+- model list/select、thinking levels；SDK `0.86.1` 的 `AgentSession.setModel()` 默认只更新
   当前 Session，Desktop 用户主动选模型时显式传入 `{ persist: true }` 保留默认模型设置，
   Extension 的临时模型切换则保持 Session-local，不能隐式改写全局默认值；
 - session tree navigation、新文件 branch、rollback、compact、name；
@@ -88,7 +107,7 @@ unsigned preview 共用该 contract，不维护另一份运行时版本常量。
   component 注入 renderer；
 - 不支持同一 JSONL session 的并发 Desktop/TUI writer；watcher 只检测并止损，不把外部 JSONL
   entry 合并进当前 `SessionManager`、Conversation projection 或 Renderer；
-- Pi SDK `0.84.3` 的 cold Session discovery 会临时构造 `firstMessage/allMessagesText`；Desktop
+- Pi SDK `0.86.1` 的 cold Session discovery 会临时构造 `firstMessage/allMessagesText`；Desktop
   立即丢弃这些字段，既不持久化也不跨进程传输。Catalog 不做 FTS、transcript index 或 Prompt
   派生名称，cold reconcile 的时间和 RSS 仍需按平台持续测量；
 - 不实现 system Pi/RPC session import adapter。当前 agent directory 内的已

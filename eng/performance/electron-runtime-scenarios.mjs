@@ -62,6 +62,10 @@ export async function initializePackagedRuntime(application, window, workspace) 
   await window.getByRole("button", { name: "选择工作区" }).click();
   await waitForRuntimeReady(window, 30_000);
   await window.locator(".conversation-region").waitFor({ state: "visible", timeout: 10_000 });
+  const inspector = window.getByRole("complementary", { name: "任务检查器", exact: true });
+  if (await inspector.isVisible()) {
+    await inspector.getByRole("tab", { name: "文件", exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+  }
   return performance.now() - started;
 }
 

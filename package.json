@@ -123,7 +123,7 @@
     "@playwright/test": "1.61.1",
     "@types/node": "24.10.1",
     "@vitest/coverage-v8": "4.1.10",
-    "electron": "43.2.0",
+    "electron": "43.7.3",
     "electron-builder": "26.15.3",
     "knip": "6.29.0",
     "oxc-parser": "0.140.0",

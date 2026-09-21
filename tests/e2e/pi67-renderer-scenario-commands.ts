@@ -7,6 +7,7 @@ const WORKBENCH_SETUP_OR_READ_COMMANDS = new Set([
   "workspace.changes",
   "workspace.file.list",
   "command.list",
+  "enterprise.identity.get",
   "session.catalog.query"
 ]);
 

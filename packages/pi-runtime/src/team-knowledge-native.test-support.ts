@@ -1,3 +1,4 @@
+import type { JsonValue } from "@earendil-works/pi-ai";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect } from "vitest";
@@ -30,7 +31,7 @@ export function createNativeKnowledgeSession(input: {
     call,
     async persistAndReopen(search: Awaited<ReturnType<typeof call>>, read: Awaited<ReturnType<typeof call>>) {
       for (const [name, result] of [["viking_team_search", search], ["viking_team_read", read]] as const) {
-        manager.appendMessage({ role: "toolResult", toolCallId: name, toolName: name, isError: false, timestamp: 1, ...result });
+        manager.appendMessage({ role: "toolResult", toolCallId: name, toolName: name, isError: false, timestamp: 1, ...result, details: result.details as JsonValue });
       }
       const path = join(input.directory, "team-session.jsonl");
       await writeFile(path, [manager.getHeader(), ...manager.getEntries()].map(entry => JSON.stringify(entry)).join("\n") + "\n", { mode: 0o600 });

@@ -350,12 +350,14 @@ function compareTreeNodes(left: SessionTreeNode, right: SessionTreeNode): number
 }
 
 function accumulateEntry(state: ProjectionState, entry: SessionEntry): void {
-  if ((entry.type === "branch_summary" || entry.type === "compaction") && entry.usage) {
+  if ((entry.type === "branch_summary" || entry.type === "compaction" || entry.type === "usage") && entry.usage) {
     addUsage(state.usage, entry.usage);
   }
   if (entry.type !== "message") return;
 
+  // Catalog metadata mirrors Pi SessionManager.list message-entry counts.
   state.metadata = accumulateMetadata(state.metadata, entry);
+  if (entry.message.role === "system") return;
   state.messageStats.totalMessages += 1;
   const message = entry.message;
   if (message.role === "user") {

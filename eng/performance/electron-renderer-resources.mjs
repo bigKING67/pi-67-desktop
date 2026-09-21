@@ -3,9 +3,9 @@ import { join, relative } from "node:path";
 
 const MAX_CAPTURED_RESOURCES = 512;
 const MAX_REPORTED_RESOURCES = 128;
-const STAGES = ["runtimeInitialization", "sessionRestore"];
+const STAGES = ["agentConnection", "runtimeInitialization", "sessionRestore"];
 const DEFERRED_OVERLAY_ASSET = /\/assets\/(?:ApprovalDialog|CommandPalette|CredentialDialog|DoctorDialog|ExtensionDialog|UpdateDialog)/u;
-const DEFERRED_WORKSPACE_ASSET = /\/assets\/(?:WorkspaceShell|Modal-|code-highlighter|MapleMono|markdown-)/u;
+const DEFERRED_WORKSPACE_ASSET = /\/assets\/(?:port-client|WorkspaceShell|Modal-|code-highlighter|MapleMono|markdown-)/u;
 
 export async function createRendererResourceCollector(page, assetRoot) {
   const welcome = await attachAssetFileBytes(await captureWelcomeDocumentAssets(page), assetRoot);
@@ -85,6 +85,7 @@ export function summarizeRendererResourceTransitions(transitions) {
     capture: "Welcome document script/link assets plus stage-scoped Playwright app://pi67 requests",
     stages: {
       welcome: summarizeStage(transitions.map((transition) => transition.welcome)),
+      agentConnection: summarizeStage(transitions.map((transition) => transition.agentConnection ?? [])),
       runtimeInitialization: summarizeStage(transitions.map((transition) => transition.runtimeInitialization)),
       sessionRestore: summarizeStage(transitions.map((transition) => transition.sessionRestore))
     },

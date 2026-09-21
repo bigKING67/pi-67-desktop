@@ -15,6 +15,7 @@ export default defineConfig({
       "@pi67/protocol/prompt-attachment-limits": fileURLToPath(
         new URL("./packages/protocol/src/prompt-attachment-limits.ts", import.meta.url)
       ),
+      "@pi67/protocol/port-client": fileURLToPath(new URL("./packages/protocol/src/port-client.ts", import.meta.url)),
       "@pi67/protocol": fileURLToPath(new URL("./packages/protocol/src/index.ts", import.meta.url))
     }
   },

@@ -203,6 +203,9 @@ describe("Inspector protocol", () => {
     expect(Value.Check(CommandPayloadSchemas["workspace.usage.report"], { window: "30d" })).toBe(true);
     expect(Value.Check(CommandResultSchemas["workspace.usage.report"], report)).toBe(true);
     expect(Value.Check(CommandResultSchemas["workspace.usage.report"], {
+      ...report, buckets: report.buckets.map(bucket => ({ ...bucket, source: "usage-entry" }))
+    })).toBe(true);
+    expect(Value.Check(CommandResultSchemas["workspace.usage.report"], {
       ...report,
       reasoningTokens: 10
     })).toBe(false);

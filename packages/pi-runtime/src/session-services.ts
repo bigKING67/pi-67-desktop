@@ -85,7 +85,7 @@ export async function createDesktopSessionServices(
       ? { managedExtensionPaths: configuredManagedExtensions }
       : { settingsManager: admittedSettingsManager })
   });
-  const settingsManager = memoryOwnerPreflight.blockedOwners.length > 0
+  const packageSettingsManager = memoryOwnerPreflight.blockedOwners.length > 0
     ? createDesktopPackageSettingsView(
         baseSettingsManager,
         process.env,
@@ -93,6 +93,15 @@ export async function createDesktopSessionServices(
         memoryOwnerPreflight
       )
     : admittedSettingsManager;
+  // Pi reads this cost-bearing setting directly from globalSettings, bypassing
+  // applyOverrides. Keep the Desktop policy runtime-only and stable across reload.
+  const settingsManager = new Proxy(packageSettingsManager, {
+    get(target, property) {
+      if (property === "getCacheWarmingMode") return () => "off" as const;
+      const value = Reflect.get(target, property, target) as unknown;
+      return typeof value === "function" ? value.bind(target) : value;
+    }
+  });
   const configuredCapabilities = new ConfiguredCapabilityCatalog({
     agentDir: options.agentDir,
     settingsManager

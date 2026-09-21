@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SettingsManager } from "@earendil-works/pi-coding-agent";
@@ -15,6 +15,30 @@ afterEach(async () => {
 });
 
 describe("Desktop Session package trust admission", () => {
+  it("disables paid cache warming across reload without changing the user's settings", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-cache-policy-"));
+    roots.push(root);
+    const cwd = join(root, "workspace"), agentDir = join(root, "agent");
+    await Promise.all([mkdir(cwd), mkdir(agentDir)]);
+    const path = join(agentDir, "settings.json");
+    const saved = JSON.stringify({ cacheWarming: "idle" });
+    await writeFile(path, saved);
+    const settingsManager = SettingsManager.create(cwd, agentDir);
+    const services = await createDesktopSessionServices({
+      cwd, agentDir, settingsManager,
+      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
+      requestApproval: async () => ({ status: "denied" })
+    });
+    expect(settingsManager.getCacheWarmingMode()).toBe("idle");
+    expect(services.settingsManager.getCacheWarmingMode()).toBe("off");
+    await services.settingsManager.reload();
+    await services.resourceLoader.reload();
+    expect(services.settingsManager.getCacheWarmingMode()).toBe("off");
+    expect(settingsManager.getCacheWarmingMode()).toBe("idle");
+    expect(await readFile(path, "utf8")).toBe(saved);
+  });
+
+
   it("does not import a configured package until current trust observation admits it", async () => {
     process.env.PI67_DESKTOP = "1";
     const root = await mkdtemp(join(tmpdir(), "pi67-runtime-package-trust-"));

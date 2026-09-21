@@ -21,6 +21,7 @@ export interface AgentConnectionRequestOptions {
 }
 
 export interface AgentConnectionControllerOptions {
+  loadPortClient?: () => Promise<typeof import("@pi67/protocol").AgentPortClient>;
   now?: () => number;
   slowAcknowledgementThresholdMs?: number;
 }

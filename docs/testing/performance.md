@@ -39,9 +39,15 @@ Code highlighting、Markdown 和长 transcript 必须保持 lazy/virtualized；�
 WASM、语言 grammar、WorkspaceShell 或全局 Overlay。Runtime 初始化可以加载 WorkspaceShell，
 Operation freshness/recovery controller 也只能在 Workspace 存在后按需加载，不能进入 Welcome
 资源集合；加载失败必须保持可观察且不能阻断 Workspace 主流程。
+新会话意图界面只在 provisional draft 选中且 Session transition 完成时加载；等待或加载失败局限于中央内容，
+不得隐藏已就绪的导航和任务检查器。Protocol client 只在实际 Port handoff 后加载，
+替换/退出时必须关闭仍在等待模块的 Port，所有消息校验保持完整。
+宽屏默认可见的检查器仍正常加载，其成本必须计入初始化，不能为通过预算强制隐藏。
+初始化采样等待可见检查器的文件 Tab 就绪；加载失败使样本失败，不能把可见内容的成本移到下一阶段。
 但不能提前加载 Approval、Extension、Doctor、Credential、Update 或 Command Palette Overlay。
 Command Palette 首次 `Ctrl/Cmd+K` 到可见加载反馈的 packaged p95 不得超过 50 ms，完整可访问
 Dialog 就绪不得超过 400 ms，避免以初始 bundle 变小为代价制造无反馈的首次交互停顿。
+资源报告另列 agentConnection 阶段，明确披露从首屏延后至连接时的代码，不能将延迟加载说成删除。
 Asset 预算按 production build 文件 bytes 计算，不冒充网络传输或 decoded memory。Streaming
 batching 默认 50 ms，禁止 token-level React commit。
 

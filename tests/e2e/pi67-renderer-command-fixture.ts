@@ -46,6 +46,7 @@ export function installMockCommandResponseHandler({
     const sessionCatalogPage = current.sessionCatalogPagesByWorkspace[current.workspaceId]
       ?? current.sessionCatalogPage;
     if (type === "runtime.getStatus") return { initialized: true, loaded: true };
+    if (type === "enterprise.identity.get") return { state: "signed-out" };
     const larkResult = resolveMockLarkCommand(type, payload);
     if (larkResult !== undefined) return larkResult;
     if (type === "runtime.initialize" || type === "workspace.open") return {};

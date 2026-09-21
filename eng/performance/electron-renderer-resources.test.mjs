@@ -20,17 +20,20 @@ describe("packaged renderer resource attribution", () => {
     const report = summarizeRendererResourceTransitions([
       {
         welcome: [resource("/assets/index.js", 100)],
+        agentConnection: [resource("/assets/port-client.js", 150)],
         runtimeInitialization: [resource("/assets/virtualization.js", 200)],
         sessionRestore: [resource("/assets/markdown.js", 300)]
       },
       {
         welcome: [resource("/assets/index.js", 100)],
+        agentConnection: [resource("/assets/port-client.js", 150)],
         runtimeInitialization: [resource("/assets/virtualization.js", 200)],
         sessionRestore: []
       }
     ]);
 
     expect(report.stages.welcome.resourceCount.p95).toBe(1);
+    expect(report.stages.agentConnection.assetFileMiB.p95).toBeCloseTo(150 / 1024 / 1024, 3);
     expect(report.stages.welcome.assetFileMiB.p95).toBeCloseTo(100 / 1024 / 1024, 3);
     expect(report.stages.runtimeInitialization.resources).toMatchObject([
       { name: "/assets/virtualization.js", sampleCount: 2, sampleRate: 1 }
@@ -44,6 +47,13 @@ describe("packaged renderer resource attribution", () => {
       runtimeInitialization: [],
       sessionRestore: []
     }], "welcome")).toEqual([0.5]);
+  });
+
+  it("rejects protocol client loading on Welcome", () => {
+    expect(() => assertRendererResourceBoundaries({
+      welcome: [resource("/assets/port-client-current.js", 100)],
+      runtimeInitialization: [], sessionRestore: []
+    })).toThrow(/resource boundary violation/u);
   });
 
   it("enforces deferred workspace and overlay resource boundaries", () => {

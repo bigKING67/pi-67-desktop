@@ -122,6 +122,7 @@ function sessionTreeEntryType(entry: Record<string, unknown>): string {
   const message = typeof entry.message === "object" && entry.message !== null
     ? entry.message as Record<string, unknown>
     : undefined;
+  if (message?.role === "system") return "system_message";
   if (message?.role === "user") return "user_message";
   if (message?.role === "assistant") return "assistant_message";
   if (message?.role === "toolResult") return "tool_result";
@@ -161,6 +162,7 @@ function sessionTreePreview(entry: Record<string, unknown>): string {
   const message = typeof entry.message === "object" && entry.message !== null
     ? entry.message as Record<string, unknown>
     : undefined;
+  if (message?.role === "system") return "System prompt and tool update";
   const content = message?.content ?? entry.summary ?? entry.name ?? entry.type;
   if (typeof content === "string") return content.slice(0, MAX_TREE_PREVIEW_BYTES * 2);
   if (!Array.isArray(content)) return "Session entry";

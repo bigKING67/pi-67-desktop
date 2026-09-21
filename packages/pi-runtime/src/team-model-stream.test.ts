@@ -1,3 +1,4 @@
+import { normalizeContext } from "@earendil-works/pi-ai";
 import { Agent, type StreamFn } from "@earendil-works/pi-agent-core";
 import { createAssistantMessageEventStream, type AssistantMessage } from "@earendil-works/pi-ai";
 import { SessionManager, type AgentSession } from "@earendil-works/pi-coding-agent";
@@ -18,7 +19,7 @@ afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 it("preserves model, context, options and valid Pi events, then removes its timer", async () => {
   vi.useFakeTimers();
   const source = createAssistantMessageEventStream(), result = message(), parent = new AbortController();
-  const context = { messages: [] };
+  const context = normalizeContext({ messages: [] });
   const transport = vi.fn<StreamFn>(() => source);
   const output = streamWithTeamLease(transport, [model as never, context, { signal: parent.signal, maxTokens: 42 }], () => undefined);
   source.push({ type: "start", partial: result }); source.push({ type: "done", reason: "stop", message: result });
@@ -36,7 +37,7 @@ it.each(["event", "idle"])("terminates an invalid lease during %s and rejects la
   const source = createAssistantMessageEventStream();
   const valid = vi.fn();
   let signal: AbortSignal | undefined;
-  const output = streamWithTeamLease((_model, _context, options) => { signal = options?.signal; return source; }, [model as never, { messages: [] }], valid);
+  const output = streamWithTeamLease((_model, _context, options) => { signal = options?.signal; return source; }, [model as never, normalizeContext({ messages: [] })], valid);
   source.push({ type: "start", partial: message() });
   await vi.advanceTimersByTimeAsync(0);
   valid.mockImplementation(() => { throw new Error("lease expired"); });
@@ -56,7 +57,7 @@ it.each([true, false])("honors caller cancellation before or during transport: p
   const parent = new AbortController(), source = createAssistantMessageEventStream();
   const transport = vi.fn<StreamFn>(() => source);
   if (preaborted) parent.abort();
-  const output = streamWithTeamLease(transport, [model as never, { messages: [] }, { signal: parent.signal }], () => undefined);
+  const output = streamWithTeamLease(transport, [model as never, normalizeContext({ messages: [] }), { signal: parent.signal }], () => undefined);
   parent.abort();
   expect(await output.result()).toMatchObject({ stopReason: "aborted", content: [] });
   expect(transport).toHaveBeenCalledTimes(preaborted ? 0 : 1);
@@ -67,10 +68,10 @@ it.each([true, false])("honors caller cancellation before or during transport: p
 
 it("cleans up when transport throws or silently ends", async () => {
   vi.useFakeTimers();
-  const throwing = streamWithTeamLease(() => { throw new Error("transport failed"); }, [model as never, { messages: [] }], () => undefined);
+  const throwing = streamWithTeamLease(() => { throw new Error("transport failed"); }, [model as never, normalizeContext({ messages: [] })], () => undefined);
   expect(await throwing.result()).toMatchObject({ stopReason: "error", errorMessage: "transport failed" });
   const source = createAssistantMessageEventStream();
-  const empty = streamWithTeamLease(() => source, [model as never, { messages: [] }], () => undefined);
+  const empty = streamWithTeamLease(() => source, [model as never, normalizeContext({ messages: [] })], () => undefined);
   source.end();
   expect(await empty.result()).toMatchObject({ stopReason: "error", errorMessage: expect.stringContaining("without a terminal") });
   expect(vi.getTimerCount()).toBe(0);

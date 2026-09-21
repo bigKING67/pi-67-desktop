@@ -59,6 +59,12 @@ interoperable with Pi TUI. Local-first ownership does not imply offline
 inference: Provider and Tool network effects remain explicit and governed by
 the selected trust and approval contract.
 
+Desktop disables Pi's optional paid prompt-cache warming through a runtime-only
+SettingsManager view, including after resource reload. This does not overwrite
+the user's Pi TUI settings. Pi transcript system/tool-control messages stay in
+JSONL for SDK replay; they are not conversation bubbles or conversation counts.
+Imported standalone Pi usage entries remain included in usage totals.
+
 ## Reference policy
 
 Pi-67 only follows `pi-gui` and `t3code` as comprehensive implementation
