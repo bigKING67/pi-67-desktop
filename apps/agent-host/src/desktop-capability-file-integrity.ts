@@ -6,6 +6,8 @@ import { isContainedRelativePath } from "./desktop-capability-catalog.js";
 const MAX_METADATA_BYTES = 1_000_000;
 const HASH_READ_CONCURRENCY = 8;
 const HASH_READ_BATCH_BYTES = 2 * 1024 * 1024;
+const COPY_BATCH_FILES = 8;
+const COPY_BATCH_BYTES = 2 * 1024 * 1024;
 
 export async function copyCapabilityDirectory(
   source: string,
@@ -20,6 +22,20 @@ export async function copyCapabilityDirectory(
   const entries = (await readdir(source, { withFileTypes: true }))
     .filter((entry) => entry.name !== ".DS_Store" && (includeNodeModules || entry.name !== "node_modules"))
     .sort((left, right) => left.name.localeCompare(right.name));
+  const pending: { input: string; output: string; mode: number }[] = [];
+  let pendingBytes = 0;
+  const flush = async (): Promise<void> => {
+    // Settle every write before returning an error so staging cleanup cannot race
+    // another file in this batch. Directories are still traversed sequentially.
+    const results = await Promise.allSettled(pending.map(async (file) => (
+      writeFile(file.output, await readFile(file.input), { mode: file.mode })
+    )));
+    pending.length = 0;
+    pendingBytes = 0;
+    for (const result of results) {
+      if (result.status === "rejected") throw result.reason;
+    }
+  };
   for (const entry of entries) {
     const input = resolve(source, entry.name);
     const output = resolve(destination, entry.name);
@@ -27,13 +43,21 @@ export async function copyCapabilityDirectory(
     const child = await lstat(input);
     if (child.isSymbolicLink()) throw new Error(`Desktop capabilities cannot contain symlinks: ${input}`);
     if (child.isDirectory()) {
+      await flush();
       await copyCapabilityDirectory(input, output, sourceRoot, includeNodeModules);
     } else if (child.isFile()) {
-      await writeFile(output, await readFile(input), { mode: child.mode & 0o111 ? 0o755 : 0o600 });
+      if (pending.length > 0 && (pending.length >= COPY_BATCH_FILES || pendingBytes + child.size > COPY_BATCH_BYTES)) {
+        await flush();
+      }
+      pending.push({ input, output, mode: child.mode & 0o111 ? 0o755 : 0o600 });
+      pendingBytes += child.size;
+      // An individually oversized file is copied alone, as in the serial path.
+      if (pendingBytes >= COPY_BATCH_BYTES) await flush();
     } else {
       throw new Error(`Unsupported Desktop capability entry: ${input}`);
     }
   }
+  await flush();
 }
 
 export async function capabilityTreeSha256(root: string, includeNodeModules = false): Promise<string> {

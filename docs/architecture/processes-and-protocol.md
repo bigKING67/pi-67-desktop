@@ -1794,6 +1794,13 @@ retain Pi's supported loading path. Desktop's Session-only settings exclude both
 and `.js` shared projections of these owned entries, preserving one canonical owner
 without modifying user settings or resources.
 
+Capability staging copies files in batches of at most eight, with a 2 MiB budget
+based on their inspected sizes; an individually larger file is copied alone.
+Directory traversal remains sequential, and every started write settles before a
+batch failure reaches staging cleanup. File modes, filtering, containment and
+symlink checks remain enforced. This is not an integrity cache: the existing full
+source and staged-tree verification still gates activation.
+
 ## Startup and recovery
 
 1. Main 注册 secure `app` scheme 并创建窗口；Welcome 不启动 Agent Host。
