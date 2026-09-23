@@ -2,7 +2,6 @@ import {
   DEFAULT_MAX_ENVELOPE_BYTES,
   correlateInvalidRequest,
   isEnvelopeWithinByteLimit,
-  isEventEnvelope,
   isHandshakeCandidate,
   isRequestCancellationEnvelope,
   isRendererHello,
@@ -14,6 +13,7 @@ import {
   type AgentCommandType,
   type CommandResults,
   type CommandResponse,
+  type EventEnvelope,
   type HostWelcome,
   type ProtocolError,
   type ProtocolPort,
@@ -148,9 +148,9 @@ export class HostConnectionContext {
     this.sendResponse(envelope, requestId);
   }
 
-  postEvent(envelope: unknown): boolean {
+  // HostEventChannel already validated this synchronous handoff before sequence/activity changes.
+  postEvent(envelope: EventEnvelope): boolean {
     if (!this.handshaken || this.retired || this.closed) return false;
-    if (!isEventEnvelope(envelope)) return false;
     if (!isEnvelopeWithinByteLimit(envelope, this.negotiatedMaxEnvelopeBytes)) {
       this.recordIncident(hostIncident("event-post", "failed", { reason: "event-envelope-too-large" }));
       this.retire("event-envelope-too-large");

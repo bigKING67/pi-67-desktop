@@ -2117,6 +2117,15 @@ accepted Operation，而不是继续扩大通用 request timeout。
 第二次仍超时返回`REQUEST_OUTCOME_UNKNOWN`并走既有精确marker恢复；不第三次创建、
 不跨Host重放、不提前发送Prompt，也不提高普通查询或通用control mutation的预算。
 
+Host 出站事件由 `HostEventChannel` 在提交 sequence 和 operation activity 前完整校验 envelope、
+payload 与 context；同进程同步调用 `HostConnectionContext.postEvent` 时只传递已校验的
+`EventEnvelope`，不重复遍历 payload。连接层仍检查握手、关闭状态和协商后的消息大小，
+Renderer 接收端仍独立执行跨进程校验。新增出站调用方必须先经过同一事件通道。
+Host 通过独立的 `@pi67/protocol/host-event-validation` 入口，对两个 Provider configuration
+事件共用的 canonical payload schema 延迟编译并复用一个 TypeBox validator；其余 schema
+仍解释校验。envelope 与 context 检查共用同一实现，不缓存 payload，不接收用户 schema，
+编译失败不放行。该入口不从默认 protocol barrel 导出，Renderer 不导入编译器、不放宽 CSP。
+
 Renderer 检测到 event sequence 缺口后停止消费增量事件，只允许一次 `projection.resync`。
 重同步结果在 Host 同步屏障内返回 Snapshot、Recorded Changes、Extension Catalog、Session
 Catalog status、event sequence、Host epoch、session generation、active Operation 和可选的最近 terminal

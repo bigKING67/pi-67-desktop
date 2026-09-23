@@ -1,11 +1,11 @@
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   agentEventEnvelope,
-  isEventEnvelope,
   type AgentEvent,
   type ProtocolContext,
   type TaskProtocolContext
 } from "@pi67/protocol";
+import { isHostEventEnvelope } from "@pi67/protocol/host-event-validation";
 import type { HostConnectionContext } from "./connection-context.js";
 import type { OperationRegistry } from "./operation-registry.js";
 
@@ -121,7 +121,7 @@ export class HostEventChannel {
           sequence: nextSequence,
           context: protocolContext
         });
-    if (!isEventEnvelope(envelope)) {
+    if (!isHostEventEnvelope(envelope)) {
       if (blockingInteractiveRequest) rejectInteractiveRequest(runtime, event);
       return false;
     }

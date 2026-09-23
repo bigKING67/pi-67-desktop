@@ -1,3 +1,4 @@
+import { isHostEventEnvelope } from "./host-event-validation.js";
 import { describe, expect, it } from "vitest";
 import { isReplaySafeControlMutation } from "./agent-messages.js";
 import {
@@ -6,7 +7,7 @@ import {
   commandEnvelope,
   eventEnvelope,
   hasValidCommandContext,
-  isEventEnvelope,
+  isEventEnvelope as interpretedEventEnvelope,
   isRequestEnvelope,
   isResponseEnvelope,
   responseEnvelope,
@@ -25,7 +26,10 @@ const TASK_CONTEXT: TaskProtocolContext = {
   taskGeneration: 1
 };
 
-describe("Provider configuration protocol", () => {
+describe.each([
+  { mode: "interpreted", isEventEnvelope: interpretedEventEnvelope },
+  { mode: "Host accelerated", isEventEnvelope: isHostEventEnvelope }
+])("Provider configuration protocol ($mode)", ({ isEventEnvelope }) => {
   it("separates global App authority from Workspace runtime and project authority", () => {
     const appQueries = [
       "provider.configuration.get",
@@ -290,6 +294,20 @@ describe("Provider configuration protocol", () => {
       context: APP_PROTOCOL_CONTEXT
     });
     expect(isEventEnvelope(event)).toBe(true);
+    for (const payload of [
+      { ...event.payload, source: "unknown" },
+      { ...event.payload, changedFiles: ["models", "models"] },
+      { ...event.payload, unknown: true },
+      { ...event.payload, snapshot: { ...snapshot, revision: "invalid" } },
+      { ...event.payload, snapshot: { ...snapshot, updatedAt: -1 } },
+      { ...event.payload, snapshot: { ...snapshot, files: snapshot.files.slice(1) } },
+      { ...event.payload, snapshot: { ...snapshot, providers: [{ ...snapshot.providers[0], apiKey: "forbidden" }] } },
+      { ...event.payload, snapshot: { ...snapshot, providers: [{ ...snapshot.providers[0], models: [{ id: "invalid" }] }] } }
+    ]) expect(isEventEnvelope({ ...event, payload })).toBe(false);
+    expect(isEventEnvelope({ ...event, context: WORKSPACE_CONTEXT })).toBe(false);
+    expect(isEventEnvelope({
+      ...event, type: "provider.projectConfiguration.changed", context: WORKSPACE_CONTEXT
+    })).toBe(true);
     const serialized = JSON.stringify({ response, event });
     for (const secret of [
       "write-only-model-header",

@@ -1,6 +1,6 @@
 import { createMessageId } from "./message-id.js";
 export { createMessageId } from "./message-id.js";
-import { strictObject, Type, Value, type Static } from "./typebox-schema.js";
+import { strictObject, Type, Value, type Static, type TSchema } from "./typebox-schema.js";
 import {
   MAX_SESSION_CATALOG_PAGE_JSON_BYTES
 } from "@pi67/domain";
@@ -246,12 +246,23 @@ export function correlateInvalidRequest(value: unknown): {
 }
 
 export function isEventEnvelope(value: unknown): value is EventEnvelope {
-  if (!Value.Check(EventEnvelopeSchema, value)) return false;
+  return validateEventEnvelope(value, Value.Check);
+}
+
+export function createEventEnvelopeValidator(checkSchema: (schema: TSchema, value: unknown) => boolean) {
+  return (value: unknown): value is EventEnvelope => validateEventEnvelope(value, checkSchema);
+}
+
+function validateEventEnvelope(
+  value: unknown,
+  checkSchema: (schema: TSchema, value: unknown) => boolean
+): value is EventEnvelope {
+  if (!checkSchema(EventEnvelopeSchema, value)) return false;
   const envelope = value as EventEnvelopeShape;
   const schema = EventPayloadSchemas[envelope.type as AgentEventType];
   return Boolean(
     schema
-    && Value.Check(schema, envelope.payload)
+    && checkSchema(schema, envelope.payload)
     && hasValidEventContext(envelope as EventEnvelope)
   );
 }
