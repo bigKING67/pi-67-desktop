@@ -112,17 +112,34 @@ export async function readWorkspaceConfigurationBundle(
   state: WorkspaceConfigurationState,
   fileAccessWaitMs: number
 ): Promise<WorkspaceBundle> {
-  const projectPath = join(state.cwd, ".pi", "settings.json");
-  const entries = await Promise.all([
+  const bundles = await readWorkspaceConfigurationBundles(paths, [state], fileAccessWaitMs);
+  return bundles[0]!;
+}
+
+/** Share global reads only within this invocation; each refresh observes files anew. */
+export async function readWorkspaceConfigurationBundles(
+  paths: PiConfigurationPaths,
+  states: readonly WorkspaceConfigurationState[],
+  fileAccessWaitMs: number
+): Promise<WorkspaceBundle[]> {
+  if (states.length === 0) return [];
+  const globalEntries = Promise.all([
     readConfigurationPath("models", paths.modelsPath, true, fileAccessWaitMs),
     readConfigurationPath("auth", paths.authPath, true, fileAccessWaitMs),
-    readConfigurationPath("global-settings", paths.globalSettingsPath, true, fileAccessWaitMs),
-    readConfigurationPath("project-settings", projectPath, state.projectTrusted, fileAccessWaitMs)
+    readConfigurationPath("global-settings", paths.globalSettingsPath, true, fileAccessWaitMs)
   ]);
-  const byKind = Object.fromEntries(entries.map((entry) => [entry.kind, entry])) as WorkspaceBundle["byKind"];
-  const hash = createHash("sha256");
-  for (const entry of entries) hash.update(entry.kind).update("\0").update(entry.revision).update("\0");
-  return { paths: entries, byKind, revision: hash.digest("hex") };
+  return Promise.all(states.map(async (state) => {
+    const [global, project] = await Promise.all([
+      globalEntries,
+      readConfigurationPath("project-settings", join(state.cwd, ".pi", "settings.json"),
+        state.projectTrusted, fileAccessWaitMs)
+    ]);
+    const entries = [...global, project];
+    const byKind = Object.fromEntries(entries.map((entry) => [entry.kind, entry])) as WorkspaceBundle["byKind"];
+    const hash = createHash("sha256");
+    for (const entry of entries) hash.update(entry.kind).update("\0").update(entry.revision).update("\0");
+    return { paths: entries, byKind, revision: hash.digest("hex") };
+  }));
 }
 
 export async function readModelConfigurationBundle(

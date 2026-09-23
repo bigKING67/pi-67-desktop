@@ -12,7 +12,8 @@ import {
   configurationErrorMessage,
   fileRevisionRecord,
   fileStatus,
-  readWorkspaceConfigurationBundle,
+  readWorkspaceConfigurationBundles,
+  type WorkspaceBundle,
   type PiConfigurationPaths,
   type WorkspaceConfigurationState
 } from "./pi-configuration-file-state.js";
@@ -36,7 +37,7 @@ export interface ValidatedConfigurationRuntimeCandidate {
 export function currentValidatedRuntimeCandidate(
   runtime: ModelRuntime | undefined,
   state: WorkspaceConfigurationState,
-  bundle: Awaited<ReturnType<typeof readWorkspaceConfigurationBundle>>
+  bundle: WorkspaceBundle
 ): ValidatedConfigurationRuntimeCandidate | undefined {
   if (
     !runtime
@@ -68,9 +69,9 @@ interface RefreshPiConfigurationOptions {
 
 export async function refreshPiConfigurationProjection(options: RefreshPiConfigurationOptions): Promise<void> {
   if (options.states.length === 0) return;
-  const bundles = await Promise.all(options.states.map((state) => (
-    readWorkspaceConfigurationBundle(options.paths, state, options.fileAccessWaitMs)
-  )));
+  const bundles = await readWorkspaceConfigurationBundles(
+    options.paths, options.states, options.fileAccessWaitMs
+  );
   if (
     !options.force
     && bundles.every((bundle, index) => options.states[index]?.snapshot?.revision === bundle.revision)

@@ -1760,6 +1760,11 @@ path escape、invalid payload 和其他错误不重试。Pi 配置仍在 path-sc
 Context/Provider validation 或 Runtime reload 失败时，只有当前文件仍等于本次写入版本才允许回滚，外部
 再次修改会保留冲突而不是覆盖。该合同不把多个独立用户操作伪装成不存在的多文件事务。
 
+Provider 配置投影在每次 refresh 内只读取一次 models/auth/global-settings 三个全局文件，
+并为该轮各 Workspace 复用同一份读取结果；项目配置仍独立按 trust 读取，未受信任项目只取
+原有文件元数据、不读取内容。该批次不跨 refresh 或 mutation 缓存，不构成多文件原子快照；
+下一次读取仍检查当前文件，原有 revision、错误、超时与 Runtime reload 规则保持不变。
+
 Custom Provider 模型发现使用 App-scoped `provider.modelDiscovery.inspect`，不复用
 `provider.modelCatalog.refresh`：后者只刷新 Pi Runtime 已注册且实现 `refreshModels` 的动态
 Provider。Renderer 只提交 Provider ID、Base URL、默认选中的 OpenAI/Anthropic/Gemini 协议族、
