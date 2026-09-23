@@ -35,10 +35,13 @@ interface DesktopReloadHook {
 const desktopReloadHooks = new WeakMap<object, DesktopReloadHook>();
 
 const DESKTOP_WORKSPACE_LEGACY_EXTENSION_EXCLUSIONS = [
-  "-extensions/pi-rules-loader/index.ts"
+  "-extensions/pi-rules-loader/index.ts",
+  "-extensions/pi-rules-loader/index.js"
 ] as const;
 
-const DESKTOP_OPENVIKING_PROJECTION_EXCLUSION = "-extensions/pi67-openviking/index.ts";
+const DESKTOP_OPENVIKING_PROJECTION_EXCLUSIONS = [
+  "-extensions/pi67-openviking/index.ts", "-extensions/pi67-openviking/index.js"
+] as const;
 
 const DESKTOP_MANAGED_NPM_SOURCES = new Set([
   "npm:pi-mcp-adapter"
@@ -341,7 +344,7 @@ function desktopExtensionOverrides(
   const exclusions = [
     ...DESKTOP_WORKSPACE_LEGACY_EXTENSION_EXCLUSIONS,
     ...(environment.PI67_OPENVIKING_SHARED_PROJECTION === "managed"
-      ? [DESKTOP_OPENVIKING_PROJECTION_EXCLUSION]
+      ? DESKTOP_OPENVIKING_PROJECTION_EXCLUSIONS
       : [])
   ];
   return [...new Set([...configured, ...exclusions])];

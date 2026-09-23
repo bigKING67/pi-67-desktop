@@ -131,6 +131,7 @@
     "oxlint-tsgolint": "7.0.2001",
     "pnpm": "11.16.0",
     "semver": "7.7.4",
+    "tsdown": "0.22.13",
     "typescript": "7.0.2",
     "vitest": "4.1.10"
   }

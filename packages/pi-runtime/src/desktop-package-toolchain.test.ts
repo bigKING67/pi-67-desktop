@@ -99,7 +99,8 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
     expect(sessionView.getGlobalSettings().extensions).toEqual([
       "extensions/user-tool/index.ts",
       "-extensions/xtalpi-pi-tools/index.ts",
-      "-extensions/pi-rules-loader/index.ts"
+      "-extensions/pi-rules-loader/index.ts",
+      "-extensions/pi-rules-loader/index.js"
     ]);
     expect(settingsManager.getGlobalSettings().packages).toEqual(["npm:user-package"]);
     expect(settingsManager.getGlobalSettings().extensions).toEqual([
@@ -206,7 +207,7 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
     ]);
   });
 
-  it("loads the managed Workspace Resources extension once instead of the identical legacy copy", async () => {
+  it.each(["ts", "js"])("loads one managed Workspace Resources extension with a matching %s projection", async (suffix) => {
     const root = await mkdtemp(join(tmpdir(), "pi67-managed-extension-"));
     temporaryDirectories.push(root);
     const cwd = join(root, "workspace");
@@ -230,12 +231,12 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
       });
     }`;
     await Promise.all([
-      writeFile(join(legacyExtension, "index.ts"), extensionSource),
-      writeFile(join(managedExtension, "index.ts"), extensionSource),
+      writeFile(join(legacyExtension, `index.${suffix}`), extensionSource),
+      writeFile(join(managedExtension, `index.${suffix}`), extensionSource),
       writeFile(join(managedPackage, "package.json"), JSON.stringify({
         name: "pi-workspace-resources",
         version: "0.15.8",
-        pi: { extensions: ["./extensions/pi-rules-loader/index.ts"] }
+        pi: { extensions: [`./extensions/pi-rules-loader/index.${suffix}`] }
       }))
     ]);
     const settingsManager = createDesktopPackageSettingsView(SettingsManager.inMemory(), {
@@ -246,7 +247,7 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
     const services = await createAgentSessionServices({ cwd, agentDir, settingsManager });
 
     expect(services.resourceLoader.getExtensions().extensions.map((extension) => extension.resolvedPath))
-      .toEqual([join(managedExtension, "index.ts")]);
+      .toEqual([join(managedExtension, `index.${suffix}`)]);
     expect(services.resourceLoader.getExtensions().errors).toEqual([]);
   });
 
@@ -266,7 +267,9 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
       packages: [workspaceResources, openViking],
       extensions: [
         "-extensions/pi-rules-loader/index.ts",
-        "-extensions/pi67-openviking/index.ts"
+        "-extensions/pi-rules-loader/index.js",
+        "-extensions/pi67-openviking/index.ts",
+        "-extensions/pi67-openviking/index.js"
       ]
     });
     expect(settingsManager.getGlobalSettings().extensions).toBeUndefined();

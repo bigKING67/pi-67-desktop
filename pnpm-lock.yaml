@@ -74,6 +74,9 @@ importers:
       semver:
         specifier: 7.7.4
         version: 7.7.4
+      tsdown:
+        specifier: 0.22.13
+        version: 0.22.13(oxc-resolver@11.24.2)(typescript@7.0.2)
       typescript:
         specifier: 7.0.2
         version: 7.0.2

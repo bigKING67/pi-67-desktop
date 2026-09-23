@@ -28,7 +28,8 @@ import {
   copyCapabilityEntry as copyEntry,
   writeCapabilityPackageManifest as writePackageManifest
 } from "./prepared-capability-files.mjs";
-import { assertPreparedLocalModuleClosure } from "./prepared-module-closure.mjs";
+import { prepareOpenVikingPiExtension } from "./prepare-openviking-extension.mjs";
+import { compileOwnedExtension } from "./compile-owned-extension.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const lockPath = resolve(repositoryRoot, "eng/capabilities/capability-sources.lock.json");
@@ -105,7 +106,7 @@ export async function prepareDesktopCapabilities() {
     lock.sources.find((item) => item.id === "pi-workspace-resources"),
     skillPackOverlays
   ));
-  entries.push(await prepareOpenVikingPiExtension(
+  entries.push(await prepareOpenVikingPackage(
     sources.get("openviking-pi-extension"),
     lock.sources.find((item) => item.id === "openviking-pi-extension")
   ));
@@ -180,6 +181,11 @@ async function prepareWorkspaceResources(sourceRoot, source, skillPackOverlays) 
       join(destination, "extensions", extension.id),
       join(sourceRoot, "extensions")
     );
+    await compileOwnedExtension({
+      sourceRoot,
+      entryPath: `extensions/${extension.id}/index.ts`,
+      destination: join(destination, "extensions", extension.id)
+    });
   }
   const overlaySkillRoots = new Map();
   for (const overlay of skillPackOverlays) {
@@ -214,11 +220,12 @@ async function prepareWorkspaceResources(sourceRoot, source, skillPackOverlays) 
     .sort();
   await writePackageManifest(destination, {
     name: "@pi67/bundled-workspace-resources",
+    type: "module",
     version: source.version,
     private: true,
     desktopMigration: { legacyRulesLoaderTreeSha256 },
     pi: {
-      extensions,
+      extensions: extensions.map((path) => `${path}/index.js`),
       skills: skillNames.map((name) => `skills/${name}`),
       prompts
     }
@@ -237,51 +244,10 @@ async function prepareWorkspaceResources(sourceRoot, source, skillPackOverlays) 
   );
 }
 
-export async function prepareOpenVikingPiExtension(
-  sourceRoot, source, destination = join(outputRoot, "packages", source.id)
-) {
-  await copyAllowed(sourceRoot, destination, [
-    "UPSTREAM.md",
-    "archive-tool-support.ts",
-    "client.ts",
-    "client-contracts.ts",
-    "config.json",
-    "config.ts",
-    "desktop-commit-outcome.ts",
-    "desktop-memory-commit.ts",
-    "diagnostics.ts",
-    "index.ts",
-    "lib",
-    "managed-connection.ts",
-    "managed-extension.ts",
-    "memory-owner-policy.ts",
-    "package.json",
-    "private-uri-policy.ts",
-    "recall.ts",
-    "recall-timing.ts",
-    "recall-feedback.ts",
-    "recall-tool-policy.ts",
-    "recall-tool-support.ts",
-    "runtime-privacy.ts",
-    "scoped-pending-queue.ts",
-    "shared",
-    "sync.ts",
-    "takeover.ts",
-    "tool-result.ts",
-    "tools.ts"
-  ]);
-  await assertPreparedLocalModuleClosure(destination, "index.ts");
-  await assertPreparedLocalModuleClosure(destination, "managed-extension.ts");
-  const packageManifest = JSON.parse(await readFile(join(destination, "package.json"), "utf8"));
-  if (packageManifest.version !== source.version || packageManifest.pi?.extensions?.[0] !== "./index.ts") {
-    throw new Error("Bundled OpenViking Pi Extension does not match its Desktop source lock.");
-  }
-  return catalogEntry(
-    source,
-    "packages/openviking-pi-extension",
-    ["extension", "context", "memory", "experience"],
-    source.includedExtensions
-  );
+async function prepareOpenVikingPackage(sourceRoot, source) {
+  await prepareOpenVikingPiExtension(sourceRoot, source, join(outputRoot, "packages", source.id));
+  return catalogEntry(source, "packages/openviking-pi-extension",
+    ["extension", "context", "memory", "experience"], source.includedExtensions);
 }
 
 async function prepareBrowser67(sourceRoot, source, npmCommand) {

@@ -1776,6 +1776,19 @@ revision-fenced `provider.configuration.save` 写 `models.json`；可选新凭�
 `provider.credential.store` 写 `auth.json`。后一步失败时前一步保持为可见的未认证 Provider，
 不能伪装成多文件原子成功。已有模型、未知自定义 API 和 write-only Header 不因发现被覆盖。
 
+## Desktop-owned extension build boundary
+
+Capability preparation compiles only the locked first-party rules loader and OpenViking
+entry into ESM `index.js`, declared explicitly in their prepared Pi package manifests.
+The locked source tree and its provenance stay unchanged. OpenViking bundles its exact
+TypeBox dependency and retains its MIT license; generated entries have only Node built-in
+runtime imports. Generated JS, manifests and license bytes participate in the existing
+prepared tree hashes. A catalog revision invalidates older prepared capability output.
+Pi ResourceLoader remains the sole extension loader; user and third-party extensions
+retain Pi's supported loading path. Desktop's Session-only settings exclude both `.ts`
+and `.js` shared projections of these owned entries, preserving one canonical owner
+without modifying user settings or resources.
+
 ## Startup and recovery
 
 1. Main 注册 secure `app` scheme 并创建窗口；Welcome 不启动 Agent Host。
