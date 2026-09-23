@@ -13,7 +13,7 @@ import {
   TriangleAlert,
   Wrench
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import piIconUrl from "../assets/pi-icon-64.png";
 import { useAppStore } from "../app/app-store.js";
 import {
@@ -108,8 +108,21 @@ export function TitleBar({
   const runtime = selectedTaskIsLive || (selectedTaskOwnsLiveWorkspace && sessionTransitionPending)
     ? liveRuntime
     : selectedTask?.runtime ?? liveRuntime;
+  const switchFeedbackKey = runtime.phase === "ready"
+    && (runtime.detail === "已切换到对话" || /^已切换至「.*」$/u.test(runtime.detail))
+    ? `${selectedTask?.id ?? sessionId}:${runtime.detail}`
+    : undefined;
+  const [expiredSwitchFeedback, setExpiredSwitchFeedback] = useState<string>();
+  useEffect(() => {
+    setExpiredSwitchFeedback(undefined);
+    if (!switchFeedbackKey) return;
+    const timeout = window.setTimeout(() => setExpiredSwitchFeedback(switchFeedbackKey), 3_000);
+    return () => window.clearTimeout(timeout);
+  }, [switchFeedbackKey]);
   const status = statusPresentation(
-    runtime,
+    switchFeedbackKey && expiredSwitchFeedback === switchFeedbackKey
+      ? { ...runtime, detail: "Pi SDK 已就绪" }
+      : runtime,
     selectedTaskIsLive ? operation : undefined,
     selectedTaskIsLive ? operationDetail : undefined
   );
@@ -233,7 +246,7 @@ export function TitleBar({
             className={`${styles.status} ${styles[status.tone]!}`}
             aria-label={messages.shell.currentStatus(status.label)}
             data-runtime-phase={runtime.phase}
-            title={status.label}
+            title={status.label === "就绪" ? runtime.detail : status.label}
           >
             <StatusIcon kind={status.icon} {...(status.spinning === undefined ? {} : { spinning: status.spinning })} />
             <span>{status.label}</span>
@@ -313,7 +326,11 @@ function statusPresentation(
   if (runtime.phase === "starting" || runtime.phase === "busy") {
     return { label: runtime.detail, tone: "accent", icon: "active", spinning: true };
   }
-  if (runtime.phase === "ready") return { label: runtime.detail, tone: "success", icon: "ready" };
+  if (runtime.phase === "ready") return {
+    label: runtime.detail === "Pi SDK 已就绪" ? "就绪" : runtime.detail,
+    tone: "neutral",
+    icon: "ready"
+  };
   return { label: runtime.detail, tone: "neutral", icon: "idle" };
 }
 

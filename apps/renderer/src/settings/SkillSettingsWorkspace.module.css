@@ -83,14 +83,14 @@
 
 .packCopy strong {
   color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 650;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .packCopy small,
 .packCopy span {
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   line-height: 1.45;
 }
 
@@ -103,8 +103,8 @@
   border-radius: 999px;
   background: var(--surface-muted);
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 620;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   white-space: nowrap;
 }
 
@@ -129,8 +129,8 @@
   border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 
 .packUpdateButton[data-hovered] {
@@ -189,8 +189,8 @@
   border-radius: 999px;
   background: var(--surface-muted);
   color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 620;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 
 .detailStatus[data-status="ready"] {
@@ -214,7 +214,7 @@
 
 .checkedAt {
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   white-space: nowrap;
 }
 
@@ -260,7 +260,7 @@
   background: transparent;
   color: var(--text-primary);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--font-size-interface);
 }
 
 .skillSearch input::placeholder {
@@ -280,7 +280,7 @@
   display: block;
   margin-top: 2px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
 }
 
@@ -290,7 +290,7 @@
   margin-top: 2px;
   overflow: hidden;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -314,13 +314,13 @@
 
 .dialog h2 {
   color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 680;
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-semibold);
 }
 
 .dialog > p {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-interface);
   line-height: 1.55;
 }
 
@@ -340,7 +340,7 @@
   gap: 12px;
   padding: 9px 12px;
   border-bottom: 1px solid var(--border);
-  font-size: 12px;
+  font-size: var(--font-size-support);
 }
 
 .updateSummary > div:last-child {
@@ -364,7 +364,7 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--danger) 8%, transparent);
   color: var(--danger);
-  font-size: 12px;
+  font-size: var(--font-size-support);
 }
 
 .dialogActions {

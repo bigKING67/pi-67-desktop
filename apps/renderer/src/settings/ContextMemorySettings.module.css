@@ -55,7 +55,7 @@
 
 .projectSelectLabel {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .projectSelectTrigger {
@@ -116,7 +116,7 @@
 
 .projectSelectOption small {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .projectSelectOption[data-hovered],
@@ -165,9 +165,9 @@
 }
 
 .privacyIdentity { display: grid; min-width: 0; gap: 2px; }
-.privacyIdentity strong { color: var(--text-primary); font-size: 13px; font-weight: 630; }
-.privacyIdentity strong small { margin-left: 8px; color: var(--text-secondary); font-size: 12px; font-weight: 400; }
-.privacyIdentity > span, .note, .details { color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.privacyIdentity strong { color: var(--text-primary); font-size: var(--font-size-interface); font-weight: var(--font-weight-semibold); }
+.privacyIdentity strong small { margin-left: 8px; color: var(--text-secondary); font-size: var(--font-size-support); font-weight: var(--font-weight-regular); }
+.privacyIdentity > span, .note, .details { color: var(--text-secondary); font-size: var(--font-size-support); line-height: 1.5; }
 .note { margin: 0; }
 .details { margin-top: 24px; }
 .details summary { width: fit-content; cursor: pointer; color: var(--text-primary); }

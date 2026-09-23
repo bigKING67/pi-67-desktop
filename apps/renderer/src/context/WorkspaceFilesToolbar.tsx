@@ -1,5 +1,5 @@
-import { ChevronDown, FilePlus2, FolderPlus, LoaderCircle, Plus, RefreshCw, Search } from "lucide-react";
-import { Button, Menu, MenuItem, MenuTrigger, Popover } from "react-aria-components";
+import { ChevronDown, FilePlus2, FolderPlus, LoaderCircle, Plus, RefreshCw, Search, ListFilter } from "lucide-react";
+import { Button, Dialog, DialogTrigger, Menu, MenuItem, MenuTrigger, Popover } from "react-aria-components";
 import type { FormEvent } from "react";
 
 export function WorkspaceFilesToolbar({
@@ -41,14 +41,28 @@ export function WorkspaceFilesToolbar({
         </button>
       </form>
       <div className="inspector-files-toolbar">
-        <label title="在文件树和搜索结果中显示依赖与生成目录">
-          <input
-            checked={includeGenerated}
-            type="checkbox"
-            onChange={(event) => onIncludeGeneratedChange(event.target.checked)}
-          />
-          显示依赖/生成目录
-        </label>
+        <DialogTrigger>
+          <Button
+            aria-label="文件筛选"
+            className="inspector-filter-trigger"
+            data-active={includeGenerated || undefined}
+          >
+            <ListFilter aria-hidden="true" size={14} />
+            筛选{includeGenerated ? " · 1" : ""}
+          </Button>
+          <Popover className="inspector-file-menu-popover" placement="bottom start" offset={4}>
+            <Dialog aria-label="文件筛选" className="inspector-filter-dialog">
+              <label>
+                <input
+                  checked={includeGenerated}
+                  type="checkbox"
+                  onChange={(event) => onIncludeGeneratedChange(event.target.checked)}
+                />
+                显示依赖/生成目录
+              </label>
+            </Dialog>
+          </Popover>
+        </DialogTrigger>
         <div className="inspector-files-toolbar-actions">
           <MenuTrigger>
             <Button

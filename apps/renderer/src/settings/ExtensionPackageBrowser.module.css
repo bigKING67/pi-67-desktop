@@ -56,8 +56,8 @@
   background: color-mix(in srgb, var(--info) 5%, transparent);
   color: var(--info);
   cursor: pointer;
-  font-size: 11px;
-  font-weight: 650;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   white-space: nowrap;
 }
 

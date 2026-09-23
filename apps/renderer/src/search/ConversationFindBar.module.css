@@ -23,14 +23,14 @@
   outline: 0;
   background: transparent;
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-interface);
 }
 
 .bar span {
   max-width: 150px;
   overflow: hidden;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

@@ -15,7 +15,7 @@
   border-radius: 7px;
   background: var(--surface-muted);
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   text-align: left;
 }
 
@@ -104,8 +104,8 @@
 .sectionHeader {
   padding: 5px 7px 3px;
   color: var(--text-tertiary);
-  font-size: 9px;
-  font-weight: 650;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.04em;
 }
 
@@ -149,19 +149,19 @@
 }
 
 .option strong {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .option small {
   color: var(--text-tertiary);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
 }
 
 .option em {
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   font-style: normal;
 }
 

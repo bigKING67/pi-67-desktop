@@ -78,7 +78,7 @@ test("stops a running task from its conversation row without deleting Pi JSONL h
   expect((await recordedCommandDetails(page)).filter((command) => command.type === "conversation.archive"))
     .toHaveLength(0);
   await expect(page.getByRole("heading", { name: "未命名对话", exact: true })).toBeVisible();
-  await expect(page.getByText("对话当前未在运行，打开后可继续。", {
+  await expect(page.getByText("打开对话，继续之前的工作。", {
     exact: true
   })).toBeVisible();
   await expect(page.getByRole("button", { name: "打开对话", exact: true })).toBeVisible();

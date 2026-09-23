@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Root } from "mdast";
 import type { Plugin } from "unified";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Children, isValidElement, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useCopyFeedback } from "../clipboard/use-copy-feedback.js";
@@ -62,14 +62,16 @@ export function MarkdownView({ children, mode = "settled", onOpenWorkspacePath }
       }
       return <span className={`${styles.link} ${styles.disabled}`}>{linkChildren}</span>;
     },
-    code: ({ className, children: codeChildren }) => {
-      const code = codeText(codeChildren).replace(/\n$/, "");
-      const language = /language-([\w-]+)/.exec(className ?? "")?.[1];
-      return className
-        ? streaming
-          ? <StreamingCodeBlock code={code} {...(language === undefined ? {} : { language })} />
-          : <CodeBlock code={code} {...(language === undefined ? {} : { language })} />
-        : <code>{codeChildren}</code>;
+    pre: ({ children: blockChildren }) => {
+      const child = Children.toArray(blockChildren)[0];
+      if (!isValidElement<{ children?: ReactNode; className?: string }>(child)) {
+        return <pre>{blockChildren}</pre>;
+      }
+      const code = codeText(child.props.children).replace(/\n$/, "");
+      const language = /language-([\w-]+)/.exec(child.props.className ?? "")?.[1];
+      return streaming
+        ? <StreamingCodeBlock code={code} {...(language === undefined ? {} : { language })} />
+        : <CodeBlock code={code} {...(language === undefined ? {} : { language })} />;
     },
     img: ({ alt, src }) => (
       <BlockedMarkdownImage

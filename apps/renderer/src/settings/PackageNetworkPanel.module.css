@@ -14,8 +14,8 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   color: var(--danger);
-  font-size: 10px;
-  font-weight: 650;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .readiness[data-ready="true"] {
@@ -51,8 +51,8 @@
 .form label > span,
 .form legend {
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 620;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .form select,
@@ -66,7 +66,7 @@
   outline: 0;
   background: var(--surface-muted);
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: var(--font-size-interface);
 }
 
 .form select:focus-visible,
@@ -108,7 +108,7 @@
 
 .checkedAt {
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 @media (max-width: 720px) {

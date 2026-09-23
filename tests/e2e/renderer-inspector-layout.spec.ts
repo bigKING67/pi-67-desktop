@@ -131,7 +131,7 @@ test("keeps all five Inspector icon-label tabs equal, visible, and single-line",
     };
   });
   expect(drawerGeometry.position).toBe("fixed");
-  expect(drawerGeometry.width).toBeGreaterThanOrEqual(359);
+  expect(drawerGeometry.width).toBe(320);
   expect(drawerGeometry.right).toBeLessThanOrEqual(1_121);
   expect(drawerGeometry.rootScrollWidth).toBeLessThanOrEqual(drawerGeometry.rootClientWidth + 1);
 });

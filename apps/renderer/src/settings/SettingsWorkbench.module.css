@@ -32,8 +32,8 @@
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 620;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
   text-align: left;
 }
 
@@ -81,7 +81,7 @@
   background: transparent;
   color: var(--text-primary);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-support);
 }
 
 .searchInput::placeholder {
@@ -136,8 +136,8 @@
 .navigationGroupLabel {
   padding: 0 9px;
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 650;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.01em;
 }
 
@@ -153,13 +153,13 @@
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 560;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-medium);
   text-align: left;
 }
 
 .navigationItem.selected {
-  font-weight: 650;
+  font-weight: var(--font-weight-medium);
   background: color-mix(in srgb, var(--text-primary) 9%, transparent);
   color: var(--text-primary);
 }
@@ -173,11 +173,11 @@
 
 .emptySearch strong {
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-interface);
 }
 
 .emptySearch span {
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
 }
 
@@ -188,8 +188,8 @@
   border: 0;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 650;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 
 .content {
@@ -216,7 +216,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-support);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -284,7 +284,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-support);
 }
 
 .themeSegmented button[data-hovered] {
@@ -329,7 +329,7 @@
   overflow: hidden;
   color: var(--text-secondary);
   font-family: var(--font-code);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   font-variant-ligatures: none;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -362,14 +362,14 @@
 
 .mobileNavigationTrigger small {
   color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 650;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .mobileNavigationTrigger strong {
   overflow: hidden;
-  font-size: 13px;
-  font-weight: 650;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -405,8 +405,8 @@
 .mobileNavigationHeader {
   padding: 3px 9px;
   color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 680;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .mobileNavigationItem {
@@ -418,14 +418,14 @@
   padding: 0 9px;
   border-radius: 7px;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   outline: none;
 }
 
 .mobileNavigationItem[data-current="true"] {
   background: color-mix(in srgb, var(--text-primary) 9%, transparent);
   color: var(--text-primary);
-  font-weight: 650;
+  font-weight: var(--font-weight-semibold);
 }
 
 .mobileNavigationItem:not([data-current="true"])[data-focused],

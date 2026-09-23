@@ -40,13 +40,13 @@
 
 .header h2 {
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
 }
 
 .header p {
   margin-top: 2px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-support);
 }
 
 .close {
@@ -92,14 +92,14 @@
 
 .row strong {
   color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .row small {
   overflow: hidden;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -113,7 +113,7 @@
   background: var(--surface-muted);
   color: var(--text-secondary);
   font-family: var(--font-code);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   text-align: center;
   white-space: nowrap;
 }
@@ -122,7 +122,7 @@
   padding: 10px 16px 12px;
   border-top: 1px solid var(--border);
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
 }
 

@@ -53,15 +53,15 @@
 .timelineSummaryCopy strong {
   overflow: hidden;
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 620;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .timelineSummaryCopy small {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   white-space: nowrap;
 }
 
@@ -139,8 +139,8 @@
 .stepCopy strong {
   overflow: hidden;
   color: var(--text-tertiary);
-  font-size: 12px;
-  font-weight: 540;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-medium);
   line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -149,7 +149,7 @@
 .timelineStep[data-step-status="pending"] .stepCopy strong,
 .timelineStep[data-step-status="running"] .stepCopy strong {
   color: var(--text-secondary);
-  font-weight: 620;
+  font-weight: var(--font-weight-semibold);
 }
 
 .timelineStep[data-step-status="failed"] .stepCopy strong {
@@ -159,7 +159,7 @@
 .stepCopy small {
   overflow-wrap: anywhere;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
 }
 
@@ -167,7 +167,7 @@
   padding-top: 1px;
   color: var(--text-tertiary);
   font-family: var(--font-code);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   line-height: 1.55;
 }
 
@@ -180,7 +180,7 @@
   margin: 1px 0 3px 25px;
   color: var(--text-tertiary);
   cursor: pointer;
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   list-style: none;
 }
 
@@ -234,8 +234,8 @@
 }
 
 .timelineSettled > summary strong {
-  font-size: 11px;
-  font-weight: 560;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-medium);
 }
 
 .timelineSettled[open] > summary {
@@ -257,15 +257,15 @@
 
 .copy strong {
   color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 620;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.45;
 }
 
 .copy small {
   overflow-wrap: anywhere;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
 }
 

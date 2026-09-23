@@ -71,15 +71,15 @@
 
 .heading strong {
   color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .status {
   width: fit-content;
   gap: 4px;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .status[data-status="implemented"] {
@@ -104,8 +104,8 @@
   justify-content: center;
   gap: 5px;
   border-radius: 7px;
-  font-size: 11px;
-  font-weight: 620;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 
 .copyButton {
@@ -126,7 +126,7 @@
 }
 
 .body > div {
-  font-size: 12px;
+  font-size: var(--font-size-support);
 }
 
 .actionRegion {
@@ -174,13 +174,13 @@
 
 .actionLabel strong {
   color: var(--text-primary);
-  font-size: 11px;
-  font-weight: 650;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .actionLabel small {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .compactActions {
@@ -214,7 +214,7 @@
   border-radius: 0 0 8px 8px;
   background: color-mix(in srgb, var(--danger) 7%, var(--surface-raised));
   color: var(--danger);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 @media (max-width: 720px) {

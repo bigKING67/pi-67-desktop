@@ -21,13 +21,13 @@
 
 .heading strong {
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--font-size-interface);
 }
 
 .heading small {
   max-width: 780px;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.55;
 }
 
@@ -54,7 +54,7 @@
   display: grid;
   gap: 6px;
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .controlRow select {
@@ -65,7 +65,7 @@
   border-radius: 8px;
   background: var(--surface);
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: var(--font-size-interface);
 }
 
 .controlRow select:focus-visible {
@@ -76,7 +76,7 @@
 
 .noModels {
   color: var(--warning);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
 }
 
@@ -90,7 +90,7 @@
   border-radius: 8px;
   background: var(--surface-muted);
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .effective svg {
@@ -110,7 +110,7 @@
   overflow: hidden;
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-interface);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -152,7 +152,7 @@
   background: var(--surface-muted);
   color: var(--text-secondary);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   font-style: normal;
 }
 
@@ -164,12 +164,12 @@
 }
 
 .presets strong {
-  font-size: 11px;
+  font-size: var(--font-size-interface);
 }
 
 .presets small {
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
 }
 
 @media (max-width: 920px) {

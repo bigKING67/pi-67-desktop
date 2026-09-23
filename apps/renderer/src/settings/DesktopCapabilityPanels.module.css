@@ -39,14 +39,14 @@
 .installDialog h2 {
   margin: -6px 0 0;
   color: var(--text-primary);
-  font-size: 20px;
+  font-size: var(--font-size-title);
   letter-spacing: -0.02em;
 }
 
 .installIntro {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   line-height: 1.6;
 }
 
@@ -56,7 +56,7 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--danger) 8%, var(--surface));
   color: var(--danger);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
 }
 
@@ -66,7 +66,7 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--warning) 9%, var(--surface));
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.55;
 }
 
@@ -106,8 +106,8 @@
   background: var(--surface-muted);
   color: var(--text-tertiary);
   font-family: var(--font-code);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .installStep[data-current="true"] .stepMarker {
@@ -131,14 +131,14 @@
 
 .installStep strong {
   color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 650;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .installStep p {
   margin: 0;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-support);
   line-height: 1.55;
 }
 
@@ -161,8 +161,8 @@
   align-items: center;
   gap: 6px;
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 620;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .inlineProgress svg {

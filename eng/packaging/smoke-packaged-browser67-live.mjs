@@ -58,7 +58,7 @@ try {
   await window.evaluate(() => window.pi67.system.connectAgentHost());
   await installWorkspaceDialogResult(application, workspace);
   await window.getByRole("button", { name: "选择工作区" }).click();
-  await window.getByLabel("当前状态：Pi SDK 已就绪")
+  await window.getByLabel("当前状态：就绪")
     .waitFor({ state: "visible", timeout: 30_000 });
 
   const mcpConfig = await readJson(`${agentDir}/mcp.json`);

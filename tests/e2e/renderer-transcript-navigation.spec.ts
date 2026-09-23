@@ -47,6 +47,13 @@ test("restores an away-from-bottom reading anchor across a Settings round trip",
   await expect.poll(() => scroller.evaluate((element) => (
     element.scrollHeight - element.clientHeight - element.scrollTop
   ))).toBeGreaterThan(400);
+  await latestButton.focus();
+  await expect(latestButton).toBeFocused();
+  await latestButton.press("Enter");
+  await expect.poll(() => scroller.evaluate((element) => (
+    element.scrollHeight - element.clientHeight - element.scrollTop
+  ))).toBeLessThanOrEqual(4);
+  await expect(latestButton).toHaveCount(0);
 });
 
 function message(id: string, text: string): FixtureMessage {

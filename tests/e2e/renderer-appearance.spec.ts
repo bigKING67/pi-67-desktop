@@ -19,8 +19,8 @@ test("preserves the workspace hierarchy in dark mode", async ({ page }, testInfo
     background: getComputedStyle(body).backgroundColor,
     foreground: getComputedStyle(body).color
   }));
-  expect(colors.background).toBe("rgb(17, 20, 18)");
-  expect(colors.foreground).toBe("rgb(240, 243, 239)");
+  expect(colors.background).toBe("rgb(10, 10, 10)");
+  expect(colors.foreground).toBe("rgb(237, 237, 237)");
   await page.screenshot({ path: testInfo.outputPath("workspace-dark.png"), animations: "disabled" });
 });
 
@@ -48,7 +48,7 @@ test("lets users persist System, Light, and Dark appearance choices", async ({ p
   await settings.getByRole("button", { name: /^浅色/u }).click();
   await expect(root).toHaveAttribute("data-theme-preference", "light");
   await expect(root).toHaveAttribute("data-theme", "light");
-  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(245, 246, 244)");
+  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(255, 255, 255)");
   expect(await page.evaluate(() => localStorage.getItem("pi67.themePreference"))).toBe("light");
   await page.screenshot({ path: testInfo.outputPath("appearance-settings-light.png"), animations: "disabled" });
 
@@ -207,8 +207,8 @@ test("renders structured Markdown without letting wide tables widen the workbenc
         "  - 记录真实使用场景",
         "- [x] 保留可验证证据",
         "",
-        "| 人群 | 场景 | 问题 | 证据 | 标题 | 正文 | 图片 | 复盘 |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| 人群 | 场景 | 问题 | 证据 | 标题 | 正文 | 图片 | 复盘 |" + " 附加维度 |".repeat(12),
+        "| --- | --- | --- | --- | --- | --- | --- | --- |" + " --- |".repeat(12),
         "| 通勤用户 | 早高峰 | 没时间护肤 | 30 天照片对比 | 油皮通勤底妆 | 步骤与数据 | 实拍对比图 | 收藏与搜索进站 |",
         "| 新手用户 | 第一次购买 | 不会选色号 | 自然光试色 | 新手选色指南 | 肤色判断方法 | 多肤色样本 | 有效评论 |",
         "",

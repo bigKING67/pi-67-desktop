@@ -103,7 +103,10 @@ test("opens Workspace files directly and keeps tree, search, and toolbar semanti
   await expect(searchTree.getByText("src/index.ts", { exact: true })).toBeVisible();
   await expect(searchTree.getByText("tests/index.ts", { exact: true })).toBeVisible();
   await expect(searchTree.getByText("node_modules/dependency/index.ts", { exact: true })).toHaveCount(0);
-  await inspector.getByRole("checkbox", { name: "显示依赖/生成目录" }).check();
+  await inspector.getByRole("button", { name: "文件筛选", exact: true }).click();
+  await page.getByRole("checkbox", { name: "显示依赖/生成目录" }).check();
+  await page.keyboard.press("Escape");
+  await expect(inspector.getByRole("button", { name: "文件筛选", exact: true })).toContainText("1");
   await expect(searchTree.getByText("node_modules/dependency/index.ts", { exact: true })).toBeVisible();
   await testInfo.attach("workspace-tree-search", {
     body: await inspector.screenshot(),

@@ -40,7 +40,7 @@ test("keeps shell ownership while quieting resting header and Composer chrome", 
   await expectRestingSearch(inspectorSearch, "rgb(255, 255, 255)");
 
   await navigationSearch.hover();
-  await expect(searchHost(navigationSearch)).toHaveCSS("border-top-color", "rgb(200, 206, 200)");
+  await expect(searchHost(navigationSearch)).toHaveCSS("border-top-color", "rgb(191, 191, 191)");
   await navigationSearch.focus();
   await expectFocusedSearch(navigationSearch, "rgb(44, 112, 201)");
   await expect(navigationSearch).toHaveCSS("outline-style", "none");
@@ -48,7 +48,7 @@ test("keeps shell ownership while quieting resting header and Composer chrome", 
 
   await inspectorSearch.hover();
   await expect(searchHost(inspectorSearch))
-    .toHaveCSS("border-top-color", "rgb(200, 206, 200)");
+    .toHaveCSS("border-top-color", "rgb(191, 191, 191)");
   await inspectorSearch.focus();
   await expectFocusedSearch(inspectorSearch, "rgb(44, 112, 201)");
 
@@ -56,8 +56,8 @@ test("keeps shell ownership while quieting resting header and Composer chrome", 
   await expect(composerShell).toHaveCSS("border-top-color", "rgb(44, 112, 201)");
   await expect(composerShell).toHaveCSS("box-shadow", /44, 112, 201/u);
   await modelControl.focus();
-  await expect(composerShell).toHaveCSS("border-top-color", "rgb(200, 206, 200)");
-  await expect(composerShell).toHaveCSS("box-shadow", /18, 27, 22/u);
+  await expect(composerShell).toHaveCSS("border-top-color", "rgb(191, 191, 191)");
+  await expect(composerShell).toHaveCSS("box-shadow", /0, 0, 0/u);
   await expect(modelControl).toHaveCSS("border-top-color", "rgb(44, 112, 201)");
   await expect(modelControl).toHaveCSS("box-shadow", /44, 112, 201/u);
 
@@ -69,8 +69,8 @@ test("keeps shell ownership while quieting resting header and Composer chrome", 
   await page.mouse.move(0, 0);
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await expectRestingSearch(navigationSearch, "rgb(24, 28, 25)");
-  await expectRestingSearch(inspectorSearch, "rgb(24, 28, 25)");
+  await expectRestingSearch(navigationSearch, "rgb(17, 17, 17)");
+  await expectRestingSearch(inspectorSearch, "rgb(17, 17, 17)");
   await expect(workspaceGroup).toHaveCSS("border-bottom-width", "0px");
   await expect(navigation.locator("header").first()).toHaveCSS("border-bottom-width", "0px");
   await expect(inspector.getByRole("tablist", { name: "任务检查器" }))

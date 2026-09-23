@@ -61,7 +61,7 @@ test("reconciles a completed Operation with its committed Assistant answer", asy
     payload: { operationId, completedAt: startedAt + 2_000 }
   }, { operationId });
   const timeline = page.locator("[data-turn-activity][data-operation-lifecycle='completed']");
-  await expect(timeline).toContainText("执行完成");
-  await expect(timeline).not.toContainText("执行未完整收口");
+  await expect(timeline).toContainText("执行已结束");
+  await expect(timeline).not.toContainText("执行已结束，未收到最终回复");
   await expect(timeline).not.toHaveAttribute("open", "");
 });

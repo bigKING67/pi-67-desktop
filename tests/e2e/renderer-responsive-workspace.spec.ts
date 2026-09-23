@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
   await installMockDesktopBridge(page);
 });
 
-test("bounds wide side columns and expands the shared conversation measure", async ({ page }, testInfo) => {
+test("bounds side columns and preserves the shared reading measure", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
@@ -28,12 +28,10 @@ test("bounds wide side columns and expands the shared conversation measure", asy
   await expect(inspector).toBeVisible();
 
   const wide = await measureWorkspace(navigation, inspector, message, composer);
-  expect(wide.navigationWidth).toBeGreaterThanOrEqual(248);
-  expect(wide.navigationWidth).toBeLessThanOrEqual(288);
-  expect(wide.inspectorWidth).toBeGreaterThanOrEqual(360);
-  expect(wide.inspectorWidth).toBeLessThanOrEqual(384);
-  expect(wide.messageWidth).toBeGreaterThanOrEqual(858);
-  expect(wide.messageWidth).toBeLessThanOrEqual(862);
+  expect(wide.navigationWidth).toBe(248);
+  expect(wide.inspectorWidth).toBe(320);
+  expect(wide.messageWidth).toBeGreaterThanOrEqual(798);
+  expect(wide.messageWidth).toBeLessThanOrEqual(802);
   expect(Math.abs(wide.messageWidth - wide.composerWidth)).toBeLessThanOrEqual(1);
 
   const wideTitleGeometry = await measurePaneTitleGeometry(page);
@@ -58,21 +56,21 @@ test("bounds wide side columns and expands the shared conversation measure", asy
   await page.getByTestId("inspector-toggle").click();
   await expect(inspector).toHaveCount(0);
   await expect(page.getByTestId("title-inspector-zone")).toHaveCount(0);
-  await expect.poll(async () => (await message.boundingBox())?.width ?? 0).toBeGreaterThan(1010);
+  await expect.poll(async () => (await message.boundingBox())?.width ?? 0).toBe(800);
   const contextHidden = await measureWorkspace(navigation, undefined, message, composer);
-  expect(contextHidden.messageWidth).toBeGreaterThan(wide.messageWidth + 150);
-  expect(contextHidden.messageWidth).toBeLessThanOrEqual(1042);
+  expect(contextHidden.messageWidth).toBe(wide.messageWidth);
+  expect(contextHidden.messageWidth).toBe(800);
   expect(Math.abs(contextHidden.messageWidth - contextHidden.composerWidth)).toBeLessThanOrEqual(1);
 
   await page.getByRole("button", { name: "隐藏对话导航" }).click();
   await expect(navigation).not.toBeVisible();
   await expect(page.getByTestId("title-navigation-zone")).toHaveCount(0);
-  await expect.poll(async () => (await message.boundingBox())?.width ?? 0).toBeGreaterThan(1110);
+  await expect.poll(async () => (await message.boundingBox())?.width ?? 0).toBe(800);
   const sidesHidden = await measureWorkspace(undefined, undefined, message, composer);
   expect(sidesHidden.workspaceClass).toContain("navigation-hidden");
-  expect(sidesHidden.conversationTrack).toBe("1120px");
-  expect(sidesHidden.messageWidth).toBeGreaterThan(contextHidden.messageWidth + 70);
-  expect(sidesHidden.messageWidth).toBeLessThanOrEqual(1122);
+  expect(sidesHidden.conversationTrack).toBe("800px");
+  expect(sidesHidden.messageWidth).toBe(contextHidden.messageWidth);
+  expect(sidesHidden.messageWidth).toBe(800);
   expect(Math.abs(sidesHidden.messageWidth - sidesHidden.composerWidth)).toBeLessThanOrEqual(1);
   expect(sidesHidden.documentScrollWidth).toBe(sidesHidden.documentClientWidth);
 
@@ -97,8 +95,8 @@ test("keeps the transcript primary at the context-drawer breakpoint", async ({ p
   await contextToggle.click();
   await expect(inspector).toBeVisible();
   await expect(page.getByTestId("title-inspector-zone")).toHaveCount(0);
-  expect((await inspector.boundingBox())?.width).toBeGreaterThanOrEqual(359);
-  expect((await inspector.boundingBox())?.width).toBeLessThanOrEqual(384);
+  expect((await inspector.boundingBox())?.width).toBe(320);
+  expect((await inspector.boundingBox())?.width).toBe(320);
   await expect(page.getByRole("tab", { name: "消息", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "关闭任务检查器抽屉" })).toBeVisible();
   const sendButton = page.getByRole("button", { name: "发送" });

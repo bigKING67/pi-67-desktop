@@ -404,7 +404,7 @@ test("projects operation activities and sends an operation-scoped abort", async 
   const completedTimeline = page.locator(
     "[data-turn-activity][data-operation-lifecycle='completed']"
   );
-  await expect(completedTimeline).toContainText("执行未完整收口 · 1 次工具调用 · 3 秒");
+  await expect(completedTimeline).toContainText("执行已结束，未收到最终回复 · 1 次工具调用 · 3 秒");
   await expect(completedTimeline).toHaveAttribute("open", "");
   await expect(completedTimeline).toContainText("分析问题");
   await expect(completedTimeline).toContainText("读取文件");

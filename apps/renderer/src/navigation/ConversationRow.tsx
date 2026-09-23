@@ -115,7 +115,7 @@ export function ConversationRow({
         type="button"
       >
         <span className={styles.conversationCopy} data-testid="conversation-copy">
-          <strong>{row.title}</strong>
+          <strong title={row.title}>{row.title}</strong>
           <small>{row.meta}</small>
         </span>
         <span className={styles.conversationIndicators}>

@@ -7,7 +7,7 @@
   border: 1px dashed var(--border);
   border-radius: var(--radius-panel);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   text-align: center;
 }
 

@@ -9,7 +9,7 @@
   border-top: 1px solid var(--border);
 }
 
-.scope legend { color: var(--text-primary); font-weight: 600; }
+.scope legend { color: var(--text-primary); font-weight: var(--font-weight-semibold); }
 .scope p { overflow-wrap: anywhere; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .fields { display: grid; gap: 10px; min-width: 0; }
@@ -23,7 +23,7 @@
   background: var(--surface);
   color: var(--text-secondary);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-support);
   cursor: pointer;
 }
 .actions > button:hover,
@@ -32,4 +32,4 @@
 .fields > button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .actions > button:disabled,
 .fields > button:disabled { background: var(--surface-disabled); color: var(--text-disabled); cursor: not-allowed; }
-.origin { grid-area: origin; margin: 0; padding: 8px 16px; color: var(--text-secondary); font-size: 12px; overflow-wrap: anywhere; }
+.origin { grid-area: origin; margin: 0; padding: 8px 16px; color: var(--text-secondary); font-size: var(--font-size-support); overflow-wrap: anywhere; }

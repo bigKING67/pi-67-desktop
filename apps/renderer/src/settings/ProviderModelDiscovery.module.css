@@ -29,7 +29,7 @@
 .heading strong,
 .results > header strong {
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-interface);
 }
 
 .heading small,
@@ -41,8 +41,8 @@
 .modelOption small,
 .openAiChoices small {
   color: var(--text-tertiary);
-  font-size: 9px;
-  font-weight: 450;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
   line-height: 1.45;
 }
 
@@ -55,8 +55,8 @@
 .credentialField > label,
 .protocolGroup > label {
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .secretInput {
@@ -73,7 +73,7 @@
   border-radius: 7px;
   background: var(--surface);
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-interface);
 }
 
 .secretInput input:focus {
@@ -157,7 +157,7 @@
 .modelOption strong,
 .openAiChoices strong {
   color: var(--text-primary);
-  font-size: 10px;
+  font-size: var(--font-size-interface);
 }
 
 .checkIndicator,
@@ -215,8 +215,8 @@
   padding-top: 10px;
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 10px;
-  font-weight: 600;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .openAiChoices {
@@ -242,7 +242,7 @@
 .error,
 .warning {
   margin: 0;
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
 }
 
@@ -321,11 +321,11 @@
 }
 
 .conflicts strong {
-  font-size: 10px;
+  font-size: var(--font-size-interface);
 }
 
 .conflicts small {
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
 }
 

@@ -1,4 +1,4 @@
-import { Brain, Sparkles } from "lucide-react";
+import { SlidersHorizontal, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAppStore } from "../app/app-store.js";
 import { useCommittedConversationStreaming } from "../conversation/conversation-store.js";
@@ -146,7 +146,7 @@ export function ComposerRuntimeControls({ submitting }: { submitting: boolean })
           modelLabel,
           thinkingOptions.map((option) => option.label)
         )}
-        icon={<Brain aria-hidden="true" size={14} />}
+        icon={<SlidersHorizontal aria-hidden="true" size={14} />}
         isOpen={thinkingPickerOpen}
         onOpenChange={setThinkingPickerOpen}
         onSelectionChange={(level) => void setSessionThinkingLevel(level)}

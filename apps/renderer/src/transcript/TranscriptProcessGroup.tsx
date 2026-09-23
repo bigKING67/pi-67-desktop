@@ -20,6 +20,7 @@ import type {
   TranscriptProcessItem,
   TranscriptRow
 } from "./transcript-rows.js";
+import { processItemUnsuccessful } from "./transcript-rows.js";
 import styles from "./TranscriptProcessGroup.module.css";
 
 type ProcessGroupRow = Extract<TranscriptRow, { kind: "process-group" }>;
@@ -53,15 +54,22 @@ export function TranscriptProcessGroup({
   const outcome = resolveProcessGroupOutcome(row, operation, running, unsuccessfulToolCount);
   const autoExpanded = processOutcomeAutoExpanded(outcome);
   const [open, setOpen] = useState(autoExpanded);
+  const [onlyUnsuccessful, setOnlyUnsuccessful] = useState(false);
   const previousOutcome = useRef(outcome);
 
   useEffect(() => {
-    if (previousOutcome.current !== outcome) setOpen(autoExpanded);
+    if (previousOutcome.current !== outcome) {
+      setOpen(autoExpanded);
+      setOnlyUnsuccessful(false);
+    }
     previousOutcome.current = outcome;
   }, [autoExpanded, outcome]);
 
   useEffect(() => {
-    if (highlighted) setOpen(true);
+    if (highlighted) {
+      setOpen(true);
+      setOnlyUnsuccessful(false);
+    }
   }, [highlighted]);
 
   const label = running && operation
@@ -84,6 +92,11 @@ export function TranscriptProcessGroup({
     ? `${toolCount} 次工具调用${unsuccessfulToolCount > 0 ? ` · ${unsuccessfulToolCount} 个步骤未成功` : ""}`
     : `${Math.max(1, stepCount)} 个步骤`;
 
+  const visibleItems = onlyUnsuccessful ? row.items.filter(processItemUnsuccessful) : row.items;
+  const visibleTimeline = onlyUnsuccessful
+    ? supplementalTimeline.filter((item) => item.kind === "tool" && isUnsuccessfulToolStatus(item.tool.status))
+    : supplementalTimeline;
+
   return (
     <details
       className={`${styles.group} ${outcome === "failed" ? styles.failed : ""} ${isWarningOutcome(outcome) ? styles.warning : ""} ${highlighted ? styles.highlighted : ""}`}
@@ -96,7 +109,10 @@ export function TranscriptProcessGroup({
       data-transcript-row-key={row.key}
       data-turn-activity={operation ? "true" : undefined}
       open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
+      onToggle={(event) => {
+        setOpen(event.currentTarget.open);
+        if (!event.currentTarget.open) setOnlyUnsuccessful(false);
+      }}
       tabIndex={-1}
     >
       <summary>
@@ -109,11 +125,29 @@ export function TranscriptProcessGroup({
             {!running ? " · " : ""}{countSummary}{duration ? ` · ${duration}` : ""}
           </small>
         </span>
+        {!running && unsuccessfulToolCount > 0 ? (
+          <button
+            className={styles.issueAction}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setOnlyUnsuccessful(true);
+              setOpen(true);
+            }}
+            type="button"
+          >查看未成功步骤</button>
+        ) : null}
         <ChevronRight className={styles.chevron} size={14} aria-hidden="true" />
       </summary>
+      {open && onlyUnsuccessful ? (
+        <div className={styles.filterNotice}>
+          <span>正在查看未成功步骤</span>
+          <button onClick={() => setOnlyUnsuccessful(false)} type="button">显示全部步骤</button>
+        </div>
+      ) : null}
       {hasBody ? (
         <ol className={styles.steps} aria-label="模型执行步骤">
-          {row.items.map((item) => (
+          {visibleItems.map((item) => (
             <ProcessItem
               {...(item.kind === "tool" && toolAuthorizations.has(item.call.id)
                 ? { authorization: toolAuthorizations.get(item.call.id)! }
@@ -122,12 +156,12 @@ export function TranscriptProcessGroup({
               key={item.key}
             />
           ))}
-          {supplementalThinking ? (
+          {supplementalThinking && !onlyUnsuccessful ? (
             <li className={styles.step} data-process-step="reasoning">
               <Reasoning text={supplementalThinking} streaming />
             </li>
           ) : null}
-          {supplementalTimeline.map((item) => item.kind === "tool" ? (
+          {visibleTimeline.map((item) => item.kind === "tool" ? (
             <li className={styles.step} data-process-step="tool" key={item.key}>
               <ToolCard
                 {...(item.authorization === undefined ? {} : { authorization: item.authorization })}
@@ -327,11 +361,11 @@ function processOutcomeLabel(outcome: ProcessGroupOutcome): string {
   switch (outcome) {
     case "running": return "正在执行";
     case "completed":
-    case "completed-with-warnings": return "执行完成";
+    case "completed-with-warnings": return "执行已结束";
     case "failed": return "执行失败";
     case "cancelled": return "执行已取消";
     case "lost": return "执行连接中断";
-    case "incomplete": return "执行未完整收口";
+    case "incomplete": return "执行已结束，未收到最终回复";
   }
 }
 

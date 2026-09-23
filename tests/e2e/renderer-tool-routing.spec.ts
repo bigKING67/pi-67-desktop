@@ -50,7 +50,9 @@ test("shows a Claude-style Bash alias as failed and keeps the exact-tool recover
   await expect(page.getByText("Tool execution failed.", { exact: true })).toHaveCount(0);
 });
 
-test("collapses a recovered Tool failure after a final answer", async ({ page }) => {
+for (const theme of ["light", "dark"] as const) {
+test(`inspects recovered Tool failures in ${theme}`, async ({ page }) => {
+  await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
   await page.goto("/");
   await attachMockAgent(page, [
     {
@@ -76,6 +78,17 @@ test("collapses a recovered Tool failure after a final answer", async ({ page })
       parts: [{ type: "text", text: "结果引用已过期。" }]
     },
     {
+      id: "assistant-successful-call",
+      role: "assistant",
+      parts: [{ type: "tool-call", id: "successful-call", name: "read", status: "completed" }]
+    },
+    {
+      id: "successful-call",
+      role: "tool",
+      toolName: "read",
+      parts: [{ type: "text", text: "已获取备用资料。" }]
+    },
+    {
       id: "assistant-recovered-final",
       role: "assistant",
       parts: [{ type: "text", text: "已通过其他只读来源完成回答。" }]
@@ -85,15 +98,34 @@ test("collapses a recovered Tool failure after a final answer", async ({ page })
 
   const process = page.getByTestId("transcript-process-group");
   await expect(process).toBeVisible();
-  await expect(process.locator(":scope > summary")).toContainText("执行完成 · 1 次工具调用 · 1 个步骤未成功");
+  await expect(process.locator(":scope > summary")).toContainText("执行已结束 · 2 次工具调用 · 1 个步骤未成功");
   await expect(process).not.toHaveAttribute("open", "");
   await expect(page.getByText("已通过其他只读来源完成回答。", { exact: true })).toBeVisible();
   await expect(page.getByText("结果引用已过期。", { exact: true })).not.toBeVisible();
 
+  const inspect = process.getByRole("button", { name: "查看未成功步骤" });
+  await inspect.focus();
+  await inspect.press("Enter");
+  await expect(process).toHaveAttribute("open", "");
+  await expect(process.locator('[data-tool-status="completed"]')).toHaveCount(0);
+  await page.screenshot({ path: `artifacts/visual-review/execution-summary/${theme}.png`, animations: "disabled" });
+  await process.getByRole("button", { name: "显示全部步骤" }).click();
+  await expect(process.locator('[data-tool-status="completed"]')).toBeVisible();
+  await inspect.click();
+  await expect(process.locator('[data-tool-status="completed"]')).toHaveCount(0);
   await process.locator(":scope > summary").click();
+  await expect(process).not.toHaveAttribute("open", "");
+  await process.locator(":scope > summary").click();
+  await expect(process.locator('[data-tool-status="completed"]')).toBeVisible();
+  await page.setViewportSize({ width: 700, height: 800 });
+  await inspect.click();
+  await expect(inspect).toBeVisible();
+  await page.screenshot({ path: `artifacts/visual-review/execution-summary/${theme}-narrow.png`, animations: "disabled" });
   await expect(page.getByText("Stored result was unavailable.", { exact: true })).toBeVisible();
   await expect(page.getByText("结果引用已过期。", { exact: true })).toBeVisible();
 });
+
+}
 
 test("does not render an empty reasoning disclosure when the provider exposes only a signature", async ({ page }) => {
   await page.goto("/");
@@ -184,7 +216,7 @@ test("keeps the settled process collapsed and renders Tool output as a bounded l
 
   const process = page.getByTestId("transcript-process-group");
   await expect(process).toBeVisible();
-  await expect(process.locator(":scope > summary")).toContainText("执行完成 · 1 次工具调用");
+  await expect(process.locator(":scope > summary")).toContainText("执行已结束 · 1 次工具调用");
   await expect(page.getByText("杭州今天有雷阵雨。", { exact: true })).toBeVisible();
   await expect(page.getByText(rawResult, { exact: true })).not.toBeVisible();
 
@@ -282,7 +314,7 @@ test("expands the current execution process and collapses it when the operation 
   }, { operationId });
 
   await expect(process).not.toHaveAttribute("open", "");
-  await expect(process.locator(":scope > summary")).toContainText("执行完成 · 1 次工具调用");
+  await expect(process.locator(":scope > summary")).toContainText("执行已结束 · 1 次工具调用");
   await expect(page.getByText("export const ready = true;", { exact: true })).not.toBeVisible();
 });
 

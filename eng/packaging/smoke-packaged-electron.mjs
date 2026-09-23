@@ -363,7 +363,7 @@ try {
   } catch (error) {
     throw new Error(`Packaged task did not resume after reload: ${JSON.stringify(await inspectRendererSurface(window))}`, { cause: error });
   }
-  await window.getByLabel("当前状态：Pi SDK 已就绪").waitFor({ state: "visible", timeout: 30_000 });
+  await window.getByLabel("当前状态：就绪").waitFor({ state: "visible", timeout: 30_000 });
   await verifyPackagedProjectedImage(window, "warm Restore Task");
   console.info("Packaged smoke stage: warm reload restored; closing before cold restart.");
   const warmApplication = application;

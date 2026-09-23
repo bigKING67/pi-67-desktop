@@ -249,7 +249,7 @@ async function prepareWindow(application) {
   await window.waitForLoadState("domcontentloaded");
   const workspacePicker = window.getByRole("button", { name: "选择工作区" });
   const openConversation = window.getByRole("button", { name: "打开对话" });
-  const readyStatus = window.getByLabel("当前状态：Pi SDK 已就绪");
+  const readyStatus = window.getByLabel("当前状态：就绪");
   let initialState;
   try {
     await waitForAsync(async () => {

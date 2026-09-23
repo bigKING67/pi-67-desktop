@@ -19,9 +19,9 @@
 .archiveDialog h2 {
   margin: 0;
 }
-.dialog p { color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+.dialog p { color: var(--text-secondary); font-size: var(--font-size-support); line-height: 1.6; }
 .field { display: grid; gap: 6px; }
-.field label { color: var(--text-secondary); font-size: 11px; font-weight: 650; }
+.field label { color: var(--text-secondary); font-size: var(--font-size-caption); font-weight: var(--font-weight-semibold); }
 .field input,
 .searchField input {
   min-width: 0;
@@ -35,7 +35,7 @@
 .field input:focus { border-color: var(--accent); box-shadow: var(--shadow-focus); }
 .dialogActions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .dialogActions > div { display: flex; gap: 8px; }
-.textButton { padding: 6px 0; border: 0; background: transparent; color: var(--accent-strong); font-size: 12px; }
+.textButton { padding: 6px 0; border: 0; background: transparent; color: var(--accent-strong); font-size: var(--font-size-support); }
 .archiveHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .archiveHeader > div { display: grid; gap: 4px; }
 .iconButton { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 7px; background: transparent; color: var(--text-secondary); }
@@ -59,14 +59,14 @@
 .archiveRow:last-child { border-bottom: 0; }
 .archiveRow > svg { color: var(--text-tertiary); }
 .archiveRow > span { display: grid; min-width: 0; gap: 3px; }
-.archiveRow strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.archiveRow strong { overflow: hidden; font-size: var(--font-size-interface); text-overflow: ellipsis; white-space: nowrap; }
 .archiveRow small {
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
 }
 .archiveRow > div { display: flex; gap: 6px; }
-.rowButton, .rowPrimaryButton, .loadMore { min-height: 30px; padding: 0 9px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--surface-raised); color: var(--text-primary); font-size: 11px; }
+.rowButton, .rowPrimaryButton, .loadMore { min-height: 30px; padding: 0 9px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--surface-raised); color: var(--text-primary); font-size: var(--font-size-support); }
 .rowPrimaryButton {
   border-color: var(--accent);
   background: var(--accent);
@@ -80,7 +80,7 @@
   opacity: 0.55;
 }
 .loadMore { justify-self: center; }
-.empty, .error { margin: auto; padding: 24px; color: var(--text-secondary); font-size: 12px; }
+.empty, .error { margin: auto; padding: 24px; color: var(--text-secondary); font-size: var(--font-size-support); }
 .error { color: var(--danger); }
 .dangerButton {
   min-height: 32px;
@@ -90,8 +90,8 @@
   background: var(--danger);
   color: white;
   font: inherit;
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 .dangerButton[data-hovered] { filter: brightness(1.05); }
 .dangerButton[data-focus-visible] { box-shadow: var(--shadow-focus); outline: none; }

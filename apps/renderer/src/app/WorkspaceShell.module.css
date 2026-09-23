@@ -7,7 +7,7 @@
 }
 
 .navigationHidden {
-  grid-template-columns: minmax(520px, 1fr) var(--workspace-inspector-width, 360px);
+  grid-template-columns: minmax(520px, 1fr) var(--workspace-inspector-width, 320px);
 }
 
 .navigationHidden:global(.context-hidden) {
@@ -33,7 +33,7 @@
 
 .emptyWorkspace > div {
   display: grid;
-  width: min(460px, 100%);
+  width: min(800px, 100%);
   justify-items: start;
   gap: 10px;
 }
@@ -44,7 +44,7 @@
 }
 
 .emptyWorkspace h2 {
-  font-size: 22px;
+  font-size: var(--font-size-title);
   letter-spacing: -0.025em;
 }
 
@@ -85,7 +85,7 @@
 
 .newSessionIntent h2 {
   color: var(--text-primary);
-  font-size: 24px;
+  font-size: var(--font-size-display);
   letter-spacing: -0.025em;
 }
 
@@ -110,8 +110,8 @@
 .environmentSelector legend {
   padding: 0;
   color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.01em;
 }
 
@@ -184,13 +184,13 @@
 
 .environmentOption strong {
   color: inherit;
-  font-size: 13px;
+  font-size: var(--font-size-interface);
   white-space: nowrap;
 }
 
 .environmentOption small {
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
 }
 
@@ -204,7 +204,7 @@
 
 .environmentHelp p {
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-support);
   line-height: 1.45;
 }
 
@@ -216,7 +216,7 @@
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   cursor: pointer;
 }
 

@@ -20,8 +20,8 @@
 
 .pageHeading h1 {
   color: var(--text-primary);
-  font-size: 24px;
-  font-weight: 680;
+  font-size: var(--font-size-display);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: -0.03em;
   line-height: 1.2;
 }
@@ -29,7 +29,7 @@
 .pageHeading p {
   max-width: 720px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-interface);
   line-height: 1.55;
 }
 
@@ -73,15 +73,15 @@
 
 .sectionHeader h3 {
   color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 660;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: -0.01em;
 }
 
 .sectionHeader p {
   max-width: 720px;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   line-height: 1.55;
 }
 
@@ -142,22 +142,22 @@
   min-width: 0;
   overflow: hidden;
   color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 630;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
   text-overflow: ellipsis;
 }
 
 .identity small {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   line-height: 1.5;
 }
 
 .value {
   flex: 0 0 auto;
   color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
   text-align: right;
 }
 
@@ -230,8 +230,8 @@
 .catalogIdentity strong {
   overflow: hidden;
   color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 650;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -240,7 +240,7 @@
 .catalogMeta {
   overflow: hidden;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   line-height: 1.45;
   text-overflow: ellipsis;
 }
@@ -255,7 +255,7 @@
   align-items: center;
   justify-content: flex-end;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
 }
 
 .catalogActions {
@@ -279,8 +279,8 @@
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 620;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 
 .backAction[data-hovered] {
@@ -321,7 +321,7 @@
   border-left: 3px solid var(--info);
   background: color-mix(in srgb, var(--info) 7%, transparent);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   line-height: 1.5;
 }
 
@@ -421,8 +421,8 @@
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 630;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .tab[data-hovered] {

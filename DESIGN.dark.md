@@ -1,31 +1,31 @@
 ---
-version: 4
+version: 5
 name: π Desktop Dark Calibration
 status: active
 platform: electron-web
 theme: dark
 color:
-  canvas: "#111412"
-  surface: "#181c19"
-  surface-muted: "#202521"
-  surface-raised: "#252b26"
-  surface-hover: "#2a302b"
-  surface-active: "#30433a"
-  surface-disabled: "#202521"
-  text-primary: "#f0f3ef"
-  text-secondary: "#a9b1aa"
-  text-tertiary: "#7f8981"
-  text-disabled: "#7f8981"
-  border: "#343b35"
-  border-strong: "#465047"
-  accent: "#7bc5ad"
-  accent-strong: "#a1dbc8"
-  accent-soft: "#203b32"
+  canvas: "#0a0a0a"
+  surface: "#111111"
+  surface-muted: "#1a1a1a"
+  surface-raised: "#1f1f1f"
+  surface-hover: "#262626"
+  surface-active: "#292929"
+  surface-disabled: "#1a1a1a"
+  text-primary: "#ededed"
+  text-secondary: "#a1a1a1"
+  text-tertiary: "#999999"
+  text-disabled: "#777777"
+  border: "#2e2e2e"
+  border-strong: "#454545"
+  accent: "#ededed"
+  accent-strong: "#ffffff"
+  accent-soft: "#292929"
   focus: "#83b9f3"
   info: "#84b8f4"
   warning: "#e2ad69"
   danger: "#ef9189"
-  text-on-danger: "#171a18"
+  text-on-danger: "#0a0a0a"
   success: "#7bc99c"
   diff-added: "#1d3a2b"
   diff-removed: "#482725"
@@ -44,7 +44,19 @@ spacing, component states, and motion as `DESIGN.md`.
 
 - Dark may come from the operating system or an explicit persisted selection;
   both paths resolve to the same semantic tokens and component states.
-- Large backgrounds remain neutral and low glare.
+- Large backgrounds use achromatic near-black and gray surfaces; ordinary text,
+  borders, selection, and primary actions must not introduce a green cast.
+- Primary actions use a light neutral fill with canvas-colored text/icons.
+  Selection uses neutral gray surfaces plus the existing label/marker, not hue alone.
+- The composer uses `surface-muted`; elevated menus and dialogs use
+  `surface-raised`. Disabled surfaces use `surface-disabled`.
+- The conversation plane uses `canvas`, both workbench sidebars use `surface`,
+  and the selected Inspector tab uses `surface-active` to remain distinguishable.
+- Green is semantic (success and additions), not a dark-theme brand accent.
+  Preserve warning, danger, info, keyboard focus, and code syntax/diff colors.
+- Grok Bot's official design demo informs neutral surface depth; Vercel Geist
+  informs state/contrast roles. These are bounded visual references, not copied
+  layouts or runtime authorities. See the design interaction reference guide.
 - Raised surfaces are slightly lighter than the canvas.
 - Borders separate only where spacing or luminance is insufficient.
 - Accent is reserved for current state and primary actions.
@@ -230,3 +242,22 @@ both themes. The wordmark inherits the primary text token; keep existing brand
 scale, spacing and context-title hierarchy. Mode symbols are separate from
 brand identity and are not introduced by this naming change. Native application
 assets remain unchanged.
+
+Workbench polish follows DESIGN.md in both themes: matching pane/reading widths,
+quieter navigation weights, transparent model/parameter utilities, labelled file
+filters and compact product status. Existing semantic/focus tokens remain.
+
+## Shared typography
+
+Dark mode consumes the same semantic size, weight and line-height roles as
+DESIGN.md. Do not shrink or embolden text solely for dark mode. Primary, secondary
+and tertiary text retain their role-specific neutral tokens; code syntax and
+semantic status colors remain distinct.
+
+Editorial inline emphasis uses medium weight below semibold headings, matching
+light mode. File names remain secondary at rest and primary on hover, selection
+or keyboard focus; do not lower their contrast to quiet a dense file list.
+
+Inline-code borders use the same 35% border-token mix as light mode. Disabled
+Composer send actions use disabled surface/text tokens rather than translucent
+accent fill; enabled send and active stop keep their action emphasis.

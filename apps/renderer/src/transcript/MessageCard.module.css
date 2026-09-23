@@ -41,14 +41,14 @@
 
 .author {
   gap: 6px;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 
 .meta {
   gap: var(--space-2);
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .content {
@@ -117,7 +117,7 @@
 .inlineEditError {
   margin: 0;
   color: var(--danger);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.4;
 }
 
@@ -139,8 +139,8 @@
   border-radius: 8px;
   background: var(--surface-muted);
   color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 
 .inlineEditActions button:hover:not(:disabled) {
@@ -175,7 +175,7 @@
   border-left: 2px solid var(--danger);
   background: color-mix(in srgb, var(--danger) 8%, transparent);
   color: var(--danger);
-  font-size: 12px;
+  font-size: var(--font-size-support);
 }
 
 .thinking {
@@ -183,7 +183,7 @@
   padding: var(--space-2) 10px;
   border-left: 2px solid var(--border-strong);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
 }
 
 .thinking summary {
@@ -191,7 +191,7 @@
   color: var(--text-tertiary);
   cursor: default;
   font-family: var(--font-code);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .visionEvidence {
@@ -226,14 +226,14 @@
 
 .visionEvidence > summary strong {
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: var(--font-size-interface);
 }
 
 .visionEvidence > summary small {
   overflow: hidden;
   color: var(--text-tertiary);
   font-family: var(--font-code);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -259,20 +259,20 @@
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .visionEvidence li small {
   margin-left: 4px;
   color: var(--text-tertiary);
   font-family: var(--font-code);
-  font-size: 8px;
+  font-size: var(--font-size-caption);
 }
 
 .visionEvidence footer {
   color: var(--text-tertiary);
   font-family: var(--font-code);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
 }
 
 .toolResult {
@@ -317,22 +317,22 @@
 
 .toolResultIdentity strong {
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 620;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .toolResultIdentity code {
   min-width: 0;
   overflow: hidden;
   font-family: var(--font-code);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .toolResultStatus {
   color: var(--success);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .toolResultFailed {
@@ -369,7 +369,7 @@
   background: color-mix(in srgb, var(--canvas) 80%, var(--surface));
   color: var(--text-secondary);
   font-family: var(--font-code);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.55;
   tab-size: 2;
   white-space: pre;
@@ -385,7 +385,7 @@
   padding: 8px 10px;
   border-radius: 6px;
   background: color-mix(in srgb, var(--danger) 7%, transparent);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
 }
 
@@ -410,7 +410,7 @@
   border-radius: 6px;
   background: var(--surface);
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-support);
 }
 
 .toolResultButton[data-hovered] {
@@ -446,7 +446,7 @@
 .timestamp {
   padding: 0 6px;
   font-family: var(--font-code);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -501,7 +501,7 @@
   background: var(--surface-raised);
   box-shadow: var(--shadow-floating);
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.35;
   pointer-events: none;
   text-align: center;

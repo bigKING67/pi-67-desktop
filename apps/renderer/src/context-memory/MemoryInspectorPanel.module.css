@@ -13,8 +13,8 @@
   background: color-mix(in srgb, var(--surface-raised) 88%, var(--focus) 3%);
 }
 
-.hero strong { color: var(--text-primary); font-size: 14px; }
-.hero p, .boundary p { margin: 0; color: var(--text-secondary); font-size: 11px; line-height: 1.55; }
+.hero strong { color: var(--text-primary); font-size: var(--font-size-body); }
+.hero p, .boundary p { margin: 0; color: var(--text-secondary); font-size: var(--font-size-support); line-height: 1.55; }
 
 .section {
   display: grid;
@@ -28,7 +28,7 @@
   gap: 10px;
 }
 
-.section > header strong { color: var(--text-secondary); font-size: 11px; }
+.section > header strong { color: var(--text-secondary); font-size: var(--font-size-interface); }
 
 .search {
   display: grid;
@@ -50,7 +50,7 @@
   background: transparent;
   color: var(--text-primary);
   font: inherit;
-  font-size: 11px;
+  font-size: var(--font-size-interface);
 }
 
 .search button {
@@ -60,7 +60,7 @@
   border-left: 1px solid var(--border);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-support);
 }
 
 .list { display: grid; gap: 7px; }
@@ -76,9 +76,9 @@
 }
 
 .row div { display: grid; gap: 2px; }
-.row strong { color: var(--text-primary); font-size: 11px; }
-.row small, .row > span { color: var(--text-tertiary); font-size: 10px; }
-.row p { grid-column: 1 / -1; margin: 0; color: var(--text-secondary); font-size: 10px; line-height: 1.5; }
+.row strong { color: var(--text-primary); font-size: var(--font-size-interface); }
+.row small, .row > span { color: var(--text-tertiary); font-size: var(--font-size-caption); }
+.row p { grid-column: 1 / -1; margin: 0; color: var(--text-secondary); font-size: var(--font-size-support); line-height: 1.5; }
 
 .feedback {
   display: flex !important;
@@ -96,7 +96,7 @@
   background: transparent;
   color: var(--text-tertiary);
   font: inherit;
-  font-size: 9px;
+  font-size: var(--font-size-support);
 }
 
 .feedback button:hover { border-color: var(--border-strong); color: var(--text-primary); }
@@ -110,14 +110,14 @@
 .metricNote {
   margin: 0;
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
 }
 
 .section dd[data-state="warning"] { color: var(--warning); }
 
-.error { margin: 0; color: var(--danger); font-size: 11px; line-height: 1.5; }
-.archiveStatus { margin: 0; font-size: 11px; line-height: 1.5; }
+.error { margin: 0; color: var(--danger); font-size: var(--font-size-caption); line-height: 1.5; }
+.archiveStatus { margin: 0; font-size: var(--font-size-caption); line-height: 1.5; }
 
 .boundary {
   display: grid;
@@ -127,7 +127,7 @@
   background: color-mix(in srgb, var(--focus) 5%, transparent);
 }
 
-.boundary strong { color: var(--text-primary); font-size: 11px; }
+.boundary strong { color: var(--text-primary); font-size: var(--font-size-interface); }
 
 .sectionActions {
   display: inline-flex;
@@ -169,8 +169,8 @@
   border-radius: 999px;
   background: var(--surface-muted);
   color: var(--text-secondary);
-  font-size: 9px;
-  font-weight: 700;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -200,7 +200,7 @@
   flex-wrap: wrap;
   gap: 4px 9px !important;
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
 }
 
 .sopReadiness {
@@ -213,8 +213,8 @@
   background: var(--surface-muted);
 }
 
-.sopReadiness strong { font-size: 9px; }
-.sopReadiness small { color: var(--text-tertiary); font-size: 9px; line-height: 1.45; }
+.sopReadiness strong { font-size: var(--font-size-interface); }
+.sopReadiness small { color: var(--text-tertiary); font-size: var(--font-size-caption); line-height: 1.45; }
 .sopReadiness[data-ready="true"] {
   border-color: color-mix(in srgb, var(--success) 30%, var(--border));
   background: color-mix(in srgb, var(--success) 6%, var(--surface));
@@ -235,10 +235,10 @@
 .reviewActions :global(.secondary-button) {
   min-height: 28px;
   padding: 0 9px;
-  font-size: 10px;
+  font-size: var(--font-size-support);
 }
 
-.candidateActions small { color: var(--text-tertiary); font-size: 9px; line-height: 1.45; }
+.candidateActions small { color: var(--text-tertiary); font-size: var(--font-size-caption); line-height: 1.45; }
 
 .privateNotice,
 .submittedNotice {
@@ -250,7 +250,7 @@
   border-radius: 7px;
   background: var(--surface-muted);
   color: var(--text-secondary);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
 }
 
@@ -285,8 +285,8 @@
 }
 
 .reviewForm > header > div { display: grid; gap: 2px; }
-.reviewForm > header strong { font-size: 11px; }
-.reviewForm > header small { color: var(--text-tertiary); font-size: 9px; text-align: right; }
+.reviewForm > header strong { font-size: var(--font-size-interface); }
+.reviewForm > header small { color: var(--text-tertiary); font-size: var(--font-size-caption); text-align: right; }
 
 .reviewGrid {
   display: grid;
@@ -304,19 +304,19 @@
 }
 
 .methodFields > header { display: grid; gap: 2px; }
-.methodFields > header strong { font-size: 10px; }
-.methodFields > header small { color: var(--text-tertiary); font-size: 9px; line-height: 1.45; }
+.methodFields > header strong { font-size: var(--font-size-interface); }
+.methodFields > header small { color: var(--text-tertiary); font-size: var(--font-size-caption); line-height: 1.45; }
 
 .field {
   display: grid;
   min-width: 0;
   gap: 4px;
   color: var(--text-secondary);
-  font-size: 9px;
-  font-weight: 650;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
-.field > small { color: var(--text-tertiary); font-size: 9px; font-weight: 450; }
+.field > small { color: var(--text-tertiary); font-size: var(--font-size-caption); font-weight: var(--font-weight-regular); }
 
 .field input,
 .field select,
@@ -329,8 +329,8 @@
   background: var(--surface-raised);
   color: var(--text-primary);
   font: inherit;
-  font-size: 10px;
-  font-weight: 450;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-regular);
 }
 
 .field input,
@@ -358,8 +358,8 @@
 
 .checkbox[data-disabled] { cursor: not-allowed; opacity: 0.5; }
 .checkbox > span:last-child { display: grid; gap: 2px; }
-.checkbox strong { font-size: 10px; }
-.checkbox small { color: var(--text-tertiary); font-size: 9px; font-weight: 450; line-height: 1.45; }
+.checkbox strong { font-size: var(--font-size-interface); }
+.checkbox small { color: var(--text-tertiary); font-size: var(--font-size-caption); font-weight: var(--font-weight-regular); line-height: 1.45; }
 
 .checkboxIndicator {
   display: grid;

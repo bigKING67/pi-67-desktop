@@ -48,12 +48,11 @@ export function MessagesPanel() {
     <div className="inspector-messages">
       <header className="inspector-messages-header">
         <div>
-          <span className="section-label">当前活动分支</span>
           <strong>{page ? `${page.total} 条用户消息` : "正在建立索引"}</strong>
         </div>
         <button disabled={loading} onClick={() => void loadPage(undefined)} type="button">刷新</button>
       </header>
-      <p className="inspector-messages-help">只显示你在当前任务活动分支中发出的消息；点击后跳到对话中的对应位置。</p>
+      <p className="inspector-messages-help">当前活动分支 · 点击消息定位原文</p>
       {error ? <p className="inspector-error" role="alert">{error}</p> : null}
       {loading && !page ? (
         <div className="inspector-loading" role="status"><LoaderCircle className="spin" size={16} />正在加载消息索引</div>
@@ -92,7 +91,7 @@ export function MessagesPanel() {
           })}
         </div>
       )}
-      {page ? (
+      {page && (page.offset > 0 || page.offset + page.items.length < page.total) ? (
         <footer className="inspector-message-pagination">
           <button
             disabled={loading || page.offset === 0}

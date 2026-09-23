@@ -21,6 +21,12 @@
   box-shadow: var(--shadow-composer);
 }
 
+:global(:root[data-theme="dark"]) .region {
+  background: linear-gradient(180deg, transparent, var(--canvas) 16%);
+}
+
+:global(:root[data-theme="dark"]) .shell { background: var(--surface-muted); }
+
 .shell:has(textarea:focus) {
   border-color: var(--focus);
   box-shadow: var(--shadow-focus);
@@ -60,8 +66,8 @@
 .workspaceContextLabel {
   flex: 0 0 auto;
   color: var(--text-tertiary);
-  font-size: 10px;
-  font-weight: 650;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .workspaceContextChip {
@@ -78,7 +84,7 @@
   background: var(--surface-muted);
   color: var(--text-secondary);
   font-family: var(--font-code);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .workspaceContextChip > span {
@@ -153,8 +159,8 @@
   white-space: nowrap;
 }
 
-.reviewContextChip strong { font-size: 10px; }
-.reviewContextChip small { color: var(--text-secondary); font-size: 10px; font-weight: 400; }
+.reviewContextChip strong { font-size: var(--font-size-interface); }
+.reviewContextChip small { color: var(--text-secondary); font-size: var(--font-size-caption); font-weight: var(--font-weight-regular); }
 
 .reviewContextChip button {
   display: grid;
@@ -188,8 +194,8 @@
   border-radius: calc(var(--radius-panel) - 4px);
   background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
   color: var(--accent);
-  font-size: 12px;
-  font-weight: 620;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
   pointer-events: none;
 }
 
@@ -228,8 +234,8 @@
   border-radius: 5px;
   background: transparent;
   color: var(--text-tertiary);
-  font-size: 10px;
-  font-weight: 620;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 
 .interactionMode button:hover:not(:disabled) {
@@ -312,8 +318,8 @@
   padding-left: var(--space-2);
   border: 1px solid transparent;
   border-radius: 7px;
-  background: var(--surface-muted);
-  color: var(--text-tertiary);
+  background: transparent;
+  color: var(--text-secondary);
 }
 
 .runtimeField:focus-within {
@@ -360,8 +366,8 @@
   overflow: hidden;
   color: var(--text-secondary);
   font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 550;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -413,15 +419,15 @@
   border-bottom: 1px solid var(--border);
   background: var(--surface-raised);
   color: var(--text-tertiary);
-  font-size: 10px;
-  font-weight: 620;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.2;
 }
 
 .runtimeSelectSectionHeader > span:last-child {
   font-family: var(--font-code);
-  font-size: 10px;
-  font-weight: 540;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
 }
 
 .runtimeSelectOption {
@@ -468,20 +474,20 @@
 }
 
 .runtimeSelectOption strong {
-  font-size: 12px;
-  font-weight: 620;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .runtimeSelectOption[data-runtime-select="thinking"] strong {
   font-family: var(--font-code);
-  font-size: 12px;
+  font-size: var(--font-size-interface);
   letter-spacing: 0.01em;
 }
 
 .runtimeSelectOption small {
   color: var(--text-tertiary);
   font-family: var(--font-code);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .runtimeSelectCheck {
@@ -498,7 +504,7 @@
   padding: 7px 10px 8px;
   border-top: 1px solid var(--border);
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   line-height: 1.3;
 }
 
@@ -512,8 +518,8 @@
   padding-left: var(--space-2);
   overflow: hidden;
   color: var(--text-tertiary);
-  font-size: 10px;
-  font-weight: 540;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -530,7 +536,7 @@
 .hint,
 .extensionWidget,
 .attachmentRow small {
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .hint {
@@ -592,8 +598,8 @@
 .queueToggle strong {
   overflow: hidden;
   color: var(--text-primary);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -602,7 +608,7 @@
 .queueGroup small,
 .queueLimitNotice {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .queueToggle > svg:last-child {
@@ -628,7 +634,7 @@
   border-radius: 6px;
   background: var(--surface-raised);
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-support);
 }
 
 .queueConfirmButton {
@@ -648,8 +654,8 @@
 .queueGroup h3 {
   margin: 0 0 var(--space-1);
   color: var(--text-tertiary);
-  font-size: 10px;
-  font-weight: 650;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.04em;
 }
 
@@ -674,7 +680,7 @@
 
 .queueGroup li > span {
   overflow: hidden;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -705,8 +711,8 @@
   border-radius: 7px;
   background: var(--surface-muted);
   color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 680;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.035em;
 }
 
@@ -718,8 +724,8 @@
   padding: 0 6px;
   border-radius: 7px;
   color: var(--text-tertiary);
-  font-size: 10px;
-  font-weight: 650;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .contextPressure[data-tone="warning"] {
@@ -737,7 +743,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
+  font-size: var(--font-size-support);
 }
 
 .contextPressure small {
@@ -751,7 +757,7 @@
   border-radius: 6px;
   background: transparent;
   color: inherit;
-  font-weight: 650;
+  font-weight: var(--font-weight-semibold);
 }
 
 .contextPressure button:disabled {
@@ -856,14 +862,14 @@
 }
 
 .toolModeOption strong {
-  font-size: 11px;
-  font-weight: 680;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.03em;
 }
 
 .toolModeOption small {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   line-height: 1.4;
 }
 
@@ -880,13 +886,13 @@
 
 .toolModeConfirmation strong {
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--font-size-interface);
 }
 
 .toolModeConfirmation p {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-support);
   line-height: 1.55;
 }
 
@@ -904,8 +910,8 @@
   border-radius: 7px;
   background: var(--surface);
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 620;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 
 .toolModeConfirmButton {
@@ -933,22 +939,21 @@
   border-radius: var(--radius-control);
   background: var(--accent);
   color: var(--canvas);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
   white-space: nowrap;
 }
 
-.sendButton:hover {
+.sendButton:hover:not([data-disabled]) {
   background: var(--accent-strong);
 }
-
 .secondarySendButton {
   border-color: var(--border-strong);
   background: var(--surface-muted);
   color: var(--text-secondary);
 }
 
-.secondarySendButton:hover {
+.secondarySendButton:hover:not([data-disabled]) {
   background: var(--surface-hover);
   color: var(--text-primary);
 }
@@ -965,18 +970,19 @@
   border-radius: var(--radius-control);
   background: var(--danger);
   color: var(--canvas);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
   white-space: nowrap;
 }
 
 .stopButton:hover {
   background: color-mix(in srgb, var(--danger) 86%, var(--text-primary));
 }
-
 .sendButton[data-disabled] {
   cursor: not-allowed;
-  opacity: 0.45;
+  border-color: transparent;
+  background: var(--surface-disabled);
+  color: var(--text-disabled);
 }
 
 .attachmentRow {
@@ -994,7 +1000,7 @@
   border-radius: 7px;
   background: color-mix(in srgb, var(--danger) 9%, var(--surface));
   color: var(--danger);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .attachmentError span {
@@ -1011,7 +1017,7 @@
   border-radius: 7px;
   background: var(--surface-muted);
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .extensionWidget strong {

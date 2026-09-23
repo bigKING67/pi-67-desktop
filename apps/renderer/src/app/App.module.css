@@ -41,8 +41,8 @@
 
 .surfaceFailureEyebrow {
   color: var(--danger);
-  font-size: 11px;
-  font-weight: 680;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.04em;
 }
 
@@ -52,7 +52,7 @@
 }
 
 .surfaceFailure h2 {
-  font-size: 18px;
+  font-size: var(--font-size-heading);
 }
 
 .surfaceFailure p {
@@ -67,8 +67,8 @@
 
 .surfaceFailureDetails > span {
   color: var(--text-tertiary);
-  font-size: 11px;
-  font-weight: 650;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .surfaceFailureDetails textarea {
@@ -80,7 +80,7 @@
   background: var(--surface);
   color: var(--text-secondary);
   font-family: var(--font-code);
-  font-size: 11px;
+  font-size: var(--font-size-interface);
   line-height: 1.55;
   resize: vertical;
 }

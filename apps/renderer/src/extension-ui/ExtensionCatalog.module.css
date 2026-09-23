@@ -13,7 +13,7 @@
 .heading strong {
   color: var(--text-secondary);
   font-family: var(--font-code);
-  font-size: 12px;
+  font-size: var(--font-size-interface);
   font-variant-ligatures: none;
 }
 
@@ -45,7 +45,7 @@
 
 .itemHeading strong {
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--font-size-interface);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -53,7 +53,7 @@
 .overall {
   flex: 0 0 auto;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .overall[data-status="unsupported"],
@@ -63,7 +63,7 @@
 
 .meta {
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .item > p,
@@ -71,14 +71,14 @@
 .truncated {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   line-height: 1.5;
 }
 
 .item > .adapter {
   color: var(--text-tertiary);
   font-family: var(--font-code);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   font-variant-ligatures: none;
 }
 
@@ -89,7 +89,7 @@
 
 .toolNames > span {
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .toolNames > div {
@@ -105,7 +105,7 @@
   border-radius: 4px;
   background: var(--surface-hover);
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -113,7 +113,7 @@
 .toolNames small {
   align-self: center;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .empty {
@@ -140,7 +140,7 @@
 .surfaces dd {
   overflow: hidden;
   margin: 0;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

@@ -80,7 +80,7 @@ test("restores persisted Workspace authority without asking for the Workspace ag
   await page.getByRole("button", { name: "打开对话", exact: true }).click();
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
   await expect(page.getByLabel("给 Pi 发送消息")).toBeVisible();
-  await expect(page.getByLabel("当前状态：Pi SDK 已就绪")).toBeVisible();
+  await expect(page.getByLabel("当前状态：就绪")).toBeVisible();
   await expect.poll(async () => {
     const commands = await recordedCommandDetails(page);
     return commands.filter((command) => command.type === "runtime.initialize").length;

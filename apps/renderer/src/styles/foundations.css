@@ -15,8 +15,8 @@ body {
   background: var(--canvas);
   color: var(--text-primary);
   font-family: var(--font-ui);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-interface);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -70,3 +70,5 @@ select:focus-visible,
   background: linear-gradient(90deg, transparent, var(--accent), transparent);
   animation: loading-pulse 1.2s ease-in-out infinite;
 }
+
+strong, b { font-weight: var(--font-weight-semibold); }

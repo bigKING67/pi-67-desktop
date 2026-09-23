@@ -242,7 +242,7 @@ function StoppedConversationState({ sessionName, sessionFileIdentity, sessionPat
       <div>
         <span className="section-label">{workspace.displayName}</span>
         <h2>{sessionName?.trim() || "未命名对话"}</h2>
-        <p>对话当前未在运行，打开后可继续。</p>
+        <p>打开对话，继续之前的工作。</p>
         <button
           className="primary-button"
           disabled={workspace.availability !== "available"}

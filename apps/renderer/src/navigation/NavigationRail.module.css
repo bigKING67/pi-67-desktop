@@ -35,8 +35,8 @@
   min-width: 0;
   overflow: hidden;
   color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 680;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -173,8 +173,8 @@
   background: var(--surface-raised);
   color: var(--text-primary);
   font-family: var(--font-code);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .workspaceItem > span:last-child {
@@ -191,19 +191,19 @@
 
 .workspaceItem strong {
   color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 620;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .workspaceItem small {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .workspaceFallback {
   padding: var(--space-2);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
 }
 
 .search {
@@ -240,7 +240,7 @@
   outline: 0;
   background: transparent;
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
 }
 
 .searchInput:focus-visible,
@@ -291,13 +291,13 @@
   padding: var(--space-2) var(--space-2) 3px;
   color: var(--text-tertiary);
   font-family: var(--font-code);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.04em;
 }
 
 .groupHeading span:last-child {
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 
 .sessionItem {
@@ -348,8 +348,8 @@
 .sessionName {
   min-width: 0;
   overflow: hidden;
-  font-size: 12px;
-  font-weight: 620;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -358,8 +358,8 @@
   flex: 0 0 auto;
   gap: var(--space-1);
   color: var(--text-tertiary);
-  font-size: 11px;
-  font-weight: 550;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
   white-space: nowrap;
 }
 
@@ -379,7 +379,7 @@
   gap: 5px;
   overflow: hidden;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -388,7 +388,7 @@
   margin: 0;
   padding: 20px 10px;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   line-height: 1.55;
   text-align: center;
 }
@@ -405,8 +405,8 @@
 .searchResultGroupLabel {
   margin: 8px 10px 4px;
   color: var(--text-tertiary);
-  font-size: 10px;
-  font-weight: 650;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.04em;
 }
 
@@ -466,13 +466,13 @@
 
 .contentSearchResult strong {
   color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 620;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .contentSearchResult small {
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .workspaceGroup {
@@ -572,20 +572,20 @@
 
 .workspaceGroupName strong {
   color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-medium);
 }
 
 .workspaceGroupName small {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .workspaceGroupName .workspaceGlyph {
   width: 22px;
   height: 22px;
   border-radius: 6px;
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .backgroundBadge {
@@ -598,8 +598,8 @@
   background: color-mix(in srgb, var(--accent) 13%, var(--surface-raised));
   color: var(--accent);
   font-family: var(--font-code);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
 }
 
@@ -628,7 +628,7 @@
   background: transparent;
   color: var(--text-tertiary);
   font: inherit;
-  font-size: 10px;
+  font-size: var(--font-size-support);
   text-align: left;
 }
 
@@ -648,7 +648,7 @@
   border-radius: 999px;
   background: var(--surface-muted);
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: var(--font-size-support);
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
@@ -730,13 +730,13 @@
 
 .conversationCopy strong {
   color: var(--text-primary);
-  font-size: 11px;
-  font-weight: 610;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-regular);
 }
 
 .conversationCopy small {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .conversationState {
@@ -744,7 +744,7 @@
   border-radius: 4px;
   background: var(--surface-raised);
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   white-space: nowrap;
 }
 
@@ -769,8 +769,8 @@
   border-radius: 4px;
   background: color-mix(in srgb, var(--accent) 12%, var(--surface-raised));
   color: var(--accent);
-  font-size: 10px;
-  font-weight: 650;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   white-space: nowrap;
 }
 
@@ -784,7 +784,7 @@
 .workspaceCatalogError {
   margin: 0;
   padding: var(--space-2);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
 }
 
@@ -804,7 +804,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-support);
   text-align: left;
 }
 
@@ -823,7 +823,7 @@
   border-radius: 7px;
   background: color-mix(in srgb, var(--warning) 8%, transparent);
   color: var(--warning);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
 }
 
@@ -868,13 +868,13 @@
 
 .accountButton strong {
   color: var(--text-primary);
-  font-size: 11px;
-  font-weight: 620;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .accountButton small {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-support);
 }
 
 .helpButton {
@@ -923,7 +923,7 @@
 .loadingMore {
   grid-column: 1 / -1;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .settingsButton {
@@ -937,7 +937,7 @@
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
 }
 
 .settingsButton[data-hovered] {
@@ -988,7 +988,7 @@
   padding: 0 9px;
   border-radius: 6px;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   outline: none;
 }
 
@@ -1008,8 +1008,8 @@
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent-strong);
-  font-size: 9px;
-  font-weight: 680;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.2;
 }
 
@@ -1035,3 +1035,5 @@
     animation: none;
   }
 }
+
+.activeConversation .conversationCopy strong { font-weight: var(--font-weight-medium); }

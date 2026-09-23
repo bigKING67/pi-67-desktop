@@ -68,7 +68,7 @@ export function ComposerRuntimeSelect({
         data-runtime-select={variant}
       >
         {icon}
-        <span className={styles.runtimeSelectValue}>{valueText}</span>
+        <span className={styles.runtimeSelectValue} title={valueText}>{valueText}</span>
         <ChevronDown aria-hidden="true" size={13} />
       </AriaButton>
       <Popover

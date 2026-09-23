@@ -12,12 +12,12 @@
 
 .catalogIntro strong {
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .catalogIntro small {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   line-height: 1.5;
 }
 
@@ -49,14 +49,14 @@
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 630;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .catalogTabs button span {
   color: var(--text-tertiary);
   font-family: var(--font-code);
-  font-size: 11px;
+  font-size: var(--font-size-support);
   font-variant-numeric: tabular-nums;
 }
 
@@ -102,7 +102,7 @@
   border-radius: 7px;
   background: var(--surface);
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: var(--font-size-interface);
 }
 
 .providerSearch input:focus {
@@ -150,8 +150,8 @@
 
 .providerMeta strong {
   color: var(--text-tertiary);
-  font-size: 12px;
-  font-weight: 620;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .providerMeta strong[data-configured="true"] {
@@ -161,8 +161,8 @@
 .providerMeta small {
   color: var(--text-tertiary);
   font-family: var(--font-code);
-  font-size: 10px;
-  font-weight: 400;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
 }
 
 .providerListEmpty {
@@ -178,12 +178,12 @@
 
 .providerListEmpty strong {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-interface);
 }
 
 .providerListEmpty small {
   max-width: 480px;
-  font-size: 12px;
+  font-size: var(--font-size-support);
   line-height: 1.5;
 }
 

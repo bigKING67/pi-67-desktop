@@ -4,7 +4,7 @@
   padding: 20px;
 }
 
-.diagnostic-dialog-content h2 { margin: -7px 0 0; font-size: 18px; }
+.diagnostic-dialog-content h2 { margin: -7px 0 0; font-size: var(--font-size-heading); }
 .doctor-dialog { width: min(720px, 100%); }
 .doctor-dialog .diagnostic-dialog-content {
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
@@ -26,8 +26,8 @@
 .doctor-section h3 {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .doctor-loading,
@@ -59,9 +59,9 @@
   background: var(--surface);
 }
 .doctor-check > div { display: grid; min-width: 0; gap: 1px; }
-.doctor-check strong { font-size: 12px; }
-.doctor-check code { overflow: hidden; color: var(--text-secondary); font-family: var(--font-code); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.doctor-check > span { color: var(--text-tertiary); font-size: 10px; }
+.doctor-check strong { font-size: var(--font-size-interface); }
+.doctor-check code { overflow: hidden; color: var(--text-secondary); font-family: var(--font-code); font-size: var(--font-size-caption); text-overflow: ellipsis; white-space: nowrap; }
+.doctor-check > span { color: var(--text-tertiary); font-size: var(--font-size-caption); }
 .doctor-check.status-pass > svg { color: var(--success); }
 .doctor-check.status-warning > svg { color: var(--warning); }
 .doctor-check.status-fail > svg { color: var(--danger); }
@@ -74,8 +74,8 @@
 
 .credential-notice { color: var(--accent); }
 .credential-notice p { display: grid; gap: 2px; margin: 0; }
-.credential-notice strong { color: var(--text-primary); font-size: 12px; }
-.credential-notice span { color: var(--text-secondary); font-size: 11px; line-height: 1.55; }
+.credential-notice strong { color: var(--text-primary); font-size: var(--font-size-interface); }
+.credential-notice span { color: var(--text-secondary); font-size: var(--font-size-caption); line-height: 1.55; }
 .credential-dialog { width: min(760px, 100%); }
 .provider-credential-layout {
   display: grid;
@@ -122,7 +122,7 @@
   height: 34px;
   padding: 0 34px 0 34px;
   background: var(--surface);
-  font-size: 11px;
+  font-size: var(--font-size-interface);
 }
 .provider-search-clear {
   position: absolute;
@@ -173,23 +173,23 @@
 .provider-list button:hover { background: var(--surface-hover); color: var(--text-primary); }
 .provider-list button.is-selected { border-color: var(--border-strong); background: var(--surface); color: var(--text-primary); }
 .provider-list button > span { display: grid; min-width: 0; }
-.provider-list strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.provider-list small { overflow: hidden; color: var(--text-tertiary); font-family: var(--font-code); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.provider-list strong { overflow: hidden; font-size: var(--font-size-interface); text-overflow: ellipsis; white-space: nowrap; }
+.provider-list small { overflow: hidden; color: var(--text-tertiary); font-family: var(--font-code); font-size: var(--font-size-caption); text-overflow: ellipsis; white-space: nowrap; }
 .provider-list em {
   padding: 2px 5px;
   border-radius: 5px;
   background: var(--surface-active);
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   font-style: normal;
 }
 .provider-list em.is-configured { background: var(--accent-soft); color: var(--accent); }
-.provider-list-empty { margin: 0; padding: 18px 10px; color: var(--text-tertiary); font-size: 10px; text-align: center; }
+.provider-list-empty { margin: 0; padding: 18px 10px; color: var(--text-tertiary); font-size: var(--font-size-caption); text-align: center; }
 .provider-credential-editor { display: grid; align-content: start; min-height: 0; gap: 16px; padding: 16px; overflow-y: auto; }
 .provider-detail-heading { display: flex; align-items: center; justify-content: space-between; color: var(--accent); }
 .provider-detail-heading > span { display: grid; }
-.provider-detail-heading strong { font-size: 14px; }
-.provider-detail-heading small { color: var(--text-tertiary); font-family: var(--font-code); font-size: 10px; }
+.provider-detail-heading strong { font-size: var(--font-size-body); }
+.provider-detail-heading small { color: var(--text-tertiary); font-family: var(--font-code); font-size: var(--font-size-caption); }
 .credential-current {
   display: grid;
   gap: 3px;
@@ -200,7 +200,7 @@
 }
 .credential-current.is-configured { border-style: solid; border-color: color-mix(in srgb, var(--success) 30%, var(--border)); }
 .credential-current-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.credential-current-heading > span { font-size: 10px; font-weight: 650; }
+.credential-current-heading > span { font-size: var(--font-size-caption); font-weight: var(--font-weight-semibold); }
 .credential-current-toggle {
   display: inline-flex;
   align-items: center;
@@ -215,14 +215,14 @@
 }
 .credential-current-toggle:hover:not([disabled]) { background: var(--surface-hover); color: var(--text-primary); }
 .credential-current-toggle[disabled] { opacity: 0.45; }
-.credential-current code { color: var(--text-primary); font-family: var(--font-code); font-size: 13px; letter-spacing: 0.08em; }
+.credential-current code { color: var(--text-primary); font-family: var(--font-code); font-size: var(--font-size-interface); letter-spacing: 0.08em; }
 .credential-current code.is-revealed { overflow-wrap: anywhere; letter-spacing: 0; }
-.credential-current small { color: var(--text-tertiary); font-size: 10px; }
+.credential-current small { color: var(--text-tertiary); font-size: var(--font-size-caption); }
 .credential-current .credential-reveal-message { color: var(--warning); }
 .dialog-field { display: grid; gap: 6px; }
-.dialog-field > label { color: var(--text-secondary); font-size: 11px; font-weight: 650; }
+.dialog-field > label { color: var(--text-secondary); font-size: var(--font-size-caption); font-weight: var(--font-weight-semibold); }
 .dialog-field select { width: 100%; height: 38px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); }
-.dialog-field small { color: var(--text-tertiary); font-size: 10px; }
+.dialog-field small { color: var(--text-tertiary); font-size: var(--font-size-caption); }
 .credential-secret-input { position: relative; }
 .credential-secret-input input { width: 100%; padding-right: 42px; }
 .credential-secret-toggle {
@@ -265,8 +265,8 @@
 .update-summary.phase-current { color: var(--success); }
 .update-summary.phase-error { color: var(--danger); }
 .update-summary > div { display: grid; gap: 2px; }
-.update-summary strong { color: var(--text-primary); font-size: 12px; }
-.update-summary span { color: var(--text-secondary); font-size: 11px; }
+.update-summary strong { color: var(--text-primary); font-size: var(--font-size-interface); }
+.update-summary span { color: var(--text-secondary); font-size: var(--font-size-caption); }
 .update-progress-track {
   height: 5px;
   overflow: hidden;
@@ -280,7 +280,7 @@
   background: var(--accent);
   transition: width 160ms ease-out;
 }
-.update-network-note { color: var(--text-tertiary); font-size: 10px; line-height: 1.6; }
-.update-action-error { color: var(--danger); font-size: 11px; line-height: 1.5; }
+.update-network-note { color: var(--text-tertiary); font-size: var(--font-size-caption); line-height: 1.6; }
+.update-action-error { color: var(--danger); font-size: var(--font-size-caption); line-height: 1.5; }
 
 @keyframes loading-spin { to { transform: rotate(360deg); } }

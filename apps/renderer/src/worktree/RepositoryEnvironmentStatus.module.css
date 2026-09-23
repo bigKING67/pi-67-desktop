@@ -9,8 +9,8 @@
   border-radius: 6px;
   background: transparent;
   font: inherit;
-  font-size: 11px;
-  font-weight: 560;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
   -webkit-app-region: no-drag;
 }
@@ -75,11 +75,19 @@
   color: var(--text-secondary);
   background: transparent;
   font: inherit;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   cursor: pointer;
 }
 
 .action:disabled {
   cursor: wait;
   opacity: 0.65;
+}
+
+.status[data-repository-status="non-git"] span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }

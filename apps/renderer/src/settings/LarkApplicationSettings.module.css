@@ -3,8 +3,8 @@
   overflow-wrap: anywhere;
   color: var(--text-primary);
   font-family: var(--font-code);
-  font-size: 11px;
-  font-weight: 560;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
 }
 
 .editor {
@@ -23,14 +23,14 @@
 
 .editorHeader strong {
   color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 650;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .editorHeader small,
 .field small {
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
 }
 
@@ -48,8 +48,8 @@
 
 .field > span:first-child {
   color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 630;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 
 .field input,
@@ -117,7 +117,7 @@
 .error {
   margin: 0;
   color: var(--danger);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
 }
 

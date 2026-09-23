@@ -3,7 +3,7 @@ import type {
   PiProviderConfigurationSnapshot,
   PiProviderConfigurationView
 } from "@pi67/protocol";
-import { Brain, RefreshCw, Sparkles } from "lucide-react";
+import { SlidersHorizontal, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { messages } from "../localization/message-catalog.js";
 import { useShellStore } from "../shell/shell-store.js";
@@ -194,7 +194,7 @@ export function ComposerIntentRuntimeControls({
               thinkingLevels
             )
           : "先选择模型，再设置思考级别。"}
-        icon={<Brain aria-hidden="true" size={14} />}
+        icon={<SlidersHorizontal aria-hidden="true" size={14} />}
         isOpen={thinkingPickerOpen}
         onOpenChange={setThinkingPickerOpen}
         onSelectionChange={(value) => {

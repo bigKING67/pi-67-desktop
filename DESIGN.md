@@ -1,26 +1,26 @@
 ---
-version: 5
+version: 6
 name: π Desktop Design Authority
 status: active
 platform: electron-web
 theme: system-light-dark
 color:
-  canvas: "#f5f6f4"
+  canvas: "#ffffff"
   surface: "#ffffff"
-  surface-muted: "#eef0ed"
+  surface-muted: "#f5f5f5"
   surface-raised: "#ffffff"
-  surface-hover: "#e8ebe7"
-  surface-active: "#e0e9e4"
-  surface-disabled: "#eef0ed"
-  text-primary: "#171a18"
-  text-secondary: "#626862"
-  text-tertiary: "#858c86"
-  text-disabled: "#858c86"
-  border: "#d9ddd8"
-  border-strong: "#c8cec8"
-  accent: "#2f6757"
-  accent-strong: "#215244"
-  accent-soft: "#dcebe5"
+  surface-hover: "#f0f0f0"
+  surface-active: "#eaeaea"
+  surface-disabled: "#f5f5f5"
+  text-primary: "#171717"
+  text-secondary: "#525252"
+  text-tertiary: "#666666"
+  text-disabled: "#999999"
+  border: "#dedede"
+  border-strong: "#bfbfbf"
+  accent: "#171717"
+  accent-strong: "#000000"
+  accent-soft: "#eaeaea"
   focus: "#2c70c9"
   info: "#2d67aa"
   warning: "#9a5b16"
@@ -199,8 +199,8 @@ Application-level surfaces use a separate wide-window shell:
 - Clicking a conversation selects both that conversation and its Workspace.
   Switching conversations, collapsing a Workspace, or opening Settings never
   stops or reorders background tasks.
-- Navigation uses `clamp(248px, 18vw, 288px)` and Inspector uses
-  `clamp(360px, 24vw, 384px)` on the wide three-region layout. Neither side
+- Navigation uses `248px` and Inspector uses
+  `320px` on the wide three-region layout. Neither side
   column gains width at the other's expense; long names truncate inside their
   owned measure.
 - The Inspector tab strip uses five equal-width compact actions: `文件`, `修改`,
@@ -212,7 +212,7 @@ Application-level surfaces use a separate wide-window shell:
   persists while switching primary Inspector views.
   At 1320px and below the Inspector defaults closed and becomes the existing
   right-side drawer. This preserves a comfortable central work plane instead of
-  waiting until the 360px Inspector and 520px Transcript reach their physical
+  waiting until the 320px Inspector and 520px Transcript reach their physical
   minimum. Explicitly opening Inspector first asks Electron Main to widen a
   normal window within its current display work area; a constrained, maximized,
   or full-screen window stays in the dismissible drawer mode.
@@ -224,10 +224,9 @@ Application-level surfaces use a separate wide-window shell:
   permanent application region.
 - Transcript owns remaining width and never drops below 520px on a wide layout.
 - Transcript, execution process, Composer, queue, and Composer-anchored overlays
-  share one conversation measure: 860px with both side columns present, 1040px
-  when either side column stops consuming layout width, and at most 1120px when
-  neither side column consumes layout width. The workbench expands visibly when
-  a side column closes without turning ordinary prose into full-window lines.
+  share one conversation measure capped at 800px, regardless of side-column
+  visibility. Closing a side column increases breathing room while keeping
+  ordinary prose and Composer aligned to a stable reading measure.
 - At 1320px and below, context defaults closed and becomes an overlay drawer with a
   dismissible scrim, so trust, transcript, and composer actions are never
   covered before the user explicitly opens context.
@@ -273,10 +272,26 @@ Application-level surfaces use a separate wide-window shell:
 - Use Maple Mono for code, tools, diffs, paths, commands, and compact runtime
   metadata.
 - Code blocks may use ligatures. Commands, paths, diffs, and exact output do not.
-- Body text is 14-15px with a 1.5-1.6 line height. Standard metadata is
-  12-13px; space-constrained navigation and Inspector metadata never drops
-  below 10px, and their primary labels remain at least 12px.
+- Shared typography roles are caption 11px, support 12px, interface 13px,
+  body 14px, section 16px, heading 18px, title 20px, display 22px.
+  CSS uses `--font-size-*` roles rather than local pixel sizes. Inline code/math
+  may retain relative sizing; zero-size icon-font suppression is not text.
+- UI copy never falls below 11px. Navigation titles, file names, form inputs and
+  primary controls use interface; secondary controls and explanations use support;
+  timestamps, counts, file sizes and language labels use caption.
+- Regular/medium/semibold weights are 400/500/600. UI strong text uses semibold;
+  ordinary controls and group names use medium. Selected navigation retains
+  the normal size and at most medium weight, with neutral surface/marker feedback.
+- Interface line height is 1.5; editorial body is 1.75. Code keeps its 12px size,
+  1.6 line height and exact 19.2px virtual row geometry. Native/browser zoom scales
+  the whole interface; this change does not introduce a separate font setting.
 - Use tabular figures for tokens, context, time, and cost.
+- Editorial inline emphasis uses medium, while semantic headings remain semibold
+  (including emphasis nested in a heading). Preserve the source heading levels.
+  List items use 0.5em separation and balanced paragraph margins, with pretty
+  wrapping to reduce short trailing lines where the browser supports it.
+- Inspector file names retain secondary text at rest; hover, selection and
+  keyboard focus promote the name to primary text without changing its size.
 
 ## Semantic tokens
 
@@ -316,6 +331,12 @@ use `50%`.
   components. Light and dark themes may change values, but not role meaning.
 - Canvas and surface colors establish depth quietly; borders separate regions
   without turning every group into a card.
+- Dark mode uses achromatic near-black surfaces, neutral selection, and light
+  primary buttons with dark content, as calibrated in `DESIGN.dark.md`. Ordinary
+  accents are neutral in both themes; semantic status and code colors retain their
+  meaning. Light mode uses white canvas/surfaces, light gray sidebars and selection,
+  dark primary buttons with white content, and neutral text/borders/shadows.
+  Both themes retain the existing layout and typography.
 - Accent is reserved for the current selection and primary action. Info,
   warning, danger, success, and diff colors communicate only their named state.
 - Text and interactive-state contrast must remain usable at 200% zoom and in
@@ -391,13 +412,13 @@ loading error where the operation can produce those states
   message outside that process surface. Pi JSONL remains the conversation source of
   truth; this hierarchy is a disposable Renderer projection.
 - Process outcome is independent from individual Tool outcome. `running` reads
-  `正在执行` and remains expanded; a clean final answer reads `执行完成` and folds;
+  `正在执行` and remains expanded; a clean final answer reads `执行已结束` and folds;
   a final answer with failed, interrupted, cancelled, lost, or unreconciled Tools
-  reads `执行完成 · N 次工具调用 · M 个步骤未成功`, uses the quiet warning role, and
+  reads `执行已结束 · N 次工具调用 · M 个步骤未成功`, uses the quiet warning role, and
   folds while preserving every Tool detail. Only an Operation whose authoritative
   lifecycle is `failed` reads `执行失败`, uses danger, and stays expanded. Cancelled,
   lost, and no-final-answer states read `执行已取消`, `执行连接中断`, and
-  `执行未完整收口`; they stay expanded and never masquerade as a Tool failure.
+  `执行已结束，未收到最终回复`; they stay expanded and never masquerade as a Tool failure.
 - Tool lifecycle is keyed by Pi `toolCallId` and distinguishes `pending`, `running`,
   `completed`, `failed`, `interrupted`, `cancelled`, `lost`, and `unreconciled`.
   Live events may add bounded redacted input, recognized command, Session working
@@ -412,8 +433,8 @@ loading error where the operation can produce those states
   the default row. Dedicated presenters derive summaries from allowlisted fields;
   structured arguments from an unknown Tool collapse to `已提交参数` instead of raw
   JSON, while the unknown Tool name remains visible as its only reliable identity.
-  Tool titles use 12px, semantic summaries 11px, and process metadata no smaller
-  than 10px. Desktop widths keep one truncated row; narrow widths use one deliberate
+  Tool titles use the 13px interface role; semantic summaries and process
+  metadata use the 11px caption role. Desktop widths keep one truncated row; narrow widths use one deliberate
   second metadata row rather than arbitrary wrapping or document overflow.
   Failed or integrity-uncertain rows open by default and show the projected real
   error or a specific missing-result explanation; successful rows remain compact.
@@ -469,6 +490,9 @@ loading error where the operation can produce those states
   They are revoked only after authoritative reconciliation, failure disposal, or
   authority replacement; the renderer never copies their binary payload merely
   to keep the acknowledgement state visible.
+- Fenced code with or without a language and indented block code share the same
+  block container and copy action; inline code remains inline. Block detection
+  follows Markdown structure, never presence of a language class.
 - Long transcript code uses a bounded 520px viewport, worker-based highlighting, internally
   virtualized lines, and a full-content copy action. Long lines preserve their
   source layout and remain horizontally navigable without a persistent scrollbar;
@@ -481,7 +505,9 @@ loading error where the operation can produce those states
 - Editorial Markdown uses visible heading, paragraph, nested-list, quote,
   separator, and GFM task-list hierarchy. GFM tables retain semantic table
   structure, a quiet header surface, cell spacing and row boundaries; a wide
-  table scrolls only inside its keyboard-focusable table viewport and never
+  table uses intrinsic column widths with a compact 3rem minimum and wraps long
+  text before overflowing. Short index columns do not reserve full text-column
+  widths. A genuinely wide table scrolls only inside its keyboard-focusable table viewport and never
   widens the Transcript or application document. Streaming and settled text use
   the same semantic structure so completion does not replace the document layout.
   Long streaming prose may retain the last parsed prefix while a Renderer Worker
@@ -537,8 +563,8 @@ loading error where the operation can produce those states
   root preserves expansion, search, selection, and scroll state while the
   Inspector stays mounted. Directories load in pages of at most 200 entries.
   Tabs, search text, file names, message summaries, tree labels, and resource
-  names use at least 12px type; constrained ordinals, paths, counts, timestamps,
-  and other compact metadata use at least 10px. File-tree rows remain at least
+  names use the 13px interface role; constrained ordinals, paths, counts, timestamps,
+  and other compact metadata use the 11px caption role. File-tree rows remain at least
   32px high.
   Search accepts at most 256 characters, returns at most 200 matches, visits at
   most 50,000 nodes, always skips `.git`, and skips dependency, generated, and
@@ -2583,3 +2609,69 @@ Public product labels, accessibility region names, approval headings, native
 notifications and system-menu display text use New Money. Pi SDK/runtime names,
 resource paths and immutable technical/package identities remain exact. Native
 application bundles, Helpers, executables and installer filenames use New Money.
+
+## Workbench polish (2026-09-23)
+
+- Desktop navigation and Inspector defaults are 248px and 320px; title-bar tracks
+  match pane tracks. Conversation/composer reading width is capped at 800px even
+  when side panels close. Existing responsive drawers and session-local visibility
+  remain; this change introduces no resize handles or persistence migration.
+- Workspace labels use interface/medium; ordinary conversation titles interface/regular, current
+  titles medium; conversation metadata uses caption. Current-row gray fill and marker
+  remain. Important runtime badges stay visible and row actions retain focus access.
+- Composer model and parameter utilities use quiet transparent resting surfaces.
+  Thinking selection appears as 思考 with its current level, still one
+  selection away in the existing accessible Select; model/provider grouping,
+  authority, pending/error, safety modes and Execute/Plan behavior stay unchanged.
+- File generated/dependency filtering moves to a labelled Filter popover; an
+  enabled-filter count stays visible on its trigger. Escape closes and returns
+  focus. Search/tree state and refresh semantics remain unchanged.
+- Ordinary `Pi SDK 已就绪` reads `就绪`, with runtime detail in the title tooltip;
+  other ready-phase details, including post-resume synchronization, remain visible; active,
+  recovery, waiting and failure statuses retain truthful specific labels. A non-Git
+  environment keeps its accessible inspection button and tooltip but hides the
+  redundant resting label; warnings and actionable environment states retain text.
+- Stopped-conversation content aligns to the 800px reading track, with a compact
+  20px title, concise continuation copy and the explicit Open Conversation action.
+
+### Workbench feedback refinement
+
+- Conversation-switch success copy is transient for three seconds in the title
+  bar, then renders ordinary readiness. This is presentation-only: do not mutate
+  Host/runtime state, expire recovery/failure text, or override an Operation.
+  Switching task or leaving the successful ready state cancels its old timer.
+- Messages Inspector starts with the user-message count and compact active-branch
+  guidance. Its list owns remaining scroll space, independent of optional errors
+  and footer. Hide pagination only when no earlier or later page exists; pending,
+  empty, failed and multi-page indexes keep truthful states and navigation.
+- The single thinking-level picker reads `思考：<canonical level>` in draft and
+  live conversations; retain the quieter utility styling and direct selection.
+
+### Execution summary inspection
+
+- Settled summaries describe execution ending, never target success. Preserve
+  authoritative failed/cancelled/lost/waiting states and expand them as before.
+- A settled group with unsuccessful steps exposes `查看未成功步骤` directly in
+  its summary. It opens the group filtered by the same status/result-error rule
+  used for the unsuccessful count, including orphan results and live supplemental
+  tools. Mark the filtered view without presenting a Tool failure as whole-task failure.
+- `显示全部步骤` restores source order without discarding data. Closing the group,
+  outcome transition, or a highlighted transcript jump resets the filter. Running
+  groups do not expose the failure filter, preserving live activity visibility.
+
+### Long-form reading refinement
+
+- Inline code keeps its monospace face and muted background, with a subdued
+  border at 35% of the border token. Block-code containers remain unchanged.
+- Disabled Composer send actions use disabled surface/text tokens and a
+  transparent border instead of a faded accent fill; hover does not promote
+  disabled actions. Enabled send and active stop retain their distinct emphasis.
+- Editorial Markdown keeps the 14px body and shared reading measure, with 1.75
+  line height, 0.85em paragraph spacing, and 600-weight headings with greater
+  separation above than below. Streaming and settled content share these rules.
+- Table headers use 600 weight; code toolbar labels use 11px and copy targets
+  are at least 28px high with hover and focus feedback. Preserve the code
+  viewport, virtualized line height, full-copy behavior, and source whitespace.
+- `回到最新` is a neutral 32px utility action with a downward arrow, aligned to
+  the reading track right edge above Composer. Preserve user-owned reading
+  anchors, unseen counts, and existing follow-latest behavior.

@@ -15,8 +15,8 @@
   border-radius: 999px;
   background: var(--danger);
   color: var(--surface);
-  font-size: 9px;
-  font-weight: 760;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -33,8 +33,8 @@
   background: var(--surface-raised);
   box-shadow: var(--shadow-floating);
   color: var(--text-primary);
-  font-size: 11px;
-  font-weight: 540;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
   line-height: 1.3;
   opacity: 0;
   pointer-events: none;
@@ -90,13 +90,13 @@
 .heading {
   margin: 0;
   color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 680;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
 }
 
 .header small {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .clear {
@@ -109,8 +109,8 @@
   border-radius: 7px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .clear[data-hovered] {
@@ -178,15 +178,15 @@
 .itemHeader strong {
   min-width: 0;
   color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.45;
 }
 
 .itemHeader time,
 .copy small {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
 }
 
@@ -195,7 +195,7 @@
 }
 
 .copy > span:not(.itemHeader) {
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.55;
 }
 
@@ -212,11 +212,11 @@
 
 .empty strong {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-interface);
 }
 
 .empty span {
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 @media (prefers-reduced-motion: reduce) {

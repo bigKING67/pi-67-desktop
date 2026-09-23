@@ -188,7 +188,7 @@ async function launchCertificationApplication(artifact, directories) {
     await page.getByRole("button", { name: "选择工作区" }).waitFor({ state: "visible", timeout: 15_000 });
     await installWorkspaceDialogResult(application, directories.workspace);
     await page.getByRole("button", { name: "选择工作区" }).click();
-    await page.getByLabel("当前状态：Pi SDK 已就绪").waitFor({ state: "visible", timeout: 30_000 });
+    await page.getByLabel("当前状态：就绪").waitFor({ state: "visible", timeout: 30_000 });
     if (page.url() !== "app://pi67/index.html") {
       throw new Error(`Windows native certification loaded an unexpected renderer URL: ${page.url()}.`);
     }

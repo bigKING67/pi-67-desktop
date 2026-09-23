@@ -1,5 +1,5 @@
 import type { LocatedMessageWindow, SessionMessageView } from "@pi67/domain";
-import { CircleAlert, MessageSquareText } from "lucide-react";
+import { ArrowDown, CircleAlert, MessageSquareText } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "../app/app-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
@@ -325,6 +325,7 @@ export function Transcript() {
       />
       {!historicalWindow && !atBottom ? (
         <button className={styles.latestButton} onClick={returnToLatest} type="button">
+          <ArrowDown aria-hidden="true" size={14} />
           回到最新{unseenRowCount > 0 ? ` · ${unseenRowCount} 条新内容` : ""}
         </button>
       ) : null}

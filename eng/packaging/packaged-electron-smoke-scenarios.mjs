@@ -78,7 +78,7 @@ export async function openPackagedSmokeWorkspace({ application, window, workspac
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selectedWorkspace] });
   }, workspace);
   await window.getByRole("button", { name: "选择工作区" }).click();
-  await window.getByLabel("当前状态：Pi SDK 已就绪").waitFor({ state: "visible", timeout: 30_000 });
+  await window.getByLabel("当前状态：就绪").waitFor({ state: "visible", timeout: 30_000 });
   await window.getByRole("list", { name: "工作区与对话" }).waitFor({ state: "visible", timeout: 30_000 });
   const rows = window.locator('[data-testid="conversation-row"]');
   await rows.first().waitFor({ state: "visible", timeout: 30_000 });

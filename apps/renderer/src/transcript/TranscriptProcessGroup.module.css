@@ -68,15 +68,15 @@
 .summaryCopy strong {
   overflow: hidden;
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 620;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .summaryCopy small {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   white-space: nowrap;
 }
 
@@ -154,8 +154,8 @@
   margin-bottom: 3px;
   color: var(--text-tertiary);
   font-family: var(--font-code);
-  font-size: 10px;
-  font-weight: 620;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -163,7 +163,7 @@
 .reasoning > div,
 .narration > div {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   line-height: 1.62;
 }
 
@@ -178,7 +178,7 @@
   border-left: 2px solid var(--warning);
   background: color-mix(in srgb, var(--warning) 6%, transparent);
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
 }
 
@@ -192,14 +192,14 @@
 
 .timelineStatus strong {
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 580;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-medium);
   line-height: 1.45;
 }
 
 .timelineStatus small {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
 }
 
@@ -256,4 +256,40 @@
     transition: none;
     animation: none;
   }
+}
+
+.group > summary:has(.issueAction) {
+  grid-template-columns: 16px minmax(0, auto) auto 16px;
+}
+
+.issueAction,
+.filterNotice button {
+  border: 0;
+  border-radius: 4px;
+  padding: 3px 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--font-size-support);
+  cursor: pointer;
+}
+
+.issueAction:hover,
+.filterNotice button:hover { background: var(--surface-hover); }
+.issueAction:focus-visible,
+.filterNotice button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.filterNotice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0 25px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-support);
+}
+
+@media (max-width: 760px) {
+  .group > summary:has(.issueAction) { grid-template-columns: 16px minmax(0, 1fr) 16px; }
+  .issueAction { grid-column: 2; grid-row: 2; justify-self: start; }
+  .chevron { grid-column: 3; grid-row: 1; }
 }

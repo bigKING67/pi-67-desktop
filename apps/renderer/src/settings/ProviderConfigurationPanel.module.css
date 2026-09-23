@@ -69,7 +69,7 @@
 .syncStatus small {
   color: var(--text-tertiary);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .conflict,
@@ -108,8 +108,8 @@
 .secondarySection header small,
 .sectionIntro small {
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 400;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
 }
 
 .conflict button {
@@ -119,7 +119,7 @@
   border-radius: 7px;
   background: transparent;
   color: inherit;
-  font-size: 11px;
+  font-size: var(--font-size-support);
 }
 
 .workspace {
@@ -176,7 +176,7 @@
   border-radius: 7px;
   background: var(--surface);
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: var(--font-size-interface);
 }
 
 .providerSearch input:focus,
@@ -296,19 +296,19 @@
 }
 
 .providerList strong {
-  font-size: 12px;
+  font-size: var(--font-size-interface);
 }
 
 .providerList small {
   color: var(--text-tertiary);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
 }
 
 .providerList em {
   flex: 0 0 auto;
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   font-style: normal;
 }
 
@@ -320,7 +320,7 @@
   margin: 0;
   padding: 10px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-support);
 }
 
 .providerListEmpty {
@@ -354,8 +354,8 @@
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 620;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 
 .providerBackButton[data-hovered] {
@@ -410,8 +410,8 @@
   border: 0;
   background: transparent;
   color: var(--text-tertiary);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 
 .sectionTabs button::after {
@@ -480,7 +480,7 @@
 
 .sectionIntro strong,
 .sectionHeaderWithAction strong {
-  font-size: 13px;
+  font-size: var(--font-size-interface);
 }
 
 .fieldGrid {
@@ -493,7 +493,7 @@
   display: grid;
   gap: 5px;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .field input,
@@ -505,7 +505,7 @@
   border-radius: 7px;
   background: var(--surface-muted);
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-interface);
 }
 
 .field input:focus,
@@ -523,7 +523,7 @@
 
 .field small {
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
 }
 
 .checkRow {
@@ -537,7 +537,7 @@
   align-items: center;
   gap: 6px;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .advancedDetails,
@@ -558,8 +558,8 @@
   padding: 0 11px;
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   list-style: none;
 }
 
@@ -573,8 +573,8 @@
   flex: 0 0 auto;
   color: var(--text-tertiary);
   content: "+";
-  font-size: 15px;
-  font-weight: 400;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
 }
 
 .advancedDetails[open] > summary::after,
@@ -586,7 +586,7 @@
   margin: 0;
   padding: 0 11px 8px;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-support);
   line-height: 1.5;
 }
 
@@ -600,7 +600,7 @@
 .trustNotice {
   margin: 0;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
 }
 
@@ -628,7 +628,7 @@
 
 .connectionPrimary strong {
   color: var(--warning);
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .connectionPrimary[data-configured="true"] strong {
@@ -637,7 +637,7 @@
 
 .connectionPrimary small {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   line-height: 1.5;
 }
 
@@ -661,8 +661,8 @@
 
 .connectionFacts dt {
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 650;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .connectionFacts dd {
@@ -672,7 +672,7 @@
   gap: 6px 10px;
   margin: 0;
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.55;
 }
 
@@ -680,7 +680,7 @@
   overflow-wrap: anywhere;
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .headersEditor {
@@ -691,7 +691,7 @@
 
 .headerEmpty {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .headerChips {
@@ -710,7 +710,7 @@
   background: var(--surface);
   color: var(--text-secondary);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
 }
 
 .headerChips button {
@@ -748,7 +748,7 @@
   background: var(--surface);
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.55;
 }
 
@@ -774,7 +774,7 @@
 .fileDetails > summary em,
 .fileList em {
   color: var(--danger);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   font-style: normal;
 }
 
@@ -805,7 +805,7 @@
   overflow: hidden;
   color: var(--text-tertiary);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -818,7 +818,7 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--danger) 7%, transparent);
   color: var(--danger);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .diagnostics strong {
@@ -828,7 +828,7 @@
 .error {
   margin: 0;
   color: var(--danger);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .panelEmpty {
@@ -847,12 +847,12 @@
 
 .panelEmpty strong {
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .panelEmpty span {
   max-width: 520px;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
 }
 

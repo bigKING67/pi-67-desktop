@@ -50,7 +50,7 @@
   border: 0;
   background: transparent;
   color: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-support);
 }
 
 .workspace-file-tab > span:last-child {
@@ -65,7 +65,7 @@
   justify-content: center;
   border-right: 1px solid var(--border);
   color: var(--text-secondary);
-  font-weight: 650;
+  font-weight: var(--font-weight-semibold);
 }
 
 .workspace-file-tab.is-conversation[aria-selected="true"] {
@@ -140,12 +140,12 @@
   gap: 2px;
 }
 
-.workspace-file-document-header strong { font-size: 12px; }
+.workspace-file-document-header strong { font-size: var(--font-size-interface); }
 .workspace-file-document-header code {
   overflow: hidden;
   color: var(--text-tertiary);
   font-family: var(--font-code);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -164,7 +164,7 @@
   border-radius: 6px;
   background: var(--surface);
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--font-size-support);
 }
 
 .workspace-file-document-actions button:hover,
@@ -182,7 +182,7 @@
   border-bottom: 1px solid color-mix(in srgb, var(--warning) 30%, var(--border));
   background: color-mix(in srgb, var(--warning) 8%, var(--surface));
   color: var(--warning);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .workspace-file-conflict span { min-width: 0; flex: 1; color: var(--text-secondary); }
@@ -201,17 +201,17 @@
   text-align: center;
 }
 
-.workspace-file-state strong { color: var(--text-primary); font-size: 14px; }
-.workspace-file-state p { max-width: 420px; margin: 0; font-size: 11px; line-height: 1.55; }
+.workspace-file-state strong { color: var(--text-primary); font-size: var(--font-size-body); }
+.workspace-file-state p { max-width: 420px; margin: 0; font-size: var(--font-size-support); line-height: 1.55; }
 
 .workspace-file-name-modal,
 .workspace-file-close-modal { width: min(500px, calc(100vw - 32px)); }
 .workspace-file-name-dialog { display: block; }
 .workspace-file-close-dialog { display: grid; gap: 13px; padding: 20px; }
 .workspace-file-name-dialog h2,
-.workspace-file-close-dialog h2 { margin: 0; font-size: 17px; }
+.workspace-file-close-dialog h2 { margin: 0; font-size: var(--font-size-section); }
 .workspace-file-name-dialog p,
-.workspace-file-close-dialog p { margin: 0; color: var(--text-secondary); font-size: 11px; line-height: 1.55; }
+.workspace-file-close-dialog p { margin: 0; color: var(--text-secondary); font-size: var(--font-size-support); line-height: 1.55; }
 .workspace-file-name-dialog form { gap: 16px; }
 .workspace-file-dialog-header { display: grid; gap: 7px; }
 .workspace-file-dialog-location {
@@ -224,15 +224,15 @@
   border-radius: 7px;
   background: var(--surface-muted);
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 .workspace-file-dialog-location svg { flex: 0 0 auto; color: var(--text-tertiary); }
 .workspace-file-dialog-location span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-file-name-field,
 .workspace-file-format-field { display: grid; gap: 7px; }
 .workspace-file-name-field > label,
-.workspace-file-format-field > span { color: var(--text-primary); font-size: 12px; font-weight: 650; }
-.workspace-file-name-field input { height: 40px; font-family: var(--font-code); font-size: 13px; }
+.workspace-file-format-field > span { color: var(--text-primary); font-size: var(--font-size-support); font-weight: var(--font-weight-semibold); }
+.workspace-file-name-field input { height: 40px; font-family: var(--font-code); font-size: var(--font-size-interface); }
 .workspace-file-name-field[data-invalid] input,
 .workspace-file-name-field input[aria-invalid="true"] { border-color: var(--danger); }
 .workspace-file-field-support {
@@ -241,11 +241,11 @@
   justify-content: space-between;
   gap: 12px;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   line-height: 1.45;
 }
 .workspace-file-detected-format { flex: 0 0 auto; color: var(--accent-strong); font-family: var(--font-code); }
-.workspace-file-field-error { color: var(--danger); font-size: 11px; line-height: 1.4; }
+.workspace-file-field-error { color: var(--danger); font-size: var(--font-size-caption); line-height: 1.4; }
 .workspace-file-format-field select {
   width: 100%;
   height: 38px;
@@ -254,9 +254,9 @@
   border-radius: 8px;
   background: var(--surface);
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-interface);
 }
-.workspace-file-format-field small { color: var(--text-tertiary); font-size: 10px; line-height: 1.45; }
+.workspace-file-format-field small { color: var(--text-tertiary); font-size: var(--font-size-caption); line-height: 1.45; }
 .workspace-file-dialog-actions { padding-top: 2px; }
 .workspace-file-discard-button { border: 0; background: transparent; color: var(--danger); }
 

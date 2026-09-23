@@ -26,7 +26,7 @@
   gap: var(--space-3);
   padding: 8px 10px;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .slashPicker header {
@@ -35,15 +35,15 @@
 
 .slashPicker header strong {
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 650;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .slashPicker > p {
   margin: 0;
   padding: 16px 12px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-support);
 }
 
 .slashPicker footer {
@@ -70,8 +70,8 @@
 .slashCommandGroupHeading {
   padding: 5px 8px 3px;
   color: var(--text-tertiary);
-  font-size: 9px;
-  font-weight: 650;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.05em;
 }
 
@@ -116,13 +116,13 @@
 
 .slashCommandList strong {
   font-family: var(--font-code);
-  font-size: 11px;
-  font-weight: 620;
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
 }
 
 .slashCommandList small {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .slashCommandList em {
@@ -130,6 +130,6 @@
   border-radius: 999px;
   background: var(--surface-muted);
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   font-style: normal;
 }

@@ -19,7 +19,7 @@ describe("TranscriptProcessGroup outcome", () => {
     const html = renderToStaticMarkup(createElement(TranscriptProcessGroup, { row }));
 
     expect(html).toContain('data-process-outcome="completed-with-warnings"');
-    expect(html).toContain("执行完成");
+    expect(html).toContain("执行已结束");
     expect(html).toContain("7 次工具调用 · 2 个步骤未成功");
     expect(html).not.toMatch(/<details[^>]* open=""/u);
   });

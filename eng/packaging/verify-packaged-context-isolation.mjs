@@ -84,7 +84,7 @@ try {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [workspace] });
   }, directories.workspace);
   await window.getByRole("button", { name: "选择工作区" }).click();
-  await window.getByLabel("当前状态：Pi SDK 已就绪").waitFor({ state: "visible", timeout: 45_000 });
+  await window.getByLabel("当前状态：就绪").waitFor({ state: "visible", timeout: 45_000 });
   await window.getByRole("textbox", { name: "给 Pi 发送消息" }).fill("Verify the isolated packaged Session and empty synthetic memory recall.");
   await window.getByRole("button", { name: "发送", exact: true }).click();
   await window.locator(

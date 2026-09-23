@@ -44,6 +44,15 @@ describe("MarkdownView", () => {
       .toBe(settled);
   });
 
+  it.each(["settled", "streaming"] as const)("renders unlabelled and indented blocks with copy controls in %s mode", (mode) => {
+    const html = renderMarkdown("Inline `identifier` stays inline.\n\n```\nfirst\nsecond\n```\n\n    indented", mode);
+    expect(html.match(/data-testid="code-block"/gu)).toHaveLength(2);
+    expect(html.match(/复制/gu)).toHaveLength(2);
+    expect(html).toContain("<code>identifier</code>");
+    expect(html).toContain("first\nsecond");
+    expect(html).not.toMatch(/<pre[^>]*><div/u);
+  });
+
   it("does not execute or mount raw HTML", () => {
     const html = renderMarkdown("<script>window.injected = true</script>\n\n安全正文", "settled");
 

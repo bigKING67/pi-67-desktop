@@ -23,7 +23,7 @@
 
 .header h2 {
   margin: -7px 0 0;
-  font-size: 18px;
+  font-size: var(--font-size-heading);
 }
 
 .reason,
@@ -52,13 +52,13 @@
   border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--warning) 9%, var(--surface));
   color: var(--warning);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   line-height: 1.5;
 }
 
 .securityWarning strong {
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-interface);
 }
 
 .details {
@@ -81,15 +81,15 @@
 
 .details dt {
   color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 
 .details dd {
   min-width: 0;
   margin: 0;
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
 }
 
 .securityLiteral {
@@ -103,7 +103,7 @@
   margin: 0;
   overflow: auto;
   color: inherit;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.55;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
@@ -113,16 +113,16 @@
   display: block;
   margin-top: 4px;
   color: var(--warning);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .details .literalStatus {
   color: var(--danger);
-  font-weight: 650;
+  font-weight: var(--font-weight-semibold);
 }
 
 .denial {
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .yoloNotice {
@@ -130,7 +130,7 @@
   border: 1px solid color-mix(in srgb, var(--warning) 32%, var(--border));
   border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--warning) 8%, var(--surface));
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .yoloButton {
@@ -140,8 +140,8 @@
   border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--warning) 12%, var(--surface));
   color: var(--warning);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 
 .yoloButton[data-hovered] {

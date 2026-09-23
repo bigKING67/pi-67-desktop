@@ -25,14 +25,14 @@
 .eyebrow {
   color: var(--text-secondary);
   font-family: var(--font-code);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 
 .copy h1 {
   margin: 2px 0 0;
-  font-size: 24px;
-  font-weight: 690;
+  font-size: var(--font-size-display);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: -0.025em;
   line-height: 1.2;
 }
@@ -40,7 +40,7 @@
 .copy > p {
   margin: 22px 0 0;
   color: var(--text-secondary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   line-height: 1.65;
 }
 
@@ -48,7 +48,7 @@
   min-height: 40px;
   margin-top: 24px;
   padding: 0 16px;
-  font-size: 13px;
+  font-size: var(--font-size-interface);
 }
 
 .facts {
@@ -75,12 +75,12 @@
 
 .facts strong {
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-interface);
 }
 
 .facts small {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   line-height: 1.45;
 }
 

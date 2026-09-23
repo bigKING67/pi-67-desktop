@@ -15,12 +15,12 @@
 
 .dialog h2 {
   color: var(--text-primary);
-  font-size: 18px;
+  font-size: var(--font-size-heading);
 }
 
 .dialog p {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-support);
   line-height: 1.6;
 }
 
@@ -52,13 +52,13 @@
 .facts dt,
 .facts dd {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
 }
 
 .facts dt {
   color: var(--text-secondary);
-  font-weight: 650;
+  font-weight: var(--font-weight-semibold);
 }
 
 .facts dd {
@@ -82,8 +82,8 @@
   border-radius: var(--radius-control);
   background: var(--danger);
   color: var(--text-on-danger);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
 }
 
 .dangerButton[data-hovered] {
