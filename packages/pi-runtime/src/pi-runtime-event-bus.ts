@@ -4,7 +4,10 @@ import type {
 } from "@pi67/domain";
 import type { AgentEvent } from "@pi67/protocol";
 
+import { RuntimeResponseTimings } from "./runtime-response-timing.js";
+
 export class PiRuntimeEventBus {
+  readonly responseTimings = new RuntimeResponseTimings();
   private readonly agentListeners = new Set<(event: AgentEvent) => void>();
   private readonly activityListeners = new Set<(activity: RuntimeOperationActivity) => void>();
   private readonly toolExecutionListeners = new Set<(execution: ToolExecutionView) => void>();
@@ -25,6 +28,7 @@ export class PiRuntimeEventBus {
   }
 
   emitAgent(event: AgentEvent): void {
+    if (event.type === "turn.streamBatch") this.responseTimings.emitted(event.payload.events);
     this.agentListeners.forEach((listener) => listener(event));
   }
 

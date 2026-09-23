@@ -4,6 +4,8 @@ import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path
 import { isContainedRelativePath } from "./desktop-capability-catalog.js";
 
 const MAX_METADATA_BYTES = 1_000_000;
+const HASH_READ_CONCURRENCY = 8;
+const HASH_READ_BATCH_BYTES = 2 * 1024 * 1024;
 
 export async function copyCapabilityDirectory(
   source: string,
@@ -36,6 +38,20 @@ export async function copyCapabilityDirectory(
 
 export async function capabilityTreeSha256(root: string, includeNodeModules = false): Promise<string> {
   const hash = createHash("sha256");
+  // Preserve traversal order; batch by observed size and read oversized files alone.
+  const pending: { path: string; relativePath: string }[] = [];
+  let pendingBytes = 0;
+  const flush = async (): Promise<void> => {
+    const results = await Promise.allSettled(pending.map((file) => readFile(file.path)));
+    for (const [index, result] of results.entries()) {
+      if (result.status === "rejected") throw result.reason;
+      hash.update(`f\0${pending[index]!.relativePath}\0`);
+      hash.update(result.value);
+      hash.update("\0");
+    }
+    pending.length = 0;
+    pendingBytes = 0;
+  };
   const visit = async (directory: string): Promise<void> => {
     const entries = (await readdir(directory, { withFileTypes: true }))
       .filter((entry) => entry.name !== ".DS_Store" && (includeNodeModules || entry.name !== "node_modules"))
@@ -48,15 +64,19 @@ export async function capabilityTreeSha256(root: string, includeNodeModules = fa
       if (metadata.isDirectory()) {
         await visit(path);
       } else if (metadata.isFile()) {
-        hash.update(`f\0${relativePath}\0`);
-        hash.update(await readFile(path));
-        hash.update("\0");
+        if (pending.length > 0 && (pending.length >= HASH_READ_CONCURRENCY || pendingBytes + metadata.size > HASH_READ_BATCH_BYTES)) {
+          await flush();
+        }
+        pending.push({ path, relativePath });
+        pendingBytes += metadata.size;
+        if (pendingBytes >= HASH_READ_BATCH_BYTES) await flush();
       } else {
         throw new Error(`Unsupported Desktop capability entry: ${path}`);
       }
     }
   };
   await visit(root);
+  await flush();
   return hash.digest("hex");
 }
 

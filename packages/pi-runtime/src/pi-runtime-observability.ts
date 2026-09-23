@@ -6,16 +6,20 @@ import { projectRuntimeDiagnostics, projectRuntimeIdentity } from "./runtime-met
 import type { RuntimeProjectionController } from "./runtime-projection-controller.js";
 import type { RuntimeSessionBindings } from "./runtime-session-bindings.js";
 
+import type { RuntimeResponseTimings } from "./runtime-response-timing.js";
+
 export function collectPiRuntimeDiagnostics(
   bindings: RuntimeSessionBindings,
-  projections: RuntimeProjectionController
+  projections: RuntimeProjectionController,
+  responseTimings?: RuntimeResponseTimings
 ): RuntimeDiagnostics {
-  return projectRuntimeDiagnostics(
+  const diagnostics = projectRuntimeDiagnostics(
     bindings.runtime,
     bindings.extensions,
     VERSION,
     projections.getToolExecutionReceiptFailureCount()
   );
+  return { ...diagnostics, ...(responseTimings ? { responseTiming: responseTimings.snapshot() } : {}) };
 }
 
 export async function runPiRuntimeDoctor(

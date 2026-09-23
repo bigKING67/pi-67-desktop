@@ -10,14 +10,15 @@ const serveEnvironment: ConfigEnv = {
 };
 
 describe("renderer Vite dependency optimization", () => {
-  it("discovers the Shiki worker during the initial dependency scan", async () => {
+  it("discovers both transcript workers during the initial dependency scan", async () => {
     expect(typeof viteConfig).toBe("function");
 
     const config = await (viteConfig as UserConfigFn)(serveEnvironment);
 
     expect(config.optimizeDeps?.entries).toEqual([
       "index.html",
-      "src/transcript/code-highlighter.worker.ts"
+      "src/transcript/code-highlighter.worker.ts",
+      "src/transcript/streaming-markdown-parser.worker.ts"
     ]);
   });
 });

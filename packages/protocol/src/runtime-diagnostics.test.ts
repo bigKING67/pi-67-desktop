@@ -186,3 +186,22 @@ describe("runtime diagnostics boundary", () => {
     })).toBe(false);
   });
 });
+
+describe("bounded first-response diagnostics", () => {
+  const timing = { scope: "runtime-to-stream-emission", receipts: [{
+    sequence: 1, status: "running", elapsedMs: 12, sdkPromptInvokedMs: 5
+  }] };
+  it("accepts partial numeric milestones without pretending network or paint evidence", () => {
+    expect(isRuntimeDiagnostics({ ...diagnostics, responseTiming: timing })).toBe(true);
+  });
+  it("rejects content, unbounded receipts and invalid times at the diagnostic boundary", () => {
+    for (const responseTiming of [
+      { ...timing, prompt: "private" },
+      { ...timing, receipts: Array.from({ length: 9 }, () => timing.receipts[0]) },
+      { ...timing, receipts: [{ ...timing.receipts[0], firstTextMs: -1 }] },
+      { ...timing, receipts: [{ ...timing.receipts[0], firstTextMs: Infinity }] },
+      { ...timing, receipts: [{ ...timing.receipts[0], text: "private" }] },
+      { ...timing, scope: "network-ttft" }
+    ]) expect(isRuntimeDiagnostics({ ...diagnostics, responseTiming })).toBe(false);
+  });
+});

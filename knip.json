@@ -28,6 +28,7 @@
       "project": ["src/**/*.ts"]
     },
     "apps/renderer": {
+      "ignoreDependencies": ["decode-named-character-reference"],
       "entry": ["src/context-memory/ExperienceInspectorPanel.browser-fixture.tsx"],
       "project": ["src/**/*.{ts,tsx}"]
     },

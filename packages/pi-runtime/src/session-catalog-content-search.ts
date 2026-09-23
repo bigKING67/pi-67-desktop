@@ -1,11 +1,11 @@
-import type {
-  SessionCatalogStatus,
-  WorkspaceMessageSearchResult
+import {
+  RuntimeError,
+  type SessionCatalogStatus,
+  type WorkspaceMessageSearchResult
 } from "@pi67/domain";
 import type { SessionCatalogContext } from "./session-catalog-contract.js";
 import type { SessionCatalogIndexCoordinator } from "./session-catalog-index-coordinator.js";
-import { sessionCatalogSummaryFromRecord } from "./session-catalog-projection.js";
-import { searchIndexedSessionContent } from "./session-content-index.js";
+import { sessionCatalogSummaryFromRecord, sortSessionCatalogRecords } from "./session-catalog-projection.js";
 import { searchWorkspaceSessionContent } from "./session-content-search.js";
 import {
   supportsSessionContentIndex,
@@ -20,6 +20,8 @@ export interface SessionCatalogContentSearchOptions {
   context: SessionCatalogContext;
   contextGeneration: number;
   records: readonly SessionCatalogRecord[];
+  revision(): number;
+  isCurrent(): boolean;
   status: SessionCatalogStatus;
   sqlite: SqliteSessionCatalog | undefined;
   indexes: SessionCatalogIndexCoordinator;
@@ -30,6 +32,18 @@ export interface SessionCatalogContentSearchOptions {
 export async function searchSessionCatalogContent(
   options: SessionCatalogContentSearchOptions
 ): Promise<WorkspaceMessageSearchResult> {
+  const revision = options.revision();
+  const result = await searchCurrentSnapshot({
+    ...options,
+    records: sortSessionCatalogRecords(options.records.filter(record => record.cwdKey === options.workspaceKey && record.archivedAt === undefined))
+  });
+  if (!options.isCurrent() || options.revision() !== revision) {
+    throw new RuntimeError("STALE_SESSION_CATALOG", "Session Catalog changed during content search.");
+  }
+  return result;
+}
+
+async function searchCurrentSnapshot(options: SessionCatalogContentSearchOptions): Promise<WorkspaceMessageSearchResult> {
   const { sqlite } = options;
   if (sqlite && options.status.source === "sqlite" && supportsSessionContentIndex(sqlite)) {
     try {
@@ -38,18 +52,14 @@ export async function searchSessionCatalogContent(
         options.indexes.awaitContent(options.context, options.contextGeneration),
         options.signal
       );
-      const outcome = await searchIndexedSessionContent({
+      const outcome = await options.indexes.searchContent(options.context, {
         workspaceId: options.workspaceId,
         workspaceKey: options.workspaceKey,
         query: options.query,
-        records: options.records,
         catalogIncomplete: options.status.incomplete || options.status.rebuilding,
         catalogSkippedCount: options.status.skippedCount,
-        sqlite,
-        ...(options.signal === undefined ? {} : { signal: options.signal })
-      });
+      }, options.signal);
       for (const fileIdentity of outcome.staleFileIdentities) {
-        sqlite.removeContentIndex(fileIdentity);
         const record = options.projectionRecord(fileIdentity);
         if (record) options.indexes.enqueueContent(record);
       }

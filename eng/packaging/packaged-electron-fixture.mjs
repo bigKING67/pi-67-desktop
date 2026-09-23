@@ -110,7 +110,7 @@ export function resolvePackagedArtifact(platform = process.platform, arch = proc
 }
 
 export async function assertPackagedRuntimeAssets(artifact, {
-  requiredAsarPaths = packagedAttachmentRequiredAsarPaths,
+  requiredAsarPaths = [...packagedAttachmentRequiredAsarPaths, "packages/pi-runtime/dist/session-content-index-worker.mjs"],
   requiredCapabilityPaths = ["packages/pi-workspace-resources/package.json"],
   requireWindowsPackageWorkerJob = true
 } = {}) {

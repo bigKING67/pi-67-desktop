@@ -90,6 +90,20 @@ const DiagnosticIncidentSchema = strictObject({
   binaryBytes: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }))
 });
 
+const ResponseTimingSchema = strictObject({
+  sequence: Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
+  status: Type.Union(["running", "resolved", "rejected", "cancelled", "queued", "interrupted"].map(value => Type.Literal(value))),
+  elapsedMs: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+  sessionCheckedMs: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  configurationReadyMs: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  sdkPromptInvokedMs: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  sdkAgentStartedMs: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  firstThinkingMs: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  firstTextMs: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  firstThinkingEmittedMs: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  firstTextEmittedMs: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+});
+
 export const RuntimeDiagnosticsSchema = strictObject({
   generatedAt: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
   application: Type.String({ minLength: 1, maxLength: 64 }),
@@ -110,6 +124,10 @@ export const RuntimeDiagnosticsSchema = strictObject({
     errorClass: Type.String({ minLength: 1, maxLength: 64, pattern: "^[A-Z0-9_]+$" })
   }), { maxItems: 64 }),
   toolExecutionReceiptFailureCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+  responseTiming: Type.Optional(strictObject({
+    scope: Type.Literal("runtime-to-stream-emission"),
+    receipts: Type.Array(ResponseTimingSchema, { maxItems: 8 })
+  })),
   host: Type.Optional(strictObject({
     hostEpoch: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
     taskCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),

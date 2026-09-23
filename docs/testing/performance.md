@@ -319,6 +319,19 @@ power-cycle cold cache、packaged Utility Process、MessagePort、OneDrive、Def
 - `longCodeHighlightMaxLongTask`：使用 Chromium Long Tasks API 暴露同步 tokenizer 的主线程
   阻塞风险；`longCodeComposerInputToPaint` 单独验证长代码投影完成后的输入响应，不能冒充
   tokenizer 执行期间的真实按键延迟。
+- `concurrentInputToFrame` / `concurrentScheduledInputToFrame` / `concurrentBatchSchedulingDelay`：
+  在加载 1,000 条历史消息后，同步执行 60 个每 50 ms 调度的 Markdown 增量、25 次合成草稿输入，
+  并在当前回答底部附近滚动。先投影 40 个合成段落，再增长至 100 段，内容包含标题、表格、列表和
+  行内代码；总文本受 64 KiB projection budget 约束。每轮保存原始样本，指标以各轮 p95 汇总。
+  输入指标分别从事件派发和原定调度时刻计时，避免忽略主线程阻塞期间的排队；下一次 rAF 不等于
+  物理显示完成，合成 InputEvent 不等于真实键盘或 IME。必须核对全部输出段落标记及最终草稿。
+- `concurrentStreamingMaxLongTask` / `concurrentStreamingDroppedFrames` / `concurrentStreamingElapsed`：
+  记录上述并发窗口的 Long Tasks、rAF 间隔和完成时间。初始 40 段的投影不在计时窗口内；
+  丢帧使用观测帧间隔中位数为基准，均匀低帧率可能被低估。这组指标暂为 informational，
+  不能套用短文本独立滚动的预算，也不能证明 packaged Electron、真实 Provider 或 Windows 性能。
+  该场景安排在原有 loaded-1k memory 采样之后，避免把持续增长的 Markdown DOM 混入历史消息预算。
+  性能 Agent 仅在 Main bridge 请求连接时交付 MessagePort，使用有效的 signed-out identity 和一条
+  对应 synthetic Session 的 catalog entry；不得以提前注入端口造成的恢复等待作为应用投影性能。
 - `packagedLongCodeHighlight`：使用另一份临时官方 Pi JSONL 打开 500 行 TypeScript 代码块，
   验证 production `app://pi67`、CSP、same-origin module worker、Shiki WASM、grammar 和虚拟行
   窗口真实协作；该信息项在大 session restore 与 recovery 计时之后运行，不污染两项预算。
@@ -339,6 +352,41 @@ wiring 下的草稿保留和 Enter 未被提交分支消费。
 ClearType 或 RDP；synthetic DOM composition 也不能证明 Microsoft Pinyin、候选窗定位、TSF、Narrator
 或真实 `isTrusted` 输入。正式 Windows DPI/IME 结论仍要求交互式 Windows 会话逐档录制配置、窗口、
 候选确认和第二次 Enter 发送行为。
+
+## Workspace content index
+
+Workspace 会话内容索引的 bigram HMAC 在每个输入文本内先去重，salt 每次调用只构造一次 KeyObject；
+保持原有哈希字节、首次出现顺序和 content-index-v2 版本，不缓存原始文本到持久层。
+SQLite 写入仍使用原有语句和原子事务，不在开放事务中让出事件循环。回归需覆盖 Unicode、
+重复字符对、哈希字节与顺序兼容、持久化隐私和搜索结果。性能收益须用相同负载复测。
+
+## Long streaming Markdown parser
+
+普通流式 Markdown 从 8,192 个源字符开始按组件启用 lazy module Worker，使用与既有
+`react-markdown` 相同的 `remark-parse` / `remark-gfm` 版本解析完整文档。主线程继续执行现有
+remark-to-rehype、React 渲染及 URL/image policy；数学文档与 settled 文档保留原路径。
+Worker 不增加 Main/Agent Host 命令、Provider 请求、缓存数据库或第二份 Session 真源。
+
+每个挂载文档最多一个 in-flight parse 加一个可覆盖的最新待处理源；已完成前缀可以先显示，
+不得因持续来新文本而无限丢弃全部解析结果。跨文档替换不展示旧树；settled/unmount 后终止 Worker。
+输入遵守 64 KiB UTF-8 projection 上限，加载/传输/响应错误或五秒无响应终止 Worker，并降级到
+原同步渲染。队列测试覆盖 coalescing、晚到响应、失配 ID、UTF-8 上限和超时。
+
+`decode-named-character-reference` 的 browser export 依赖 `document`。生产 Worker 构建显式
+解析到该包默认的 DOM-free export，开发 resolver 使用同一实现；主 Renderer 生产依赖解析保持原样。
+该构建依赖由 `vite.config.ts` 的精确文件 alias 使用，Knip 在 renderer workspace 单独声明此计算路径例外。
+不可用全局 DOM shim 掩盖 Worker 兼容问题。E2E 必须验证实际 `data-markdown-parser="worker"`、
+跨段晚到的 link definition、GFM 表格、HTML entity、阻止图片加载、会话切换时真实终止 Worker，以及
+Worker 加载失败后的完整同步输出。并发报告的 `markdownWorkerUsed` 用于区分实际 Worker 与 fallback。
+
+这是用线程调度减少主线程竞争，不能把它描述为减少全部解析计算、零额外内存或整体 Agent 推理提速。
+
+生命周期合成测量必须为每轮分配不同的 Operation ID，并为结束中的流发送带原 Operation ID 的
+`conversation.changed(reason="settled")` 与对应的完成事件；取消路径发送取消事件后再切换 Session。
+仅替换正文或 Session 不代表任务已结束，不能把此时的动画/计时开销当成空闲 CPU。
+同时观察真实 Worker 存活数、in-flight 请求数和 Renderer 进程内存；Worker 与 Renderer 共用进程，
+主线程 JS heap 不代表 Worker 总成本。自然空闲回落与显式 GC 后样本须分开报告，短期 RSS 上升
+或一次 GC 回落都不能单独证明持续泄漏或长期无泄漏。
 
 ## Explicit real Provider long-turn validation
 
@@ -451,3 +499,58 @@ Electron + accepted Operation + 超过 90 秒业务操作 + terminal receipt”�
 当前常规 harness 仍不证明 power-cycle cold launch、真实 Provider turn 的完整 memory 曲线、
 Provider-driven active-tool close、签名安装包升级或 Windows/macOS 另一平台。报告必须继续列出这些 unverified 项，
 不能因为较低层预算通过就删除。
+
+## Desktop capability integrity reads
+
+Capability tree hashing reads at most eight files concurrently and groups files
+using a 2 MiB budget based on observed file sizes; an oversized file is read alone.
+This is a scheduling budget, not a hard bound on a file that changes after `lstat`.
+Hash updates retain the existing sorted depth-first path/content framing. Symlink
+rejection, ignored entries, optional `node_modules`, and source/staging/active
+integrity checks remain unchanged. Each batch settles all reads before returning
+or throwing; no persistent hash cache bypasses content validation.
+
+Measure fresh-profile installation and existing-profile verification separately.
+Source-level timing of packaged capability files diagnoses filesystem costs;
+only a packaged Electron run supports an end-to-end startup claim.
+
+## Isolated content search index
+
+Measure foreground initialization and heartbeat gaps while the Worker builds a
+large synthetic index, separately from total indexing throughput. The Worker
+owns a private `content-index-worker` subdirectory and never opens the foreground
+catalog database. Validate query parity, archive/deletion filtering, source
+retirement, cancellation, worker exit/restart, and search fallback. A successful
+fallback does not prove Worker execution: packaged acceptance must also verify
+the independent index contains the expected committed projection.
+
+The `test` and `test:coverage` scripts build the runtime Worker entry before
+Vitest. Direct `pnpm exec vitest` runs of Worker tests require
+`pnpm --filter @pi67/pi-runtime run build:runtime` first. Node tests do not prove
+ASAR-relative Worker loading; validate that in the packaged Electron runtime.
+
+For memory attribution, compare the same packaged index/search algorithms with
+synchronous SQL on the utility thread and the actual packaged Worker, using fresh
+isolated utility processes, identical synthetic JSONL sizes and alternating run
+order. Report whole-process RSS separately from the parent isolate's JS heap;
+parent `heapUsed` excludes the Worker's heap. Capture cold indexing, repeated warm
+queries, metadata invalidations/rebuilds, idle and disposal. RSS sampling can miss
+peaks during synchronous event-loop stalls, so sampled maxima are lower bounds.
+Do not attribute all post-index RSS growth to the Worker, interpret immediate
+post-disposal RSS as retained live objects, or call a finite stress run proof of
+long-term leak freedom. Evaluate persisted-index restart latency and repeated
+thread recreation before introducing automatic idle termination. Diagnostic
+three-run medians are not the release p95 certification defined above.
+
+## First-response timing receipts
+
+Runtime diagnostics retain eight content-free, relative-time receipts at most.
+Validate first thinking separately from first text with the offline provider in
+`eng/performance/response-timing-fixture.ts`; verify schema/privacy bounds,
+settled listener cleanup, queued submission exclusion and incomplete failure or
+cancellation. Native acceptance must read the current ASAR runtime and export its
+receipt through the Main diagnostic boundary. Synthetic delays validate wiring,
+not real model speed. Runtime-to-stream-emission excludes Host admission queues,
+HTTP dispatch, first network bytes, Renderer receipt and visible paint; none may
+be inferred from SDK invocation or a first text delta. No default raw event log,
+forced Provider request or automatic diagnostic upload is permitted.

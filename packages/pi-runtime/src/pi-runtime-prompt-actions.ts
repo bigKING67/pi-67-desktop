@@ -4,8 +4,10 @@ import type { RuntimePromptAttachments } from "./runtime-prompt-attachments.js";
 import type { RuntimeSessionBindings } from "./runtime-session-bindings.js";
 import type { createRuntimeSessionCatalog } from "./runtime-session-catalog.js";
 import { clearSessionQueue } from "./session-queue.js";
+import type { RuntimeResponseTimings } from "./runtime-response-timing.js";
 
 interface PiRuntimePromptActionsOptions {
+  responseTimings?: RuntimeResponseTimings;
   sessionBindings: RuntimeSessionBindings;
   sessionCatalog: ReturnType<typeof createRuntimeSessionCatalog>;
   configurationReload: PiRuntimeConfigurationReload;
@@ -22,21 +24,35 @@ export class PiRuntimePromptActions {
     attachments?: PreparedPromptAttachmentSet,
     signal?: AbortSignal
   ): Promise<void> {
-    signal?.throwIfAborted();
-    await this.options.assertWritable();
-    signal?.throwIfAborted();
-    await this.options.configurationReload.assertReady();
-    signal?.throwIfAborted();
-    const session = this.options.sessionBindings.requireSession();
-    let completed = false;
+    const timing = this.options.responseTimings?.begin();
+    let unsubscribe: (() => void) | undefined;
+    let outcome: "resolved" | "rejected" = "rejected";
     try {
-      await this.options.promptAttachments.submit(session, text, attachments, signal);
-      completed = true;
+      signal?.throwIfAborted();
+      await this.options.assertWritable();
+      timing?.mark("sessionCheckedMs");
+      signal?.throwIfAborted();
+      await this.options.configurationReload.assertReady();
+      timing?.mark("configurationReadyMs");
+      signal?.throwIfAborted();
+      const session = this.options.sessionBindings.requireSession();
+      if (session.isStreaming) timing?.finish("queued");
+      else if (timing) unsubscribe = session.subscribe(event => timing.observe(event));
+      let completed = false;
+      try {
+        await this.options.promptAttachments.submit(session, text, attachments, signal,
+          timing ? () => timing.mark("sdkPromptInvokedMs") : undefined);
+        completed = true;
+      } finally {
+        await this.options.sessionCatalog.upsertCurrent("session-updated");
+        await this.options.configurationReload.apply();
+      }
+      if (completed) this.options.generateSemanticTitle();
+      outcome = "resolved";
     } finally {
-      await this.options.sessionCatalog.upsertCurrent("session-updated");
-      await this.options.configurationReload.apply();
+      unsubscribe?.();
+      timing?.finish(signal?.aborted ? "cancelled" : outcome);
     }
-    if (completed) this.options.generateSemanticTitle();
   }
 
   async steer(text: string, attachments?: PreparedPromptAttachmentSet, signal?: AbortSignal): Promise<void> {

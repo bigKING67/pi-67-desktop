@@ -28,6 +28,20 @@ export type RendererConnectionTeardownReason =
   | "request-cancellation-send-failed"
   | "disposed";
 
+export interface RuntimeResponseTiming {
+  sequence: number;
+  status: "running" | "resolved" | "rejected" | "cancelled" | "queued" | "interrupted";
+  elapsedMs: number;
+  sessionCheckedMs?: number;
+  configurationReadyMs?: number;
+  sdkPromptInvokedMs?: number;
+  sdkAgentStartedMs?: number;
+  firstThinkingMs?: number;
+  firstTextMs?: number;
+  firstThinkingEmittedMs?: number;
+  firstTextEmittedMs?: number;
+}
+
 export interface RuntimeDiagnostics {
   generatedAt: number;
   application: string;
@@ -43,6 +57,7 @@ export interface RuntimeDiagnostics {
   extensionErrors: Array<{ sourceHash: string; errorClass: string }>;
   toolExecutionReceiptFailureCount: number;
   host?: RuntimeHostDiagnostics;
+  responseTiming?: { scope: "runtime-to-stream-emission"; receipts: RuntimeResponseTiming[] };
 }
 
 export type RuntimeDiagnosticsCollectionFailure =

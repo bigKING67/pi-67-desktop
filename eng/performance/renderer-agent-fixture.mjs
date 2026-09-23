@@ -1,3 +1,5 @@
+export { installPerformanceSystemBridge } from "./renderer-system-bridge-fixture.mjs";
+
 import {
   eventEnvelope,
   isEventEnvelope,
@@ -65,7 +67,7 @@ export async function attachMockAgent(page, messageCount) {
       state: "ready",
       rebuilding: false,
       reconciledAt: Date.now(),
-      itemCount: 0,
+      itemCount: 1,
       incomplete: false,
       skippedCount: 0
     };
@@ -96,7 +98,8 @@ export async function attachMockAgent(page, messageCount) {
     const channel = new MessageChannel();
     const appInstanceId = "performance-app";
     const hostEpoch = 1;
-    const operationId = "performance-operation";
+    let operationId = "performance-operation";
+    let operationSequence = 0;
     let messageSequence = 0;
     let activeTaskContext;
     const requests = [];
@@ -162,12 +165,19 @@ export async function attachMockAgent(page, messageCount) {
       const type = envelope.type;
       requests.push(type);
       try {
-        let result = type === "workspace.register"
+        let result = type === "enterprise.identity.get"
+          ? { state: "signed-out" }
+          : type === "workspace.register"
           ? { registered: true }
           : type === "session.tree"
           ? snapshot.tree
           : type === "session.catalog.query"
-            ? { ...sessionCatalogStatus, items: [], total: 0, hasMore: false }
+            ? { ...sessionCatalogStatus, items: [{
+                id: snapshot.sessionId, fileIdentity: snapshot.sessionFileIdentity,
+                path: snapshot.sessionPath, cwd: snapshot.cwd,
+                name: "Performance session", nameSource: "explicit",
+                modifiedAt: 1, messageCount: messages.length
+              }], total: 1, hasMore: false }
           : type === "workspace.file.list"
             ? { workspaceId: "workspace-performance", entries: [], truncated: false }
           : type === "command.list"
@@ -224,8 +234,19 @@ export async function attachMockAgent(page, messageCount) {
       }
     }
 
+    let connected = false;
     globalThis.__pi67Performance = {
+      connect() {
+        if (connected) throw new Error("Performance fixture does not support port replacement.");
+        connected = true;
+        window.postMessage(
+          { source: "pi67-preload", type: "agent-port", appInstanceId, hostEpoch },
+          window.location.origin,
+          [channel.port1]
+        );
+      },
       async beginStreaming() {
+        operationId = `performance-operation-${++operationSequence}`;
         snapshot.streaming = true;
         await sendEvent("operation.started", {
           operation: {
@@ -250,7 +271,14 @@ export async function attachMockAgent(page, messageCount) {
           events: [{ assistantMessageEvent: { type: "text_delta", delta } }]
         }, operationId);
       },
+      async finishStreaming(cancelled = false) {
+        snapshot.streaming = false;
+        await sendEvent(cancelled ? "operation.cancelled" : "operation.completed", cancelled
+          ? { operationId, cancelledAt: Date.now(), reason: "Synthetic lifecycle cancellation" }
+          : { operationId, completedAt: Date.now() }, operationId);
+      },
       async showMarkdown(markdown, messageId) {
+        const wasStreaming = snapshot.streaming;
         snapshot.streaming = false;
         messages = [{
           id: messageId,
@@ -258,7 +286,7 @@ export async function attachMockAgent(page, messageCount) {
           parts: [{ type: "text", text: markdown }],
           createdAt: Date.now()
         }];
-        await sendEvent("conversation.changed", { sessionId: snapshot.sessionId, reason: "settled" });
+        await sendEvent("conversation.changed", { sessionId: snapshot.sessionId, reason: "settled" }, wasStreaming ? operationId : undefined);
       },
       async switchSession(marker, nextMessageCount) {
         messages = Array.from({ length: nextMessageCount }, (_, index) => ({
@@ -339,105 +367,9 @@ export async function attachMockAgent(page, messageCount) {
         eventSequence: messageSequence
       };
     }
-    window.postMessage(
-      { source: "pi67-preload", type: "agent-port", appInstanceId, hostEpoch },
-      window.location.origin,
-      [channel.port1]
-    );
   }, {
     count: messageCount,
     protocolVersion: PROTOCOL_VERSION,
     protocolRevision: PROTOCOL_REVISION
-  });
-}
-
-export async function installPerformanceSystemBridge(page) {
-  await page.addInitScript(() => {
-    const workspace = {
-      id: "workspace-performance",
-      displayName: "pi67-performance-workspace",
-      identity: {
-        canonicalPath: "/tmp/pi67-performance-workspace",
-        assurance: "path-only"
-      },
-      trust: "trusted",
-      trustProvenance: "native-picker",
-      availability: "available"
-    };
-    let workbenchState = {
-      version: 5,
-      workspaces: [],
-      workspaceOrder: [],
-      expandedWorkspaceIds: [],
-      runtimeRecovery: [],
-      sessionCreationRecovery: [],
-      workspaceEnvironments: [],
-      environmentMutations: [],
-      settings: { section: "general", scope: "global" },
-      cleanExit: false
-    };
-    Object.defineProperty(window, "pi67", {
-      configurable: false,
-      value: {
-        system: {
-          getPlatformInfo: async () => ({ platform: "darwin", architecture: "arm64", version: "performance" }),
-          ensureContextPanelRoom: async () => false,
-          connectAgentHost: async () => undefined,
-          loadWorkbenchState: async () => structuredClone(workbenchState),
-          updateWorkbenchLayout: async (layout) => {
-            workbenchState = { ...workbenchState, ...structuredClone(layout) };
-            return structuredClone(workbenchState);
-          },
-          pickAndAddWorkspace: async () => {
-            workbenchState = {
-              ...workbenchState,
-              workspaces: [workspace],
-              workspaceOrder: [workspace.id],
-              expandedWorkspaceIds: [workspace.id],
-              workspaceEnvironments: [{
-                workspaceId: workspace.id,
-                kind: "plain",
-                ownership: "user"
-              }],
-              currentWorkspaceId: workspace.id
-            };
-            return structuredClone(workspace);
-          },
-          inspectRepositoryEnvironment: async ({ workspaceId }) => ({
-            workspaceId,
-            status: "non-git",
-            revision: 1,
-            observedAt: Date.now(),
-            stale: false,
-            worktrees: []
-          }),
-          selectWorkspace: async () => "/tmp/pi67-performance-workspace",
-          selectSessionFile: async () => undefined,
-          saveDiagnostics: async () => undefined,
-          showNativeNotification: async () => true,
-          dismissNativeNotification: async () => true,
-          onNativeNotificationActivated: () => () => undefined,
-          requestOpenExternal: async () => false,
-          getUpdateState: async () => ({
-            phase: "disabled",
-            channel: "unsigned-preview",
-            currentVersion: "performance",
-            detail: "Performance fixture"
-          }),
-          checkForUpdates: async () => ({
-            phase: "disabled",
-            channel: "unsigned-preview",
-            currentVersion: "performance",
-            detail: "Performance fixture"
-          }),
-          onUpdateStateChanged: () => () => undefined,
-          onAgentHostFailed: () => () => undefined,
-          onAgentHostStartup: () => () => undefined,
-          completeShutdownCheckpoint: async () => true,
-          onShutdownCheckpointRequested: () => () => undefined,
-          onPowerResume: () => () => undefined
-        }
-      }
-    });
   });
 }

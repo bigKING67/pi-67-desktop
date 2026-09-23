@@ -13,7 +13,6 @@ import {
   normalizeSessionCatalogSearch,
   querySessionCatalogFallback,
   sanitizeSessionCatalogRecord,
-  sortSessionCatalogRecords,
   validateSessionCatalogContext,
   validateSessionCatalogQuery,
   type ValidatedSessionCatalogQuery
@@ -89,6 +88,9 @@ class DefaultSessionCatalog implements SessionCatalog {
       this.now
     );
     this.indexes = new SessionCatalogIndexCoordinator({
+      ...(options.directory === undefined ? {} : { contentIndexDirectory: options.directory }),
+      ...(options.storageRoot === undefined ? {} : { storageRoot: options.storageRoot }),
+      records: () => [...this.projectionRecords.values()],
       sqlite: () => this.sqlite,
       status: () => this.current,
       setStatus: (status) => { this.current = status; },
@@ -172,16 +174,15 @@ class DefaultSessionCatalog implements SessionCatalog {
       if (!this.isCurrentContext(context, contextGeneration)) {
         throw new RuntimeError("STALE_SESSION_CATALOG", "Session Catalog source changed during the query.");
       }
-      const records = sortSessionCatalogRecords([...this.projectionRecords.values()].filter((record) => (
-        record.cwdKey === workspaceKey && record.archivedAt === undefined
-      )));
       return searchSessionCatalogContent({
         workspaceId,
         workspaceKey,
         query,
         context,
         contextGeneration,
-        records,
+        records: [...this.projectionRecords.values()],
+        revision: () => this.current.revision,
+        isCurrent: () => this.isCurrentContext(context, contextGeneration),
         status: this.current,
         sqlite: this.sqlite,
         indexes: this.indexes,
@@ -251,7 +252,7 @@ class DefaultSessionCatalog implements SessionCatalog {
     this.disposed = true;
     this.contextGeneration += 1;
     this.reconcileFlight = undefined;
-    this.indexes.dispose();
+    await this.indexes.dispose();
     this.sqliteLifecycle.close();
     this.fallbackRecords = [];
     this.projectionRecords.clear();

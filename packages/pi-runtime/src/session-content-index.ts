@@ -1,4 +1,4 @@
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, createSecretKey } from "node:crypto";
 import { lstat } from "node:fs/promises";
 import { SessionManager, type SessionEntry } from "@earendil-works/pi-coding-agent";
 import {
@@ -205,9 +205,14 @@ export function normalizeSessionContentSearch(value: string): string {
 export function tokenHashesForText(value: string, salt: string): string[] {
   if (!/^[0-9a-f]{64}$/u.test(salt)) throw new Error("Content index salt is invalid.");
   const characters = Array.from(normalizeSessionContentSearch(value));
+  const key = createSecretKey(Buffer.from(salt, "hex"));
+  const pairs = new Set<string>();
   const hashes = new Set<string>();
   for (let index = 0; index + 1 < characters.length; index += 1) {
-    hashes.add(createHmac("sha256", Buffer.from(salt, "hex"))
+    const pair = characters[index]! + characters[index + 1]!;
+    if (pairs.has(pair)) continue;
+    pairs.add(pair);
+    hashes.add(createHmac("sha256", key)
       .update(characters[index]!)
       .update(characters[index + 1]!)
       .digest("hex")

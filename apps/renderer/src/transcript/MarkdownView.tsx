@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import type { Root } from "mdast";
+import type { Plugin } from "unified";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -8,6 +10,7 @@ import { classifyMarkdownLink } from "./markdown-link.js";
 import { normalizeMarkdownMath } from "./markdown-math.js";
 import { preserveMarkdownUrlForPolicy } from "./markdown-url.js";
 import styles from "./MarkdownView.module.css";
+import { useStreamingMarkdown } from "./use-streaming-markdown.js";
 
 interface MarkdownViewProps {
   children: string;
@@ -22,6 +25,7 @@ const MarkdownMathDocument = lazy(() => import("./MarkdownMathDocument.js").then
 export function MarkdownView({ children, mode = "settled", onOpenWorkspacePath }: MarkdownViewProps) {
   const streaming = mode === "streaming";
   const normalized = useMemo(() => normalizeMarkdownMath(children), [children]);
+  const parsed = useStreamingMarkdown(normalized.source, streaming && !normalized.hasMath);
   const components = useMemo<Components>(() => ({
     a: ({ href, children: linkChildren }) => {
       const target = classifyMarkdownLink(href);
@@ -88,20 +92,25 @@ export function MarkdownView({ children, mode = "settled", onOpenWorkspacePath }
     <Suspense fallback={<MarkdownDocument components={components}>{normalized.source}</MarkdownDocument>}>
       <MarkdownMathDocument components={components}>{normalized.source}</MarkdownMathDocument>
     </Suspense>
-  ) : <MarkdownDocument components={components}>{normalized.source}</MarkdownDocument>;
+  ) : <MarkdownDocument components={components} {...(parsed ? { tree: parsed.tree } : {})}>{parsed?.source ?? normalized.source}</MarkdownDocument>;
 
   return (
-    <div className={styles.body} data-markdown-math={normalized.hasMath || undefined} data-markdown-mode={mode}>
+    <div className={styles.body} data-markdown-math={normalized.hasMath || undefined} data-markdown-mode={mode} data-markdown-parser={parsed ? "worker" : undefined}>
       {document}
     </div>
   );
 }
 
-function MarkdownDocument({ children, components }: { children: string; components: Components }) {
+function MarkdownDocument({ children, components, tree }: { children: string; components: Components; tree?: Root }) {
+  const plugins = useMemo(() => {
+    if (!tree) return [remarkGfm];
+    const preparedParser: Plugin = function () { this.parser = () => tree; };
+    return [remarkGfm, preparedParser];
+  }, [tree]);
   return (
     <ReactMarkdown
       components={components}
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={plugins}
       urlTransform={preserveMarkdownUrlForPolicy}
     >
       {children}

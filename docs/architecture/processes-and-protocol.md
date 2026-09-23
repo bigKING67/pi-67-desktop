@@ -23,6 +23,32 @@ so connection waiters fail observably. This does not defer or omit validation of
 any message. The protocol package preserves module boundaries so lightweight IDs
 and context constants do not initialize transport schemas on the Welcome screen.
 
+## First-response diagnostic timing
+
+`diagnostics.collect` may include `responseTiming` with fixed scope
+`runtime-to-stream-emission`. Each Pi runtime keeps at most eight in-memory
+receipts for ordinary submit calls. Milestones are monotonic elapsed milliseconds
+from runtime submit entry: Session consistency check, pending configuration
+readiness, SDK prompt invocation, SDK agent start, first nonempty thinking/text
+increment and first corresponding Host stream-batch emission. Preparation before
+SDK invocation includes attachment/vision work; receipt elapsed time also includes
+post-prompt persistence. No prompt/body/path/credential/error text is retained.
+
+Receipts use fixed statuses: running, resolved, rejected, cancelled, queued or
+interrupted. Resolved means the submit call returned, not that a Provider answered
+successfully. Cancellation only reflects the observed submission AbortSignal.
+Missing milestones remain absent; never fill them with zero or invent network
+TTFT. A streaming Session's queued submit is excluded from event attribution;
+steer/follow-up, commands and subagents do not create these receipts. Subscriptions
+are scoped to the exact Session and removed when the submission settles.
+
+SDK invocation is not HTTP dispatch; SDK deltas are not first network bytes, and
+Host emission is not Renderer receipt or visible paint. These external/display
+stages remain unmeasured. Use supported Session subscriptions rather than
+intercepting transport or adopting the SDK's internal RPC preflight hook. Existing
+bounded diagnostic export carries these receipts on user request; no autonomous
+upload, Session entry, additional logging or Provider request is introduced.
+
 ## Responsibility boundaries
 
 Shared-knowledge receipt persistence belongs to Electron Main, not Agent Host or
@@ -2253,8 +2279,28 @@ single-owner lock；文件替换、恶意重写 version cookie、多 utility-pro
 Catalog 当前继续使用 DELETE journal。WAL 的 main/`-wal`/`-shm` private-file 校验、checkpoint、整组隔离、
 外部 writer detection 和 Windows Defender/同步盘锁定尚未形成同等证据，因此不与 schema v3 同时切换。
 当前 Pi SDK `0.86.1` 的 cold discovery 内部仍会临时构造 `allMessagesText`，但该值在适配边界立即
-丢弃，不进入 SQLite、Protocol、Renderer、日志或 diagnostics。当前不实现 FTS 或 transcript index；
+丢弃，不进入 SQLite、Protocol、Renderer、日志或 diagnostics。当前不实现 FTS 或明文 transcript index；
 活动 Session watcher 与 Catalog metadata discovery 保持独立，前者不会把 JSONL entry 写入 SQLite。
+
+#### Content search worker ownership
+
+会话内容搜索的 HMAC token 索引由单个 Node Worker 独占读写。Host 的 Catalog 目录下
+`content-index-worker/` 保存独立的可重建 SQLite 文件；沿用 Catalog schema/私有权限与恢复
+校验，并保存索引查询所需的 metadata 副本。它不是目录、会话或组织状态真源。旧 Catalog
+中的内容表保留供源码回退，但前台不再写入或查询它们；不迁移或删除 Pi JSONL。
+每次 Worker 请求使用 Host 当前 metadata snapshot 替换副本并淘汰不在 snapshot 中的索引；
+搜索仍按当前 workspace/归档状态过滤，并从 JSONL 验证候选正文 fingerprint。
+返回结果前核对 Host source generation 和 Catalog revision，变化则返回
+`STALE_SESSION_CATALOG`，不能接受旧 metadata 的搜索结果。
+
+Worker 使用自己的 SQLite connection 和文件，不与前台目录库共享写锁。每个 Catalog owner
+至多一个 Worker、一个执行中的请求和八个未完成请求；metadata snapshot 有 100000 条记录及
+16 MiB 保守字符串大小预算，超过预算走显式 incomplete 的现有有界搜索回退。每请求 30 秒
+截止；失败/取消执行中的请求、source reset 和 dispose 会终止 Worker，等待旧实例退出后
+才能创建新实例。排队中的搜索取消立即返回，且在执行前再次检查取消状态。独立库事务
+保持原子提交，进程退出后的未完成事务由 SQLite 回滚；下一次请求重新校验和重建。
+Worker 不运行 Agent loop、Provider 或 Tools，不记录消息正文、原始请求或 salt。Worker
+故障不会伪造完整索引；显式搜索沿用 bounded JSONL fallback 并标记 incomplete。
 
 ### Pi Session Recorded Changes
 

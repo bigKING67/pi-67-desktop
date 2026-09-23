@@ -40,7 +40,8 @@ export class RuntimePromptAttachments {
     session: AgentSession,
     text: string,
     attachments?: PreparedPromptAttachmentSet,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    onSdkPrompt?: () => void
   ): Promise<void> {
     signal?.throwIfAborted();
     const images = await this.images(attachments);
@@ -52,6 +53,7 @@ export class RuntimePromptAttachments {
     }
     if (assistance) await this.persistVisionAssistance(session, assistance);
     let lateAbort: Promise<void> | undefined;
+    onSdkPrompt?.();
     const prompt = session.prompt(text, {
       images: assistance ? [] : images,
       ...(session.isStreaming ? { streamingBehavior: "followUp" as const } : {}),

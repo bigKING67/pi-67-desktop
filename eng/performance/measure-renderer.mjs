@@ -8,6 +8,7 @@ import { MAX_PROJECTED_TEXT_BYTES } from "../../packages/domain/dist/index.mjs";
 import {
   createReport,
   droppedFrameRate,
+  percentile,
   enforceReport,
   printReport,
   resolveSampleCount,
@@ -29,6 +30,8 @@ import {
   loadAllOlderMessages,
   switchPerformanceSessions
 } from "./renderer-memory.mjs";
+
+import { measureStreamingInteraction } from "./renderer-streaming-interaction.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const samples = resolveSampleCount();
@@ -54,6 +57,7 @@ try {
   const composerSamples = [];
   const scrollSamples = [];
   const streamingSamples = [];
+  const concurrentSamples = [];
   const deferredHighlightResourceSamples = [];
   const coldCodeHighlightSamples = [];
   const warmCodeHighlightSamples = [];
@@ -90,6 +94,7 @@ try {
     const loadedMemory = await memory.sample();
     loadedTranscriptHeapSamples.push(loadedMemory.usedHeapMiB);
     loadedTranscriptNodeSamples.push(loadedMemory.nodes);
+    concurrentSamples.push(await measureStreamingInteraction(page));
     await switchPerformanceSessions(page, 10, 1_000);
     const switchedMemory = await memory.sample();
     switchedHeapSamples.push(switchedMemory.usedHeapMiB);
@@ -202,6 +207,33 @@ try {
       method: "Native textarea input event to next animation frame after the warm long-code block is fully rendered",
       limitations: ["Measures post-highlight responsiveness; in-task blocking is represented separately by longCodeHighlightMaxLongTask."]
     }),
+    ...[
+      ["concurrentInputToFrame", "Concurrent input event to animation frame", "inputToFrame"],
+      ["concurrentScheduledInputToFrame", "Concurrent scheduled input to animation frame including queue delay", "scheduledInputToFrame"],
+      ["concurrentBatchSchedulingDelay", "Concurrent stream batch scheduling delay", "batchSchedulingDelay"]
+    ].map(([id, label, key]) => summarizeMetric({
+      id, label, unit: "ms",
+      samples: concurrentSamples.map((sample) => percentile([...sample[key]].sort((a, b) => a - b), 0.95)),
+      evidenceLevel: "browser",
+      method: "Per-run p95 during 60 Markdown batches at 50 ms, 25 synthetic input events and live-answer scrolling over 1,000 loaded messages",
+      limitations: ["Informational stress workload; synthetic DOM input and requestAnimationFrame are not trusted keyboard or physical paint measurements."]
+    })),
+    summarizeMetric({
+      id: "concurrentStreamingMaxLongTask", label: "Concurrent streaming maximum main-thread long task", unit: "ms",
+      samples: concurrentSamples.map((sample) => sample.maxLongTask), evidenceLevel: "browser",
+      method: "Long Tasks API during concurrent Markdown streaming, input and scrolling"
+    }),
+    summarizeMetric({
+      id: "concurrentStreamingDroppedFrames", label: "Concurrent streaming dropped-frame rate", unit: "%",
+      samples: concurrentSamples.map((sample) => droppedFrameRate(sample.frames) * 100), evidenceLevel: "browser",
+      method: "Animation-frame gaps during the concurrent scenario, relative to the median observed frame interval",
+      limitations: ["A uniformly slow frame rate may be hidden by the median baseline; inspect elapsed duration and long tasks too."]
+    }),
+    summarizeMetric({
+      id: "concurrentStreamingElapsed", label: "Concurrent streaming elapsed time", unit: "ms",
+      samples: concurrentSamples.map((sample) => sample.elapsedMs), evidenceLevel: "browser",
+      method: "Three-second scheduled workload until the final stream marker is rendered and all input events complete"
+    }),
     ...createRendererMemoryMetrics({
       welcomeHeap: welcomeHeapSamples,
       restoredHeap: restoredHeapSamples,
@@ -217,6 +249,7 @@ try {
     metrics,
     unverified: []
   });
+  report.concurrentStreaming = concurrentSamples;
   await writeReport(outputPath, report);
   printReport(outputPath, report);
   enforceReport(report);
@@ -298,7 +331,7 @@ async function measureProjection(page) {
           .slice(0, 40);
         reject(new Error(
           `1,000-message projection timed out: url=${location.href}, testIds=${JSON.stringify(testIds)}, `
-          + `body=${document.body.innerText.slice(0, 500)}`
+          + `fixture=${JSON.stringify(globalThis.__pi67Performance?.diagnostics())}`
         ));
         return;
       }

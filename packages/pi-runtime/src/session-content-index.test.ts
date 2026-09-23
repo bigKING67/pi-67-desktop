@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { appendFile, mkdtemp, realpath, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,6 +7,7 @@ import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   indexSessionContentRecords,
+  normalizeSessionContentSearch,
   searchIndexedSessionContent,
   sessionContentProjectionVersion,
   tokenHashesForText
@@ -25,6 +26,19 @@ afterEach(async () => {
 });
 
 describe("indexed Workspace Session content search", () => {
+  it("preserves legacy hash bytes and first-occurrence order across repeated and Unicode pairs", () => {
+    const salt = "ab".repeat(32);
+    for (const text of ["", "a", "abababab", "小红书小红书", "😀a😀a", "Ａa e\u0301 é", "x\ud800x\ud800", "abc ".repeat(16000)]) {
+      const characters = Array.from(normalizeSessionContentSearch(text));
+      const expected = new Set<string>();
+      for (let index = 0; index + 1 < characters.length; index++) {
+        expected.add(createHmac("sha256", Buffer.from(salt, "hex"))
+          .update(characters[index]!).update(characters[index + 1]!).digest("hex").slice(0, 32));
+      }
+      expect(tokenHashesForText(text, salt)).toEqual([...expected]);
+    }
+    expect(() => tokenHashesForText("test", "bad-salt")).toThrow("salt is invalid");
+  });
   it("finds Chinese and Latin substrings once per Session without persisting raw text", async () => {
     const fixture = await createFixture();
     fixture.manager.appendMessage({ role: "user", content: "小红书投放复盘与 release marker", timestamp: 1 });

@@ -484,6 +484,10 @@ loading error where the operation can produce those states
   table scrolls only inside its keyboard-focusable table viewport and never
   widens the Transcript or application document. Streaming and settled text use
   the same semantic structure so completion does not replace the document layout.
+  Long streaming prose may retain the last parsed prefix while a Renderer Worker
+  parses the newest complete source. Completion must render the authoritative full
+  text immediately; changing Session or unmounting cancels the old parser, and a
+  parser failure falls back to the existing synchronous Markdown rendering path.
 - Formulae accept `$...$`, `$$...$$`, `\(...\)`, and `\[...\]`, plus fenced
   `math` blocks. Recognized formulae lazy-load KaTeX and its CSS rather than
   increasing the ordinary prose path. KaTeX emits HTML plus MathML with

@@ -10,9 +10,7 @@ import {
   type SessionSnapshot, type SessionTreeProjection, type SessionInteractionMode,
   type PlanImplementationRequestLineage, type TaskToolMode,
   type ToolExecutionView, type WorkspaceTrust,
-  type NativeSubagentMode,
-  type NativeSubagentView,
-  type NativeSubagentWaitResult
+  type NativeSubagentMode, type NativeSubagentView, type NativeSubagentWaitResult
 } from "@pi67/domain";
 import type { AgentEvent, AssetReadResult, PiConfigurationReloadState, SlashCommandCatalogResult,
   PromptAttachmentRef, RuntimeDiagnostics, StreamDelta } from "@pi67/protocol";
@@ -221,6 +219,7 @@ export class PiSdkRuntime implements AgentRuntime {
       assertWritable: () => this.assertSessionWritable()
     });
     this.promptActions = new PiRuntimePromptActions({
+      responseTimings: this.events.responseTimings,
       sessionBindings: this.sessionBindings,
       sessionCatalog: this.sessionCatalog,
       configurationReload: this.configurationReload,
@@ -426,7 +425,7 @@ export class PiSdkRuntime implements AgentRuntime {
   cancelInteractiveRequests(reason: ExtensionUiCancellationReason): string[] { return this.uiBridge.cancelAll(reason); }
 
   async collectDiagnostics(): Promise<RuntimeDiagnostics> {
-    return collectPiRuntimeDiagnostics(this.sessionBindings, this.projections);
+    return collectPiRuntimeDiagnostics(this.sessionBindings, this.projections, this.events.responseTimings);
   }
 
   async runDoctor(): Promise<DoctorReport> {

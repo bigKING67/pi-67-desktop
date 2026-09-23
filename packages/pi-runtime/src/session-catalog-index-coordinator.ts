@@ -3,9 +3,8 @@ import type {
 } from "@pi67/domain";
 import { SessionCatalogAutomaticTitlePublisher } from "./session-catalog-automatic-title-publisher.js";
 import { sortSessionCatalogRecords } from "./session-catalog-projection.js";
-import {
-  indexSessionContentRecords
-} from "./session-content-index.js";
+import { ContentIndexWorkerClient } from "./session-content-index-worker-client.js";
+import type { ContentIndexWorkerRequest } from "./session-content-index-worker-contract.js";
 import type { AutomaticTitleReadResult } from "./session-automatic-title.js";
 import {
   supportsSessionContentIndex,
@@ -31,6 +30,9 @@ interface PendingAutomaticTitleUpdate {
 
 export interface SessionCatalogIndexCoordinatorOptions {
   sqlite(): SqliteSessionCatalog | undefined;
+  contentIndexDirectory?: string;
+  storageRoot?: string;
+  records(): readonly SessionCatalogRecord[];
   status(): SessionCatalogStatus;
   setStatus(status: SessionCatalogStatus): void;
   projectionRecord(fileIdentity: string): SessionCatalogRecord | undefined;
@@ -60,9 +62,14 @@ export class SessionCatalogIndexCoordinator {
   private automaticTitleBatch: Promise<void> | undefined;
   private readonly publisher = new SessionCatalogAutomaticTitlePublisher();
 
-  constructor(private readonly options: SessionCatalogIndexCoordinatorOptions) {}
+  private readonly contentWorker: ContentIndexWorkerClient | undefined;
+  constructor(private readonly options: SessionCatalogIndexCoordinatorOptions) {
+    this.contentWorker = options.contentIndexDirectory === undefined ? undefined
+      : new ContentIndexWorkerClient(options.contentIndexDirectory, options.storageRoot);
+  }
 
   reset(publisher = false): void {
+    this.contentWorker?.reset();
     this.automaticTitleFlight = undefined;
     this.contentIndexFlight = undefined;
     this.pendingAutomaticTitleRecords.clear();
@@ -71,8 +78,20 @@ export class SessionCatalogIndexCoordinator {
     if (publisher) this.publisher.dispose();
   }
 
-  dispose(): void {
+  async dispose(): Promise<void> {
     this.reset(true);
+    await this.contentWorker?.dispose();
+  }
+
+  async searchContent(
+    context: SessionCatalogContext,
+    search: NonNullable<ContentIndexWorkerRequest["search"]>,
+    signal?: AbortSignal
+  ) {
+    if (!this.contentWorker) throw new Error("Content index worker is unavailable.");
+    const reply = await this.contentWorker.request({ sourceKey: context.sourceKey, records: this.options.records(), search }, signal);
+    if (!reply.ok || !reply.result) throw new Error("Content index search is unavailable.");
+    return reply.result;
   }
 
   startContent(
@@ -81,7 +100,7 @@ export class SessionCatalogIndexCoordinator {
     records: readonly SessionCatalogRecord[]
   ): void {
     const sqlite = this.options.sqlite();
-    if (!this.options.isCurrentContext(context, contextGeneration)
+    if (!this.contentWorker || !this.options.isCurrentContext(context, contextGeneration)
       || !sqlite
       || !supportsSessionContentIndex(sqlite)
       || this.options.status().source !== "sqlite") return;
@@ -91,17 +110,10 @@ export class SessionCatalogIndexCoordinator {
     const batch = [...this.pendingContentIndexRecords.values()];
     this.pendingContentIndexRecords.clear();
     if (batch.length === 0) return;
-    const promise = indexSessionContentRecords({
-      records: batch,
-      sqlite,
-      isCurrentFlight: () => this.options.isCurrentContext(context, contextGeneration),
-      isCurrent: (record) => {
-        const current = this.options.projectionRecord(record.fileIdentity);
-        return this.options.isCurrentContext(context, contextGeneration)
-          && current !== undefined
-          && sameSessionCatalogRecordVersion(current, record);
-      }
-    }).catch(() => undefined).finally(() => {
+    const promise = this.contentWorker.request({
+      sourceKey: context.sourceKey,
+      records: this.options.records()
+    }).then(() => undefined).catch(() => undefined).finally(() => {
       if (this.contentIndexFlight?.promise !== promise) return;
       this.contentIndexFlight = undefined;
       if (this.pendingContentIndexRecords.size > 0
