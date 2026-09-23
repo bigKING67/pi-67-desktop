@@ -64,8 +64,9 @@ describe("workspace conversation model", () => {
 
     expect(row).toMatchObject({
       title: "稳定的 Pi 会话名",
-      meta: expect.stringContaining("重新检查双栏设置的响应式问题")
+      meta: expect.stringContaining("条消息")
     });
+    expect(row?.meta).not.toContain("重新检查");
     expect(conversationRows("workspace-test", [task], [session], "重新检查")).toHaveLength(1);
     expect(conversationRows("workspace-test", [task], [session], "稳定的 Pi 会话名")).toHaveLength(1);
   });

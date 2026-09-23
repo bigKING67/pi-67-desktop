@@ -246,29 +246,32 @@ function WorkspaceConversationGroup({
         <button
           className={styles.workspaceGroupName}
           onClick={() => rendererWorkbenchStore.getState().selectWorkspace(workspace.id)}
-          title={workspace.identity.canonicalPath}
+          title={`${workspaceStatus(workspace)} · ${workspace.identity.canonicalPath}`}
+          aria-label={`${workspace.displayName} ${workspaceStatus(workspace)}`}
           type="button"
         >
           <span className={styles.workspaceGlyph} aria-hidden="true">{workspace.displayName.slice(0, 1).toUpperCase()}</span>
-          <span><strong>{workspace.displayName}</strong><small>{workspaceStatus(workspace)}</small></span>
+          <span><strong>{workspace.displayName}</strong>{workspace.availability !== "available" || workspace.trust !== "trusted" ? <small>{workspaceStatus(workspace)}</small> : null}</span>
         </button>
         {!expanded && backgroundCount > 0 ? (
           <span className={styles.backgroundBadge} title={`${backgroundCount} 个后台任务`}>{backgroundCount}</span>
         ) : null}
-        <button
-          aria-label={`在 ${workspace.displayName} 新建对话`}
-          className={styles.workspaceQuickAction}
-          disabled={workspace.availability !== "available" || sessionTransitionPending || workspaceOpenPending}
-          onClick={() => void beginRendererSessionIntentInWorkspace(workspace)}
-          title="新建对话"
-          type="button"
-        ><Plus aria-hidden="true" size={13} /></button>
-        <WorkspaceMenu
-          index={index}
-          workspace={workspace}
-          workspaceCount={workspaceCount}
-          onRequestRemoval={onRequestRemoval}
-        />
+        <div className={styles.workspaceHeaderActions}>
+          <button
+            aria-label={`在 ${workspace.displayName} 新建对话`}
+            className={styles.workspaceQuickAction}
+            disabled={workspace.availability !== "available" || sessionTransitionPending || workspaceOpenPending}
+            onClick={() => void beginRendererSessionIntentInWorkspace(workspace)}
+            title="新建对话"
+            type="button"
+          ><Plus aria-hidden="true" size={13} /></button>
+          <WorkspaceMenu
+            index={index}
+            workspace={workspace}
+            workspaceCount={workspaceCount}
+            onRequestRemoval={onRequestRemoval}
+          />
+        </div>
       </header>
       {expanded ? (
         <div className={styles.workspaceConversations}>

@@ -261,3 +261,8 @@ or keyboard focus; do not lower their contrast to quiet a dense file list.
 Inline-code borders use the same 35% border-token mix as light mode. Disabled
 Composer send actions use disabled surface/text tokens rather than translucent
 accent fill; enabled send and active stop keep their action emphasis.
+
+Workspace navigation uses the shared compact single-line healthy headers and
+metadata-only conversation secondary lines. Conversation selection uses a neutral
+surface and medium title, without a leading stripe. Warnings, keyboard actions
+and touch action visibility follow the light-mode contract.

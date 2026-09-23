@@ -52,9 +52,7 @@ export function conversationRows(
     const stableTitle = conversationStableTitle(task, session);
     const title = conversationPrimaryTitle(task, session);
     const meta = session
-      ? task.recentUserMessagePreview
-        ? `${task.recentUserMessagePreview} · ${sessionMeta(session, snoozed)}`
-        : sessionMeta(session, snoozed)
+      ? sessionMeta(session, snoozed)
       : task.conversation.kind === "provisional" ? "尚未保存 · 当前草稿" : stableTitle;
     return {
       identity: rendererConversationIdentity(task.conversation),
@@ -71,7 +69,7 @@ export function conversationRows(
       titleSource: task.titleSource === "explicit" ? "explicit" : session?.nameSource ?? "fallback",
       modifiedAt: session?.modifiedAt ?? 0,
       searchText: session
-        ? sessionSearchText(session, `${title} ${stableTitle}`, meta)
+        ? sessionSearchText(session, `${title} ${stableTitle} ${task.recentUserMessagePreview ?? ""}`, meta)
         : `${title} ${stableTitle} ${meta}`
     };
   });

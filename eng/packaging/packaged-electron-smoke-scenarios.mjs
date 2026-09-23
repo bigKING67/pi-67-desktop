@@ -296,7 +296,8 @@ export async function runControlledShutdownScenario({
   const priorControlledMessageCount = await controlledMessages.count();
   await startControlledPrompt(window);
   await window.locator('[data-testid="conversation-row"][aria-current="page"]')
-    .filter({ hasText: CONTROLLED_PROMPT_TEXT }).waitFor({ state: "visible", timeout: 10_000 });
+    .filter({ has: window.getByTitle(CONTROLLED_PROMPT_TEXT, { exact: false }) })
+    .waitFor({ state: "visible", timeout: 10_000 });
   await controlledMessages.nth(priorControlledMessageCount)
     .waitFor({ state: "visible", timeout: 10_000 });
   shutdownState.childPid = await readPositiveProcessId(childPidPath);

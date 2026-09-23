@@ -340,7 +340,8 @@ try {
     .waitFor({ state: "hidden", timeout: 10_000 });
   await window.locator('[data-runtime-phase="ready"]').waitFor({ state: "visible", timeout: 10_000 });
   await window.locator('[data-testid="conversation-row"][aria-current="page"]')
-    .filter({ hasText: CONTROLLED_PROMPT_TEXT }).waitFor({ state: "visible", timeout: 10_000 });
+    .filter({ has: window.getByTitle(CONTROLLED_PROMPT_TEXT, { exact: false }) })
+    .waitFor({ state: "visible", timeout: 10_000 });
   await verifyPackagedProjectedImage(window, "stopped submission");
   await waitForPersistedRuntimeRecovery(userDataDirectory);
   console.info("Packaged smoke stage: pre-reload controlled prompt stopped and persisted.");

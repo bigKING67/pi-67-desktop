@@ -203,6 +203,14 @@ Application-level surfaces use a separate wide-window shell:
   `320px` on the wide three-region layout. Neither side
   column gains width at the other's expense; long names truncate inside their
   owned measure.
+- Healthy trusted workspace headers are compact single-line rows. Status and full
+  path remain in the accessible name/tooltip; trust and availability warnings stay
+  visible. Header actions overlay the right edge on hover, keyboard focus or open
+  menu, and stay visible on touch input. Background task counts remain visible.
+- Conversation secondary lines use message count and relative date (or existing
+  draft/snooze status). Recent prompt previews remain searchable and available in
+  the title tooltip, without displacing metadata. Selection uses a neutral surface
+  and medium title weight, without a leading accent stripe. Navigation stays 248px.
 - The Inspector tab strip uses five equal-width compact actions: `文件`, `修改`,
   `消息`, `代理`, and `上下文`. Every action retains its 14px icon and full label on
   one line across platforms and display scaling; columns use `minmax(0, 1fr)`,
@@ -281,7 +289,7 @@ Application-level surfaces use a separate wide-window shell:
   timestamps, counts, file sizes and language labels use caption.
 - Regular/medium/semibold weights are 400/500/600. UI strong text uses semibold;
   ordinary controls and group names use medium. Selected navigation retains
-  the normal size and at most medium weight, with neutral surface/marker feedback.
+  the normal size and at most medium weight, with neutral surface feedback.
 - Interface line height is 1.5; editorial body is 1.75. Code keeps its 12px size,
   1.6 line height and exact 19.2px virtual row geometry. Native/browser zoom scales
   the whole interface; this change does not introduce a separate font setting.
