@@ -598,6 +598,12 @@ loading error where the operation can produce those states
   after exact opaque-reference/revision revalidation and positions the editor at
   that line; dirty or stale bytes fail closed. `添加到上下文` reuses the existing
   opaque Workspace file reference instead of copying a source body into Workbench.
+- Long file names retain a suffix of up to 16 Unicode code points while the prefix
+  ellipsizes, preserving end identifiers and extensions where space permits.
+  Full names remain in tree accessibility labels and relative-path tooltips.
+  File sizes use compact tabular UI text. Row menus overlay the size area on hover,
+  keyboard focus or open menu; touch input reserves a visible menu slot. File sizes
+  remain in the row accessibility label while visually covered. No files are hidden.
 - Directory rows expand or collapse. Clicking an ordinary file opens or focuses
   its central Pi-67 file tab; source never gets squeezed into the Inspector.
   The row menu presents `在 New Money 中打开`, system-default open, relative-path

@@ -266,3 +266,7 @@ Workspace navigation uses the shared compact single-line healthy headers and
 metadata-only conversation secondary lines. Conversation selection uses a neutral
 surface and medium title, without a leading stripe. Warnings, keyboard actions
 and touch action visibility follow the light-mode contract.
+
+The file tree shares light-mode suffix-preserving filenames, compact size labels
+and hover/focus/menu action disclosure. Names retain secondary text at rest;
+full paths and file-size accessibility labels remain available.

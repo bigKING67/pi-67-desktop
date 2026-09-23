@@ -96,6 +96,8 @@ export function WorkspaceFileTree({
     const childProjection = directories[entry.id];
     const target: WorkspaceFileSelection = { entry, ...(parentId === undefined ? {} : { parentId }) };
     const isSelected = selected?.entry.id === entry.id;
+    const nameCharacters = Array.from(entry.name);
+    const preserveTail = !directory && nameCharacters.length > 24;
     const metadata = entry.kind === "file" && entry.byteLength !== undefined ? formatBytes(entry.byteLength) : undefined;
     return (
       <div className="inspector-file-branch" key={`${resultMode ? "search" : "tree"}-${entry.id}`}>
@@ -131,7 +133,9 @@ export function WorkspaceFileTree({
             </span>
             {directory ? <Folder aria-hidden="true" size={14} /> : <File aria-hidden="true" size={14} />}
             <span className="inspector-file-labels">
-              <span className="inspector-file-name">{entry.name}</span>
+              <span className="inspector-file-name">
+                {preserveTail ? <><span className="inspector-file-name-prefix">{nameCharacters.slice(0, -16).join("")}</span><span className="inspector-file-name-tail">{nameCharacters.slice(-16).join("")}</span></> : entry.name}
+              </span>
               {resultMode ? <small className="inspector-file-path">{entry.relativePath}</small> : null}
             </span>
             {metadata ? <small className="inspector-file-size">{metadata}</small> : null}

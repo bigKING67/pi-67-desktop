@@ -2,7 +2,10 @@ import { expect, test, type Locator } from "@playwright/test";
 import { attachMockAgent, installMockDesktopBridge } from "./pi67-renderer-fixture.js";
 
 function channels(color: string): number[] {
-  if (color.startsWith("#")) return [1, 3, 5].map((index) => Number.parseInt(color.slice(index, index + 2), 16));
+  if (color.startsWith("#")) {
+    const expanded = color.length === 4 ? `#${color.slice(1).split("").map((digit) => digit + digit).join("")}` : color;
+    return [1, 3, 5].map((index) => Number.parseInt(expanded.slice(index, index + 2), 16));
+  }
   return color.match(/[\d.]+/gu)!.slice(0, 3).map(Number);
 }
 
@@ -67,6 +70,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(send).toBeDisabled();
     await composer.fill("检查深色主题的阅读和操作层次");
     await expect(send).toBeEnabled();
+    await expect(send).toHaveCSS("background-color", `rgb(${channels(palette.accent!).join(", ")})`);
     const idle = await appearance(send);
     expectNeutral(idle.background);
     expect(contrast(idle.foreground, idle.background)).toBeGreaterThanOrEqual(4.5);
