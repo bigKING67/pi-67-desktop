@@ -37,6 +37,7 @@ import {
 import { closeElectronApplicationWithinTimeout } from "./electron-shutdown-measurement.mjs";
 import { assertPackagedSkillSuites } from "./smoke-packaged-skill-suites.mjs";
 import { assertNoWorkspaceChangesAuthorityWarning, verifyPackagedChangesInspector } from "./packaged-changes-inspector-smoke.mjs";
+import { verifyPackagedWorkbenchJourney } from "./packaged-workbench-journey-smoke.mjs";
 const artifact = resolvePackagedArtifact();
 await assertPackagedRuntimeAssets(artifact);
 const packagedScreenshotDirectory = process.env.PI67_PACKAGED_SCREENSHOT_DIR?.trim() || undefined;
@@ -319,6 +320,7 @@ try {
     const returnedSurface = await inspectRendererSurface(window);
     throw new Error(`Packaged Settings did not return to the conversation: ${JSON.stringify(returnedSurface)}`, { cause: error });
   }
+  await verifyPackagedWorkbenchJourney({ window, captureScreenshot: capturePackagedScreenshot });
   const heicAttachment = await verifyPackagedHeicAttachment({ artifact, userDataDirectory, window });
   console.info(`Packaged HEIC attachment: ${JSON.stringify(heicAttachment)}`);
   const projectedImage = await preparePackagedProjectedImage(window);
