@@ -22,7 +22,7 @@ describe("PiSdkRuntime task Tool mode", () => {
       }));
 
       runtime.setWorkspacePolicy("trusted", "balanced");
-      expect(runtime.setTaskToolMode("ask")).toBe("ask");
+      expect(runtime.setTaskToolMode("ask")).toBe("auto");
       expect(runtime.setTaskToolMode("yolo")).toBe("yolo");
       expect(runtime.setWorkspacePolicy("unknown", "balanced")).toBe("auto");
       expect(runtime.getTaskToolMode()).toBe("auto");

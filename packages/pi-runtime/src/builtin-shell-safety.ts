@@ -3,6 +3,8 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 import {
   classifyShellCommand,
+  MAX_APPROVAL_CWD_BYTES,
+  MAX_APPROVAL_TASK_PATHS,
   shellCommandExternalPaths,
   type RiskCategory
 } from "@pi67/domain";
@@ -15,24 +17,33 @@ import {
 export interface BuiltinShellClassification {
   category: RiskCategory;
   approvalReason?: string;
+  taskPathGrant?: readonly string[];
+  authorizedByTaskRoot?: boolean;
 }
 
 export async function classifyBuiltinShellCommand(
   command: string,
-  workspace: string
+  workspace: string,
+  taskTrustedRoots: readonly string[] = []
 ): Promise<BuiltinShellClassification> {
-  const category = await classifyCategory(command, workspace);
+  const classification = await classifyCategory(command, workspace, taskTrustedRoots);
   return {
-    category,
-    ...(category === "ambiguous-command" ? { approvalReason: ambiguousReason(command) } : {})
+    ...classification,
+    ...(classification.category === "ambiguous-command" ? { approvalReason: ambiguousReason(command) } : {})
   };
 }
 
-async function classifyCategory(command: string, workspace: string): Promise<RiskCategory> {
+async function classifyCategory(
+  command: string,
+  workspace: string,
+  taskTrustedRoots: readonly string[]
+): Promise<BuiltinShellClassification> {
   const externalPaths = shellCommandExternalPaths(command);
-  if (!externalPaths || externalPaths.length === 0) return classifyShellCommand(command);
+  if (!externalPaths || externalPaths.length === 0) return { category: classifyShellCommand(command) };
   const canonicalWorkspace = await realpath(resolve(workspace));
   const verifiedWorkspacePaths = new Set<string>();
+  const untrustedPaths = new Set<string>();
+  let authorizedByTaskRoot = false;
   for (const rawPath of externalPaths) {
     const expandedPath = rawPath === "~"
       ? homedir()
@@ -40,10 +51,29 @@ async function classifyCategory(command: string, workspace: string): Promise<Ris
         ? resolve(homedir(), rawPath.slice(2))
         : normalizeShellPathForPlatform(rawPath);
     const canonical = await canonicalizePotentialPath(expandedPath, workspace);
-    if (!isContained(canonical, canonicalWorkspace)) return classifyShellCommand(command);
-    verifiedWorkspacePaths.add(rawPath);
+    if (isContained(canonical, canonicalWorkspace)) {
+      verifiedWorkspacePaths.add(rawPath);
+      continue;
+    }
+    if (taskTrustedRoots.some((root) => isContained(canonical, root))) {
+      verifiedWorkspacePaths.add(rawPath);
+      authorizedByTaskRoot = true;
+      continue;
+    }
+    untrustedPaths.add(canonical);
   }
-  return classifyShellCommand(command, { verifiedWorkspacePaths });
+  const category = classifyShellCommand(command, { verifiedWorkspacePaths });
+  const taskPathGrant = category === "external-path"
+    && untrustedPaths.size > 0
+    && untrustedPaths.size <= MAX_APPROVAL_TASK_PATHS
+    && [...untrustedPaths].every((path) => Buffer.byteLength(path, "utf8") <= MAX_APPROVAL_CWD_BYTES)
+    ? [...untrustedPaths]
+    : undefined;
+  return {
+    category,
+    ...(taskPathGrant === undefined ? {} : { taskPathGrant }),
+    ...(authorizedByTaskRoot && category !== "external-path" ? { authorizedByTaskRoot: true } : {})
+  };
 }
 
 function ambiguousReason(command: string): string {

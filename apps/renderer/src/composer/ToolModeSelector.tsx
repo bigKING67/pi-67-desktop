@@ -16,7 +16,7 @@ import {
 } from "../workbench/workbench-store.js";
 import styles from "./Composer.module.css";
 
-const MODES: TaskToolMode[] = ["ask", "auto", "yolo"];
+const MODES: TaskToolMode[] = ["auto", "yolo"];
 
 export function ToolModeSelector() {
   const connected = useAppStore((state) => state.connected);

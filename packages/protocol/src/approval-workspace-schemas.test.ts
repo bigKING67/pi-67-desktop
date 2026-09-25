@@ -80,6 +80,29 @@ describe("approval protocol schemas", () => {
     })).toBe(false);
   });
 
+  it("accepts an exact task-path trust decision without widening its response payload", () => {
+    const approval = commandEnvelope("approval.respond", {
+      requestId: "approval-path-1",
+      toolCallId: "tool-path-1",
+      sessionId: "session-1",
+      sessionGeneration: 3,
+      operationId: "operation-1",
+      decision: "trust-task-paths-and-allow"
+    }, taskContext(), 4);
+    const result = responseEnvelope(approval.requestId, 4, approval.context, {
+      ok: true,
+      type: "approval.respond",
+      result: { resolved: true, taskToolMode: "auto" }
+    });
+
+    expect(isRequestEnvelope(approval)).toBe(true);
+    expect(isResponseEnvelope(result)).toBe(true);
+    expect(isRequestEnvelope({
+      ...approval,
+      payload: { ...approval.payload, paths: ["/renderer-invented"] }
+    })).toBe(false);
+  });
+
   it("rejects missing authority, invalid scope and unknown approval fields", () => {
     const event = eventEnvelope("approval.requested", approvalPayload(), eventContext(9, 1));
     const { operationId: _operationId, ...withoutOperation } = event.payload;

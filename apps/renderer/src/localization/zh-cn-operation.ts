@@ -38,6 +38,8 @@ export const zhCNOperationMessages = {
     "configured-source": "AUTO · 已配置来源",
     "installed-capability": "AUTO · 已安装能力",
     "read-only": "AUTO · 只读",
+    "routine-write": "AUTO · 常规文件写入",
+    "task-trusted-root": "AUTO · 本任务可信目录",
     "workspace-command": "AUTO · 工作区命令",
     "workspace-write": "AUTO · Workspace 内写入"
   },

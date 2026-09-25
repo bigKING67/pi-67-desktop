@@ -133,7 +133,60 @@ test("renders a host-authored network-read approval when one is required", async
   await expect(page.getByRole("button", { name: "本任务开启 YOLO" })).toBeVisible();
 });
 
-test("renders destructive confirmation without offering a YOLO bypass", async ({ page }) => {
+test("offers task-scoped trust only for Host-authored external paths", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
+  await clearRecordedCommands(page);
+  const operationId = "operation-task-path-trust";
+  await startApprovalOperation(page, operationId);
+
+  await emitMockAgentEvent(page, {
+    type: "approval.requested",
+    payload: {
+      requestId: "approval-task-path",
+      sessionId: "session-test",
+      sessionGeneration: 1,
+      operationId,
+      hostEpoch: 1,
+      toolCallId: "tool-task-path",
+      toolName: "bash",
+      toolSource: "Pi 内置",
+      category: "external-path",
+      reason: "访问工作区之外的路径",
+      targetKind: "command",
+      target: "cd /Users/test/Projects/groland && cargo test",
+      targetTruncated: false,
+      cwd: "/Users/test/Projects/pi-demo",
+      cwdTruncated: false,
+      scope: "single-tool-call",
+      taskPathGrant: {
+        kind: "paths",
+        paths: ["/Users/test/Projects/groland"]
+      }
+    }
+  }, { operationId });
+
+  await expect(page.getByRole("heading", { name: "需要单次授权" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("可加入本任务的可信路径", { exact: true })).toBeVisible();
+  await expect(page.getByText("/Users/test/Projects/groland", { exact: true })).toBeVisible();
+  await expect(page.getByText(/任务停止、应用重启或工作区失去信任后自动清除/u)).toBeVisible();
+  await page.getByRole("button", { name: "本任务信任该路径" }).click();
+
+  await expect.poll(async () => (
+    await recordedCommandDetails(page)
+  ).find((command) => command.type === "approval.respond")?.payload).toEqual({
+    requestId: "approval-task-path",
+    toolCallId: "tool-task-path",
+    sessionId: "session-test",
+    sessionGeneration: 1,
+    operationId,
+    decision: "trust-task-paths-and-allow"
+  });
+});
+
+test("renders destructive confirmation with explicit one-shot or uninterrupted YOLO choices", async ({ page }) => {
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
@@ -155,9 +208,10 @@ test("renders destructive confirmation without offering a YOLO bypass", async ({
   await expect(page.getByRole("dialog", { name: "不可逆操作确认" })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "确认不可逆操作" })).toBeVisible();
   await expect(page.getByText("批量删除", { exact: true })).toBeVisible();
-  await expect(page.getByText(/即使任务已开启 YOLO/)).toBeVisible();
+  await expect(page.getByText(/当前、已等待和后续合法工具将不再逐次确认/u)).toBeVisible();
   await expect(page.getByRole("button", { name: "拒绝" })).toBeFocused();
-  await expect(page.getByRole("button", { name: "本任务开启 YOLO" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "本任务开启 YOLO" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /本任务信任/u })).toHaveCount(0);
 
   await page.getByRole("button", { name: "确认执行此操作" }).click();
   await expect.poll(async () => (

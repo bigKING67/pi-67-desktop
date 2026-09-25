@@ -868,29 +868,44 @@ the only Runtime and behavior specification source.
   directory is an explicit rebind; Desktop does not scan unrelated user folders
   to guess where it moved.
 - Every Task Runtime created through the current Desktop default starts in
-  `AUTO`; an explicit legacy `guided` initialization maps to `ASK` rather than
-  silently broadening its former policy. The mode is memory-only, belongs to
-  that exact Task Runtime, is not written to Workbench state, Pi settings, or
-  Session JSONL, and resets to the current default after Task stop, Runtime
-  disposal, application restart, or Workspace trust revocation. Switching Tasks
-  shows each live Runtime's independent mode.
-- `ASK` automatically permits canonical Workspace reads, current-Session loaded
-  resource reads, capability inspection, and verified read-only web operations;
-  configured operations, persistent writes, Workspace writes and commands, and
-  higher-risk effects request a one-shot decision. `AUTO` additionally permits
-  canonical Workspace writes, bounded local inspection/test/build and common
+  `AUTO`. `AUTO` and `YOLO` are the only user-visible Tool modes. Legacy
+  `guided` initialization and the internal compatibility value `ask` normalize
+  to `AUTO`; they do not reintroduce a third selectable mode. The mode is
+  memory-only, belongs to that exact Task Runtime, is not written to Workbench
+  state, Pi settings, or Session JSONL, and resets to the current default after
+  Task stop, Runtime disposal, application restart, or Workspace trust
+  revocation. Switching Tasks shows each live Runtime's independent mode.
+- `AUTO` permits canonical Workspace reads and writes, routine canonical built-in
+  `write`/`edit` calls outside system and credential paths, current-Session loaded
+  resource reads, capability inspection, verified read-only web operations,
+  bounded local inspection/test/build and common
   project commands, Workspace-local dependency changes, non-destructive local Git
   operations, non-destructive persistent-state writes, and every operation from an enabled,
   installed/admitted Package or MCP capability whose effective identity resolves
   uniquely. That persistent capability grant includes authentication, JavaScript,
   native input, clipboard, external paths/files, upload, external submission,
-  system, dependency, publish, remote, and network side effects. Recognized file,
-  persistent-state, external-object, Shell, and destructive-Git deletion is the
-  narrow exception: it always requests exact one-shot confirmation before AUTO's
-  installed-capability grant or YOLO. `YOLO` permits every other valid registered
-  Tool in that trusted Task Runtime, including calls which do not have an
+  system, dependency, publish, remote, and network side effects. In AUTO,
+  recognized file, persistent-state, external-object, Shell, and destructive-Git
+  deletion requests exact one-shot confirmation before the installed-capability
+  grant. `YOLO` permits every valid registered Tool in that trusted Task Runtime,
+  including recognized destructive operations and calls which do not have an
   installed-capability grant. YOLO never makes an invalid Tool identity, schema,
   route, or target valid.
+- Trusted AUTO classifies canonical built-in `write` and `edit` targets as routine
+  file work and executes them without an approval dialog, including ordinary
+  Workspace-external targets. Canonical system configuration and credential roots
+  remain one-shot AUTO boundaries. For other valid built-in path or conservatively
+  classified Shell calls that reach a canonical Workspace-external path outside an
+  installed-capability grant, AUTO offers one-shot execution or a Host-authored exact
+  path grant for the current Task. Accepting the path grant allows later built-in reads and
+  safely classified commands at those exact roots and their descendants without repeat
+  dialogs. Renderer can choose the projected action but cannot provide or widen
+  the roots. Grants stay only in the Task Runtime, are bounded, never enter Pi
+  JSONL or Workbench persistence, and clear with Runtime disposal, application
+  restart, or Workspace trust revocation. They do not authorize another path,
+  opaque Tool identity, upload, publish, remote action, system change, credential
+  flow, or any recognized irreversible deletion; those keep their AUTO
+  confirmation boundary.
 - AUTO trusts an effective configured source, not an arbitrary registered Tool
   name. At Session resource load, Desktop builds a bounded in-memory capability
   catalog from the effective Task-local Package settings plus that Task's valid
@@ -935,12 +950,13 @@ the only Runtime and behavior specification source.
   response limits apply after decompression. Successful search or fetch
   results receive an in-memory bounded `responseId` for `get_search_content`; the
   reference neither performs a second network request nor broadens Tool authority.
-  Recognized irreversible deletion and destructive commands retain exact one-shot
-  confirmation even under an installed-capability grant or YOLO. Outside an exact
+  In AUTO, recognized irreversible deletion and destructive commands retain exact
+  one-shot confirmation even under an installed-capability grant. Trusted YOLO
+  executes them without another per-call decision. Outside an exact
   installed-capability grant, external paths, upload or external submit,
   authentication or credential actions, publishing, remote Git writes, system
-  changes, global dependencies, and external writes retain one-shot approval in
-  AUTO. Calls that
+  changes and global dependencies retain one-shot approval in AUTO; routine
+  canonical built-in `write`/`edit` targets do not. Calls that
   approval cannot make valid -- including unregistered or
   ambiguous Tools, reserved Tool identity mismatches, malformed MCP routing, and
   unverifiable opaque cursors -- are rejected with a corrective message and no
@@ -953,9 +969,10 @@ the only Runtime and behavior specification source.
   describe those exact names accordingly. In the default named mode the live
   names remain `ffgrep` and `fffind`.
   Workspace-local roots run normally. In AUTO, canonical workspace-external and
-  symlink-escaped roots use the installed-capability grant; ASK exposes that
-  canonical path for one-shot approval. Opaque pagination cursors fail closed
-  outside `YOLO` because their original root cannot be proven.
+  symlink-escaped roots use an exact installed-capability grant when present;
+  otherwise Desktop exposes the canonical path for a one-shot decision. Opaque
+  pagination cursors fail closed outside `YOLO`
+  because their original root cannot be proven.
 - Desktop transactionally publishes the verified `pi-workspace-resources`
   Package under the shared Pi Agent Profile using `staging / active / previous /
   receipt` semantics. Desktop loads the Package's rules loader and force-excludes
@@ -969,13 +986,14 @@ the only Runtime and behavior specification source.
   Tool authority by itself.
 - Verified `pi-mcp-adapter@2.10.0` and `2.11.0` metadata operations remain a
   read-only capability: status, cached server Tool lists, bounded
-  search/describe, and current-Session UI-message inspection run in `ASK` and
-  `AUTO`. In AUTO, connecting a server already present in effective `mcp.json`
+  search/describe, and current-Session UI-message inspection run in `AUTO`.
+  Connecting a server already present in effective `mcp.json`
   and invoking a nested Tool present in the effective cache use that resolved
-  installed-capability grant for every classified non-hard-stop side effect,
+  installed-capability grant for every classified side effect in AUTO except
+  recognized destructive operations,
   including the configured target's OAuth/authentication and credential flow;
-  recognized deletion remains exact-confirmation only. ASK still requests
-  a one-shot decision for connect and configured operations. Adding an unconfigured
+  recognized deletion remains exact-confirmation only in AUTO and runs directly
+  in trusted YOLO. Adding an unconfigured
   server or expanding the configured server catalog remains a separate configuration
   confirmation boundary.
   An unconfigured server, missing or ambiguous nested Tool, malformed proxy args,
@@ -986,16 +1004,17 @@ the only Runtime and behavior specification source.
   authorization decision: Desktop rejects it without opening Approval and tells
   the model to use the active direct name (`find`/`grep` in override mode or
   `fffind`/`ffgrep` in named mode). The corrected Workspace-local read then follows
-  the normal `ASK`/`AUTO` path policy.
+  the normal AUTO path policy.
 - Configured Memory reads and search/list/recall operations are read-only;
   remember/add/learn/propose/flush are non-destructive persistent writes and run
   in AUTO. When Memory, browser67, JS-Reverse, or another Package/MCP source is
   installed/admitted and resolves uniquely, its complete configured Tool surface
-  runs in AUTO except for recognized irreversible effects: JavaScript execution,
+  runs in AUTO except for recognized irreversible deletion: JavaScript execution,
   native input, clipboard mutation, upload, authentication, external file writes,
   hook removal, and finalization run automatically, while forget/delete/purge and
-  declared file or external-object deletion request exact confirmation. Effect
-  categories remain visible for ASK, PLAN, audit, and diagnostics; authorization
+  declared file or external-object deletion request exact confirmation in AUTO
+  and run directly in trusted YOLO. Effect
+  categories remain visible for AUTO, PLAN, audit, and diagnostics; authorization
   is not inferred from Tool names alone.
 - Restored Workspace registrations are checked against their persisted filesystem
   identity before project resources load. A missing or replaced directory stays
@@ -1786,18 +1805,19 @@ the only Runtime and behavior specification source.
   request for that exact Operation without granting or retrying the Tool.
 - An automatically admitted Tool exposes one bounded Host/Runtime-authored reason
   in its execution row: `AUTO · 已安装能力`, `AUTO · 已配置来源`, `AUTO · 只读`,
-  `AUTO · 工作区命令`, or `AUTO · Workspace 内写入`. Renderer code never infers
+  `AUTO · 工作区命令`, `AUTO · Workspace 内写入`, `AUTO · 常规文件写入`, or
+  `AUTO · 本任务可信目录`. Renderer code never infers
   this reason and Pi JSONL is not rewritten to persist it; raw Tool args, results,
   prompts, source paths, URLs, and credentials never enter this projection.
 - The ordinary approval dialog names the verified Tool source and offers `拒绝`,
   `仅允许本次`, and `本任务开启 YOLO`. The third action atomically allows the
-  current and other pending ordinary Safety Approval requests in the same Runtime,
-  but it never resolves hard-stop deletion confirmations or ordinary Extension
-  `ctx.ui` requests. A hard-stop dialog instead offers `拒绝` and
-  `确认执行此操作`; exact confirmation never grants later destructive calls and
-  remains required when the Task is already in YOLO. Composer-initiated YOLO
-  selection requires a second confirmation in the same upward menu and describes
-  this narrow exception.
+  current and every other pending Safety Approval request in the same Runtime,
+  but it never resolves ordinary Extension `ctx.ui` requests. A hard-stop dialog
+  offers `拒绝`, `确认执行此操作`, and the explicit Task-level YOLO action. Exact
+  one-shot confirmation never grants later destructive calls while the Task stays
+  in AUTO. Composer-initiated YOLO selection requires a second confirmation in the
+  same upward menu and states that every valid Tool, including irreversible,
+  Workspace-external, system, and network actions, will execute automatically.
 - A blocking Safety Approval or Extension input distinguishes resolving only the
   current interaction from stopping the entire Task. `拒绝`/`取消当前输入` answers
   that one request; `停止整个任务` is available only when exactly one current Task

@@ -64,9 +64,13 @@ describe("createDesktopSafetyExtension pi-fff classification", () => {
     const outside = join(root, "outside");
     await Promise.all([mkdir(workspace), mkdir(outside)]);
     await symlink(outside, join(workspace, "escape-link"));
+    const canonicalOutside = await realpath(outside);
     const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
     const tools = [piFffTool("grep"), piFffTool("find")];
-    const handler = safetyHandler(autoPolicy(workspace), requestApproval, () => tools);
+    const handler = safetyHandler({
+      ...autoPolicy(workspace),
+      taskTrustedRoots: [canonicalOutside]
+    }, requestApproval, () => tools);
 
     for (const [index, path] of [
       "../outside",
@@ -88,11 +92,11 @@ describe("createDesktopSafetyExtension pi-fff classification", () => {
       "external-path",
       "external-path"
     ]);
-    const canonicalOutside = await realpath(outside);
     expect(requestApproval.mock.calls[0]?.[0].target).toBe(canonicalOutside);
     expect(requestApproval.mock.calls[1]?.[0].target).toBe(canonicalOutside);
     expect(requestApproval.mock.calls[2]?.[0].target).toBe(await realpath(homedir()));
     expect(requestApproval.mock.calls[3]?.[0].target).toBe(resolve(canonicalOutside, "**"));
+    expect(requestApproval.mock.calls.every(([request]) => request.taskPathGrant === undefined)).toBe(true);
   });
 
   it("fails closed for malformed inputs and opaque pagination cursors", async () => {

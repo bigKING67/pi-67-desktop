@@ -42,6 +42,8 @@ const ToolAuthorizationProjectionSchema = strictObject({
     Type.Literal("configured-source"),
     Type.Literal("installed-capability"),
     Type.Literal("read-only"),
+    Type.Literal("routine-write"),
+    Type.Literal("task-trusted-root"),
     Type.Literal("workspace-command"),
     Type.Literal("workspace-write")
   ])

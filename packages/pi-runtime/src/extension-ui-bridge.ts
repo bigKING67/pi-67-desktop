@@ -175,6 +175,16 @@ export class DesktopExtensionUiBridge {
       && isHardStopRiskCategory(pending.details.category);
   }
 
+  pendingTaskPathGrant(requestId: string, toolCallId: string): readonly string[] | undefined {
+    const pending = this.pending.get(requestId);
+    if (
+      pending?.purpose !== "approval"
+      || pending.toolCallId !== toolCallId
+      || pending.details.taskPathGrant?.kind !== "paths"
+    ) return undefined;
+    return [...pending.details.taskPathGrant.paths];
+  }
+
   hasPendingSubagentApproval(requestId: string, toolCallId: string): boolean {
     const pending = this.pending.get(requestId);
     return pending?.purpose === "approval"
@@ -182,10 +192,10 @@ export class DesktopExtensionUiBridge {
       && pending.details.subagent !== undefined;
   }
 
-  allowAllPendingOrdinaryApprovals(): string[] {
+  allowAllPendingApprovals(): string[] {
     const resolved: string[] = [];
     for (const [requestId, pending] of this.pending) {
-      if (pending.purpose !== "approval" || isHardStopRiskCategory(pending.details.category)) continue;
+      if (pending.purpose !== "approval") continue;
       this.pending.delete(requestId);
       clearTimeout(pending.timer);
       pending.abort?.();

@@ -257,6 +257,7 @@ export class PiSdkRuntime implements AgentRuntime {
     await this.subagents.dispose();
     await this.configurationReload.dispose();
     await this.sessionBindings.settleAndDispose();
+    this.toolSafety.resetTaskAuthorizations();
     await this.sessionCatalog.dispose();
     this.runtimeCredentialUnsubscribe?.();
     this.runtimeCredentialUnsubscribe = undefined;

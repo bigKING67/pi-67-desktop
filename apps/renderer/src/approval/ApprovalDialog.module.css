@@ -116,6 +116,11 @@
   font-size: var(--font-size-caption);
 }
 
+.taskPathGrant {
+  display: grid;
+  gap: 6px;
+}
+
 .details .literalStatus {
   color: var(--danger);
   font-weight: var(--font-weight-semibold);

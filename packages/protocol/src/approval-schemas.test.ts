@@ -33,6 +33,19 @@ describe("ApprovalRequestSchema", () => {
     expect(Value.Check(ApprovalRequestSchema, { ...request, category: "external-delete" })).toBe(true);
     expect(Value.Check(ApprovalRequestSchema, { ...request, category: "external-submit" })).toBe(true);
     expect(Value.Check(ApprovalRequestSchema, { ...request, category: "credential-or-auth" })).toBe(true);
+    expect(Value.Check(ApprovalRequestSchema, {
+      ...request,
+      category: "external-path",
+      taskPathGrant: { kind: "paths", paths: ["/external/project"] }
+    })).toBe(true);
+    expect(Value.Check(ApprovalRequestSchema, {
+      ...request,
+      taskPathGrant: { kind: "paths", paths: [] }
+    })).toBe(false);
+    expect(Value.Check(ApprovalRequestSchema, {
+      ...request,
+      taskPathGrant: { kind: "paths", paths: ["/external/project", "/external/project"] }
+    })).toBe(false);
     expect(Value.Check(ApprovalRequestSchema, { ...request, category: "unknown-risk" })).toBe(false);
   });
 });

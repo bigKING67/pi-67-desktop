@@ -28,6 +28,8 @@ export type ToolAutoAuthorizationReason =
   | "configured-source"
   | "installed-capability"
   | "read-only"
+  | "routine-write"
+  | "task-trusted-root"
   | "workspace-command"
   | "workspace-write";
 

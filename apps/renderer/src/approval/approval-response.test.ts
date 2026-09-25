@@ -67,6 +67,21 @@ describe("approvalResponsePayload", () => {
     });
   });
 
+  it("sends only the scoped trust decision and never Renderer-authored paths", () => {
+    expect(approvalResponsePayload(state, {
+      ...request,
+      category: "external-path",
+      taskPathGrant: { kind: "paths", paths: ["/external/project"] }
+    }, "trust-task-paths-and-allow")).toEqual({
+      requestId: "approval-1",
+      toolCallId: "tool-1",
+      sessionId: "session-1",
+      sessionGeneration: 3,
+      operationId: "operation-1",
+      decision: "trust-task-paths-and-allow"
+    });
+  });
+
   it("rejects stale authority context instead of guessing from current UI state", () => {
     const { operationId: _operationId, ...requestWithoutOperation } = request;
     expect(approvalResponsePayload({ ...state, hostEpoch: 10 }, request, "allow-once")).toBeUndefined();

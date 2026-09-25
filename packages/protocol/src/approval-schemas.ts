@@ -1,4 +1,8 @@
-import { MAX_APPROVAL_CWD_BYTES, MAX_APPROVAL_TARGET_BYTES } from "@pi67/domain";
+import {
+  MAX_APPROVAL_CWD_BYTES,
+  MAX_APPROVAL_TARGET_BYTES,
+  MAX_APPROVAL_TASK_PATHS
+} from "@pi67/domain";
 import { Type, type TProperties } from "./typebox-schema.js";
 import {
   ExtensionUiCancellationReasonSchema,
@@ -7,6 +11,14 @@ import {
 import { NativeSubagentLineageSchema } from "./native-subagent-schemas.js";
 
 const ApprovalIdentifierSchema = Type.String({ minLength: 1, maxLength: 512 });
+const ApprovalTaskPathGrantSchema = strictObject({
+  kind: Type.Literal("paths"),
+  paths: Type.Array(Type.String({ minLength: 1, maxLength: MAX_APPROVAL_CWD_BYTES }), {
+    minItems: 1,
+    maxItems: MAX_APPROVAL_TASK_PATHS,
+    uniqueItems: true
+  })
+});
 
 const RiskCategorySchema = Type.Union([
   Type.Literal("workspace-read"),
@@ -50,6 +62,7 @@ export const ApprovalRequestSchema = strictObject({
   cwd: Type.String({ maxLength: MAX_APPROVAL_CWD_BYTES }),
   cwdTruncated: Type.Boolean(),
   scope: Type.Literal("single-tool-call"),
+  taskPathGrant: Type.Optional(ApprovalTaskPathGrantSchema),
   subagent: Type.Optional(NativeSubagentLineageSchema)
 });
 
@@ -62,6 +75,7 @@ export const ApprovalRespondSchema = strictObject({
   decision: Type.Union([
     Type.Literal("deny"),
     Type.Literal("allow-once"),
+    Type.Literal("trust-task-paths-and-allow"),
     Type.Literal("enable-task-yolo-and-allow")
   ])
 });
@@ -77,6 +91,7 @@ export const ApprovalResolvedSchema = strictObject({
   decision: Type.Union([
     Type.Literal("deny"),
     Type.Literal("allow-once"),
+    Type.Literal("trust-task-paths-and-allow"),
     Type.Literal("enable-task-yolo-and-allow")
   ])
 });

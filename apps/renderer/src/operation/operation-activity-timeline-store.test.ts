@@ -206,6 +206,40 @@ describe("operation activity timeline", () => {
     });
   });
 
+  it("labels AUTO-authorized task roots distinctly from the selected Workspace", () => {
+    let timeline = createOperationActivityTimeline(operation());
+    timeline = recordOperationTimelineActivity(timeline, {
+      kind: "tool",
+      toolCallId: "tool-auto-task-root",
+      toolName: "bash",
+      toolKind: "shell",
+      status: "completed",
+      authorization: { mode: "auto", reason: "task-trusted-root" }
+    }, 20);
+
+    expect(timeline.steps.at(-1)).toMatchObject({
+      detail: "AUTO · 本任务可信目录 · 执行成功",
+      activity: { authorization: { mode: "auto", reason: "task-trusted-root" } }
+    });
+  });
+
+  it("labels AUTO-authorized routine file writes without claiming Workspace containment", () => {
+    let timeline = createOperationActivityTimeline(operation());
+    timeline = recordOperationTimelineActivity(timeline, {
+      kind: "tool",
+      toolCallId: "tool-auto-routine-write",
+      toolName: "write",
+      toolKind: "edit",
+      status: "completed",
+      authorization: { mode: "auto", reason: "routine-write" }
+    }, 20);
+
+    expect(timeline.steps.at(-1)).toMatchObject({
+      detail: "AUTO · 常规文件写入 · 执行成功",
+      activity: { authorization: { mode: "auto", reason: "routine-write" } }
+    });
+  });
+
   it("labels AUTO-authorized installed capabilities distinctly", () => {
     let timeline = createOperationActivityTimeline(operation());
     timeline = recordOperationTimelineActivity(timeline, {

@@ -170,29 +170,31 @@ authorization and the repository's separate operation and distribution rules.
 - Project trust controls project resources. It is distinct from one-shot tool
   approval.
 - New trusted Workspaces default to `balanced`: bounded Workspace reads/writes,
+  canonical built-in `write`/`edit` calls outside system and credential paths,
   current-Session loaded-resource reads, verified read-only web Tools, and
   conservatively classified local checks, common project scripts, Workspace-local
   dependency changes, and non-destructive local Git operations may run without a duplicate dialog. An
   enabled Package or MCP capability whose installed content is admitted and whose
   effective Tool identity resolves uniquely is also an AUTO authorization grant,
   including its system, external-path, upload, authentication, publish, dependency,
-  or remote side effects. Recognized file, persistent-state, external-object, Shell,
-  and destructive-Git deletion remains an exact one-shot hard confirmation before
-  both that AUTO grant and YOLO. Trusted YOLO automatically executes every other
-  valid registered Tool; it does not make an invalid identity, schema, route, or
-  target valid. ASK remains one-shot; PLAN remains read-only. Unknown, duplicate,
+  or remote side effects. In AUTO, recognized file, persistent-state,
+  external-object, Shell, and destructive-Git deletion remains an exact one-shot
+  confirmation. Trusted YOLO automatically executes every valid registered Tool,
+  including recognized destructive operations; it does not make an invalid identity,
+  schema, route, or target valid. ASK remains one-shot; PLAN remains read-only. Unknown, duplicate,
   malformed, drifted, or non-approvable capabilities fail closed instead of
   inheriting a grant. AUTO Shell syntax that cannot be classified safely returns a
   corrective Tool Result without opening a meaningless approval dialog.
 - Extensions cannot inject HTML, JavaScript, or React components into the
   renderer. TUI-only custom UI must fail explicitly instead of hanging.
-- Recognized irreversible destructive actions always require an explicit exact
-  one-shot confirmation. Other external, system, or workspace-external actions
-  outside an exact installed-capability AUTO grant require one-shot approval. Loaded
+- In AUTO, recognized irreversible destructive actions always require an explicit
+  exact one-shot confirmation. Other external, system, credential, or externally
+  visible actions outside an exact installed-capability AUTO grant require one-shot approval. Loaded
   resources alone never create that grant: the only Workspace-external read
   exception is the canonical file or Skill directory already loaded by that exact
-  Session's Pi `ResourceLoader`; it never grants write or arbitrary home-directory
-  access.
+  Session's Pi `ResourceLoader`; it never grants arbitrary home-directory reads.
+  Routine built-in file writes are admitted by their own canonical target and
+  side-effect classification rather than by loaded-resource or path-trust state.
 
 ## Candidate distribution
 

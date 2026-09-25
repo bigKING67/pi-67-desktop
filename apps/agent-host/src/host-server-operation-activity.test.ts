@@ -216,7 +216,7 @@ class ActivityRuntime {
   readonly resolvedApprovals: Array<{
     requestId: string;
     toolCallId: string;
-    decision: "deny" | "allow-once" | "enable-task-yolo-and-allow";
+    decision: ApprovalResponseDecision;
   }> = [];
   readonly resolvedExtensions: Array<{ requestId: string; value: string | boolean | undefined; cancelled: boolean }> = [];
 

@@ -1,9 +1,9 @@
-import { mkdtemp, rm, symlink } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdtemp, realpath, rm, symlink } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DesktopApprovalRequester } from "./safety-extension.js";
-import { safetyHandler, trustedPolicy } from "./safety-extension-test-fixture.js";
+import { builtinTool, safetyHandler, trustedPolicy } from "./safety-extension-test-fixture.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -66,6 +66,7 @@ describe("Desktop AUTO and YOLO safety order", () => {
     const workspace = await mkdtemp(join(tmpdir(), "pi67-shell-workspace-"));
     const outside = await mkdtemp(join(tmpdir(), "pi67-shell-outside-"));
     temporaryDirectories.push(workspace, outside);
+    const canonicalOutside = await realpath(outside);
     const escapeLink = join(workspace, "escape-link");
     await symlink(outside, escapeLink, process.platform === "win32" ? "junction" : "dir");
     const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
@@ -87,10 +88,151 @@ describe("Desktop AUTO and YOLO safety order", () => {
       input: { command: `ls ${escapeLink}` }
     }, { hasUI: true })).resolves.toMatchObject({ block: true });
     expect(requestApproval).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      category: "external-path"
+      category: "external-path",
+      taskPathGrant: { kind: "paths", paths: [canonicalOutside] }
     }), expect.anything());
     expect(requestApproval).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      category: "external-path"
+      category: "external-path",
+      taskPathGrant: { kind: "paths", paths: [canonicalOutside] }
+    }), expect.anything());
+  });
+
+  it("auto-allows bounded Shell commands inside a task-trusted root but not its sibling", async () => {
+    const workspace = await mkdtemp(join(tmpdir(), "pi67-shell-workspace-"));
+    const trustedRoot = await mkdtemp(join(tmpdir(), "pi67-shell-trusted-"));
+    const sibling = await mkdtemp(join(tmpdir(), "pi67-shell-sibling-"));
+    temporaryDirectories.push(workspace, trustedRoot, sibling);
+    const canonicalTrustedRoot = await realpath(trustedRoot);
+    const canonicalSibling = await realpath(sibling);
+    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
+    const recordToolAuthorization = vi.fn();
+    const handler = safetyHandler({
+      ...trustedPolicy(),
+      cwd: workspace,
+      approvalMode: "balanced",
+      taskToolMode: "auto",
+      taskTrustedRoots: [canonicalTrustedRoot]
+    }, requestApproval, undefined, undefined, recordToolAuthorization);
+
+    await expect(handler({
+      toolCallId: "tool-call-task-root",
+      toolName: "bash",
+      input: { command: `ls ${trustedRoot}` }
+    }, { hasUI: true })).resolves.toBeUndefined();
+    expect(recordToolAuthorization).toHaveBeenCalledWith(
+      "tool-call-task-root",
+      "task-trusted-root"
+    );
+
+    await expect(handler({
+      toolCallId: "tool-call-task-root-sibling",
+      toolName: "bash",
+      input: { command: `ls ${sibling}` }
+    }, { hasUI: true })).resolves.toMatchObject({ block: true });
+    expect(requestApproval).toHaveBeenCalledWith(expect.objectContaining({
+      taskPathGrant: { kind: "paths", paths: [canonicalSibling] }
+    }), expect.anything());
+  });
+
+  it("auto-allows built-in path reads and writes inside a task-trusted root", async () => {
+    const workspace = await mkdtemp(join(tmpdir(), "pi67-path-workspace-"));
+    const trustedRoot = await mkdtemp(join(tmpdir(), "pi67-path-trusted-"));
+    temporaryDirectories.push(workspace, trustedRoot);
+    const canonicalTrustedRoot = await realpath(trustedRoot);
+    const requestApproval = vi.fn<DesktopApprovalRequester>();
+    const recordToolAuthorization = vi.fn();
+    const handler = safetyHandler({
+      ...trustedPolicy(),
+      cwd: workspace,
+      approvalMode: "balanced",
+      taskToolMode: "auto",
+      taskTrustedRoots: [canonicalTrustedRoot]
+    }, requestApproval, () => [builtinTool("read"), builtinTool("write")], undefined, recordToolAuthorization);
+
+    await expect(handler({
+      toolCallId: "tool-call-task-root-read",
+      toolName: "read",
+      input: { path: trustedRoot }
+    }, { hasUI: true })).resolves.toBeUndefined();
+    expect(requestApproval).not.toHaveBeenCalled();
+    expect(recordToolAuthorization).toHaveBeenCalledWith(
+      "tool-call-task-root-read",
+      "task-trusted-root"
+    );
+    await expect(handler({
+      toolCallId: "tool-call-task-root-write",
+      toolName: "write",
+      input: { path: join(trustedRoot, "note.md"), content: "task-scoped" }
+    }, { hasUI: true })).resolves.toBeUndefined();
+    expect(requestApproval).not.toHaveBeenCalled();
+    expect(recordToolAuthorization).toHaveBeenCalledWith(
+      "tool-call-task-root-write",
+      "task-trusted-root"
+    );
+  });
+
+  it("auto-allows routine external write/edit calls but keeps credential targets behind AUTO approval", async () => {
+    const workspace = await mkdtemp(join(tmpdir(), "pi67-path-workspace-"));
+    const externalDirectory = await mkdtemp(join(tmpdir(), "pi67-path-external-"));
+    temporaryDirectories.push(workspace, externalDirectory);
+    const canonicalExternalDirectory = await realpath(externalDirectory);
+    const firstPath = join(canonicalExternalDirectory, "first.txt");
+    const secondPath = join(canonicalExternalDirectory, "second.txt");
+    const credentialPath = join(homedir(), ".ssh", "pi67-auto-sensitive-test");
+    const configurationPath = join(homedir(), ".codex", "config.toml");
+    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
+    const recordToolAuthorization = vi.fn();
+    const handler = safetyHandler({
+      ...trustedPolicy(),
+      cwd: workspace,
+      approvalMode: "balanced",
+      taskToolMode: "auto"
+    }, requestApproval, () => [builtinTool("write"), builtinTool("edit")], undefined, recordToolAuthorization);
+
+    await expect(handler({
+      toolCallId: "tool-call-external-write-first",
+      toolName: "write",
+      input: { path: firstPath, content: "first" }
+    }, { hasUI: true })).resolves.toBeUndefined();
+    await expect(handler({
+      toolCallId: "tool-call-external-edit-second",
+      toolName: "edit",
+      input: {
+        path: secondPath,
+        edits: [{ oldText: "before", newText: "after" }]
+      }
+    }, { hasUI: true })).resolves.toBeUndefined();
+    expect(requestApproval).not.toHaveBeenCalled();
+    expect(recordToolAuthorization).toHaveBeenNthCalledWith(
+      1,
+      "tool-call-external-write-first",
+      "routine-write"
+    );
+    expect(recordToolAuthorization).toHaveBeenNthCalledWith(
+      2,
+      "tool-call-external-edit-second",
+      "routine-write"
+    );
+
+    await expect(handler({
+      toolCallId: "tool-call-sensitive-write",
+      toolName: "write",
+      input: { path: credentialPath, content: "sensitive" }
+    }, { hasUI: true })).resolves.toMatchObject({ block: true });
+    expect(requestApproval).toHaveBeenCalledWith(expect.objectContaining({
+      category: "credential-or-auth",
+      target: credentialPath
+    }), expect.anything());
+    expect(requestApproval.mock.calls[0]?.[0]).not.toHaveProperty("taskPathGrant");
+
+    await expect(handler({
+      toolCallId: "tool-call-configuration-write",
+      toolName: "write",
+      input: { path: configurationPath, content: "approval_policy = 'never'" }
+    }, { hasUI: true })).resolves.toMatchObject({ block: true });
+    expect(requestApproval).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      category: "system-configuration",
+      target: configurationPath
     }), expect.anything());
   });
 
@@ -118,7 +260,7 @@ describe("Desktop AUTO and YOLO safety order", () => {
     });
   });
 
-  it("keeps recognized destructive operations behind confirmation in trusted YOLO", async () => {
+  it("runs recognized destructive operations without per-call confirmation in trusted YOLO", async () => {
     const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "allowed" });
     const handler = safetyHandler(
       { ...trustedPolicy(), approvalMode: "balanced", taskToolMode: "yolo" },
@@ -136,10 +278,6 @@ describe("Desktop AUTO and YOLO safety order", () => {
       input: { command: "rm -rf build" }
     }, { hasUI: true })).resolves.toBeUndefined();
 
-    expect(requestApproval).toHaveBeenCalledOnce();
-    expect(requestApproval).toHaveBeenCalledWith(expect.objectContaining({
-      category: "bulk-delete",
-      toolCallId: "yolo-delete"
-    }), expect.any(Object));
+    expect(requestApproval).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,3 @@
-import { realpath } from "node:fs/promises";
-import { homedir } from "node:os";
-import { resolve } from "node:path";
 import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
 import {
   MAX_APPROVAL_CWD_BYTES,
@@ -19,8 +16,8 @@ import {
   type ToolIntent,
   type WorkspaceTrust
 } from "@pi67/domain";
-import { canonicalizePotentialPath, isContained } from "./path-policy.js";
 import { classifyBuiltinShellCommand } from "./builtin-shell-safety.js";
+import { classifyPathToolIntent } from "./path-tool-safety.js";
 import {
   isVerifiedDesktopToolAlias,
   resolveDesktopToolAliasCall
@@ -51,6 +48,7 @@ export interface SafetyPolicyState {
   trust: WorkspaceTrust;
   approvalMode: ApprovalMode;
   taskToolMode: TaskToolMode;
+  taskTrustedRoots?: readonly string[];
 }
 
 export type DesktopApprovalDecision =
@@ -71,7 +69,6 @@ export type DesktopToolAuthorizationRecorder = (
 export const DESKTOP_SAFETY_EXTENSION_PATH = "<inline:pi67-desktop-safety>";
 
 const PATH_TOOLS = new Set(["read", "write", "edit", "grep", "find", "ls"]);
-const WRITE_TOOLS = new Set(["write", "edit"]);
 
 interface ClassifiedToolIntent extends ToolIntent {
   targetKind: ApprovalTargetKind;
@@ -79,6 +76,7 @@ interface ClassifiedToolIntent extends ToolIntent {
   approvalReason?: string;
   nonApprovableReason?: string;
   autoAuthorizationReason?: ToolAutoAuthorizationReason;
+  taskPathGrant?: readonly string[];
 }
 
 export function createDesktopSafetyExtension(
@@ -106,7 +104,8 @@ export function createDesktopSafetyExtension(
             state.cwd,
             loadedResourceReadAccess,
             resolveToolProfile,
-            configuredCapabilities
+            configuredCapabilities,
+            state.taskTrustedRoots ?? []
           );
         } catch {
           return { block: true, reason: "π could not establish a safe canonical target." };
@@ -121,8 +120,8 @@ export function createDesktopSafetyExtension(
         if (intent.nonApprovableReason) {
           return { block: true, reason: intent.nonApprovableReason };
         }
+        if (state.trust === "trusted" && state.taskToolMode === "yolo") return undefined;
         const hardStop = isHardStopRiskCategory(intent.category);
-        if (state.trust === "trusted" && state.taskToolMode === "yolo" && !hardStop) return undefined;
         if (
           state.trust === "trusted"
           && state.taskToolMode === "auto"
@@ -166,7 +165,10 @@ export function createDesktopSafetyExtension(
             targetTruncated: false,
             cwd: cwd.value,
             cwdTruncated: false,
-            scope: "single-tool-call"
+            scope: "single-tool-call",
+            ...(intent.taskPathGrant === undefined
+              ? {}
+              : { taskPathGrant: { kind: "paths" as const, paths: [...intent.taskPathGrant] } })
           }, ctx.signal === undefined ? {} : { signal: ctx.signal });
           if (ctx.signal?.aborted) {
             return { block: true, reason: "π approval was cancelled before the tool could run." };
@@ -233,7 +235,8 @@ async function classifyToolIntent(
   workspace: string,
   loadedResourceReadAccess: LoadedResourceReadAccess | undefined,
   resolveToolProfile: ReturnType<typeof createToolSafetyProfileResolver>,
-  configuredCapabilities: ConfiguredCapabilityCatalog | undefined
+  configuredCapabilities: ConfiguredCapabilityCatalog | undefined,
+  taskTrustedRoots: readonly string[]
 ): Promise<ClassifiedToolIntent> {
   const record = asToolInputRecord(input);
   const alias = resolveDesktopToolAliasCall(toolName, record);
@@ -250,7 +253,8 @@ async function classifyToolIntent(
       workspace,
       loadedResourceReadAccess,
       resolveToolProfile,
-      configuredCapabilities
+      configuredCapabilities,
+      taskTrustedRoots
     );
   }
   const profile = await resolveToolProfile(pi, toolName);
@@ -268,14 +272,16 @@ async function classifyToolIntent(
   }
   if (toolName === "bash" && profile.kind === "builtin") {
     const command = stringField(record, "command") ?? "";
-    const shell = await classifyBuiltinShellCommand(command, workspace);
+    const shell = await classifyBuiltinShellCommand(command, workspace, taskTrustedRoots);
     return {
       toolName,
       category: shell.category,
       target: command,
       targetKind: "command",
       sourceLabel: profile.sourceLabel,
-      ...(shell.approvalReason === undefined ? {} : { approvalReason: shell.approvalReason })
+      ...(shell.approvalReason === undefined ? {} : { approvalReason: shell.approvalReason }),
+      ...(shell.taskPathGrant === undefined ? {} : { taskPathGrant: shell.taskPathGrant }),
+      ...(shell.authorizedByTaskRoot ? { autoAuthorizationReason: "task-trusted-root" as const } : {})
     };
   }
 
@@ -284,12 +290,14 @@ async function classifyToolIntent(
     && PATH_TOOLS.has(toolName)
     && hasBuiltinInputContract(toolName, record)
   ) {
-    return classifyPathTool(
-      profile,
+    return classifyPathToolIntent(
+      profile.toolName,
+      profile.sourceLabel,
       toolName,
       stringField(record, "path") ?? workspace,
       workspace,
-      loadedResourceReadAccess
+      loadedResourceReadAccess,
+      taskTrustedRoots
     );
   }
 
@@ -304,12 +312,15 @@ async function classifyToolIntent(
         nonApprovableReason: "无法验证分页游标对应的搜索根目录；请不带 cursor 重新执行搜索。"
       };
     }
-    return classifyPathTool(
-      profile,
+    return classifyPathToolIntent(
+      profile.toolName,
+      profile.sourceLabel,
       profile.canonicalToolName,
       stringField(record, "path") ?? workspace,
       workspace,
-      loadedResourceReadAccess
+      loadedResourceReadAccess,
+      [],
+      false
     );
   }
 
@@ -427,33 +438,4 @@ async function classifyPiFffMcpMisroute(
     };
   }
   return undefined;
-}
-
-async function classifyPathTool(
-  profile: Extract<ToolSafetyProfile, { kind: "builtin" | "pi-fff" }>,
-  capabilityName: string,
-  rawPath: string,
-  workspace: string,
-  loadedResourceReadAccess?: LoadedResourceReadAccess
-): Promise<ClassifiedToolIntent> {
-  const expandedPath = rawPath === "~"
-    ? homedir()
-    : rawPath.startsWith("~/")
-      ? resolve(homedir(), rawPath.slice(2))
-      : rawPath;
-  const canonical = await canonicalizePotentialPath(expandedPath, workspace);
-  const canonicalWorkspace = await realpath(resolve(workspace));
-  const contained = isContained(canonical, canonicalWorkspace);
-  const category: RiskCategory = contained
-    ? WRITE_TOOLS.has(capabilityName) ? "workspace-write" : "workspace-read"
-    : loadedResourceReadAccess?.allows(capabilityName, canonical)
-      ? "resource-read"
-      : "external-path";
-  return {
-    toolName: profile.toolName,
-    category,
-    target: canonical,
-    targetKind: "path",
-    sourceLabel: profile.sourceLabel
-  };
 }

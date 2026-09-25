@@ -455,7 +455,8 @@ loading error where the operation can produce those states
   never the entire raw Tool payload.
 - An AUTO-admitted Tool row may append one non-interactive, low-emphasis reason:
   `AUTO · 已安装能力`, `AUTO · 已配置来源`, `AUTO · 只读`,
-  `AUTO · 工作区命令`, or `AUTO · Workspace 内写入`. The reason
+  `AUTO · 工作区命令`, `AUTO · Workspace 内写入`, `AUTO · 常规文件写入`, or
+  `AUTO · 本任务可信目录`. The reason
   is a fixed enum projected by Host/Runtime authority, stays on the same unwrapped
   header line without becoming a badge, and remains visible when a completed
   process is reopened. It never competes with the Tool name, compact summary, or
@@ -1222,8 +1223,8 @@ loading error where the operation can produce those states
   receipt digests, or raw receipt content.
   The installed view always includes one quiet authorization disclosure: an
   enabled Package whose current content is confirmed may execute its uniquely
-  resolved Tools directly in trusted-Workspace AUTO; ASK remains one-shot and
-  unknown, duplicate, unverified, or drifted content remains blocked. The
+  resolved Tools directly in trusted-Workspace AUTO; unknown, duplicate,
+  unverified, or drifted content remains blocked. The
   discovery view states the same consequence before installation without implying
   that a recommendation is already installed, admitted, or authorized.
   A successful mutation with an `active` or `removed` receipt produces one Package-specific floating result containing
@@ -1798,20 +1799,21 @@ loading error where the operation can produce those states
 - The leftmost Composer utility action is a plain `+` with an accessible
   `添加附件` name. It opens the native file picker and is the only toolbar entry
   for file attachment; it is not styled or labeled as a gallery action.
-- Immediately after `+`, the Composer shows one compact `ASK` / `AUTO` / `YOLO`
+- Immediately after `+`, the Composer shows one compact `AUTO` / `YOLO`
   Tool-mode control for the selected Task Runtime. Its menu opens upward, keeps
-  all three options and their short consequences visible, uses neutral styling
-  for `ASK`, restrained accent for `AUTO`, and semantic warning styling rather
-  than destructive red for `YOLO`. It remains usable during a running Operation
-  so the user can correct later Tool decisions without stopping the Turn. AUTO's
-  short consequence reads `已安装能力与常规操作自动，未知来源受限`; it does not
-  claim that every high-risk call must still ask after installation authorization.
-- `ASK` and `AUTO` switch directly after an authoritative Host acknowledgement;
-  the resting control never changes optimistically. Selecting `YOLO` replaces
-  the same menu content with a second confirmation naming workspace-external,
-  system, and network automation plus the narrow irreversible-operation
-  confirmation exception. Its short consequence reads
-  `普通工具全部自动，仅不可逆操作确认`. An untrusted Workspace disables that
+  both options and their short consequences visible, uses restrained accent for
+  `AUTO`, and semantic warning styling rather than destructive red for `YOLO`.
+  Legacy `ASK` may remain an internal Protocol compatibility value but never
+  appears as a selectable option and normalizes to `AUTO`. The control remains
+  usable during a running Operation so the user can correct later Tool decisions
+  without stopping the Turn. AUTO's short consequence reads
+  `自动判断风险，仅高风险或无法判断时介入`; it describes intervention as a
+  classification outcome rather than making routine write/edit operations appear privileged.
+- `AUTO` switches directly after an authoritative Host acknowledgement; the
+  resting control never changes optimistically. Selecting `YOLO` replaces
+  the same menu content with a second confirmation naming irreversible,
+  workspace-external, system, and network automation. Its short consequence reads
+  `所有合法工具自动，不再逐次确认`. An untrusted Workspace disables that
   option with `仅可信工作区可开启` instead of waiting for a Host error.
 - Tool mode belongs to the exact live Task Runtime. Switching conversations
   displays that Task's independent value; session transition or missing Session
@@ -2197,7 +2199,8 @@ loading error where the operation can produce those states
   results, malformed or expired IDs, duplicate Tool names, and same-name legacy
   Package Tools never gain first-party identity or authorization.
 - New trusted Workspaces default to `AUTO` (`balanced`). Exact Workspace
-  read/write Tools, exact current-Session loaded resource reads, first-party
+  read/write Tools, routine canonical built-in `write`/`edit` calls outside
+  system and credential paths, exact current-Session loaded resource reads, first-party
   read-only web Tools, non-destructive persistent writes, conservatively classified
   local inspection/test/build and common project Shell commands, Workspace-local
   dependency changes, non-destructive local Git operations, and every operation from an enabled,
@@ -2205,9 +2208,10 @@ loading error where the operation can produce those states
   uniquely proceed without repetitive approval. The installed-capability grant
   includes authentication, JavaScript, native input, clipboard, external files,
   upload/submission, system, dependency, publish, remote, and network side effects.
-  Recognized file, persistent-state, external-object, Shell, and destructive-Git
-  deletion is a hard stop before both this grant and YOLO. Every other valid
-  registered Tool runs directly in trusted YOLO; invalid identity, schema, route,
+  In AUTO, recognized file, persistent-state, external-object, Shell, and
+  destructive-Git deletion is a one-shot hard stop before an installed-capability
+  grant. Every valid registered Tool runs directly in trusted YOLO, including
+  recognized destructive operations; invalid identity, schema, route,
   and target state remains corrective rather than executable. A
   bounded `&&`/`;` chain or read-only pipeline is admitted only when every segment
   is independently safe; Workspace-local `cd` and the small CI environment allowlist
@@ -2227,21 +2231,23 @@ loading error where the operation can produce those states
   credential, args, results, or source paths. Skill directories authorize only canonical
   `read`/`grep`/`find`/`ls` targets within that directory; loaded Prompt, context,
   and visible Extension resources authorize only canonical exact-file reads.
-  Reload atomically replaces those grants. Recognized irreversible deletion and
-  destructive Shell always retain exact one-shot confirmation. Symlink escape,
-  arbitrary home files, upload or external submit, credentials/authentication,
+  Reload atomically replaces those grants. In AUTO, recognized irreversible deletion
+  and destructive Shell retain exact one-shot confirmation. Symlink escape reads,
+  arbitrary home reads, upload or external submit, credentials/authentication,
   global dependencies, publish, remote Git writes, system changes, and external
-  writes retain the dedicated one-shot flow when they do not originate from an
-  exact installed-capability grant. PLAN remains read-only;
-  ASK remains one-shot; unconfigured, duplicate, malformed, unverified, or drifted
-  identities remain corrective failures rather than approvable shortcuts.
+  side effects retain the dedicated one-shot flow when they do not originate from
+  an exact installed-capability grant. Routine canonical built-in `write`/`edit`
+  calls are AUTO-admitted independently; system and credential targets are not.
+  PLAN remains read-only; unconfigured,
+  duplicate, malformed, unverified, or drifted identities remain corrective
+  failures rather than approvable shortcuts.
 - Retired `@ff-labs/pi-fff` is neither bundled nor recommended. If a user
   explicitly installs and admits legacy `@ff-labs/pi-fff@0.10.1`, its `grep`/`find` and fallback
   `ffgrep`/`fffind` names share one source-and-contract profile. Workspace-local
   paths and globs follow normal read policy; `~`, absolute, `../`, and symlink
-  escapes use the installed-capability grant in AUTO and display the canonical
-  external path before one-shot approval in ASK. An
-  opaque pagination cursor is not approvable in `ASK` or `AUTO` because Desktop
+  escapes use the installed-capability grant in AUTO or display the canonical
+  external path before a one-shot decision. An
+  opaque pagination cursor is not approvable in `AUTO` because Desktop
   cannot prove the original root; the model is instructed to restart without
   the cursor. When pi-fff registers the override names, Desktop's per-turn Tool
   guidance explicitly states that live `find` and `grep` are FFF-backed, so the
@@ -2261,12 +2267,11 @@ loading error where the operation can produce those states
 - Verified `pi-mcp-adapter@2.10.0` and `2.11.0` `mcp` proxy calls distinguish
   local capability discovery from execution. Empty status, cached server lists,
   bounded search/describe, and current-Session UI-message reads use the
-  read-only capability category in `ASK` and `AUTO`. AUTO connects an already
+  read-only capability category in `AUTO`. AUTO connects an already
   configured server and runs a cached nested Tool under the resolved installed-
-  capability grant for every classified non-hard-stop side effect, including that
-  target's OAuth/authentication and credential flow; recognized deletion remains
-  exact-confirmation only. ASK requests one-shot approval for
-  connect and configured operations. New server setup or catalog expansion remains
+  capability grant for every classified side effect, including that target's
+  OAuth/authentication and credential flow; recognized deletion remains exact-
+  confirmation only in AUTO and runs directly in trusted YOLO. New server setup or catalog expansion remains
   a separate configuration confirmation boundary. Missing or ambiguous servers/Tools,
   malformed args, duplicate sources, and unsupported versions are corrective
   errors rather than approvable actions. When a proxy call instead targets the currently verified
@@ -2279,19 +2284,28 @@ loading error where the operation can produce those states
   and resolves uniquely, AUTO executes JavaScript, native input, clipboard, upload,
   authentication, external-file writes, hook cleanup, and finalization operations.
   Delete/forget/purge and declared file or external-object deletion remain exact
-  confirmation. Classification remains visible in ASK, PLAN, audit, and diagnostics
+  confirmation in AUTO and run directly in trusted YOLO. Classification remains visible in AUTO, PLAN, audit, and diagnostics
   even when the installed-capability grant removes other duplicate AUTO approval.
 - Approval makes bidi, zero-width, control, and non-standard line-separator
   characters explicit in a non-mutating safe display. At constrained height,
   details scroll independently while all applicable decision actions remain visible.
-- Ordinary Approval actions are ordered `拒绝`, `仅允许本次`, `本任务开启 YOLO`, with
-  default focus on `拒绝`. The YOLO action atomically permits the current and all
-  other pending ordinary Safety Approval requests owned by the same Task Runtime
-  and changes its mode; hard-stop approvals and ordinary Extension `ctx.ui`
-  requests remain pending. Hard-stop Approval uses the same Dialog, detail table,
+- Ordinary Approval always offers `拒绝` and `仅允许本次`, with default focus on
+  `拒绝`. For a Host-projected canonical external path, it also shows the exact
+  bounded roots and a primary `本任务信任该路径` action. Routine built-in `write`
+  and `edit` calls never use this flow; the action is reserved for external reads
+  and conservatively classifiable Shell work. It trusts only
+  those roots and descendants for later built-in path Tools and conservatively
+  classified Shell calls in the current Runtime; it cannot be shown for a
+  hard-stop, cannot accept Renderer-supplied paths, and explains that the grant
+  clears when the Task stops, the app restarts, or Workspace trust is revoked.
+  Ordinary Approval also offers `本任务开启 YOLO`. The YOLO action atomically permits the current and all
+  other pending Safety Approval requests owned by the same Task Runtime
+  and changes its mode; ordinary Extension `ctx.ui` requests remain pending.
+  Hard-stop Approval uses the same Dialog, detail table,
   safe literals, fixed action region, focus contract, and theme tokens, but changes
-  its title to `确认不可逆操作` and exposes only `拒绝` plus the destructive
-  `确认执行此操作` Tool decision. `停止整个任务` remains a separately authorized
+  its title to `确认不可逆操作` and exposes `拒绝`, the destructive
+  `确认执行此操作` one-shot decision, and the explicit Task-level YOLO action.
+  `停止整个任务` remains a separately authorized
   lifecycle action when available. A stale
   Host, Session generation, Operation, request, or Tool call cannot enable the
   mode. The mode never changes OS permission, Electron sandbox/preload,

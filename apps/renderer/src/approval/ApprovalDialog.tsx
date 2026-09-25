@@ -39,15 +39,23 @@ export function ApprovalDialog() {
   const toolSource = analyzeSecurityLiteral(request.toolSource);
   const target = analyzeSecurityLiteral(request.target);
   const cwd = analyzeSecurityLiteral(request.cwd);
+  const taskPathGrant = request.taskPathGrant?.kind === "paths"
+    ? request.taskPathGrant.paths.map(analyzeSecurityLiteral)
+    : [];
+  const canTrustTaskPaths = !hardStop
+    && request.category === "external-path"
+    && taskPathGrant.length > 0;
   const suspiciousCharacterCount = toolName.suspiciousCharacterCount
     + toolSource.suspiciousCharacterCount
     + target.suspiciousCharacterCount
-    + cwd.suspiciousCharacterCount;
+    + cwd.suspiciousCharacterCount
+    + taskPathGrant.reduce((total, path) => total + path.suspiciousCharacterCount, 0);
   const suspiciousCategories = uniqueCategories([
     ...toolName.categories,
     ...toolSource.categories,
     ...target.categories,
-    ...cwd.categories
+    ...cwd.categories,
+    ...taskPathGrant.flatMap((path) => path.categories)
   ]);
   const stoppableTaskId = taskIdForInteractiveStop(request);
 
@@ -138,19 +146,43 @@ export function ApprovalDialog() {
                     {request.cwdTruncated ? <small>{messages.approval.cwdTruncated}</small> : null}
                   </dd>
                 </div>
-                <div><dt>{messages.approval.approvalScope}</dt><dd>{messages.approval.singleToolCall}</dd></div>
+                {canTrustTaskPaths ? (
+                  <div>
+                    <dt>{messages.approval.taskTrustedPaths}</dt>
+                    <dd className={styles.taskPathGrant}>
+                      {taskPathGrant.map((path, index) => (
+                        <SecurityLiteral
+                          analysis={path}
+                          key={request.taskPathGrant?.paths[index]}
+                          kind="target"
+                          label={messages.approval.taskTrustedPaths}
+                          multiline
+                        />
+                      ))}
+                    </dd>
+                  </div>
+                ) : null}
+                <div>
+                  <dt>{messages.approval.approvalScope}</dt>
+                  <dd>{canTrustTaskPaths
+                    ? messages.approval.singleToolCallOrTaskPaths
+                    : messages.approval.singleToolCall}</dd>
+                </div>
               </dl>
               <p className={styles.denial}>
                 {hardStop ? messages.approval.destructiveNotice : messages.approval.denialNotice}
               </p>
-              {hardStop ? null : <p className={styles.yoloNotice}>{messages.approval.yoloNotice}</p>}
+              {canTrustTaskPaths
+                ? <p className={styles.denial}>{messages.approval.taskPathTrustNotice}</p>
+                : null}
+              <p className={styles.yoloNotice}>{messages.approval.yoloNotice}</p>
             </div>
             <div className={`dialog-actions ${styles.actions}`}>
               <Button autoFocus className="secondary-button" isDisabled={submittingDecision !== undefined || stoppingTask} onPress={() => void submit("deny")}>
                 {submittingDecision === "deny" ? messages.approval.submitting : messages.approval.deny}
               </Button>
               <Button
-                className={hardStop ? "danger-button" : "primary-button"}
+                className={hardStop ? "danger-button" : canTrustTaskPaths ? "secondary-button" : "primary-button"}
                 isDisabled={submittingDecision !== undefined || stoppingTask}
                 onPress={() => void submit("allow-once")}
               >
@@ -158,17 +190,26 @@ export function ApprovalDialog() {
                   ? messages.approval.submitting
                   : hardStop ? messages.approval.executeDestructiveOnce : messages.approval.allowOnce}
               </Button>
-              {hardStop ? null : (
+              {canTrustTaskPaths ? (
                 <Button
-                  className={styles.yoloButton!}
+                  className="primary-button"
                   isDisabled={submittingDecision !== undefined || stoppingTask}
-                  onPress={() => void submit("enable-task-yolo-and-allow")}
+                  onPress={() => void submit("trust-task-paths-and-allow")}
                 >
-                  {submittingDecision === "enable-task-yolo-and-allow"
+                  {submittingDecision === "trust-task-paths-and-allow"
                     ? messages.approval.submitting
-                    : messages.approval.enableTaskYolo}
+                    : messages.approval.trustTaskPaths(taskPathGrant.length)}
                 </Button>
-              )}
+              ) : null}
+              <Button
+                className={styles.yoloButton!}
+                isDisabled={submittingDecision !== undefined || stoppingTask}
+                onPress={() => void submit("enable-task-yolo-and-allow")}
+              >
+                {submittingDecision === "enable-task-yolo-and-allow"
+                  ? messages.approval.submitting
+                  : messages.approval.enableTaskYolo}
+              </Button>
               {stoppableTaskId ? (
                 <Button
                   className="danger-button"

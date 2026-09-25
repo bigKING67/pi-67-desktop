@@ -2470,11 +2470,25 @@ Notification history 已迁移到独立 `notificationStore`，App Store 不再�
 - Shell approval follows the validated Tool identity, current mode, exact targets,
   and conservative syntax/side-effect classification, never a command-prefix grant.
   AUTO permits classified bounded local checks, Workspace scripts/dependency changes,
-  and non-destructive local Git operations. Unclassifiable AUTO Shell returns a
+  non-destructive local Git operations, and routine canonical built-in `write`/`edit`
+  calls outside system and credential paths. Unclassifiable AUTO Shell returns a
   corrective Tool Result without a meaningless approval dialog. Recognized destructive
-  actions require exact one-shot confirmation before installed-capability AUTO grants
-  and YOLO; ASK keeps the verified read-only exemptions below and otherwise requires
-  one-shot approval, while PLAN remains read-only.
+  actions require exact one-shot confirmation in AUTO; trusted YOLO executes every
+  valid Tool without per-call approval. PLAN remains read-only. AUTO and YOLO are the only user-visible Tool
+  modes. Legacy `guided` / `ask` input normalizes to AUTO and is not selectable.
+- For a valid built-in read or classifiable Shell request whose canonical target is
+  Workspace-external, Safety may project at most eight exact path roots with the
+  approval request. Routine built-in `write` / `edit` calls are classified directly
+  and never depend on this grant. Renderer returns only
+  `trust-task-paths-and-allow`; it cannot
+  supply or modify paths. Agent Host re-reads the still-pending request, rejects
+  untrusted Workspaces and hard-stop categories, and stores at most 32 unique
+  absolute roots in that Task Runtime. Later canonical targets at those roots or
+  descendants classify through AUTO with `task-trusted-root`. The roots are not
+  persisted or placed in Session JSONL and clear on Runtime initialization or
+  disposal and Workspace trust revocation. They do not grant opaque capability,
+  upload, publish, remote, system, credential, or destructive-operation authority
+  while the Task remains in AUTO.
 - Safety Approval 与普通 Extension `confirm` 使用不同 event、pending registry、Store 和 Dialog。
   Approval 绑定 `hostEpoch + sessionId + sessionGeneration + operationId + requestId + toolCallId`；
   Port 不可投递、session/operation 过期、requester 异常、等待期间 abort 或 target/cwd 无法完整

@@ -21,15 +21,15 @@ export const zhCNComposerMessages = {
     },
     auto: {
       label: "AUTO",
-      description: "已安装能力与常规操作自动，未知来源受限"
+      description: "自动判断风险，仅高风险或无法判断时介入"
     },
     yolo: {
       label: "YOLO",
-      description: "普通工具全部自动，仅不可逆操作确认"
+      description: "所有合法工具自动，不再逐次确认"
     }
   },
   yoloConfirmationTitle: "为当前任务开启 YOLO？",
-  yoloConfirmationDescription: "已等待和后续产生的普通工具将自动执行，包括工作区外、系统和网络操作；可识别的不可逆操作仍会单独确认。",
+  yoloConfirmationDescription: "当前、已等待和后续产生的所有合法工具都会自动执行，包括不可逆、工作区外、系统和网络操作；无效调用仍会直接失败。",
   yoloRequiresTrustedWorkspace: "仅可信工作区可开启",
   enableYolo: "开启 YOLO",
   slashCatalogUnavailable: "Pi 指令目录尚未加载，请稍后重试。草稿已保留。",
