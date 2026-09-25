@@ -9,6 +9,7 @@ import {
   Clock3,
   Ellipsis,
   FileInput,
+  Folder,
   FolderSearch,
   Plus,
   RefreshCw,
@@ -250,7 +251,7 @@ function WorkspaceConversationGroup({
           aria-label={`${workspace.displayName} ${workspaceStatus(workspace)}`}
           type="button"
         >
-          <span className={styles.workspaceGlyph} aria-hidden="true">{workspace.displayName.slice(0, 1).toUpperCase()}</span>
+          <span className={styles.workspaceGlyph} aria-hidden="true"><Folder size={16} /></span>
           <span><strong>{workspace.displayName}</strong>{workspace.availability !== "available" || workspace.trust !== "trusted" ? <small>{workspaceStatus(workspace)}</small> : null}</span>
         </button>
         {!expanded && backgroundCount > 0 ? (

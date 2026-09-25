@@ -166,15 +166,9 @@
 .workspaceGlyph {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--surface-raised);
-  color: var(--text-primary);
-  font-family: var(--font-code);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
+  width: 20px;
+  height: 20px;
+  color: var(--text-secondary);
 }
 
 .workspaceItem > span:last-child {
@@ -488,7 +482,6 @@
 }
 
 .workspaceGroup.currentGroup .workspaceGroupHeader {
-  border-radius: 7px;
   background: color-mix(in srgb, var(--surface-active) 18%, transparent);
 }
 
@@ -501,6 +494,11 @@
   align-items: center;
   gap: 2px;
   padding: 3px 2px;
+  border-radius: var(--radius-control);
+}
+
+.workspaceGroup .workspaceGroupHeader:hover {
+  background: var(--surface-hover);
 }
 
 .workspaceHeaderActions {
@@ -567,7 +565,7 @@
   display: grid;
   min-width: 0;
   min-height: 30px;
-  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-columns: 20px minmax(0, 1fr);
   align-items: center;
   gap: 7px;
   padding: 3px 2px;
@@ -576,10 +574,6 @@
   background: transparent;
   color: var(--text-secondary);
   text-align: left;
-}
-
-.workspaceGroupName:hover {
-  background: var(--surface-hover);
 }
 
 .workspaceGroupName > span:last-child {
@@ -602,13 +596,6 @@
 
 .workspaceGroupName small {
   color: var(--text-tertiary);
-  font-size: var(--font-size-caption);
-}
-
-.workspaceGroupName .workspaceGlyph {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
   font-size: var(--font-size-caption);
 }
 

@@ -156,6 +156,11 @@ Application-level surfaces use a separate wide-window shell:
   whitespace, indentation, and restrained current/selected surfaces rather than
   full-width horizontal dividers; hard lines remain reserved for pane boundaries
   or distinct semantic subsections.
+- Workspace group identity uses a 16px rounded-stroke Folder icon in a fixed
+  20px slot, without a separate background, border, or name-derived initial.
+  The full group header owns the rounded hover/current surface using the control
+  radius; the disclosure arrow alone indicates expansion. Light and Dark share
+  this treatment and use semantic icon and surface colors.
 - The Title Bar contains navigation, the current Workspace/conversation title,
   status, notifications, command actions, and the Inspector toggle. It contains
   no horizontal task strip. At 1320px and below the docked Inspector title zone
