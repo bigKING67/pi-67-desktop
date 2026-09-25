@@ -13,6 +13,7 @@ import {
   isContained,
   normalizeShellPathForPlatform
 } from "./path-policy.js";
+import { classifySensitivePathTarget } from "./path-tool-safety.js";
 
 export interface BuiltinShellClassification {
   category: RiskCategory;
@@ -55,7 +56,10 @@ async function classifyCategory(
       verifiedWorkspacePaths.add(rawPath);
       continue;
     }
-    if (taskTrustedRoots.some((root) => isContained(canonical, root))) {
+    if (
+      classifySensitivePathTarget(canonical) === undefined
+      && taskTrustedRoots.some((root) => isContained(canonical, root))
+    ) {
       verifiedWorkspacePaths.add(rawPath);
       authorizedByTaskRoot = true;
       continue;
@@ -66,14 +70,21 @@ async function classifyCategory(
   const taskPathGrant = category === "external-path"
     && untrustedPaths.size > 0
     && untrustedPaths.size <= MAX_APPROVAL_TASK_PATHS
+    && [...untrustedPaths].every((path) => classifySensitivePathTarget(path) === undefined)
     && [...untrustedPaths].every((path) => Buffer.byteLength(path, "utf8") <= MAX_APPROVAL_CWD_BYTES)
     ? [...untrustedPaths]
     : undefined;
   return {
     category,
     ...(taskPathGrant === undefined ? {} : { taskPathGrant }),
-    ...(authorizedByTaskRoot && category !== "external-path" ? { authorizedByTaskRoot: true } : {})
+    ...(authorizedByTaskRoot && isTaskRootAuthorizedCategory(category)
+      ? { authorizedByTaskRoot: true }
+      : {})
   };
+}
+
+function isTaskRootAuthorizedCategory(category: RiskCategory): boolean {
+  return category === "workspace-command" || category === "dependency-change";
 }
 
 function ambiguousReason(command: string): string {

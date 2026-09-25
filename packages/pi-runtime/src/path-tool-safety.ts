@@ -65,9 +65,12 @@ export async function classifyPathToolIntent(
   const canonicalWorkspace = await realpath(resolve(workspace));
   const contained = isContained(canonical, canonicalWorkspace);
   const writeTool = WRITE_TOOLS.has(capabilityName);
-  const sensitiveWriteCategory = writeTool ? classifySensitiveWriteTarget(canonical) : undefined;
+  const sensitivePathCategory = classifySensitivePathTarget(canonical);
+  const sensitiveWriteCategory = writeTool ? sensitivePathCategory : undefined;
   const taskRootContained = allowTaskPathGrant
+    && !writeTool
     && !contained
+    && sensitivePathCategory === undefined
     && taskTrustedRoots.some((root) => isContained(canonical, root));
   const category: RiskCategory = sensitiveWriteCategory ?? (contained || taskRootContained
     ? writeTool ? "workspace-write" : "workspace-read"
@@ -94,13 +97,14 @@ export async function classifyPathToolIntent(
       && !contained
       && !taskRootContained
       && category === "external-path"
+      && sensitivePathCategory === undefined
       && Buffer.byteLength(canonical, "utf8") <= MAX_APPROVAL_CWD_BYTES
       ? { taskPathGrant: [canonical] }
       : {})
   };
 }
 
-function classifySensitiveWriteTarget(canonical: string): RiskCategory | undefined {
+export function classifySensitivePathTarget(canonical: string): RiskCategory | undefined {
   const home = resolve(homedir());
   if (USER_CREDENTIAL_ROOTS.some((path) => isContained(canonical, resolve(home, path)))) {
     return "credential-or-auth";

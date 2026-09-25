@@ -126,7 +126,7 @@ export function createDesktopSafetyExtension(
           state.trust === "trusted"
           && state.taskToolMode === "auto"
           && !hardStop
-          && intent.autoAuthorizationReason !== undefined
+          && isApplicableAutoAuthorization(intent)
         ) {
           recordToolAuthorization?.(event.toolCallId, intent.autoAuthorizationReason);
           return undefined;
@@ -187,6 +187,16 @@ export function createDesktopSafetyExtension(
       });
     }
   };
+}
+
+function isApplicableAutoAuthorization(
+  intent: ClassifiedToolIntent
+): intent is ClassifiedToolIntent & { autoAuthorizationReason: ToolAutoAuthorizationReason } {
+  if (intent.autoAuthorizationReason === undefined) return false;
+  if (intent.autoAuthorizationReason !== "task-trusted-root") return true;
+  return intent.category === "workspace-read"
+    || intent.category === "workspace-command"
+    || intent.category === "dependency-change";
 }
 
 function autoAuthorizationReason(category: RiskCategory): ToolAutoAuthorizationReason | undefined {

