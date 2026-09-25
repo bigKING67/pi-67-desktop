@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  expectPiSdkReady,
   forwardElectronDebugOutput,
   nativeElectronAgentDirectory,
   openModelServiceSettings,
@@ -128,7 +129,7 @@ test("keeps the Main-resolved Pi profile authoritative when the launch environme
     const window = await application.firstWindow();
     await window.waitForLoadState("domcontentloaded");
     await window.getByRole("button", { name: "选择工作区" }).click();
-    await expect(window.getByText("Pi SDK 已就绪", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expectPiSdkReady(window);
 
     const settings = await openModelServiceSettings(window);
     await expect(settings.getByText("正在读取 Pi 配置", { exact: true })).toHaveCount(0, {

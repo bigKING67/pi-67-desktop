@@ -104,7 +104,15 @@ test("keeps the environment selector single-column and legible in narrow dark mo
   expect(worktreeBox!.y).toBeGreaterThan(localBox!.y + localBox!.height);
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await worktreeOption.click();
-  await expect(worktreeOption).toHaveCSS("background-color", "rgb(32, 59, 50)");
+  await expect(worktreeOption).toHaveAttribute("data-selected", "true");
+  await expect.poll(() => worktreeOption.evaluate((element) => {
+    const tokenProbe = document.createElement("span");
+    tokenProbe.style.backgroundColor = "var(--surface-active)";
+    element.append(tokenProbe);
+    const expected = getComputedStyle(tokenProbe).backgroundColor;
+    tokenProbe.remove();
+    return getComputedStyle(element).backgroundColor === expected;
+  })).toBe(true);
   await expect(selector).toContainText("选择环境不会修改 Git；只有首次发送才开始创建。");
   await page.screenshot({ path: testInfo.outputPath("worktree-environment-dark-narrow.png"), animations: "disabled" });
 });

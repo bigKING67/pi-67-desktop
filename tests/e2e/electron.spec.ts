@@ -10,6 +10,7 @@ import {
   writeControlledShutdownExtension
 } from "../../eng/packaging/controlled-shutdown-fixture.js";
 import {
+  expectPiSdkReady,
   forwardElectronDebugOutput,
   nativeElectronAgentDirectory,
   openRuntimeSettings,
@@ -59,7 +60,7 @@ test("initializes and trusts a workspace through the on-demand real Agent Host",
     });
     await window.waitForLoadState("domcontentloaded");
     await window.getByRole("button", { name: "选择工作区" }).click();
-    await expect(window.getByText("Pi SDK 已就绪", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expectPiSdkReady(window);
     await expect(window.getByLabel("Pi conversation")).toBeVisible();
     await expect(window.getByLabel("New Money 设置")).toHaveCount(0);
     await expect(window.locator('[data-testid="conversation-row"]')).toHaveCount(1);
@@ -245,8 +246,7 @@ test("opens, switches, creates, and restores exact Sessions across a real Electr
     await expect(window.getByRole("button", { name: "打开对话", exact: true })).toBeVisible();
     await window.getByRole("button", { name: "打开对话", exact: true }).click();
     await expect(window.getByLabel("给 Pi 发送消息")).toBeEnabled({ timeout: 30_000 });
-    await expect(window.getByRole("banner").getByText("Pi SDK 已就绪", { exact: true }))
-      .toBeVisible({ timeout: 30_000 });
+    await expectPiSdkReady(window);
 
     await window.getByTestId("conversation-row").filter({ hasText: "Session Story A" }).click();
     await expect(window.getByText("Session Story A assistant response.", { exact: true }))
@@ -297,15 +297,14 @@ test("refreshes the session tree after rollback without a transition BUSY warnin
     });
     await window.waitForLoadState("domcontentloaded");
     await window.getByRole("button", { name: "选择工作区" }).click();
-    await expect(window.getByText("Pi SDK 已就绪", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expectPiSdkReady(window);
 
     const fixtureSession = window
       .locator('[data-testid="conversation-row"]')
       .filter({ hasText: "Rollback race fixture" });
     await expect(fixtureSession).toBeVisible({ timeout: 30_000 });
     await fixtureSession.click();
-    await expect(window.getByRole("banner").getByText("Pi SDK 已就绪", { exact: true }))
-      .toBeVisible({ timeout: 30_000 });
+    await expectPiSdkReady(window);
     await expect(window.getByText("Rollback fixture assistant response.", { exact: true })).toBeVisible();
 
     const settings = await openRuntimeSettings(window);
@@ -378,7 +377,7 @@ test("closes an active Extension command and its child process within the shutdo
     const window = await application.firstWindow();
     await window.waitForLoadState("domcontentloaded");
     await window.getByRole("button", { name: "选择工作区" }).click();
-    await expect(window.getByText("Pi SDK 已就绪", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expectPiSdkReady(window);
     await window.keyboard.press(process.platform === "darwin" ? "Meta+k" : "Control+k");
     const command = window.getByRole("option", {
       name: "/hold-open Start a controlled child process until Pi shuts down"

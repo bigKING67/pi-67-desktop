@@ -8,7 +8,7 @@ import {
   CONTROLLED_PROMPT_TEXT,
   writeControlledShutdownExtension
 } from "../../eng/packaging/controlled-shutdown-fixture.js";
-import { nativeElectronAgentDirectory } from "./electron-test-fixtures.js";
+import { expectPiSdkReady, nativeElectronAgentDirectory } from "./electron-test-fixtures.js";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const inheritedEnvironment = Object.fromEntries(
@@ -68,7 +68,7 @@ test("runs independent real Pi tasks across Sessions and Workspaces", async () =
     });
     await window.waitForLoadState("domcontentloaded");
     await window.getByRole("button", { name: "选择工作区" }).click();
-    await expect(window.getByText("Pi SDK 已就绪", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expectPiSdkReady(window);
     const primaryGroup = window.getByRole("listitem", { name: "工作区：workspace-primary" });
     const primaryOne = primaryGroup.locator('[data-testid="conversation-row"]').filter({ hasText: "Primary task one" });
     const primaryTwo = primaryGroup.locator('[data-testid="conversation-row"]').filter({ hasText: "Primary task two" });

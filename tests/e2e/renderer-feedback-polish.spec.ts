@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { attachMockAgent, installMockDesktopBridge, waitForMockWorkspaceReady } from "./pi67-renderer-fixture.js";
+import {
+  attachMockAgent,
+  emitMockAgentEvent,
+  installMockDesktopBridge,
+  waitForMockWorkspaceReady
+} from "./pi67-renderer-fixture.js";
 
 for (const theme of ["light", "dark"] as const) {
   test(`single-page message index stays compact in ${theme}`, async ({ page }) => {
@@ -28,18 +33,18 @@ test("switch success expires without mutating runtime or hiding recovery", async
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
   await waitForMockWorkspaceReady(page);
-  await page.evaluate(`(async () => {
-    const { useAppStore } = await import('/src/app/app-store.ts');
-    useAppStore.setState({ runtime: { phase: 'ready', detail: '已切换至「检查任务」', recoverable: true } });
-  })()`);
+  await emitMockAgentEvent(page, {
+    type: "runtime.statusChanged",
+    payload: { phase: "ready", detail: "已切换至「检查任务」", recoverable: true }
+  });
   await expect(page.getByLabel("当前状态：已切换至「检查任务」", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("当前状态：就绪", { exact: true })).toBeVisible({ timeout: 5_000 });
-  expect(await page.evaluate(`(async () => (await import('/src/app/app-store.ts')).useAppStore.getState().runtime.detail)()`))
-    .toBe("已切换至「检查任务」");
-  await page.evaluate(`(async () => {
-    const { useAppStore } = await import('/src/app/app-store.ts');
-    useAppStore.setState({ runtime: { phase: 'recovering', detail: '正在恢复连接', recoverable: true } });
-  })()`);
+  const ready = page.getByLabel("当前状态：就绪", { exact: true });
+  await expect(ready).toBeVisible({ timeout: 5_000 });
+  await expect(ready).toHaveAttribute("title", "已切换至「检查任务」");
+  await emitMockAgentEvent(page, {
+    type: "runtime.statusChanged",
+    payload: { phase: "recovering", detail: "正在恢复连接", recoverable: true }
+  });
   await expect(page.getByLabel("当前状态：正在恢复连接", { exact: true })).toBeVisible();
   await page.waitForTimeout(3_200);
   await expect(page.getByLabel("当前状态：正在恢复连接", { exact: true })).toBeVisible();

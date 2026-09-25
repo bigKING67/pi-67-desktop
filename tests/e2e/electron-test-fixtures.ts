@@ -35,6 +35,12 @@ export function nativeElectronAgentDirectory(fallback: string): string {
   return sharedRoot ? resolve(sharedRoot, "agent profile") : fallback;
 }
 
+export async function expectPiSdkReady(window: Page, timeout = 30_000): Promise<void> {
+  const status = window.getByRole("banner").getByLabel("当前状态：就绪", { exact: true });
+  await expect(status).toBeVisible({ timeout });
+  await expect(status).toHaveAttribute("title", "Pi SDK 已就绪");
+}
+
 export async function openRuntimeSettings(window: Page) {
   await window.keyboard.press(process.platform === "darwin" ? "Meta+," : "Control+,");
   const settings = window.getByLabel("New Money 设置");

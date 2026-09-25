@@ -53,14 +53,10 @@ export function useTranscriptMessageFocus({
     }
     const timeout = window.setTimeout(() => setHighlightedMessageId((current) => (
       current === highlightedMessageId ? undefined : current
-    )), reducedMotion() ? 300 : 1_800);
+    )), 1_800);
     return () => {
       observer.disconnect();
       window.clearTimeout(timeout);
     };
   }, [focusMessage, highlightedMessageId, regionRef, rows, setHighlightedMessageId, virtuosoRef]);
-}
-
-function reducedMotion(): boolean {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
