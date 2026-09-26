@@ -59,6 +59,11 @@ installer or full NSIS upgrade lifecycle requirements.
   but then exposed the same historical-version defect for the capability layout.
   The user authorized the versioned capability correction, validation, scoped
   commit/push, and one further exact-SHA candidate dispatch without automatic retry.
+- Installed-UI follow-up: run `36235125575` proved both installed asset corrections,
+  installed Alpha.40, and then failed at baseline launch because the verifier waited
+  for the later `New Money 设置` accessible name instead of Alpha.40's exact `π 设置`.
+  The user authorized the versioned UI-label correction, validation, scoped
+  commit/push, and one further exact-SHA candidate dispatch without automatic retry.
 
 ## Current evidence
 
@@ -76,6 +81,7 @@ installer or full NSIS upgrade lifecycle requirements.
 | VERIFIED | Follow-up run `36231515012` passed provenance, Windows packaging, packaged smoke, and all three synthetic-scale shutdown samples; the slowest complete product exit was 1553.6 ms under the unchanged 5000 ms gate. | exact Actions jobs and uploaded UI receipt | 2026-09-26 |
 | VERIFIED | Certification then failed immediately after installing Alpha.40 because the current verifier required the Alpha.41 Pi TUI native clipboard path. Alpha.40 source required the legacy `@mariozechner` path; commit `9c2d162...` changed that path only after the Alpha.40 source. Upgrade, restart, and uninstall phases did not begin. | lifecycle diagnostic artifact and exact Git history | 2026-09-26 |
 | VERIFIED | Run `36233437302` passed provenance, Windows packaging, packaged smoke and all synthetic-scale checks. Alpha.40 baseline installation completed in 99.36 seconds, then certification failed because the verifier required the later unified `pi-workspace-resources` layout. Commit `d6175e1` introduced that verifier assumption after baseline source `8c0c560...` while the source version still read Alpha.40; the first distributed version with the unified layout is Alpha.41. | exact Actions log, diagnostic artifact and Git ancestry | 2026-09-26 |
+| VERIFIED | Run `36235125575` passed provenance, Windows packaging, packaged smoke, synthetic-scale/IME, exact candidate identity, immutable Alpha.40 restore, all 23 Alpha.40 asset checks, and Alpha.40 installation. Baseline launch then timed out waiting for `New Money 设置`; exact Alpha.40 source exposes `π 设置`, while branding commit `4a19e93` changed the label before later Alpha.41 version commit `63d9a0f`. | exact Actions log, lifecycle diagnostic and Git history | 2026-09-26 |
 
 ## Affected boundaries
 
@@ -99,6 +105,7 @@ installer or full NSIS upgrade lifecycle requirements.
 | Project only the typed Main shutdown stage report into Windows failure evidence. | A process-only receipt cannot distinguish checkpoint/Host cleanup from Electron teardown, while raw process output may contain unrelated data. | The harness gains an equivalent typed lifecycle event. |
 | Version the native clipboard asset path with the installed package contract. | The full lifecycle installs the previous version first; checking that installation against the candidate's later dependency layout creates a false failure while weakening the check would lose native asset coverage. | A future package format provides a self-describing, authenticated runtime asset manifest. |
 | Treat Alpha.41 as the first distributed unified-capability layout. | The retained Alpha.40 artifact predates the unification even though later source commits retained the Alpha.40 version string; the exact distributed artifact, not an intermediate source version, owns the lifecycle contract. | A signed per-artifact runtime asset manifest replaces version thresholds. |
+| Version the installed Settings accessible name at Alpha.41. | The retained Alpha.40 artifact exposes `π 设置`; an intermediate branding commit changed it to `New Money 设置` while the source version still read Alpha.40, so the distributed boundary again owns the contract. | A signed per-artifact UI contract replaces version thresholds. |
 
 ## Checkpoints
 
@@ -117,9 +124,12 @@ installer or full NSIS upgrade lifecycle requirements.
 - [x] 9. Version the native clipboard asset contract for Alpha.40 and Alpha.41,
   validate the verifier-only correction, commit/push only its scoped files, and
   dispatch the separately authorized exact-SHA candidate once.
-- [ ] 10. Version the capability layout contract for the retained Alpha.40 artifact,
+- [x] 10. Version the capability layout contract for the retained Alpha.40 artifact,
   validate and commit/push the scoped correction, then dispatch the separately
   authorized exact-SHA candidate once without automatic retry.
+- [ ] 11. Version the installed Settings accessible name for Alpha.40 and Alpha.41,
+  retain the full Settings assertions, validate and commit/push the scoped correction,
+  then dispatch the separately authorized exact-SHA candidate once without automatic retry.
 
 ## Validation matrix
 
@@ -136,6 +146,7 @@ installer or full NSIS upgrade lifecycle requirements.
 | Shutdown correction | focused controller/measurement tests, affected typecheck/lint, architecture/structure, aggregate source gate | 5-second product gate unchanged; 3-second inner watchdog and typed evidence pass | PASS: focused 17/17; Desktop typecheck, scoped lint, architecture and structure passed. The first ordinary aggregate run passed all static gates but had one unrelated parallel Host crash-recovery timing failure; its isolated rerun passed 1/1. The complete bounded-concurrency rerun passed 883 files / 5763 tests with 9 files / 24 tests skipped and coverage 84.02/78.48/87.26/87.66. |
 | Local shutdown package | `corepack pnpm run preview:mac:unsigned` | rebuilt macOS arm64 package, smoke, relaunch | PASS on the preserved dirty worktree: packaged smoke and active-prompt shutdown passed at 83.7 ms; `app.asar` SHA-256 `657fb525...`; the repository preview was relaunched. This is not clean exact-SHA Windows evidence. |
 | Installed-version asset contract | focused packaged fixture and lifecycle tests, source gate, candidate gate, macOS packaged smoke | PASS: Alpha.40 selects legacy clipboard native modules plus the legacy `pi67-core`/observational-memory package paths, while Alpha.41 selects Pi TUI native modules plus the unified `pi-workspace-resources` path; focused 33/33, `check:source` and `check:candidate` each passed 883 files / 5763 tests with production dependency, capability-source/freshness, Extension Adapter, aggregate source and coverage gates; rebuilt packaged smoke passed with 105.3 ms active-prompt shutdown and `app.asar` SHA-256 `657fb525...` | PASS |
+| Installed-version Settings contract | focused smoke-scenario/lifecycle/verifier tests, source gate, candidate gate, macOS packaged smoke | PASS: Alpha.40 resolves exact `π 设置`, Alpha.41 and later resolve exact `New Money 设置`, and both retain the full Settings navigation assertions; focused 44/44, `check:source` and `check:candidate` each passed 883 files / 5763 tests with production dependency, capability-source/freshness, Extension Adapter, aggregate source and coverage gates; rebuilt packaged smoke passed with 86.1 ms active-prompt shutdown and `app.asar` SHA-256 `657fb525...` | PASS |
 
 ## Rollback
 
@@ -211,6 +222,22 @@ failure or delete prior artifacts. No public update state is changed by this pla
   coverage 84.02/78.48/87.26/87.66. A fresh macOS arm64 package passed the full
   packaged Electron smoke with 105.3 ms active-prompt shutdown, then relaunched
   the repository preview from `app.asar` SHA-256 `657fb525...`.
+- 2026-09-26: Scoped commit `69eb0f98...` was pushed and candidate run
+  `36235125575` dispatched once. The run passed provenance, Windows packaging,
+  packaged smoke, synthetic-scale/IME, candidate identity, immutable Alpha.40
+  restore, all 23 Alpha.40 asset assertions, and baseline installation. Baseline
+  launch then timed out on the later `New Money 设置` label before upgrade; no
+  testable candidate was uploaded and no rerun was attempted. Exact source history
+  established `π 设置` as the retained Alpha.40 artifact contract and Alpha.41 as
+  the first distributed `New Money 设置` contract.
+- 2026-09-26: Versioned the installed Settings accessible-name contract at
+  Alpha.41 without weakening the Settings structure or navigation assertions.
+  Focused tests passed 44/44; `check:source` and `check:candidate` each passed
+  883 test files and 5763 tests with 9 files / 24 tests skipped by existing
+  platform contracts. Source-gate coverage was 84.02/78.48/87.26/87.66 and the
+  candidate-gate rerun was 84.02/78.49/87.26/87.66. A fresh macOS arm64 package
+  passed the full packaged Electron smoke with 86.1 ms active-prompt shutdown,
+  then relaunched the repository preview from `app.asar` SHA-256 `657fb525...`.
 
 ## Closeout
 

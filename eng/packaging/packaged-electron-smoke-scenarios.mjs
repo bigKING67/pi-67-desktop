@@ -392,9 +392,9 @@ export function captureRendererBootstrapFailures(window) {
   return () => failures;
 }
 
-export async function openSettingsSection(window, sectionName) {
+export async function openSettingsSection(window, sectionName, settingsAccessibleName = "New Money 设置") {
   await window.keyboard.press(process.platform === "darwin" ? "Meta+," : "Control+,");
-  const settings = window.getByLabel("New Money 设置");
+  const settings = window.getByLabel(settingsAccessibleName);
   await settings.waitFor({ state: "visible", timeout: 15_000 });
   const settingsLayout = await settings.evaluate((element) => ({
     columns: getComputedStyle(element).gridTemplateColumns,

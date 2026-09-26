@@ -219,6 +219,7 @@ describe("Windows installer lifecycle contract", () => {
     expect(source).toContain("provisioningTimeoutMs,");
     expect(source).toContain("resolvePackagedRuntimeAssetContract(initialVersion)");
     expect(source).toContain("resolveInstalledUserInterfaceContract(initialVersion)");
+    expect(source).toContain("settingsAccessibleName: initialUserInterfaceContract.settingsAccessibleName");
     expect(source).toContain("assertPackagedRuntimeAssets(installedArtifact, initialRuntimeAssetContract)");
     expect(source).toContain(
       "initialRuntimeAssetContract.clipboardNativeModulePaths[installedArtifact.platform]"

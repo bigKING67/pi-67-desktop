@@ -7,6 +7,7 @@ import {
   selectLightThemePreference,
   waitForInstalledStartupSurface,
   waitForRuntimeReady,
+  WINDOWS_NEW_MONEY_SETTINGS_LABEL_VERSION,
   WINDOWS_SETTINGS_WORKBENCH_VERSION
 } from "./windows-installed-application-lifecycle.mjs";
 
@@ -22,15 +23,20 @@ describe("Windows installed application lifecycle", () => {
     expect(resolveInstalledUserInterfaceContract("0.1.0-alpha.7")).toEqual({
       legacyUserInterface: true,
       runtimeReadiness: "legacy-exact-label",
+      settingsAccessibleName: "π 设置",
       settingsFlow: "legacy-toolbar-menu"
     });
     expect(resolveInstalledUserInterfaceContract("0.1.0-alpha.8")).toEqual({
       legacyUserInterface: false,
       runtimeReadiness: "runtime-phase-and-conversation",
+      settingsAccessibleName: "π 设置",
       settingsFlow: "settings-workbench"
     });
-    expect(resolveInstalledUserInterfaceContract("0.1.0-alpha.22"))
-      .toMatchObject({ legacyUserInterface: false });
+    expect(WINDOWS_NEW_MONEY_SETTINGS_LABEL_VERSION).toBe("0.1.0-alpha.41");
+    expect(resolveInstalledUserInterfaceContract("0.1.0-alpha.40"))
+      .toMatchObject({ legacyUserInterface: false, settingsAccessibleName: "π 设置" });
+    expect(resolveInstalledUserInterfaceContract("0.1.0-alpha.41"))
+      .toMatchObject({ legacyUserInterface: false, settingsAccessibleName: "New Money 设置" });
     expect(() => resolveInstalledUserInterfaceContract("not-a-version"))
       .toThrow("Invalid version for installed user interface contract");
   });
@@ -53,16 +59,20 @@ describe("Windows installed application lifecycle", () => {
       waitFor: async (options) => actions.push(`settings:${options.state}`)
     };
     const window = {
-      getByLabel: () => settings,
+      getByLabel: (name) => {
+        actions.push(`label:${name}`);
+        return settings;
+      },
       getByRole: () => ({ count: async () => 0 }),
       getByTestId: () => ({ count: async () => 0 }),
       keyboard: { press: async (key) => actions.push(`key:${key}`) }
     };
 
-    await selectLightThemePreference(window, false);
+    await selectLightThemePreference(window, false, "π 设置");
 
     expect(actions).toEqual([
       `key:${process.platform === "darwin" ? "Meta+," : "Control+,"}`,
+      "label:π 设置",
       "settings:visible",
       "role:navigation:设置分类",
       "role:button:/^外观/u",

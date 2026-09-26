@@ -28,6 +28,7 @@ export const INSTALLED_SHUTDOWN_BUDGET_MS = 5_000;
 export const INSTALLED_RUNTIME_READINESS_TIMEOUT_MS =
   CONTROL_MUTATION_ACK_TIMEOUT_MS + RUNTIME_READINESS_PROPAGATION_MARGIN_MS;
 export const WINDOWS_SETTINGS_WORKBENCH_VERSION = "0.1.0-alpha.8";
+export const WINDOWS_NEW_MONEY_SETTINGS_LABEL_VERSION = "0.1.0-alpha.41";
 
 export function resolveInstalledUserInterfaceContract(version) {
   if (!validSemver(version)) {
@@ -37,6 +38,9 @@ export function resolveInstalledUserInterfaceContract(version) {
   return {
     legacyUserInterface,
     runtimeReadiness: legacyUserInterface ? "legacy-exact-label" : "runtime-phase-and-conversation",
+    settingsAccessibleName: semverLessThan(version, WINDOWS_NEW_MONEY_SETTINGS_LABEL_VERSION)
+      ? "π 设置"
+      : "New Money 设置",
     settingsFlow: legacyUserInterface ? "legacy-toolbar-menu" : "settings-workbench"
   };
 }
@@ -51,6 +55,7 @@ export async function launchInstalledApplication({
   lifecyclePath,
   probePackagedRendererIsolation,
   selectLightTheme,
+  settingsAccessibleName,
   userDataDirectory,
   workspace
 }) {
@@ -89,7 +94,7 @@ export async function launchInstalledApplication({
     }
 
     if (selectLightTheme && legacyUserInterface) {
-      await selectLightThemePreference(window, legacyUserInterface);
+      await selectLightThemePreference(window, legacyUserInterface, settingsAccessibleName);
       await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
     }
 
@@ -114,7 +119,7 @@ export async function launchInstalledApplication({
     }
 
     if (selectLightTheme && !legacyUserInterface) {
-      await selectLightThemePreference(window, legacyUserInterface);
+      await selectLightThemePreference(window, legacyUserInterface, settingsAccessibleName);
       await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
     }
 
@@ -216,13 +221,13 @@ export function readSelectedConversationIdentity(window) {
     .evaluateAll((rows) => rows[0]?.getAttribute("data-conversation-id") ?? null);
 }
 
-export async function selectLightThemePreference(window, legacyUserInterface) {
+export async function selectLightThemePreference(window, legacyUserInterface, settingsAccessibleName) {
   if (legacyUserInterface) {
     await window.getByRole("button", { name: /外观：跟随系统/u }).click();
     await window.getByRole("menuitemradio", { name: /浅色/u }).click();
     return;
   }
-  const settings = await openSettingsSection(window, /^外观/u);
+  const settings = await openSettingsSection(window, /^外观/u, settingsAccessibleName);
   await settings.getByRole("button", { name: /^浅色/u }).click();
   await settings.getByRole("button", { name: "返回工作台", exact: true }).click();
   await settings.waitFor({ state: "hidden", timeout: 15_000 });

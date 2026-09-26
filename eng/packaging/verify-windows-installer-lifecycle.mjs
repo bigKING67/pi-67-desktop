@@ -209,7 +209,6 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
     } else {
       await writeControlledShutdownExtension({ extensionPath, childPidPath, lifecyclePath });
     }
-
     const initialInstallerPath = baseline?.path ?? installerPath;
     const initialVersion = baseline?.version ?? packageJson.version;
     await recordProgress(report, baseline ? "baseline-install:started" : "install:started");
@@ -265,6 +264,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       lifecyclePath,
       probePackagedRendererIsolation: !baseline,
       selectLightTheme: true,
+      settingsAccessibleName: initialUserInterfaceContract.settingsAccessibleName,
       userDataDirectory,
       workspace
     });
@@ -311,6 +311,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
         lifecyclePath,
         probePackagedRendererIsolation: true,
         selectLightTheme: false,
+        settingsAccessibleName: resolveInstalledUserInterfaceContract(packageJson.version).settingsAccessibleName,
         userDataDirectory,
         workspace
       });

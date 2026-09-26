@@ -177,6 +177,11 @@ clipboard package plus the legacy `pi67-core` and observational-memory capabilit
 and later use the Pi TUI native module and unified `pi-workspace-resources` capability path. It must not apply
 the current candidate's dependency layout to the previous-version baseline or skip either asset check.
 
+The installed Settings assertion also uses the contract of the version currently installed. The retained
+Alpha.40 artifact exposes the exact accessible name `π 设置`; Alpha.41 and later expose `New Money 设置`.
+Cross-version certification must select that exact name by installed version, retain the complete Settings
+layout and navigation assertions, and fail closed instead of accepting an arbitrary Settings surface.
+
 GitHub's `Re-run failed jobs` always uses the original commit and workflow. Use it for an external
 or transient failure. A verifier code fix requires a new commit; automatic artifact reuse applies
 that new verifier to the old immutable candidate while binding both SHAs and the source run.
