@@ -28,6 +28,8 @@ export async function verifyPackagedWorkbenchJourney({ window, captureScreenshot
   const surface = window.getByRole("region", { name: "工作区文件与对话" });
   await expect(surface.getByRole("tab", { name: /AGENTS\.md$/u })).toBeVisible({ timeout: 30_000 });
   await expect(window.locator(".cm-content")).toContainText("Packaged project context fixture.");
+  const drawerScrim = window.getByRole("button", { name: "关闭任务检查器抽屉", exact: true });
+  if (await drawerScrim.isVisible()) await drawerScrim.click();
   await captureScreenshot(window, "19-journey-open-file.png");
   await surface.getByRole("tab", { name: "对话", exact: true }).click();
   await expect(composer).toHaveValue(draft);

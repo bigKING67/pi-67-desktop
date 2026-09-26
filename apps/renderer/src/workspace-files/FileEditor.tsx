@@ -25,12 +25,16 @@ export function FileEditor({ content, fileName, onChange, onSave, navigation }: 
   useEffect(() => {
     let disposed = false;
     let view: EditorView | undefined;
+    const focusOrigin = containerRef.current?.ownerDocument.activeElement;
     void loadLanguage(fileName).then((language) => {
       if (disposed || !containerRef.current) return;
       view = createEditor(containerRef.current, initialContent, fileName, language);
       viewRef.current = view;
       applyNavigation(view, navigationRef.current);
-      view.focus();
+      const ownerDocument = containerRef.current.ownerDocument;
+      if (ownerDocument.activeElement === focusOrigin || ownerDocument.activeElement === ownerDocument.body) {
+        view.focus();
+      }
     }).catch(() => {
       if (disposed || !containerRef.current) return;
       view = createEditor(containerRef.current, initialContent, fileName);
