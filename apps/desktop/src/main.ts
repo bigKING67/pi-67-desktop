@@ -234,9 +234,12 @@ if (hasSingleInstanceLock) {
       console.info("Prompt attachment cleanup removed=0 errors=1 classes=UnknownError");
     });
     const desktopSafeStorage = new DesktopSafeStorage(safeStorage);
+    const isolatedUserData = app.commandLine.hasSwitch("user-data-dir")
+      ? app.getPath("userData")
+      : undefined;
     localMemory = createApplicationLocalMemory({
-      appData: app.getPath("appData"), platform: process.platform, arch: process.arch,
-      ...(app.commandLine.hasSwitch("user-data-dir") ? { isolatedUserData: app.getPath("userData") } : {}),
+      ...(isolatedUserData === undefined ? { appData: app.getPath("appData") } : { isolatedUserData }),
+      platform: process.platform, arch: process.arch,
       encryption: desktopSafeStorage, models: agentHostSupervisor.localMemoryModels
     });
     enterpriseCredentialStore = new EnterpriseCredentialStore(app.getPath("userData"), {

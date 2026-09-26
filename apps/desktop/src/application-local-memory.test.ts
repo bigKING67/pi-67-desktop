@@ -67,7 +67,8 @@ describe("application local memory wiring", () => {
   });
   it("keeps explicit test profiles independent of the canonical memory directory", async () => {
     const options = await fixture(); const isolated = await fixture();
-    const memory = createApplicationLocalMemory({ ...options, isolatedUserData: isolated.appData })!;
+    const { appData: _canonicalAppData, ...optionsWithoutAppData } = options;
+    const memory = createApplicationLocalMemory({ ...optionsWithoutAppData, isolatedUserData: isolated.appData })!;
     expect(memory.settings.path).toBe(join(isolated.appData, "openviking/settings/models.enc.json"));
     await memory.settings.save({ extraction: { provider: "fixture", model: "fixture" }, embedding: {
       protocol: "openai-compatible", endpoint: "https://example.invalid/v1", model: "embed", dimension: 8, apiKey: "synthetic"

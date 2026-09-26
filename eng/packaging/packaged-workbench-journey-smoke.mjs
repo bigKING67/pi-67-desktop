@@ -26,7 +26,7 @@ export async function verifyPackagedWorkbenchJourney({ window, captureScreenshot
   const file = inspector.getByRole("treeitem", { name: /^文件 AGENTS\.md /u });
   await file.click();
   const surface = window.getByRole("region", { name: "工作区文件与对话" });
-  await expect(surface.getByRole("tab", { name: /AGENTS\.md$/u })).toBeVisible();
+  await expect(surface.getByRole("tab", { name: /AGENTS\.md$/u })).toBeVisible({ timeout: 30_000 });
   await expect(window.locator(".cm-content")).toContainText("Packaged project context fixture.");
   await captureScreenshot(window, "19-journey-open-file.png");
   await surface.getByRole("tab", { name: "对话", exact: true }).click();

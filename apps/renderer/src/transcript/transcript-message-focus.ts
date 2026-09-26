@@ -29,6 +29,7 @@ export function useTranscriptMessageFocus({
     const row = rows[index]!;
     virtuosoRef.current?.scrollToIndex({ index, align: "center", behavior: "auto" });
 
+    let focusedTarget: HTMLElement | undefined;
     const focusTarget = () => {
       const selector = row.kind === "process-group"
         ? `[data-transcript-row-key="${CSS.escape(row.key)}"]`
@@ -36,14 +37,14 @@ export function useTranscriptMessageFocus({
       const target = regionRef.current?.querySelector<HTMLElement>(
         selector
       );
-      if (!target || target.getClientRects().length === 0) return false;
-      if (focusMessage) target.focus({ preventScroll: true });
-      return !focusMessage || document.activeElement === target;
+      if (!target || target.getClientRects().length === 0 || !focusMessage) return;
+      const activeElement = document.activeElement;
+      if (focusedTarget?.isConnected && activeElement !== focusedTarget) return;
+      if (activeElement !== target) target.focus({ preventScroll: true });
+      if (document.activeElement === target) focusedTarget = target;
     };
-    const observer = new MutationObserver(() => {
-      if (focusTarget()) observer.disconnect();
-    });
-    if (!focusTarget() && regionRef.current) {
+    const observer = new MutationObserver(focusTarget);
+    if (focusMessage && regionRef.current) {
       observer.observe(regionRef.current, {
         attributes: true,
         attributeFilter: ["style"],
@@ -51,11 +52,20 @@ export function useTranscriptMessageFocus({
         subtree: true
       });
     }
+    let focusFrame: number | undefined;
+    let remainingFocusFrames = 4;
+    const stabilizeFocus = () => {
+      focusTarget();
+      remainingFocusFrames -= 1;
+      if (remainingFocusFrames > 0) focusFrame = window.requestAnimationFrame(stabilizeFocus);
+    };
+    if (focusMessage) focusFrame = window.requestAnimationFrame(stabilizeFocus);
     const timeout = window.setTimeout(() => setHighlightedMessageId((current) => (
       current === highlightedMessageId ? undefined : current
     )), 1_800);
     return () => {
       observer.disconnect();
+      if (focusFrame !== undefined) window.cancelAnimationFrame(focusFrame);
       window.clearTimeout(timeout);
     };
   }, [focusMessage, highlightedMessageId, regionRef, rows, setHighlightedMessageId, virtuosoRef]);
