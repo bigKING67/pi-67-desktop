@@ -76,7 +76,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
     description: "产品界面和交互设计工程能力。",
     packageId: "design-craft",
     packageDisplayName: "design-craft",
-    version: "0.6.1",
+    version: "0.7.0",
     installed: true
   }, {
     id: "minimalist-ui",
@@ -89,7 +89,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
   }];
   return {
     phase: "ready",
-    catalogVersion: "2026.09.01.1",
+    catalogVersion: "2026.09.26.1",
     packages: [{
       id: "pi-workspace-resources",
       displayName: "Pi Workspace Resources",
@@ -128,8 +128,8 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
       origin: "first-party",
       bundled: true,
       defaultEnabled: true,
-      version: "0.6.1",
-      commit: "b1688725876fa8624251c46763eddc4f4a8e2c52",
+      version: "0.7.0",
+      commit: "f52ac60ad8fcebad89b125d761775bf5050cc4d0",
       resourceTypes: ["skill"],
       installed: true
     }, {

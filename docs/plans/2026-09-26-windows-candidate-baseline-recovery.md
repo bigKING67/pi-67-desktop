@@ -21,13 +21,13 @@ installer or full NSIS upgrade lifecycle requirements.
 
 ## Acceptance criteria
 
-- [ ] The existing GitHub Actions artifact path remains the preferred baseline path.
-- [ ] Recovery is admitted only when the exact Actions artifact is unavailable and a
+- [x] The existing GitHub Actions artifact path remains the preferred baseline path.
+- [x] Recovery is admitted only when the exact Actions artifact is unavailable and a
   repository-pinned historical candidate identity, manual-test receipt, publication
   manifest, and immutable public installer all agree.
-- [ ] The recovery download is restricted to the fixed update origin, rejects redirects,
+- [x] The recovery download is restricted to the fixed update origin, rejects redirects,
   enforces a bounded exact byte count, verifies SHA-256, and publishes the local file atomically.
-- [ ] The recovered installer still feeds the existing full install, upgrade, restart,
+- [x] The recovered installer still feeds the existing full install, upgrade, restart,
   restore, shutdown, uninstall, and data-preservation lifecycle.
 - [ ] Focused release/workflow tests, aggregate source gates, exact staged-diff review,
   scoped commit, and push pass before candidate dispatch.
@@ -43,6 +43,10 @@ installer or full NSIS upgrade lifecycle requirements.
   GitHub Actions artifact output only.
 - Tag/release/promotion: not authorized.
 - Feishu/R2 mutation or cleanup: not authorized.
+- Freshness follow-up: after run `36228639998` failed before Windows build,
+  the user authorized reviewing and advancing `design-craft` to the exact current
+  stable release, regenerating capabilities, validating/package-smoking, scoped
+  commit/push, and one replacement exact-SHA Windows candidate dispatch.
 
 ## Current evidence
 
@@ -53,6 +57,9 @@ installer or full NSIS upgrade lifecycle requirements.
 | OBSERVED | Windows candidate preflight rejected baseline run `33320336253/1` because its exact Actions artifact is absent; recent successful candidate artifacts are also absent. | live preflight and Actions API | 2026-09-26 |
 | VERIFIED | Alpha.40 identity/manual receipt bind source `8c0c560...`, run `33320336253/1`, installer size `275361161`, and SHA-256 `4b6c7561...`. | retained ignored evidence | 2026-09-26 |
 | OBSERVED | The fixed public update origin serves the Alpha.40 Windows installer with HTTP 200, exact content length, immutable cache policy, and no redirect. | public fixed origin HEAD | 2026-09-26 |
+| OBSERVED | Candidate run `36228639998` stopped in provenance before Windows build because `design-craft` freshness advanced from locked `0.6.1`/`b168872...` to stable `0.7.0`/`f52ac60...`. | GitHub Actions failed-step log and exact tag resolution | 2026-09-26 |
+| VERIFIED | Stable tag `v0.7.0` peels to `f52ac60...`; the Desktop-bundled product boundary contains 95 regular files and no symlink or submodule entries. | canonical remote tag and local exact clean source | 2026-09-26 |
+| VERIFIED | Prepared and packaged capability catalogs identify `design-craft` `0.7.0` at exact commit `f52ac60...`, tree SHA-256 `4cfd9278...`; the packaged Skill directory is byte-for-byte identical to the exact source boundary. | generated catalogs and packaged application filesystem comparison | 2026-09-26 |
 
 ## Affected boundaries
 
@@ -81,6 +88,9 @@ installer or full NSIS upgrade lifecycle requirements.
 - [x] 4. Update authority docs and focused workflow/release tests.
 - [ ] 5. Run aggregate gates, review/stage only task files, commit, push, and verify remote CI.
 - [ ] 6. Run the new preflight, dispatch one exact-SHA Windows candidate, and record its state.
+- [ ] 7. Advance the exact reviewed `design-craft` source lock, regenerate and verify
+  prepared capabilities, complete packaged smoke, then commit/push and dispatch the
+  separately authorized replacement candidate.
 
 ## Validation matrix
 
@@ -92,6 +102,8 @@ installer or full NSIS upgrade lifecycle requirements.
 | Runtime/host | live fixed-origin preflight | exact immutable baseline admitted only after Actions absence | PASS for `0c7010c...`: selected `immutable-update`, alpha.40, 275361161 bytes, exact identity SHA-256 |
 | Packaged artifact | `Windows candidate` workflow | full workflow and installer lifecycle success | pending |
 | Target OS/manual | separate Windows x64 installation test | exact downloaded candidate identity | UNVERIFIED; outside this implementation |
+| Capability source | exact `design-craft` stable tag/product-boundary review, prepare/freshness/source-lock gates | self-contained reviewed v0.7.0 package | PASS: stable tag peels to `f52ac60...`; source lock/freshness passed; 95-file package prepared with tree SHA-256 `4cfd9278...`; focused capability tests 27/27 |
+| Local package | required capability gates and `preview:mac:unsigned` | prepared exact package and packaged Electron smoke | PASS: aggregate `check` 883 files / 5761 tests; Extension Adapter provenance passed; packaged Electron smoke passed; `app.asar` SHA-256 `0d23d713...`; packaged catalog and exact Skill directory verified |
 
 ## Rollback
 
@@ -117,6 +129,17 @@ failure or delete prior artifacts. No public update state is changed by this pla
 - 2026-09-26: Focused tests passed 29/29; aggregate `check` passed 883 test files
   and 5761 tests; live GitHub/origin preflight selected the exact alpha.40
   immutable baseline for source `0c7010c...`.
+- 2026-09-26: Scoped recovery commit `67fbb436...` was pushed and candidate run
+  `36228639998` dispatched once. Provenance stopped before build on the independent
+  stale `design-craft` lock; no Windows artifact or lifecycle evidence was produced.
+- 2026-09-26: User authorized the exact stable `design-craft` refresh and one
+  replacement exact-SHA candidate after full validation; no publication boundary changed.
+- 2026-09-26: Advanced the capability lock/catalog fixtures to `design-craft`
+  `0.7.0` at exact commit `f52ac60...`. Source-lock and freshness verification,
+  capability preparation, focused tests 27/27, aggregate `check`, Extension Adapter
+  provenance, macOS arm64 unsigned packaging, and packaged Electron smoke all passed.
+  The packaged catalog reports `2026.09.26.1`, and its exact Skill directory matches
+  the reviewed upstream product boundary.
 
 ## Closeout
 
