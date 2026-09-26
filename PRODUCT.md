@@ -887,8 +887,8 @@ the only Runtime and behavior specification source.
   system, dependency, publish, remote, and network side effects. In AUTO,
   recognized file, persistent-state, external-object, Shell, and destructive-Git
   deletion requests exact one-shot confirmation before the installed-capability
-  grant. `YOLO` permits every valid registered Tool in that trusted Task Runtime,
-  including recognized destructive operations and calls which do not have an
+  grant and while the Task is in `YOLO`. `YOLO` permits every other valid registered
+  Tool in that trusted Task Runtime, including calls which do not have an
   installed-capability grant. YOLO never makes an invalid Tool identity, schema,
   route, or target valid.
 - Trusted AUTO classifies canonical built-in `write` and `edit` targets as routine
@@ -950,9 +950,9 @@ the only Runtime and behavior specification source.
   response limits apply after decompression. Successful search or fetch
   results receive an in-memory bounded `responseId` for `get_search_content`; the
   reference neither performs a second network request nor broadens Tool authority.
-  In AUTO, recognized irreversible deletion and destructive commands retain exact
-  one-shot confirmation even under an installed-capability grant. Trusted YOLO
-  executes them without another per-call decision. Outside an exact
+  Recognized irreversible deletion and destructive commands retain exact one-shot
+  confirmation in AUTO and trusted YOLO, including under an installed-capability
+  grant. Outside an exact
   installed-capability grant, external paths, upload or external submit,
   authentication or credential actions, publishing, remote Git writes, system
   changes and global dependencies retain one-shot approval in AUTO; routine
@@ -992,8 +992,8 @@ the only Runtime and behavior specification source.
   installed-capability grant for every classified side effect in AUTO except
   recognized destructive operations,
   including the configured target's OAuth/authentication and credential flow;
-  recognized deletion remains exact-confirmation only in AUTO and runs directly
-  in trusted YOLO. Adding an unconfigured
+  recognized deletion retains exact one-shot confirmation in AUTO and trusted
+  YOLO. Adding an unconfigured
   server or expanding the configured server catalog remains a separate configuration
   confirmation boundary.
   An unconfigured server, missing or ambiguous nested Tool, malformed proxy args,
@@ -1013,7 +1013,7 @@ the only Runtime and behavior specification source.
   native input, clipboard mutation, upload, authentication, external file writes,
   hook removal, and finalization run automatically, while forget/delete/purge and
   declared file or external-object deletion request exact confirmation in AUTO
-  and run directly in trusted YOLO. Effect
+  and trusted YOLO. Effect
   categories remain visible for AUTO, PLAN, audit, and diagnostics; authorization
   is not inferred from Tool names alone.
 - Restored Workspace registrations are checked against their persisted filesystem
@@ -1811,13 +1811,14 @@ the only Runtime and behavior specification source.
   prompts, source paths, URLs, and credentials never enter this projection.
 - The ordinary approval dialog names the verified Tool source and offers `拒绝`,
   `仅允许本次`, and `本任务开启 YOLO`. The third action atomically allows the
-  current and every other pending Safety Approval request in the same Runtime,
-  but it never resolves ordinary Extension `ctx.ui` requests. A hard-stop dialog
-  offers `拒绝`, `确认执行此操作`, and the explicit Task-level YOLO action. Exact
-  one-shot confirmation never grants later destructive calls while the Task stays
-  in AUTO. Composer-initiated YOLO selection requires a second confirmation in the
-  same upward menu and states that every valid Tool, including irreversible,
-  Workspace-external, system, and network actions, will execute automatically.
+  current and every other pending non-destructive Safety Approval request in the
+  same Runtime, but it never resolves hard-stop approvals or ordinary Extension
+  `ctx.ui` requests. A hard-stop dialog offers only `拒绝` and
+  `确认执行此操作`; exact one-shot confirmation never grants later destructive
+  calls in AUTO or YOLO. Composer-initiated YOLO selection requires a second
+  confirmation in the same upward menu and states that valid Workspace-external,
+  system, network, and other non-deletion actions will execute automatically while
+  recognized deletion still requires confirmation.
 - A blocking Safety Approval or Extension input distinguishes resolving only the
   current interaction from stopping the entire Task. `拒绝`/`取消当前输入` answers
   that one request; `停止整个任务` is available only when exactly one current Task

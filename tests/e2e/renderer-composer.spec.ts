@@ -41,14 +41,14 @@ test("offers AUTO and YOLO only and confirms current-Task YOLO in the upward Com
   await expect(menu.getByRole("radio", { name: /AUTO/u })).toHaveAttribute("aria-checked", "true");
   await expect(menu.getByText("自动判断风险，仅高风险或无法判断时介入", { exact: true })).toBeVisible();
   await expect(menu.getByRole("radio", { name: /YOLO/u })).toBeVisible();
-  await expect(menu.getByText("所有合法工具自动，不再逐次确认", { exact: true })).toBeVisible();
+  await expect(menu.getByText("合法工具自动执行，删除仍需确认", { exact: true })).toBeVisible();
   const menuBox = await menu.boundingBox();
   expect(menuBox).not.toBeNull();
   expect((menuBox?.y ?? 0) + (menuBox?.height ?? 0)).toBeLessThanOrEqual(modeBox?.y ?? 0);
 
   await page.getByRole("radio", { name: /YOLO/u }).click();
   await expect(page.getByText("为当前任务开启 YOLO？", { exact: true })).toBeVisible();
-  await expect(page.getByText(/包括不可逆、工作区外、系统和网络操作/u)).toBeVisible();
+  await expect(page.getByText(/文件、持久状态、外部对象、Shell 与破坏性 Git 删除仍需逐次确认/u)).toBeVisible();
   expect(await scenarioCommandTypes(page)).toEqual([]);
   await page.getByRole("button", { name: "开启 YOLO" }).click();
 

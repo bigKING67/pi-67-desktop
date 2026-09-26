@@ -2473,8 +2473,8 @@ Notification history 已迁移到独立 `notificationStore`，App Store 不再�
   non-destructive local Git operations, and routine canonical built-in `write`/`edit`
   calls outside system and credential paths. Unclassifiable AUTO Shell returns a
   corrective Tool Result without a meaningless approval dialog. Recognized destructive
-  actions require exact one-shot confirmation in AUTO; trusted YOLO executes every
-  valid Tool without per-call approval. PLAN remains read-only. AUTO and YOLO are the only user-visible Tool
+  actions require exact one-shot confirmation in AUTO and trusted YOLO; YOLO executes
+  every other valid Tool without per-call approval. PLAN remains read-only. AUTO and YOLO are the only user-visible Tool
   modes. Legacy `guided` / `ask` input normalizes to AUTO and is not selectable.
 - For a valid built-in read or classifiable Shell request whose canonical target is
   Workspace-external, Safety may project at most eight exact path roots with the

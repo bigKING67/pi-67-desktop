@@ -337,7 +337,7 @@ describe("Desktop AUTO and YOLO safety order", () => {
     });
   });
 
-  it("runs recognized destructive operations without per-call confirmation in trusted YOLO", async () => {
+  it("keeps recognized destructive operations behind exact confirmation in trusted YOLO", async () => {
     const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "allowed" });
     const handler = safetyHandler(
       { ...trustedPolicy(), approvalMode: "balanced", taskToolMode: "yolo" },
@@ -355,6 +355,10 @@ describe("Desktop AUTO and YOLO safety order", () => {
       input: { command: "rm -rf build" }
     }, { hasUI: true })).resolves.toBeUndefined();
 
-    expect(requestApproval).not.toHaveBeenCalled();
+    expect(requestApproval).toHaveBeenCalledTimes(1);
+    expect(requestApproval).toHaveBeenCalledWith(expect.objectContaining({
+      toolCallId: "yolo-delete",
+      category: "bulk-delete"
+    }), expect.anything());
   });
 });

@@ -179,8 +179,8 @@ authorization and the repository's separate operation and distribution rules.
   including its system, external-path, upload, authentication, publish, dependency,
   or remote side effects. In AUTO, recognized file, persistent-state,
   external-object, Shell, and destructive-Git deletion remains an exact one-shot
-  confirmation. Trusted YOLO automatically executes every valid registered Tool,
-  including recognized destructive operations; it does not make an invalid identity,
+  hard confirmation before both that AUTO grant and YOLO. Trusted YOLO automatically
+  executes every other valid registered Tool; it does not make an invalid identity,
   schema, route, or target valid. ASK remains one-shot; PLAN remains read-only. Unknown, duplicate,
   malformed, drifted, or non-approvable capabilities fail closed instead of
   inheriting a grant. AUTO Shell syntax that cannot be classified safely returns a

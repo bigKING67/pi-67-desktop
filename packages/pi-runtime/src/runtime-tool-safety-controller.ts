@@ -87,6 +87,12 @@ export class RuntimeToolSafetyController {
       return { resolved: false, taskToolMode: this.state.taskToolMode };
     }
     if (
+      decision === "enable-task-yolo-and-allow"
+      && bridge.hasPendingHardStopApproval(requestId, toolCallId)
+    ) {
+      return { resolved: false, taskToolMode: this.state.taskToolMode };
+    }
+    if (
       decision === "trust-task-paths-and-allow"
       && bridge.hasPendingHardStopApproval(requestId, toolCallId)
     ) {
@@ -100,7 +106,9 @@ export class RuntimeToolSafetyController {
     }
     if (decision === "enable-task-yolo-and-allow") this.setTaskToolMode("yolo");
     const resolved = bridge.resolveApproval(requestId, toolCallId, decision);
-    if (resolved && decision === "enable-task-yolo-and-allow") bridge.allowAllPendingApprovals();
+    if (resolved && decision === "enable-task-yolo-and-allow") {
+      bridge.allowPendingNonHardStopApprovals();
+    }
     return { resolved, taskToolMode: this.state.taskToolMode };
   }
 

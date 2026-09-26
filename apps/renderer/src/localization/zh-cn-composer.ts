@@ -25,11 +25,11 @@ export const zhCNComposerMessages = {
     },
     yolo: {
       label: "YOLO",
-      description: "所有合法工具自动，不再逐次确认"
+      description: "合法工具自动执行，删除仍需确认"
     }
   },
   yoloConfirmationTitle: "为当前任务开启 YOLO？",
-  yoloConfirmationDescription: "当前、已等待和后续产生的所有合法工具都会自动执行，包括不可逆、工作区外、系统和网络操作；无效调用仍会直接失败。",
+  yoloConfirmationDescription: "当前、已等待和后续产生的合法工具会自动执行；已识别的文件、持久状态、外部对象、Shell 与破坏性 Git 删除仍需逐次确认，无效调用仍会直接失败。",
   yoloRequiresTrustedWorkspace: "仅可信工作区可开启",
   enableYolo: "开启 YOLO",
   slashCatalogUnavailable: "Pi 指令目录尚未加载，请稍后重试。草稿已保留。",

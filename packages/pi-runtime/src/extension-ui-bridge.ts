@@ -192,10 +192,11 @@ export class DesktopExtensionUiBridge {
       && pending.details.subagent !== undefined;
   }
 
-  allowAllPendingApprovals(): string[] {
+  allowPendingNonHardStopApprovals(): string[] {
     const resolved: string[] = [];
     for (const [requestId, pending] of this.pending) {
       if (pending.purpose !== "approval") continue;
+      if (isHardStopRiskCategory(pending.details.category)) continue;
       this.pending.delete(requestId);
       clearTimeout(pending.timer);
       pending.abort?.();

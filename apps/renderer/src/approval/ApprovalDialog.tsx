@@ -201,15 +201,17 @@ export function ApprovalDialog() {
                     : messages.approval.trustTaskPaths(taskPathGrant.length)}
                 </Button>
               ) : null}
-              <Button
-                className={styles.yoloButton!}
-                isDisabled={submittingDecision !== undefined || stoppingTask}
-                onPress={() => void submit("enable-task-yolo-and-allow")}
-              >
-                {submittingDecision === "enable-task-yolo-and-allow"
-                  ? messages.approval.submitting
-                  : messages.approval.enableTaskYolo}
-              </Button>
+              {!hardStop ? (
+                <Button
+                  className={styles.yoloButton!}
+                  isDisabled={submittingDecision !== undefined || stoppingTask}
+                  onPress={() => void submit("enable-task-yolo-and-allow")}
+                >
+                  {submittingDecision === "enable-task-yolo-and-allow"
+                    ? messages.approval.submitting
+                    : messages.approval.enableTaskYolo}
+                </Button>
+              ) : null}
               {stoppableTaskId ? (
                 <Button
                   className="danger-button"

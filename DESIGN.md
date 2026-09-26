@@ -1811,9 +1811,9 @@ loading error where the operation can produce those states
   classification outcome rather than making routine write/edit operations appear privileged.
 - `AUTO` switches directly after an authoritative Host acknowledgement; the
   resting control never changes optimistically. Selecting `YOLO` replaces
-  the same menu content with a second confirmation naming irreversible,
-  workspace-external, system, and network automation. Its short consequence reads
-  `所有合法工具自动，不再逐次确认`. An untrusted Workspace disables that
+  the same menu content with a second confirmation naming workspace-external,
+  system, and network automation plus the deletion exception. Its short consequence
+  reads `合法工具自动执行，删除仍需确认`. An untrusted Workspace disables that
   option with `仅可信工作区可开启` instead of waiting for a Host error.
 - Tool mode belongs to the exact live Task Runtime. Switching conversations
   displays that Task's independent value; session transition or missing Session
@@ -2210,8 +2210,8 @@ loading error where the operation can produce those states
   upload/submission, system, dependency, publish, remote, and network side effects.
   In AUTO, recognized file, persistent-state, external-object, Shell, and
   destructive-Git deletion is a one-shot hard stop before an installed-capability
-  grant. Every valid registered Tool runs directly in trusted YOLO, including
-  recognized destructive operations; invalid identity, schema, route,
+  grant and while the Task is in YOLO. Every other valid registered Tool runs
+  directly in trusted YOLO; invalid identity, schema, route,
   and target state remains corrective rather than executable. A
   bounded `&&`/`;` chain or read-only pipeline is admitted only when every segment
   is independently safe; Workspace-local `cd` and the small CI environment allowlist
@@ -2270,8 +2270,8 @@ loading error where the operation can produce those states
   read-only capability category in `AUTO`. AUTO connects an already
   configured server and runs a cached nested Tool under the resolved installed-
   capability grant for every classified side effect, including that target's
-  OAuth/authentication and credential flow; recognized deletion remains exact-
-  confirmation only in AUTO and runs directly in trusted YOLO. New server setup or catalog expansion remains
+  OAuth/authentication and credential flow; recognized deletion retains exact
+  one-shot confirmation in AUTO and trusted YOLO. New server setup or catalog expansion remains
   a separate configuration confirmation boundary. Missing or ambiguous servers/Tools,
   malformed args, duplicate sources, and unsupported versions are corrective
   errors rather than approvable actions. When a proxy call instead targets the currently verified
@@ -2283,8 +2283,8 @@ loading error where the operation can produce those states
   Memory, browser67, JS-Reverse, or another Package/MCP source is installed/admitted
   and resolves uniquely, AUTO executes JavaScript, native input, clipboard, upload,
   authentication, external-file writes, hook cleanup, and finalization operations.
-  Delete/forget/purge and declared file or external-object deletion remain exact
-  confirmation in AUTO and run directly in trusted YOLO. Classification remains visible in AUTO, PLAN, audit, and diagnostics
+  Delete/forget/purge and declared file or external-object deletion retain exact
+  confirmation in AUTO and trusted YOLO. Classification remains visible in AUTO, PLAN, audit, and diagnostics
   even when the installed-capability grant removes other duplicate AUTO approval.
 - Approval makes bidi, zero-width, control, and non-standard line-separator
   characters explicit in a non-mutating safe display. At constrained height,
@@ -2299,12 +2299,14 @@ loading error where the operation can produce those states
   hard-stop, cannot accept Renderer-supplied paths, and explains that the grant
   clears when the Task stops, the app restarts, or Workspace trust is revoked.
   Ordinary Approval also offers `本任务开启 YOLO`. The YOLO action atomically permits the current and all
-  other pending Safety Approval requests owned by the same Task Runtime
-  and changes its mode; ordinary Extension `ctx.ui` requests remain pending.
+  other pending non-destructive Safety Approval requests owned by the same Task
+  Runtime and changes its mode; hard-stop approvals and ordinary Extension
+  `ctx.ui` requests remain pending.
   Hard-stop Approval uses the same Dialog, detail table,
   safe literals, fixed action region, focus contract, and theme tokens, but changes
-  its title to `确认不可逆操作` and exposes `拒绝`, the destructive
-  `确认执行此操作` one-shot decision, and the explicit Task-level YOLO action.
+  its title to `确认不可逆操作` and exposes only `拒绝` and the destructive
+  `确认执行此操作` one-shot decision. It never offers a path grant or Task-level
+  YOLO action, and the same exact confirmation remains required when YOLO is active.
   `停止整个任务` remains a separately authorized
   lifecycle action when available. A stale
   Host, Session generation, Operation, request, or Tool call cannot enable the

@@ -186,7 +186,7 @@ test("offers task-scoped trust only for Host-authored external paths", async ({ 
   });
 });
 
-test("renders destructive confirmation with explicit one-shot or uninterrupted YOLO choices", async ({ page }) => {
+test("renders destructive confirmation as an exact one-shot choice even when YOLO is available", async ({ page }) => {
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
@@ -208,9 +208,9 @@ test("renders destructive confirmation with explicit one-shot or uninterrupted Y
   await expect(page.getByRole("dialog", { name: "不可逆操作确认" })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "确认不可逆操作" })).toBeVisible();
   await expect(page.getByText("批量删除", { exact: true })).toBeVisible();
-  await expect(page.getByText(/当前、已等待和后续合法工具将不再逐次确认/u)).toBeVisible();
+  await expect(page.getByText(/删除类操作无法通过路径授权或 YOLO 预先放行/u)).toBeVisible();
   await expect(page.getByRole("button", { name: "拒绝" })).toBeFocused();
-  await expect(page.getByRole("button", { name: "本任务开启 YOLO" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "本任务开启 YOLO" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /本任务信任/u })).toHaveCount(0);
 
   await page.getByRole("button", { name: "确认执行此操作" }).click();

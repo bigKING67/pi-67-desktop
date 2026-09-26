@@ -87,7 +87,7 @@ describe("RuntimeToolSafetyController", () => {
     bridge.dispose();
   });
 
-  it("enables YOLO from a hard-stop request and resolves every pending Safety Approval", async () => {
+  it("enables YOLO only from an ordinary request and keeps hard-stop approvals pending", async () => {
     const events: AgentEvent[] = [];
     const bridge = new DesktopExtensionUiBridge((event) => events.push(event));
     const controller = new RuntimeToolSafetyController();
@@ -112,8 +112,25 @@ describe("RuntimeToolSafetyController", () => {
       destructiveRequest.payload.requestId,
       destructiveRequest.payload.toolCallId,
       "enable-task-yolo-and-allow"
+    )).toEqual({ resolved: false, taskToolMode: "auto" });
+
+    expect(controller.resolveApproval(
+      bridge,
+      ordinaryRequest.payload.requestId,
+      ordinaryRequest.payload.toolCallId,
+      "enable-task-yolo-and-allow"
     )).toEqual({ resolved: true, taskToolMode: "yolo" });
     await expect(ordinary).resolves.toEqual({ status: "allowed" });
+    expect(bridge.hasPendingApproval(
+      destructiveRequest.payload.requestId,
+      destructiveRequest.payload.toolCallId
+    )).toBe(true);
+    expect(controller.resolveApproval(
+      bridge,
+      destructiveRequest.payload.requestId,
+      destructiveRequest.payload.toolCallId,
+      "allow-once"
+    )).toEqual({ resolved: true, taskToolMode: "yolo" });
     await expect(destructive).resolves.toEqual({ status: "allowed" });
     expect(bridge.hasPendingApproval(
       ordinaryRequest.payload.requestId,

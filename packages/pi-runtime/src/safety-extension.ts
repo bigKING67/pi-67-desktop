@@ -120,8 +120,10 @@ export function createDesktopSafetyExtension(
         if (intent.nonApprovableReason) {
           return { block: true, reason: intent.nonApprovableReason };
         }
-        if (state.trust === "trusted" && state.taskToolMode === "yolo") return undefined;
         const hardStop = isHardStopRiskCategory(intent.category);
+        if (state.trust === "trusted" && state.taskToolMode === "yolo" && !hardStop) {
+          return undefined;
+        }
         if (
           state.trust === "trusted"
           && state.taskToolMode === "auto"
