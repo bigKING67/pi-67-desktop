@@ -227,6 +227,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       heicNormalizationAssetsIncluded: initialRuntimeAssetContract.heicNormalizationAssetsIncluded,
       packageWorkerIsolated: initialRuntimeAssetContract.packageWorkerIsolated,
       piTuiNativeAssetsIncluded: initialRuntimeAssetContract.piTuiNativeAssetsIncluded,
+      requiredCapabilityPaths: [...initialRuntimeAssetContract.requiredCapabilityPaths],
       requiredAsarPathCount: initialRuntimeAssetContract.requiredAsarPaths.length,
       requireWindowsPackageWorkerJob: initialRuntimeAssetContract.requireWindowsPackageWorkerJob,
       version: initialVersion

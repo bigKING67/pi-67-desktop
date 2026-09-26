@@ -223,6 +223,7 @@ describe("Windows installer lifecycle contract", () => {
     expect(source).toContain(
       "initialRuntimeAssetContract.clipboardNativeModulePaths[installedArtifact.platform]"
     );
+    expect(source).toContain("requiredCapabilityPaths: [...initialRuntimeAssetContract.requiredCapabilityPaths]");
     expect(source).toContain("await verifyWindowsInstallerUpdateLifecycle({");
     expect(source).toContain("repairScenario: \"missing-before-cross-version-upgrade\"");
     expect(updateSource).toContain("await assertPackagedRuntimeAssets(installedArtifact)");

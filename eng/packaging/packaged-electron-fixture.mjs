@@ -58,6 +58,7 @@ const HEIC_NORMALIZATION_ASAR_PATHS = new Set([
 export const WINDOWS_PACKAGE_WORKER_ISOLATION_VERSION = "0.1.0-alpha.24";
 export const HEIC_NORMALIZATION_ASSET_VERSION = "0.1.0-alpha.33";
 export const PI_TUI_NATIVE_ASSET_VERSION = "0.1.0-alpha.41";
+export const UNIFIED_CAPABILITIES_ASSET_VERSION = "0.1.0-alpha.41";
 
 const LEGACY_CLIPBOARD_NATIVE_MODULE_PATHS = Object.freeze({
   darwin: "@mariozechner/clipboard-darwin-arm64/clipboard.darwin-arm64.node",
@@ -84,7 +85,10 @@ export function resolvePackagedRuntimeAssetContract(version) {
     version,
     PI_TUI_NATIVE_ASSET_VERSION
   );
-  const unifiedCapabilities = semverGreaterThanOrEqual(version, "0.1.0-alpha.40");
+  const unifiedCapabilities = semverGreaterThanOrEqual(
+    version,
+    UNIFIED_CAPABILITIES_ASSET_VERSION
+  );
   return {
     clipboardNativeModulePaths: piTuiNativeAssetsIncluded
       ? PI_TUI_NATIVE_MODULE_PATHS

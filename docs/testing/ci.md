@@ -172,9 +172,10 @@ only baseline acquisition; it does not skip or shorten the full installer lifecy
 manual acceptance.
 
 The packaged Runtime asset assertion uses the contract of the version currently installed, including the
-versioned native clipboard module path. Cross-version certification checks the legacy clipboard package for
-Alpha.40 and the Pi TUI native module for Alpha.41 and later. It must not apply the current candidate's native
-dependency layout to the previous-version baseline or skip the native asset check.
+versioned native clipboard module and capability layout paths. Cross-version certification checks the legacy
+clipboard package plus the legacy `pi67-core` and observational-memory capability paths for Alpha.40; Alpha.41
+and later use the Pi TUI native module and unified `pi-workspace-resources` capability path. It must not apply
+the current candidate's dependency layout to the previous-version baseline or skip either asset check.
 
 GitHub's `Re-run failed jobs` always uses the original commit and workflow. Use it for an external
 or transient failure. A verifier code fix requires a new commit; automatic artifact reuse applies

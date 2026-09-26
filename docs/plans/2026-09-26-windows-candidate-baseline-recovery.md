@@ -55,6 +55,10 @@ installer or full NSIS upgrade lifecycle requirements.
   the verifier applied the Alpha.41 Pi TUI native path to the installed Alpha.40
   baseline, the user authorized the versioned verifier correction, validation,
   scoped commit/push, and one further exact-SHA candidate dispatch.
+- Capability-layout follow-up: run `36233437302` proved the native-path correction
+  but then exposed the same historical-version defect for the capability layout.
+  The user authorized the versioned capability correction, validation, scoped
+  commit/push, and one further exact-SHA candidate dispatch without automatic retry.
 
 ## Current evidence
 
@@ -71,6 +75,7 @@ installer or full NSIS upgrade lifecycle requirements.
 | OBSERVED | Replacement run `36229880389` passed provenance, Windows packaging and packaged Electron smoke, then failed the first 1.25-scale synthetic UI shutdown sample: child exited in 414.1 ms, both Utility processes by 4534.8 ms, and Main by 6272.3 ms. No candidate identity, installer artifact, certification, or baseline lifecycle followed. | exact Actions failed-step log and uploaded bounded UI receipt | 2026-09-26 |
 | VERIFIED | Follow-up run `36231515012` passed provenance, Windows packaging, packaged smoke, and all three synthetic-scale shutdown samples; the slowest complete product exit was 1553.6 ms under the unchanged 5000 ms gate. | exact Actions jobs and uploaded UI receipt | 2026-09-26 |
 | VERIFIED | Certification then failed immediately after installing Alpha.40 because the current verifier required the Alpha.41 Pi TUI native clipboard path. Alpha.40 source required the legacy `@mariozechner` path; commit `9c2d162...` changed that path only after the Alpha.40 source. Upgrade, restart, and uninstall phases did not begin. | lifecycle diagnostic artifact and exact Git history | 2026-09-26 |
+| VERIFIED | Run `36233437302` passed provenance, Windows packaging, packaged smoke and all synthetic-scale checks. Alpha.40 baseline installation completed in 99.36 seconds, then certification failed because the verifier required the later unified `pi-workspace-resources` layout. Commit `d6175e1` introduced that verifier assumption after baseline source `8c0c560...` while the source version still read Alpha.40; the first distributed version with the unified layout is Alpha.41. | exact Actions log, diagnostic artifact and Git ancestry | 2026-09-26 |
 
 ## Affected boundaries
 
@@ -93,6 +98,7 @@ installer or full NSIS upgrade lifecycle requirements.
 | Keep the five-second product gate and shorten Main's internal shutdown watchdog from 4.25 to 3 seconds. | The failed sample needed about 2.02 seconds from the old watchdog boundary to observed Main exit, proving the old 0.75-second teardown reserve was insufficient; forcing the recursive Electron quit earlier preserves the external acceptance contract. | Repeated staged evidence proves a different product deadline or a narrower lifecycle defect. |
 | Project only the typed Main shutdown stage report into Windows failure evidence. | A process-only receipt cannot distinguish checkpoint/Host cleanup from Electron teardown, while raw process output may contain unrelated data. | The harness gains an equivalent typed lifecycle event. |
 | Version the native clipboard asset path with the installed package contract. | The full lifecycle installs the previous version first; checking that installation against the candidate's later dependency layout creates a false failure while weakening the check would lose native asset coverage. | A future package format provides a self-describing, authenticated runtime asset manifest. |
+| Treat Alpha.41 as the first distributed unified-capability layout. | The retained Alpha.40 artifact predates the unification even though later source commits retained the Alpha.40 version string; the exact distributed artifact, not an intermediate source version, owns the lifecycle contract. | A signed per-artifact runtime asset manifest replaces version thresholds. |
 
 ## Checkpoints
 
@@ -108,9 +114,12 @@ installer or full NSIS upgrade lifecycle requirements.
 - [x] 8. Preserve the five-second Windows gate, reserve two seconds for Electron
   teardown, add typed stage evidence, validate/package-smoke, and dispatch the one
   separately authorized follow-up candidate from the final pushed SHA.
-- [ ] 9. Version the native clipboard asset contract for Alpha.40 and Alpha.41,
+- [x] 9. Version the native clipboard asset contract for Alpha.40 and Alpha.41,
   validate the verifier-only correction, commit/push only its scoped files, and
   dispatch the separately authorized exact-SHA candidate once.
+- [ ] 10. Version the capability layout contract for the retained Alpha.40 artifact,
+  validate and commit/push the scoped correction, then dispatch the separately
+  authorized exact-SHA candidate once without automatic retry.
 
 ## Validation matrix
 
@@ -126,7 +135,7 @@ installer or full NSIS upgrade lifecycle requirements.
 | Local package | required capability gates and `preview:mac:unsigned` | prepared exact package and packaged Electron smoke | PASS: aggregate `check` 883 files / 5761 tests; Extension Adapter provenance passed; packaged Electron smoke passed; `app.asar` SHA-256 `0d23d713...`; packaged catalog and exact Skill directory verified |
 | Shutdown correction | focused controller/measurement tests, affected typecheck/lint, architecture/structure, aggregate source gate | 5-second product gate unchanged; 3-second inner watchdog and typed evidence pass | PASS: focused 17/17; Desktop typecheck, scoped lint, architecture and structure passed. The first ordinary aggregate run passed all static gates but had one unrelated parallel Host crash-recovery timing failure; its isolated rerun passed 1/1. The complete bounded-concurrency rerun passed 883 files / 5763 tests with 9 files / 24 tests skipped and coverage 84.02/78.48/87.26/87.66. |
 | Local shutdown package | `corepack pnpm run preview:mac:unsigned` | rebuilt macOS arm64 package, smoke, relaunch | PASS on the preserved dirty worktree: packaged smoke and active-prompt shutdown passed at 83.7 ms; `app.asar` SHA-256 `657fb525...`; the repository preview was relaunched. This is not clean exact-SHA Windows evidence. |
-| Installed-version asset contract | focused packaged fixture and lifecycle tests, source gate, candidate gate, macOS packaged smoke | PASS: Alpha.40 selects legacy clipboard native modules and Alpha.41 selects Pi TUI native modules; focused 33/33, `check:source` 883 files / 5763 tests, `check:candidate` including production dependency, capability-source/freshness, Extension Adapter, aggregate source and coverage gates, packaged smoke 89.1 ms shutdown, `app.asar` SHA-256 `657fb525...` | PASS |
+| Installed-version asset contract | focused packaged fixture and lifecycle tests, source gate, candidate gate, macOS packaged smoke | PASS: Alpha.40 selects legacy clipboard native modules plus the legacy `pi67-core`/observational-memory package paths, while Alpha.41 selects Pi TUI native modules plus the unified `pi-workspace-resources` path; focused 33/33, `check:source` and `check:candidate` each passed 883 files / 5763 tests with production dependency, capability-source/freshness, Extension Adapter, aggregate source and coverage gates; rebuilt packaged smoke passed with 105.3 ms active-prompt shutdown and `app.asar` SHA-256 `657fb525...` | PASS |
 
 ## Rollback
 
@@ -188,6 +197,20 @@ failure or delete prior artifacts. No public update state is changed by this pla
   and relaunched the repository preview. The full candidate preflight gate then
   passed production dependency audit, capability source/freshness, Extension
   Adapter verification, aggregate source checks, tests, and coverage.
+- 2026-09-26: Scoped commit `08915763...` was pushed and candidate run
+  `36233437302` dispatched once. Provenance, Windows packaging, packaged smoke,
+  synthetic-scale/IME checks, exact candidate bytes and immutable Alpha.40 restore
+  passed. Full lifecycle installed Alpha.40, then failed before launch/upgrade on
+  the later unified capability path; no testable candidate was uploaded and no
+  rerun was attempted. Exact Git ancestry established Alpha.41 as the first
+  distributed unified-capability contract.
+- 2026-09-26: Versioned the installed capability-layout contract at Alpha.41
+  without skipping any required asset. Focused fixture/lifecycle tests passed
+  33/33; `check:source` and `check:candidate` each passed 883 test files and
+  5763 tests with 9 files / 24 tests skipped by existing platform contracts and
+  coverage 84.02/78.48/87.26/87.66. A fresh macOS arm64 package passed the full
+  packaged Electron smoke with 105.3 ms active-prompt shutdown, then relaunched
+  the repository preview from `app.asar` SHA-256 `657fb525...`.
 
 ## Closeout
 

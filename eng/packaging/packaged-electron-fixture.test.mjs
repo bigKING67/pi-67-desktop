@@ -7,6 +7,7 @@ import {
   packagedAttachmentRequiredAsarPaths,
   PI_TUI_NATIVE_ASSET_VERSION,
   resolvePackagedRuntimeAssetContract,
+  UNIFIED_CAPABILITIES_ASSET_VERSION,
   WINDOWS_PACKAGE_WORKER_ISOLATION_VERSION
 } from "./packaged-electron-fixture.mjs";
 
@@ -200,13 +201,13 @@ describe("packaged Electron launch environment", () => {
       "node_modules/heic-decode/index.js",
       "node_modules/libheif-js/libheif-wasm/libheif-bundle.js"
     ]));
+    const legacyCapabilityPaths = [
+      "packages/pi67-core/package.json",
+      "managed-packages/bundled/packages/pi-observational-memory/package.json"
+    ];
+    expect(UNIFIED_CAPABILITIES_ASSET_VERSION).toBe("0.1.0-alpha.41");
     expect(resolvePackagedRuntimeAssetContract("0.1.0-alpha.39").requiredCapabilityPaths)
-      .toEqual([
-        "packages/pi67-core/package.json",
-        "managed-packages/bundled/packages/pi-observational-memory/package.json"
-      ]);
-    expect(resolvePackagedRuntimeAssetContract("0.1.0-alpha.40").requiredCapabilityPaths)
-      .toEqual(["packages/pi-workspace-resources/package.json"]);
+      .toEqual(legacyCapabilityPaths);
     const alpha40 = resolvePackagedRuntimeAssetContract("0.1.0-alpha.40");
     expect(PI_TUI_NATIVE_ASSET_VERSION).toBe("0.1.0-alpha.41");
     expect(alpha40).toMatchObject({
@@ -214,14 +215,16 @@ describe("packaged Electron launch environment", () => {
         darwin: "@mariozechner/clipboard-darwin-arm64/clipboard.darwin-arm64.node",
         win32: "@mariozechner/clipboard-win32-x64-msvc/clipboard.win32-x64-msvc.node"
       },
-      piTuiNativeAssetsIncluded: false
+      piTuiNativeAssetsIncluded: false,
+      requiredCapabilityPaths: legacyCapabilityPaths
     });
     expect(resolvePackagedRuntimeAssetContract("0.1.0-alpha.41")).toMatchObject({
       clipboardNativeModulePaths: {
         darwin: "@earendil-works/pi-tui/native/darwin/prebuilds/darwin-arm64/darwin-platform.node",
         win32: "@earendil-works/pi-tui/native/win32/prebuilds/win32-x64/win32-platform.node"
       },
-      piTuiNativeAssetsIncluded: true
+      piTuiNativeAssetsIncluded: true,
+      requiredCapabilityPaths: ["packages/pi-workspace-resources/package.json"]
     });
     expect(resolvePackagedRuntimeAssetContract("0.1.0-alpha.24"))
       .toMatchObject({ packageWorkerIsolated: true });
