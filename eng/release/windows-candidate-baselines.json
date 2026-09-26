@@ -1,0 +1,92 @@
+{
+  "schema": "pi67.windows-candidate-baselines.v1",
+  "records": [
+    {
+      "candidateIdentitySha256": "68c6c218ddf2d6dda2682b5cd4f2b625bf2bbeb004d3f9c502fb7acd7fa553df",
+      "manualTestReceiptSha256": "4f4d275608ad524cc15bf4615bfa067377349db3b7dc231bb3fe610644233751",
+      "unsignedPreviewManifestSha256": "226469289fd7bb7f9d16ab959ad9e31d519c37b874a798761bc0a9858b6656d7",
+      "publishedWindowsFileName": "Pi-67-Desktop-0.1.0-alpha.40-win-x64-unsigned-preview.exe",
+      "candidateIdentity": {
+        "schema": "pi67.windows-preview-candidate.v1",
+        "channel": "unsigned-preview-candidate",
+        "signed": false,
+        "repository": "bigKING67/pi-67-desktop",
+        "workflow": {
+          "name": "Windows candidate",
+          "runId": "33320336253",
+          "runAttempt": "1"
+        },
+        "source": {
+          "policy": "main",
+          "commit": "8c0c56038c92e156ee617f7791a269cb3024b14a"
+        },
+        "application": {
+          "product": "Pi-67 Desktop",
+          "version": "0.1.0-alpha.40",
+          "platform": "win32",
+          "architecture": "x64",
+          "runtime": "@earendil-works/pi-coding-agent@0.84.3"
+        },
+        "installer": {
+          "fileName": "Pi-67-Desktop-0.1.0-alpha.40-win-x64.exe",
+          "byteLength": 275361161,
+          "sha256": "4b6c7561dccdd8e15e989dad0148d3ba55b0448191717414a2c250e90fbdd53b"
+        },
+        "packagedExecutable": {
+          "fileName": "win-unpacked/Pi-67 Desktop.exe",
+          "byteLength": 225613824,
+          "sha256": "d8d4e904236debe3292a7db326b2a9f491da8da8ba444500ce6c6161fb01182c"
+        }
+      },
+      "manualTestReceipt": {
+        "schema": "pi67.windows-preview-manual-test.v2",
+        "status": "passed",
+        "evidenceLevel": "manual-windows-x64-test-confirmed",
+        "repository": "bigKING67/pi-67-desktop",
+        "source": {
+          "commit": "8c0c56038c92e156ee617f7791a269cb3024b14a"
+        },
+        "candidate": {
+          "identitySha256": "68c6c218ddf2d6dda2682b5cd4f2b625bf2bbeb004d3f9c502fb7acd7fa553df",
+          "runId": "33320336253",
+          "runAttempt": "1",
+          "certificationRunAttempt": "1",
+          "installerSha256": "4b6c7561dccdd8e15e989dad0148d3ba55b0448191717414a2c250e90fbdd53b",
+          "packagedExecutableSha256": "d8d4e904236debe3292a7db326b2a9f491da8da8ba444500ce6c6161fb01182c"
+        },
+        "attestation": {
+          "actor": "gaoqian",
+          "channel": "operator-confirmed"
+        }
+      },
+      "unsignedPreviewManifest": {
+        "schemaVersion": 1,
+        "product": "Pi-67 Desktop",
+        "version": "0.1.0-alpha.40",
+        "channel": "unsigned-preview",
+        "signed": false,
+        "runtime": "@earendil-works/pi-coding-agent@0.84.3",
+        "files": [
+          {
+            "name": "Pi-67-Desktop-0.1.0-alpha.40-win-x64-unsigned-preview.exe",
+            "bytes": 275361161,
+            "sha256": "4b6c7561dccdd8e15e989dad0148d3ba55b0448191717414a2c250e90fbdd53b",
+            "target": "windows-x64"
+          },
+          {
+            "name": "Pi-67-Desktop-0.1.0-alpha.40-mac-arm64-unsigned-preview.dmg",
+            "bytes": 363180014,
+            "sha256": "41d8e9f2c3a82c8ea55b515bcc9291067d796e85736341c16ecb9b4e483594fe",
+            "target": "macos-arm64"
+          },
+          {
+            "name": "Pi-67-Desktop-0.1.0-alpha.40-mac-arm64-unsigned-preview.zip",
+            "bytes": 372515244,
+            "sha256": "a06ae6905efbc7b2cf083a85e942454eaaabfe592441e31392b23160029ee514",
+            "target": "macos-arm64"
+          }
+        ]
+      }
+    }
+  ]
+}

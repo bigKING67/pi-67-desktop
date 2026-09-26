@@ -29,15 +29,34 @@ function fixture() {
     if (!(endpoint in responses)) throw new Error(`Unexpected endpoint: ${endpoint}`);
     return responses[endpoint];
   });
-  return { options: { repository: "owner/repo", sourceSha, baseline, artifactAttempt: "2", query }, responses };
+  return {
+    options: {
+      repository: "owner/repo",
+      sourceSha,
+      baseline,
+      baselineIdentitySha256: "e".repeat(64),
+      artifactAttempt: "2",
+      loadCatalog: vi.fn(async () => undefined),
+      query
+    },
+    responses
+  };
 }
 
 describe("Windows candidate metadata preflight", () => {
   it("preserves separate successful upload and original build attempts", async () => {
     const { options } = fixture();
     const result = await preflightWindowsCandidate(options);
-    expect(result.workflowInputs).toMatchObject({ baseline_run_attempt: "1", baseline_artifact_run_attempt: "2", source_sha: options.sourceSha });
+    expect(result.workflowInputs).toMatchObject({
+      baseline_transport: "actions-artifact",
+      baseline_run_attempt: "1",
+      baseline_artifact_run_attempt: "2",
+      baseline_identity_sha256: "not-applicable",
+      baseline_published_file_name: "not-applicable",
+      source_sha: options.sourceSha
+    });
     expect(result.artifactBytes).toContain("NOT_VERIFIED");
+    expect(options.loadCatalog).not.toHaveBeenCalled();
   });
   it("rejects short SHA before remote queries", async () => {
     const { options } = fixture();
@@ -54,13 +73,46 @@ describe("Windows candidate metadata preflight", () => {
     responses[`compare/${options.sourceSha}...${options.sourceSha}`].status = "diverged";
     await expect(preflightWindowsCandidate(options)).rejects.toThrow("not reachable");
   });
-  it.each(["expired", "missing", "duplicate"])("rejects %s artifacts", async (mode) => {
+  it.each(["expired", "missing"])("requires a reviewed fallback for %s artifacts", async (mode) => {
     const { options, responses } = fixture();
     const inventory = responses["actions/runs/42/artifacts?per_page=100&page=1"];
     if (mode === "expired") inventory.artifacts[0].expired = true;
     if (mode === "missing") inventory.artifacts = [];
-    if (mode === "duplicate") inventory.artifacts.push({ ...inventory.artifacts[0] });
-    await expect(preflightWindowsCandidate(options)).rejects.toThrow("artifact is missing");
+    await expect(preflightWindowsCandidate(options)).rejects.toThrow("reviewed catalog identity");
+  });
+  it("rejects duplicate artifacts instead of falling back", async () => {
+    const { options, responses } = fixture();
+    const inventory = responses["actions/runs/42/artifacts?per_page=100&page=1"];
+    inventory.artifacts.push({ ...inventory.artifacts[0] });
+    await expect(preflightWindowsCandidate(options)).rejects.toThrow("ambiguous");
+  });
+  it("rejects a non-expired empty artifact instead of falling back", async () => {
+    const { options, responses } = fixture();
+    responses["actions/runs/42/artifacts?per_page=100&page=1"].artifacts[0].size_in_bytes = 0;
+    await expect(preflightWindowsCandidate(options)).rejects.toThrow("non-expired baseline artifact is empty");
+  });
+  it.each(["expired", "missing"])("selects the exact immutable fallback for a %s artifact", async (mode) => {
+    const { options, responses } = fixture();
+    const inventory = responses["actions/runs/42/artifacts?per_page=100&page=1"];
+    if (mode === "expired") inventory.artifacts[0].expired = true;
+    if (mode === "missing") inventory.artifacts = [];
+    const publishedWindowsFileName = "New-Money-0.1.0-alpha.39-win-x64-unsigned-preview.exe";
+    const catalog = {
+      records: [{
+        candidateIdentitySha256: options.baselineIdentitySha256,
+        publishedWindowsFileName,
+        candidateIdentity: options.baseline
+      }]
+    };
+    const probeBaseline = vi.fn(async () => ({ bytes: 10, sha256: "c".repeat(64) }));
+    const result = await preflightWindowsCandidate({ ...options, catalog, probeBaseline });
+    expect(result.workflowInputs).toMatchObject({
+      baseline_transport: "immutable-update",
+      baseline_identity_sha256: options.baselineIdentitySha256,
+      baseline_published_file_name: publishedWindowsFileName
+    });
+    expect(result.artifactBytes).toContain("immutable origin HEAD verified");
+    expect(probeBaseline).toHaveBeenCalledOnce();
   });
   it("rejects unsuccessful certification even if an artifact exists", async () => {
     const { options, responses } = fixture();

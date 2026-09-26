@@ -110,14 +110,25 @@ corepack pnpm run release:windows:preflight --repository bigKING67/pi-67-desktop
 ```
 
 预检复用现有 identity 合同，并检查远端 main 可达性、源码与基线版本、原始 build job、成功的
-认证 attempt，以及精确 artifact 是否存在、未过期且非空。只读 GitHub 查询需要可用的 `gh`
-认证；查询失败会停止，不以未知状态放行。成功输出的 `workflowInputs` 是本次调度的完整参数。
-预检不调用 `gh workflow run`，push/调度仍使用现有授权边界。
+认证 attempt，以及精确 artifact 状态。未过期且非空的 Actions artifact 始终是首选 transport。
+若精确 artifact 不存在或唯一匹配已过期，预检只能命中仓库内
+`eng/release/windows-candidate-baselines.json` 已审查记录：candidate identity、Windows 人工测试 receipt、
+unsigned preview manifest 的规范化 JSON SHA-256 必须与目录 pin 一致，repository、source、run/attempt、
+version、runtime 和产品文件 hash 必须完整交叉一致；随后只对固定更新源的精确版本化 Windows 文件做
+禁止重定向的 HEAD 检查。重复 artifact、未过期空 artifact、目录缺失/重复/漂移或远端元数据异常均直接
+失败，不能回退。只读 GitHub 查询需要可用的 `gh` 认证；查询失败会停止，不以未知状态放行。成功输出的
+`workflowInputs`（包括 `baseline_transport`）是本次调度的完整参数。预检不调用 `gh workflow run`，
+push/调度仍使用现有授权边界。
 
 此处是 metadata 预检，不证明远端安装包内容与本地 baseline identity 相同，也不能消除预检后
-artifact 过期或远端变化的可能。workflow 必须继续下载精确 artifact，复核 identity、文件哈希、
-版本和运行身份，保留所有现有 provenance、freshness、审计和安装认证门禁。Tag/Release 的
-版本占用检查也继续由 workflow 执行。候选完整源码前置检查统一使用 `corepack pnpm run check:candidate`。
+artifact 过期或远端变化的可能。workflow 必须继续获得并验证精确 bytes。Actions transport 下载并
+复核原 identity、installer、packaged executable；immutable-update transport 只能从代码内固定的
+`https://updates.52671314.xyz` 精确文件名流式下载，拒绝重定向，要求精确 `Content-Length`、1 GiB
+上限和目录 pin 的 SHA-256，通过 staging 验证后原子放入 baseline 目录。两条 transport 最终都必须
+设置同一 `PI67_WINDOWS_BASELINE_INSTALLER`，缺失即停止；其后继续执行原有完整 NSIS install、upgrade、
+restart、restore、shutdown、uninstall 和数据保留 lifecycle。所有 provenance、freshness、审计、
+Tag/Release 版本占用和安装认证门禁不变。候选完整源码前置检查统一使用
+`corepack pnpm run check:candidate`。
 
 ## Failure and replacement rules
 

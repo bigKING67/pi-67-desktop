@@ -43,10 +43,13 @@ describe("unsigned preview candidate and promotion workflow security", () => {
     const certification = source.slice(source.indexOf("  certify-installer:"));
 
     for (const input of [
+      "baseline_transport",
       "baseline_run_id",
       "baseline_run_attempt",
       "baseline_artifact_run_attempt",
-      "baseline_source_sha"
+      "baseline_source_sha",
+      "baseline_identity_sha256",
+      "baseline_published_file_name"
     ]) {
       expect(inputs).toMatch(new RegExp(`${input}:[\\s\\S]*?required: true`, "u"));
     }
@@ -56,7 +59,13 @@ describe("unsigned preview candidate and promotion workflow security", () => {
       "windows-candidate-${{ inputs.baseline_run_id }}-${{ inputs.baseline_artifact_run_attempt }}"
     );
     expect(certification).toContain("Verify exact previous-version upgrade baseline");
+    expect(certification).toContain("if: ${{ inputs.baseline_transport == 'actions-artifact' }}");
     expect(certification).toContain("BASELINE_RUN_ATTEMPT: ${{ inputs.baseline_run_attempt }}");
+    expect(certification).toContain("Restore exact immutable previous-version upgrade baseline");
+    expect(certification).toContain("if: ${{ inputs.baseline_transport == 'immutable-update' }}");
+    expect(certification).toContain("node eng/release/windows-candidate-baseline.mjs");
+    expect(certification).toContain("--candidate-identity-sha256 \"$BASELINE_IDENTITY_SHA256\"");
+    expect(certification).toContain("Require an exact verified Windows upgrade baseline");
     expect(certification).toContain("PI67_WINDOWS_BASELINE_INSTALLER=");
   });
 

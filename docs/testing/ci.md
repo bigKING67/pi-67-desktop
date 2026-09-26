@@ -162,6 +162,15 @@ rebuilding it. A quick CI receipt is never sufficient evidence for a public Wind
 lifecycle fails and a follow-up verifier-only commit can reuse its candidate, the reusable lane applies
 the new verifier to that immutable candidate and executes the full lifecycle.
 
+`Windows candidate` prefers the exact retained Actions artifact for its previous-version upgrade baseline.
+When that one artifact is missing or expired, preflight may select `immutable-update` only for an exact
+reviewed record in `eng/release/windows-candidate-baselines.json`. The workflow then downloads the pinned
+versioned installer from the fixed update origin with redirects disabled and verifies exact length and
+SHA-256 before setting the same lifecycle input. Duplicate or non-expired empty Actions artifacts and any
+catalog, identity, receipt, manifest, origin, size, or hash drift fail closed. The alternate transport changes
+only baseline acquisition; it does not skip or shorten the full installer lifecycle and is not target-Windows
+manual acceptance.
+
 GitHub's `Re-run failed jobs` always uses the original commit and workflow. Use it for an external
 or transient failure. A verifier code fix requires a new commit; automatic artifact reuse applies
 that new verifier to the old immutable candidate while binding both SHAs and the source run.

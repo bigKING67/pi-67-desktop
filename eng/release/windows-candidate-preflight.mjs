@@ -1,10 +1,27 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { lstat, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gt, valid } from "semver";
+import {
+  probeWindowsCandidateBaseline,
+  readWindowsCandidateBaselineCatalog,
+  resolveWindowsCandidateBaseline
+} from "./windows-candidate-baseline.mjs";
 import { assertWindowsPreviewCandidateIdentity, readWindowsPreviewCandidateIdentity } from "./windows-preview-candidate.mjs";
 
-export async function preflightWindowsCandidate({ repository, sourceSha, baseline, artifactAttempt, query }) {
+export async function preflightWindowsCandidate({
+  repository,
+  sourceSha,
+  baseline,
+  baselineIdentitySha256,
+  artifactAttempt,
+  catalog,
+  loadCatalog = readWindowsCandidateBaselineCatalog,
+  probeBaseline = probeWindowsCandidateBaseline,
+  query
+}) {
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(repository ?? "")
     || !/^[a-f0-9]{40}$/u.test(sourceSha ?? "")
     || !/^[1-9][0-9]*$/u.test(artifactAttempt ?? "")) {
@@ -49,24 +66,86 @@ export async function preflightWindowsCandidate({ repository, sourceSha, baselin
   const name = `windows-candidate-${runId}-${artifactAttempt}`;
   const artifacts = await listArtifacts(runId, query);
   const matches = artifacts.filter((artifact) => artifact.name === name);
-  if (matches.length !== 1 || matches[0].expired !== false
-    || !Number.isSafeInteger(matches[0].size_in_bytes) || matches[0].size_in_bytes <= 0) {
-    throw new Error("Exact baseline artifact is missing, expired, empty, or ambiguous.");
+  if (matches.length > 1) {
+    throw new Error("Exact baseline artifact is ambiguous.");
   }
+  if (matches.length === 1 && matches[0].expired !== true && matches[0].expired !== false) {
+    throw new Error("Exact baseline artifact has an invalid expiration state.");
+  }
+  if (matches.length === 1 && matches[0].expired === false) {
+    if (!Number.isSafeInteger(matches[0].size_in_bytes) || matches[0].size_in_bytes <= 0) {
+      throw new Error("Exact non-expired baseline artifact is empty or has an invalid size.");
+    }
+    return preflightResult({
+      artifactBytes: "NOT_VERIFIED; workflow must download and verify candidate identity and hashes",
+      artifactAttempt,
+      baseline,
+      baselineArtifact: name,
+      baselineTransport: "actions-artifact",
+      candidatePackage,
+      main,
+      sourceSha
+    });
+  }
+
+  if (!/^[a-f0-9]{64}$/u.test(baselineIdentitySha256 ?? "")) {
+    throw new Error("Expired or missing Actions baseline requires an exact reviewed catalog identity.");
+  }
+  const reviewedCatalog = catalog ?? await loadCatalog();
+  if (!reviewedCatalog) {
+    throw new Error("Expired or missing Actions baseline requires an exact reviewed catalog identity.");
+  }
+  const record = resolveWindowsCandidateBaseline(reviewedCatalog, {
+    repository,
+    sourceCommit: baseline.source.commit,
+    runId: baseline.workflow.runId,
+    runAttempt: baseline.workflow.runAttempt,
+    candidateIdentitySha256: baselineIdentitySha256
+  });
+  const remote = await probeBaseline(record);
+  return preflightResult({
+    artifactBytes: `${remote.bytes} bytes; immutable origin HEAD verified, workflow must download and verify SHA-256`,
+    artifactAttempt,
+    baseline,
+    baselineArtifact: record.publishedWindowsFileName,
+    baselineIdentitySha256,
+    baselinePublishedFileName: record.publishedWindowsFileName,
+    baselineTransport: "immutable-update",
+    candidatePackage,
+    main,
+    sourceSha
+  });
+}
+
+function preflightResult({
+  artifactBytes,
+  artifactAttempt,
+  baseline,
+  baselineArtifact,
+  baselineIdentitySha256 = "not-applicable",
+  baselinePublishedFileName = "not-applicable",
+  baselineTransport,
+  candidatePackage,
+  main,
+  sourceSha
+}) {
   return {
     status: "passed",
     sourceSha,
     mainSha: main.sha,
     version: candidatePackage.version,
-    baselineVersion: baselinePackage.version,
-    baselineArtifact: name,
-    artifactBytes: "NOT_VERIFIED; workflow must download and verify candidate identity and hashes",
+    baselineVersion: baseline.application.version,
+    baselineArtifact,
+    artifactBytes,
     workflowInputs: {
       source_sha: sourceSha,
-      baseline_run_id: runId,
+      baseline_transport: baselineTransport,
+      baseline_run_id: baseline.workflow.runId,
       baseline_run_attempt: baseline.workflow.runAttempt,
       baseline_artifact_run_attempt: artifactAttempt,
-      baseline_source_sha: baseline.source.commit
+      baseline_source_sha: baseline.source.commit,
+      baseline_identity_sha256: baselineIdentitySha256,
+      baseline_published_file_name: baselinePublishedFileName
     }
   };
 }
@@ -108,14 +187,25 @@ export function parsePreflightArguments(args) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = parsePreflightArguments(process.argv.slice(2));
   const repository = args.get("--repository");
+  const baselineIdentityPath = args.get("--baseline-identity");
+  const baselineIdentity = await readBoundedIdentity(baselineIdentityPath);
   const result = await preflightWindowsCandidate({
     repository,
     sourceSha: args.get("--source-sha"),
-    baseline: await readWindowsPreviewCandidateIdentity(args.get("--baseline-identity")),
+    baseline: await readWindowsPreviewCandidateIdentity(baselineIdentityPath),
+    baselineIdentitySha256: createHash("sha256").update(baselineIdentity).digest("hex"),
     artifactAttempt: args.get("--baseline-artifact-attempt"),
     query: async (endpoint) => JSON.parse(execFileSync("gh", ["api", `repos/${repository}/${endpoint}`], {
       encoding: "utf8", timeout: 30_000, maxBuffer: 4 * 1024 * 1024
     }))
   });
   console.log(JSON.stringify(result, null, 2));
+}
+
+async function readBoundedIdentity(path) {
+  const metadata = await lstat(path);
+  if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > 1024 * 1024) {
+    throw new Error("Windows candidate baseline identity is not a bounded regular file.");
+  }
+  return readFile(path);
 }
