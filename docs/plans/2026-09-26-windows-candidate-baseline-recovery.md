@@ -47,6 +47,9 @@ installer or full NSIS upgrade lifecycle requirements.
   the user authorized reviewing and advancing `design-craft` to the exact current
   stable release, regenerating capabilities, validating/package-smoking, scoped
   commit/push, and one replacement exact-SHA Windows candidate dispatch.
+- Shutdown follow-up: after replacement run `36229880389` failed the first
+  synthetic-scale shutdown sample, the user authorized the bounded shutdown-budget
+  correction, validation, scoped commit/push, and one further exact-SHA candidate dispatch.
 
 ## Current evidence
 
@@ -60,6 +63,7 @@ installer or full NSIS upgrade lifecycle requirements.
 | OBSERVED | Candidate run `36228639998` stopped in provenance before Windows build because `design-craft` freshness advanced from locked `0.6.1`/`b168872...` to stable `0.7.0`/`f52ac60...`. | GitHub Actions failed-step log and exact tag resolution | 2026-09-26 |
 | VERIFIED | Stable tag `v0.7.0` peels to `f52ac60...`; the Desktop-bundled product boundary contains 95 regular files and no symlink or submodule entries. | canonical remote tag and local exact clean source | 2026-09-26 |
 | VERIFIED | Prepared and packaged capability catalogs identify `design-craft` `0.7.0` at exact commit `f52ac60...`, tree SHA-256 `4cfd9278...`; the packaged Skill directory is byte-for-byte identical to the exact source boundary. | generated catalogs and packaged application filesystem comparison | 2026-09-26 |
+| OBSERVED | Replacement run `36229880389` passed provenance, Windows packaging and packaged Electron smoke, then failed the first 1.25-scale synthetic UI shutdown sample: child exited in 414.1 ms, both Utility processes by 4534.8 ms, and Main by 6272.3 ms. No candidate identity, installer artifact, certification, or baseline lifecycle followed. | exact Actions failed-step log and uploaded bounded UI receipt | 2026-09-26 |
 
 ## Affected boundaries
 
@@ -79,6 +83,8 @@ installer or full NSIS upgrade lifecycle requirements.
 | Pin the historical identity, manual receipt, and unsigned manifest in a reviewed release catalog. | Workflow inputs and mutable remote metadata are not sufficient trust anchors. | A stronger immutable provenance service replaces the catalog. |
 | Download only from the fixed update origin and verify exact bytes before lifecycle use. | Reuses the already-published immutable product bytes without introducing credentials or arbitrary transport. | The fixed origin no longer retains immutable versioned objects. |
 | Keep full lifecycle unchanged. | Recovery must restore evidence availability, not weaken acceptance. | None. |
+| Keep the five-second product gate and shorten Main's internal shutdown watchdog from 4.25 to 3 seconds. | The failed sample needed about 2.02 seconds from the old watchdog boundary to observed Main exit, proving the old 0.75-second teardown reserve was insufficient; forcing the recursive Electron quit earlier preserves the external acceptance contract. | Repeated staged evidence proves a different product deadline or a narrower lifecycle defect. |
+| Project only the typed Main shutdown stage report into Windows failure evidence. | A process-only receipt cannot distinguish checkpoint/Host cleanup from Electron teardown, while raw process output may contain unrelated data. | The harness gains an equivalent typed lifecycle event. |
 
 ## Checkpoints
 
@@ -91,6 +97,9 @@ installer or full NSIS upgrade lifecycle requirements.
 - [ ] 7. Advance the exact reviewed `design-craft` source lock, regenerate and verify
   prepared capabilities, complete packaged smoke, then commit/push and dispatch the
   separately authorized replacement candidate.
+- [ ] 8. Preserve the five-second Windows gate, reserve two seconds for Electron
+  teardown, add typed stage evidence, validate/package-smoke, and dispatch the one
+  separately authorized follow-up candidate from the final pushed SHA.
 
 ## Validation matrix
 
@@ -104,6 +113,8 @@ installer or full NSIS upgrade lifecycle requirements.
 | Target OS/manual | separate Windows x64 installation test | exact downloaded candidate identity | UNVERIFIED; outside this implementation |
 | Capability source | exact `design-craft` stable tag/product-boundary review, prepare/freshness/source-lock gates | self-contained reviewed v0.7.0 package | PASS: stable tag peels to `f52ac60...`; source lock/freshness passed; 95-file package prepared with tree SHA-256 `4cfd9278...`; focused capability tests 27/27 |
 | Local package | required capability gates and `preview:mac:unsigned` | prepared exact package and packaged Electron smoke | PASS: aggregate `check` 883 files / 5761 tests; Extension Adapter provenance passed; packaged Electron smoke passed; `app.asar` SHA-256 `0d23d713...`; packaged catalog and exact Skill directory verified |
+| Shutdown correction | focused controller/measurement tests, affected typecheck/lint, architecture/structure, aggregate source gate | 5-second product gate unchanged; 3-second inner watchdog and typed evidence pass | PASS: focused 17/17; Desktop typecheck, scoped lint, architecture and structure passed. The first ordinary aggregate run passed all static gates but had one unrelated parallel Host crash-recovery timing failure; its isolated rerun passed 1/1. The complete bounded-concurrency rerun passed 883 files / 5763 tests with 9 files / 24 tests skipped and coverage 84.02/78.48/87.26/87.66. |
+| Local shutdown package | `corepack pnpm run preview:mac:unsigned` | rebuilt macOS arm64 package, smoke, relaunch | PASS on the preserved dirty worktree: packaged smoke and active-prompt shutdown passed at 83.7 ms; `app.asar` SHA-256 `657fb525...`; the repository preview was relaunched. This is not clean exact-SHA Windows evidence. |
 
 ## Rollback
 
@@ -140,6 +151,18 @@ failure or delete prior artifacts. No public update state is changed by this pla
   provenance, macOS arm64 unsigned packaging, and packaged Electron smoke all passed.
   The packaged catalog reports `2026.09.26.1`, and its exact Skill directory matches
   the reviewed upstream product boundary.
+- 2026-09-26: Replacement run `36229880389` reached the Windows packaged synthetic
+  scale/IME gate but failed its first shutdown sample at 6272.3 ms. The preceding
+  packaged active-prompt smoke shut down in 384.8 ms, so the evidence does not support
+  widening the five-second gate. The nested 4.25-second Main watchdog left only 750 ms
+  for Electron teardown; remediation reserves two seconds and records only the typed
+  application shutdown stage report for future diagnosis.
+- 2026-09-26: Implemented the 3-second inner watchdog and typed bounded stage parser.
+  Focused tests passed 17/17; affected typecheck/lint and architecture/structure passed.
+  The first full aggregate run retained one unrelated parallel crash-recovery timing
+  failure; isolated reproduction passed, and the complete two-worker aggregate rerun
+  passed 5763 tests plus all static/coverage gates. Rebuilt macOS packaged smoke passed
+  with 83.7 ms active-prompt shutdown and relaunched the preview.
 
 ## Closeout
 

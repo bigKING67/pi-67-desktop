@@ -12,6 +12,7 @@ import {
 import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
 import {
   measureElectronApplicationShutdown,
+  parseApplicationShutdownReport,
   productShutdownWithinBudget
 } from "./electron-shutdown-measurement.mjs";
 import {
@@ -166,6 +167,7 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
     });
     application = undefined;
     const shutdown = {
+      application: parseApplicationShutdownReport(processOutput()),
       budgetMs: WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS,
       driverCloseDurationMs: round(shutdownMeasurement.driverCloseDurationMs),
       processes: shutdownMeasurement.processes,

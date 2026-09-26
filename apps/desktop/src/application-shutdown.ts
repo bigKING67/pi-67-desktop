@@ -31,8 +31,8 @@ interface ApplicationShutdownOptions {
   now?: () => number;
 }
 
-// Leave 750ms of the Windows 5s product gate for Electron process teardown.
-const APPLICATION_SHUTDOWN_BUDGET_MS = 4_250;
+// Leave 2s of the Windows 5s product gate for Electron process teardown.
+const APPLICATION_SHUTDOWN_BUDGET_MS = 3_000;
 const RENDERER_CHECKPOINT_BUDGET_MS = 750;
 const FINALIZATION_RESERVE_MS = 500;
 const MINIMUM_STAGE_DEADLINE_MS = 100;

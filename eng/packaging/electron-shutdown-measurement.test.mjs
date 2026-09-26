@@ -1,10 +1,33 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   measureElectronApplicationShutdown,
+  parseApplicationShutdownReport,
   productShutdownWithinBudget
 } from "./electron-shutdown-measurement.mjs";
 
 describe("Electron shutdown measurement", () => {
+  it("extracts only the bounded application shutdown stage report", () => {
+    const report = parseApplicationShutdownReport([
+      "unrelated output",
+      "Application shutdown: {\"budgetMs\":3000,\"deadlineExceeded\":true,\"durationMs\":3000.04,\"rendererCheckpointed\":true,\"rendererCheckpointDurationMs\":20.04,\"agentHostStopped\":false,\"agentHostStopDurationMs\":2479.96}",
+      "private payload that must not be projected"
+    ].join("\n"));
+
+    expect(report).toEqual({
+      agentHostStopDurationMs: 2_480,
+      agentHostStopped: false,
+      budgetMs: 3_000,
+      deadlineExceeded: true,
+      durationMs: 3_000,
+      rendererCheckpointDurationMs: 20,
+      rendererCheckpointed: true
+    });
+    expect(JSON.stringify(report)).not.toContain("private payload");
+    expect(parseApplicationShutdownReport(
+      "Application shutdown: {\"budgetMs\":3000,\"deadlineExceeded\":\"yes\"}"
+    )).toBeNull();
+  });
+
   it("records bounded product process exit timing", async () => {
     vi.useFakeTimers();
     try {

@@ -204,6 +204,33 @@ describe("ApplicationShutdownController", () => {
     });
   });
 
+  it("reserves two seconds of the Windows product gate for Electron teardown by default", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const quit = vi.fn();
+    const onComplete = vi.fn();
+    const controller = createApplicationShutdownController({
+      stopAgentHost: () => new Promise<never>(() => undefined),
+      quit,
+      onComplete,
+      now: () => Date.now()
+    });
+
+    controller.handleBeforeQuit({ preventDefault: vi.fn() });
+    await vi.advanceTimersByTimeAsync(2_999);
+    expect(quit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(quit).toHaveBeenCalledOnce();
+    expect(onComplete).toHaveBeenCalledWith({
+      agentHostStopped: false,
+      budgetMs: 3_000,
+      deadlineExceeded: true,
+      durationMs: 3_000,
+      rendererCheckpointed: true
+    });
+  });
+
   it("keeps the workbench dirty if Main-owned finalization misses the total deadline", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);

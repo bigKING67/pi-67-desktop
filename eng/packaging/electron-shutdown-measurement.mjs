@@ -3,6 +3,43 @@ import { isProcessAlive } from "./controlled-shutdown-fixture.ts";
 const DEFAULT_PROCESS_POLL_INTERVAL_MS = 50;
 const DEFAULT_DRIVER_CLOSE_TIMEOUT_MS = 15_000;
 const DEFAULT_FORCED_TERMINATION_GRACE_MS = 2_000;
+const APPLICATION_SHUTDOWN_PREFIX = "Application shutdown: ";
+
+export function parseApplicationShutdownReport(output) {
+  let result = null;
+  for (const line of output.split(/\r?\n/u)) {
+    const start = line.indexOf(APPLICATION_SHUTDOWN_PREFIX);
+    if (start < 0) continue;
+    try {
+      const report = JSON.parse(line.slice(start + APPLICATION_SHUTDOWN_PREFIX.length));
+      if (
+        !isNonNegativeFinite(report.budgetMs)
+        || typeof report.deadlineExceeded !== "boolean"
+        || !isNonNegativeFinite(report.durationMs)
+        || typeof report.rendererCheckpointed !== "boolean"
+        || typeof report.agentHostStopped !== "boolean"
+        || !isOptionalNonNegativeFinite(report.rendererCheckpointDurationMs)
+        || !isOptionalNonNegativeFinite(report.agentHostStopDurationMs)
+      ) continue;
+      result = {
+        agentHostStopped: report.agentHostStopped,
+        budgetMs: round(report.budgetMs),
+        deadlineExceeded: report.deadlineExceeded,
+        durationMs: round(report.durationMs),
+        rendererCheckpointed: report.rendererCheckpointed,
+        ...(report.rendererCheckpointDurationMs === undefined
+          ? {}
+          : { rendererCheckpointDurationMs: round(report.rendererCheckpointDurationMs) }),
+        ...(report.agentHostStopDurationMs === undefined
+          ? {}
+          : { agentHostStopDurationMs: round(report.agentHostStopDurationMs) })
+      };
+    } catch {
+      // Only an exact, valid shutdown report is useful as bounded evidence.
+    }
+  }
+  return result;
+}
 
 export async function measureElectronApplicationShutdown({
   application,
@@ -200,6 +237,14 @@ function summarizeUtilityProcesses(states) {
 
 function round(value) {
   return Math.round(value * 10) / 10;
+}
+
+function isNonNegativeFinite(value) {
+  return Number.isFinite(value) && value >= 0;
+}
+
+function isOptionalNonNegativeFinite(value) {
+  return value === undefined || isNonNegativeFinite(value);
 }
 
 function settleWithin(promise, timeoutMs) {

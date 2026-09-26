@@ -1875,6 +1875,9 @@ drive/UNC/ADS 形式，并在单次解码后验证 resolved Renderer root contai
 Supervisor `stop()` 是 idempotent Promise。graceful 路径等待 Host 实际退出；forced 路径有固定上限，且两条
 路径都保持 stopping fence，不能因 late exit、late parent message、`activate` 或 `did-finish-load` 复活 Host。
 Shutdown metadata 不包含 Prompt、Session path、命令、source、raw Tool payload 或错误堆栈。
+Desktop Main 的默认 shutdown-controller watchdog 为 3 秒，给 Windows 5 秒产品进程退出门槛保留名义 2 秒
+用于 Electron 自身的 utility/Main teardown。watchdog 到期后必须继续 `app.quit()`，不能为等待 Host 或
+Main-owned finalization 延长外部门槛；阶段报告只包含预算、耗时及布尔完成状态。
 
 ## Skill Pack process completion
 
