@@ -171,6 +171,11 @@ catalog, identity, receipt, manifest, origin, size, or hash drift fail closed. T
 only baseline acquisition; it does not skip or shorten the full installer lifecycle and is not target-Windows
 manual acceptance.
 
+The packaged Runtime asset assertion uses the contract of the version currently installed, including the
+versioned native clipboard module path. Cross-version certification checks the legacy clipboard package for
+Alpha.40 and the Pi TUI native module for Alpha.41 and later. It must not apply the current candidate's native
+dependency layout to the previous-version baseline or skip the native asset check.
+
 GitHub's `Re-run failed jobs` always uses the original commit and workflow. Use it for an external
 or transient failure. A verifier code fix requires a new commit; automatic artifact reuse applies
 that new verifier to the old immutable candidate while binding both SHAs and the source run.

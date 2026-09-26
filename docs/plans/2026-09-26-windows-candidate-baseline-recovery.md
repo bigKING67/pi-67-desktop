@@ -50,6 +50,11 @@ installer or full NSIS upgrade lifecycle requirements.
 - Shutdown follow-up: after replacement run `36229880389` failed the first
   synthetic-scale shutdown sample, the user authorized the bounded shutdown-budget
   correction, validation, scoped commit/push, and one further exact-SHA candidate dispatch.
+- Asset-contract follow-up: after run `36231515012` passed Windows packaging,
+  packaged smoke, and synthetic-scale shutdown but failed before upgrade because
+  the verifier applied the Alpha.41 Pi TUI native path to the installed Alpha.40
+  baseline, the user authorized the versioned verifier correction, validation,
+  scoped commit/push, and one further exact-SHA candidate dispatch.
 
 ## Current evidence
 
@@ -64,6 +69,8 @@ installer or full NSIS upgrade lifecycle requirements.
 | VERIFIED | Stable tag `v0.7.0` peels to `f52ac60...`; the Desktop-bundled product boundary contains 95 regular files and no symlink or submodule entries. | canonical remote tag and local exact clean source | 2026-09-26 |
 | VERIFIED | Prepared and packaged capability catalogs identify `design-craft` `0.7.0` at exact commit `f52ac60...`, tree SHA-256 `4cfd9278...`; the packaged Skill directory is byte-for-byte identical to the exact source boundary. | generated catalogs and packaged application filesystem comparison | 2026-09-26 |
 | OBSERVED | Replacement run `36229880389` passed provenance, Windows packaging and packaged Electron smoke, then failed the first 1.25-scale synthetic UI shutdown sample: child exited in 414.1 ms, both Utility processes by 4534.8 ms, and Main by 6272.3 ms. No candidate identity, installer artifact, certification, or baseline lifecycle followed. | exact Actions failed-step log and uploaded bounded UI receipt | 2026-09-26 |
+| VERIFIED | Follow-up run `36231515012` passed provenance, Windows packaging, packaged smoke, and all three synthetic-scale shutdown samples; the slowest complete product exit was 1553.6 ms under the unchanged 5000 ms gate. | exact Actions jobs and uploaded UI receipt | 2026-09-26 |
+| VERIFIED | Certification then failed immediately after installing Alpha.40 because the current verifier required the Alpha.41 Pi TUI native clipboard path. Alpha.40 source required the legacy `@mariozechner` path; commit `9c2d162...` changed that path only after the Alpha.40 source. Upgrade, restart, and uninstall phases did not begin. | lifecycle diagnostic artifact and exact Git history | 2026-09-26 |
 
 ## Affected boundaries
 
@@ -85,6 +92,7 @@ installer or full NSIS upgrade lifecycle requirements.
 | Keep full lifecycle unchanged. | Recovery must restore evidence availability, not weaken acceptance. | None. |
 | Keep the five-second product gate and shorten Main's internal shutdown watchdog from 4.25 to 3 seconds. | The failed sample needed about 2.02 seconds from the old watchdog boundary to observed Main exit, proving the old 0.75-second teardown reserve was insufficient; forcing the recursive Electron quit earlier preserves the external acceptance contract. | Repeated staged evidence proves a different product deadline or a narrower lifecycle defect. |
 | Project only the typed Main shutdown stage report into Windows failure evidence. | A process-only receipt cannot distinguish checkpoint/Host cleanup from Electron teardown, while raw process output may contain unrelated data. | The harness gains an equivalent typed lifecycle event. |
+| Version the native clipboard asset path with the installed package contract. | The full lifecycle installs the previous version first; checking that installation against the candidate's later dependency layout creates a false failure while weakening the check would lose native asset coverage. | A future package format provides a self-describing, authenticated runtime asset manifest. |
 
 ## Checkpoints
 
@@ -93,13 +101,16 @@ installer or full NSIS upgrade lifecycle requirements.
 - [x] 3. Route the Windows workflow through conditional exact baseline acquisition while retaining full lifecycle.
 - [x] 4. Update authority docs and focused workflow/release tests.
 - [ ] 5. Run aggregate gates, review/stage only task files, commit, push, and verify remote CI.
-- [ ] 6. Run the new preflight, dispatch one exact-SHA Windows candidate, and record its state.
-- [ ] 7. Advance the exact reviewed `design-craft` source lock, regenerate and verify
+- [x] 6. Run the new preflight, dispatch one exact-SHA Windows candidate, and record its state.
+- [x] 7. Advance the exact reviewed `design-craft` source lock, regenerate and verify
   prepared capabilities, complete packaged smoke, then commit/push and dispatch the
   separately authorized replacement candidate.
-- [ ] 8. Preserve the five-second Windows gate, reserve two seconds for Electron
+- [x] 8. Preserve the five-second Windows gate, reserve two seconds for Electron
   teardown, add typed stage evidence, validate/package-smoke, and dispatch the one
   separately authorized follow-up candidate from the final pushed SHA.
+- [ ] 9. Version the native clipboard asset contract for Alpha.40 and Alpha.41,
+  validate the verifier-only correction, commit/push only its scoped files, and
+  dispatch the separately authorized exact-SHA candidate once.
 
 ## Validation matrix
 
@@ -115,6 +126,7 @@ installer or full NSIS upgrade lifecycle requirements.
 | Local package | required capability gates and `preview:mac:unsigned` | prepared exact package and packaged Electron smoke | PASS: aggregate `check` 883 files / 5761 tests; Extension Adapter provenance passed; packaged Electron smoke passed; `app.asar` SHA-256 `0d23d713...`; packaged catalog and exact Skill directory verified |
 | Shutdown correction | focused controller/measurement tests, affected typecheck/lint, architecture/structure, aggregate source gate | 5-second product gate unchanged; 3-second inner watchdog and typed evidence pass | PASS: focused 17/17; Desktop typecheck, scoped lint, architecture and structure passed. The first ordinary aggregate run passed all static gates but had one unrelated parallel Host crash-recovery timing failure; its isolated rerun passed 1/1. The complete bounded-concurrency rerun passed 883 files / 5763 tests with 9 files / 24 tests skipped and coverage 84.02/78.48/87.26/87.66. |
 | Local shutdown package | `corepack pnpm run preview:mac:unsigned` | rebuilt macOS arm64 package, smoke, relaunch | PASS on the preserved dirty worktree: packaged smoke and active-prompt shutdown passed at 83.7 ms; `app.asar` SHA-256 `657fb525...`; the repository preview was relaunched. This is not clean exact-SHA Windows evidence. |
+| Installed-version asset contract | focused packaged fixture and lifecycle tests, source gate, candidate gate, macOS packaged smoke | PASS: Alpha.40 selects legacy clipboard native modules and Alpha.41 selects Pi TUI native modules; focused 33/33, `check:source` 883 files / 5763 tests, `check:candidate` including production dependency, capability-source/freshness, Extension Adapter, aggregate source and coverage gates, packaged smoke 89.1 ms shutdown, `app.asar` SHA-256 `657fb525...` | PASS |
 
 ## Rollback
 
@@ -163,6 +175,19 @@ failure or delete prior artifacts. No public update state is changed by this pla
   failure; isolated reproduction passed, and the complete two-worker aggregate rerun
   passed 5763 tests plus all static/coverage gates. Rebuilt macOS packaged smoke passed
   with 83.7 ms active-prompt shutdown and relaunched the preview.
+- 2026-09-26: Follow-up run `36231515012` proved the shutdown correction on hosted
+  Windows at all three synthetic scale targets, with a slowest full exit of 1553.6 ms.
+  Installer certification then exposed a verifier-only compatibility defect before
+  upgrade: the installed Alpha.40 baseline was checked for the Alpha.41 Pi TUI native
+  module instead of its legacy clipboard module. No rerun was attempted.
+- 2026-09-26: Added the installed-version native clipboard contract without
+  weakening asset checks. Focused fixture/lifecycle tests passed 33/33; the first
+  source-gate attempt exposed and corrected this change's test-file line-budget
+  overage, then the complete fixed-worker source gate passed 883 files and 5763
+  tests. Rebuilt macOS packaged smoke passed with 89.1 ms active-prompt shutdown
+  and relaunched the repository preview. The full candidate preflight gate then
+  passed production dependency audit, capability source/freshness, Extension
+  Adapter verification, aggregate source checks, tests, and coverage.
 
 ## Closeout
 

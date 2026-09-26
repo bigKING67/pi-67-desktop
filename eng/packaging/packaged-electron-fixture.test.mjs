@@ -5,6 +5,7 @@ import {
   packagedApplicationEnvironment,
   packagedAttachmentExcludedAsarPaths,
   packagedAttachmentRequiredAsarPaths,
+  PI_TUI_NATIVE_ASSET_VERSION,
   resolvePackagedRuntimeAssetContract,
   WINDOWS_PACKAGE_WORKER_ISOLATION_VERSION
 } from "./packaged-electron-fixture.mjs";
@@ -206,6 +207,22 @@ describe("packaged Electron launch environment", () => {
       ]);
     expect(resolvePackagedRuntimeAssetContract("0.1.0-alpha.40").requiredCapabilityPaths)
       .toEqual(["packages/pi-workspace-resources/package.json"]);
+    const alpha40 = resolvePackagedRuntimeAssetContract("0.1.0-alpha.40");
+    expect(PI_TUI_NATIVE_ASSET_VERSION).toBe("0.1.0-alpha.41");
+    expect(alpha40).toMatchObject({
+      clipboardNativeModulePaths: {
+        darwin: "@mariozechner/clipboard-darwin-arm64/clipboard.darwin-arm64.node",
+        win32: "@mariozechner/clipboard-win32-x64-msvc/clipboard.win32-x64-msvc.node"
+      },
+      piTuiNativeAssetsIncluded: false
+    });
+    expect(resolvePackagedRuntimeAssetContract("0.1.0-alpha.41")).toMatchObject({
+      clipboardNativeModulePaths: {
+        darwin: "@earendil-works/pi-tui/native/darwin/prebuilds/darwin-arm64/darwin-platform.node",
+        win32: "@earendil-works/pi-tui/native/win32/prebuilds/win32-x64/win32-platform.node"
+      },
+      piTuiNativeAssetsIncluded: true
+    });
     expect(resolvePackagedRuntimeAssetContract("0.1.0-alpha.24"))
       .toMatchObject({ packageWorkerIsolated: true });
     expect(() => resolvePackagedRuntimeAssetContract("not-a-version"))

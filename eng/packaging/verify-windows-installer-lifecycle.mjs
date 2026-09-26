@@ -222,8 +222,11 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
     const initialRuntimeAssetContract = resolvePackagedRuntimeAssetContract(initialVersion);
     await assertPackagedRuntimeAssets(installedArtifact, initialRuntimeAssetContract);
     report.initialRuntimeAssetContract = {
+      clipboardNativeModulePath:
+        initialRuntimeAssetContract.clipboardNativeModulePaths[installedArtifact.platform],
       heicNormalizationAssetsIncluded: initialRuntimeAssetContract.heicNormalizationAssetsIncluded,
       packageWorkerIsolated: initialRuntimeAssetContract.packageWorkerIsolated,
+      piTuiNativeAssetsIncluded: initialRuntimeAssetContract.piTuiNativeAssetsIncluded,
       requiredAsarPathCount: initialRuntimeAssetContract.requiredAsarPaths.length,
       requireWindowsPackageWorkerJob: initialRuntimeAssetContract.requireWindowsPackageWorkerJob,
       version: initialVersion

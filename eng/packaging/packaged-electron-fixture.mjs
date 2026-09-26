@@ -57,6 +57,16 @@ const HEIC_NORMALIZATION_ASAR_PATHS = new Set([
 ]);
 export const WINDOWS_PACKAGE_WORKER_ISOLATION_VERSION = "0.1.0-alpha.24";
 export const HEIC_NORMALIZATION_ASSET_VERSION = "0.1.0-alpha.33";
+export const PI_TUI_NATIVE_ASSET_VERSION = "0.1.0-alpha.41";
+
+const LEGACY_CLIPBOARD_NATIVE_MODULE_PATHS = Object.freeze({
+  darwin: "@mariozechner/clipboard-darwin-arm64/clipboard.darwin-arm64.node",
+  win32: "@mariozechner/clipboard-win32-x64-msvc/clipboard.win32-x64-msvc.node"
+});
+const PI_TUI_NATIVE_MODULE_PATHS = Object.freeze({
+  darwin: "@earendil-works/pi-tui/native/darwin/prebuilds/darwin-arm64/darwin-platform.node",
+  win32: "@earendil-works/pi-tui/native/win32/prebuilds/win32-x64/win32-platform.node"
+});
 
 export function resolvePackagedRuntimeAssetContract(version) {
   if (!validSemver(version)) {
@@ -70,8 +80,15 @@ export function resolvePackagedRuntimeAssetContract(version) {
     version,
     HEIC_NORMALIZATION_ASSET_VERSION
   );
+  const piTuiNativeAssetsIncluded = semverGreaterThanOrEqual(
+    version,
+    PI_TUI_NATIVE_ASSET_VERSION
+  );
   const unifiedCapabilities = semverGreaterThanOrEqual(version, "0.1.0-alpha.40");
   return {
+    clipboardNativeModulePaths: piTuiNativeAssetsIncluded
+      ? PI_TUI_NATIVE_MODULE_PATHS
+      : LEGACY_CLIPBOARD_NATIVE_MODULE_PATHS,
     requiredCapabilityPaths: unifiedCapabilities
       ? ["packages/pi-workspace-resources/package.json"]
       : [
@@ -80,6 +97,7 @@ export function resolvePackagedRuntimeAssetContract(version) {
       ],
     heicNormalizationAssetsIncluded,
     packageWorkerIsolated,
+    piTuiNativeAssetsIncluded,
     requiredAsarPaths: packagedAttachmentRequiredAsarPaths.filter((path) =>
       (packageWorkerIsolated || path !== PACKAGE_WORKER_ASAR_PATH)
       && (heicNormalizationAssetsIncluded || !HEIC_NORMALIZATION_ASAR_PATHS.has(path))
@@ -110,13 +128,15 @@ export function resolvePackagedArtifact(platform = process.platform, arch = proc
 }
 
 export async function assertPackagedRuntimeAssets(artifact, {
+  clipboardNativeModulePaths = PI_TUI_NATIVE_MODULE_PATHS,
   requiredAsarPaths = [...packagedAttachmentRequiredAsarPaths, "packages/pi-runtime/dist/session-content-index-worker.mjs"],
   requiredCapabilityPaths = ["packages/pi-workspace-resources/package.json"],
   requireWindowsPackageWorkerJob = true
 } = {}) {
-  const clipboardModule = artifact.platform === "darwin"
-    ? "@earendil-works/pi-tui/native/darwin/prebuilds/darwin-arm64/darwin-platform.node"
-    : "@earendil-works/pi-tui/native/win32/prebuilds/win32-x64/win32-platform.node";
+  const clipboardModule = clipboardNativeModulePaths[artifact.platform];
+  if (!clipboardModule) {
+    throw new Error(`Missing clipboard native module contract for ${artifact.platform}.`);
+  }
   const unpackedModules = join(artifact.resourcesPath, "app.asar.unpacked/node_modules");
   const canvasModule = artifact.platform === "darwin"
     ? "@napi-rs/canvas-darwin-arm64/skia.darwin-arm64.node"
