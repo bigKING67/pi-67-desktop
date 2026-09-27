@@ -4,9 +4,14 @@ Pi-67 Desktop 只持续跟踪 `pi-gui` 与 `t3code` 两个综合参考项目。�
 产品、功能、交互、UI、设计、架构、Harness、orchestration、runtime lifecycle、恢复、
 测试和工程质量；不做永久领域分工，也不把 `t3code` 限定为 Harness 专项。
 
+[设计与交互参考指南](design-interaction-references.md) 另行收录有界的专题研究来源，
+用于信息架构、视觉、组件、Agent 反馈和成果交互。它不是第三个综合实现上游，
+不扩展以下 S0/S1 Catalog，也不自动授予依赖安装、源码复用或产品行为变更。
+
 `references.catalog.json` 是机器可读目录，`references.lock.json` 记录完成过的固定 commit
 审阅，`licenses/provenance.json` 记录已经发生的代码重实现、改造或复制。删除旧参考项目的
 治理记录不重写 Git 历史，也不删除已有实现；未来不得再以旧项目作为新功能的参考依据。
+这条历史清理约束不排除用户新批准的专题来源；新增来源须在专题指南中明确范围和证据。
 
 ## Authority order
 
@@ -17,6 +22,9 @@ Pi-67 Desktop 只持续跟踪 `pi-gui` 与 `t3code` 两个综合参考项目。�
 3. `earendil-works/pi` 的 SDK、Session、Extension、Model、Provider、Auth 和 Tool 语义；
 4. 固定 commit 的 `pi-gui` 与 `t3code` 实现观察；
 5. README、截图、宣传文案和未审阅的远端 HEAD。
+
+专题指南中的来源观察和项目建议均服从以上项目合同及 Pi 行为规范；文档、截图和
+真实交互证据分别标记，不能仅因被收录就获得固定 commit 实现审阅的证据等级。
 
 `earendil-works/pi` 不是第三个可选产品参考，而是唯一 Runtime 与行为规范源。
 `@earendil-works/pi-coding-agent` 是唯一 Agent Runtime；Pi JSONL 是对话真源。Pi 的实际
@@ -58,7 +66,7 @@ Lock 不接受 `null`、branch、tag 或短 SHA。`reviewedCommit` 表示实际�
 默认优先级是：问题定义 -> 固定 commit 研究 -> 按 Pi-67 Domain/Protocol 重新实现 -> 有来源地
 改造 -> 最后才是复制。Reference 不自动扩大 roadmap、产品边界或进程权限。
 
-每次吸收必须：
+从 S1 综合参考吸收实现时必须：
 
 1. 先定义 Pi-67 自己的问题和验收标准；
 2. 选择 `pi-gui`、`t3code` 或两者，并记录实际审阅职责；
@@ -75,6 +83,13 @@ Renderer Node/文件系统权限和自动源码同步仍不吸收。上述拒绝
 `reimplemented`、`adapted` 和 `copied` 必须记录 source repository、完整 commit、source
 path/hash、target path、license hash 和修改说明；`adapted` 或 `copied` 还必须提供发行物
 所需的 third-party notice。
+
+专题指南当前只记录设计研究，没有代码吸收记录。未来从专题来源复制、改造或基于
+源码重实现时，必须先固定实际源码版本、核验许可证及文件头、记录来源与目标文件，
+并在该次已授权复用变更内完善可表达该来源的 provenance/schema/检查器和发行 notice。
+上述问题与验收定义、项目边界核对、适用测试及独立 scoped change 要求同样适用。
+当前 Catalog 不接受这些来源，因此不能伪装成 pi-gui/t3code 条目或绕过既有检查；
+未完成治理适配前保持 reference-only。文章启示与原创界面设计不冒充源码复用。
 
 ## Commands
 

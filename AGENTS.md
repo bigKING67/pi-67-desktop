@@ -8,6 +8,10 @@
   scope or a referenced contract is unclear, expand the read before editing.
 - Product behavior and non-goals: `PRODUCT.md`.
 - UI, interaction, and visual tokens: `DESIGN.md` and `DESIGN.dark.md`.
+- For redesign, information architecture, Agent execution/approval, or artifact
+  interaction work, consult the index in
+  `docs/provenance/design-interaction-references.md`, then read only the relevant
+  entries. Routine local polish does not require reading the whole guide.
 - Process boundaries and cross-process commands/events:
   `docs/architecture/processes-and-protocol.md`.
 - Before changing grouped choices, read `Grouped choice implementation` in
@@ -38,6 +42,9 @@
   Either may inform product, interaction, UI, design, architecture, Harness,
   runtime lifecycle, recovery, tests, and engineering quality. Neither is a
   merge upstream or overrides Pi-67 product and security contracts.
+- Bounded design and interaction references are cataloged separately in
+  `docs/provenance/design-interaction-references.md`. They inform design research,
+  not Runtime authority, automatic dependency adoption, or implemented behavior.
 
 ## New Money service and memory boundary
 

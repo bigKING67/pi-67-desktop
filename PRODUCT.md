@@ -75,6 +75,14 @@ and `t3code` is not limited to Harness concerns. Reference observations do not
 automatically enter the roadmap or override this product contract. Pi remains
 the only Runtime and behavior specification source.
 
+The [design and interaction reference guide](docs/provenance/design-interaction-references.md)
+adds bounded topical research alongside those comprehensive references. Its
+research direction is New Money as a general-purpose work Agent across research,
+writing, analysis, and coding. This direction does not itself change the current
+Users, Primary jobs, or success criteria, or claim unimplemented capabilities.
+Accepted behavior changes must update this product contract and the applicable
+design/protocol contracts; reference inclusion alone does not approve them.
+
 ## Product vocabulary
 
 - `对话` is the user-visible, long-lived navigation object that may be renamed,
