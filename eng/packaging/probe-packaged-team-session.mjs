@@ -128,6 +128,7 @@ try {
   assert.ok(fixture.webGovernance, "Requires the explicit extended Web fixture window");
   phase("device-login");
   let settings = await memorySettings(window);
+  await settings.locator("summary").filter({ hasText: "高级连接设置" }).click();
   await settings.getByRole("textbox", { name: "New Money 服务地址" }).fill(fixture.credential.endpoint);
   await settings.getByRole("button", { name: "保存更改", exact: true }).click();
   phase("device-begin");

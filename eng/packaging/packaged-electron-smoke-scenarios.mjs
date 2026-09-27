@@ -105,6 +105,7 @@ async function verifyInitialRuntimeSettings(window, packagedProcessOutput) {
   const settings = await openSettingsSection(window, /^运行服务/u);
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: /^下载源与网络/u }).click();
+  await settings.locator("summary").filter({ hasText: "内置工具链" }).click();
   await settings.getByText("24.18.0", { exact: true }).waitFor({ state: "visible", timeout: 15_000 });
   await settings.getByText("12.0.1", { exact: true }).waitFor({ state: "visible", timeout: 15_000 });
   const gitVersion = process.platform === "win32" ? "2.53.0.windows.3" : "2.53.0";
