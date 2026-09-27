@@ -1,7 +1,6 @@
 import type { Page } from "@playwright/test";
 import type {
   DesktopSystemBridge,
-  DesktopUpdateState,
   WorkbenchLayoutV5,
   WorkspaceFilePersistedState,
   WorkspaceEntryRequest
@@ -35,6 +34,7 @@ import {
   type MockDesktopShutdownBridge
 } from "./pi67-renderer-desktop-shutdown-bridge.js";
 import { installMockSupportDiagnosticsBridge, type MockSupportDiagnosticsBridge } from "./pi67-support-diagnostics-bridge.js";
+import { installMockDesktopUpdateBridge, type MockDesktopUpdateBridge } from "./pi67-renderer-desktop-update-bridge.js";
 import { installComposerDraftTestControl } from "./pi67-composer-draft-test-control.js";
 import { MOCK_DESKTOP_RUNTIME_HEALTH } from "./pi67-runtime-diagnostics-fixture.js";
 export { DEFAULT_MOCK_WORKSPACE } from "./pi67-renderer-desktop-bridge-contract.js";
@@ -42,7 +42,7 @@ export type { MockDesktopBridgeOptions, MockWorkspaceDescriptor } from "./pi67-r
 type MockDesktopPrimaryBridge = Omit<DesktopSystemBridge,
   keyof MockDesktopCapabilityBridge | keyof MockDesktopAttachmentBridge
   | keyof MockDesktopRepositoryBridge | keyof MockDesktopShutdownBridge
-  | keyof MockSupportDiagnosticsBridge>;
+  | keyof MockSupportDiagnosticsBridge | keyof MockDesktopUpdateBridge>;
 export async function installMockDesktopBridge(
   page: Page,
   options: MockDesktopBridgeOptions = {}
@@ -66,7 +66,6 @@ export async function installMockDesktopBridge(
     currentWorkspaceId: options.currentWorkspaceId,
     selectedSurface: options.selectedSurface,
     settings: options.settings ?? { section: "general" as const, scope: "global" as const },
-    deferInitialUpdateState: options.deferInitialUpdateState ?? false,
     repositoryEnvironmentSnapshot: options.repositoryEnvironmentSnapshot,
     runtimeHealth: MOCK_DESKTOP_RUNTIME_HEALTH
   };
@@ -78,6 +77,7 @@ export async function installMockDesktopBridge(
   await installMockDesktopRepositoryBridge(page, options.repositoryEnvironmentSnapshot);
   await installMockDesktopShutdownBridge(page);
   await installMockSupportDiagnosticsBridge(page);
+  await installMockDesktopUpdateBridge(page, { deferInitialUpdateState: options.deferInitialUpdateState ?? false });
   await installComposerDraftTestControl(page);
   await page.addInitScript((bridgeFixture) => {
     // Dev-mode module graphs can exceed Chromium's default 250-entry buffer.
@@ -101,36 +101,6 @@ export async function installMockDesktopBridge(
       cleanExit: boolean;
     };
     let pickerIndex = 0;
-    let updateState: Record<string, unknown> = {
-      phase: "idle",
-      channel: "unsigned-preview",
-      currentVersion: "0.1.0-alpha.1",
-      automaticChecks: true
-    };
-    // The mock plays an untrusted wire: tests may emit states outside the contract to exercise
-    // renderer validation, so values are cast only where they cross the typed bridge.
-    const wireState = (state: Record<string, unknown>) => structuredClone(state) as DesktopUpdateState;
-    const updateListeners = new Set<(state: DesktopUpdateState) => void>();
-    let finishUpdate: ((state: DesktopUpdateState) => void) | undefined;
-    let resolveInitialUpdateState: (() => void) | undefined;
-    const initialUpdateStateGate = bridgeFixture.deferInitialUpdateState
-      ? new Promise<void>((resolve) => { resolveInitialUpdateState = resolve; })
-      : Promise.resolve();
-    const updateTest = {
-      checks: 0,
-      starts: 0,
-      cancellations: 0,
-      openedUrls: [] as string[],
-      allowOpen: false,
-      finishInitialRead() {
-        resolveInitialUpdateState?.();
-        resolveInitialUpdateState = undefined;
-      },
-      emit(state: Record<string, unknown>) {
-        updateState = structuredClone(state);
-        for (const listener of updateListeners) listener(wireState(updateState));
-      }
-    };
     let workspaceFileState: WorkspaceFilePersistedState = { version: 1 as const, workspaces: [] };
     let composerDraftState: ComposerDraftPersistedState = structuredClone(
       bridgeFixture.initialComposerDraftState
@@ -377,6 +347,8 @@ export async function installMockDesktopBridge(
             };
           },
           requestOpenExternal: async (url: string) => {
+            const updateTest = (window as unknown as { __pi67UpdateTest: { openedUrls: string[]; allowOpen: boolean } })
+              .__pi67UpdateTest;
             updateTest.openedUrls.push(url);
             return updateTest.allowOpen;
           },
@@ -404,30 +376,6 @@ export async function installMockDesktopBridge(
             workspaceEntryTest.trashes.push(structuredClone(entry));
             return true;
           },
-          getUpdateState: async () => { await initialUpdateStateGate; return wireState(updateState); },
-          checkForUpdates: async () => {
-            updateTest.checks += 1;
-            updateState = { phase: "available", channel: "unsigned-preview", currentVersion: "0.1.0-alpha.1", version: "0.1.0-alpha.2", artifactName: "Pi-67-Desktop-0.1.0-alpha.2-mac-arm64-unsigned-preview.zip", artifactBytes: 104_857_600, automaticChecks: true, checkedAt: "2026-08-03T08:00:00.000Z" };
-            for (const listener of updateListeners) listener(wireState(updateState));
-            return wireState(updateState);
-          },
-          startUpdate: async () => {
-            updateTest.starts += 1;
-            updateState = { phase: "downloading", channel: "unsigned-preview", currentVersion: "0.1.0-alpha.1", version: "0.1.0-alpha.2", artifactName: "Pi-67-Desktop-0.1.0-alpha.2-mac-arm64-unsigned-preview.zip", artifactBytes: 104_857_600, transferred: 52_428_800, percent: 50, automaticChecks: true, checkedAt: "2026-08-03T08:00:00.000Z" };
-            for (const listener of updateListeners) listener(wireState(updateState));
-            return new Promise<DesktopUpdateState>((resolve) => { finishUpdate = resolve; });
-          },
-          cancelUpdate: async () => {
-            updateTest.cancellations += 1;
-            updateState = { phase: "available", channel: "unsigned-preview", currentVersion: "0.1.0-alpha.1", version: "0.1.0-alpha.2", artifactName: "Pi-67-Desktop-0.1.0-alpha.2-mac-arm64-unsigned-preview.zip", artifactBytes: 104_857_600, automaticChecks: true, checkedAt: "2026-08-03T08:00:00.000Z" };
-            for (const listener of updateListeners) listener(wireState(updateState));
-            finishUpdate?.(wireState(updateState)); finishUpdate = undefined;
-            return wireState(updateState);
-          },
-          onUpdateStateChanged: (listener: (state: DesktopUpdateState) => void) => {
-            updateListeners.add(listener);
-            return () => { updateListeners.delete(listener); };
-          },
           onAgentHostFailed: () => () => undefined,
           onAgentHostStartup: () => () => undefined,
           onPowerResume: () => () => undefined
@@ -436,10 +384,6 @@ export async function installMockDesktopBridge(
     Object.defineProperty(window, "pi67", {
       configurable: false,
       value: { system: systemFixture.methods as DesktopSystemBridge }
-    });
-    Object.defineProperty(window, "__pi67UpdateTest", {
-      configurable: false,
-      value: updateTest
     });
     Object.defineProperty(window, "__pi67WorkspaceEntryTest", {
       configurable: false,
