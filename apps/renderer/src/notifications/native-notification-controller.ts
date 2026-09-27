@@ -17,6 +17,7 @@ import {
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import type { WorkbenchEventRoute } from "../workbench/workbench-event-router.js";
 import { publishNotification } from "./notification-store.js";
+import { runAfterLeavingSettings } from "../settings/settings-leave-guard.js";
 
 const MAX_TRACKED_NATIVE_NOTIFICATIONS = 512;
 
@@ -113,6 +114,10 @@ export async function activateRendererNativeNotification(
 ): Promise<boolean> {
   forgetTrackedNotification(activation.notificationId);
   void window.pi67.system.dismissNativeNotification(activation.notificationId).catch(() => false);
+  return (await runAfterLeavingSettings(() => activateNotificationTarget(activation))) ?? false;
+}
+
+async function activateNotificationTarget(activation: NativeNotificationActivation): Promise<boolean> {
   const workbench = rendererWorkbenchStore.getState();
   const task = Object.values(workbench.tasks).find((candidate) => (
     candidate.workspaceId === activation.workspaceId

@@ -199,3 +199,41 @@ test("memory settings keep an unsaved draft across a background identity failure
   await expect(fullLearning).toBeChecked();
   await expect(settings.getByRole("button", { name: "保存更改" })).toBeEnabled();
 });
+
+test("command palette exits from Settings go through the unsaved draft guard", async ({ page }) => {
+  await installMockDesktopBridge(page);
+  await page.goto("/");
+  await attachMockAgent(page, [], {}, { responseResults: {
+    "context.status.get": status,
+    "context.runtime.doctor": { checkedAt: 1, status, effectiveConfiguration: configuration, checks: [] },
+    "context.config.get": configuration,
+    "enterprise.identity.get": { state: "signed-out" },
+    "enterprise.workspace.get": { state: "unbound", workspaceId: DEFAULT_MOCK_WORKSPACE.id }
+  } });
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.getByRole("button", { name: "帮助与设置" }).click();
+  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
+  await page.getByRole("button", { name: "上下文与记忆", exact: true }).click();
+  const settings = page.getByTestId("context-memory-settings");
+  const fullLearning = settings.getByRole("radio", { name: /完整学习/ });
+  await settings.getByRole("radio", { name: /^私人学习/ }).focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(fullLearning).toBeChecked();
+
+  const runResume = async () => {
+    await page.keyboard.press("ControlOrMeta+K");
+    const palette = page.getByRole("dialog", { name: "命令面板" });
+    await palette.getByRole("combobox").fill("/resume");
+    await palette.getByRole("option", { name: /resume/u }).first().click();
+  };
+  const discard = page.getByRole("dialog", { name: "放弃未保存的修改" });
+  await runResume();
+  await expect(discard).toBeVisible();
+  await page.getByRole("button", { name: "继续编辑", exact: true }).click();
+  await expect(settings).toBeVisible();
+  await expect(fullLearning).toBeChecked();
+
+  await runResume();
+  await page.getByRole("button", { name: "放弃修改并离开", exact: true }).click();
+  await expect(settings).toHaveCount(0);
+});

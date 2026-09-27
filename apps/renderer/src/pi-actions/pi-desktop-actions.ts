@@ -22,6 +22,7 @@ import {
 } from "../workbench/workbench-store.js";
 import { conversationPrimaryTitle } from "../workbench/conversation-title.js";
 import { selectConversationSessionSummary, useSessionCatalogStore } from "../navigation/session-catalog-store.js";
+import { runAfterLeavingSettings } from "../settings/settings-leave-guard.js";
 import { useConversationDialogStore } from "../navigation/conversation-dialog-store.js";
 import { renameRendererConversation } from "../navigation/conversation-organization-controller.js";
 import { setRendererSessionInteractionMode } from "../session/session-plan-controller.js";
@@ -160,7 +161,7 @@ export async function executePiDesktopAction(
   }
   switch (descriptor.name) {
     case "new":
-      beginRendererSessionIntent();
+      await runAfterLeavingSettings(beginRendererSessionIntent);
       return { status: "handled" };
     case "model":
       return executeModelAction(args, context);
@@ -170,12 +171,16 @@ export async function executePiDesktopAction(
       await compactRendererSession(args || undefined);
       return { status: "handled" };
     case "resume":
-      rendererWorkbenchStore.getState().closeSettings();
-      useShellStore.getState().openSessionCatalog();
+      await runAfterLeavingSettings(() => {
+        rendererWorkbenchStore.getState().closeSettings();
+        useShellStore.getState().openSessionCatalog();
+      });
       return { status: "handled" };
     case "tree": {
-      rendererWorkbenchStore.getState().closeSettings();
-      useShellStore.getState().setSessionTreeDialogOpen(true);
+      await runAfterLeavingSettings(() => {
+        rendererWorkbenchStore.getState().closeSettings();
+        useShellStore.getState().setSessionTreeDialogOpen(true);
+      });
       return { status: "handled" };
     }
     case "reload":
@@ -186,7 +191,7 @@ export async function executePiDesktopAction(
     case "default":
       return executeInteractionModeAction("execute", context);
     case "settings":
-      rendererWorkbenchStore.getState().openSettings("general");
+      await runAfterLeavingSettings(() => rendererWorkbenchStore.getState().openSettings("general"));
       return { status: "handled" };
   }
 }
@@ -243,8 +248,10 @@ async function executeModelAction(
   context: PiDesktopActionContext
 ): Promise<PiDesktopActionExecutionResult> {
   if (!target) {
-    rendererWorkbenchStore.getState().closeSettings();
-    useShellStore.getState().requestModelPicker();
+    await runAfterLeavingSettings(() => {
+      rendererWorkbenchStore.getState().closeSettings();
+      useShellStore.getState().requestModelPicker();
+    });
     return { status: "handled" };
   }
   const model = context.configuredModels.find((candidate) => (

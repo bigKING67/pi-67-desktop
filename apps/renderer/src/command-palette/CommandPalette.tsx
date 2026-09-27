@@ -10,6 +10,7 @@ import { openKeyboardShortcutsDialog } from "../help/keyboard-shortcuts-dialog-c
 import { publishNotification } from "../notifications/notification-store.js";
 import { invokeRuntimeCommand } from "../operation/operation-controller.js";
 import { executePiDesktopAction } from "../pi-actions/pi-desktop-actions.js";
+import { runAfterLeavingSettings } from "../settings/settings-leave-guard.js";
 import {
   beginRendererSessionIntent,
   openRendererSession
@@ -93,7 +94,7 @@ export function CommandPalette() {
       configuredModels: models ?? []
     },
     handlers: {
-      openSession: (session) => openRendererSession(session.path, session.fileIdentity),
+      openSession: (session) => runAfterLeavingSettings(() => openRendererSession(session.path, session.fileIdentity)),
       invokeCommand: (command) => void invokeRuntimeCommand(command),
       executeDesktopAction: async (descriptor) => {
         const result = await executePiDesktopAction(descriptor, "", {
@@ -119,7 +120,7 @@ export function CommandPalette() {
     },
     applicationHandlers: {
       settings: () => rendererWorkbenchStore.getState().openSettings(),
-      "new-session": () => { beginRendererSessionIntent(); },
+      "new-session": () => { void runAfterLeavingSettings(beginRendererSessionIntent); },
       "toggle-navigation": toggleRendererNavigation,
       "toggle-context": () => {
         const shell = useShellStore.getState();
@@ -138,7 +139,7 @@ export function CommandPalette() {
       detail: `${item.role === "user" ? "用户" : "Pi"}${item.createdAt === undefined ? "" : ` · ${formatRelativeTime(item.createdAt)}`} · ${item.snippet}`,
       keywords: `${item.snippet} ${item.sessionName} ${item.role}`,
       icon: MessageSquareText,
-      run: () => openWorkspaceMessageResult(item)
+      run: () => runAfterLeavingSettings(() => openWorkspaceMessageResult(item))
     }))
   ], [
     activeSessionFileIdentity,

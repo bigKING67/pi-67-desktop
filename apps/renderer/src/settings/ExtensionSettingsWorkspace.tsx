@@ -1,9 +1,7 @@
 import { FileText, PackageOpen, Puzzle, RefreshCw, SquareCode } from "lucide-react";
 import { Button, Tab, TabList, TabPanel, Tabs } from "react-aria-components";
-import {
-  rendererWorkbenchStore,
-  useWorkbenchStore
-} from "../workbench/workbench-store.js";
+import { useWorkbenchStore } from "../workbench/workbench-store.js";
+import { useSettingsNavigation } from "./SettingsDraftGuard.js";
 import {
   useDesktopCapabilitySnapshot
 } from "./DesktopCapabilityPanels.js";
@@ -56,6 +54,7 @@ export function ExtensionSettingsWorkspace() {
 
 function BundledExtensionPanel({ capability }: { capability: CapabilityState }) {
   const scope = useWorkbenchStore((state) => state.settingsScope);
+  const navigateSettings = useSettingsNavigation();
   const extensions = [...(capability.snapshot?.bundledExtensions ?? [])]
     .sort((left, right) => left.displayName.localeCompare(right.displayName, "zh-CN"));
   return (
@@ -84,7 +83,7 @@ function BundledExtensionPanel({ capability }: { capability: CapabilityState }) 
           value={extension.installed ? "已随应用提供" : "尚未准备"}
           actions={extension.id === "pi-rules-loader" ? <Button
             className="secondary-button"
-            onPress={() => rendererWorkbenchStore.getState().selectSettingsSection("rules")}
+            onPress={() => navigateSettings("rules")}
           >
             <FileText aria-hidden="true" size={14} />
             查看工作规则
