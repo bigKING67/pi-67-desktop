@@ -19,6 +19,7 @@ import type {
   WorkspaceFileStateSnapshot
 } from "@pi67/domain";
 import type { SupportDiagnosticsUploadReceipt } from "@pi67/support-contract";
+import type { DesktopUpdateState } from "./desktop-update-state.js";
 import type { LocalMemorySettingsBridge } from "./local-memory-settings.js";
 import type { StagedPromptAttachment } from "./agent-messages.js";
 import type {
@@ -241,11 +242,12 @@ export interface DesktopSystemBridge {
   revealBrowser67Extension(): Promise<boolean>;
   copyBrowser67ExtensionPath(): Promise<boolean>;
   verifyBrowser67Extension(options: { startHub: boolean }): Promise<DesktopCapabilitySnapshot>;
-  getUpdateState(): Promise<unknown>;
-  checkForUpdates(): Promise<unknown>;
-  startUpdate(): Promise<unknown>;
-  cancelUpdate(): Promise<unknown>;
-  onUpdateStateChanged(listener: (state: unknown) => void): () => void;
+  // Renderer still validates each value with parseDesktopUpdateState before use.
+  getUpdateState(): Promise<DesktopUpdateState>;
+  checkForUpdates(): Promise<DesktopUpdateState>;
+  startUpdate(): Promise<DesktopUpdateState>;
+  cancelUpdate(): Promise<DesktopUpdateState>;
+  onUpdateStateChanged(listener: (state: DesktopUpdateState) => void): () => void;
   onAgentHostFailed(
     listener: (state: DesktopAgentHostFailureState) => void
   ): () => void;

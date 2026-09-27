@@ -1,3 +1,4 @@
+import { parseDesktopUpdateState } from "@pi67/protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AUTOMATIC_UPDATE_INTERVAL_MS,
@@ -125,6 +126,8 @@ describe("DesktopUpdateController", () => {
       percent: 50
     }));
     expect(publish).toHaveBeenLastCalledWith(expect.objectContaining({ phase: "installing" }));
+    // Every state Main publishes must satisfy the protocol contract the renderer validates against.
+    for (const [state] of publish.mock.calls) expect(parseDesktopUpdateState(state), JSON.stringify(state)).toMatchObject({ ok: true });
   });
 
   it("cancels an active download and returns to the verified available state", async () => {

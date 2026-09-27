@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import type {
   DesktopSystemBridge,
+  DesktopUpdateState,
   WorkbenchLayoutV5,
   WorkspaceFilePersistedState,
   WorkspaceEntryRequest
@@ -106,8 +107,11 @@ export async function installMockDesktopBridge(
       currentVersion: "0.1.0-alpha.1",
       automaticChecks: true
     };
-    const updateListeners = new Set<(state: unknown) => void>();
-    let finishUpdate: ((state: Record<string, unknown>) => void) | undefined;
+    // The mock plays an untrusted wire: tests may emit states outside the contract to exercise
+    // renderer validation, so values are cast only where they cross the typed bridge.
+    const wireState = (state: Record<string, unknown>) => structuredClone(state) as DesktopUpdateState;
+    const updateListeners = new Set<(state: DesktopUpdateState) => void>();
+    let finishUpdate: ((state: DesktopUpdateState) => void) | undefined;
     let resolveInitialUpdateState: (() => void) | undefined;
     const initialUpdateStateGate = bridgeFixture.deferInitialUpdateState
       ? new Promise<void>((resolve) => { resolveInitialUpdateState = resolve; })
@@ -124,7 +128,7 @@ export async function installMockDesktopBridge(
       },
       emit(state: Record<string, unknown>) {
         updateState = structuredClone(state);
-        for (const listener of updateListeners) listener(structuredClone(updateState));
+        for (const listener of updateListeners) listener(wireState(updateState));
       }
     };
     let workspaceFileState: WorkspaceFilePersistedState = { version: 1 as const, workspaces: [] };
@@ -400,27 +404,27 @@ export async function installMockDesktopBridge(
             workspaceEntryTest.trashes.push(structuredClone(entry));
             return true;
           },
-          getUpdateState: async () => { await initialUpdateStateGate; return structuredClone(updateState); },
+          getUpdateState: async () => { await initialUpdateStateGate; return wireState(updateState); },
           checkForUpdates: async () => {
             updateTest.checks += 1;
             updateState = { phase: "available", channel: "unsigned-preview", currentVersion: "0.1.0-alpha.1", version: "0.1.0-alpha.2", artifactName: "Pi-67-Desktop-0.1.0-alpha.2-mac-arm64-unsigned-preview.zip", artifactBytes: 104_857_600, automaticChecks: true, checkedAt: "2026-08-03T08:00:00.000Z" };
-            for (const listener of updateListeners) listener(structuredClone(updateState));
-            return structuredClone(updateState);
+            for (const listener of updateListeners) listener(wireState(updateState));
+            return wireState(updateState);
           },
           startUpdate: async () => {
             updateTest.starts += 1;
             updateState = { phase: "downloading", channel: "unsigned-preview", currentVersion: "0.1.0-alpha.1", version: "0.1.0-alpha.2", artifactName: "Pi-67-Desktop-0.1.0-alpha.2-mac-arm64-unsigned-preview.zip", artifactBytes: 104_857_600, transferred: 52_428_800, percent: 50, automaticChecks: true, checkedAt: "2026-08-03T08:00:00.000Z" };
-            for (const listener of updateListeners) listener(structuredClone(updateState));
-            return new Promise<Record<string, unknown>>((resolve) => { finishUpdate = resolve; });
+            for (const listener of updateListeners) listener(wireState(updateState));
+            return new Promise<DesktopUpdateState>((resolve) => { finishUpdate = resolve; });
           },
           cancelUpdate: async () => {
             updateTest.cancellations += 1;
             updateState = { phase: "available", channel: "unsigned-preview", currentVersion: "0.1.0-alpha.1", version: "0.1.0-alpha.2", artifactName: "Pi-67-Desktop-0.1.0-alpha.2-mac-arm64-unsigned-preview.zip", artifactBytes: 104_857_600, automaticChecks: true, checkedAt: "2026-08-03T08:00:00.000Z" };
-            for (const listener of updateListeners) listener(structuredClone(updateState));
-            finishUpdate?.(structuredClone(updateState)); finishUpdate = undefined;
-            return structuredClone(updateState);
+            for (const listener of updateListeners) listener(wireState(updateState));
+            finishUpdate?.(wireState(updateState)); finishUpdate = undefined;
+            return wireState(updateState);
           },
-          onUpdateStateChanged: (listener: (state: unknown) => void) => {
+          onUpdateStateChanged: (listener: (state: DesktopUpdateState) => void) => {
             updateListeners.add(listener);
             return () => { updateListeners.delete(listener); };
           },

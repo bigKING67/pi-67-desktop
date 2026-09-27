@@ -6,6 +6,7 @@ import type {
   ComposerDraftStateSnapshot,
   DesktopCapabilitySnapshot,
   DesktopAgentHostFailureState,
+  DesktopUpdateState,
   DesktopAgentHostStartupState,
   DesktopPlatformInfo,
   DesktopRecoverySnapshot,
@@ -322,12 +323,12 @@ const systemBridge = {
   verifyBrowser67Extension: (options: { startHub: boolean }): Promise<DesktopCapabilitySnapshot> => (
     ipcRenderer.invoke("pi67:browser67-extension-verify", options)
   ),
-  getUpdateState: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-state"),
-  checkForUpdates: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-check"),
-  startUpdate: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-start"),
-  cancelUpdate: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-cancel"),
-  onUpdateStateChanged: (listener: (state: unknown) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, state: unknown) => listener(state);
+  getUpdateState: (): Promise<DesktopUpdateState> => ipcRenderer.invoke("pi67:update-state"),
+  checkForUpdates: (): Promise<DesktopUpdateState> => ipcRenderer.invoke("pi67:update-check"),
+  startUpdate: (): Promise<DesktopUpdateState> => ipcRenderer.invoke("pi67:update-start"),
+  cancelUpdate: (): Promise<DesktopUpdateState> => ipcRenderer.invoke("pi67:update-cancel"),
+  onUpdateStateChanged: (listener: (state: DesktopUpdateState) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: DesktopUpdateState) => listener(state);
     ipcRenderer.on("pi67:update-state-changed", handler);
     return () => ipcRenderer.removeListener("pi67:update-state-changed", handler);
   },

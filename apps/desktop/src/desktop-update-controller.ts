@@ -1,3 +1,4 @@
+import type { DesktopUpdateState } from "@pi67/protocol";
 import type { UnsignedUpdateDownloadProgress, VerifiedUnsignedUpdateDownload } from "./unsigned-update-download.js";
 import { downloadUnsignedUpdate } from "./unsigned-update-download.js";
 import { installUnsignedUpdate } from "./unsigned-update-installer.js";
@@ -12,32 +13,13 @@ import {
 export const AUTOMATIC_UPDATE_STARTUP_DELAY_MS = 10_000;
 export const AUTOMATIC_UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1_000;
 
-interface UpdateMetadata {
-  readonly channel: typeof UNSIGNED_PREVIEW_CHANNEL;
-  readonly currentVersion: string;
-  readonly automaticChecks: boolean;
-  readonly checkedAt?: string;
-}
+export type { DesktopUpdateState };
 
-type DesktopUpdateStateCore =
-  | { readonly phase: "checking" | "current" | "idle" }
-  | {
-      readonly phase: "available" | "installing";
-      readonly version: string;
-      readonly artifactName: string;
-      readonly artifactBytes: number;
-    }
-  | {
-      readonly phase: "downloading";
-      readonly version: string;
-      readonly artifactName: string;
-      readonly artifactBytes: number;
-      readonly transferred: number;
-      readonly percent: number;
-  }
-  | { readonly phase: "disabled" | "error"; readonly detail: string };
-
-export type DesktopUpdateState = UpdateMetadata & DesktopUpdateStateCore;
+type UpdateMetadataKey = "channel" | "currentVersion" | "automaticChecks" | "checkedAt";
+// Phase-specific fields of the protocol-owned state; metadata is added by #withMetadata.
+type DesktopUpdateStateCore = DesktopUpdateState extends infer State
+  ? State extends DesktopUpdateState ? Omit<State, UpdateMetadataKey> : never
+  : never;
 
 interface DesktopUpdateControllerOptions {
   currentVersion: string;
@@ -283,7 +265,7 @@ export class DesktopUpdateController {
       currentVersion: this.#options.currentVersion,
       automaticChecks: this.#options.packaged,
       ...(checkedAt === undefined ? {} : { checkedAt: new Date(checkedAt).toISOString() })
-    } as DesktopUpdateState;
+    } satisfies DesktopUpdateState;
   }
 
   #boundedError(error: unknown): string {

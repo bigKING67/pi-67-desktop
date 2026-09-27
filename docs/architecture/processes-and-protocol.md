@@ -14,7 +14,9 @@ Electron Main
 
 Main 创建 `MessageChannelMain`，把一端交给 Agent Host，另一端经 Preload 转给 renderer。
 Agent 消息不经过 IPC invoke、HTTP 或 WebSocket。Preload 的 invoke API 只用于文件夹选择、
-诊断保存、通知、外部链接和更新等系统能力。
+诊断保存、通知、外部链接和更新等系统能力。更新状态（`pi67:update-*` 结果与 `pi67:update-state-changed`）
+由 `@pi67/protocol` 的 `DesktopUpdateStateSchema` 定义并纳入 protocol revision；Main 按该类型构造，renderer 用
+`parseDesktopUpdateState` 校验后才使用。
 
 Renderer loads the protocol Port client and its validation schemas only after an
 exact-source/origin Preload handoff. Loading is generation-bound: a replaced or

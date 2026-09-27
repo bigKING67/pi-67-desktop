@@ -24,6 +24,7 @@ import {
   RepositorySubmoduleInitializationRequestSchema,
   RepositorySubmoduleInitializationResultSchema
 } from "./repository-environment-schema.js";
+import { DesktopUpdateStateSchema } from "./desktop-update-state.js";
 import {
   AgentHostAttachPortMessageSchema,
   AgentHostReadyMessageSchema,
@@ -62,6 +63,7 @@ export function canonicalProtocolRevisionMaterial(): string {
     },
     events: EventPayloadSchemas,
     desktop: {
+      updateState: DesktopUpdateStateSchema,
       localMemoryActivation: { request: LocalMemoryActivationRequestSchema, snapshot: LocalMemoryActivationSnapshotSchema, healthCheck: LocalMemoryHealthCheckSchema },
       localMemoryRuntime: { status: LocalMemoryRuntimeStatusSchema, installResult: LocalMemoryRuntimeInstallResultSchema },
       localMemorySettings: { request: LocalMemorySettingsRequestSchema, snapshot: LocalMemorySettingsSnapshotSchema,

@@ -30,6 +30,7 @@ export * from "./prompt-text-limits.js";
 export * from "./runtime-diagnostics-contract.js";
 export * from "./runtime-diagnostics.js";
 export * from "./supervisor-messages.js";
+export * from "./desktop-update-state.js";
 export * from "./workspace-file-schemas.js";
 export * from "./worktree-environment.js";
 export * from "./worktree-creation-contract.js";
