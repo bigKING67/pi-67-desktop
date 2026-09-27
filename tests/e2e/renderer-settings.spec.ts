@@ -376,7 +376,7 @@ test("uses compact grouped navigation and real Settings search", async ({ page }
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
   const search = settings.getByRole("searchbox", { name: "搜索设置分类" });
 
-  for (const group of ["通用", "AI 配置", "连接与集成", "系统与支持"]) {
+  for (const group of ["通用", "模型与记忆", "能力与指令", "连接与集成", "系统与支持"]) {
     await expect(navigation.getByRole("group", { name: group, exact: true })).toBeVisible();
   }
   await expect(settings.locator("aside img")).toHaveCount(0);

@@ -40,7 +40,7 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   await categoryTrigger.click();
   const categoryMenu = page.getByRole("menu", { name: "选择设置分类" });
   await expect(categoryMenu).toBeVisible();
-  for (const group of ["通用", "AI 配置", "连接与集成", "系统与支持"]) {
+  for (const group of ["通用", "模型与记忆", "能力与指令", "连接与集成", "系统与支持"]) {
     await expect(categoryMenu.getByText(group, { exact: true })).toBeVisible();
   }
   const categoryPopover = page.getByRole("dialog", { name: "选择设置分类" });
@@ -110,7 +110,7 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);
 
   await selectMobileSettingsSection(settings, page, "用量分析");
-  await expect(settings.getByRole("heading", { name: "Pi JSONL 用量分析", exact: true })).toBeVisible();
+  await expect(settings.getByRole("heading", { name: "当前工作区用量", exact: true })).toBeVisible();
   await expect(settings.getByRole("group", { name: "统计窗口" })).toBeVisible();
   await expect(settings.getByRole("button", { name: "重建", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);

@@ -38,7 +38,7 @@ import {
 } from "./SettingsPrimitives.js";
 import styles from "./ContextMemorySettings.module.css";
 import tabStyles from "./SettingsPrimitives.module.css";
-import { useSettingsDraftRegistration } from "./SettingsDraftGuard.js";
+import { useSettingsDraftRegistration, useSettingsNavigation } from "./SettingsDraftGuard.js";
 import { messages } from "../localization/message-catalog.js";
 import { LocalMemoryModelSettings } from "./LocalMemoryModelSettings.js";
 import { LegacyMemoryServiceSettings } from "./LegacyMemoryServiceSettings.js";
@@ -61,6 +61,9 @@ const PRIVACY_MODES: Array<{ id: MemoryPrivacyMode; label: string; detail: strin
 ];
 
 export function ContextMemorySettings() {
+  const navigate = useSettingsNavigation();
+  const subpage = useWorkbenchStore(state => state.settingsSubpage);
+  const [selectedTab, setSelectedTab] = useState<string>("privacy");
   const workspaceId = useWorkbenchStore((state) => state.currentWorkspaceId);
   const [overview, setOverview] = useState<ContextMemoryOverview>();
   const [legacyChecked, setLegacyChecked] = useState(false);
@@ -218,13 +221,20 @@ export function ContextMemorySettings() {
   const changed = !!draft && !!overview && configurationChanged(draft, overview.configuration);
   useSettingsDraftRegistration({
     dirty: changed,
-    busy: busy !== undefined,
+    busy: busy === "save" || busy === "bind",
     subject: "上下文与记忆设置",
     discard: () => setDraft(overview?.configuration)
   });
 
+  useEffect(() => {
+    if (!overview || subpage !== "enterprise") return;
+    setSelectedTab("enterprise");
+    rendererWorkbenchStore.getState().selectSettingsSection("context-memory");
+    requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-settings-team-tab]')?.focus());
+  }, [overview, subpage]);
+
   if (!draft || !overview) {
-    return <div className={styles.workspace}><SettingsPageHeader title={messages.settings.sections.contextMemory.label} description={messages.settings.sections.contextMemory.summary} /><SettingsNotice tone={error ? "danger" : "info"}>{error ?? "正在读取记忆设置…"}</SettingsNotice></div>;
+    return <div className={styles.workspace}><SettingsPageHeader title={messages.settings.sections.contextMemory.label} description={messages.settings.sections.contextMemory.summary} /><SettingsNotice tone={error ? "danger" : "info"} actions={error ? <Button className="secondary-button" isDisabled={busy !== undefined} onPress={() => void refresh()}>重试读取设置</Button> : undefined}>{error ?? "正在读取记忆设置…"}</SettingsNotice></div>;
   }
 
   return <div className={styles.workspace} data-testid="context-memory-settings">
@@ -237,13 +247,14 @@ export function ContextMemorySettings() {
     {overview.status.conflictExtensions.length > 0 ? <SettingsNotice tone="danger">
       检测到冲突的记忆扩展：{overview.status.conflictExtensions.join("、")}。这些扩展已停止加载；对话仍可继续，已有记忆不会删除。
     </SettingsNotice> : null}
-    <Tabs className={styles.tabs!} defaultSelectedKey="privacy">
+    <Tabs className={styles.tabs!} selectedKey={selectedTab} onSelectionChange={key => setSelectedTab(String(key))}>
       <TabList aria-label="上下文与记忆设置" className={tabStyles.tabList!}>
         <Tab className={tabStyles.tab!} id="privacy">记忆与隐私</Tab>
-        <Tab className={tabStyles.tab!} id="enterprise" isDisabled={modelPending}>团队经验</Tab>
+        <Tab className={tabStyles.tab!} id="enterprise" data-settings-team-tab isDisabled={modelPending}>团队经验</Tab>
         <Tab className={tabStyles.tab!} id="advanced" isDisabled={modelPending}>高级</Tab>
       </TabList>
       <TabPanel className={tabStyles.tabPanel!} id="privacy">
+        <LocalMemoryModelSettings onPendingChange={setModelPending}>
         <SettingsSectionBlock title="记忆模式" description="选择默认的记忆使用方式。私人记忆保持独立，团队候选不会自动发布。">
           <RadioGroup aria-label="默认记忆模式" className={styles.privacyGroup!} value={draft.defaultPrivacyMode} isDisabled={busy !== undefined}
             onChange={(value) => {
@@ -257,7 +268,7 @@ export function ContextMemorySettings() {
           </RadioGroup>
           <p className={styles.note}>保存后，只读或关闭会在当前会话的下一次处理边界生效；重新开启学习需要新建会话。</p>
         </SettingsSectionBlock>
-        <LocalMemoryModelSettings onPendingChange={setModelPending} />
+        </LocalMemoryModelSettings>
       </TabPanel>
       <TabPanel className={tabStyles.tabPanel!} id="enterprise">
     <SettingsSectionBlock title="New Money" description="登录只增加团队共享召回和候选提交流程，不会上传本地私人记忆。">
@@ -269,8 +280,8 @@ export function ContextMemorySettings() {
             ? `${account.identity.displayName ?? account.identity?.userId ?? "New Money 用户"} · 本地私人记忆保持独立`
             : "连接 New Money 后，可选择团队并为当前工作区绑定项目。"}
           value={account.identity ? identityLabel(account.identity.state) : "状态待确认"}
-          actions={<Button className="secondary-button" isDisabled={busy !== undefined || changed}
-            onPress={() => rendererWorkbenchStore.getState().openSettings("account")}>账户与登录设置</Button>}
+          actions={<Button className="secondary-button" isDisabled={busy !== undefined}
+            onPress={() => navigate("account")}>账户与登录设置</Button>}
         />
         {account.identity?.state === "signed-in" ? <SettingsRow
           title="当前团队"

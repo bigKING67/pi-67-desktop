@@ -86,7 +86,11 @@ test("memory settings preserve one draft across tabs, use keyboard radios, and g
   await expect(settings.getByLabel("OpenViking 服务地址")).toHaveCount(0);
   await settings.getByRole("tab", { name: "团队经验" }).click();
   await expect(settings.getByRole("textbox", { name: "New Money 服务地址" })).toHaveCount(0);
-  await expect(settings.getByRole("button", { name: "账户与登录设置" })).toBeDisabled();
+  const accountLink = settings.getByRole("button", { name: "账户与登录设置" });
+  await accountLink.click();
+  await expect(page.getByRole("dialog", { name: "放弃未保存的修改" })).toBeVisible();
+  await page.getByRole("button", { name: "继续编辑", exact: true }).click();
+  await expect(accountLink).toBeFocused();
   await settings.getByRole("tab", { name: "高级", exact: true }).click();
   await expect(settings.getByText("上下文参数", { exact: true })).toBeVisible();
   await expect(settings.getByRole("button", { name: "检测手动地址" })).toBeDisabled();
@@ -109,6 +113,7 @@ test("memory settings preserve one draft across tabs, use keyboard radios, and g
   await expect(settings.getByRole("button", { name: "账户与登录设置" })).toBeEnabled();
   await settings.getByRole("button", { name: "账户与登录设置" }).click();
   await expect(page.getByRole("heading", { name: "账户与数据", exact: true, level: 1 })).toBeVisible();
+  await page.locator("summary").filter({ hasText: "高级连接设置" }).click();
   await expect(page.getByRole("textbox", { name: "New Money 服务地址" })).toHaveValue(configuration.enterpriseGatewayEndpoint);
   await page.getByRole("button", { name: "返回工作台" }).click();
   await setMockAgentResponseResult(page, "context.session.commit", { kind: "accepted", operationId: "archive-test", cancellable: false });

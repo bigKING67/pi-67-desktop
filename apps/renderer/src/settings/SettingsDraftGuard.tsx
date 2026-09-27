@@ -1,3 +1,4 @@
+import type { SettingsSection } from "@pi67/domain";
 import {
   createContext,
   useContext,
@@ -45,4 +46,12 @@ export function useSettingsDraftRegistration({
       discard: () => discardRef.current()
     });
   }, [busy, dirty, register, subject]);
+}
+
+export type SettingsPageNavigation = (section: SettingsSection, subpage?: "enterprise") => void;
+export const SettingsNavigationContext = createContext<SettingsPageNavigation | undefined>(undefined);
+export function useSettingsNavigation(): SettingsPageNavigation {
+  const navigate = useContext(SettingsNavigationContext);
+  if (!navigate) throw new Error("Settings navigation requires the Settings workbench.");
+  return navigate;
 }

@@ -20,11 +20,16 @@ describe("settings navigation", () => {
         ]
       },
       {
-        label: "AI 配置",
+        label: "模型与记忆",
         items: [
           { id: "providers", label: "模型" },
-          { id: "context-memory", label: "上下文与记忆" },
           { id: "vision", label: "视觉辅助" },
+          { id: "context-memory", label: "上下文与记忆" }
+        ]
+      },
+      {
+        label: "能力与指令",
+        items: [
           { id: "extensions", label: "扩展" },
           { id: "skills", label: "技能" },
           { id: "prompts", label: "提示词模板" },

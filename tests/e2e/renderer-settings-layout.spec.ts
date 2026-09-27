@@ -7,8 +7,8 @@ const categories = ["外观", "账户与数据", "模型", "上下文与记忆",
 const wide = new Set(["模型", "扩展", "技能", "提示词模板", "工作规则", "用量分析"]);
 
 for (const theme of ["light", "dark"] as const) {
-  for (const width of [1440, 1000, 720]) {
-    test(`Settings preserve alignment and usable controls in ${theme} at ${width}px`, async ({ page }) => {
+  for (const width of [1440, 1040, 720]) {
+    test(`Settings preserve alignment and usable controls in ${theme} at ${width}px`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 1000 });
       await installMockDesktopBridge(page);
       await page.addInitScript((preference) => localStorage.setItem("pi67.themePreference", preference), theme);
@@ -51,12 +51,50 @@ for (const theme of ["light", "dark"] as const) {
         expect(Math.abs(metrics.left - left)).toBeLessThanOrEqual(1);
         expect(Math.abs(metrics.headingLeft - left)).toBeLessThanOrEqual(1);
         expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+        await page.screenshot({ path: testInfo.outputPath(`${theme}-${width}-${categories.indexOf(category)}.png`) });
         if (category === "上下文与记忆") await expect(settings.getByRole("radio")).toHaveCount(4);
         if (category === "用量分析") await expect(settings.getByText("Pi 记录 token", { exact: true })).toBeVisible();
         if (category === "账户与数据") {
+          await expect(settings.getByRole("textbox", { name: "New Money 服务地址" })).toBeHidden();
+          await settings.locator("summary").filter({ hasText: "高级连接设置" }).click();
           await expect(settings.getByRole("textbox", { name: "New Money 服务地址" })).toBeVisible();
           await expect(settings.getByRole("button", { name: "登录 New Money", exact: true })).toBeVisible();
           await expect(settings.getByRole("button", { name: "打开管理网页", exact: true })).toBeDisabled();
+        }
+        const disclosureTitles: Record<string, string> = {
+          "账户与数据": "高级连接设置", "下载源与网络": "内置工具链",
+          "运行服务": "运行机制", "关于": "技术信息"
+        };
+        const disclosureTitle = disclosureTitles[category];
+        if (disclosureTitle) {
+          const summary = settings.locator("summary").filter({ hasText: disclosureTitle });
+          const details = summary.locator("..");
+          await summary.focus();
+          if (await details.getAttribute("open") === null) await page.keyboard.press("Enter");
+          await expect(details).toHaveAttribute("open", "");
+          const address = settings.getByRole("textbox", { name: "New Money 服务地址" });
+          const originalAddress = category === "账户与数据" ? await address.inputValue() : undefined;
+          if (originalAddress !== undefined) {
+            await address.fill(`https://${"long-service-name-".repeat(8)}example.test`);
+            await expect(settings.getByRole("button", { name: "保存服务地址", exact: true })).toBeVisible();
+          }
+          await details.scrollIntoViewIfNeeded();
+          const expandedMetrics = await details.evaluate(element => {
+            const region = element.closest('[data-testid="settings-scroll-region"]')!;
+            return { scroll: element.scrollWidth, width: element.clientWidth,
+              pageScroll: region.scrollWidth, pageWidth: region.clientWidth };
+          });
+          expect(expandedMetrics.scroll).toBeLessThanOrEqual(expandedMetrics.width + 1);
+          expect(expandedMetrics.pageScroll).toBeLessThanOrEqual(expandedMetrics.pageWidth + 1);
+          await page.screenshot({ path: testInfo.outputPath(`expanded-${theme}-${width}-${categories.indexOf(category)}.png`) });
+          if (originalAddress !== undefined) {
+            await address.fill(originalAddress);
+            await expect(settings.getByRole("button", { name: "保存服务地址", exact: true })).toBeHidden();
+          }
+          await summary.focus();
+          await page.keyboard.press("Space");
+          await expect(details).not.toHaveAttribute("open");
+          await expect(summary).toBeFocused();
         }
         if (category === "下载源与网络") {
           const header = settings.getByRole("heading", { level: 1 }).locator("../..");

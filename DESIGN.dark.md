@@ -74,7 +74,7 @@ spacing, component states, and motion as `DESIGN.md`.
   low-contrast luminance fill rather than the green runtime accent, and the
   removed Settings brand/description hero must not reappear as dark-theme-only
   chrome. At narrow widths the grouped Popover uses the same raised neutral surface,
-  retains all four group labels, and remains bounded inside the viewport.
+  retains all five group labels, and remains bounded inside the viewport.
 - The right column uses the same centered `min(1120px, 100%)` document
   frame as light mode with a left-aligned 880px standard inner page or full-width
   catalog/editor/usage page, and a single vertical scroll owner. Navigation hover
@@ -270,3 +270,5 @@ and touch action visibility follow the light-mode contract.
 The file tree shares light-mode suffix-preserving filenames, compact size labels
 and hover/focus/menu action disclosure. Names retain secondary text at rest;
 full paths and file-size accessibility labels remain available.
+
+Settings V2 shares light-mode hierarchy, five groups, guarded subpage links and progressive disclosure. Advanced fields use semantic surfaces and visible focus; errors and unsaved changes cannot be hidden by disclosure. No dark-only navigation or save behavior is introduced.

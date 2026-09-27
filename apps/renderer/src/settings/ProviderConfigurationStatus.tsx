@@ -7,7 +7,8 @@ import styles from "./ProviderConfigurationPanel.module.css";
 
 export function ProviderConfigurationFiles({ snapshot }: { snapshot: PiProviderConfigurationSnapshot }) {
   const validCount = snapshot.files.filter((file) => file.valid).length;
-  const [expanded, setExpanded] = useState(snapshot.syncState === "invalid" || snapshot.diagnostics.length > 0);
+  const requiredOpen = snapshot.syncState === "invalid" || snapshot.diagnostics.length > 0;
+  const [expanded, setExpanded] = useState(false);
   return (
     <section className={styles.secondarySection}>
       <header className={styles.sectionIntro}>
@@ -23,13 +24,17 @@ export function ProviderConfigurationFiles({ snapshot }: { snapshot: PiProviderC
       ) : null}
       <details
         className={styles.fileDetails}
-        open={expanded}
-        onToggle={(event) => setExpanded(event.currentTarget.open)}
+        open={requiredOpen || expanded}
+        onToggle={(event) => {
+          if (requiredOpen && !event.currentTarget.open) event.currentTarget.open = true;
+          else setExpanded(event.currentTarget.open);
+        }}
       >
         <summary>
           <span><FileJson2 aria-hidden="true" size={15} /><strong>Pi 文件同步</strong></span>
           <em data-valid={validCount === snapshot.files.length}>{validCount}/{snapshot.files.length} 有效</em>
         </summary>
+        <p>Desktop 与 Pi TUI 共用配置 · revision {snapshot.revision.slice(0, 10)}</p>
         <div className={styles.fileList}>{snapshot.files.map((file) => (
           <div key={file.kind}>
             <FileJson2 aria-hidden="true" size={15} />
@@ -61,19 +66,20 @@ export function ProviderConfigurationStatusBar({
       {snapshot.syncState === "current"
         ? <Check aria-hidden="true" size={14} />
         : <AlertTriangle aria-hidden="true" size={14} />}
-      <strong>{snapshot.syncState === "current" ? "已与当前用户 Pi Profile 同步" : "Pi Profile 需要处理"}</strong>
-      <small>Desktop 与 Pi TUI 双向共用 · revision {snapshot.revision.slice(0, 10)}</small>
+      <strong>{snapshot.syncState === "current" ? "配置已同步" : "配置需要处理"}</strong>
+      <small>与 Pi 共用当前用户配置</small>
     </span>}
     actions={<>
       {onRefreshCatalog ? <Button
         className="secondary-button"
         isDisabled={busy || catalogBusy}
+        aria-description="重新读取可用模型目录，不保存配置或测试连接"
         onPress={onRefreshCatalog}
       >
         <RefreshCw aria-hidden="true" size={14} />
         {catalogBusy ? "刷新目录中…" : "刷新模型目录"}
       </Button> : null}
-      <Button className="secondary-button" isDisabled={busy || catalogBusy} onPress={onReload}>
+      <Button className="secondary-button" isDisabled={busy || catalogBusy} aria-description="从已保存的配置文件重新读取设置" onPress={onReload}>
         <RefreshCw aria-hidden="true" size={14} />重新加载配置
       </Button>
     </>}

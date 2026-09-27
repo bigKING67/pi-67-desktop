@@ -39,6 +39,7 @@ import { SupportDiagnosticsUploadRow } from "./SupportDiagnosticsUploadRow.js";
 import { SettingsCategoryNavigation } from "./SettingsCategoryNavigation.js";
 import {
   SettingsDraftGuardContext,
+  SettingsNavigationContext,
   combineSettingsDrafts,
   type SettingsDraftRegistration,
   type SettingsDraftRegistrar
@@ -82,15 +83,16 @@ export function SettingsWorkbench() {
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
   const visibleGroups = SETTINGS_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => matchesSettingsQuery(item, normalizedQuery))
+    items: group.label.toLocaleLowerCase("zh-CN").includes(normalizedQuery) ? group.items : group.items.filter((item) => matchesSettingsQuery(item, normalizedQuery))
   })).filter((group) => group.items.length > 0);
   const projectScopeAvailable = sectionSupportsProjectScope(activeSection);
   const [draftRegistration, setDraftRegistration] = useState<SettingsDraftRegistration>();
   const draftRegistrationRef = useRef<SettingsDraftRegistration | undefined>(undefined);
+  const navigationTrigger = useRef<HTMLElement | null>(null);
   const drafts = useRef(new Set<SettingsDraftRegistration>());
   const [pendingNavigation, setPendingNavigation] = useState<
     | { kind: "close" }
-    | { kind: "section"; section: SettingsSection }
+    | { kind: "section"; section: SettingsSection; subpage?: "enterprise" }
     | { kind: "scope"; scope: "global" | "project" }
   >();
 
@@ -116,14 +118,16 @@ export function SettingsWorkbench() {
       store.setSettingsScope(navigation.scope);
       return;
     }
-    store.selectSettingsSection(navigation.section);
+    store.selectSettingsSection(navigation.section, navigation.subpage);
     if (!sectionSupportsProjectScope(navigation.section)) store.setSettingsScope("global");
   }, []);
 
   const requestNavigation = (navigation: NonNullable<typeof pendingNavigation>) => {
-    if (navigation.kind === "section" && navigation.section === activeSection) return;
+    if (draftRegistrationRef.current?.busy) return;
+    if (navigation.kind === "section" && navigation.section === activeSection && !navigation.subpage) return;
     if (navigation.kind === "scope" && navigation.scope === scope) return;
     if (draftRegistrationRef.current?.dirty) {
+      navigationTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setPendingNavigation(navigation);
       return;
     }
@@ -151,6 +155,7 @@ export function SettingsWorkbench() {
     if (!scrollRegion) return;
     scrollRegion.scrollTop = 0;
     scrollRegion.scrollLeft = 0;
+    scrollRegion.querySelector<HTMLElement>("h1")?.focus({ preventScroll: true });
   }, [activeSection]);
 
   useEffect(() => {
@@ -235,7 +240,9 @@ export function SettingsWorkbench() {
             /> : null}
             <div className={styles.pageContent}>
               <SettingsDraftGuardContext.Provider value={registerDraft}>
-                <SettingsSectionContent section={activeSection} />
+                <SettingsNavigationContext.Provider value={(nextSection, subpage) => requestNavigation({ kind: "section", section: nextSection, ...(subpage ? { subpage } : {}) })}>
+                  <SettingsSectionContent section={activeSection} />
+                </SettingsNavigationContext.Provider>
               </SettingsDraftGuardContext.Provider>
             </div>
             </div>
@@ -247,7 +254,7 @@ export function SettingsWorkbench() {
       busy={draftRegistration?.busy ?? false}
       open={pendingNavigation !== undefined}
       subject={draftRegistration?.subject ?? "当前设置"}
-      onCancel={() => setPendingNavigation(undefined)}
+      onCancel={() => { setPendingNavigation(undefined); requestAnimationFrame(() => navigationTrigger.current?.focus()); }}
       onDiscard={() => {
         const navigation = pendingNavigation;
         draftRegistrationRef.current?.discard();
@@ -363,7 +370,7 @@ function UpdateSettings() {
         <SettingsRow
           leading={<DownloadCloud aria-hidden="true" size={17} />}
           title="自动检查更新"
-          description="打包版启动 10 秒后检查固定 R2 清单；持续运行时每天最多检查一次，点击前不会下载或安装。"
+          description="启动后自动检查，每天最多一次；下载和安装均由你确认。"
           value={initialized ? (update.automaticChecks ? "已开启" : "仅打包版可用") : "正在读取…"}
         />
         <SettingsRow

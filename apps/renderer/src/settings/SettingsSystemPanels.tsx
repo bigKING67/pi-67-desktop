@@ -7,6 +7,7 @@ import { useShellStore } from "../shell/shell-store.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import styles from "./SettingsSystemPanels.module.css";
 import {
+  SettingsDetails,
   SettingsNotice,
   SettingsRow,
   SettingsRows,
@@ -27,15 +28,19 @@ export function RuntimeSettings() {
           description="正在执行、等待审批或等待交互的独立会话任务都会占用名额；任务内部的子代理不单独占用。"
           value={`${runningCount} / ${MAX_RUNNING_TASKS}`}
         />
-        <SettingsRow title="可浏览的本地会话" description="会话目录按需加载，Pi JSONL 始终是唯一真源。" value="不设上限" />
-        <SettingsRow title="单个会话写入实例" description="同一 Session 路径不会同时绑定两个 live writer。" value="1 个" />
         <SettingsRow
           leading={<Stethoscope aria-hidden="true" size={17} />}
           title="恢复与诊断"
-          description="检查运行环境、Workspace 身份、Session 恢复、Writer Lease 和附件暂存状态。"
+          description="检查运行环境、工作区与会话恢复；遇到运行异常时从这里开始。"
           actions={<Button aria-label="恢复与诊断" className="secondary-button" onPress={() => setDoctorDialogOpen(true)}>打开诊断</Button>}
         />
       </SettingsRows>
+      <SettingsDetails title="运行机制" summary="会话与写入规则">
+        <SettingsRows>
+        <SettingsRow title="可浏览的本地会话" description="会话目录按需加载，Pi JSONL 始终是唯一真源。" value="不设上限" />
+        <SettingsRow title="单个会话写入实例" description="同一 Session 路径不会同时绑定两个 live writer。" value="1 个" />
+        </SettingsRows>
+      </SettingsDetails>
     </SettingsSectionBlock>
   );
 }
@@ -75,11 +80,15 @@ export function AboutSettings() {
         <SettingsRow title="操作系统" value={platformLabel(platformInfo?.platform)} />
         <SettingsRow title="处理器架构" value={architectureLabel(platformInfo?.architecture)} />
         <SettingsRow title="发布与更新" value="Internal Unsigned · 点击更新" />
+      </SettingsRows>
+      <SettingsDetails title="技术信息" summary="运行组件、会话格式与安全边界">
+        <SettingsRows>
         <SettingsRow title="Agent 运行组件" value="@earendil-works/pi-coding-agent" />
         <SettingsRow title="会话真源" value="Pi JSONL" />
         <SettingsRow title="渲染进程" value="Electron sandbox + contextIsolation" />
         <SettingsRow title="网络边界" value="生产环境无本地 HTTP 服务或业务网络监听" />
-      </SettingsRows>
+        </SettingsRows>
+      </SettingsDetails>
     </SettingsSectionBlock>
   );
 }

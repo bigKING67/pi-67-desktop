@@ -56,6 +56,7 @@ export function createRendererWorkbenchStore() {
         selectedSurface,
         settingsReturnSurface: undefined,
         settingsSection: state.settings.section,
+        settingsSubpage: undefined,
         settingsScope: state.settings.scope,
         settingsWorkspaceId: state.settings.workspaceId && workspaces[state.settings.workspaceId]
           ? state.settings.workspaceId
@@ -309,10 +310,11 @@ export function createRendererWorkbenchStore() {
       return runningCount >= MAX_RUNNING_TASKS ? "run-limit" : "allowed";
     },
 
-    openSettings(section) {
+    openSettings(section, subpage) {
       const current = get();
       set({
         settingsSection: section ?? current.settingsSection,
+        settingsSubpage: section === "context-memory" ? subpage : undefined,
         settingsWorkspaceId: current.settingsScope === "project" ? current.currentWorkspaceId : undefined,
         settingsReturnSurface: current.selectedSurface?.kind === "settings"
           ? current.settingsReturnSurface
@@ -321,8 +323,8 @@ export function createRendererWorkbenchStore() {
       });
     },
 
-    selectSettingsSection(settingsSection) {
-      set({ settingsSection });
+    selectSettingsSection(settingsSection, subpage) {
+      set({ settingsSection, settingsSubpage: settingsSection === "context-memory" ? subpage : undefined });
     },
 
     setSettingsScope(settingsScope) {
@@ -342,7 +344,8 @@ export function createRendererWorkbenchStore() {
         : fallbackSurface(current.currentWorkspaceId, current.runtimeTaskOrder, current.tasks);
       set({
         selectedSurface: current.selectedSurface?.kind === "settings" ? returnSurface : current.selectedSurface,
-        settingsReturnSurface: undefined
+        settingsReturnSurface: undefined,
+        settingsSubpage: undefined
       });
     },
 
@@ -385,6 +388,7 @@ function emptyWorkbenchState() {
     selectedSurface: undefined,
     settingsReturnSurface: undefined,
     settingsSection: "general" as const,
+    settingsSubpage: undefined,
     settingsScope: "global" as const,
     settingsWorkspaceId: undefined
   };

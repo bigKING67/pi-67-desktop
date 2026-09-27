@@ -1,5 +1,5 @@
 import { ArrowLeft } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "react-aria-components";
 import styles from "./SettingsPrimitives.module.css";
 
@@ -11,7 +11,7 @@ export function SettingsPageHeader({ title, description, actions }: {
   return (
     <header className={styles.pageHeader}>
       <span className={styles.pageHeading}>
-        <h1>{title}</h1>
+        <h1 tabIndex={-1}>{title}</h1>
         <p>{description}</p>
       </span>
       {actions ? <div className={styles.pageActions}>{actions}</div> : null}
@@ -29,7 +29,7 @@ export function SettingsSectionBlock({ title, description, actions, children, cl
   return (
     <section className={`${styles.section} ${className ?? ""}`}>
       <header className={styles.sectionHeader}>
-        <span><h3>{title}</h3><p>{description}</p></span>
+        <span><h2>{title}</h2><p>{description}</p></span>
         {actions ? <div className={styles.sectionActions}>{actions}</div> : null}
       </header>
       {children}
@@ -159,4 +159,18 @@ export function SettingsNotice({ tone = "info", children, actions, className, te
       {actions ? <div className={styles.noticeActions}>{actions}</div> : null}
     </div>
   );
+}
+
+export function SettingsDetails({ title, summary, requiredOpen = false, children }: {
+  title: string; summary?: string; requiredOpen?: boolean; children: ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  return <details className={styles.details} open={requiredOpen || expanded}
+    onToggle={event => {
+      if (requiredOpen && !event.currentTarget.open) event.currentTarget.open = true;
+      else setExpanded(event.currentTarget.open);
+    }}>
+    <summary><strong>{title}</strong>{summary ? <span>{summary}</span> : null}</summary>
+    <div className={styles.detailsContent}>{children}</div>
+  </details>;
 }

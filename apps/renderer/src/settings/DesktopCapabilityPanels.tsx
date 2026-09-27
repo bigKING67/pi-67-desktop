@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 import styles from "./DesktopCapabilityPanels.module.css";
 import {
+  SettingsDetails,
   SettingsNotice,
   SettingsRow,
   SettingsRows,
@@ -53,12 +54,11 @@ export function Browser67IntegrationPanel() {
       actions={<Button className="secondary-button" isDisabled={phase === "loading" || operation !== undefined} onPress={() => void refresh()}>
         <RefreshCw aria-hidden="true" size={14} />刷新
       </Button>}
-      description="内置表示源码与技能随应用提供，不代表浏览器扩展、依赖或真实受管浏览器已经就绪。"
+      description="连接 Chrome 或 Edge，让 Agent 在受管浏览器中执行任务。安装后需验证真实连接。"
       title="browser67"
     >
       {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
       <SettingsRows>
-        <SettingsRow leading={<span className={styles.status} data-status="ready" />} title="源码" description="固定第一方快照随 Desktop 提供。" value="内置第一方" />
         <SettingsRow
           leading={<span className={styles.status} data-status={integration?.dependencyState === "prepared" ? "ready" : integration?.dependencyState === "failed" ? "failed" : "warning"} />}
           title="运行依赖"
@@ -93,6 +93,9 @@ export function Browser67IntegrationPanel() {
           </>}
         />
       </SettingsRows>
+      <SettingsDetails title="组件来源" summary="随应用提供">
+        <SettingsRows><SettingsRow title="源码与技能" description="固定第一方快照随应用提供；与依赖、扩展安装及连接状态分别检查。" value="内置第一方" /></SettingsRows>
+      </SettingsDetails>
     </SettingsSectionBlock>
     <Browser67ExtensionInstallDialog
       error={error}

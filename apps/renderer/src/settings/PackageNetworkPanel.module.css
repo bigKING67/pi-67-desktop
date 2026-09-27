@@ -9,19 +9,6 @@
   min-width: 0;
 }
 
-.readiness {
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  color: var(--danger);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-}
-
-.readiness[data-ready="true"] {
-  color: var(--success);
-}
-
 .form {
   display: grid;
   overflow: hidden;

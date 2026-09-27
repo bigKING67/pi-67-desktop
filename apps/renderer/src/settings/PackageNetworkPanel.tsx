@@ -12,6 +12,7 @@ import { Button } from "react-aria-components";
 import styles from "./PackageNetworkPanel.module.css";
 import { messages } from "../localization/message-catalog.js";
 import {
+  SettingsDetails,
   SettingsNotice,
   SettingsPageHeader,
   SettingsRow,
@@ -132,20 +133,6 @@ export function PackageNetworkPanel() {
       />
     <div className={styles.stack}>
       <SettingsSectionBlock
-        actions={<span className={styles.readiness} data-ready={snapshot?.toolchain.ready ?? false}>
-            {snapshot?.toolchain.ready ? "就绪" : "不可用"}
-          </span>}
-        title="私有工具链"
-        description="Node、npm 与 Git 随 Desktop 提供，不依赖系统安装，也不会修改系统工具链。"
-      >
-        <SettingsRows>
-          <SettingsRow title="Node" value={snapshot?.toolchain.nodeVersion ?? "-"} />
-          <SettingsRow title="npm" value={snapshot?.toolchain.npmVersion ?? "-"} />
-          <SettingsRow title="Git" value={snapshot?.toolchain.gitVersion ?? "-"} />
-        </SettingsRows>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock
         actions={<>
           <Button className="secondary-button" isDisabled={!validDraft || busy} onPress={() => void probe()}><RefreshCw aria-hidden="true" size={14} />{phase === "probing" ? "检测中…" : "检测全部源"}</Button>
           <Button className="secondary-button" isDisabled={busy} onPress={() => setResetOpen(true)}><RotateCcw aria-hidden="true" size={14} />恢复默认</Button>
@@ -204,6 +191,14 @@ export function PackageNetworkPanel() {
           />)}
         </SettingsRows>
       </SettingsSectionBlock>
+      <SettingsDetails title="内置工具链" summary={snapshot ? (snapshot.toolchain.ready ? "已就绪 · Node、npm、Git" : "工具链不可用") : "正在读取…"} requiredOpen={snapshot !== undefined && !snapshot.toolchain.ready}>
+        <SettingsRows>
+          <SettingsRow title="Node" value={snapshot?.toolchain.nodeVersion ?? "-"} />
+          <SettingsRow title="npm" value={snapshot?.toolchain.npmVersion ?? "-"} />
+          <SettingsRow title="Git" value={snapshot?.toolchain.gitVersion ?? "-"} />
+        </SettingsRows>
+        <p>工具随应用提供，不依赖系统安装，也不会修改系统工具链。</p>
+      </SettingsDetails>
     </div>
     </div>
     <SettingsDestructiveActionDialog

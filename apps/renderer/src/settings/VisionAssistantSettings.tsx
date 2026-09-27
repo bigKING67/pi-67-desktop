@@ -1,8 +1,8 @@
+import { useSettingsNavigation } from "./SettingsDraftGuard.js";
 import type { PiProviderConfigurationInput } from "@pi67/protocol";
 import { useEffect } from "react";
 import { Button } from "react-aria-components";
 import {
-  rendererWorkbenchStore,
   useWorkbenchStore
 } from "../workbench/workbench-store.js";
 import {
@@ -23,6 +23,7 @@ import { SettingsNotice } from "./SettingsPrimitives.js";
 import styles from "./VisionAssistantSettings.module.css";
 
 export function VisionAssistantSettings() {
+  const navigate = useSettingsNavigation();
   const scope = useWorkbenchStore((state) => state.settingsScope);
   const workspaceId = useWorkbenchStore((state) => state.settingsWorkspaceId);
   const snapshot = useProviderConfigurationStore((state) => state.snapshot);
@@ -109,6 +110,6 @@ export function VisionAssistantSettings() {
       store.startProvider(preset);
       store.requestProviderEditor(GLOBAL_PROVIDER_CONFIGURATION_KEY, "configuration");
     }
-    rendererWorkbenchStore.getState().selectSettingsSection("providers");
+    navigate("providers");
   }
 }

@@ -1,6 +1,6 @@
 import { Download, Sparkles } from "lucide-react";
 import { Button } from "react-aria-components";
-import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import { useSettingsNavigation } from "./SettingsDraftGuard.js";
 import { SettingsNotice } from "./SettingsPrimitives.js";
 import styles from "./LarkCliRequiredNotice.module.css";
 
@@ -9,6 +9,7 @@ export function LarkCliRequiredNotice({ canInstall, installing, onInstall }: {
   installing: boolean;
   onInstall: () => void;
 }) {
+  const navigate = useSettingsNavigation();
   return <SettingsNotice
     actions={<span className={styles.actions}>
       <Button
@@ -22,7 +23,7 @@ export function LarkCliRequiredNotice({ canInstall, installing, onInstall }: {
       <Button
         className="secondary-button"
         isDisabled={installing}
-        onPress={() => rendererWorkbenchStore.getState().openSettings("skills")}
+        onPress={() => navigate("skills")}
       >
         <Sparkles aria-hidden="true" size={14} />
         前往技能

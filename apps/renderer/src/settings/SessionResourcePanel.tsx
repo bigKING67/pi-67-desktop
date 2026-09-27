@@ -13,6 +13,7 @@ import { useSessionProjectionStore } from "../session/session-projection-store.j
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import styles from "./SettingsWorkbench.module.css";
 import {
+  SettingsDetails,
   SettingsNotice,
   SettingsRow,
   SettingsRows,
@@ -72,7 +73,7 @@ export function SessionResourcePanel({
           description={resourceMetadata(resource, scope)}
           value={resourceStatusLabel(resource.status)}
         >
-          {resource.path ? <code className={styles.resourcePath} title={resource.path}>{resource.path}</code> : null}
+          {resource.path ? <SettingsDetails title="资源路径"><code className={styles.resourcePath}>{resource.path}</code></SettingsDetails> : null}
         </SettingsRow>
       ))}</SettingsRows> : resources === undefined ? (
         <SettingsNotice>当前 Pi 会话尚未就绪；请返回工作台打开对话后再查看或重新加载资源。</SettingsNotice>

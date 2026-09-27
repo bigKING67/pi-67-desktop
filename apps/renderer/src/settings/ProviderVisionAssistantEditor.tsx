@@ -1,3 +1,4 @@
+import { useSettingsDraftRegistration } from "./SettingsDraftGuard.js";
 import type {
   PiProviderConfigurationInput,
   PiProviderConfigurationSnapshot
@@ -74,6 +75,7 @@ export function ProviderVisionAssistantEditor({
   onUsePreset?: (preset: PiProviderConfigurationInput) => void;
 }) {
   const [saving, setSaving] = useState(false);
+  useSettingsDraftRegistration({ dirty: false, busy: saving, subject: "视觉辅助", discard: () => {} });
   const imageModels = useMemo(() => snapshot.providers
     .filter((provider) => provider.configured)
     .flatMap((provider) => (
@@ -192,7 +194,7 @@ export function ProviderVisionAssistantEditor({
           {VISION_PROVIDER_PRESETS.map((preset, index) => (
             <article key={preset.id}>
               <span><em>{index + 1}</em><strong>{preset.title}</strong><small>{preset.detail}</small></span>
-              <Button className="secondary-button" onPress={() => onUsePreset(clonePreset(preset.provider))}>
+              <Button className="secondary-button" isDisabled={saving} onPress={() => onUsePreset(clonePreset(preset.provider))}>
                 <Plus aria-hidden="true" size={13} />使用预设
               </Button>
             </article>

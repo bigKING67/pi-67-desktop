@@ -16,7 +16,8 @@ export const zhCNMessages = {
   settings: {
     groups: {
       application: "通用",
-      pi: "AI 配置",
+      pi: "模型与记忆",
+      resources: "能力与指令",
       capabilities: "连接与集成",
       systemSupport: "系统与支持"
     },

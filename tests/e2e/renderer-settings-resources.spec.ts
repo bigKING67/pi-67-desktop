@@ -250,6 +250,8 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   await expect(ruleWorkspace.getByRole("list", { name: "New Money 内置规则" })).toBeVisible();
 
   await navigation.getByRole("button", { name: "下载源与网络", exact: true }).click();
+  await expect(settings.getByText("24.18.0", { exact: true })).toBeHidden();
+  await settings.locator("summary").filter({ hasText: "内置工具链" }).click();
   for (const version of ["24.18.0", "12.0.1", "2.53.0"]) {
     await expect(settings.getByText(version, { exact: true })).toBeVisible();
   }
@@ -274,6 +276,8 @@ test("keeps browser integration as the only first-party connection surface", asy
   await expect(settings.getByText("Tavily Bridge", { exact: true })).toHaveCount(0);
   await navigation.getByRole("button", { name: "浏览器集成", exact: true }).click();
   await expect(settings.getByRole("heading", { name: "浏览器集成", exact: true })).toBeVisible();
+  await expect(settings.getByText("内置第一方", { exact: true })).toBeHidden();
+  await settings.locator("summary").filter({ hasText: "组件来源" }).click();
   await expect(settings.getByText("内置第一方", { exact: true })).toBeVisible();
   await expect(settings.getByText("尚未检查", { exact: true })).toBeVisible();
   await expect(settings.getByRole("button", { name: "安装浏览器扩展", exact: true })).toBeVisible();

@@ -92,8 +92,8 @@ test("organizes Provider task views while search and drill-down preserve the act
   const customTab = panel.getByRole("tab", { name: "自定义 1" });
 
   await expect(panel.getByText("Desktop 与 Pi TUI 双向共用当前用户的 Pi Profile", { exact: false })).toBeVisible();
-  await expect(panel.getByText("已与当前用户 Pi Profile 同步", { exact: true })).toBeVisible();
-  await expect(panel.getByText(/Desktop 与 Pi TUI 双向共用 · revision/u)).toBeVisible();
+  await expect(panel.getByText("配置已同步", { exact: true })).toBeVisible();
+  await expect(panel.getByText("与 Pi 共用当前用户配置", { exact: true })).toBeVisible();
   await expect(search).toBeVisible();
   await expect(configuredTab).toHaveAttribute("aria-selected", "true");
   await expect(providerList.getByRole("button")).toHaveCount(2);

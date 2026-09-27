@@ -69,6 +69,12 @@ completing a real session without learning terminal UI conventions first.
   authority, and `t3code` is not Harness-only. Neither source contributes
   branding, exact pixels, assets, automatic roadmap expansion, or synchronized
   components.
+- Use the [design and interaction reference guide](docs/provenance/design-interaction-references.md)
+  for bounded research into composition, Agent feedback, user intervention, and
+  artifacts. Select the relevant entries for the current problem; source demos
+  and proposals do not replace this authority or prove target-runtime behavior.
+  Accepted visual or interaction changes must update the corresponding clauses
+  here, and `DESIGN.dark.md` when applicable, in the same change.
 - Transcript and composer form the dominant work plane. Navigation is quieter;
   files, tools, diffs, and resources appear only when they explain active work.
 - Use editorial utility composition, restrained surfaces, precise alignment,
@@ -866,9 +872,9 @@ loading error where the operation can produce those states
   Settings document. The document begins with one category title and one bounded
   summary; global-only sections do not repeat a redundant `全局设置` label, while
   project-aware sections retain the explicit scope switch in the same header row.
-- Settings keeps 16 stable category identities in four task-oriented groups:
-  `通用`: `外观`, `账户与数据`; `AI 配置`: `模型`, `上下文与记忆`,
-  `视觉辅助`, `扩展`, `技能`, `提示词模板`, `工作规则`;
+- Settings keeps 16 stable category identities in five task-oriented groups:
+  `通用`: `外观`, `账户与数据`; `模型与记忆`: `模型`, `视觉辅助`, `上下文与记忆`;
+  `能力与指令`: `扩展`, `技能`, `提示词模板`, `工作规则`;
   `连接与集成`: `飞书`, `浏览器集成`; `系统与支持`: `运行服务`,
   `用量分析`, `下载源与网络`, `更新与诊断`, `关于`.
   Account retains its existing route and search aliases. First open defaults to
@@ -893,9 +899,10 @@ loading error where the operation can produce those states
 - Whole-page drafts keep Save in the page header. Provider detail and credential
   edits retain local save/verify/cancel transactions. Test, refresh, install and
   reset remain beside their affected section. No cross-capability master Save.
-- Account/Data shows compact `本地模式` and `数据与同步` rows, explaining that
-  account services/sync are not connected and that local storage is distinct from
-  content sent to requested model or connected services. No fake login action.
+- Account/Data shows actual identity and device authorization state, followed by
+  team/project actions and local/private/shared-data boundaries. The service
+  address lives in advanced connection details; login and logout use the existing
+  account service. Never infer a signed-out identity from an unconfirmed read.
 - All page-level Tabs (Memory, Lark, Extensions, Skills and Rules) share the neutral
   Settings Tab family: 36px minimum height, selection underline, neutral fill,
   keyboard focus and horizontal overflow confined to the tab strip.
@@ -911,7 +918,8 @@ loading error where the operation can produce those states
   for the shared draft; switching tabs preserves it, and leaving the category
   uses the standard unsaved-settings guard. Connection testing requires a saved
   draft and remains beside the service status rather than beside Save.
-- `记忆与隐私` leads with one grouped radio list in this order: `私人学习`
+- `记忆与隐私` shows activation and runtime availability before memory mode and
+  model configuration. The grouped radio list keeps this order: `私人学习`
   (default), `完整学习`, `只读记忆`, `完全关闭`. Each minimum-64px row has
   a visible radio indicator, one title and one concise description. Selection
   uses neutral surface/text roles; keyboard focus is distinct. Do not use
@@ -1457,7 +1465,7 @@ loading error where the operation can produce those states
   Workspace and contains the project default override plus project file diagnostics.
   An identity-reconfirmation error does not replace the global document with an
   empty-state failure.
-- `视觉辅助` is an independent Settings document under `能力与集成`. It names the
+- `视觉辅助` is an independent Settings document under `模型与记忆`. It names the
   effective image-capable Provider/model and states that
   native visual models still receive images directly. Global scope offers
   `关闭视觉辅助`; project scope offers `继承全局设置`, `当前项目关闭`, and explicit
@@ -2710,3 +2718,11 @@ application bundles, Helpers, executables and installer filenames use New Money.
 - `回到最新` is a neutral 32px utility action with a downward arrow, aligned to
   the reading track right edge above Composer. Preserve user-owned reading
   anchors, unseen counts, and existing follow-latest behavior.
+
+## Settings experience V2
+
+Settings uses General, Models and Memory, Capabilities and Instructions, Integrations, and System/Support groups while preserving all 16 section identities. Standard documents remain 880px and catalogs 1120px. Page H1, section H2 and necessary inner H3 headings use existing typography roles. Account service editing belongs to advanced connection details; private/team boundaries stay visible. Renderer-only team links select the enterprise memory tab through the existing draft guard and consume their transient target. Dirty or erroneous details cannot collapse. Independent save units and existing save/restart semantics remain distinct; Settings navigation cannot interrupt a pending mutation. Ordinary navigation starts at the page heading; cancelled navigation restores its trigger.
+
+Runtime keeps current occupancy and recovery actions visible, with invariant writer/session mechanics in disclosure. Network prioritizes editable download policies and reachability; bundled toolchain versions are secondary and expand when unavailable. About keeps product/version/platform visible and discloses internal technology. Browser integration distinguishes dependencies, extension and verified connection; bundled-source provenance is secondary. Session resource paths are available on demand; existing resource catalogs and rule editors retain their list/detail and scope contracts. Usage labels explicitly distinguish recorded tokens from provider billing. Vision saves block Settings navigation until completion.
+
+Account and Memory initial configuration-read failures expose an inline retry. Retrying only reloads state, never saves configuration, begins login, tests remote memory or starts a model request. Configuration remains unavailable until a successful read; retry controls cannot issue duplicate pending reads.

@@ -58,12 +58,6 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
         icon: Bot
       },
       {
-        id: "context-memory",
-        ...messages.settings.sections.contextMemory,
-        searchTerms: ["OpenViking", "上下文", "记忆", "经验", "隐私", "召回", "context", "memory", "experience"],
-        icon: BrainCircuit
-      },
-      {
         id: "vision",
         ...messages.settings.sections.vision,
         searchTerms: [
@@ -78,6 +72,17 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
         ],
         icon: Eye
       },
+      {
+        id: "context-memory",
+        ...messages.settings.sections.contextMemory,
+        searchTerms: ["OpenViking", "上下文", "记忆", "经验", "隐私", "召回", "context", "memory", "experience"],
+        icon: BrainCircuit
+      },
+    ]
+  },
+  {
+    label: messages.settings.groups.resources,
+    items: [
       {
         id: "extensions",
         ...messages.settings.sections.extensions,

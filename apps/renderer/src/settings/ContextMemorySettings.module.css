@@ -180,3 +180,7 @@
 }
 
 .tabs { display: grid; min-width: 0; gap: 28px; }
+
+.quietAction { padding: 6px 10px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-secondary); font-size: var(--font-size-support); }
+.quietAction[data-hovered] { background: var(--surface-hover); color: var(--text-primary); }
+.quietAction[data-focus-visible] { outline: 2px solid var(--focus); outline-offset: 2px; }

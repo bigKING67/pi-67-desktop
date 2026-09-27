@@ -64,6 +64,7 @@ export interface RendererWorkbenchState {
   selectedSurface: WorkbenchSurface | undefined;
   settingsReturnSurface: WorkbenchSurface | undefined;
   settingsSection: SettingsSection;
+  settingsSubpage: "enterprise" | undefined;
   settingsScope: "global" | "project";
   settingsWorkspaceId: WorkspaceId | undefined;
   hydrate: (state: WorkbenchStateV5) => void;
@@ -84,8 +85,8 @@ export interface RendererWorkbenchState {
   selectConversation: (conversation: ConversationKey) => boolean;
   removeRuntimeTask: (taskId: TaskId) => boolean;
   canStartTask: (taskId: TaskId) => TaskRunAdmission;
-  openSettings: (section?: SettingsSection) => void;
-  selectSettingsSection: (section: SettingsSection) => void;
+  openSettings: (section?: SettingsSection, subpage?: "enterprise") => void;
+  selectSettingsSection: (section: SettingsSection, subpage?: "enterprise") => void;
   setSettingsScope: (scope: "global" | "project") => void;
   closeSettings: () => void;
   reset: () => void;

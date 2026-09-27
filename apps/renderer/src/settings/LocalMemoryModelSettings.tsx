@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { LocalMemorySettingsSnapshot } from "@pi67/protocol";
 import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -15,7 +16,7 @@ function fields(snapshot: LocalMemorySettingsSnapshot) {
     endpoint: snapshot.embedding.endpoint, model: snapshot.embedding.model, dimension: String(snapshot.embedding.dimension)
   };
 }
-export function LocalMemoryModelSettings({ onPendingChange }: { onPendingChange?: (pending: boolean) => void }) {
+export function LocalMemoryModelSettings({ onPendingChange, children }: { onPendingChange?: (pending: boolean) => void; children?: ReactNode }) {
   const bridge = window.pi67?.system.localMemoryModels;
   const [snapshot, setSnapshot] = useState<LocalMemorySettingsSnapshot>();
   const [draft, setDraft] = useState({ ...empty });
@@ -76,7 +77,10 @@ export function LocalMemoryModelSettings({ onPendingChange }: { onPendingChange?
   };
   const canReveal = !!replacement || (snapshot?.status === "configured" && draft.endpoint === snapshot.embedding.endpoint);
   return <><LocalMemoryActivationSettings disabled={dirty || busy || runtimePending} onPendingChange={setActivationPending} />
-    <LocalMemoryRuntimeSettings onPendingChange={setRuntimePending} disabled={activationPending} /><SettingsSectionBlock title="本地记忆模型" description="模型调用由你配置并付费。保存设置不会测试连接或启动记忆服务。">
+    <LocalMemoryRuntimeSettings onPendingChange={setRuntimePending} disabled={activationPending} />{children}<SettingsSectionBlock title="本地记忆模型" description="模型调用由你配置并付费。保存设置不会测试连接或启动记忆服务。" actions={<div className={styles.bindingActions}>
+          <Button className="primary-button" isDisabled={busy || activationPending || !dirty} onPress={() => void save()}>{busy ? "正在保存…" : "保存模型配置"}</Button>
+          <Button className="secondary-button" isDisabled={busy || activationPending || !dirty} onPress={discard}>撤销修改</Button>
+        </div>}>
     {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
     {notice ? <SettingsNotice tone="info">{notice}</SettingsNotice> : null}
     {dirty ? <SettingsNotice tone="info">切换页签前，请保存或撤销模型修改。</SettingsNotice> : null}
@@ -108,10 +112,7 @@ export function LocalMemoryModelSettings({ onPendingChange }: { onPendingChange?
             {loadingKey ? <span role="status">正在读取密钥…</span> : null}
           </SettingsRow>
         </SettingsRows>
-        <div className={styles.bindingActions}>
-          <Button className="primary-button" isDisabled={busy || activationPending || !dirty} onPress={() => void save()}>{busy ? "正在保存…" : "保存模型配置"}</Button>
-          <Button className="secondary-button" isDisabled={busy || activationPending || !dirty} onPress={discard}>撤销修改</Button>
-        </div>
+
       </>}
   </SettingsSectionBlock></>;
 }

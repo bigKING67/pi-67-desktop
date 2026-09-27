@@ -102,8 +102,8 @@ export function UsageSettings() {
 
   return (
     <SettingsSectionBlock
-      title="Pi JSONL 用量分析"
-      description="每次从当前工作区的 Pi 会话重新构建；不读取 Claude、Codex、Cursor 或其他 Runtime 的记录。"
+      title="当前工作区用量"
+      description="统计当前工作区 Pi 会话记录的 token 用量；不代表服务商账单，也不包含其他应用的使用量。"
       actions={<div className={styles.actions}>
         <div aria-label="统计窗口" className={styles.segmented} role="group">
           {WINDOWS.map((item) => (
