@@ -9,6 +9,7 @@ import { useSessionProjectionStore } from "../session/session-projection-store.j
 import { installSessionProjectionFixture, sessionSnapshotFixture } from "../session/session-projection-test-support.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { useTaskDraftStore } from "../workbench/task-draft-store.js";
+import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
 
 const responseForB = {
   kind: "accepted" as const, operationId: "op-b", cancellable: true, hostEpoch: 9,
@@ -82,6 +83,30 @@ describe("selected task differs from active projection", () => {
       .resolves.toMatchObject({ accepted: true, operationId: "op-b" });
     expect(request).toHaveBeenCalledOnce();
     expect(rendererWorkbenchStore.getState().tasks["task-b"]?.lifecycle).toBe("accepted");
+  });
+
+  it("keeps the streamed turn when a steer joins the running operation", async () => {
+    vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue({ appInstanceId: "app", hostInstanceId: "host", hostEpoch: 9, sdkVersion: "0.84.3", eventSequence: 0 });
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue(responseForB as never);
+    useAppStore.setState({ sessionTransitionPending: false });
+    installSessionProjectionFixture({ connected: true, hostEpoch: 9 }, sessionSnapshotFixture({
+      sessionId: "session-b", sessionFileIdentity: "file-b"
+    }), 2);
+    const running = {
+      operationId: "op-b", kind: "prompt" as const, lifecycle: "running" as const, cancellable: true,
+      sessionId: "session-b", sessionFileIdentity: "file-b", sessionGeneration: 2, startedAt: 1_000
+    };
+    useAppStore.setState({ operation: running, operationDetail: "Pi 正在执行任务" });
+    useLiveTurnStore.getState().begin(running, 9);
+    useLiveTurnStore.getState().append({ text: "Partial streamed answer", thinking: "" },
+      { hostEpoch: 9, sessionId: "session-b", sessionGeneration: 2, operationId: "op-b" });
+    rendererWorkbenchStore.getState().updateTask("task-b", { lifecycle: "running" });
+
+    await expect(submitRendererPrompt("focus on tests", "steer", "submission-steer"))
+      .resolves.toMatchObject({ accepted: true, operationId: "op-b" });
+    expect(useLiveTurnStore.getState().textChunks).toEqual(["Partial streamed answer"]);
+    expect(useAppStore.getState().operation).toEqual(running);
+    expect(rendererWorkbenchStore.getState().tasks["task-b"]?.lifecycle).toBe("running");
   });
 
 });

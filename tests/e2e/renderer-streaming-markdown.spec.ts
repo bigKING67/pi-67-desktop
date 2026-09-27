@@ -92,7 +92,8 @@ test("discards an active worker projection when a different Session is installed
 
 
 test("falls back to current synchronous Markdown when the worker cannot load", async ({ page }) => {
-  await page.route("**/streaming-markdown-parser.worker-*.js", (route) => route.abort());
+  // Built assets use a hashed .js worker; the Vite dev server serves the .ts source as a worker file.
+  await page.route(/streaming-markdown-parser\.worker(?:-[^/]+\.js|\.ts\?worker_file)/u, (route) => route.abort());
   const failure = page.waitForEvent("console", (message) => message.text().includes("Streaming Markdown parser unavailable"));
   await openStream(page);
   await append(page, prefix + "fallback-first-marker");

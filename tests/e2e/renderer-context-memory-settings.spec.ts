@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import type { DesktopSystemBridge } from "@pi67/protocol";
 import { DEFAULT_MOCK_WORKSPACE } from "./pi67-renderer-desktop-bridge.js";
 import { DEFAULT_CONTEXT_MEMORY_CONFIGURATION } from "../../packages/domain/src/index.js";
-import { attachMockAgent, currentMockSessionAuthority, emitMockAgentEvent, installMockDesktopBridge, recordedCommandDetails, setMockAgentResponseDelay, setMockAgentResponseResult } from "./pi67-renderer-fixture.js";
+import { attachMockAgent, currentMockSessionAuthority, emitMockAgentEvent, installMockDesktopBridge, recordedCommandDetails, setMockAgentResponseDelay, setMockAgentResponseFailure, setMockAgentResponseResult } from "./pi67-renderer-fixture.js";
 
 const configuration = { ...DEFAULT_CONTEXT_MEMORY_CONFIGURATION, revision: "fixture-1" };
 const status = { provider: "openviking", health: "healthy", owner: "pi67-openviking", effectivePrivacyMode: "private-learning", endpoint: configuration.endpoint, configured: true, conflictExtensions: [], lastCheckedAt: 1 };
@@ -151,4 +151,51 @@ test("memory settings preserve one draft across tabs, use keyboard radios, and g
     await expect(panel.getByRole("status")).toContainText(message);
     await expect(panel.getByRole("button", { name: "立即归档", exact: true })).toBeEnabled();
   }
+});
+
+test("memory settings keep an unsaved draft across a background identity failure and recovery", async ({ page }) => {
+  await installMockDesktopBridge(page);
+  await page.goto("/");
+  await attachMockAgent(page, [], {}, { responseResults: {
+    "context.status.get": status,
+    "context.runtime.doctor": { checkedAt: 1, status, effectiveConfiguration: configuration, checks: [] },
+    "context.config.get": configuration,
+    "enterprise.identity.get": { state: "signed-out" },
+    "enterprise.workspace.get": { state: "unbound", workspaceId: DEFAULT_MOCK_WORKSPACE.id }
+  } });
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.getByRole("button", { name: "帮助与设置" }).click();
+  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
+  await page.getByRole("button", { name: "上下文与记忆", exact: true }).click();
+  const settings = page.getByTestId("context-memory-settings");
+  const fullLearning = settings.getByRole("radio", { name: /完整学习/ });
+  await settings.getByRole("radio", { name: /^私人学习/ }).focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(fullLearning).toBeChecked();
+  await expect(settings.getByRole("button", { name: "保存更改" })).toBeEnabled();
+
+  const identityReads = async () => (await recordedCommandDetails(page))
+    .filter((command) => command.type === "enterprise.identity.get").length;
+  const refocus = async () => {
+    const before = await identityReads();
+    // Focus again until a new read starts; an in-flight read is deliberately shared.
+    await expect.poll(async () => {
+      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+      return identityReads();
+    }).toBeGreaterThan(before);
+  };
+  await setMockAgentResponseFailure(page, "enterprise.identity.get", {
+    code: "INTERNAL", message: "temporary identity failure", recoverable: true
+  });
+  await refocus();
+  await page.evaluate(() => {
+    delete (window as unknown as { __pi67TestAgent: { responseFailures: Record<string, unknown> } })
+      .__pi67TestAgent.responseFailures["enterprise.identity.get"];
+  });
+  await refocus();
+  await expect.poll(async () => (await recordedCommandDetails(page))
+    .filter((command) => command.type === "context.config.get").length).toBeGreaterThan(1);
+
+  await expect(fullLearning).toBeChecked();
+  await expect(settings.getByRole("button", { name: "保存更改" })).toBeEnabled();
 });

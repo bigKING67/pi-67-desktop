@@ -77,7 +77,7 @@ export async function submitRendererPrompt(
         : { workspaceFiles: workspaceFiles.map(({ id, revision }) => ({ id, revision })) }),
       delivery
     });
-    const result = applyAcceptedPrompt(accepted, expectedAuthority);
+    const result = applyAcceptedPrompt(accepted, expectedAuthority, delivery);
     const taskStillSelected = selectedTaskId !== undefined
       && selectedWorkbenchTask(rendererWorkbenchStore.getState())?.id === selectedTaskId;
     const terminalFailure = settledPromptFailure(accepted);
@@ -120,7 +120,8 @@ export async function submitRendererPrompt(
     if (result.accepted && selectedTaskId) {
       const preview = userMessagePreview(text, attachments.length > 0);
       rendererWorkbenchStore.getState().updateTask(selectedTaskId, {
-        lifecycle: "accepted",
+        // A steer or follow-up joins the running turn; keep its running/waiting lifecycle.
+        ...(result.joinedRunningOperation ? {} : { lifecycle: "accepted" as const }),
         pendingTitle: undefined,
         ...(preview ? { recentUserMessagePreview: preview } : {})
       });
@@ -161,8 +162,9 @@ export async function retryPendingVisualAssistance(): Promise<boolean> {
 
 function applyAcceptedPrompt(
   accepted: OperationSubmissionResult,
-  expectedAuthority: NonNullable<ReturnType<typeof capturePromptSubmissionAuthority>>
-): PromptSubmissionResult {
+  expectedAuthority: NonNullable<ReturnType<typeof capturePromptSubmissionAuthority>>,
+  delivery: "new-turn" | "steer" | "follow-up"
+): PromptSubmissionResult & { joinedRunningOperation?: true } {
   const current = useAppStore.getState();
   const authorityIssue = validatePromptSubmissionAcceptance(expectedAuthority, accepted, current);
   if (authorityIssue) {
@@ -178,6 +180,11 @@ function applyAcceptedPrompt(
     expectedAuthority
   )) return { accepted: true, operationId: accepted.operationId, retainsAttachmentPreviews: false };
 
+  // The host acknowledges a queued steer/follow-up with the already running operation.
+  // Restarting the live turn here would wipe streamed text, the timer and tool activity.
+  if (delivery !== "new-turn" && current.operation?.operationId === accepted.operationId) {
+    return { accepted: true, operationId: accepted.operationId, retainsAttachmentPreviews: false, joinedRunningOperation: true };
+  }
   const operation = operationFromSubmission(accepted, "prompt");
   useLiveTurnStore.getState().begin(operation, current.hostEpoch);
   useConversationStore.getState().setStreaming(true, expectedAuthority);

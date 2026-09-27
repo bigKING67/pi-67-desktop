@@ -77,13 +77,17 @@ export function ContextMemorySettings() {
   const [error, setError] = useState<string>();
   const [modelPending, setModelPending] = useState(false);
   const refresh = async (): Promise<void> => {
-    setBusy("load");
+    // An identity refresh must not relabel an in-flight save/bind as a read.
+    setBusy((current) => current === "save" || current === "bind" ? current : "load");
     setError(undefined);
     try {
       const next = await loadContextMemoryOverview(workspaceId, false);
       setLegacyChecked(false);
+      // Unsaved edits survive background identity refreshes until the user saves or discards;
+      // `overview` is the saved configuration from the render that scheduled this refresh.
+      const previous = overview?.configuration;
       setOverview(next);
-      setDraft(next.configuration);
+      setDraft((current) => current && previous && configurationChanged(current, previous) ? current : next.configuration);
       if (next.identity.state === "signed-in") {
         const nextTeams = await loadEnterpriseTeams();
         const nextTeamId = nextTeams.some((team) => team.id === next.identity.accountId)
@@ -117,7 +121,7 @@ export function ContextMemorySettings() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "无法读取上下文与记忆状态。");
     } finally {
-      setBusy(undefined);
+      setBusy((current) => current === "load" ? undefined : current);
     }
   };
 
