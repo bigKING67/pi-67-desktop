@@ -13,15 +13,33 @@ const QUALITY_ONLY_UNIT_TEST_PATHS = new Set([
   "eng/release/windows-candidate-preflight.test.mjs"
 ]);
 
+// Markdown the source gate parses or requires (check-architecture, check-structure,
+// check-external-references). Editing these can fail the gate, so they are not docs-only.
+const GATE_CONSUMED_DOCUMENTS = new Set([
+  "README.md",
+  "PRODUCT.md",
+  "DESIGN.md",
+  "DESIGN.dark.md",
+  "docs/adr/0001-electron-sdk-runtime.md",
+  "docs/architecture/processes-and-protocol.md",
+  "docs/compatibility/pi-sdk.md",
+  "docs/release/signing.md",
+  "docs/testing/performance.md"
+]);
+
 export function classifyChangedPaths(paths) {
   const changedPaths = [...new Set(paths.map(normalizeRepoPath).filter(Boolean))]
     .sort((left, right) => left.localeCompare(right));
   if (changedPaths.length === 0) return fullValidation("empty-diff", changedPaths);
-  if (changedPaths.every((path) => isDocumentationPath(path) && !isDeveloperWorkflowPath(path))) {
+  if (changedPaths.every((path) => (
+    isDocumentationPath(path) && !isDeveloperWorkflowPath(path) && !isGateConsumedDocument(path)
+  ))) {
     return scopeResult("docs-only", changedPaths, false, false, false, false, "none");
   }
 
-  const productPaths = changedPaths.filter((path) => !isDocumentationPath(path) || isDeveloperWorkflowPath(path));
+  const productPaths = changedPaths.filter((path) => (
+    !isDocumentationPath(path) || isDeveloperWorkflowPath(path) || isGateConsumedDocument(path)
+  ));
   if (productPaths.every(isQualityOnlyPath)) {
     return scopeResult("quality-only", changedPaths, true, false, false, false, "none");
   }
@@ -67,16 +85,24 @@ export function normalizeRepoPath(path) {
 }
 
 function isDocumentationPath(path) {
+  // Markdown under apps/ and packages/ ships as product content (for example bundled
+  // SKILL.md capabilities whose tree hash is locked), so it is never documentation-only.
+  if (path.startsWith("apps/") || path.startsWith("packages/")) return false;
   return path.startsWith("docs/")
     || path.endsWith(".md")
     || path.startsWith(".github/ISSUE_TEMPLATE/");
+}
+
+function isGateConsumedDocument(path) {
+  return GATE_CONSUMED_DOCUMENTS.has(path) || path.startsWith("docs/provenance/");
 }
 
 function isQualityOnlyPath(path) {
   return QUALITY_ONLY_UNIT_TEST_PATHS.has(path)
     || /^tests\/e2e\/renderer(?:-[a-z-]+)?\.spec\.ts$/u.test(path)
     || isRendererBrowserSupportPath(path)
-    || isDeveloperWorkflowPath(path);
+    || isDeveloperWorkflowPath(path)
+    || isGateConsumedDocument(path);
 }
 
 function isDeveloperWorkflowPath(path) {

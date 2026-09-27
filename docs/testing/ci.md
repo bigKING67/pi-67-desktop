@@ -12,8 +12,8 @@ base diffs retain conservative behavior; exact installer mode selection follows 
 
 | Classified change | Source quality + Renderer E2E | Windows native | macOS native |
 | --- | --- | --- | --- |
-| Documentation only (excluding developer-governance paths) | Skipped | Skipped | Skipped |
-| Reviewed quality-only paths | Required | Skipped | Skipped |
+| Documentation only (excluding developer-governance paths, gate-consumed Markdown, and Markdown under `apps/` or `packages/`) | Skipped | Skipped | Skipped |
+| Reviewed quality-only paths, including Markdown the source gate parses or requires | Required | Skipped | Skipped |
 | Windows-only paths | Required | Required | Skipped |
 | macOS-only paths | Required | Skipped | Required |
 | Installer verifier allowlist | Reuse lane; if unavailable, quality + Renderer and Windows fallback | Certified base artifact reuse or normal Windows lane | Skipped |

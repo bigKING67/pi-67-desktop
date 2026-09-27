@@ -4,10 +4,14 @@ import { fileURLToPath } from "node:url";
 import { productionTransportViolations } from "./production-transport-policy.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
+// Every packaged runtime source tree, including extension code loaded by the agent host.
 const scanRoots = [
   "apps/desktop/src",
   "apps/agent-host/src",
   "apps/renderer/src",
+  "packages/domain/src",
+  "packages/extension-compat/src",
+  "packages/openviking-pi-extension",
   "packages/pi-runtime/src",
   "packages/protocol/src"
 ];
@@ -53,9 +57,12 @@ async function collect(directory) {
   const output = [];
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) output.push(...await collect(path));
-    else if (
-      [".ts", ".tsx", ".mts", ".cts", ".html"].includes(extname(entry.name))
+    if (entry.isDirectory()) {
+      if (entry.name !== "node_modules" && entry.name !== "dist") output.push(...await collect(path));
+    } else if (
+      [".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs", ".html"].includes(extname(entry.name))
+      && !entry.name.endsWith(".d.ts")
+      && !entry.name.endsWith(".d.mts")
       && !entry.name.includes(".test.")
       && !entry.name.includes(".spec.")
     ) output.push(path);

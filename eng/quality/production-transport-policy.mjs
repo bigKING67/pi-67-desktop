@@ -1,4 +1,10 @@
 const nativeAdapter = "apps/desktop/src/openviking-native-process.mts";
+// ADR 0002: the authenticated loopback OpenViking sidecar's default client endpoint.
+const OPENVIKING_LOOPBACK_DEFAULT = "http://127.0.0.1:1933";
+const openVikingDefaultConfig = new Set([
+  "packages/domain/src/context-memory.ts",
+  "packages/openviking-pi-extension/config.ts"
+]);
 const forbidden = [
   ["WebSocket API", /\bWebSocket\b/u],
   ["local HTTP server", /\bcreateServer\s*\(/u],
@@ -30,7 +36,8 @@ export function productionTransportViolations(path, source) {
     const vite = path === "apps/desktop/src/renderer-security.ts"
       && ["http://127.0.0.1:5173/", "http://127.0.0.1:5173"].includes(match[0]);
     const sidecar = path === nativeAdapter && match[0] === "http://127.0.0.1:${port}";
-    if (!vite && !sidecar) failures.push(`${path} contains localhost production URL`);
+    const memorySidecar = openVikingDefaultConfig.has(path) && match[0] === OPENVIKING_LOOPBACK_DEFAULT;
+    if (!vite && !sidecar && !memorySidecar) failures.push(`${path} contains localhost production URL`);
   }
   return failures;
 }

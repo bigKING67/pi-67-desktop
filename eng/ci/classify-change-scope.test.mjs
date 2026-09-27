@@ -47,8 +47,24 @@ describe("CI change scope classifier", () => {
     }
   });
 
+  it("runs the source gate for Markdown the gate parses or requires", () => {
+    for (const path of ["README.md", "PRODUCT.md", "DESIGN.dark.md", "docs/architecture/processes-and-protocol.md",
+      "docs/provenance/t3code-reference.md"]) {
+      expect(classifyChangedPaths([path, "docs/testing/ci.md"]), path).toMatchObject({
+        reason: "quality-only", runQuality: true, runWindows: false, runMacos: false
+      });
+    }
+  });
+
+  it("validates Markdown that ships as product content", () => {
+    for (const path of ["packages/pi-workspace-resources/skills/thesis-tracker/SKILL.md",
+      "packages/openviking-pi-extension/README.md"]) {
+      expect(classifyChangedPaths([path]), path).toMatchObject({ reason: "shared-or-unknown", fullValidation: true });
+    }
+  });
+
   it("skips product validation for documentation-only changes", () => {
-    expect(classifyChangedPaths(["README.md", "docs/testing/ci.md"])).toMatchObject({
+    expect(classifyChangedPaths(["CONTRIBUTING.md", "docs/testing/ci.md"])).toMatchObject({
       reason: "docs-only",
       runQuality: false,
       runWindows: false,

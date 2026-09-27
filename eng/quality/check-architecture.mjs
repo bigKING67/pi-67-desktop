@@ -1,6 +1,8 @@
 import { readdir, readFile } from "node:fs/promises";
+import { builtinModules } from "node:module";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseSync } from "oxc-parser";
 import {
   protocolDocumentationViolations,
   rendererSessionInstallationViolations,
@@ -8,6 +10,14 @@ import {
 } from "./architecture-rules.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
+// Runtime import cycles that predate AST parsing. They are lazily evaluated today, but any new
+// cycle fails and a listed cycle that disappears must be removed so the list only shrinks.
+const KNOWN_RUNTIME_CYCLES = new Set([
+  "apps/renderer/src/app/app-store.ts|apps/renderer/src/connection/connection-state.ts|apps/renderer/src/session/session-creation-recovery-controller.ts",
+  "apps/renderer/src/app/app-store.ts|apps/renderer/src/connection/connection-state.ts|apps/renderer/src/connection/projection-recovery-controller.ts|apps/renderer/src/connection/projection-recovery-task-selection.ts|apps/renderer/src/workbench/workbench-controller.ts"
+]);
+const NODE_BUILTINS = new Set(builtinModules.filter((name) => !name.startsWith("_")));
+const APPLICATION_PACKAGES = ["@pi67/desktop", "@pi67/agent-host", "@pi67/renderer", "@pi67/support-ingest"];
 const sourceRoots = [join(root, "apps"), join(root, "packages")];
 const files = (await Promise.all(sourceRoots.map(collectSourceFiles))).flat();
 const fileSet = new Set(files);
@@ -24,11 +34,12 @@ let dependencyCount = 0;
 for (const file of files) {
   const source = await readFile(file, "utf8");
   violations.push(...rendererSessionInstallationViolations(toRepoPath(file), source));
-  for (const specifier of parseImports(source)) {
+  for (const [specifier, typeOnly] of parseImports(file, source)) {
     dependencyCount += 1;
     checkBoundary(file, specifier, violations);
     const target = resolveSourceImport(file, specifier, fileSet);
-    if (target) graph.get(file)?.push(target);
+    // Type-only edges are erased at compile time and cannot form an initialization cycle.
+    if (target && !typeOnly) graph.get(file)?.push(target);
   }
 }
 
@@ -45,8 +56,14 @@ violations.push(...runningTaskDocumentationViolations(
   })))
 ));
 
+const knownCyclesSeen = new Set();
 for (const cycle of findCycles(graph)) {
-  violations.push(`circular dependency: ${cycle.map(toRepoPath).join(" -> ")}`);
+  const key = [...new Set(cycle.map(toRepoPath))].sort((left, right) => left.localeCompare(right)).join("|");
+  if (KNOWN_RUNTIME_CYCLES.has(key)) knownCyclesSeen.add(key);
+  else violations.push(`circular dependency: ${cycle.map(toRepoPath).join(" -> ")}`);
+}
+for (const key of KNOWN_RUNTIME_CYCLES) {
+  if (!knownCyclesSeen.has(key)) violations.push(`known runtime cycle no longer exists; remove it from KNOWN_RUNTIME_CYCLES: ${key}`);
 }
 
 if (violations.length > 0) {
@@ -55,7 +72,7 @@ if (violations.length > 0) {
   process.exit(1);
 }
 
-console.log(`Architecture check passed: ${files.length} modules, ${dependencyCount} imports, 0 cycles.`);
+console.log(`Architecture check passed: ${files.length} modules, ${dependencyCount} imports, 0 new runtime cycles (${knownCyclesSeen.size} known).`);
 
 async function collectSourceFiles(directory) {
   const output = [];
@@ -73,16 +90,29 @@ async function collectSourceFiles(directory) {
   return output;
 }
 
-function parseImports(source) {
-  const imports = new Set();
-  const staticPattern = /(?:^|\n)\s*(?:import|export)\s+(?:type\s+)?(?:[^"'\n]*?\s+from\s+)?["']([^"']+)["']/gu;
-  const dynamicPattern = /\bimport\s*\(\s*["']([^"']+)["']\s*\)/gu;
-  for (const pattern of [staticPattern, dynamicPattern]) {
-    let match;
-    while ((match = pattern.exec(source)) !== null) {
-      if (match[1]) imports.add(match[1]);
-    }
+// Parse with the TypeScript-aware AST so multi-line, re-export and dynamic imports are all
+// visible; a line-based pattern silently skipped about a fifth of the import graph.
+function parseImports(file, source) {
+  const parsed = parseSync(file, source);
+  if (parsed.errors.length > 0) {
+    throw new Error(`${toRepoPath(file)} could not be parsed for import boundaries: ${parsed.errors[0].message}`);
   }
+  const imports = new Map();
+  const add = (specifier, typeOnly) => {
+    if (typeof specifier !== "string" || specifier.length === 0) return;
+    imports.set(specifier, (imports.get(specifier) ?? true) && typeOnly);
+  };
+  for (const entry of parsed.module.staticImports) {
+    add(entry.moduleRequest.value, entry.entries.length > 0 && entry.entries.every((item) => item.isType));
+  }
+  for (const entry of parsed.module.staticExports) {
+    for (const item of entry.entries) add(item.moduleRequest?.value, item.isType);
+  }
+  for (const entry of parsed.module.dynamicImports) {
+    const literal = /^["'`]([^"'`]+)["'`]$/u.exec(source.slice(entry.moduleRequest.start, entry.moduleRequest.end));
+    add(literal?.[1], false);
+  }
+  for (const match of source.matchAll(/\brequire\s*\(\s*["']([^"']+)["']\s*\)/gu)) add(match[1], false);
   return imports;
 }
 
@@ -97,7 +127,9 @@ function checkBoundary(file, specifier, output) {
       fail("relative import escapes its package boundary");
     }
   }
-  if (path.startsWith("packages/") && specifier.startsWith("apps/")) fail("packages cannot import applications");
+  if (path.startsWith("packages/") && (
+    specifier.startsWith("apps/") || APPLICATION_PACKAGES.some((name) => isPackageSpecifier(specifier, name))
+  )) fail("packages cannot import applications");
   if (path.startsWith("packages/domain/") && (
     specifier.startsWith("node:")
     || specifier === "electron"
@@ -128,9 +160,11 @@ function checkBoundary(file, specifier, output) {
   }
   if (path.startsWith("apps/renderer/") && (
     specifier.startsWith("node:")
-    || specifier === "electron"
+    || NODE_BUILTINS.has(specifier.split("/")[0] ?? "")
+    || isPackageSpecifier(specifier, "electron")
     || specifier.startsWith("@earendil-works/")
-    || specifier === "@pi67/pi-runtime"
+    || isPackageSpecifier(specifier, "@pi67/pi-runtime")
+    || APPLICATION_PACKAGES.some((name) => name !== "@pi67/renderer" && isPackageSpecifier(specifier, name))
   )) fail("renderer cannot import privileged runtimes");
   if (path.startsWith("apps/desktop/") && (
     specifier === "@pi67/pi-runtime"
@@ -214,6 +248,10 @@ function checkManifestBoundaries(packages, output) {
       )) fail("Electron Main must depend only on protocol-neutral application contracts");
     }
   }
+}
+
+function isPackageSpecifier(specifier, name) {
+  return specifier === name || specifier.startsWith(`${name}/`);
 }
 
 function resolveSourceImport(file, specifier, knownFiles) {

@@ -28,7 +28,7 @@ export default defineConfig({
       junit: "artifacts/quality/vitest-results.xml"
     },
     environment: "node",
-    include: ["packages/**/*.test.ts", "apps/**/*.test.ts", "tests/**/*.test.ts", "eng/**/*.test.mjs"],
+    include: ["packages/**/*.test.{ts,tsx,mts}", "apps/**/*.test.{ts,tsx,mts}", "tests/**/*.test.ts", "eng/**/*.test.mjs"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary"],

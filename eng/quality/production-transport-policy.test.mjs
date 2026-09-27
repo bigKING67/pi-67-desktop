@@ -29,3 +29,14 @@ describe("approved native transport exception", () => {
     }
   });
 });
+
+describe("OpenViking loopback default endpoint", () => {
+  it("admits only the documented default in its two configuration owners", () => {
+    const config = 'const defaults = { endpoint: "http://127.0.0.1:1933" };';
+    expect(productionTransportViolations("packages/openviking-pi-extension/config.ts", config)).toEqual([]);
+    expect(productionTransportViolations("packages/domain/src/context-memory.ts", config)).toEqual([]);
+    expect(productionTransportViolations("packages/openviking-pi-extension/client.ts", config).length).toBeGreaterThan(0);
+    expect(productionTransportViolations("packages/openviking-pi-extension/config.ts",
+      'const defaults = { endpoint: "http://127.0.0.1:8080" };').length).toBeGreaterThan(0);
+  });
+});
