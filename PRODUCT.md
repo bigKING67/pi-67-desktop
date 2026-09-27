@@ -895,7 +895,11 @@ design/protocol contracts; reference inclusion alone does not approve them.
   system, dependency, publish, remote, and network side effects. In AUTO,
   recognized file, persistent-state, external-object, Shell, and destructive-Git
   deletion requests exact one-shot confirmation before the installed-capability
-  grant and while the Task is in `YOLO`. `YOLO` permits every other valid registered
+  grant and while the Task is in `YOLO`. Recognition looks through Git global options
+  and `env` prefixes. Working-tree `checkout`/`restore` forms, `reflog expire`,
+  `gc --prune`, `push --mirror`, `rsync --delete`, and `rd /s` count as destructive;
+  a path-like single `checkout` operand such as `feature/x` is confirmed because Git
+  may resolve it as a pathspec, while `git switch` stays routine. `YOLO` permits every other valid registered
   Tool in that trusted Task Runtime, including calls which do not have an
   installed-capability grant. YOLO never makes an invalid Tool identity, schema,
   route, or target valid.

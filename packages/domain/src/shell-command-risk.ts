@@ -2,8 +2,8 @@ import type { ParsedShellCommand } from "./shell-command-parser.js";
 import type { RiskCategory } from "./safety-policy.js";
 
 const FALLBACK_COMMAND_RULES: ReadonlyArray<[RiskCategory, RegExp]> = [
-  ["bulk-delete", /\b(?:rm|rmdir|del|erase|Remove-Item)\b[^\n]*(?:-r|-rf|\/s|\*)/i],
-  ["destructive-shell", /\b(?:rm|rmdir|del|erase|format|diskpart|mkfs|shutdown|reboot|Stop-Computer)\b/i],
+  ["bulk-delete", /\b(?:rm|rmdir|rd|del|erase|Remove-Item)\b[^\n]*(?:-r|-rf|\/s|\*)/i],
+  ["destructive-shell", /\b(?:rm|rmdir|rd|del|erase|format|diskpart|mkfs|shutdown|reboot|Stop-Computer)\b/i],
   ["system-configuration", /\b(?:sudo|runas|reg(?:\.exe)?\s+(?:add|delete)|sc(?:\.exe)?\s+(?:create|delete|config)|Set-ExecutionPolicy|bcdedit|netsh)\b/i],
   ["dependency-change", /\b(?:npm|pnpm|yarn|pip|uv|cargo|dotnet)\s+(?:install|add|remove|uninstall|update|upgrade|ci|tool\s+install)\b/i],
   ["git-external-action", /\bgit\s+(?:push|fetch|pull|clone|remote|submodule|ls-remote)\b/i],
@@ -26,12 +26,15 @@ const NETWORK_COMMANDS = new Set([
 ]);
 const SHELL_INTERPRETERS = new Set(["sh", "bash", "pwsh", "powershell", "cmd", "node", "python", "python3"]);
 const ENVIRONMENT_ASSIGNMENT_PATTERN = /^([a-z_][a-z0-9_]*)=(.*)$/iu;
+// Git global options that consume the following token; others are single-token flags.
+const GIT_GLOBAL_OPTIONS_WITH_VALUE = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--exec-path"]);
+const ENV_OPTIONS_WITH_VALUE = new Set(["-u", "--unset", "-C", "--chdir", "-S", "--split-string"]);
 
 export function classifyCommandRisk(originalTokens: readonly string[]): RiskCategory | undefined {
   const tokens = stripEnvironmentAssignments(originalTokens);
   const executable = executableName(tokens[0] ?? "");
   const args = tokens.slice(1);
-  if (["rm", "rmdir", "del", "erase", "remove-item"].includes(executable)) {
+  if (["rm", "rmdir", "rd", "del", "erase", "remove-item"].includes(executable)) {
     return args.some((arg) => /^(?:-[a-z]*r[a-z]*|\/s)$/iu.test(arg) || arg.includes("*"))
       ? "bulk-delete"
       : "destructive-shell";
@@ -59,6 +62,9 @@ export function classifyCommandRisk(originalTokens: readonly string[]): RiskCate
         : "dependency-change";
     }
   }
+  if (executable === "rsync" && args.some((arg) => arg.startsWith("--delete") || arg === "--remove-source-files")) {
+    return "destructive-shell";
+  }
   if (NETWORK_COMMANDS.has(executable)) return "network-side-effect";
   return undefined;
 }
@@ -79,14 +85,17 @@ export function classifyFallbackRisk(command: string): RiskCategory | undefined 
   return undefined;
 }
 
-function classifyGitCommandRisk(args: readonly string[]): RiskCategory | undefined {
+function classifyGitCommandRisk(originalArgs: readonly string[]): RiskCategory | undefined {
+  const args = stripGitGlobalOptions(originalArgs);
   const subcommand = (args[0] ?? "").toLowerCase();
   const options = args.slice(1).map((arg) => arg.toLowerCase());
   if (subcommand === "rm" || subcommand === "clean") return "destructive-shell";
   if (subcommand === "reset" && options.includes("--hard")) return "destructive-shell";
-  if (subcommand === "restore" && !options.includes("--staged")) return "destructive-shell";
+  if (subcommand === "restore" && !isIndexOnlyRestore(options)) return "destructive-shell";
+  if (subcommand === "reflog" && options.some((arg) => arg === "expire" || arg === "delete")) return "destructive-shell";
+  if (subcommand === "gc" && options.some((arg) => arg.startsWith("--prune"))) return "destructive-shell";
   if (
-    (subcommand === "checkout" && (options.includes("--") || options.includes("-f") || options.includes("--force")))
+    (subcommand === "checkout" && isWorktreeCheckout(options))
     || (subcommand === "switch" && (options.includes("-f") || options.includes("--force") || options.includes("--discard-changes")))
     || (subcommand === "branch" && options.some((arg) => arg === "-d" || arg === "--delete"))
     || (subcommand === "tag" && options.some((arg) => arg === "-d" || arg === "--delete"))
@@ -101,6 +110,8 @@ function classifyGitCommandRisk(args: readonly string[]): RiskCategory | undefin
       || arg.startsWith("--force-with-lease")
       || arg === "-d"
       || arg === "--delete"
+      || arg === "--mirror"
+      || arg === "--prune"
       || arg.startsWith(":")
     )) ? "destructive-shell" : "git-external-action";
   }
@@ -110,6 +121,30 @@ function classifyGitCommandRisk(args: readonly string[]): RiskCategory | undefin
     "ls-remote"
   ].includes(subcommand)) return "workspace-command";
   return undefined;
+}
+
+function stripGitGlobalOptions(args: readonly string[]): readonly string[] {
+  let index = 0;
+  while (index < args.length && (args[index] ?? "").startsWith("-")) {
+    index += GIT_GLOBAL_OPTIONS_WITH_VALUE.has(args[index] ?? "") ? 2 : 1;
+  }
+  return args.slice(index);
+}
+
+// `git restore --staged` without a worktree target only rewrites the index.
+function isIndexOnlyRestore(options: readonly string[]): boolean {
+  return options.includes("--staged")
+    && !options.some((arg) => arg === "--worktree" || /^-[a-z]*w[a-z]*$/u.test(arg));
+}
+
+// A single bare branch name switches branches; `--`, force, a tree-ish plus pathspec,
+// or a path-like operand overwrites working-tree files. Path-like branch names such as
+// `feature/x` are deliberately treated as destructive because Git resolves them either way.
+function isWorktreeCheckout(options: readonly string[]): boolean {
+  if (options.some((arg) => arg === "--" || arg === "-f" || arg === "--force")) return true;
+  if (options.some((arg) => arg === "-b" || arg === "--orphan")) return false;
+  const operands = options.filter((arg) => !arg.startsWith("-"));
+  return operands.length > 1 || operands.some((arg) => /[./*:]/u.test(arg));
 }
 
 function isGlobalDependencyChange(manager: string, args: readonly string[]): boolean {
@@ -122,8 +157,17 @@ function isGlobalDependencyChange(manager: string, args: readonly string[]): boo
 }
 
 function stripEnvironmentAssignments(tokens: readonly string[]): readonly string[] {
-  const index = tokens.findIndex((token) => !ENVIRONMENT_ASSIGNMENT_PATTERN.test(token));
-  return index < 0 ? [] : tokens.slice(index);
+  let index = tokens.findIndex((token) => !ENVIRONMENT_ASSIGNMENT_PATTERN.test(token));
+  if (index < 0) return [];
+  if (executableName(tokens[index] ?? "") !== "env") return tokens.slice(index);
+  index += 1;
+  while (index < tokens.length) {
+    const token = tokens[index] ?? "";
+    if (ENV_OPTIONS_WITH_VALUE.has(token)) index += 2;
+    else if (token.startsWith("-") || ENVIRONMENT_ASSIGNMENT_PATTERN.test(token)) index += 1;
+    else break;
+  }
+  return tokens.slice(index);
 }
 
 function executableName(value: string): string {
