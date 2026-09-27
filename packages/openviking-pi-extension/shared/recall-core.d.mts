@@ -10,6 +10,17 @@ export function buildRecallBlock(
   },
 ): Promise<string | null>;
 
+export function buildServerAssembledBlock(
+  fetchJSON: (path: string, init?: any, options?: any) => Promise<{ ok: boolean; status?: number; result?: any; error?: any }>,
+  cfg: Record<string, any>,
+  query: string,
+  options?: {
+    actorPeerId?: string;
+    sessionId?: string;
+    log?: (stage: string, data?: any) => void;
+  },
+): Promise<string | null>;
+
 export function buildRecallEndpointBody(cfg?: Record<string, any>): Record<string, any>;
 export function postRecall(
   fetchJSON: (path: string, init?: any, options?: any) => Promise<{ ok: boolean; status?: number; result?: any; error?: any }>,

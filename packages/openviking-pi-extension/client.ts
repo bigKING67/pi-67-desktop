@@ -103,7 +103,9 @@ export class OVClient {
     try {
       const resp = await fetch(`${this.baseUrl}${path}`, {
         ...init,
-        ...(this.localProfileId ? { redirect: "error" as const } : {}),
+        // The HTTPS/loopback endpoint check covers only the configured URL; following a
+        // redirect would re-send transcripts and actor headers to an unvetted origin.
+        redirect: "error",
         headers: { ...this.headers(), ...(init?.headers as Record<string, string> | undefined) },
         signal: controller.signal,
       });

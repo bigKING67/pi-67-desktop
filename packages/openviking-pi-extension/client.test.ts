@@ -44,6 +44,13 @@ describe("OVClient connection authority", () => {
     expect(observedSignal?.aborted).toBe(true);
   });
 
+  it("refuses redirects for external connections so data never leaves the vetted endpoint", async () => {
+    const fetch = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    await new OVClient(config()).fetchJSON("/api/v1/sessions/s/messages", { method: "POST", body: "{}" });
+    expect(fetch).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ redirect: "error" }));
+  });
+
   it("projects safe summary timings only for successful managed context transport", async () => {
     const body = { status: "ok", result: { rendered: "synthetic" }, telemetry: {
       id: "do-not-expose", summary: { operation: "search.context", status: "ok", duration_ms: 23,

@@ -1,7 +1,7 @@
 import type { OVClient } from "./client.js";
 import type { OVConfig } from "./config.js";
 import { hashDiagnosticValue } from "./diagnostics.js";
-import { buildRecallBlock } from "./shared/recall-core.mjs";
+import { buildRecallBlock, buildServerAssembledBlock } from "./shared/recall-core.mjs";
 import { withContextTiming, type ContextServerTiming } from "./recall-timing.js";
 
 export type RecallState = "idle" | "pending" | "running" | "ready" | "empty";
@@ -121,7 +121,13 @@ export class RecallManager {
 
   private async search(userQuery: string, signal: AbortSignal): Promise<string | null> {
     const timing: RecallRequestTiming = { contextRequestMs: 0, otherRequestMs: 0, requestCount: 0 };
-    const block = await buildRecallBlock(
+    // Actor scope is a privacy boundary: only the scoped server faces may answer.
+    // The generated core otherwise falls back to an unscoped raw /find on 404,
+    // 5xx or timeout, which UPSTREAM.md forbids for actor-scoped Recall.
+    const recall = this.config.recallPeerScope === "actor"
+      ? async (...args: Parameters<typeof buildServerAssembledBlock>) => (await buildServerAssembledBlock(...args)) || null
+      : buildRecallBlock;
+    const block = await recall(
       async (path: string, init?: any, options?: any) => {
         const startedAt = performance.now();
         const contextRequest = path === "/api/v1/search/search";
