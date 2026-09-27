@@ -25,6 +25,7 @@ import {
   RepositorySubmoduleInitializationResultSchema
 } from "./repository-environment-schema.js";
 import {
+  AgentHostAttachPortMessageSchema,
   AgentHostReadyMessageSchema,
   AgentHostRuntimePoisonedMessageSchema,
   AgentHostStartupFailedMessageSchema,
@@ -102,6 +103,7 @@ export function canonicalProtocolRevisionMaterial(): string {
       teamIndexSettingsRequest: TeamIndexSettingsRequestSchema,
       teamIndexSettingsMessage: TeamIndexSettingsMessageSchema,
       localMemoryConnectResult: LocalMemoryConnectResultSchema,
+      attachPort: AgentHostAttachPortMessageSchema,
       ready: AgentHostReadyMessageSchema,
       startupFailed: AgentHostStartupFailedMessageSchema,
       runtimePoisoned: AgentHostRuntimePoisonedMessageSchema,

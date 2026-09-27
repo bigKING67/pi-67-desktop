@@ -1,4 +1,5 @@
 import {
+  isAgentHostAttachPortMessage,
   isAgentHostShutdownRequest,
   isEnterprisePowerTransitionMessage,
   isEnterpriseCredentialBootstrapMessage,
@@ -17,7 +18,6 @@ import {
   AgentHostStartupError,
   coordinateAgentHostStartup
 } from "./agent-host-startup.js";
-import { isAttachPortMessage } from "./connection-context.js";
 import { AgentHostServer } from "./host-server.js";
 import { resolveAgentDirectory } from "./host-task-runtime-lifecycle.js";
 import { createPromptAttachmentAccessOwner } from "./prompt-attachment-access.js";
@@ -148,7 +148,7 @@ async function startAgentHost(): Promise<void> {
       void shutdown(event.data.deadlineMs, true);
       return;
     }
-    if (!isAttachPortMessage(event.data) || event.ports.length !== 1) return;
+    if (!isAgentHostAttachPortMessage(event.data) || event.ports.length !== 1) return;
     const port = event.ports[0];
     if (!port) return;
     if (shuttingDown) {

@@ -3,7 +3,7 @@ import {
   type BrowserWindow,
   type UtilityProcess
 } from "electron";
-import type { AgentHostStartupState } from "@pi67/protocol";
+import type { AgentHostAttachPortMessage, AgentHostStartupState } from "@pi67/protocol";
 import { rendererDocumentHandoffKey } from "./agent-host-supervisor-contract.js";
 import { isExpectedRendererLocation } from "./renderer-security.js";
 
@@ -25,12 +25,13 @@ export function handoffAgentHostPort(input: {
   if (!handoffKey || (!input.replaceCurrent && handoffKey === input.lastHandoffKey)) return undefined;
 
   const { port1, port2 } = new MessageChannelMain();
-  input.host.postMessage({
+  const attachPort: AgentHostAttachPortMessage = {
     type: "attach-port",
     appInstanceId: input.appInstanceId,
     hostInstanceId: input.identity.hostInstanceId,
     hostEpoch: input.identity.hostEpoch
-  }, [port1]);
+  };
+  input.host.postMessage(attachPort, [port1]);
   window.webContents.postMessage("pi67:agent-port", {
     expectedOrigin: input.expectedRendererOrigin,
     appInstanceId: input.appInstanceId,

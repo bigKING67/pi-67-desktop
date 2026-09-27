@@ -83,6 +83,16 @@ export const AgentHostStartupStateSchema = strictObject({
 
 export type AgentHostStartupState = Static<typeof AgentHostStartupStateSchema>;
 
+/** Main -> agent-host parent-port message that transfers the renderer MessagePort. */
+export const AgentHostAttachPortMessageSchema = strictObject({
+  type: Type.Literal("attach-port"),
+  appInstanceId: Type.String({ minLength: 1, maxLength: 128 }),
+  hostInstanceId: Type.String({ minLength: 1, maxLength: 128 }),
+  hostEpoch: Type.Integer({ minimum: 0 })
+});
+
+export type AgentHostAttachPortMessage = Static<typeof AgentHostAttachPortMessageSchema>;
+
 export const AgentHostReadyMessageSchema = strictObject({
   type: Type.Literal("agent-host-ready"),
   startup: AgentHostStartupStateSchema
@@ -149,6 +159,10 @@ export const AgentHostShutdownCompleteMessageSchema = strictObject({
   queuedCommandsDropped: Type.Integer({ minimum: 0, maximum: 10_000 }),
   extensionRequestsCancelled: Type.Integer({ minimum: 0, maximum: 10_000 })
 });
+
+export function isAgentHostAttachPortMessage(value: unknown): value is AgentHostAttachPortMessage {
+  return Value.Check(AgentHostAttachPortMessageSchema, value);
+}
 
 export function isAgentHostReadyMessage(value: unknown): value is AgentHostReadyMessage {
   return Value.Check(AgentHostReadyMessageSchema, value);

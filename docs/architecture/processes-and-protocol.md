@@ -1817,7 +1817,7 @@ source and staged-tree verification still gates activation.
    existing/shared 或 managed-upgrade Profile 的用户资源冲突、MCP cache/CAS conflict 和 Desktop-owned
    enhancement I/O failure 只形成最多八条安全 startup issue。核心 Server 构造成功后 Host 发送严格的
    `agent-host-ready { startup }`，状态可为 `ready` 或 `degraded`；消息不含 path、raw error 或 stack。
-5. Agent Host `spawn` 且 Main 收到有效 ready 后才转移新的 MessagePort；窗口 reload 的 `did-finish-load` 以及 renderer
+5. Agent Host `spawn` 且 Main 收到有效 ready 后才通过严格的 `attach-port { appInstanceId, hostInstanceId, hostEpoch }`（定义于 `@pi67/protocol`，纳入 protocol revision）转移新的 MessagePort；窗口 reload 的 `did-finish-load` 以及 renderer
    的显式恢复请求都会为仍存活的同一 Host broker 新 Port，而不会 fork 第二个 Host。若 Host 正处于
    supervised restart backoff，恢复请求不能绕过退避计时器。
 6. Preload 只在可信 renderer origin 上转交 MessagePort；renderer 的

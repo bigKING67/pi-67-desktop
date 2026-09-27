@@ -4,6 +4,7 @@ import type {
   RuntimeInitializationObservation
 } from "@pi67/pi-runtime";
 import type {
+  AgentHostAttachPortMessage,
   AgentHostRuntimePoisonedMessage,
   AgentHostShutdownCompleteMessage
 } from "@pi67/protocol";
@@ -22,12 +23,8 @@ import type { LocalMemoryBrokerClient } from "./context/local-memory-broker-clie
 import type { TeamWorkerBrokerClient } from "./context/team-worker-broker-client.js";
 import type { TeamIndexSettingsClient } from "./context/team-index-settings-client.js";
 
-export interface AttachPortOptions {
-  expectedOrigin?: string;
-  appInstanceId?: string;
-  hostInstanceId?: string;
-  hostEpoch?: number;
-}
+/** Host identity carried by the protocol `attach-port` message; tests may omit fields. */
+export type AttachPortOptions = Partial<Omit<AgentHostAttachPortMessage, "type">>;
 
 export type AgentRuntimeLoader = TaskRuntimeLoader;
 

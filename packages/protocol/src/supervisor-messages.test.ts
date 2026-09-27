@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isAgentHostAttachPortMessage,
   isAgentHostReadyMessage,
   isAgentHostRuntimePoisonedMessage,
   isAgentHostStartupFailedMessage,
@@ -101,5 +102,16 @@ describe("Agent Host supervisor messages", () => {
     expect(isAgentHostShutdownCompleteMessage({ ...message, queuedCommandsDropped: -1 })).toBe(false);
     expect(isAgentHostShutdownCompleteMessage({ ...message, extensionRequestsCancelled: 10_001 })).toBe(false);
     expect(isAgentHostShutdownCompleteMessage({ ...message, rawToolPayload: "forbidden" })).toBe(false);
+  });
+
+  it("accepts only the complete host identity on the attach-port handoff", () => {
+    const message = { type: "attach-port", appInstanceId: "app-1", hostInstanceId: "host-1", hostEpoch: 3 };
+    expect(isAgentHostAttachPortMessage(message)).toBe(true);
+    expect(isAgentHostAttachPortMessage({ ...message, hostEpoch: -1 })).toBe(false);
+    expect(isAgentHostAttachPortMessage({ ...message, hostEpoch: "3" })).toBe(false);
+    expect(isAgentHostAttachPortMessage({ ...message, appInstanceId: "" })).toBe(false);
+    expect(isAgentHostAttachPortMessage({ type: "attach-port", hostInstanceId: "host-1", hostEpoch: 3 })).toBe(false);
+    // The renderer-bound origin belongs to pi67:agent-port, never to the host handoff.
+    expect(isAgentHostAttachPortMessage({ ...message, expectedOrigin: "app://pi67" })).toBe(false);
   });
 });

@@ -436,22 +436,6 @@ function debugConnection(
   }
 }
 
-export function isAttachPortMessage(value: unknown): value is {
-  type: "attach-port";
-  expectedOrigin?: string;
-  appInstanceId?: string;
-  hostInstanceId?: string;
-  hostEpoch?: number;
-} {
-  if (typeof value !== "object" || value === null || (value as { type?: unknown }).type !== "attach-port") return false;
-  const candidate = value as Record<string, unknown>;
-  if (candidate.expectedOrigin !== undefined && typeof candidate.expectedOrigin !== "string") return false;
-  if (candidate.appInstanceId !== undefined && typeof candidate.appInstanceId !== "string") return false;
-  if (candidate.hostInstanceId !== undefined && typeof candidate.hostInstanceId !== "string") return false;
-  if (candidate.hostEpoch !== undefined && (!Number.isInteger(candidate.hostEpoch) || Number(candidate.hostEpoch) < 0)) return false;
-  return true;
-}
-
 function extractData(event: unknown): unknown {
   return typeof event === "object" && event !== null && "data" in event
     ? (event as { data: unknown }).data
