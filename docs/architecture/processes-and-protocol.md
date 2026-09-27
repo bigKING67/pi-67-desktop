@@ -17,6 +17,10 @@ Agent 消息不经过 IPC invoke、HTTP 或 WebSocket。Preload 的 invoke API �
 诊断保存、通知、外部链接和更新等系统能力。更新状态（`pi67:update-*` 结果与 `pi67:update-state-changed`）
 由 `@pi67/protocol` 的 `DesktopUpdateStateSchema` 定义并纳入 protocol revision；Main 按该类型构造，renderer 用
 `parseDesktopUpdateState` 校验后才使用。
+原生通知请求、workspace id、workspace entry 请求、关闭检查点请求/响应以及 `pi67:agent-host-startup`/`pi67:agent-host-failed`
+的形状由 `desktop-bridge-messages.ts` 定义；Main 在形状校验之上保留路径包含等信任策略，renderer 丢弃不合规的 Host 状态事件。
+沙盒 preload 不能加载 protocol 运行时代码，其关闭检查点请求检查按同一 schema 内联。持久化状态（workbench layout、composer 草稿、
+workspace file）的 codec 含版本迁移，仍由 Main 拥有。
 
 Renderer loads the protocol Port client and its validation schemas only after an
 exact-source/origin Preload handoff. Loading is generation-bound: a replaced or

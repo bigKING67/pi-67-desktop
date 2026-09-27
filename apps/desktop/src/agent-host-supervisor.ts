@@ -8,7 +8,7 @@ import {
   type AgentHostStartupFailedMessage,
   type AgentHostStartupState,
   type AgentHostShutdownCompleteMessage,
-  type AgentHostShutdownRequest
+  type AgentHostShutdownRequest, type DesktopAgentHostFailureState
 } from "@pi67/protocol";
 import { agentHostEnvironment } from "./agent-host-environment.js";
 import { planAgentHostRestart } from "./agent-host-restart.js";
@@ -325,7 +325,7 @@ export class AgentHostSupervisor {
     if (!restart.recoverable) {
       this.#restartBudgetExhausted = true;
       this.#phase = "failed";
-      window?.webContents.send("pi67:agent-host-failed", { code, recoverable: false });
+      window?.webContents.send("pi67:agent-host-failed", { code, recoverable: false } satisfies DesktopAgentHostFailureState);
       return;
     }
 
@@ -334,7 +334,7 @@ export class AgentHostSupervisor {
       code,
       recoverable: true,
       attempt: restart.attempt
-    });
+    } satisfies DesktopAgentHostFailureState);
     this.#phase = "restart-scheduled";
     this.#restartScheduledAt = Date.now() + restart.delay;
     this.#restartTimer = setTimeout(() => {

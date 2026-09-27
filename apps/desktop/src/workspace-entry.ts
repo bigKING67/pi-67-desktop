@@ -2,7 +2,7 @@ import { realpath } from "node:fs";
 import { lstat } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
-import type { WorkspaceEntryRequest, WorkspaceFileKind } from "@pi67/protocol";
+import { isWorkspaceEntryRequest, type WorkspaceEntryRequest, type WorkspaceFileKind } from "@pi67/protocol";
 import type { WorkbenchStateStore } from "./workbench-state.js";
 import { refreshPersistedWorkspaceDescriptor } from "./workspace-identity.js";
 
@@ -13,18 +13,10 @@ export interface ResolvedWorkspaceEntry extends WorkspaceEntryRequest {
 }
 
 function parseWorkspaceEntryRequest(value: unknown): WorkspaceEntryRequest {
-  if (!isExactRecord(value, ["workspaceId", "relativePath", "kind"])) {
-    throw new Error("Workspace entry request is invalid.");
-  }
-  if (
-    typeof value.workspaceId !== "string"
-    || value.workspaceId.length === 0
-    || value.workspaceId.length > 200
-    || !/^[A-Za-z0-9._:-]+$/u.test(value.workspaceId)
-  ) throw new Error("Workspace id is invalid.");
+  if (!isWorkspaceEntryRequest(value)) throw new Error("Workspace entry request is invalid.");
+  // The protocol owns the shape; Main owns the filesystem policy for the relative path.
   if (!isWorkspaceRelativePath(value.relativePath)) throw new Error("Workspace entry path is invalid.");
-  if (!isWorkspaceFileKind(value.kind)) throw new Error("Workspace entry kind is invalid.");
-  return value as unknown as WorkspaceEntryRequest;
+  return value;
 }
 
 export async function resolveRegisteredWorkspaceEntry(
@@ -69,10 +61,6 @@ function isWorkspaceRelativePath(value: unknown): value is string {
     && segments[0] !== ".git";
 }
 
-function isWorkspaceFileKind(value: unknown): value is WorkspaceFileKind {
-  return value === "file" || value === "directory" || value === "symlink" || value === "other";
-}
-
 function fileKind(metadata: Awaited<ReturnType<typeof lstat>>): WorkspaceFileKind {
   return metadata.isSymbolicLink()
     ? "symlink"
@@ -91,12 +79,4 @@ function assertContained(root: string, candidate: string): void {
 
 function normalizePath(path: string): string {
   return process.platform === "win32" ? path.toLowerCase() : path;
-}
-
-function isExactRecord(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
-  return typeof value === "object"
-    && value !== null
-    && !Array.isArray(value)
-    && Object.keys(value).length === keys.length
-    && Object.keys(value).every((key) => keys.includes(key));
 }

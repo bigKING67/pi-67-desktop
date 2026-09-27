@@ -20,12 +20,13 @@ import type {
 } from "@pi67/domain";
 import type { SupportDiagnosticsUploadReceipt } from "@pi67/support-contract";
 import type { DesktopUpdateState } from "./desktop-update-state.js";
+import type {
+  DesktopAgentHostFailureState,
+  DesktopAgentHostStartupState,
+  ShutdownCheckpointResponse
+} from "./desktop-bridge-messages.js";
 import type { LocalMemorySettingsBridge } from "./local-memory-settings.js";
 import type { StagedPromptAttachment } from "./agent-messages.js";
-import type {
-  AgentHostStartupFailedMessage,
-  AgentHostStartupState
-} from "./supervisor-messages.js";
 import type {
   PromptStashImagesDeleteRequest,
   PromptStashImagesRestoreRequest,
@@ -131,18 +132,7 @@ export interface DesktopPlatformInfo {
 /** Largest content width that still uses the Inspector drawer instead of a docked third region. */
 export const DESKTOP_CONTEXT_DRAWER_MAX_WIDTH = 1_320;
 
-export interface DesktopAgentHostStartupState {
-  hostEpoch: number;
-  startup: AgentHostStartupState;
-}
-
-export interface DesktopAgentHostFailureState {
-  hostEpoch?: number;
-  code: number;
-  recoverable: boolean;
-  attempt?: number;
-  startupFailure?: AgentHostStartupFailedMessage;
-}
+export type { DesktopAgentHostFailureState, DesktopAgentHostStartupState } from "./desktop-bridge-messages.js";
 
 export interface PromptAttachmentNormalization {
   readonly kind: "heic-to-jpeg";
@@ -163,11 +153,6 @@ export interface WorkbenchLayoutV5 {
   runtimeRecovery: RuntimeRecoveryRecord[];
   sessionCreationRecovery: SessionCreationRecoveryRecord[];
   settings: WorkbenchSettingsState;
-}
-
-export interface ShutdownCheckpointResponse {
-  requestId: string;
-  succeeded: boolean;
 }
 
 export type SecureStorageAccess = "available" | "unavailable";

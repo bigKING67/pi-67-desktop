@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ipcMain, type BrowserWindow } from "electron";
+import { isShutdownCheckpointResponse, type ShutdownCheckpointResponse } from "@pi67/protocol";
 
 const REQUEST_CHANNEL = "pi67:renderer-shutdown-checkpoint-requested";
 const COMPLETE_CHANNEL = "pi67:renderer-shutdown-checkpoint-complete";
@@ -95,15 +96,6 @@ interface PendingCheckpoint {
   timer: ReturnType<typeof setTimeout>;
 }
 
-function parseResponse(value: unknown): { requestId: string; succeeded: boolean } | undefined {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
-  const response = value as Record<string, unknown>;
-  if (
-    Object.keys(response).length !== 2
-    || typeof response.requestId !== "string"
-    || response.requestId.length === 0
-    || response.requestId.length > 200
-    || typeof response.succeeded !== "boolean"
-  ) return undefined;
-  return { requestId: response.requestId, succeeded: response.succeeded };
+function parseResponse(value: unknown): ShutdownCheckpointResponse | undefined {
+  return isShutdownCheckpointResponse(value) ? value : undefined;
 }

@@ -3,7 +3,7 @@ import {
   type BrowserWindow,
   type UtilityProcess
 } from "electron";
-import type { AgentHostAttachPortMessage, AgentHostStartupState } from "@pi67/protocol";
+import type { AgentHostAttachPortMessage, AgentHostStartupState, DesktopAgentHostStartupState } from "@pi67/protocol";
 import { rendererDocumentHandoffKey } from "./agent-host-supervisor-contract.js";
 import { isExpectedRendererLocation } from "./renderer-security.js";
 
@@ -41,7 +41,7 @@ export function handoffAgentHostPort(input: {
     window.webContents.send("pi67:agent-host-startup", {
       hostEpoch: input.identity.hostEpoch,
       startup: input.currentStartup
-    });
+    } satisfies DesktopAgentHostStartupState);
   }
   return handoffKey;
 }

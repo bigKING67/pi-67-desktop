@@ -26,6 +26,15 @@ import {
 } from "./repository-environment-schema.js";
 import { DesktopUpdateStateSchema } from "./desktop-update-state.js";
 import {
+  DesktopAgentHostFailureStateSchema,
+  DesktopAgentHostStartupStateSchema,
+  NativeNotificationRequestSchema,
+  ShutdownCheckpointRequestSchema,
+  ShutdownCheckpointResponseSchema,
+  WorkspaceEntryRequestSchema,
+  WorkspaceIdSchema
+} from "./desktop-bridge-messages.js";
+import {
   AgentHostAttachPortMessageSchema,
   AgentHostReadyMessageSchema,
   AgentHostRuntimePoisonedMessageSchema,
@@ -64,6 +73,15 @@ export function canonicalProtocolRevisionMaterial(): string {
     events: EventPayloadSchemas,
     desktop: {
       updateState: DesktopUpdateStateSchema,
+      bridge: {
+        workspaceId: WorkspaceIdSchema,
+        nativeNotificationRequest: NativeNotificationRequestSchema,
+        workspaceEntryRequest: WorkspaceEntryRequestSchema,
+        shutdownCheckpointRequest: ShutdownCheckpointRequestSchema,
+        shutdownCheckpointResponse: ShutdownCheckpointResponseSchema,
+        agentHostStartup: DesktopAgentHostStartupStateSchema,
+        agentHostFailure: DesktopAgentHostFailureStateSchema
+      },
       localMemoryActivation: { request: LocalMemoryActivationRequestSchema, snapshot: LocalMemoryActivationSnapshotSchema, healthCheck: LocalMemoryHealthCheckSchema },
       localMemoryRuntime: { status: LocalMemoryRuntimeStatusSchema, installResult: LocalMemoryRuntimeInstallResultSchema },
       localMemorySettings: { request: LocalMemorySettingsRequestSchema, snapshot: LocalMemorySettingsSnapshotSchema,

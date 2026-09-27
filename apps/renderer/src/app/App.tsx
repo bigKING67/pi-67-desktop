@@ -1,3 +1,4 @@
+import { isDesktopAgentHostFailureState, isDesktopAgentHostStartupState } from "@pi67/protocol";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useApprovalStore } from "../approval/approval-store.js";
 import { DEFAULT_APPLICATION_TITLE } from "../extension-ui/extension-ui-state.js";
@@ -123,13 +124,16 @@ export function App() {
     return () => installation?.deactivate();
   }, [workspace]);
 
+  // Preload events are untrusted input; drop anything outside the protocol contract.
   useEffect(() => window.pi67.system.onAgentHostFailed((state) => {
-    useAppStore.getState().handleAgentHostFailed(state);
+    if (isDesktopAgentHostFailureState(state)) useAppStore.getState().handleAgentHostFailed(state);
   }), []);
 
   useEffect(() => {
     if (typeof window.pi67.system.onAgentHostStartup !== "function") return;
-    return window.pi67.system.onAgentHostStartup(observeAgentHostStartup);
+    return window.pi67.system.onAgentHostStartup((state) => {
+      if (isDesktopAgentHostStartupState(state)) observeAgentHostStartup(state);
+    });
   }, []);
 
   useEffect(() => window.pi67.system.onPowerResume(() => {

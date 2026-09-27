@@ -357,6 +357,8 @@ const systemBridge = {
     return () => ipcRenderer.removeListener("pi67:native-notification-activated", handler);
   },
   onShutdownCheckpointRequested: (listener: (requestId: string) => void): (() => void) => {
+    // Mirrors ShutdownCheckpointRequestSchema in @pi67/protocol; the sandboxed preload bundle
+    // cannot load protocol runtime code, so the exact-shape check stays inline here.
     const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
       if (
         typeof value !== "object"
