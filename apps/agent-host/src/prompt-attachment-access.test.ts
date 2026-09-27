@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -353,16 +353,29 @@ describe("Agent Host prompt attachment access", () => {
   it("rejects a new claimed set at the recovery scan limit while replay remains idempotent", async () => {
     const fixture = await createFixture();
     const task = fixture.owner.forTask("task-a");
-    let firstSetId: string | undefined;
-    for (let index = 0; index < MAX_CLAIMED_SETS_PER_TASK; index += 1) {
+    // Seed N-1 valid on-disk sets directly. Calling claim N times here rescans
+    // 0+1+...+(N-1) manifests during setup, obscuring the boundary under test.
+    const taskDirectory = join(fixture.root, "claimed", createHash("sha256").update("task-a").digest("hex"));
+    for (let index = 0; index < MAX_CLAIMED_SETS_PER_TASK - 1; index += 1) {
       const id = `draft_${index}`;
-      const submissionId = `submission_${index}`;
+      const submissionKey = createHash("sha256").update(`submission_${index}`).digest("hex");
+      const directory = join(taskDirectory, submissionKey);
       await stageFixture(fixture.root, id, `${index}.txt`, "x", "text/plain", "document");
-      const claimed = await task.claim(submissionId, [{ id }]);
-      firstSetId ??= claimed?.id;
+      await mkdir(join(directory, "items"), { recursive: true, mode: 0o700 });
+      await rename(join(fixture.root, "draft", id), join(directory, "items", id));
+      await writeFile(join(directory, "set.json"), JSON.stringify({
+        version: 1, submissionKey, sourceIds: [id], claimedAt: 1,
+        set: { id: `seed_set_${index}`, attachments: [{ id, name: `${index}.txt`, mimeType: "text/plain", byteLength: 1, kind: "document" }] }
+      }), { mode: 0o600 });
     }
+    const lastIndex = MAX_CLAIMED_SETS_PER_TASK - 1;
+    await stageFixture(fixture.root, `draft_${lastIndex}`, `${lastIndex}.txt`, "x", "text/plain", "document");
+    const last = await task.claim(`submission_${lastIndex}`, [{ id: `draft_${lastIndex}` }]);
+    expect(last?.attachments).toHaveLength(1);
+    const firstSetId = "seed_set_0";
     const replay = await task.claim("submission_0", [{ id: "draft_0" }]);
     expect(replay?.id).toBe(firstSetId);
+    await expect(task.claim(`submission_${lastIndex}`, [{ id: `draft_${lastIndex}` }])).resolves.toEqual(last);
 
     await stageFixture(fixture.root, "draft_overflow", "overflow.txt", "x", "text/plain", "document");
     await expect(task.claim("submission_overflow", [{ id: "draft_overflow" }]))
