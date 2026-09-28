@@ -33,14 +33,7 @@ test("lets users persist System, Light, and Dark appearance choices", async ({ p
   await expect(root).toHaveAttribute("data-theme-preference", "system");
   await expect(root).toHaveAttribute("data-theme", "dark");
 
-  const trigger = page.getByRole("button", { name: "帮助与设置" });
-  await trigger.click();
-  const menu = page.getByRole("menu", { name: "帮助与设置" });
-  await expect(menu).toBeVisible();
-  await expect(menu.getByRole("menuitem", { name: "设置", exact: true })).toBeVisible();
-
-  await page.keyboard.press("Escape");
-  await expect(trigger).toBeFocused();
+  await expect(page.getByTestId("settings-entry")).toBeVisible();
   const settings = await openAppearanceSettings(page);
   await expect(settings.getByRole("heading", { name: "外观", exact: true, level: 1 })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("appearance-settings-dark.png"), animations: "disabled" });
@@ -349,9 +342,9 @@ test("renders user messages as compact right-aligned bubbles", async ({ page }) 
 test("keeps unsigned preview downloads explicit, observable, and cancellable", async ({ page }) => {
   await page.goto("/");
   await openWorkspace(page);
-  await page.getByRole("button", { name: "帮助与设置" }).click();
-  await page.getByRole("menu", { name: "帮助与设置" })
-    .getByRole("menuitem", { name: "检查更新", exact: true }).click();
+  await page.keyboard.press("ControlOrMeta+K");
+  await page.getByRole("dialog", { name: "命令面板" })
+    .getByRole("option", { name: /检查更新/u }).click();
 
   const dialog = page.getByRole("dialog", { name: "New Money 更新" });
   await expect(dialog.getByText(/updates\.52671314\.xyz/u)).toBeVisible();
@@ -377,7 +370,7 @@ test("keeps unsigned preview downloads explicit, observable, and cancellable", a
   })).toEqual({ starts: 1, cancellations: 1, openedUrls: [] });
 });
 
-test("projects an automatically discovered version into the help entry and menu", async ({ page }) => {
+test("projects an automatically discovered version into the footer update button", async ({ page }) => {
   await page.goto("/");
   await openWorkspace(page);
   await page.evaluate(() => {
@@ -395,13 +388,9 @@ test("projects an automatically discovered version into the help entry and menu"
     });
   });
 
-  const helpButton = page.getByRole("button", { name: "帮助与设置，有新版本 0.1.0-alpha.2" });
-  await expect(helpButton).toHaveAttribute("data-update-available", "true");
-  await helpButton.click();
-  const updateItem = page.getByRole("menu", { name: "帮助与设置" })
-    .getByRole("menuitem", { name: /发现新版本 0\.1\.0-alpha\.2/u });
-  await expect(updateItem.getByText("新版本", { exact: true })).toBeVisible();
-  await updateItem.click();
+  const updateButton = page.getByRole("button", { name: "更新到 0.1.0-alpha.2" });
+  await expect(updateButton).toHaveText("更新");
+  await updateButton.click();
   await expect(page.getByRole("dialog", { name: "New Money 更新" })
     .getByText("发现 New Money 0.1.0-alpha.2")).toBeVisible();
   expect(await page.evaluate(() => (

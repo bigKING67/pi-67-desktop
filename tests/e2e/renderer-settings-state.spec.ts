@@ -116,9 +116,9 @@ test("keeps update actions disabled until the Main update state is ready", async
   await page.reload();
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.getByRole("button", { name: "帮助与设置" }).click();
-  await page.getByRole("menu", { name: "帮助与设置" })
-    .getByRole("menuitem", { name: "检查更新", exact: true }).click();
+  await page.keyboard.press("ControlOrMeta+K");
+  await page.getByRole("dialog", { name: "命令面板" })
+    .getByRole("option", { name: /检查更新/u }).click();
   const dialog = page.getByRole("dialog", { name: "New Money 更新" });
   await expect(dialog.getByText("正在读取更新状态", { exact: true })).toBeVisible();
   await expect(dialog.getByText("正在确认当前版本和自动检查设置。", { exact: true })).toBeVisible();

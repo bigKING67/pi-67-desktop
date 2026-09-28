@@ -83,8 +83,7 @@ for (const theme of ["light", "dark"] as const) {
     await composer.focus();
     await page.screenshot({ path: testInfo.outputPath(`neutral-${theme}-composer.png`), animations: "disabled" });
 
-    await page.getByRole("button", { name: "帮助与设置" }).click();
-    await page.getByRole("menuitem", { name: "设置", exact: true }).click();
+    await page.getByTestId("settings-entry").click();
     const settings = page.getByTestId("settings-workbench");
     await expect(settings).toBeVisible();
     await settings.getByRole("button", { name: "外观", exact: true }).click();

@@ -26,8 +26,7 @@ async function openSharedSettings(page: Page, bound = true) {
     "enterprise.knowledge.index": { state: "published-local", snapshot: { epoch: teamId, cursor: "1" } }
   } });
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.getByRole("button", { name: "帮助与设置" }).click();
-  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
+  await page.getByTestId("settings-entry").click();
   await page.getByRole("button", { name: "上下文与记忆", exact: true }).click();
   const settings = page.getByTestId("context-memory-settings");
   await settings.getByRole("tab", { name: "团队经验", exact: true }).click();

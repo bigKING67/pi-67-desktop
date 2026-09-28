@@ -17,8 +17,7 @@ test("does not prompt-install Desktop-managed observational memory", async ({ pa
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
   await clearRecordedCommands(page);
-  await page.getByRole("button", { name: "帮助与设置" }).click();
-  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
+  await page.getByTestId("settings-entry").click();
   await page.getByRole("button", { name: "扩展", exact: true }).click();
 
   await expect(page.getByTestId("extension-management-workspace")).toBeVisible();

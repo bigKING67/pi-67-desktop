@@ -1,17 +1,13 @@
 import {
-  CircleHelp,
-  DownloadCloud,
   FolderPlus,
-  Info,
-  Settings2,
+  Settings,
   UserRound
 } from "lucide-react";
 import { lazy, Suspense, useMemo, useState, type RefObject } from "react";
-import { Button, Menu, MenuItem, MenuTrigger, Popover } from "react-aria-components";
+import { Button } from "react-aria-components";
 import piIconUrl from "../assets/pi-icon-64.png";
 import { useAppStore } from "../app/app-store.js";
 import { messages } from "../localization/message-catalog.js";
-import { openKeyboardShortcutsDialog } from "../help/keyboard-shortcuts-dialog-controller.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { useShellStore } from "../shell/shell-store.js";
 import { useUpdateStore } from "../updates/update-store.js";
@@ -115,14 +111,28 @@ export function NavigationRail({
 
       <footer className={`navigation-footer ${styles.footer}`}>
         <Button
+          {...(accountLabel.initial ? { "aria-label": `${accountLabel.title}，账户与团队` } : {})}
           className={styles.accountButton!}
           data-testid="account-settings-entry"
           onPress={() => rendererWorkbenchStore.getState().openSettings("account")}
         >
-          <UserRound aria-hidden="true" size={15} />
-          <span><strong>{accountLabel.title}</strong><small>{accountLabel.detail}</small></span>
+          {accountLabel.initial
+            ? <span aria-hidden="true" className={styles.accountAvatar!}>{accountLabel.initial}</span>
+            : <UserRound aria-hidden="true" size={15} />}
+          <span>
+            <strong>{accountLabel.title}</strong>
+            {accountLabel.initial ? null : <small>{accountLabel.detail}</small>}
+          </span>
         </Button>
-        <HelpMenu />
+        <FooterUpdateButton />
+        <Button
+          aria-label="设置"
+          className={styles.footerIconButton!}
+          data-testid="settings-entry"
+          onPress={() => rendererWorkbenchStore.getState().openSettings("general")}
+        >
+          <Settings aria-hidden="true" size={16} />
+        </Button>
       </footer>
 
       {removalWorkspace ? (
@@ -152,50 +162,19 @@ export function NavigationRail({
   );
 }
 
-function HelpMenu() {
+function FooterUpdateButton() {
   const setUpdateDialogOpen = useShellStore((state) => state.setUpdateDialogOpen);
   const update = useUpdateStore((state) => state.update);
-  const updateAvailable = update.phase === "available";
-  const updateLabel = updateAvailable ? `发现新版本 ${update.version}` : "检查更新";
+  if (update.phase !== "available") return null;
   return (
-    <MenuTrigger>
-      <Button
-        aria-label={updateAvailable ? `帮助与设置，有新版本 ${update.version}` : "帮助与设置"}
-        className={styles.helpButton!}
-        data-testid="help-menu-trigger"
-        data-update-available={updateAvailable}
-      >
-        <CircleHelp aria-hidden="true" size={16} />
-      </Button>
-      <Popover className={`${styles.menuPopover} ${styles.footerMenu}`} placement="top end" offset={6}>
-        <Menu aria-label="帮助与设置" className={styles.menu!}>
-          <MenuItem
-            className={styles.menuItem!}
-            onAction={() => rendererWorkbenchStore.getState().openSettings("general")}
-            textValue="设置"
-          ><Settings2 aria-hidden="true" size={14} />设置</MenuItem>
-          <MenuItem
-            className={styles.menuItem!}
-            onAction={() => setUpdateDialogOpen(true)}
-            textValue={updateLabel}
-          >
-            <DownloadCloud aria-hidden="true" size={14} />
-            <span>{updateLabel}</span>
-            {updateAvailable ? <span className={styles.updateBadge!}>新版本</span> : null}
-          </MenuItem>
-          <MenuItem
-            className={styles.menuItem!}
-            onAction={() => openKeyboardShortcutsDialog()}
-            textValue="键盘快捷键"
-          ><Info aria-hidden="true" size={14} />键盘快捷键</MenuItem>
-          <MenuItem
-            className={styles.menuItem!}
-            onAction={() => rendererWorkbenchStore.getState().openSettings("about")}
-            textValue="关于"
-          ><Info aria-hidden="true" size={14} />关于</MenuItem>
-        </Menu>
-      </Popover>
-    </MenuTrigger>
+    <Button
+      aria-label={`更新到 ${update.version}`}
+      className={styles.updateButton!}
+      data-testid="footer-update-entry"
+      onPress={() => setUpdateDialogOpen(true)}
+    >
+      更新
+    </Button>
   );
 }
 

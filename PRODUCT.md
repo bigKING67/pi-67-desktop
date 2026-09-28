@@ -1136,7 +1136,7 @@ design/protocol contracts; reference inclusion alone does not approve them.
   their own bounded navigation, use a two-column shell on wide windows, and
   provide an explicit `返回工作台` action that restores the prior conversation or
   Workspace without stopping background tasks.
-- The footer account entry and help menu remain compact. Local Pi, Workspace,
+- The footer account entry, update action, and Settings button remain one compact row. Local Pi, Workspace,
   Session, private Memory, and private Experience use never require login. New Money
   sign-in lives under Account & Data, uses browser-approved device authorization,
   and adds only team, project, shared-knowledge, entitlement, and audit capabilities.

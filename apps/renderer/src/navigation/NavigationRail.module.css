@@ -526,7 +526,7 @@
 
 .workspaceDisclosure,
 .workspaceQuickAction,
-.helpButton {
+.footerIconButton {
   display: grid;
   place-items: center;
   padding: 0;
@@ -549,8 +549,8 @@
 .workspaceDisclosure:hover:not(:disabled),
 .workspaceQuickAction:hover:not(:disabled),
 .workspaceQuickAction[data-hovered],
-.helpButton[data-hovered],
-.helpButton[data-pressed] {
+.footerIconButton[data-hovered],
+.footerIconButton[data-pressed] {
   background: var(--surface-hover);
   color: var(--text-primary);
 }
@@ -840,7 +840,7 @@
 
 .footer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--space-2);
 }
@@ -888,26 +888,38 @@
   font-size: var(--font-size-support);
 }
 
-.helpButton {
-  position: relative;
+.accountAvatar {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--surface-active);
+  color: var(--text-primary);
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+}
+
+.updateButton {
+  min-height: 26px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--accent);
+  color: var(--canvas);
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
+}
+
+.updateButton[data-hovered],
+.updateButton[data-pressed] {
+  background: var(--accent-strong);
+}
+
+.footerIconButton {
   width: 34px;
   height: 34px;
-}
-
-.helpButton[data-update-available="true"]::after {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 6px;
-  height: 6px;
-  border: 1px solid var(--surface);
-  border-radius: 999px;
-  background: var(--accent-strong);
-  content: "";
-}
-
-.footerMenu {
-  min-width: 174px;
 }
 
 .dangerMenuItem {
@@ -1011,17 +1023,6 @@
 
 .menuItem[data-disabled] {
   opacity: 0.45;
-}
-
-.updateBadge {
-  margin-left: auto;
-  padding: 2px 5px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1.2;
 }
 
 .workspaceDisclosure:focus-visible,

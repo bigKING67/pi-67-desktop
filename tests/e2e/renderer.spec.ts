@@ -40,7 +40,7 @@ test("opens a trusted Pi workspace through the MessagePort contract", async ({ p
   await expect(page.getByRole("tablist", { name: "已打开的任务" })).toHaveCount(0);
   await expect(page.locator(".title-actions").getByRole("button", { name: /外观：/u })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "打开更多菜单" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "帮助与设置" })).toBeVisible();
+  await expect(page.getByTestId("settings-entry")).toBeVisible();
   await expect(page.locator(".title-actions button").last()).toHaveAttribute("data-testid", "inspector-toggle");
   const conversationBottom = await page.getByLabel("Pi conversation").evaluate((element) => element.getBoundingClientRect().bottom);
   const composerBottom = await page.getByTestId("composer-region").evaluate((element) => element.getBoundingClientRect().bottom);

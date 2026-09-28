@@ -368,9 +368,7 @@ test("offers a verified Lark CLI install before application or user authorizatio
 });
 
 async function openLarkSettings(page: Page) {
-  await page.getByRole("button", { name: "帮助与设置" }).click();
-  await page.getByRole("menu", { name: "帮助与设置" })
-    .getByRole("menuitem", { name: "设置", exact: true }).click();
+  await page.getByTestId("settings-entry").click();
   const settings = page.getByLabel("New Money 设置");
   await expect(settings).toBeVisible();
   await expect(settings.getByRole("navigation", { name: "设置分类" })

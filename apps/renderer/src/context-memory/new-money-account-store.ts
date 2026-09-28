@@ -40,11 +40,15 @@ export function refreshNewMoneyIdentity(read: () => Promise<EnterpriseIdentitySt
   return request;
 }
 
-export function newMoneyAccountLabel(snapshot: AccountSnapshot): { title: string; detail: string } {
+/** `initial` is present only for a confirmed signed-in identity; the footer then shows a compact avatar row. */
+export function newMoneyAccountLabel(snapshot: AccountSnapshot): { title: string; detail: string; initial?: string } {
   if (snapshot.error) return { title: "账户状态待确认", detail: "打开账户设置重试" };
   const identity = snapshot.identity;
   if (!identity) return { title: "New Money 账户", detail: snapshot.loading ? "正在检查登录状态…" : "打开账户设置" };
-  if (identity.state === "signed-in") return { title: identity.displayName || "New Money 用户", detail: "已登录 · 账户与团队" };
+  if (identity.state === "signed-in") {
+    const title = identity.displayName?.trim() || "New Money 用户";
+    return { title, detail: "已登录 · 账户与团队", initial: Array.from(title)[0]!.toLocaleUpperCase() };
+  }
   if (identity.state === "pending") return { title: "等待登录确认", detail: "打开账户设置" };
   if (identity.state === "expired") return { title: "重新登录 New Money", detail: "登录已过期" };
   return { title: "登录 New Money", detail: "未登录也可使用私人会话" };

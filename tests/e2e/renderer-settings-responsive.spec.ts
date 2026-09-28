@@ -181,7 +181,7 @@ test("keeps local Settings workspaces inside a 1040 pixel application surface", 
   await installPackageFixture(page);
   await installUsageFixture(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await expect(page.getByRole("button", { name: "帮助与设置" })).toBeVisible();
+  await expect(page.getByTestId("settings-entry")).toBeVisible();
   await page.keyboard.press("Control+,");
 
   const settings = page.getByLabel("New Money 设置");
@@ -250,7 +250,7 @@ test("keeps every Settings category on one centered document measure without sid
   await installPackageFixture(page);
   await installUsageFixture(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await expect(page.getByRole("button", { name: "帮助与设置" })).toBeVisible();
+  await expect(page.getByTestId("settings-entry")).toBeVisible();
   await page.keyboard.press("Control+,");
 
   const settings = page.getByLabel("New Money 设置");

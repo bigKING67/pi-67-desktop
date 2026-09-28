@@ -94,7 +94,7 @@ test("uses the left workspace conversation list instead of horizontal task tabs"
   await expect(page.getByRole("tablist", { name: "已打开的任务" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /关闭任务/u })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /登录 New Money\s*未登录也可使用私人会话/u })).toBeVisible();
-  await expect(page.getByRole("button", { name: "帮助与设置" })).toBeVisible();
+  await expect(page.getByTestId("settings-entry")).toBeVisible();
 
   const titleActions = page.locator(".title-actions");
   await expect(titleActions.locator("button").last()).toHaveAttribute("data-testid", "inspector-toggle");

@@ -84,28 +84,21 @@ test("stops a running task from its conversation row without deleting Pi JSONL h
   await expect(page.getByRole("button", { name: "打开对话", exact: true })).toBeVisible();
 });
 
-test("opens Settings, update, and help from the lower-left help menu", async ({ page }) => {
+test("opens Account and Settings directly from the lower-left footer", async ({ page }) => {
   await openWorkbench(page);
-  const helpButton = page.getByRole("button", { name: "帮助与设置" });
+  const settingsButton = page.getByTestId("settings-entry");
+  await expect(page.getByRole("button", { name: "帮助与设置" })).toHaveCount(0);
+  await expect(page.getByTestId("footer-update-entry")).toHaveCount(0);
 
-  await helpButton.click();
-  await page.getByRole("menuitem", { name: "检查更新" }).click();
-  await expect(page.getByRole("dialog", { name: "New Money 更新" })).toBeVisible();
-  await page.getByRole("dialog", { name: "New Money 更新" })
-    .getByRole("button", { name: "关闭" }).click();
-
-  await helpButton.click();
-  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
+  await settingsButton.click();
   await expect(page.getByLabel("New Money 设置")).toBeVisible();
   await expect(page.getByRole("heading", { name: "外观", exact: true, level: 1 })).toBeVisible();
 
   await page.getByRole("button", { name: "返回工作台" }).click();
-  await expect(helpButton).toBeVisible();
+  await expect(settingsButton).toBeVisible();
 
-  await helpButton.click();
-  await page.getByRole("menuitem", { name: "关于", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "关于", exact: true })).toBeVisible();
-  await expect(page.getByText("用 AI 创造新的价值。", { exact: true })).toBeVisible();
+  await page.getByTestId("account-settings-entry").click();
+  await expect(page.getByLabel("New Money 设置")).toBeVisible();
 });
 
 test("keeps long workspace and session names inside the navigation column", async ({ page }) => {

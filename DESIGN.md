@@ -1456,13 +1456,17 @@ loading error where the operation can produce those states
   states that only the workbench registration is removed and that the directory,
   Pi Sessions, and project files are not deleted. Open or live Tasks must be
   stopped first so removal cannot orphan a Runtime or discard a draft implicitly.
-- The footer places the signed-out account entry on the left and a `?` menu on
-  the right. Account opens Settings/Account. The `?` menu contains Settings,
-  Check for Updates, and Help; refresh and Session import belong to the owning
-  Workspace overflow menu. When the packaged Main process discovers a newer
-  complete release, the `?` control gains one non-numeric accent dot and the menu
-  action becomes `发现新版本 <version>` with a compact `新版本` badge. Clicking it
-  opens the shared update status; it never starts a download or installation.
+- The footer is one row: the account entry on the left, then an optional `更新`
+  button, then a gear icon button. Account opens Settings/Account; the gear opens
+  Settings directly. A confirmed signed-in identity shows a 24px neutral initial
+  avatar (first visible character of the display name, `--surface-active`) and the
+  name on a single line; every other account state keeps the person icon and a
+  second actionable line. Keyboard shortcuts, About, and manual update checks live
+  in Settings and the command palette; refresh and Session import belong to the
+  owning Workspace overflow menu. When the packaged Main process discovers a newer
+  complete release, a compact `更新` button (control radius, `--accent` fill,
+  accessible name `更新到 <version>`) appears before the gear. Clicking it opens the
+  shared update status; it never starts a download or installation.
 - Account v1 is truthfully `signed-out`: local Pi, Workspaces, and Sessions remain
   available, while enterprise/team features are described as not yet connected.
 - `Cmd/Ctrl+N` creates a conversation in the current Workspace; `Cmd/Ctrl+T` is a

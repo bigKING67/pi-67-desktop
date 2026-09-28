@@ -37,8 +37,7 @@ export async function openPackageSettings(page: Page, items: PackageEntry[]): Pr
     items,
     total: items.length
   });
-  await page.getByRole("button", { name: "帮助与设置" }).click();
-  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
+  await page.getByTestId("settings-entry").click();
   await page.getByRole("button", { name: "扩展", exact: true }).click();
   await expect.poll(async () => (
     await recordedCommandDetails(page)

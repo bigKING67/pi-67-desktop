@@ -15,7 +15,17 @@ describe("shared New Money presentation state", () => {
     const first = refreshNewMoneyIdentity(read), second = refreshNewMoneyIdentity(read);
     expect(first).toBe(second); expect(read).toHaveBeenCalledTimes(1);
     resolve({ state: "signed-in", displayName: "Test account" }); await first;
-    expect(newMoneyAccountLabel(newMoneyAccountStore.getState())).toEqual({title:"Test account",detail:"已登录 · 账户与团队"});
+    expect(newMoneyAccountLabel(newMoneyAccountStore.getState())).toEqual({title:"Test account",detail:"已登录 · 账户与团队",initial:"T"});
+  });
+  it("derives the footer initial from the first visible character of the signed-in name", () => {
+    publishNewMoneyIdentity({state:"signed-in",displayName:"  whois67"});
+    expect(newMoneyAccountLabel(newMoneyAccountStore.getState()).initial).toBe("W");
+    publishNewMoneyIdentity({state:"signed-in",displayName:"六七"});
+    expect(newMoneyAccountLabel(newMoneyAccountStore.getState()).initial).toBe("六");
+    publishNewMoneyIdentity({state:"signed-in"});
+    expect(newMoneyAccountLabel(newMoneyAccountStore.getState())).toMatchObject({title:"New Money 用户",initial:"N"});
+    publishNewMoneyIdentity({state:"expired"});
+    expect(newMoneyAccountLabel(newMoneyAccountStore.getState()).initial).toBeUndefined();
   });
   it("does not allow a late signed-in read to undo logout", async () => {
     let resolve!: (value: EnterpriseIdentityStatus) => void;

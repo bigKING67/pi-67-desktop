@@ -30,8 +30,7 @@ test("managed memory checks stay separate from legacy health in both themes", as
     "enterprise.identity.get": { state: "signed-out" }
   } });
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.getByRole("button", { name: "帮助与设置" }).click();
-  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
+  await page.getByTestId("settings-entry").click();
   await page.getByRole("button", { name: "上下文与记忆", exact: true }).click();
   const settings = page.getByTestId("context-memory-settings");
   await expect(settings.getByText("本地服务运行中", { exact: true })).toBeVisible();
@@ -72,8 +71,7 @@ test("memory settings preserve one draft across tabs, use keyboard radios, and g
     "enterprise.workspace.get": { state: "unbound", workspaceId: DEFAULT_MOCK_WORKSPACE.id }
   } });
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.getByRole("button", { name: "帮助与设置" }).click();
-  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
+  await page.getByTestId("settings-entry").click();
   await page.getByRole("button", { name: "上下文与记忆", exact: true }).click();
   const settings = page.getByTestId("context-memory-settings");
   await expect(settings.getByRole("tab", { name: "记忆与隐私" })).toHaveAttribute("aria-selected", "true");
@@ -164,8 +162,7 @@ test("memory settings keep an unsaved draft across a background identity failure
     "enterprise.workspace.get": { state: "unbound", workspaceId: DEFAULT_MOCK_WORKSPACE.id }
   } });
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.getByRole("button", { name: "帮助与设置" }).click();
-  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
+  await page.getByTestId("settings-entry").click();
   await page.getByRole("button", { name: "上下文与记忆", exact: true }).click();
   const settings = page.getByTestId("context-memory-settings");
   const fullLearning = settings.getByRole("radio", { name: /完整学习/ });
@@ -211,8 +208,7 @@ test("command palette exits from Settings go through the unsaved draft guard", a
     "enterprise.workspace.get": { state: "unbound", workspaceId: DEFAULT_MOCK_WORKSPACE.id }
   } });
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.getByRole("button", { name: "帮助与设置" }).click();
-  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
+  await page.getByTestId("settings-entry").click();
   await page.getByRole("button", { name: "上下文与记忆", exact: true }).click();
   const settings = page.getByTestId("context-memory-settings");
   const fullLearning = settings.getByRole("radio", { name: /完整学习/ });
@@ -249,8 +245,7 @@ test("discarding a draft to reach another Settings page focuses that page headin
     "enterprise.workspace.get": { state: "unbound", workspaceId: DEFAULT_MOCK_WORKSPACE.id }
   } });
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.getByRole("button", { name: "帮助与设置" }).click();
-  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
+  await page.getByTestId("settings-entry").click();
   await page.getByRole("button", { name: "上下文与记忆", exact: true }).click();
   const settings = page.getByTestId("context-memory-settings");
   await settings.getByRole("radio", { name: /^私人学习/ }).focus();
