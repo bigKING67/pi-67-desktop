@@ -47,29 +47,13 @@
 }
 
 .statusBar {
-  min-height: 48px;
-  background: color-mix(in srgb, var(--surface-muted) 54%, var(--surface));
+  min-height: 40px;
 }
 
-.syncStatus,
 .editorHeading > div {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.syncStatus {
-  color: var(--warning);
-}
-
-.syncStatus[data-current="true"] {
-  color: var(--success);
-}
-
-.syncStatus small {
-  color: var(--text-tertiary);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-caption);
 }
 
 .conflict,

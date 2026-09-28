@@ -2762,8 +2762,14 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
   far right. Dirty or erroneous details still cannot collapse.
 - `SettingsNotice` is reserved for states that need action; info tone is a neutral muted
   surface, warning and danger use a light tint without a colored edge.
-- Catalog pages (models, extensions, skills, prompts, rules) use a list with a detail pane;
-  other pages use grouped rows in the centered column. Keyboard shortcuts live on the
+- Catalog pages (models, extensions, skills, prompts, rules, usage) use the 1040px frame with
+  catalog cards whose rows follow the same anatomy (`SettingsCatalogRow` has no leading slot;
+  status sits in `trailing` as `SettingsStatus`, metadata is plain text, not pills). Extensions
+  keep their detail beside the list; model, skill and rule editors open as a drill-in page
+  because they are full editors. Other pages use grouped rows in the centered column.
+- Secondary refresh/reload actions are `SettingsIconAction` (icon with tooltip, accessible
+  name = label). Counts use the UI font with tabular numbers; the code font is reserved for
+  paths, identifiers and editors. Keyboard shortcuts live on the
   standard Appearance page as compact rows: action, individual keycaps, reset only when
   customized, detail and contexts in an on-demand info tip.
 - Choices use `SettingsSelect` and `SettingsCheckbox`; native select and checkbox controls

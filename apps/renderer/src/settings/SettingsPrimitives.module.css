@@ -207,6 +207,10 @@
 .catalog {
   display: grid;
   min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
 }
 
 .catalogItem {
@@ -215,7 +219,6 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: stretch;
   border-bottom: 1px solid var(--border);
-  border-radius: 9px;
 }
 
 .catalogItem:last-child {
@@ -226,20 +229,15 @@
   display: grid;
   width: 100%;
   min-width: 0;
-  min-height: 72px;
+  min-height: 56px;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 16px;
-  padding: 12px 10px;
+  padding: 10px 16px;
   border: 0;
-  border-radius: 9px;
   background: transparent;
   color: var(--text-primary);
   text-align: left;
-}
-
-.catalogRow:has(.catalogLeading) {
-  grid-template-columns: 32px minmax(0, 1fr) auto;
 }
 
 .catalogItem:hover,
@@ -248,7 +246,7 @@
 }
 
 .catalogRow[aria-pressed="true"] {
-  background: var(--surface-muted);
+  background: var(--surface-active);
 }
 
 .catalogRow:focus-visible {
@@ -256,25 +254,17 @@
   outline-offset: -2px;
 }
 
-.catalogLeading {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  color: var(--text-secondary);
-}
-
 .catalogIdentity {
   display: grid;
   min-width: 0;
-  gap: 3px;
+  gap: 2px;
 }
 
 .catalogIdentity strong {
   overflow: hidden;
   color: var(--text-primary);
   font-size: var(--font-size-interface);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -282,7 +272,7 @@
 .catalogIdentity small,
 .catalogMeta {
   overflow: hidden;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   font-size: var(--font-size-support);
   line-height: 1.45;
   text-overflow: ellipsis;
@@ -297,6 +287,7 @@
   min-width: 0;
   align-items: center;
   justify-content: flex-end;
+  gap: 8px;
   color: var(--text-secondary);
   font-size: var(--font-size-support);
 }
@@ -410,13 +401,8 @@
     flex-wrap: wrap;
   }
 
-  .catalogRow,
-  .catalogRow:has(.catalogLeading) {
+  .catalogRow {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .catalogLeading {
-    display: none;
   }
 
   .catalogTrailing {

@@ -148,32 +148,6 @@
   cursor: not-allowed;
 }
 
-.suiteIcon {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--surface-muted);
-  color: var(--text-secondary);
-}
-
-.suiteIcon[data-status="ready"] {
-  color: var(--success);
-}
-
-.suiteIcon[data-status="partial"],
-.suiteIcon[data-status="unavailable"] {
-  color: var(--warning);
-}
-
-.suiteTrailing {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .suiteDetail {
   display: grid;
   min-width: 0;
@@ -406,3 +380,5 @@
     animation: none;
   }
 }
+
+.suiteChevron { flex: none; color: var(--text-tertiary); }

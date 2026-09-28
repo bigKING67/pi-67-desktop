@@ -1,9 +1,6 @@
 import type { SkillPackEntry } from "@pi67/domain";
 import {
   ChevronRight,
-  FolderOpen,
-  Globe2,
-  Layers3,
   RefreshCw
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -18,6 +15,7 @@ import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   BundledSkillSuiteDetail,
   suiteStatus,
+  suiteStatusTone,
   suiteVersionSummary
 } from "./BundledSkillSuiteDetail.js";
 import { useDesktopCapabilitySnapshot } from "./DesktopCapabilityPanels.js";
@@ -38,8 +36,10 @@ import { useSkillPackStore } from "./skill-pack-store.js";
 import {
   SettingsCatalog,
   SettingsCatalogRow,
+  SettingsIconAction,
   SettingsNotice,
-  SettingsSectionBlock
+  SettingsSectionBlock,
+  SettingsStatus
 } from "./SettingsPrimitives.js";
 import styles from "./SkillSettingsWorkspace.module.css";
 import tabStyles from "./SettingsPrimitives.module.css";
@@ -63,10 +63,10 @@ export function SkillSettingsWorkspace() {
     >
       <TabList aria-label="技能可用范围" className={tabStyles.tabList!}>
         <Tab className={tabStyles.tab!} id="global">
-          <Globe2 aria-hidden="true" size={15} />全局可用
+          全局可用
         </Tab>
         <Tab className={tabStyles.tab!} id="project">
-          <FolderOpen aria-hidden="true" size={15} />项目专属
+          项目专属
         </Tab>
       </TabList>
       <TabPanel className={tabStyles.tabPanel!} id="global">
@@ -260,14 +260,12 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
           />
           {phase === "checking" ? "检查中…" : updateCount > 0 ? `待处理 ${updateCount}` : "检查技能更新"}
         </Button>
-        <Button
-          className="secondary-button"
+        <SettingsIconAction
+          label={capability.phase === "loading" ? "刷新中…" : "刷新状态"}
+          icon={<RefreshCw aria-hidden="true" size={14} />}
           isDisabled={capability.phase === "loading"}
           onPress={() => void capability.refresh()}
-        >
-          <RefreshCw aria-hidden="true" size={14} />
-          {capability.phase === "loading" ? "刷新中…" : "刷新状态"}
-        </Button>
+        />
       </span>}
       title="内置技能套件"
       description={suites.length > 0
@@ -302,9 +300,6 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
             ) : undefined}
             key={suite.id}
             description={suite.description}
-            leading={<span className={styles.suiteIcon} data-status={status.id}>
-              <Layers3 aria-hidden="true" size={16} />
-            </span>}
             meta={`${pack?.skillIds.length ?? suite.skills.length} 个技能 · ${suiteVersionSummary(suite, pack)}`}
             onSelect={() => {
               setQuery("");
@@ -312,9 +307,10 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
             }}
             testId="bundled-skill-suite-row"
             title={suite.displayName}
-            trailing={<span className={styles.suiteTrailing}>
-              <span>{status.label}</span><ChevronRight aria-hidden="true" size={15} />
-            </span>}
+            trailing={<>
+              <SettingsStatus tone={suiteStatusTone(status, pack)}>{status.label}</SettingsStatus>
+              <ChevronRight aria-hidden="true" className={styles.suiteChevron} size={15} />
+            </>}
           />
         );
       })}</SettingsCatalog> : (

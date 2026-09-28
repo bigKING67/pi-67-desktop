@@ -190,10 +190,10 @@ export function SettingsCatalog({ children, className, label }: {
   return <div aria-label={label} className={`${styles.catalog} ${className ?? ""}`} role="list">{children}</div>;
 }
 
+/** Catalog entry: same anatomy as SettingsRow (no leading icon); status belongs in `trailing`. */
 export function SettingsCatalogRow({
   title,
   description,
-  leading,
   meta,
   trailing,
   actions,
@@ -203,7 +203,6 @@ export function SettingsCatalogRow({
 }: {
   title: ReactNode;
   description?: ReactNode;
-  leading?: ReactNode;
   meta?: ReactNode;
   trailing?: ReactNode;
   actions?: ReactNode;
@@ -220,7 +219,6 @@ export function SettingsCatalogRow({
         onClick={onSelect}
         type="button"
       >
-        {leading ? <span className={styles.catalogLeading}>{leading}</span> : null}
         <span className={styles.catalogIdentity}>
           <strong>{title}</strong>
           {description ? <small>{description}</small> : null}

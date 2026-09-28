@@ -7,7 +7,8 @@ import {
   SettingsNotice,
   SettingsRow,
   SettingsRows,
-  SettingsSectionBlock
+  SettingsSectionBlock,
+  type SettingsStatusTone
 } from "./SettingsPrimitives.js";
 import styles from "./SkillSettingsWorkspace.module.css";
 
@@ -137,6 +138,11 @@ export function BundledSkillSuiteDetail({ suite, pack, query, busy, onBack, onMu
       </SettingsSectionBlock>
     </div>
   );
+}
+
+export function suiteStatusTone(status: ReturnType<typeof suiteStatus>, pack?: SkillPackEntry): SettingsStatusTone {
+  if (pack?.updateStatus === "not-checked") return "neutral";
+  return status.id === "ready" ? "success" : status.id === "partial" ? "warning" : "danger";
 }
 
 export function suiteStatus(suite: DesktopBundledSkillSuiteSummary, pack?: SkillPackEntry): {

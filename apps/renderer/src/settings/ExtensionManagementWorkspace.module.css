@@ -41,9 +41,9 @@
 
 .authorizationNotice {
   margin: 0;
-  padding: 9px 11px;
-  border-left: 3px solid var(--info);
-  background: color-mix(in srgb, var(--info) 7%, var(--surface));
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
   color: var(--text-secondary);
   font-size: var(--font-size-support);
   line-height: 1.5;
@@ -70,40 +70,41 @@
 
 .tabList {
   min-width: 0;
-  gap: var(--space-1);
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
 }
 
 .tab {
   display: inline-flex;
-  min-height: 34px;
+  min-height: 28px;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   padding: 0 10px;
   border: 0;
-  border-radius: var(--radius-control);
+  border-radius: 6px;
   background: transparent;
   color: var(--text-secondary);
   font-size: var(--font-size-interface);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-regular);
 }
 
 .tab span,
 .filterButton span {
   color: var(--text-tertiary);
-  font-family: var(--font-code);
   font-size: var(--font-size-support);
-  font-variant-ligatures: none;
   font-variant-numeric: tabular-nums;
 }
 
 .tab[data-hovered] {
-  background: var(--surface-hover);
   color: var(--text-primary);
 }
 
 .tab[data-selected] {
   background: var(--surface-active);
   color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
 }
 
 .tab[data-focus-visible],
@@ -183,14 +184,12 @@
 }
 
 .filterButton[data-hovered] {
-  background: var(--surface-hover);
   color: var(--text-primary);
 }
 
 .filterButton[aria-pressed="true"] {
-  border-color: var(--border);
-  background: var(--surface-muted);
   color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
 }
 
 .managementSurface {

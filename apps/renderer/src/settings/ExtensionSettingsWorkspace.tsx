@@ -1,4 +1,4 @@
-import { FileText, PackageOpen, Puzzle, RefreshCw, SquareCode } from "lucide-react";
+import { FileText, RefreshCw } from "lucide-react";
 import { Button, Tab, TabList, TabPanel, Tabs } from "react-aria-components";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { useSettingsNavigation } from "./SettingsDraftGuard.js";
@@ -25,13 +25,13 @@ export function ExtensionSettingsWorkspace() {
     <Tabs className={styles.workspace!} defaultSelectedKey="packages" data-testid="extension-settings-workspace">
       <TabList aria-label="扩展管理分类" className={tabStyles.tabList!}>
         <Tab className={tabStyles.tab!} id="packages">
-          <PackageOpen aria-hidden="true" size={15} />扩展包
+          扩展包
         </Tab>
         <Tab className={tabStyles.tab!} id="bundled">
-          <Puzzle aria-hidden="true" size={15} />内置扩展
+          内置扩展
         </Tab>
         <Tab className={tabStyles.tab!} id="local">
-          <SquareCode aria-hidden="true" size={15} />本地扩展
+          本地扩展
         </Tab>
       </TabList>
       <TabPanel className={`${tabStyles.tabPanel} ${styles.packagePanel}`} id="packages">

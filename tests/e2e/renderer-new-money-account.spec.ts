@@ -153,7 +153,7 @@ for (const theme of ["light", "dark"] as const) {
         await expect(settings.getByRole("textbox", { name: "New Money 服务地址" })).toHaveValue("https://newmoney.example.test");
       } else {
         await expect(settings.getByRole("radio")).toHaveCount(4);
-        await expect(settings.getByRole("button", { name: "保存更改", exact: true })).toBeDisabled();
+        await expect(settings.getByRole("button", { name: "保存更改", exact: true })).toHaveCount(0);
       }
       const commands = await recordedCommandDetails(page);
       expect(commands.filter(command => command.type === "context.config.get")).toHaveLength(readsBefore + 1);

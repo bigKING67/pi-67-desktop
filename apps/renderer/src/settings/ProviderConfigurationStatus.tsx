@@ -1,8 +1,7 @@
 import type { PiProviderConfigurationSnapshot } from "@pi67/protocol";
-import { AlertTriangle, Check, FileJson2, RefreshCw } from "lucide-react";
+import { FileJson2, RefreshCw, RotateCcw } from "lucide-react";
 import type { ReactNode } from "react";
-import { Button } from "react-aria-components";
-import { SettingsToolbar, useRequiredOpenDisclosure } from "./SettingsPrimitives.js";
+import { SettingsIconAction, SettingsStatus, SettingsToolbar, useRequiredOpenDisclosure } from "./SettingsPrimitives.js";
 import styles from "./ProviderConfigurationPanel.module.css";
 
 export function ProviderConfigurationFiles({ snapshot }: { snapshot: PiProviderConfigurationSnapshot }) {
@@ -54,26 +53,22 @@ export function ProviderConfigurationStatusBar({
 }) {
   return <SettingsToolbar
     className={styles.statusBar!}
-    status={<span className={styles.syncStatus} data-current={snapshot.syncState === "current"}>
-      {snapshot.syncState === "current"
-        ? <Check aria-hidden="true" size={14} />
-        : <AlertTriangle aria-hidden="true" size={14} />}
-      <strong>{snapshot.syncState === "current" ? "配置已同步" : "配置需要处理"}</strong>
-      <small>与 Pi 共用当前用户配置</small>
-    </span>}
+    status={<SettingsStatus tone={snapshot.syncState === "current" ? "success" : "warning"}>
+      {snapshot.syncState === "current" ? "配置已同步" : "配置需要处理"}
+    </SettingsStatus>}
     actions={<>
-      {onRefreshCatalog ? <Button
-        className="secondary-button"
+      {onRefreshCatalog ? <SettingsIconAction
+        label={catalogBusy ? "刷新目录中…" : "刷新模型目录"}
+        icon={<RefreshCw aria-hidden="true" size={14} />}
         isDisabled={busy || catalogBusy}
-        aria-description="重新读取可用模型目录，不保存配置或测试连接"
         onPress={onRefreshCatalog}
-      >
-        <RefreshCw aria-hidden="true" size={14} />
-        {catalogBusy ? "刷新目录中…" : "刷新模型目录"}
-      </Button> : null}
-      <Button className="secondary-button" isDisabled={busy || catalogBusy} aria-description="从已保存的配置文件重新读取设置" onPress={onReload}>
-        <RefreshCw aria-hidden="true" size={14} />重新加载配置
-      </Button>
+      /> : null}
+      <SettingsIconAction
+        label="重新加载配置"
+        icon={<RotateCcw aria-hidden="true" size={14} />}
+        isDisabled={busy || catalogBusy}
+        onPress={onReload}
+      />
     </>}
   />;
 }

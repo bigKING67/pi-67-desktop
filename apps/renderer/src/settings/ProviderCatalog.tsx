@@ -1,7 +1,7 @@
 import type { PiProviderConfigurationView } from "@pi67/protocol";
 import { Plus, Search, X } from "lucide-react";
 import { Button, Input } from "react-aria-components";
-import { SettingsCatalog, SettingsCatalogRow } from "./SettingsPrimitives.js";
+import { SettingsCatalog, SettingsCatalogRow, SettingsStatus } from "./SettingsPrimitives.js";
 import styles from "./ProviderCatalog.module.css";
 
 export type ProviderCatalogView = "configured" | "available" | "custom";
@@ -101,10 +101,8 @@ export function ProviderCatalog({
                 onSelect={() => onSelect(provider.id)}
                 selected={provider.id === selectedProviderId}
                 title={provider.name ?? provider.id}
-                trailing={<span className={styles.providerMeta}>
-                  <strong data-configured={provider.configured}>{provider.configured ? "已配置" : "待配置"}</strong>
-                  <small>{provider.origin === "builtin" ? "Pi 内置" : "Pi models.json"} · {provider.modelCount} 个模型</small>
-                </span>}
+                meta={`${provider.origin === "builtin" ? "Pi 内置" : "Pi models.json"} · ${provider.modelCount} 个模型`}
+                trailing={<SettingsStatus tone={provider.configured ? "success" : "neutral"}>{provider.configured ? "已配置" : "待配置"}</SettingsStatus>}
               />
             ))}
           </SettingsCatalog>

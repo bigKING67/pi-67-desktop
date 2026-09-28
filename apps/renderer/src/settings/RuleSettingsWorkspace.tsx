@@ -2,8 +2,6 @@ import { MAX_CONTEXT_FILE_BYTES, type ContextFileSummary } from "@pi67/domain";
 import {
   Code2,
   Eye,
-  FolderOpen,
-  Globe2,
   Save
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -141,10 +139,10 @@ export function RuleSettingsWorkspace() {
       >
         <TabList aria-label="工作规则范围" className={tabStyles.tabList!}>
           <Tab className={tabStyles.tab!} id="global">
-            <Globe2 aria-hidden="true" size={15} />全局
+            全局
           </Tab>
           <Tab className={tabStyles.tab!} id="project">
-            <FolderOpen aria-hidden="true" size={15} />项目
+            项目
           </Tab>
         </TabList>
         <TabPanel className={tabStyles.tabPanel!} id="global">

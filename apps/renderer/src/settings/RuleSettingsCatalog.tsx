@@ -1,12 +1,14 @@
 import type { ContextFileScope, ContextFileSummary } from "@pi67/domain";
-import { ChevronDown, ChevronRight, FilePlus2, FileText, LockKeyhole, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
-import { Button } from "react-aria-components";
 import {
   SettingsCatalog,
   SettingsCatalogRow,
+  SettingsIconAction,
   SettingsNotice,
-  SettingsSectionBlock
+  SettingsSectionBlock,
+  SettingsStatus,
+  type SettingsStatusTone
 } from "./SettingsPrimitives.js";
 import styles from "./RuleSettingsWorkspace.module.css";
 
@@ -222,20 +224,14 @@ function CatalogSection({ title, description, items, actions, onSelect }: {
             <SettingsCatalogRow
               description={<span className={styles.path}>{item.path}</span>}
               key={item.id}
-              leading={item.presence === "missing"
-                ? <FilePlus2 aria-hidden="true" size={17} />
-                : item.access === "read-only"
-                  ? <LockKeyhole aria-hidden="true" size={17} />
-                  : <FileText aria-hidden="true" size={17} />}
-              meta={<span className={styles.meta}>
-                <span>{contextFileScopeLabel(item.scope)}</span>
-                <span>{contextFileAccessLabel(item)}</span>
-                <span>{contextFileStatusLabel(item)}</span>
-              </span>}
+              meta={`${contextFileScopeLabel(item.scope)} · ${contextFileAccessLabel(item)}`}
               onSelect={() => onSelect(item)}
               testId={`context-file-${item.id}`}
               title={item.name}
-              trailing={<ChevronRight aria-hidden="true" size={15} />}
+              trailing={<>
+                <SettingsStatus tone={contextFileStatusTone(item)}>{contextFileStatusLabel(item)}</SettingsStatus>
+                <ChevronRight aria-hidden="true" className={styles.rowChevron} size={15} />
+              </>}
             />
           ))}
         </SettingsCatalog>
@@ -246,9 +242,12 @@ function CatalogSection({ title, description, items, actions, onSelect }: {
 
 function RefreshButton({ busy, onPress }: { busy: boolean; onPress: () => void }) {
   return (
-    <Button className="secondary-button" isDisabled={busy} onPress={onPress}>
-      <RefreshCw aria-hidden="true" className={busy ? styles.spinning : undefined} size={14} />刷新
-    </Button>
+    <SettingsIconAction
+      label="刷新"
+      icon={<RefreshCw aria-hidden="true" className={busy ? styles.spinning : undefined} size={14} />}
+      isDisabled={busy}
+      onPress={onPress}
+    />
   );
 }
 
@@ -263,6 +262,13 @@ export function contextFileAccessLabel(item: ContextFileSummary): string {
   if (item.access === "editable") return "可编辑";
   if (item.access === "creatable") return "可创建";
   return item.presence === "missing" ? "不可创建" : "只读";
+}
+
+function contextFileStatusTone(item: ContextFileSummary): SettingsStatusTone {
+  if (item.presence === "missing") return "neutral";
+  if (item.runtimeState === "active") return "success";
+  if (item.runtimeState === "overridden" || item.runtimeState === "not-loaded") return "warning";
+  return "danger";
 }
 
 export function contextFileStatusLabel(item: ContextFileSummary): string {
