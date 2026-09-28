@@ -37,6 +37,7 @@ describe("unsigned preview R2 update manifest", () => {
     expect(fetcher).toHaveBeenCalledWith(UPDATE_MANIFEST_URL, expect.objectContaining({
       method: "GET",
       redirect: "error",
+      cache: "no-store",
       headers: {
         Accept: "application/json",
         "User-Agent": "Pi-67-Desktop/0.1.0-alpha.1"

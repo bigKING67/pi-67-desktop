@@ -65,6 +65,9 @@ export async function checkForUnsignedPreviewUpdate(
       "User-Agent": `Pi-67-Desktop/${currentVersion}`
     },
     redirect: "error",
+    // The manifest is mutable (withdrawals replace it); never trust a cached copy even if an
+    // edge rule stops sending Cache-Control: no-store.
+    cache: "no-store",
     signal: options.signal ?? AbortSignal.timeout(requestTimeoutMilliseconds)
   });
   if (!response.ok) throw new Error(`Pi-67 update manifest request failed with HTTP ${response.status}.`);
