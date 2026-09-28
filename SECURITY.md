@@ -10,8 +10,9 @@
 - renderer 运行于 `sandbox: true`、`contextIsolation: true`、
   `nodeIntegration: false`，只获得窄化 Preload API 和一个 MessagePort。
 - renderer CSP 仅为 Shiki 的 Oniguruma engine 开放 `'wasm-unsafe-eval'`，并只允许
-  same-origin module worker 承载语法高亮；不开放 JavaScript `'unsafe-eval'`、inline
-  script、远程 script/worker 或 extension script 注入。
+  same-origin module worker 承载语法高亮和流式 Markdown 解析；为组件运行时样式开放
+  `style-src 'unsafe-inline'`。不开放 JavaScript `'unsafe-eval'`、inline script、
+  远程 script/worker 或 extension script 注入。
 - Pi SDK 只在 Agent Host utility process 内运行；Main 负责窗口、原生对话框、更新、
   外部链接确认和 Agent Host 生命周期。
 - 生产资源只从 `app://pi67` 加载，不启动本地 HTTP Server，不监听应用 TCP 端口，
@@ -29,8 +30,9 @@
 - 用户 Pi JSONL session 内容；
 - 与当前工作区无关的路径或文件。
 
-Pi 的 AuthStorage 和 JSONL session 保持真源。诊断导出由用户明确触发，限制为 1 MB，
-在 Agent Host 和 Main 两层脱敏后写入用户选择的位置。
+Pi 的 AuthStorage 和 JSONL session 保持真源。诊断导出由用户明确触发：Agent Host 只产出
+protocol 限定的诊断结构（hash、枚举和有界字符串，不含原文），Main 再做一次脱敏后写入用户
+选择的位置；上传支持诊断时提交内容限制为 64 KiB。
 Agent Host 的原始 stderr 默认丢弃；只有开发者显式设置
 `PI67_DEBUG_AGENT_STDERR=1` 时才输出经过截断和脱敏的 stderr，发布构建不得启用该开关。
 

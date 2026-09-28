@@ -5,7 +5,7 @@
       "name": "ai-berkshire-investment-suite",
       "version": "1.0.1",
       "upstream": "https://github.com/xbtlin/ai-berkshire",
-      "sync_helper": "scripts/pi67-sync-ai-berkshire-skill-pack.sh",
+      "sync_helper": "eng/capabilities/ai-berkshire-skill-pack-sync.mjs",
       "skills": [
         "bottleneck-hunter",
         "deep-company-series",

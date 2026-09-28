@@ -166,7 +166,7 @@
 
 ## Security and privacy
 
-The Workspace trust, AUTO/ASK/PLAN/YOLO, and installed-capability grants below
+The Workspace trust, AUTO/PLAN/YOLO, and installed-capability grants below
 describe Pi-67 product behavior to implement and preserve. They do not authorize
 the coding agent developing this repository to upload, publish, or operate
 external systems. Development operations remain subject to the current user's
@@ -188,7 +188,8 @@ authorization and the repository's separate operation and distribution rules.
   external-object, Shell, and destructive-Git deletion remains an exact one-shot
   hard confirmation before both that AUTO grant and YOLO. Trusted YOLO automatically
   executes every other valid registered Tool; it does not make an invalid identity,
-  schema, route, or target valid. ASK remains one-shot; PLAN remains read-only. Unknown, duplicate,
+  schema, route, or target valid. Legacy `guided` and the internal value `ask` normalize to AUTO and are not a
+  selectable mode; PLAN remains read-only. Unknown, duplicate,
   malformed, drifted, or non-approvable capabilities fail closed instead of
   inheriting a grant. AUTO Shell syntax that cannot be classified safely returns a
   corrective Tool Result without opening a meaningless approval dialog.

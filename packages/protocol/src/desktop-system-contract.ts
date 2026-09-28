@@ -212,7 +212,10 @@ export interface DesktopSystemBridge {
   copyWorkspaceEntryPath(entry: WorkspaceEntryRequest, mode: "absolute" | "relative"): Promise<boolean>;
   trashWorkspaceEntry(entry: WorkspaceEntryRequest): Promise<boolean>;
   getPackageNetworkSnapshot(): Promise<PackageNetworkSnapshot>;
-  /** Optional during the local-memory rollout; never returns stored credentials. */
+  /**
+   * Optional during the local-memory rollout. Snapshots never carry stored credentials; only an
+   * explicit one-shot `revealKey` request returns the saved API key, after Main re-authorizes the sender.
+   */
   localMemoryModels?: LocalMemorySettingsBridge;
   localMemoryRuntime?: import("./local-memory-runtime.js").LocalMemoryRuntimeBridge;
   localMemoryActivation?: import("./local-memory-activation.js").LocalMemoryActivationBridge;

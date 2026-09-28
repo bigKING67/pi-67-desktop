@@ -13,8 +13,10 @@ Electron Main
 ```
 
 Main 创建 `MessageChannelMain`，把一端交给 Agent Host，另一端经 Preload 转给 renderer。
-Agent 消息不经过 IPC invoke、HTTP 或 WebSocket。Preload 的 invoke API 只用于文件夹选择、
-诊断保存、通知、外部链接和更新等系统能力。更新状态（`pi67:update-*` 结果与 `pi67:update-state-changed`）
+Agent 消息不经过 IPC invoke、HTTP 或 WebSocket。Preload 的 invoke API（约 67 个 `pi67:*` 通道）
+承载不经 Agent 的系统能力：文件夹选择、诊断、通知、外部链接、更新，以及 Workbench/草稿/文件状态持久化、
+Git 仓库检查与 submodule 初始化、worktree 创建与恢复、prompt 附件与 Prompt Stash 图片、本地记忆设置
+（含一次性的 API key 显示）、签名运行包安装、browser67 与下载源设置。每个通道都是特权面，新增通道须按同等标准审查。更新状态（`pi67:update-*` 结果与 `pi67:update-state-changed`）
 由 `@pi67/protocol` 的 `DesktopUpdateStateSchema` 定义并纳入 protocol revision；Main 按该类型构造，renderer 用
 `parseDesktopUpdateState` 校验后才使用。
 原生通知请求、workspace id、workspace entry 请求、关闭检查点请求/响应以及 `pi67:agent-host-startup`/`pi67:agent-host-failed`
@@ -1819,6 +1821,10 @@ source and staged-tree verification still gates activation.
    Profile 写入 capability state 时会持久化 `profileOwnership=shared`，后续升级仍保持 shared 分类。
    Alpha.21 等旧 state 没有该 ownership 字段，同样按 shared 迁移，不能由旧 capability 安装事实推断整个
    Profile 归 Desktop 所有。
+   managed Packages 的校验深度在打包版与开发版之间有意不同：打包版（`PI67_PACKAGED=1`）直接使用签名应用包内的
+   bundle，只校验 manifest 平台/架构、lockfile SHA-256 与目录包含关系，不重算 `treeSha256`，完整性依赖应用签名；
+   开发版重算整棵树的 hash，复制到 staging 再校验，并以 active/previous 切换和回滚激活。因此 bundle 意外损坏
+   在打包版启动时不会被发现，而是在 Pi 加载对应 Extension 时失败；两条路径各有测试，任何一侧不会覆盖另一侧。
 4. `fresh` packaged Profile 的 capability manifest/hash/private toolchain 错误属于确定性 fatal；
    existing/shared 或 managed-upgrade Profile 的用户资源冲突、MCP cache/CAS conflict 和 Desktop-owned
    enhancement I/O failure 只形成最多八条安全 startup issue。核心 Server 构造成功后 Host 发送严格的

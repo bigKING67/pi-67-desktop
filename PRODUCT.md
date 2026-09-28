@@ -1066,12 +1066,13 @@ design/protocol contracts; reference inclusion alone does not approve them.
 - Settings opens or focuses one application-level selected surface. Global and project
   scope are explicit only where meaningful, and changing the current workspace
   retargets project scope instead of creating another Settings instance.
-- Settings navigation groups `外观` and `账户与数据` under General; models,
-  context/memory, vision and Pi resources under AI Configuration; Lark and browser
-  work under Connections & Integrations; and runtime, usage, network, updates and
-  About under System & Support. Account retains its route and describes local
-  mode and data storage without inventing account login/sync capabilities or
-  implying that requested external model/service calls cannot transmit content.
+- Settings navigation groups `外观` and `账户与数据` under General; models, vision
+  and context/memory under Models & Memory; extensions, skills, prompts and rules
+  under Capabilities & Instructions; Lark and browser work under Connections &
+  Integrations; and runtime, usage, network, updates and About under System &
+  Support. Account & Data shows New Money sign-in state, device login and logout,
+  and local data storage without implying that requested external model/service
+  calls cannot transmit content.
   Category search searches these navigation targets rather than arbitrary page
   content. Narrow windows use the same groups in a bounded popover. Existing
   category identity, project scope, draft protection and local transaction
@@ -1133,7 +1134,7 @@ design/protocol contracts; reference inclusion alone does not approve them.
   Workspace without stopping background tasks.
 - The footer account entry and help menu remain compact. Local Pi, Workspace,
   Session, private Memory, and private Experience use never require login. New Money
-  sign-in lives under Context/Memory, uses browser-approved device authorization,
+  sign-in lives under Account & Data, uses browser-approved device authorization,
   and adds only team, project, shared-knowledge, entitlement, and audit capabilities.
 - Team quota presentation follows the server's optional `quotasExempt` boolean
   (absent means false), never a team name or locally inferred plan. Exempt teams
