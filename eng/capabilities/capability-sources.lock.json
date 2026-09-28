@@ -22,7 +22,7 @@
       "displayName": "OpenViking Pi Extension",
       "origin": "first-party",
       "internalPath": "packages/openviking-pi-extension",
-      "treeSha256": "528f7af9fbd2edf8c1feabe3262415d804329629c879ca3957d7905a01941d90",
+      "treeSha256": "534ccba897f82c45ebe9cf1681e4d2a771f73e5d764b422c34a87f80c6f81f16",
       "version": "0.2.0-desktop.6",
       "includedExtensions": [
         {

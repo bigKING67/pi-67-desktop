@@ -443,22 +443,6 @@ export class OVClient {
     return res.ok;
   }
 
-  // ========== Resources ==========
-
-  /** POST /api/v1/resources — ingest a URL or file path */
-  async addResource(
-    path: string, opts?: { to?: string },
-  ): Promise<{ root_uri: string } | null> {
-    const body: Record<string, unknown> = { path };
-    if (opts?.to) body.to = opts.to;
-    const res = await this.writeJSON<{ root_uri: string }>(
-      "/api/v1/resources",
-      { method: "POST", body: JSON.stringify(body) },
-      30000,
-    );
-    return res.ok ? res.result : null;
-  }
-
   // ========== URI Space Resolution ==========
 
   async resolveScopeSpace(scope: "user" | "agent"): Promise<string> {

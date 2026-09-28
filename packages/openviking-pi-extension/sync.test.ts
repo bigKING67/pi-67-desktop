@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OVClient } from "./client.js";
 import type { OVConfig } from "./config.js";
-import { SYNC_STATE_ENTRY_TYPE, SyncManager } from "./sync.js";
+import { SHARED_KNOWLEDGE_TOOLS, SYNC_STATE_ENTRY_TYPE, SyncManager } from "./sync.js";
+import { TEAM_KNOWLEDGE_TOOLS } from "../pi-runtime/src/team-knowledge-access.js";
 
 describe("OpenViking SyncManager lineage and identity", () => {
   let root = "";
@@ -195,3 +196,9 @@ function text(payload: any): string {
     ? payload.content
     : payload.parts?.map((part: any) => part.text ?? "").join("") ?? "";
 }
+
+describe("shared-knowledge tool parity", () => {
+  it("treats every pi-runtime team knowledge tool as shared knowledge", () => {
+    for (const tool of TEAM_KNOWLEDGE_TOOLS) expect(SHARED_KNOWLEDGE_TOOLS.has(tool), tool).toBe(true);
+  });
+});

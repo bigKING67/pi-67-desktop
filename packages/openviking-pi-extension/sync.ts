@@ -293,8 +293,11 @@ function emptyReplayResult(): ReplayResult {
   return { replayed: 0, failed: 0, skipped: 0, deferred: 0, outcomes: {} };
 }
 
-const SHARED_KNOWLEDGE_TOOLS = new Set([
-  "viking_shared_search", "viking_shared_read", "viking_sop_search", "viking_sop_read"
+// Any tool that reads shared or team knowledge marks the Session scope as unverified for capture.
+// The team names mirror pi-runtime TEAM_KNOWLEDGE_TOOLS; sync.test.ts keeps them in parity.
+export const SHARED_KNOWLEDGE_TOOLS = new Set([
+  "viking_shared_search", "viking_shared_read", "viking_sop_search", "viking_sop_read",
+  "viking_team_search", "viking_team_read"
 ]);
 
 function hasSharedKnowledgeCall(entry: any): boolean {
