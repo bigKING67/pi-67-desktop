@@ -1,5 +1,5 @@
 import type { LocatedMessageWindow, SessionMessageView } from "@pi67/domain";
-import { ArrowDown, CircleAlert, MessageSquareText } from "lucide-react";
+import { ArrowDown, ArrowRight, CircleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "../app/app-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
@@ -206,13 +206,17 @@ export function Transcript() {
   if (transcriptMessages.length === 0 && !pendingUserTurn && !hasLiveTurn && !hasTurnActivity) {
     return (
       <div className={styles.empty}>
-        <div className={styles.emptyIcon}><MessageSquareText size={22} /></div>
-        <h2>从一个具体任务开始</h2>
-        <p>描述目标、相关文件和验收标准。Pi 会使用当前工作区、模型和已加载资源。</p>
-        <div className={styles.starterPrompts}>
-          {STARTER_PROMPTS.map((prompt) => (
-            <button key={prompt} type="button" onClick={() => requestComposerPrefill(prompt)}>{prompt}</button>
-          ))}
+        <div className={styles.emptyColumn}>
+          <h2>从一个具体任务开始</h2>
+          <p>描述目标、相关文件和验收标准。Pi 会使用当前工作区、模型和已加载资源。</p>
+          <div className={styles.starterPrompts}>
+            {STARTER_PROMPTS.map((prompt) => (
+              <button key={prompt} type="button" onClick={() => requestComposerPrefill(prompt)}>
+                <span>{prompt}</span>
+                <ArrowRight aria-hidden="true" size={15} />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     );

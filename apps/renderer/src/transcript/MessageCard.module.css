@@ -39,10 +39,27 @@
   margin-bottom: 9px;
 }
 
+/* Reading-first answer: the assistant answer is the primary result, with a quiet author line,
+   more vertical room and a lead paragraph one role above body text. */
+.answer {
+  padding: 22px 0 26px;
+}
+
+.answer .header {
+  margin-bottom: 12px;
+}
+
 .author {
   gap: 6px;
+  color: var(--text-secondary);
   font-size: var(--font-size-support);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
+}
+
+.answer .content > [data-markdown-mode]:first-child > p:first-child {
+  color: var(--text-primary);
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-prose);
 }
 
 .meta {

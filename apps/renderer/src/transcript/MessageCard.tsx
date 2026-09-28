@@ -83,7 +83,7 @@ export function MessageCard({
 
   return (
     <article
-      className={`${styles.card} ${isUser ? styles.user : ""} ${edit ? styles.userEditing : ""} ${highlighted ? styles.highlighted : ""}`}
+      className={`${styles.card} ${isUser ? styles.user : isTool ? "" : styles.answer} ${edit ? styles.userEditing : ""} ${highlighted ? styles.highlighted : ""}`}
       aria-busy={streaming || undefined}
       aria-label={ariaLabel}
       data-delivery-status={deliveryStatus}

@@ -430,6 +430,13 @@ loading error where the operation can produce those states
   process data. The final Assistant answer remains an ordinary editorial Markdown
   message outside that process surface. Pi JSONL remains the conversation source of
   truth; this hierarchy is a disposable Renderer projection.
+- Reading-first hierarchy: the final Assistant answer is the primary result. It keeps
+  editorial Markdown with more vertical room, a quiet secondary author line, and a lead
+  paragraph at the section role when the answer opens with a paragraph. The process
+  summary is one support-size, medium-weight line separated from the request by a
+  hairline; this changes emphasis only, never the expansion rules above. The empty
+  Transcript is one left-aligned column with a display heading, the existing guidance,
+  and flat starter rows separated by hairlines (44px minimum target, trailing arrow).
 - Process outcome is independent from individual Tool outcome. `running` reads
   `正在执行` and remains expanded; a clean final answer reads `执行已结束` and folds;
   a final answer with failed, interrupted, cancelled, lost, or unreconciled Tools

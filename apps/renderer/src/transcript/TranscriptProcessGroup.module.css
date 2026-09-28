@@ -1,8 +1,11 @@
+/* Reading-first: the process is one quiet line under the request, separated by a hairline.
+   Expansion rules (open while running or unsuccessful) are unchanged. */
 .group {
   width: min(var(--conversation-track-width, 860px), calc(100% - 48px));
   min-width: 0;
   margin: 0 auto;
-  padding: 8px 0 12px;
+  padding: 12px 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 66%, transparent);
   color: var(--text-tertiary);
 }
 
@@ -68,8 +71,8 @@
 .summaryCopy strong {
   overflow: hidden;
   color: var(--text-secondary);
-  font-size: var(--font-size-interface);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
