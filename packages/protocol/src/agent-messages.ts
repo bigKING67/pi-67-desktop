@@ -247,8 +247,6 @@ export interface CommandPayloads extends WorkspaceFileCommandPayloads,
   "session.interactionMode.set": { mode: SessionInteractionMode };
   "plan.implement": { submissionId: string; planId: string };
   "prompt.submit": PromptSubmitRequest;
-  "prompt.steer": { text: string };
-  "prompt.followUp": { text: string };
   "queue.clear": Record<string, never>;
   "operation.abort": { operationId?: string };
   "model.list": Record<string, never>;
@@ -374,8 +372,6 @@ export interface CommandResults extends WorkspaceFileCommandResults,
   "session.interactionMode.set": ProjectionMutationAcknowledgement;
   "plan.implement": OperationSubmissionResult;
   "prompt.submit": OperationSubmissionResult;
-  "prompt.steer": Acknowledgement;
-  "prompt.followUp": Acknowledgement;
   "queue.clear": QueueClearResult;
   "operation.abort": { aborted: boolean; operationId?: string };
   "model.list": ModelSummary[];

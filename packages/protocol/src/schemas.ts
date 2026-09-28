@@ -8,7 +8,7 @@ import {
 } from "@pi67/domain";
 import type { AgentCommandType, AgentEventType } from "./agent-messages.js";
 import { AssetReadResultSchema } from "./asset-schemas.js";
-import { ApprovalCancelledSchema, ApprovalRequestSchema, ApprovalResolvedSchema } from "./approval-schemas.js";
+import { ApprovalCancelledSchema, ApprovalRequestSchema, ApprovalResolvedSchema, TaskToolModeSchema } from "./approval-schemas.js";
 import {
   ContextFileCatalogResultSchema,
   ContextFileReadResultSchema,
@@ -115,11 +115,6 @@ const RuntimeStatusSchema = strictObject({
   recoverable: Type.Boolean(),
   attempt: Type.Optional(Type.Number())
 });
-const TaskToolModeSchema = Type.Union([
-  Type.Literal("ask"),
-  Type.Literal("auto"),
-  Type.Literal("yolo")
-]);
 const RuntimeCapabilitiesSchema = strictObject({
   sdkVersion: Type.String(),
   supportsFollowUp: Type.Literal(true),
@@ -165,7 +160,6 @@ const DoctorCheckSchema = strictObject({
   detail: Type.String()
 });
 const DoctorReportSchema = strictObject({ generatedAt: Type.Number(), checks: Type.Array(DoctorCheckSchema) });
-const AcknowledgementSchema = strictObject({ accepted: Type.Literal(true) });
 const ProjectionMutationAcknowledgementSchema = strictObject({
   accepted: Type.Literal(true),
   hostEpoch: Type.Integer({ minimum: 0 }),
@@ -251,8 +245,6 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "conversation.snooze": strictObject({ revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }) }),
   "conversation.reorderPinned": strictObject({ revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }) }),
   "prompt.submit": operationSubmissionResultSchema(Type.Literal("prompt")),
-  "prompt.steer": AcknowledgementSchema,
-  "prompt.followUp": AcknowledgementSchema,
   "queue.clear": strictObject({
     steeringCount: Type.Integer({ minimum: 0 }),
     followUpCount: Type.Integer({ minimum: 0 }),

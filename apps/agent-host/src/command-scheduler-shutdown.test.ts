@@ -17,11 +17,11 @@ describe("CommandScheduler shutdown", () => {
     }), async () => {
       executed.push("exclusive:dropped");
     });
-    const runningQueue = scheduler.run(command("prompt.steer", { text: "running" }), async () => {
+    const runningQueue = scheduler.run(command("prompt.submit", { submissionId: "queued-17", text: "running", delivery: "steer" }), async () => {
       executed.push("queue:running");
       await new Promise<void>((resolve) => { releaseQueue = resolve; });
     });
-    const queuedPrompt = scheduler.run(command("prompt.followUp", { text: "dropped" }), async () => {
+    const queuedPrompt = scheduler.run(command("prompt.submit", { submissionId: "queued-18", text: "dropped", delivery: "follow-up" }), async () => {
       executed.push("queue:dropped");
     });
     await Promise.resolve();

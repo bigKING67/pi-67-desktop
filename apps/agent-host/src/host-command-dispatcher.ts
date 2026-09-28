@@ -381,12 +381,6 @@ export async function dispatchHostCommand(
         beforeTerminal: () => runtime.flushStream()
       });
     }
-    case "prompt.steer":
-      await runtime.steer(command.payload.text);
-      return { accepted: true };
-    case "prompt.followUp":
-      await runtime.followUp(command.payload.text);
-      return { accepted: true };
     case "operation.abort":
       return context.operations().abort(command.payload.operationId);
     case "model.list":

@@ -84,7 +84,6 @@ export function commandClassFor(command: AgentCommand): CommandClass {
   if (EXCLUSIVE_COMMANDS.has(command.type)) return "exclusive-control";
   if (command.type === "projection.resync") return "recovery";
   if (QUERY_COMMANDS.has(command.type)) return "query";
-  if (command.type === "prompt.steer" || command.type === "prompt.followUp") return "queue";
   if (command.type === "prompt.submit" && command.payload.delivery !== "new-turn") return "queue";
   if (
     command.type === "operation.abort"

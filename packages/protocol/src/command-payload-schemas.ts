@@ -1,6 +1,6 @@
 import { Type, type TProperties, type TSchema } from "./typebox-schema.js";
 import type { AgentCommandType } from "./agent-messages.js";
-import { ApprovalRespondSchema } from "./approval-schemas.js";
+import { ApprovalRespondSchema, TaskToolModeSchema } from "./approval-schemas.js";
 import { AssetReadPayloadSchema } from "./asset-schemas.js";
 import {
   ContextFileListPayloadSchema,
@@ -56,11 +56,6 @@ import {
 const EmptyPayloadSchema = strictObject({});
 const TrustSchema = Type.Union([Type.Literal("unknown"), Type.Literal("trusted"), Type.Literal("untrusted")]);
 const ApprovalModeSchema = Type.Union([Type.Literal("guided"), Type.Literal("balanced")]);
-const TaskToolModeSchema = Type.Union([
-  Type.Literal("ask"),
-  Type.Literal("auto"),
-  Type.Literal("yolo")
-]);
 const PathSchema = Type.String({ minLength: 1, maxLength: 32_768 });
 const PromptSchema = Type.String({ maxLength: MAX_PROMPT_TEXT_CHARS });
 const CompactionInstructionsSchema = Type.String({ maxLength: 2_000_000 });
@@ -73,7 +68,6 @@ const PromptAttachmentsSchema = Type.Optional(Type.Array(PromptAttachmentRefSche
 const PromptWorkspaceFilesSchema = Type.Optional(Type.Array(WorkspaceFilePromptRefSchema, {
   maxItems: MAX_COMPOSER_WORKSPACE_FILE_REFS
 }));
-const PromptPayloadSchema = strictObject({ text: PromptSchema });
 const SessionNameMutationSchema = Type.Union([
   strictObject({
     action: Type.Literal("set"),
@@ -183,8 +177,6 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
     workspaceFiles: PromptWorkspaceFilesSchema,
     delivery: Type.Union([Type.Literal("new-turn"), Type.Literal("steer"), Type.Literal("follow-up")])
   }),
-  "prompt.steer": PromptPayloadSchema,
-  "prompt.followUp": PromptPayloadSchema,
   "queue.clear": EmptyPayloadSchema,
   "operation.abort": strictObject({ operationId: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })) }),
   "model.list": EmptyPayloadSchema,

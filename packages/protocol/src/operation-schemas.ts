@@ -36,7 +36,7 @@ const ToolPresentationKindSchema = Type.Union([
   Type.Literal("approval"), Type.Literal("extension"), Type.Literal("generic")
 ]);
 
-const ToolAuthorizationProjectionSchema = strictObject({
+export const ToolAuthorizationProjectionSchema = strictObject({
   mode: Type.Literal("auto"),
   reason: Type.Union([
     Type.Literal("configured-source"),

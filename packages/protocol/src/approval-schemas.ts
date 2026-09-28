@@ -20,7 +20,14 @@ const ApprovalTaskPathGrantSchema = strictObject({
   })
 });
 
-const RiskCategorySchema = Type.Union([
+// Literal mirrors of domain unions; domain-union-parity.test.ts proves they stay exactly equal.
+export const TaskToolModeSchema = Type.Union([
+  Type.Literal("ask"),
+  Type.Literal("auto"),
+  Type.Literal("yolo")
+]);
+
+export const RiskCategorySchema = Type.Union([
   Type.Literal("workspace-read"),
   Type.Literal("resource-read"),
   Type.Literal("workspace-write"),

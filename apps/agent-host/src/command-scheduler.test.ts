@@ -34,7 +34,7 @@ describe("CommandScheduler", () => {
 
   it("rejects queued prompts when the active operation is not a Pi turn", async () => {
     const scheduler = new CommandScheduler(() => true, () => false);
-    await expect(scheduler.run(command("prompt.steer", { text: "adjust" }), async () => "queued"))
+    await expect(scheduler.run(command("prompt.submit", { submissionId: "queued-1", text: "adjust", delivery: "steer" }), async () => "queued"))
       .rejects.toMatchObject({ code: "BUSY" });
   });
 
@@ -56,7 +56,7 @@ describe("CommandScheduler", () => {
       order.push("second");
       return "second";
     });
-    const third = scheduler.run(command("prompt.followUp", { text: "third" }), async () => {
+    const third = scheduler.run(command("prompt.submit", { submissionId: "queued-2", text: "third", delivery: "follow-up" }), async () => {
       order.push("third");
       return "third";
     });
@@ -72,13 +72,13 @@ describe("CommandScheduler", () => {
     const scheduler = new CommandScheduler(() => true);
     const order: string[] = [];
     let releaseFirst!: () => void;
-    const first = scheduler.run(command("prompt.steer", { text: "first" }), async () => {
+    const first = scheduler.run(command("prompt.submit", { submissionId: "queued-3", text: "first", delivery: "steer" }), async () => {
       order.push("first:start");
       await new Promise<void>((resolve) => { releaseFirst = resolve; });
       order.push("first:reject");
       throw new Error("queue failed");
     });
-    const second = scheduler.run(command("prompt.followUp", { text: "second" }), async () => {
+    const second = scheduler.run(command("prompt.submit", { submissionId: "queued-4", text: "second", delivery: "follow-up" }), async () => {
       order.push("second");
       return "continued";
     });
@@ -95,7 +95,7 @@ describe("CommandScheduler", () => {
     const scheduler = new CommandScheduler(() => true);
     const order: string[] = [];
     let releaseQueue!: () => void;
-    const queued = scheduler.run(command("prompt.steer", { text: "adjust" }), async () => {
+    const queued = scheduler.run(command("prompt.submit", { submissionId: "queued-5", text: "adjust", delivery: "steer" }), async () => {
       order.push("queue:start");
       await new Promise<void>((resolve) => { releaseQueue = resolve; });
       order.push("queue:end");
@@ -286,10 +286,10 @@ describe("CommandScheduler", () => {
     await expect(scheduler.run(command("prompt.submit", {
       submissionId: "s", text: "go", delivery: "new-turn"
     }), async () => undefined)).rejects.toMatchObject({ code: "BUSY" });
-    await expect(scheduler.run(command("prompt.steer", { text: "adjust" }), async () => undefined))
+    await expect(scheduler.run(command("prompt.submit", { submissionId: "queued-6", text: "adjust", delivery: "steer" }), async () => undefined))
       .rejects.toMatchObject({ code: "BUSY" });
     active = true;
-    await expect(scheduler.run(command("prompt.steer", { text: "adjust" }), async () => "queued"))
+    await expect(scheduler.run(command("prompt.submit", { submissionId: "queued-7", text: "adjust", delivery: "steer" }), async () => "queued"))
       .resolves.toBe("queued");
     release();
     await control;
@@ -320,13 +320,13 @@ describe("CommandScheduler", () => {
   it("bounds admitted queue commands and releases capacity after settlement", async () => {
     const scheduler = new CommandScheduler(() => true, undefined, { maxQueuedCommands: 2 });
     let releaseFirst!: () => void;
-    const first = scheduler.run(command("prompt.steer", { text: "first" }), () => (
+    const first = scheduler.run(command("prompt.submit", { submissionId: "queued-8", text: "first", delivery: "steer" }), () => (
       new Promise<void>((resolve) => { releaseFirst = resolve; })
     ));
-    const second = scheduler.run(command("prompt.followUp", { text: "second" }), async () => undefined);
+    const second = scheduler.run(command("prompt.submit", { submissionId: "queued-9", text: "second", delivery: "follow-up" }), async () => undefined);
     await Promise.resolve();
 
-    await expect(scheduler.run(command("prompt.steer", { text: "overflow" }), async () => undefined))
+    await expect(scheduler.run(command("prompt.submit", { submissionId: "queued-10", text: "overflow", delivery: "steer" }), async () => undefined))
       .rejects.toMatchObject({
         code: "RESOURCE_LIMIT_EXCEEDED",
         details: { maxQueuedCommands: 2 }
@@ -334,14 +334,14 @@ describe("CommandScheduler", () => {
 
     releaseFirst();
     await Promise.all([first, second]);
-    await expect(scheduler.run(command("prompt.followUp", { text: "available" }), async () => "accepted"))
+    await expect(scheduler.run(command("prompt.submit", { submissionId: "queued-11", text: "available", delivery: "follow-up" }), async () => "accepted"))
       .resolves.toBe("accepted");
 
-    const rejecting = scheduler.run(command("prompt.steer", { text: "rejecting" }), async () => {
+    const rejecting = scheduler.run(command("prompt.submit", { submissionId: "queued-12", text: "rejecting", delivery: "steer" }), async () => {
       throw new Error("delivery failed");
     });
     await expect(rejecting).rejects.toThrow("delivery failed");
-    await expect(scheduler.run(command("prompt.followUp", { text: "after failure" }), async () => "accepted"))
+    await expect(scheduler.run(command("prompt.submit", { submissionId: "queued-13", text: "after failure", delivery: "follow-up" }), async () => "accepted"))
       .resolves.toBe("accepted");
   });
 
@@ -349,13 +349,13 @@ describe("CommandScheduler", () => {
     const scheduler = new CommandScheduler(() => true, undefined, { maxQueuedCommands: 3 });
     const order: string[] = [];
     let releaseRunning!: () => void;
-    const running = scheduler.run(command("prompt.steer", { text: "running" }), async () => {
+    const running = scheduler.run(command("prompt.submit", { submissionId: "queued-14", text: "running", delivery: "steer" }), async () => {
       order.push("running:start");
       await new Promise<void>((resolve) => { releaseRunning = resolve; });
       order.push("running:end");
       return "running";
     });
-    const pending = scheduler.run(command("prompt.followUp", { text: "pending" }), async () => {
+    const pending = scheduler.run(command("prompt.submit", { submissionId: "queued-15", text: "pending", delivery: "follow-up" }), async () => {
       order.push("pending");
       return "pending";
     });
@@ -365,7 +365,7 @@ describe("CommandScheduler", () => {
       order.push("clear");
       return "cleared";
     });
-    const afterClear = scheduler.run(command("prompt.steer", { text: "after clear" }), async () => {
+    const afterClear = scheduler.run(command("prompt.submit", { submissionId: "queued-16", text: "after clear", delivery: "steer" }), async () => {
       order.push("after-clear");
       return "after-clear";
     });
