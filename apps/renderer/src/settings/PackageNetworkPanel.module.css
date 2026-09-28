@@ -77,21 +77,8 @@
   gap: 6px;
 }
 
-.sourceStatus {
-  display: block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-tertiary);
-}
 
-.sourceStatus[data-status="reachable"] {
-  background: var(--success);
-}
 
-.sourceStatus[data-status="unreachable"] {
-  background: var(--danger);
-}
 
 .checkedAt {
   color: var(--text-secondary);

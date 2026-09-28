@@ -242,15 +242,17 @@
 
 .documentBody {
   display: grid;
-  width: min(1120px, 100%);
+  width: min(1040px, 100%);
   min-width: 0;
   margin-inline: auto;
 }
 
+/* Standard pages are one centered 760px column; catalogs use the full 1040px body. */
 .pageLayout {
   display: grid;
-  width: min(880px, 100%);
+  width: min(760px, 100%);
   min-width: 0;
+  margin-inline: auto;
   gap: 28px;
 }
 
@@ -302,26 +304,9 @@
   outline-offset: -2px;
 }
 
-.resourceStatus {
-  display: block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-tertiary);
-}
 
-.resourceStatus[data-status="ready"] {
-  background: var(--success);
-}
 
-.resourceStatus[data-status="failed"] {
-  background: var(--danger);
-}
 
-.resourceStatus[data-status="partial"],
-.resourceStatus[data-status="tui-only"] {
-  background: var(--warning);
-}
 
 .resourcePath {
   min-width: 0;

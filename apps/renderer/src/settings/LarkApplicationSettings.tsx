@@ -4,7 +4,7 @@ import {
   type LarkAppBrand,
   type LarkAuthSnapshot
 } from "@pi67/domain";
-import { Bot, Eye, EyeOff, Pencil } from "lucide-react";
+import { Eye, EyeOff, Pencil } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button, Input } from "react-aria-components";
 import {
@@ -94,7 +94,6 @@ export function LarkApplicationSettings({
     /> : null}
     <SettingsRows>
       <SettingsRow
-        leading={<Bot aria-hidden="true" size={17} />}
         title={snapshot?.appName ?? "飞书应用"}
         description={applicationDescription(snapshot)}
         value={applicationStatusLabel(snapshot)}

@@ -17,7 +17,8 @@ import {
   SettingsPageHeader,
   SettingsRow,
   SettingsRows,
-  SettingsSectionBlock
+  SettingsSectionBlock,
+  SettingsStatus
 } from "./SettingsPrimitives.js";
 import { SettingsDestructiveActionDialog } from "./SettingsActionDialogs.js";
 import { useSettingsDraftRegistration } from "./SettingsDraftGuard.js";
@@ -184,10 +185,11 @@ export function PackageNetworkPanel() {
         <SettingsRows>
           {displayedSnapshot?.sources.map((source) => <SettingsRow
             key={source.id}
-            leading={<span className={styles.sourceStatus} data-status={source.status} />}
             title={`${source.kind === "npm" ? "npm" : "Git"} · ${source.role}`}
             description={source.url}
-            value={source.status === "reachable" ? `${source.latencyMs ?? 0} ms` : source.status === "unreachable" ? "不可达" : "尚未检查"}
+            value={<SettingsStatus tone={source.status === "reachable" ? "success" : source.status === "unreachable" ? "danger" : "neutral"}>
+              {source.status === "reachable" ? `${source.latencyMs ?? 0} ms` : source.status === "unreachable" ? "不可达" : "尚未检查"}
+            </SettingsStatus>}
           />)}
         </SettingsRows>
       </SettingsSectionBlock>

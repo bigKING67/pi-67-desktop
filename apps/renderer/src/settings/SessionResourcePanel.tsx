@@ -17,7 +17,8 @@ import {
   SettingsNotice,
   SettingsRow,
   SettingsRows,
-  SettingsSectionBlock
+  SettingsSectionBlock,
+  SettingsStatus
 } from "./SettingsPrimitives.js";
 
 export function SessionResourcePanel({
@@ -68,10 +69,9 @@ export function SessionResourcePanel({
       {displayed.length > 0 ? <SettingsRows>{displayed.map((resource) => (
         <SettingsRow
           key={`${resource.kind}-${resource.id}`}
-          leading={<span className={styles.resourceStatus} data-status={resource.status} />}
           title={resource.label}
           description={resourceMetadata(resource, scope)}
-          value={resourceStatusLabel(resource.status)}
+          value={<SettingsStatus tone={resource.status === "ready" ? "success" : resource.status === "failed" ? "danger" : "warning"}>{resourceStatusLabel(resource.status)}</SettingsStatus>}
         >
           {resource.path ? <SettingsDetails title="资源路径"><code className={styles.resourcePath}>{resource.path}</code></SettingsDetails> : null}
         </SettingsRow>

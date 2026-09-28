@@ -8,21 +8,8 @@
   min-height: 440px;
 }
 
-.bundledStatus {
-  display: block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-tertiary);
-}
 
-.bundledStatus[data-status="ready"] {
-  background: var(--success);
-}
 
-.bundledStatus[data-status="unavailable"] {
-  background: var(--warning);
-}
 
 .bundledMeta {
   display: flex;

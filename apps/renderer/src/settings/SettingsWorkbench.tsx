@@ -1,7 +1,6 @@
 import type { SettingsSection } from "@pi67/domain";
 import {
   ArrowLeft,
-  DownloadCloud,
   Monitor,
   Moon,
   Search,
@@ -46,6 +45,7 @@ import { VisionAssistantSettings } from "./VisionAssistantSettings.js";
 import { ContextMemorySettings } from "./ContextMemorySettings.js";
 import { NewMoneyAccountSettings } from "./NewMoneyAccountSettings.js";
 import {
+  SettingsInfo,
   SettingsNotice,
   SettingsPageHeader,
   SettingsRow,
@@ -225,11 +225,10 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
 function GeneralSettings() {
   const theme = useThemeSnapshot();
   return (<>
-    <SettingsSectionBlock title="外观" description="默认跟随操作系统；选择只影响 Desktop，不会启动 Pi 运行服务。">
+    <SettingsSectionBlock title="主题">
       <SettingsRows>
         <SettingsRow
-          leading={<Monitor aria-hidden="true" size={17} />}
-          title="应用外观"
+          title={<>应用外观<SettingsInfo label="应用外观说明">默认跟随操作系统；选择只影响 Desktop，不会启动 Pi 运行服务。</SettingsInfo></>}
           description={THEME_OPTIONS.find((option) => option.id === theme.preference)?.detail}
           actions={<div aria-label="应用外观" className={styles.themeSegmented} role="group">
             {THEME_OPTIONS.map((option) => {
@@ -305,7 +304,6 @@ function UpdateSettings() {
     <SettingsSectionBlock title="更新与诊断" description="更新检查不携带工作区、会话、模型服务或凭据信息；诊断仅在你点击后脱敏上传。">
       <SettingsRows>
         <SettingsRow
-          leading={<DownloadCloud aria-hidden="true" size={17} />}
           title="自动检查更新"
           description="启动后自动检查，每天最多一次；下载和安装均由你确认。"
           value={initialized ? (update.automaticChecks ? "已开启" : "仅打包版可用") : "正在读取…"}

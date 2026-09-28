@@ -173,7 +173,6 @@ export function LarkOfficeSettings() {
         /> : null}
         <SettingsRows>
           <SettingsRow
-            leading={<UserRound aria-hidden="true" size={17} />}
             title={snapshot?.userName ?? "飞书用户"}
             description={userDescription(snapshot)}
             value={userStatusLabel(snapshot, busy, login?.stage)}

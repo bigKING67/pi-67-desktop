@@ -5,13 +5,14 @@ import type {
 import { Download, Puzzle, RefreshCw, Stethoscope } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
-import styles from "./DesktopCapabilityPanels.module.css";
 import {
   SettingsDetails,
   SettingsNotice,
   SettingsRow,
   SettingsRows,
-  SettingsSectionBlock
+  SettingsSectionBlock,
+  SettingsStatus,
+  type SettingsStatusTone
 } from "./SettingsPrimitives.js";
 import { Browser67ExtensionInstallDialog } from "./Browser67ExtensionInstallDialog.js";
 
@@ -60,22 +61,19 @@ export function Browser67IntegrationPanel() {
       {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
       <SettingsRows>
         <SettingsRow
-          leading={<span className={styles.status} data-status={integration?.dependencyState === "prepared" ? "ready" : integration?.dependencyState === "failed" ? "failed" : "warning"} />}
           title="运行依赖"
           description="依赖准备与随应用提供的源码是两个独立状态。"
-          value={dependencyLabel(integration)}
+          value={<SettingsStatus tone={integration?.dependencyState === "prepared" ? "success" : integration?.dependencyState === "failed" ? "danger" : "warning"}>{dependencyLabel(integration)}</SettingsStatus>}
         />
         <SettingsRow
-          leading={<span className={styles.status} data-status={extensionTone(integration)} />}
           title="浏览器扩展"
           description="扩展文件已准备不等于已经在 Chrome/Edge 中加载。"
-          value={extensionLabel(integration)}
+          value={<SettingsStatus tone={extensionTone(integration)}>{extensionLabel(integration)}</SettingsStatus>}
         />
         <SettingsRow
-          leading={<span className={styles.status} data-status={integration?.doctorState === "ready" ? "ready" : integration?.doctorState === "failed" ? "failed" : "warning"} />}
           title="受管连接"
           description={integration?.detail ?? "尚未证明真实受管浏览器连接已经就绪。"}
-          value={doctorLabel(integration)}
+          value={<SettingsStatus tone={integration?.doctorState === "ready" ? "success" : integration?.doctorState === "failed" ? "danger" : "warning"}>{doctorLabel(integration)}</SettingsStatus>}
         />
         <SettingsRow
           title="安装与连接"
@@ -179,10 +177,10 @@ function extensionLabel(integration: DesktopIntegrationStatus | undefined): stri
   return "未安装";
 }
 
-function extensionTone(integration: DesktopIntegrationStatus | undefined): "ready" | "failed" | "warning" {
-  if (integration?.extensionState === "failed") return "failed";
-  if (integration?.extensionState === "connected") return "ready";
-  if (integration?.extensionState === "prepared" && integration.verificationState === "verified") return "ready";
+function extensionTone(integration: DesktopIntegrationStatus | undefined): SettingsStatusTone {
+  if (integration?.extensionState === "failed") return "danger";
+  if (integration?.extensionState === "connected") return "success";
+  if (integration?.extensionState === "prepared" && integration.verificationState === "verified") return "success";
   return "warning";
 }
 

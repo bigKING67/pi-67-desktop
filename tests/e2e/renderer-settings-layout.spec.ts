@@ -27,7 +27,6 @@ for (const theme of ["light", "dark"] as const) {
       await page.getByRole("button", { name: "选择工作区" }).click();
       await page.keyboard.press("Control+,");
       const settings = page.getByTestId("settings-workbench");
-      let left: number | undefined;
       for (const category of categories) {
         if (width <= 720) {
           await settings.getByRole("button", { name: "选择设置分类", exact: true }).click();
@@ -42,14 +41,15 @@ for (const theme of ["light", "dark"] as const) {
           const frame = layout.parentElement!;
           const region = element.querySelector<HTMLElement>('[data-testid="settings-scroll-region"]')!;
           const heading = layout.querySelector("h1")!.getBoundingClientRect();
-          return { width: layout.getBoundingClientRect().width, frame: frame.getBoundingClientRect().width,
-            left: layout.getBoundingClientRect().left, headingLeft: heading.left,
+          const box = layout.getBoundingClientRect(), frameBox = frame.getBoundingClientRect();
+          return { width: box.width, frame: frameBox.width,
+            center: box.left + box.width / 2, frameCenter: frameBox.left + frameBox.width / 2,
+            left: box.left, headingLeft: heading.left,
             scrollWidth: region.scrollWidth, clientWidth: region.clientWidth };
         });
-        expect(metrics.width).toBeCloseTo(wide.has(category) ? metrics.frame : Math.min(880, metrics.frame), 0);
-        left ??= metrics.left;
-        expect(Math.abs(metrics.left - left)).toBeLessThanOrEqual(1);
-        expect(Math.abs(metrics.headingLeft - left)).toBeLessThanOrEqual(1);
+        expect(metrics.width).toBeCloseTo(wide.has(category) ? metrics.frame : Math.min(760, metrics.frame), 0);
+        expect(Math.abs(metrics.center - metrics.frameCenter)).toBeLessThanOrEqual(1);
+        expect(Math.abs(metrics.headingLeft - metrics.left)).toBeLessThanOrEqual(1);
         expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
         await page.screenshot({ path: testInfo.outputPath(`${theme}-${width}-${categories.indexOf(category)}.png`) });
         if (category === "上下文与记忆") await expect(settings.getByRole("radio")).toHaveCount(4);

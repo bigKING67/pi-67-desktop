@@ -1,26 +1,8 @@
-.status {
-  display: block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-tertiary);
-}
 
-.status[data-status="ready"] {
-  background: var(--success);
-}
 
-.status[data-status="failed"] {
-  background: var(--danger);
-}
 
-.status[data-status="warning"] {
-  background: var(--warning);
-}
 
-.status[data-status="external"] {
-  background: var(--info);
-}
+
 
 .installModal {
   width: min(680px, 100%);

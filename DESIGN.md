@@ -901,16 +901,16 @@ loading error where the operation can produce those states
 - Existing scope policy remains authoritative: only categories with meaningful
   global/project configuration expose the generic scope switch; Skills and Rules
   retain their own explicit availability tabs. No decorative scope controls.
-- Every category shares a centered `min(1120px, 100%)` outer alignment frame.
+- Every category shares a centered `min(1040px, 100%)` outer frame.
   Account, Appearance, Memory, Lark, Vision, Browser, Runtime, Network, Updates and
-  About use a left-aligned `min(880px, 100%)` inner page; Model, Extension, Skill,
+  About use a centered `min(760px, 100%)` column; Model, Extension, Skill,
   Prompt, Rule and Usage workspaces use the full frame. Headers, page actions and
-  content follow that inner measure without shifting the common left edge.
+  content follow their page's measure, so actions never jump within a page type.
   The content region is the only document vertical scroll owner, with `32px` top,
   `clamp(24px, 3vw, 32px)` inline and `48px` bottom padding. Existing narrow
   padding and the `720px` category-menu breakpoint remain in place.
-- One page title precedes content by `28px`; sections are separated by `32px`
-  and section heading/content by `12px`. Only one layer owns section spacing;
+- One page title precedes content by `28px`; sections are separated by `28px`
+  and section heading/content by `8px`. Only one layer owns section spacing;
   grid stacks must not also add sibling section margins. Actions may wrap and
   standard forms never introduce document-level horizontal overflow.
 - Whole-page drafts keep Save in the page header. Provider detail and credential
@@ -2744,9 +2744,29 @@ application bundles, Helpers, executables and installer filenames use New Money.
   the reading track right edge above Composer. Preserve user-owned reading
   anchors, unseen counts, and existing follow-latest behavior.
 
-## Settings experience V2
+## Settings visual system
 
-Settings uses General, Models and Memory, Capabilities and Instructions, Integrations, and System/Support groups while preserving all 16 section identities. Standard documents remain 880px and catalogs 1120px. Page H1, section H2 and necessary inner H3 headings use existing typography roles. Account service editing belongs to advanced connection details; private/team boundaries stay visible. Renderer-only team links select the enterprise memory tab through the existing draft guard and consume their transient target. Dirty or erroneous details cannot collapse. Independent save units and existing save/restart semantics remain distinct; Settings navigation cannot interrupt a pending mutation; a blocked request shows a notice instead of doing nothing. Command palette, slash-command and native-notification exits pass the same draft guard before their flow starts, so keeping the draft leaves no partial session switch. Ordinary navigation starts at the page heading; cancelled navigation restores its trigger.
+Settings follows one quiet-list language (2026-09-28, selected from the settings prototypes):
+
+- Row anatomy is title (interface size, medium) plus at most one hint line (support size,
+  tertiary), then value/status and actions on the right. Rows never carry a leading icon;
+  `SettingsRow` has no leading slot.
+- `SettingsStatus` (dot + short label; neutral, success, warning, danger) is the only status
+  language. Colored text, pills and bare dots are not used for state.
+- Section titles are interface size, medium, secondary; section descriptions are optional and
+  appear only when they change a decision. Boundary, privacy and implementation explanations
+  go into `SettingsInfo` (an ⓘ tooltip) or are removed. Single-section pages do not repeat the
+  page title as a section title.
+- Tabs mark the selection with an underline only; a page has at most one tab level.
+- `SettingsDetails` is the only disclosure: a rule above, title and summary, chevron at the
+  far right. Dirty or erroneous details still cannot collapse.
+- `SettingsNotice` is reserved for states that need action; info tone is a neutral muted
+  surface, warning and danger use a light tint without a colored edge.
+- Catalog pages (models, extensions, skills, prompts, rules, shortcuts) use a list with a
+  detail pane; other pages use grouped rows in the centered column.
+
+
+Settings uses General, Models and Memory, Capabilities and Instructions, Integrations, and System/Support groups while preserving all 16 section identities. Standard documents are a centered 760px column and catalogs a centered 1040px body (see Settings visual system). Page H1, section H2 and necessary inner H3 headings use existing typography roles. Account service editing belongs to advanced connection details; private/team boundaries stay visible. Renderer-only team links select the enterprise memory tab through the existing draft guard and consume their transient target. Dirty or erroneous details cannot collapse. Independent save units and existing save/restart semantics remain distinct; Settings navigation cannot interrupt a pending mutation; a blocked request shows a notice instead of doing nothing. Command palette, slash-command and native-notification exits pass the same draft guard before their flow starts, so keeping the draft leaves no partial session switch. Ordinary navigation starts at the page heading; cancelled navigation restores its trigger.
 
 Runtime keeps current occupancy and recovery actions visible, with invariant writer/session mechanics in disclosure. Network prioritizes editable download policies and reachability; bundled toolchain versions are secondary and expand when unavailable. About keeps product/version/platform visible and discloses internal technology. Browser integration distinguishes dependencies, extension and verified connection; bundled-source provenance is secondary. Session resource paths are available on demand; existing resource catalogs and rule editors retain their list/detail and scope contracts. Usage labels explicitly distinguish recorded tokens from provider billing. Vision saves block Settings navigation until completion.
 

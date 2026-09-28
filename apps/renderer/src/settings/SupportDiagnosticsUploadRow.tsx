@@ -51,7 +51,6 @@ export function SupportDiagnosticsUploadRow() {
         : "仅手动";
 
   return <SettingsRow
-    leading={<CloudUpload aria-hidden="true" size={17} />}
     title="上传脱敏诊断"
     description={description}
     value={<span aria-live={state.phase === "error" ? "assertive" : "polite"} role="status">{value}</span>}

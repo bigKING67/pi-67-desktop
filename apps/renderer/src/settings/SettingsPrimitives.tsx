@@ -1,6 +1,6 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Info } from "lucide-react";
 import { useState, type ReactNode, type SyntheticEvent } from "react";
-import { Button } from "react-aria-components";
+import { Button, Tooltip, TooltipTrigger } from "react-aria-components";
 import styles from "./SettingsPrimitives.module.css";
 
 export function SettingsPageHeader({ title, description, actions }: {
@@ -21,7 +21,8 @@ export function SettingsPageHeader({ title, description, actions }: {
 
 export function SettingsSectionBlock({ title, description, actions, children, className }: {
   title: string;
-  description: string;
+  /** Only when it changes a decision; boundary explanations belong in `SettingsInfo`. */
+  description?: string;
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
@@ -29,7 +30,7 @@ export function SettingsSectionBlock({ title, description, actions, children, cl
   return (
     <section className={`${styles.section} ${className ?? ""}`}>
       <header className={styles.sectionHeader}>
-        <span><h2>{title}</h2><p>{description}</p></span>
+        <span><h2>{title}</h2>{description ? <p>{description}</p> : null}</span>
         {actions ? <div className={styles.sectionActions}>{actions}</div> : null}
       </header>
       {children}
@@ -41,8 +42,8 @@ export function SettingsRows({ children, className }: { children: ReactNode; cla
   return <div className={`${styles.rows} ${className ?? ""}`}>{children}</div>;
 }
 
-export function SettingsRow({ leading, title, description, value, actions, children, className }: {
-  leading?: ReactNode;
+/** Row anatomy: title + at most one hint line, then value/status and actions. Rows never carry a leading icon. */
+export function SettingsRow({ title, description, value, actions, children, className }: {
   title: ReactNode;
   description?: ReactNode;
   value?: ReactNode;
@@ -52,7 +53,6 @@ export function SettingsRow({ leading, title, description, value, actions, child
 }) {
   return (
     <div className={`${styles.row} ${className ?? ""}`}>
-      {leading ? <span className={styles.leading}>{leading}</span> : null}
       <span className={styles.identity}>
         <strong>{title}</strong>
         {description ? <small>{description}</small> : null}
@@ -61,6 +61,23 @@ export function SettingsRow({ leading, title, description, value, actions, child
       {value ? <span className={styles.value}>{value}</span> : null}
       {actions ? <div className={styles.rowActions}>{actions}</div> : null}
     </div>
+  );
+}
+
+export type SettingsStatusTone = "neutral" | "success" | "warning" | "danger";
+
+/** The single status language for Settings: a dot plus a short label. */
+export function SettingsStatus({ tone, children }: { tone: SettingsStatusTone; children: ReactNode }) {
+  return <span className={styles.status} data-tone={tone}><span aria-hidden="true" className={styles.statusDot} />{children}</span>;
+}
+
+/** Boundary or privacy explanation revealed on demand instead of a permanent paragraph. */
+export function SettingsInfo({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <TooltipTrigger delay={250}>
+      <Button aria-label={label} className={styles.infoButton!}><Info aria-hidden="true" size={13} /></Button>
+      <Tooltip className={styles.infoTooltip!} offset={6}>{children}</Tooltip>
+    </TooltipTrigger>
   );
 }
 

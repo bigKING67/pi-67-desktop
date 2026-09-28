@@ -11,7 +11,8 @@ import {
   SettingsNotice,
   SettingsRow,
   SettingsRows,
-  SettingsSectionBlock
+  SettingsSectionBlock,
+  SettingsStatus
 } from "./SettingsPrimitives.js";
 import styles from "./ExtensionSettingsWorkspace.module.css";
 import tabStyles from "./SettingsPrimitives.module.css";
@@ -74,13 +75,9 @@ function BundledExtensionPanel({ capability }: { capability: CapabilityState }) 
       {extensions.length > 0 ? <SettingsRows>{extensions.map((extension) => (
         <SettingsRow
           key={`${extension.packageId}:${extension.id}`}
-          leading={<span
-            className={styles.bundledStatus}
-            data-status={extension.installed ? "ready" : "unavailable"}
-          />}
           title={extension.displayName}
           description={extension.description}
-          value={extension.installed ? "已随应用提供" : "尚未准备"}
+          value={<SettingsStatus tone={extension.installed ? "success" : "neutral"}>{extension.installed ? "已随应用提供" : "尚未准备"}</SettingsStatus>}
           actions={extension.id === "pi-rules-loader" ? <Button
             className="secondary-button"
             onPress={() => navigateSettings("rules")}

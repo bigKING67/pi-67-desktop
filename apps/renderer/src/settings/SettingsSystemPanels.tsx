@@ -1,11 +1,8 @@
 import { MAX_RUNNING_TASKS, taskConsumesRunSlot } from "@pi67/domain";
-import { Stethoscope } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "react-aria-components";
-import piIconUrl from "../assets/pi-icon-64.png";
 import { useShellStore } from "../shell/shell-store.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
-import styles from "./SettingsSystemPanels.module.css";
 import {
   SettingsDetails,
   SettingsNotice,
@@ -29,7 +26,6 @@ export function RuntimeSettings() {
           value={`${runningCount} / ${MAX_RUNNING_TASKS}`}
         />
         <SettingsRow
-          leading={<Stethoscope aria-hidden="true" size={17} />}
           title="恢复与诊断"
           description="检查运行环境、工作区与会话恢复；遇到运行异常时从这里开始。"
           actions={<Button aria-label="恢复与诊断" className="secondary-button" onPress={() => setDoctorDialogOpen(true)}>打开诊断</Button>}
@@ -71,7 +67,6 @@ export function AboutSettings() {
       >无法读取当前应用信息：{error}</SettingsNotice> : null}
       <SettingsRows>
         <SettingsRow
-          leading={<img alt="" aria-hidden="true" className={styles.aboutIcon} src={piIconUrl} />}
           title="New Money"
           description="AI 工作台"
           value="Windows / macOS"

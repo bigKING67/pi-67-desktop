@@ -5,7 +5,6 @@ import type {
   EnterpriseTeamSummary,
   MemoryPrivacyMode
 } from "@pi67/domain";
-import { BrainCircuit, Building2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   Button,
@@ -278,7 +277,6 @@ export function ContextMemorySettings() {
     <SettingsSectionBlock title="New Money" description="登录只增加团队共享召回和候选提交流程，不会上传本地私人记忆。">
       <SettingsRows>
         <SettingsRow
-          leading={<Building2 aria-hidden="true" size={17} />}
           title="New Money 账户"
           description={account.identity?.state === "signed-in"
             ? `${account.identity.displayName ?? account.identity?.userId ?? "New Money 用户"} · 本地私人记忆保持独立`
@@ -333,7 +331,7 @@ export function ContextMemorySettings() {
     <SettingsSectionBlock title="上下文参数" description="查看当前配置的归档与召回参数。当前会话的状态和手动归档位于工作台的记忆面板。">
       <SettingsRows>
         <SettingsRow title="上下文引擎" description="在会话创建时确定，变更后需要新建会话。" value={ownerLabel(overview.status.owner)} />
-        <SettingsRow leading={<BrainCircuit aria-hidden="true" size={17} />} title="上下文接管" description={`达到 ${draft.takeover.tokenThreshold.toLocaleString()} Token 后归档，保留最近 ${draft.takeover.keepRecentTurns} 轮对话。`} value={draft.takeover.enabled ? "开启" : "关闭"} />
+        <SettingsRow title="上下文接管" description={`达到 ${draft.takeover.tokenThreshold.toLocaleString()} Token 后归档，保留最近 ${draft.takeover.keepRecentTurns} 轮对话。`} value={draft.takeover.enabled ? "开启" : "关闭"} />
         <SettingsRow title="归档阈值" description="达到阈值后由 Pi 扩展排队归档；失败时保留本地上下文。" value={`${draft.commitTokenThreshold.toLocaleString()} Token`} />
         <SettingsRow title="单次召回预算" description={`符合检索条件的当前提示词自动召回最多 ${draft.recallTokenBudget.toLocaleString()} Token；信息仍不足时才按需搜索和深读。私人经验 ${draft.privateExperienceLimit} 条、本地资源 ${draft.localResourceRecallLimit} 条、团队经验 ${draft.sharedExperienceLimit} 条。`} value={`${draft.recallTokenBudget.toLocaleString()} Token`} />
       </SettingsRows>
