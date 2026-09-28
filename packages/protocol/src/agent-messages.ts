@@ -201,8 +201,7 @@ export interface CommandPayloads extends WorkspaceFileCommandPayloads,
     agentDir?: string;
     sessionPath?: string;
     trust: WorkspaceTrust;
-    /** @deprecated Ignored by the Host; removed next protocol revision. */
-    approvalMode?: ApprovalMode;
+    /** @deprecated Ignored by the Host; removed next protocol revision. */ approvalMode?: ApprovalMode;
   };
   "runtime.getStatus": Record<string, never>;
   "projection.resync": Record<string, never>;

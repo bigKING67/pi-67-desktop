@@ -1,6 +1,6 @@
 # Full-repository review follow-ups
 
-Status: open (decisions required before implementation)
+Status: decisions 1-6 applied; approvalMode removal (stage 2) and device evidence open
 Owner: main
 Started: 2026-09-28
 Last updated: 2026-09-28
@@ -19,30 +19,22 @@ turn, memory draft on identity refresh, Settings leave guard for every exit, att
 state and system-bridge protocol ownership, packaged probe selectors, diagnostics key spellings,
 manifest no-store, account poll error, authority document drift.
 
-## Decisions required
-1. **Renderer runtime import cycles (2).** `app-store -> connection-state -> {session-creation-recovery,
-   projection-recovery -> task-selection -> workbench-controller} -> app-store`. They work only because
-   every use is inside a function. Proposal: connection-state receives the store accessors it needs
-   (`get`/`set` are already passed to its handlers) instead of the controllers importing `useAppStore`,
-   or the controllers move behind an injected port registered by app-store at creation. Then remove the
-   entries from `KNOWN_RUNTIME_CYCLES` in eng/quality/check-architecture.mjs. Architecture change.
-2. **Approval refused-but-pending (protocol-domain-03, P3).** `ApprovalResolution` cannot express "decision
-   refused, request still pending", so a refused path-grant/YOLO decision removes the dialog while the
-   tool waits up to 300 s. Proposal: add a `refused` outcome to the approval.respond result carrying the
-   still-pending request, and keep the dialog with an inline reason. Protocol change.
-3. **Dead `approvalMode` wire field (protocol-domain-04).** Validated in four command payloads but never
-   read; `guided`/`ask` only normalize to AUTO. Proposal: stop sending it and accept-and-ignore for one
-   protocol revision, then remove. Protocol change; docs already corrected.
-4. **Protocol revision coverage (protocol-domain-05).** Revision material omits the context-scope,
-   event-context and replay-safe tables that gate envelope acceptance. Proposal: include them so a
-   scope or replay-safety change moves PROTOCOL_REVISION.
-5. **commerce-growth-os `sync_helper`.** packages/pi-workspace-resources/shared-skill-packs.json names
-   `scripts/pi67-sync-commerce-skill-pack.sh`, which does not exist here; the pack comes from its own
-   first-party repository. Decide: remove the field or point to the helper in that repository.
-6. **Persisted-state IPC codecs.** Workbench layout, composer draft and workspace file state are validated
-   by versioned codecs in apps/desktop (~800 lines). Moving them into packages/protocol would pull
-   persistence migration into the runtime-neutral protocol package. Decide whether to keep Main
-   ownership (current) or extract a shared persisted-state schema package.
+## Decisions (owner accepted the recommendations on 2026-09-28)
+1. **Renderer runtime import cycles** — done. Workbench persistence suspension moved to the leaf
+   `workbench-persistence-suspension.ts`; session creation recovery settles transitions through the
+   `session-transition-settlement.ts` port bound by app-store at creation. The architecture gate now
+   fails on any runtime cycle; the known-cycle allowlist was removed.
+2. **Approval refused-but-pending** — done. `approval.respond` returns `refusedDecision`
+   (`workspace-untrusted`, `hard-stop`, `path-grant-rejected`) and the renderer keeps the dialog open.
+3. **`approvalMode` wire field** — stage 1 done: optional on the wire, Host defaults it, renderer no
+   longer sends or stores it. Stage 2 (remove from schemas and runtime options) is due in the next
+   protocol revision.
+4. **Protocol revision coverage** — done. Context-scope, event-context and replay-safe tables are part
+   of the revision material.
+5. **commerce-growth-os `sync_helper`** — removed; the pack syncs through its own repository and the
+   capability lock.
+6. **Persisted-state IPC codecs** — keep Main ownership. Versioned persistence migration stays out of
+   the runtime-neutral protocol package; revisit only if a second process needs these codecs.
 
 ## Needs real-device evidence
 - macOS title bar fix (54ba0fa) in the packaged app while switching system appearance.
@@ -74,3 +66,4 @@ source (`corepack pnpm --filter @pi67/protocol run generate:revision`).
 
 ## Progress
 - 2026-09-28: plan recorded after landing the accepted fixes; decisions 1-6 pending.
+- 2026-09-28: decisions 1-6 applied (e543051..HEAD); approvalMode stage 2 remains.
