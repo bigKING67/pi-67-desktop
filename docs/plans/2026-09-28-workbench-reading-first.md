@@ -150,3 +150,7 @@ Review found and fixed metric misalignment for files at the Workspace root. `che
 Unverified: packaged Electron, Windows, screen reader; macOS `/private` realpath prefixes can make an
 absolute Pi path fall back to plain text (Main still owns containment).
 
+## Closeout (2026-09-28)
+Phase 2 CI passed (run 36401812917). The prototype directory was deleted and
+`2026-09-20-workbench-design-prototypes.md` marked superseded.
+
