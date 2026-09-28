@@ -25,6 +25,9 @@ import {
   RepositorySubmoduleInitializationResultSchema
 } from "./repository-environment-schema.js";
 import { DesktopUpdateStateSchema } from "./desktop-update-state.js";
+import { EVENT_CONTEXT_REQUIREMENTS } from "./event-context.js";
+import { COMMAND_CONTEXT_SCOPE_REQUIREMENTS } from "./protocol-context.js";
+import { REPLAY_SAFE_CONTROL_MUTATION_TYPES, REPLAY_SAFE_OPERATION_ACK_TYPES } from "./replay-safe-commands.js";
 import {
   DesktopAgentHostFailureStateSchema,
   DesktopAgentHostStartupStateSchema,
@@ -57,6 +60,13 @@ import {
 
 export function canonicalProtocolRevisionMaterial(): string {
   return stableJson({
+    // Tables that decide whether an envelope is accepted; changing them must move the revision.
+    acceptance: {
+      commandContextScope: COMMAND_CONTEXT_SCOPE_REQUIREMENTS,
+      eventContext: EVENT_CONTEXT_REQUIREMENTS,
+      replaySafeControlMutations: [...REPLAY_SAFE_CONTROL_MUTATION_TYPES].sort(),
+      replaySafeOperationAcks: [...REPLAY_SAFE_OPERATION_ACK_TYPES].sort()
+    },
     envelopes: {
       rendererHello: RendererHelloSchema,
       hostWelcome: HostWelcomeSchema,

@@ -10,4 +10,12 @@ describe("protocol revision", () => {
       .digest("hex");
     expect(PROTOCOL_REVISION).toBe(computed);
   });
+
+  it("covers the tables that gate envelope acceptance", () => {
+    const acceptance = JSON.parse(canonicalProtocolRevisionMaterial()).acceptance;
+    expect(acceptance.commandContextScope["workspace.register"]).toBe("workspace");
+    expect(acceptance.eventContext["runtime.ready"]).toEqual({ session: true, operation: false });
+    expect(acceptance.replaySafeControlMutations).toContain("runtime.initialize");
+    expect(acceptance.replaySafeOperationAcks).toContain("session.compact");
+  });
 });
