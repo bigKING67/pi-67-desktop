@@ -22,9 +22,18 @@ const MAX_JSON_DEPTH = 12;
 const MAX_OBJECT_KEYS = 256;
 const MAX_ARRAY_ITEMS = 256;
 const MAX_STRING_LENGTH = 4_096;
+// Compared after normalizeDiagnosticKey, so api_key, api-key and apiKey are the same key.
 const FORBIDDEN_DIAGNOSTIC_KEYS = new Set([
   "accesskey",
+  "accesstoken",
   "apikey",
+  "bearer",
+  "clientsecret",
+  "idtoken",
+  "privatekey",
+  "refreshtoken",
+  "sessiontoken",
+  "token",
   "authorization",
   "cookie",
   "cookies",
@@ -211,9 +220,13 @@ function isBoundedDiagnosticValue(value: unknown, depth: number): boolean {
   return entries.every(([key, item]) => (
     key.length >= 1
     && key.length <= 64
-    && !FORBIDDEN_DIAGNOSTIC_KEYS.has(key.toLowerCase())
+    && !FORBIDDEN_DIAGNOSTIC_KEYS.has(normalizeDiagnosticKey(key))
     && isBoundedDiagnosticValue(item, depth + 1)
   ));
+}
+
+function normalizeDiagnosticKey(key: string): string {
+  return key.toLowerCase().replace(/[\s._-]/gu, "");
 }
 
 function isTimestamp(value: unknown): value is number {

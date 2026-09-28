@@ -88,6 +88,10 @@ describe("support diagnostics contract", () => {
       ...diagnosticDocument(),
       desktop: { path: "/private/workspace" }
     })).toBe(false);
+    for (const key of ["token", "api_key", "api-key", "API.KEY", "access_token", "refresh_token", "bearer", "private_key", "client_secret"]) {
+      expect(isSupportDiagnosticsDocument({ ...diagnosticDocument(), desktop: { [key]: "synthetic" } }), key).toBe(false);
+    }
+    expect(isSupportDiagnosticsDocument({ ...diagnosticDocument(), desktop: { tokenCount: 3, previousRunExitStatus: "clean" } })).toBe(true);
     expect(isSupportDiagnosticsDocument({
       ...v6,
       causality: {
