@@ -143,11 +143,13 @@ test("keeps the Main-resolved Pi profile authoritative when the launch environme
     await expect(window.getByRole("dialog", { name: "配置 OpenAI API Key" })
       .getByText("已持久化到 Pi auth.json", { exact: true })).toBeVisible();
   } finally {
-    await application?.close();
+    // On CI agentDir is the shared agent profile: remove the synthetic credential before closing,
+    // so a hung close cannot leave auth/settings behind for later specs.
     await Promise.all([
       rm(join(agentDir, "auth.json"), { force: true }),
       rm(join(agentDir, "settings.json"), { force: true })
     ]);
+    await Promise.race([application?.close(), new Promise((resolve) => setTimeout(resolve, 20_000))]);
     await rm(temporaryRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   }
 });
