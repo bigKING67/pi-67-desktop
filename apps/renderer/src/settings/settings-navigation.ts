@@ -235,6 +235,17 @@ export function matchesSettingsQuery(item: SettingsNavigationItem, query: string
     .some((value) => value.toLocaleLowerCase("zh-CN").includes(query));
 }
 
+/** Category search: a matching group label shows the whole group, otherwise matching items only. */
+export function filterSettingsGroups(query: string): typeof SETTINGS_GROUPS {
+  const normalized = query.trim().toLocaleLowerCase("zh-CN");
+  return SETTINGS_GROUPS.map((group) => ({
+    ...group,
+    items: group.label.toLocaleLowerCase("zh-CN").includes(normalized)
+      ? group.items
+      : group.items.filter((item) => matchesSettingsQuery(item, normalized))
+  })).filter((group) => group.items.length > 0);
+}
+
 
 export function settingsContentWidth(section: SettingsSection): "standard" | "wide" {
   return ["providers", "packages", "extensions", "skills", "prompts", "rules", "usage"].includes(section)

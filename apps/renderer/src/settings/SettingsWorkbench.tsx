@@ -55,7 +55,7 @@ import {
 import {
   SETTINGS_GROUPS,
   SETTINGS_SECTIONS,
-  matchesSettingsQuery,
+  filterSettingsGroups,
   sectionSupportsProjectScope,
   settingsContentWidth
 } from "./settings-navigation.js";
@@ -74,11 +74,7 @@ export function SettingsWorkbench() {
   const currentSection = SETTINGS_SECTIONS.find((item) => item.id === activeSection) ?? SETTINGS_SECTIONS[0]!;
   const currentGroup = SETTINGS_GROUPS.find((group) => group.items.some((item) => item.id === activeSection))
     ?? SETTINGS_GROUPS[0]!;
-  const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
-  const visibleGroups = SETTINGS_GROUPS.map((group) => ({
-    ...group,
-    items: group.label.toLocaleLowerCase("zh-CN").includes(normalizedQuery) ? group.items : group.items.filter((item) => matchesSettingsQuery(item, normalizedQuery))
-  })).filter((group) => group.items.length > 0);
+  const visibleGroups = filterSettingsGroups(query);
   const projectScopeAvailable = sectionSupportsProjectScope(activeSection);
   const { registerDraft, requestNavigation, discardDialog } = useSettingsNavigationGuard(activeSection, scope);
   useEffect(() => {
@@ -97,7 +93,17 @@ export function SettingsWorkbench() {
     if (!scrollRegion) return;
     scrollRegion.scrollTop = 0;
     scrollRegion.scrollLeft = 0;
-    scrollRegion.querySelector<HTMLElement>("h1")?.focus({ preventScroll: true });
+    const heading = scrollRegion.querySelector<HTMLElement>("h1");
+    heading?.focus({ preventScroll: true });
+    // react-aria menus and modals restore focus to their trigger a frame after closing; when the
+    // navigation completed, reclaim it for the heading unless the page itself moved focus inside.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        const active = scrollRegion.ownerDocument.activeElement;
+        if (heading?.isConnected && active !== heading && !scrollRegion.contains(active)) heading.focus({ preventScroll: true });
+      });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [activeSection]);
 
   useEffect(() => {

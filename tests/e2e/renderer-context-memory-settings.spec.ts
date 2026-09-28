@@ -237,3 +237,25 @@ test("command palette exits from Settings go through the unsaved draft guard", a
   await page.getByRole("button", { name: "放弃修改并离开", exact: true }).click();
   await expect(settings).toHaveCount(0);
 });
+
+test("discarding a draft to reach another Settings page focuses that page heading", async ({ page }) => {
+  await installMockDesktopBridge(page);
+  await page.goto("/");
+  await attachMockAgent(page, [], {}, { responseResults: {
+    "context.status.get": status,
+    "context.runtime.doctor": { checkedAt: 1, status, effectiveConfiguration: configuration, checks: [] },
+    "context.config.get": configuration,
+    "enterprise.identity.get": { state: "signed-out" },
+    "enterprise.workspace.get": { state: "unbound", workspaceId: DEFAULT_MOCK_WORKSPACE.id }
+  } });
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.getByRole("button", { name: "帮助与设置" }).click();
+  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
+  await page.getByRole("button", { name: "上下文与记忆", exact: true }).click();
+  const settings = page.getByTestId("context-memory-settings");
+  await settings.getByRole("radio", { name: /^私人学习/ }).focus();
+  await page.keyboard.press("ArrowDown");
+  await page.getByRole("button", { name: "关于", exact: true }).click();
+  await page.getByRole("button", { name: "放弃修改并离开", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "关于", exact: true })).toBeFocused();
+});

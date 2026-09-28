@@ -54,6 +54,8 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   expect(popoverBounds.bottom).toBeLessThanOrEqual(400);
   await categoryMenu.getByRole("menuitem", { name: "扩展", exact: true }).click();
   await expect(page.getByRole("button", { name: `项目 · ${DEFAULT_MOCK_WORKSPACE.displayName}`, exact: true })).toBeVisible();
+  // Completed navigation from the category menu starts at the new page heading, not the trigger.
+  await expect(settings.getByRole("heading", { level: 1, name: "扩展", exact: true })).toBeFocused();
   const scrollRegion = settings.getByTestId("settings-scroll-region");
   await scrollRegion.evaluate((element) => { element.scrollTop = element.scrollHeight; });
   expect(await scrollRegion.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);

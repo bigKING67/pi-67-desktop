@@ -7,7 +7,7 @@ const categories = ["外观", "账户与数据", "模型", "上下文与记忆",
 const wide = new Set(["模型", "扩展", "技能", "提示词模板", "工作规则", "用量分析"]);
 
 for (const theme of ["light", "dark"] as const) {
-  for (const width of [1440, 1040, 720]) {
+  for (const width of [1440, 1040, 1000, 840, 720]) {
     test(`Settings preserve alignment and usable controls in ${theme} at ${width}px`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 1000 });
       await installMockDesktopBridge(page);

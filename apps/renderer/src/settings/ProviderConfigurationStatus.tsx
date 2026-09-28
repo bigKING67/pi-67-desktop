@@ -1,14 +1,13 @@
 import type { PiProviderConfigurationSnapshot } from "@pi67/protocol";
 import { AlertTriangle, Check, FileJson2, RefreshCw } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Button } from "react-aria-components";
-import { SettingsToolbar } from "./SettingsPrimitives.js";
+import { SettingsToolbar, useRequiredOpenDisclosure } from "./SettingsPrimitives.js";
 import styles from "./ProviderConfigurationPanel.module.css";
 
 export function ProviderConfigurationFiles({ snapshot }: { snapshot: PiProviderConfigurationSnapshot }) {
   const validCount = snapshot.files.filter((file) => file.valid).length;
-  const requiredOpen = snapshot.syncState === "invalid" || snapshot.diagnostics.length > 0;
-  const [expanded, setExpanded] = useState(false);
+  const disclosure = useRequiredOpenDisclosure(snapshot.syncState === "invalid" || snapshot.diagnostics.length > 0);
   return (
     <section className={styles.secondarySection}>
       <header className={styles.sectionIntro}>
@@ -22,14 +21,7 @@ export function ProviderConfigurationFiles({ snapshot }: { snapshot: PiProviderC
           ))}
         </ul>
       ) : null}
-      <details
-        className={styles.fileDetails}
-        open={requiredOpen || expanded}
-        onToggle={(event) => {
-          if (requiredOpen && !event.currentTarget.open) event.currentTarget.open = true;
-          else setExpanded(event.currentTarget.open);
-        }}
-      >
+      <details className={styles.fileDetails} {...disclosure}>
         <summary>
           <span><FileJson2 aria-hidden="true" size={15} /><strong>Pi 文件同步</strong></span>
           <em data-valid={validCount === snapshot.files.length}>{validCount}/{snapshot.files.length} 有效</em>

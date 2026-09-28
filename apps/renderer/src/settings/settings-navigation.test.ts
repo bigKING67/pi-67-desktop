@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SETTINGS_GROUPS,
   SETTINGS_SECTIONS,
+  filterSettingsGroups,
   matchesSettingsQuery,
   sectionSupportsProjectScope
 } from "./settings-navigation.js";
@@ -110,5 +111,16 @@ describe("settings navigation", () => {
     expect(sectionSupportsProjectScope("integrations")).toBe(false);
     expect(sectionSupportsProjectScope("runtime")).toBe(false);
     expect(items.every((item) => !("measure" in item))).toBe(true);
+  });
+
+  it("shows a whole group when its label matches and otherwise only matching items", () => {
+    expect(filterSettingsGroups("")).toHaveLength(SETTINGS_GROUPS.length);
+    const byLabel = filterSettingsGroups(" 能力与指令 ");
+    expect(byLabel.map((group) => group.label)).toEqual(["能力与指令"]);
+    expect(byLabel[0]?.items.map((item) => item.id)).toEqual(["extensions", "skills", "prompts", "rules"]);
+    const byItem = filterSettingsGroups("视觉");
+    expect(byItem.flatMap((group) => group.items.map((item) => item.id))).toContain("vision");
+    expect(byItem.flatMap((group) => group.items.map((item) => item.id))).not.toContain("providers");
+    expect(filterSettingsGroups("no-such-settings-query")).toEqual([]);
   });
 });

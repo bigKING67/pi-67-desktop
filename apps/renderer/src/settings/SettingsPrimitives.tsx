@@ -1,5 +1,5 @@
 import { ArrowLeft } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState, type ReactNode, type SyntheticEvent } from "react";
 import { Button } from "react-aria-components";
 import styles from "./SettingsPrimitives.module.css";
 
@@ -161,15 +161,23 @@ export function SettingsNotice({ tone = "info", children, actions, className, te
   );
 }
 
+/** Disclosure state that cannot collapse while dirty or erroneous content requires it open. */
+export function useRequiredOpenDisclosure(requiredOpen: boolean) {
+  const [expanded, setExpanded] = useState(false);
+  return {
+    open: requiredOpen || expanded,
+    onToggle: (event: SyntheticEvent<HTMLDetailsElement>) => {
+      if (requiredOpen && !event.currentTarget.open) event.currentTarget.open = true;
+      else setExpanded(event.currentTarget.open);
+    }
+  };
+}
+
 export function SettingsDetails({ title, summary, requiredOpen = false, children }: {
   title: string; summary?: string; requiredOpen?: boolean; children: ReactNode;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  return <details className={styles.details} open={requiredOpen || expanded}
-    onToggle={event => {
-      if (requiredOpen && !event.currentTarget.open) event.currentTarget.open = true;
-      else setExpanded(event.currentTarget.open);
-    }}>
+  const disclosure = useRequiredOpenDisclosure(requiredOpen);
+  return <details className={styles.details} {...disclosure}>
     <summary><strong>{title}</strong>{summary ? <span>{summary}</span> : null}</summary>
     <div className={styles.detailsContent}>{children}</div>
   </details>;
