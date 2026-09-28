@@ -28,3 +28,6 @@ test-results/
 
 # Team Tavily Bridge client token is injected at package time (never commit).
 apps/desktop/resources/team-mcp/tavily-bridge.token
+
+# Python bytecode from the bundled worker tests
+__pycache__/
