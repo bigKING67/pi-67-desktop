@@ -26,7 +26,8 @@ export function FileEditor({ content, fileName, onChange, onSave, navigation }: 
     let disposed = false;
     let view: EditorView | undefined;
     const focusOrigin = containerRef.current?.ownerDocument.activeElement;
-    void loadLanguage(fileName).then((language) => {
+    // A language-load failure still mounts a plain editor with the same focus handoff.
+    const mount = (language?: Awaited<ReturnType<typeof loadLanguage>>) => {
       if (disposed || !containerRef.current) return;
       view = createEditor(containerRef.current, initialContent, fileName, language);
       viewRef.current = view;
@@ -35,12 +36,8 @@ export function FileEditor({ content, fileName, onChange, onSave, navigation }: 
       if (ownerDocument.activeElement === focusOrigin || ownerDocument.activeElement === ownerDocument.body) {
         view.focus();
       }
-    }).catch(() => {
-      if (disposed || !containerRef.current) return;
-      view = createEditor(containerRef.current, initialContent, fileName);
-      viewRef.current = view;
-      applyNavigation(view, navigationRef.current);
-    });
+    };
+    void loadLanguage(fileName).then(mount, () => mount());
     return () => {
       disposed = true;
       viewRef.current = undefined;
