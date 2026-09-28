@@ -42,23 +42,18 @@ manifest no-store, account poll error, authority document drift.
   with a live directory; the rewrite is source-verified only.
 - Windows real-user probes: Provider failure now detected via `provider-configuration-error`.
 
-## Deferred with reasons (valid, lower priority)
-- test-02: packaged Python team worker tests (account/asset filtering) run in no script or workflow;
-  needs a Python toolchain step in CI.
-- protocol-domain-06: domain unions duplicated as protocol literal unions without a parity test.
-- routing-01: `prompt.steer`/`prompt.followUp` commands have no producer and bypass admission/receipts;
-  remove or route through operation admission.
-- ui-bridge-01: extension UI `resolve()` does not check the answer against the pending request kind.
-- attachments-01: 128 claimed attachment sets per Task are never released before Task disposal.
-- ov-shared-07: shared-knowledge tool list in sync.ts misses viking_team_search/read.
-- ov-dead-08: unused OpenViking write/read client surfaces, including removed Resource ingestion.
-- renderer-core-08: FileEditor focus fix does not cover the language-load failure path.
-- settings-04: react-aria focus restoration overrides "navigation starts at the page heading".
-- settings-05: ProviderConfigurationFiles duplicates SettingsDetails force-open logic.
-- settings-06: group-label search lives inline in SettingsWorkbench without tests.
-- settings-07: layout spec tests 1440/1040/720; the 721-900px band is untested.
-- e2e-01: electron-shell-provider writes auth/settings into the shared CI agent profile.
-- ps-01: PowerShell syntax gate skips implicit-pwsh Windows steps.
+## Deferred items
+Done on 2026-09-28: test-02 (Python worker tests in the CI quality lane), protocol-domain-06
+(typecheck-time union parity), routing-01 (dead steer/follow-up commands removed), ui-bridge-01
+(extension UI answers validated), ov-shared-07, ov-dead-08 (addResource removed; other upstream
+members kept per UPSTREAM.md), renderer-core-08 (source fix only; no automated test because the
+language chunk is not addressable in preview builds), settings-04/05/06/07, e2e-01, ps-01.
+
+Still open:
+- attachments-01: the 128-set limit now raises RESOURCE_LIMIT_EXCEEDED with recovery guidance.
+  Releasing only successfully completed sets is not done: PRODUCT.md retains settled sets for
+  explicit retry and replay adopts existing sets, so release needs its own analysis.
+- approvalMode stage 2 (see decision 3).
 
 ## Rollback
 Each landed fix is an independent commit; revert individually. Protocol revision regenerates from
@@ -67,3 +62,4 @@ source (`corepack pnpm --filter @pi67/protocol run generate:revision`).
 ## Progress
 - 2026-09-28: plan recorded after landing the accepted fixes; decisions 1-6 pending.
 - 2026-09-28: decisions 1-6 applied (e543051..HEAD); approvalMode stage 2 remains.
+- 2026-09-28: deferred items closed except attachments-01 release and approvalMode stage 2.
