@@ -50,9 +50,11 @@ members kept per UPSTREAM.md), renderer-core-08 (source fix only; no automated t
 language chunk is not addressable in preview builds), settings-04/05/06/07, e2e-01, ps-01.
 
 Still open:
-- attachments-01: the 128-set limit now raises RESOURCE_LIMIT_EXCEEDED with recovery guidance.
-  Releasing only successfully completed sets is not done: PRODUCT.md retains settled sets for
-  explicit retry and replay adopts existing sets, so release needs its own analysis.
+- attachments-01 — closed as by design. The limit now raises RESOURCE_LIMIT_EXCEEDED with recovery
+  guidance. Releasing completed sets was analysed and rejected: PRODUCT.md ("Operation acknowledgement
+  alone does not delete claimed bytes because the active Task may still use `read_attachment` in a
+  later turn") and the attachment read tool resolve old set ids for the rest of the Task. Evicting
+  sets would change that product contract, so it needs a product decision, not a fix.
 - approvalMode stage 2 (see decision 3).
 
 ## Rollback
