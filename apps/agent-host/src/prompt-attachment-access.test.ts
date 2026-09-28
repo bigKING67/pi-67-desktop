@@ -379,7 +379,7 @@ describe("Agent Host prompt attachment access", () => {
 
     await stageFixture(fixture.root, "draft_overflow", "overflow.txt", "x", "text/plain", "document");
     await expect(task.claim("submission_overflow", [{ id: "draft_overflow" }]))
-      .rejects.toThrow("bounded set limit");
+      .rejects.toMatchObject({ code: "RESOURCE_LIMIT_EXCEEDED", message: expect.stringContaining("关闭并重新打开这个任务") });
     await expect(access(join(fixture.root, "draft", "draft_overflow", "payload.bin")))
       .resolves.toBeUndefined();
 

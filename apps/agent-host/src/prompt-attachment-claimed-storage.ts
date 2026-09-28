@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, readdir, realpath, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { HostCommandError } from "./protocol-error.js";
 import type { PreparedPromptAttachmentSet } from "@pi67/pi-runtime";
 import {
   MAX_PROMPT_ATTACHMENT_COUNT,
@@ -75,7 +76,13 @@ export async function assertClaimCapacity(
 ): Promise<void> {
   const entries = await readStableClaimedSetEntries(claimedRoot, taskKey, taskDirectory);
   if (entries.length >= MAX_CLAIMED_SETS_PER_TASK) {
-    throw new Error("Claimed attachment Task has reached the bounded set limit.");
+    // Settled sets are retained for explicit retry (PRODUCT.md), so the only recovery is a new Task
+    // runtime; say so instead of surfacing an internal storage message.
+    throw new HostCommandError(
+      "RESOURCE_LIMIT_EXCEEDED",
+      `当前任务已发送 ${MAX_CLAIMED_SETS_PER_TASK} 组附件，已达到上限。关闭并重新打开这个任务后即可继续发送附件`,
+      false
+    );
   }
 }
 
