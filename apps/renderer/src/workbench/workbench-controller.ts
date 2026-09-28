@@ -8,6 +8,7 @@ import {
 } from "@pi67/domain";
 import type { AgentConnectionIdentity } from "@pi67/protocol";
 import { useAppStore } from "../app/app-store.js";
+import { isRendererWorkbenchPersistenceSuspended, onRendererWorkbenchPersistenceResumed } from "./workbench-persistence-suspension.js";
 import { INITIAL_RUNTIME_STATE } from "../app/app-state-projection.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
@@ -25,7 +26,6 @@ let persistenceTimer: ReturnType<typeof setTimeout> | undefined;
 let persistenceRevision = 0;
 let persistenceWriteTail: Promise<void> = Promise.resolve();
 let observedPersistenceFingerprint: string | undefined;
-let persistenceSuspensionDepth = 0;
 let persistenceBound = false;
 
 export function initializeRendererWorkbench(): Promise<void> {
@@ -33,16 +33,9 @@ export function initializeRendererWorkbench(): Promise<void> {
   return initialization;
 }
 
-export function suspendRendererWorkbenchPersistence(): () => void {
-  persistenceSuspensionDepth += 1;
-  let resumed = false;
-  return () => {
-    if (resumed) return;
-    resumed = true;
-    persistenceSuspensionDepth = Math.max(0, persistenceSuspensionDepth - 1);
-    if (persistenceSuspensionDepth === 0 && persistenceBound) observePersistenceChange();
-  };
-}
+onRendererWorkbenchPersistenceResumed(() => {
+  if (persistenceBound) observePersistenceChange();
+});
 
 export interface WorkbenchPersistenceAuthority {
   identity: Pick<AgentConnectionIdentity, "hostInstanceId" | "hostEpoch"> | undefined;
@@ -206,7 +199,7 @@ export async function persistRendererWorkbenchCheckpoint(): Promise<void> {
 }
 
 function observePersistenceChange(): void {
-  if (persistenceSuspensionDepth > 0) return;
+  if (isRendererWorkbenchPersistenceSuspended()) return;
   const next = persistenceFingerprint(rendererWorkbenchStore.getState());
   if (next === observedPersistenceFingerprint) return;
   observedPersistenceFingerprint = next;

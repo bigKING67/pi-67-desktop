@@ -1,5 +1,5 @@
 import type { SessionCreationResolution } from "@pi67/protocol";
-import { useAppStore } from "../app/app-store.js";
+import { settleRendererSessionTransition } from "./session-transition-settlement.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
@@ -141,11 +141,7 @@ export async function recheckUnconfirmedRendererSession(
     if (wasSelected) {
       workbench.selectTask(existingOwner.id);
       if (ownerIsStopped || ownerProjectionIsActive) {
-        useAppStore.setState({
-          sessionTransitionPending: false,
-          sessionBootstrapTransitionPending: false,
-          runtime: existingOwner.runtime
-        });
+        settleRendererSessionTransition(existingOwner.runtime);
       } else {
         await options.activateTask!(existingOwner.id);
       }
@@ -175,11 +171,7 @@ export async function recheckUnconfirmedRendererSession(
     sessionMetadataStatus: "indexing"
   });
   if (selectedWorkbenchTask(rendererWorkbenchStore.getState())?.id === taskId) {
-    useAppStore.setState({
-      sessionTransitionPending: false,
-      sessionBootstrapTransitionPending: false,
-      runtime: materializedRuntime
-    });
+    settleRendererSessionTransition(materializedRuntime);
   }
   notifyMaterialized(options.notify);
   return "materialized";
@@ -226,14 +218,10 @@ export function dismissUnconfirmedRendererSession(taskId: string): boolean {
   useTaskDraftStore.getState().discard(taskId);
   if (wasSelected) {
     const nextTask = selectedWorkbenchTask(rendererWorkbenchStore.getState());
-    useAppStore.setState({
-      sessionTransitionPending: false,
-      sessionBootstrapTransitionPending: false,
-      runtime: nextTask?.runtime ?? {
-        phase: "stopped",
-        detail: messages.runtime.workbench.workspaceRestored,
-        recoverable: true
-      }
+    settleRendererSessionTransition(nextTask?.runtime ?? {
+      phase: "stopped",
+      detail: messages.runtime.workbench.workspaceRestored,
+      recoverable: true
     });
   }
   publishNotification({

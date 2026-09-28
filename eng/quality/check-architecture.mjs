@@ -10,12 +10,6 @@ import {
 } from "./architecture-rules.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-// Runtime import cycles that predate AST parsing. They are lazily evaluated today, but any new
-// cycle fails and a listed cycle that disappears must be removed so the list only shrinks.
-const KNOWN_RUNTIME_CYCLES = new Set([
-  "apps/renderer/src/app/app-store.ts|apps/renderer/src/connection/connection-state.ts|apps/renderer/src/session/session-creation-recovery-controller.ts",
-  "apps/renderer/src/app/app-store.ts|apps/renderer/src/connection/connection-state.ts|apps/renderer/src/connection/projection-recovery-controller.ts|apps/renderer/src/connection/projection-recovery-task-selection.ts|apps/renderer/src/workbench/workbench-controller.ts"
-]);
 const NODE_BUILTINS = new Set(builtinModules.filter((name) => !name.startsWith("_")));
 const APPLICATION_PACKAGES = ["@pi67/desktop", "@pi67/agent-host", "@pi67/renderer", "@pi67/support-ingest"];
 const sourceRoots = [join(root, "apps"), join(root, "packages")];
@@ -56,14 +50,8 @@ violations.push(...runningTaskDocumentationViolations(
   })))
 ));
 
-const knownCyclesSeen = new Set();
 for (const cycle of findCycles(graph)) {
-  const key = [...new Set(cycle.map(toRepoPath))].sort((left, right) => left.localeCompare(right)).join("|");
-  if (KNOWN_RUNTIME_CYCLES.has(key)) knownCyclesSeen.add(key);
-  else violations.push(`circular dependency: ${cycle.map(toRepoPath).join(" -> ")}`);
-}
-for (const key of KNOWN_RUNTIME_CYCLES) {
-  if (!knownCyclesSeen.has(key)) violations.push(`known runtime cycle no longer exists; remove it from KNOWN_RUNTIME_CYCLES: ${key}`);
+  violations.push(`circular dependency: ${cycle.map(toRepoPath).join(" -> ")}`);
 }
 
 if (violations.length > 0) {
@@ -72,7 +60,7 @@ if (violations.length > 0) {
   process.exit(1);
 }
 
-console.log(`Architecture check passed: ${files.length} modules, ${dependencyCount} imports, 0 new runtime cycles (${knownCyclesSeen.size} known).`);
+console.log(`Architecture check passed: ${files.length} modules, ${dependencyCount} imports, 0 runtime cycles.`);
 
 async function collectSourceFiles(directory) {
   const output = [];

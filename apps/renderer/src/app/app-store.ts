@@ -16,6 +16,7 @@ import {
   recoverSessionImportTerminalWithoutBootstrap
 } from "./session-import-bootstrap-recovery.js";
 import type { AppState } from "./app-store.types.js";
+import { bindSessionTransitionSettlement } from "../session/session-transition-settlement.js";
 
 export const useAppStore = create<AppState>((set, get) => ({
   connectionIdentity: undefined,
@@ -60,4 +61,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       recoverSessionImportTerminalWithoutBootstrap(terminal, terminalEnvelope, get, set);
     });
   }
+}));
+
+bindSessionTransitionSettlement((runtime) => useAppStore.setState({
+  sessionTransitionPending: false,
+  sessionBootstrapTransitionPending: false,
+  runtime
 }));

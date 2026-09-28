@@ -1,5 +1,5 @@
 import type { WorkbenchSurface, WorkspaceId } from "@pi67/domain";
-import { suspendRendererWorkbenchPersistence } from "../workbench/workbench-controller.js";
+import { suspendRendererWorkbenchPersistence } from "../workbench/workbench-persistence-suspension.js";
 import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
 import {
   rendererWorkbenchStore,
