@@ -24,6 +24,14 @@ describe("shared New Money presentation state", () => {
     expect(newMoneyAccountLabel(newMoneyAccountStore.getState()).initial).toBe("六");
     publishNewMoneyIdentity({state:"signed-in"});
     expect(newMoneyAccountLabel(newMoneyAccountStore.getState())).toMatchObject({title:"New Money 用户",initial:"N"});
+    publishNewMoneyIdentity({state:"signed-in",displayName:"\u200Bwhois"});
+    expect(newMoneyAccountLabel(newMoneyAccountStore.getState()).initial).toBe("W");
+    publishNewMoneyIdentity({state:"signed-in",displayName:"🇨🇳 Team"});
+    expect(newMoneyAccountLabel(newMoneyAccountStore.getState()).initial).toBe("🇨🇳");
+    publishNewMoneyIdentity({state:"signed-in",displayName:"e\u0301mile"});
+    expect(newMoneyAccountLabel(newMoneyAccountStore.getState()).initial).toBe("E\u0301");
+    publishNewMoneyIdentity({state:"signed-in",displayName:"ßeta"});
+    expect(newMoneyAccountLabel(newMoneyAccountStore.getState()).initial).toBe("ß");
     publishNewMoneyIdentity({state:"expired"});
     expect(newMoneyAccountLabel(newMoneyAccountStore.getState()).initial).toBeUndefined();
   });

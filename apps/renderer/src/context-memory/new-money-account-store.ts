@@ -41,13 +41,24 @@ export function refreshNewMoneyIdentity(read: () => Promise<EnterpriseIdentitySt
 }
 
 /** `initial` is present only for a confirmed signed-in identity; the footer then shows a compact avatar row. */
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/** First visible grapheme, uppercased locale-independently; invisible format characters are skipped. */
+function avatarInitial(name: string): string {
+  for (const { segment } of graphemes.segment(name.replace(/[\p{Cf}\p{Z}\p{Cc}]/gu, ""))) {
+    const upper = segment.toUpperCase();
+    return upper.length === segment.length ? upper : segment;
+  }
+  return "N";
+}
+
 export function newMoneyAccountLabel(snapshot: AccountSnapshot): { title: string; detail: string; initial?: string } {
   if (snapshot.error) return { title: "账户状态待确认", detail: "打开账户设置重试" };
   const identity = snapshot.identity;
   if (!identity) return { title: "New Money 账户", detail: snapshot.loading ? "正在检查登录状态…" : "打开账户设置" };
   if (identity.state === "signed-in") {
     const title = identity.displayName?.trim() || "New Money 用户";
-    return { title, detail: "已登录 · 账户与团队", initial: Array.from(title)[0]!.toLocaleUpperCase() };
+    return { title, detail: "已登录 · 账户与团队", initial: avatarInitial(title) };
   }
   if (identity.state === "pending") return { title: "等待登录确认", detail: "打开账户设置" };
   if (identity.state === "expired") return { title: "重新登录 New Money", detail: "登录已过期" };

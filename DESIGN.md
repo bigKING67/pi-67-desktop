@@ -1465,8 +1465,12 @@ loading error where the operation can produce those states
   in Settings and the command palette; refresh and Session import belong to the
   owning Workspace overflow menu. When the packaged Main process discovers a newer
   complete release, a compact `更新` button (control radius, `--accent` fill,
-  accessible name `更新到 <version>`) appears before the gear. Clicking it opens the
-  shared update status; it never starts a download or installation.
+  accessible name `更新到 <version>`) appears before the gear; it stays as `下载中` /
+  `安装中` while that update downloads or installs so progress and cancel remain one
+  click away. Clicking it opens the shared update status; it never starts a
+  download or installation. The avatar initial is the first grapheme after
+  invisible format and space characters, uppercased only when that keeps it one
+  character.
 - Account v1 is truthfully `signed-out`: local Pi, Workspaces, and Sessions remain
   available, while enterprise/team features are described as not yet connected.
 - `Cmd/Ctrl+N` creates a conversation in the current Workspace; `Cmd/Ctrl+T` is a

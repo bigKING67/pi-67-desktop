@@ -27,7 +27,7 @@ for (const theme of ["light", "dark"] as const) {
     await setup(page);
     const footer = page.getByTestId("account-settings-entry");
     await expect(footer).toContainText("New Money 测试账户");
-    await expect(footer).toHaveAccessibleName("New Money 测试账户，账户与团队");
+    await expect(footer).toHaveAccessibleName("New Money 测试账户，已登录 · 账户与团队");
     await expect(footer).not.toContainText("已登录");
     await expect(footer.getByText("N", { exact: true })).toBeVisible();
     await footer.focus(); await expect(footer).toBeFocused(); await page.keyboard.press("Enter");

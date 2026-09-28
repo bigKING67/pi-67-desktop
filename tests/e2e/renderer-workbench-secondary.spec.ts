@@ -97,8 +97,17 @@ test("opens Account and Settings directly from the lower-left footer", async ({ 
   await page.getByRole("button", { name: "返回工作台" }).click();
   await expect(settingsButton).toBeVisible();
 
+  const footerBox = await page.locator(".navigation-footer").boundingBox();
+  const settingsBox = await settingsButton.boundingBox();
+  expect(footerBox!.x + footerBox!.width - (settingsBox!.x + settingsBox!.width)).toBeLessThan(12);
+
   await page.getByTestId("account-settings-entry").click();
-  await expect(page.getByLabel("New Money 设置")).toBeVisible();
+  const settings = page.getByLabel("New Money 设置");
+  await expect(settings).toBeVisible();
+  await settings.getByRole("navigation", { name: "设置分类" })
+    .getByRole("button", { name: /^关于/u }).click();
+  await expect(page.getByRole("heading", { name: "关于", exact: true })).toBeVisible();
+  await expect(page.getByText("用 AI 创造新的价值。", { exact: true })).toBeVisible();
 });
 
 test("keeps long workspace and session names inside the navigation column", async ({ page }) => {

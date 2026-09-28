@@ -111,7 +111,7 @@ export function NavigationRail({
 
       <footer className={`navigation-footer ${styles.footer}`}>
         <Button
-          {...(accountLabel.initial ? { "aria-label": `${accountLabel.title}，账户与团队` } : {})}
+          {...(accountLabel.initial ? { "aria-label": `${accountLabel.title}，${accountLabel.detail}` } : {})}
           className={styles.accountButton!}
           data-testid="account-settings-entry"
           onPress={() => rendererWorkbenchStore.getState().openSettings("account")}
@@ -165,15 +165,17 @@ export function NavigationRail({
 function FooterUpdateButton() {
   const setUpdateDialogOpen = useShellStore((state) => state.setUpdateDialogOpen);
   const update = useUpdateStore((state) => state.update);
-  if (update.phase !== "available") return null;
+  // Stays mounted through download/install so the dialog (progress, cancel) remains one click away.
+  if (update.phase !== "available" && update.phase !== "downloading" && update.phase !== "installing") return null;
+  const label = update.phase === "available" ? "更新" : update.phase === "downloading" ? "下载中" : "安装中";
   return (
     <Button
-      aria-label={`更新到 ${update.version}`}
+      aria-label={update.phase === "available" ? `更新到 ${update.version}` : `${label}：New Money ${update.version}`}
       className={styles.updateButton!}
       data-testid="footer-update-entry"
       onPress={() => setUpdateDialogOpen(true)}
     >
-      更新
+      {label}
     </Button>
   );
 }

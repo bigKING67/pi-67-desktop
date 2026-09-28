@@ -358,6 +358,7 @@ test("keeps unsigned preview downloads explicit, observable, and cancellable", a
   await dialog.getByRole("button", { name: "下载并安装" }).click();
   await expect(dialog.getByText("正在下载 New Money 0.1.0-alpha.2")).toBeVisible();
   await expect(dialog.getByRole("progressbar", { name: "更新下载进度" })).toHaveAttribute("aria-valuenow", "50");
+  await expect(page.getByTestId("footer-update-entry")).toHaveText("下载中");
   await expect(dialog.getByText(/50\.0 MB \/ 100\.0 MB（50%）/u)).toBeVisible();
   await expect(dialog.getByRole("button", { name: "取消下载" })).toBeEnabled();
   await dialog.getByRole("button", { name: "取消下载" }).click();
