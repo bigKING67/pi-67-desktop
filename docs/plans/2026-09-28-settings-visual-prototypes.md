@@ -1,6 +1,6 @@
 # 设置页视觉统一：双方案原型
 
-Status: ready_for_selection
+Status: closed (2026-09-28)
 Owner: Claude main
 Started: 2026-09-28
 Last updated: 2026-09-28
@@ -66,6 +66,11 @@ Last updated: 2026-09-28
 | Packaged / Windows | 原型不在范围 | UNVERIFIED |
 
 Findings fixed during review: A 卡片行分隔线被行重置覆盖；B 页头与标签双线；多组快捷键缺“或”分隔。
+
+## Selection
+
+用户选择“以 A 为主、目录页借用 B”。生产迁移见 `2026-09-28-settings-visual-unification.md`；
+原型目录已在迁移完成后删除。
 
 ## Rollback
 
