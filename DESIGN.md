@@ -2767,6 +2767,14 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
   status sits in `trailing` as `SettingsStatus`, metadata is plain text, not pills). Extensions
   keep their detail beside the list; model, skill and rule editors open as a drill-in page
   because they are full editors. Other pages use grouped rows in the centered column.
+- Lists show only what distinguishes an entry or needs attention. The normal state is not
+  repeated on every row (all-active rules and providers in the 已配置 or 可配置 view show no
+  status; a ready skill suite shows its update channel as plain tertiary text); only
+  exceptions carry a `SettingsStatus`. Rows are at most
+  two lines: name, then scope/access or version metadata. Paths stay only where they distinguish entries
+  (user rule files that share a name); built-in rule paths and IDs that restate the name
+  appear in the detail view, not the list. A disclosure summary does not repeat
+  its own statuses as a description.
 - Secondary refresh/reload actions are `SettingsIconAction` (icon with tooltip, accessible
   name = label). Counts use the UI font with tabular numbers; the code font is reserved for
   paths, identifiers and editors. Keyboard shortcuts live on the

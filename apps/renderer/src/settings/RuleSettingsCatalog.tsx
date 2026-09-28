@@ -58,7 +58,6 @@ export function GlobalRuleCatalog({
           title="全局工作规则"
         />
         <AdvancedDisclosure
-          description="New Money 内置规则与系统提示词覆盖"
           open={advancedOpen}
           statuses={[
             `New Money 内置规则 · ${managedCount} 项`,
@@ -131,7 +130,6 @@ export function ProjectRuleCatalog({
           title="继承的工作规则"
         />
         <AdvancedDisclosure
-          description="项目级系统提示词覆盖"
           open={advancedOpen}
           statuses={[`系统提示词覆盖 · ${configuredCountLabel(systemCount)}`]}
           onOpenChange={onAdvancedOpenChange}
@@ -169,21 +167,19 @@ function configuredCountLabel(count: number): string {
 
 function RuleBehaviorNotice() {
   return (
-    <SettingsNotice className={styles.behaviorNotice!}>
+    <p className={styles.behaviorNotice}>
       工作规则由 Pi 自动加载，并在会话中持续生效。提示词模板只有通过 <code>/名称</code> 调用时才会加入当前消息。
-    </SettingsNotice>
+    </p>
   );
 }
 
 function AdvancedDisclosure({
   children,
-  description,
   open,
   statuses,
   onOpenChange
 }: {
   children: ReactNode;
-  description: string;
   open: boolean;
   statuses: string[];
   onOpenChange: (open: boolean) => void;
@@ -197,7 +193,6 @@ function AdvancedDisclosure({
       <summary>
         <span className={styles.advancedIdentity}>
           <strong>高级</strong>
-          <small>{description}</small>
         </span>
         <span className={styles.advancedStatuses}>
           {statuses.map((status) => <span key={status}>{status}</span>)}
@@ -222,14 +217,15 @@ function CatalogSection({ title, description, items, actions, onSelect }: {
         <SettingsCatalog label={title}>
           {items.map((item) => (
             <SettingsCatalogRow
-              description={<span className={styles.path}>{item.path}</span>}
+              {...(item.scope === "managed" ? {} : { description: <span className={styles.path}>{item.path}</span> })}
               key={item.id}
               meta={`${contextFileScopeLabel(item.scope)} · ${contextFileAccessLabel(item)}`}
               onSelect={() => onSelect(item)}
               testId={`context-file-${item.id}`}
               title={item.name}
               trailing={<>
-                <SettingsStatus tone={contextFileStatusTone(item)}>{contextFileStatusLabel(item)}</SettingsStatus>
+                {contextFileStatusTone(item) === "success" ? null
+                  : <SettingsStatus tone={contextFileStatusTone(item)}>{contextFileStatusLabel(item)}</SettingsStatus>}
                 <ChevronRight aria-hidden="true" className={styles.rowChevron} size={15} />
               </>}
             />

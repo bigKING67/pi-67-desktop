@@ -382,3 +382,4 @@
 }
 
 .suiteChevron { flex: none; color: var(--text-tertiary); }
+.suiteNote { color: var(--text-tertiary); font-size: var(--font-size-support); white-space: nowrap; }

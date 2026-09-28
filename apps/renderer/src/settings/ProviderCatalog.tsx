@@ -96,13 +96,15 @@ export function ProviderCatalog({
           <SettingsCatalog label={`${providerCatalogViewLabel(view)}模型服务列表`}>
             {filteredProviders.map((provider) => (
               <SettingsCatalogRow
-                description={provider.id}
+                {...(sameIdentity(provider.name, provider.id) ? {} : { description: provider.id })}
                 key={provider.id}
                 onSelect={() => onSelect(provider.id)}
                 selected={provider.id === selectedProviderId}
                 title={provider.name ?? provider.id}
                 meta={`${provider.origin === "builtin" ? "Pi 内置" : "Pi models.json"} · ${provider.modelCount} 个模型`}
-                trailing={<SettingsStatus tone={provider.configured ? "success" : "neutral"}>{provider.configured ? "已配置" : "待配置"}</SettingsStatus>}
+                {...(view === "custom" ? {
+                  trailing: <SettingsStatus tone={provider.configured ? "success" : "neutral"}>{provider.configured ? "已配置" : "待配置"}</SettingsStatus>
+                } : {})}
               />
             ))}
           </SettingsCatalog>
@@ -110,6 +112,11 @@ export function ProviderCatalog({
       </div>
     </section>
   );
+}
+
+/** A provider ID that only restates its display name adds no information to the row. */
+function sameIdentity(name: string | undefined, id: string): boolean {
+  return !name || name.localeCompare(id, undefined, { sensitivity: "base" }) === 0;
 }
 
 export function defaultProviderCatalogView(

@@ -96,7 +96,7 @@ test("organizes Provider task views while search and drill-down preserve the act
   await expect(search).toBeVisible();
   await expect(configuredTab).toHaveAttribute("aria-selected", "true");
   await expect(providerList.getByRole("button")).toHaveCount(2);
-  await expect(providerList.getByRole("button", { name: /Anthropic.*Pi models\.json.*已配置/u })).toBeVisible();
+  await expect(providerList.getByRole("button", { name: /Anthropic.*Pi models\.json/u })).toBeVisible();
   await customTab.click();
   await expect(providerList.getByRole("button")).toHaveCount(1);
   await expect(providerList.getByRole("button", { name: /Anthropic/u })).toBeVisible();

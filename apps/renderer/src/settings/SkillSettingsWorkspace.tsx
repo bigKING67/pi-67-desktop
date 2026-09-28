@@ -308,7 +308,9 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
             testId="bundled-skill-suite-row"
             title={suite.displayName}
             trailing={<>
-              <SettingsStatus tone={suiteStatusTone(status, pack)}>{status.label}</SettingsStatus>
+              {status.id === "ready"
+                ? <span className={styles.suiteNote}>{status.label}</span>
+                : <SettingsStatus tone={suiteStatusTone(status, pack)}>{status.label}</SettingsStatus>}
               <ChevronRight aria-hidden="true" className={styles.suiteChevron} size={15} />
             </>}
           />

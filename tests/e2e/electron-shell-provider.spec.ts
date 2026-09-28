@@ -137,7 +137,6 @@ test("keeps the Main-resolved Pi profile authoritative when the launch environme
     });
     const openAi = settings.getByRole("button", { name: /^OpenAI\b/u });
     await expect(openAi).toBeVisible();
-    await expect(openAi).toContainText("已配置");
     await openAi.click();
     await settings.getByRole("button", { name: "更新 API Key", exact: true }).click();
     await expect(window.getByRole("dialog", { name: "配置 OpenAI API Key" })
