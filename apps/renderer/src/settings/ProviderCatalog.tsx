@@ -1,5 +1,6 @@
 import type { PiProviderConfigurationView } from "@pi67/protocol";
-import { Plus, Search, X } from "lucide-react";
+import { ChevronRight, Plus, Search, X } from "lucide-react";
+import type { ReactNode } from "react";
 import { Button, Input } from "react-aria-components";
 import { SettingsCatalog, SettingsCatalogRow, SettingsStatus } from "./SettingsPrimitives.js";
 import styles from "./ProviderCatalog.module.css";
@@ -14,7 +15,7 @@ const PROVIDER_CATALOG_VIEWS: ReadonlyArray<{ id: ProviderCatalogView; label: st
 
 export function ProviderCatalog({
   providers,
-  selectedProviderId,
+  status,
   query,
   view,
   busy,
@@ -24,7 +25,8 @@ export function ProviderCatalog({
   onViewChange
 }: {
   providers: readonly PiProviderConfigurationView[];
-  selectedProviderId: string | undefined;
+  /** Sync status and refresh actions, shown at the end of the command band. */
+  status?: ReactNode;
   query: string;
   view: ProviderCatalogView;
   busy: boolean;
@@ -44,10 +46,7 @@ export function ProviderCatalog({
 
   return (
     <section className={styles.providerCatalog} aria-label="Pi Provider 导航">
-      <header className={styles.catalogIntro}>
-        <strong>模型服务目录</strong>
-        <small>Desktop 与 Pi TUI 双向共用当前用户的 Pi Profile；在这里保存或移除的 models.json 定义会同步供 Pi TUI 使用。</small>
-      </header>
+      <p className={styles.catalogIntro}>Desktop 与 Pi TUI 双向共用当前用户的 Pi Profile，保存的 models.json 定义会同步给 Pi TUI。</p>
       <div className={styles.catalogCommandBand}>
         <nav aria-label="模型服务分类" className={styles.catalogTabs} role="tablist">
           {PROVIDER_CATALOG_VIEWS.map((item) => (
@@ -63,30 +62,31 @@ export function ProviderCatalog({
             </button>
           ))}
         </nav>
-        {view === "custom" ? (
-          <Button className="primary-button" isDisabled={busy} onPress={onNew}>
-            <Plus aria-hidden="true" size={14} />新建模型服务
-          </Button>
-        ) : null}
-      </div>
-      <div className={styles.providerCatalogControls}>
-        <div className={styles.providerSearch}>
-          <Search aria-hidden="true" size={15} />
-          <Input
-            aria-label="搜索 Pi Provider"
-            autoComplete="off"
-            placeholder="搜索名称或 ID…"
-            value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
-          />
-          {query.length > 0 ? (
-            <Button
-              aria-label="清除 Provider 搜索"
-              className={styles.providerSearchClear!}
-              onPress={() => onQueryChange("")}
-              type="button"
-            >
-              <X aria-hidden="true" size={14} />
+        <div className={styles.catalogTools}>
+          <div className={styles.providerSearch}>
+            <Search aria-hidden="true" size={15} />
+            <Input
+              aria-label="搜索 Pi Provider"
+              autoComplete="off"
+              placeholder="搜索名称或 ID…"
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+            />
+            {query.length > 0 ? (
+              <Button
+                aria-label="清除 Provider 搜索"
+                className={styles.providerSearchClear!}
+                onPress={() => onQueryChange("")}
+                type="button"
+              >
+                <X aria-hidden="true" size={14} />
+              </Button>
+            ) : null}
+          </div>
+          {status}
+          {view === "custom" ? (
+            <Button className="primary-button" isDisabled={busy} onPress={onNew}>
+              <Plus aria-hidden="true" size={14} />新建模型服务
             </Button>
           ) : null}
         </div>
@@ -99,12 +99,14 @@ export function ProviderCatalog({
                 {...(sameIdentity(provider.name, provider.id) ? {} : { description: provider.id })}
                 key={provider.id}
                 onSelect={() => onSelect(provider.id)}
-                selected={provider.id === selectedProviderId}
                 title={provider.name ?? provider.id}
                 meta={`${provider.origin === "builtin" ? "Pi 内置" : "Pi models.json"} · ${provider.modelCount} 个模型`}
-                {...(view === "custom" ? {
-                  trailing: <SettingsStatus tone={provider.configured ? "success" : "neutral"}>{provider.configured ? "已配置" : "待配置"}</SettingsStatus>
-                } : {})}
+                trailing={<>
+                  {view === "custom"
+                    ? <SettingsStatus tone={provider.configured ? "success" : "neutral"}>{provider.configured ? "已配置" : "待配置"}</SettingsStatus>
+                    : null}
+                  <ChevronRight aria-hidden="true" className={styles.rowChevron} size={15} />
+                </>}
               />
             ))}
           </SettingsCatalog>

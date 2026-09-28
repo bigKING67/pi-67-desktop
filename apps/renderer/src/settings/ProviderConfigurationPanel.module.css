@@ -1007,3 +1007,10 @@
   }
 
 }
+
+.statusInline {
+  min-height: 0;
+  flex: none;
+  gap: 4px;
+  padding: 0;
+}

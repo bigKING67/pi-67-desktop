@@ -5,20 +5,26 @@
 }
 
 .catalogIntro {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
-}
-
-.catalogIntro strong {
-  color: var(--text-primary);
-  font-size: var(--font-size-body);
-}
-
-.catalogIntro small {
-  color: var(--text-secondary);
+  margin: 0;
+  color: var(--text-tertiary);
   font-size: var(--font-size-support);
   line-height: 1.5;
+}
+
+.catalogTools {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.catalogTools .providerSearch {
+  width: 240px;
+}
+
+.rowChevron {
+  flex: none;
+  color: var(--text-tertiary);
 }
 
 .catalogCommandBand {
@@ -27,7 +33,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -84,11 +89,6 @@
   content: "";
 }
 
-.providerCatalogControls {
-  display: grid;
-  width: min(520px, 100%);
-}
-
 .providerSearch {
   position: relative;
   display: flex;
@@ -105,7 +105,7 @@
 
 .providerSearch input {
   width: 100%;
-  min-height: 38px;
+  min-height: 32px;
   padding: 0 34px;
   border: 1px solid var(--border);
   border-radius: 7px;
@@ -193,5 +193,14 @@
 
   .catalogCommandBand > button {
     width: max-content;
+  }
+
+  .catalogTools {
+    padding-bottom: 8px;
+  }
+
+  .catalogTools .providerSearch {
+    width: auto;
+    flex: 1;
   }
 }

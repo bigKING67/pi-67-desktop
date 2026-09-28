@@ -182,6 +182,11 @@ export function SettingsSaveBar({ dirty, saving, canSave, onSave, onDiscard, sav
   );
 }
 
+/** Empty or not-yet-available content shown in place of rows, inside the same card. */
+export function SettingsEmpty({ children }: { children: ReactNode }) {
+  return <div className={styles.empty} role="status">{children}</div>;
+}
+
 export function SettingsCatalog({ children, className, label }: {
   children: ReactNode;
   className?: string;

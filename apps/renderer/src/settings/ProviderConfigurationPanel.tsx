@@ -180,6 +180,17 @@ function GlobalProviderConfigurationPanel() {
   };
 
   const removalView = snapshot.providers.find((provider) => provider.id === removalTarget);
+  const statusBar = (inline: boolean) => <ConfigurationStatusBar
+    inline={inline}
+    snapshot={snapshot}
+    busy={phase === "saving"}
+    catalogBusy={catalogRefreshing}
+    onReload={() => void reloadProviderConfiguration(workspaceId)}
+    onRefreshCatalog={() => {
+      setCatalogRefreshing(true);
+      void refreshProviderModelCatalog().finally(() => setCatalogRefreshing(false));
+    }}
+  />;
   return (
     <>
     <div
@@ -188,16 +199,7 @@ function GlobalProviderConfigurationPanel() {
       data-view={providerDetailOpen ? "detail" : "catalog"}
       ref={panelRef}
     >
-      <ConfigurationStatusBar
-        snapshot={snapshot}
-        busy={phase === "saving"}
-        catalogBusy={catalogRefreshing}
-        onReload={() => void reloadProviderConfiguration(workspaceId)}
-        onRefreshCatalog={() => {
-          setCatalogRefreshing(true);
-          void refreshProviderModelCatalog().finally(() => setCatalogRefreshing(false));
-        }}
-      />
+      {providerDetailOpen ? statusBar(false) : null}
       {externalConflict ? (
         <SettingsNotice
           tone="warning"
@@ -226,6 +228,7 @@ function GlobalProviderConfigurationPanel() {
       {!providerDetailOpen ? (
         <div className={styles.catalogView}>
         <ProviderCatalog
+          status={statusBar(true)}
           busy={phase === "saving"}
           onNew={() => requestProvider(null)}
           onQueryChange={setProviderQuery}
@@ -233,7 +236,6 @@ function GlobalProviderConfigurationPanel() {
           onViewChange={setProviderCatalogView}
           providers={snapshot.providers}
           query={providerQuery}
-          selectedProviderId={selectedProviderId}
           view={providerCatalogView}
         />
         </div>

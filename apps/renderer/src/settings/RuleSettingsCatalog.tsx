@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import {
   SettingsCatalog,
   SettingsCatalogRow,
+  SettingsEmpty,
   SettingsIconAction,
   SettingsNotice,
   SettingsSectionBlock,
@@ -213,7 +214,7 @@ function CatalogSection({ title, description, items, actions, onSelect }: {
 }) {
   return (
     <SettingsSectionBlock title={title} description={description} {...(actions ? { actions } : {})}>
-      {items.length === 0 ? <SettingsNotice>当前没有可显示的 Markdown 文件。</SettingsNotice> : (
+      {items.length === 0 ? <SettingsEmpty>当前没有可显示的 Markdown 文件。</SettingsEmpty> : (
         <SettingsCatalog label={title}>
           {items.map((item) => (
             <SettingsCatalogRow

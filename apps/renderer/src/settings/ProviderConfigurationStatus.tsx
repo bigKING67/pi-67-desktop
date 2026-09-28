@@ -43,16 +43,19 @@ export function ProviderConfigurationStatusBar({
   busy,
   onReload,
   catalogBusy = false,
-  onRefreshCatalog
+  onRefreshCatalog,
+  inline = false
 }: {
   snapshot: PiProviderConfigurationSnapshot;
   busy: boolean;
   onReload: () => void;
   catalogBusy?: boolean;
   onRefreshCatalog?: () => void;
+  /** Sits inside the catalog command band instead of occupying its own row. */
+  inline?: boolean;
 }) {
   return <SettingsToolbar
-    className={styles.statusBar!}
+    className={inline ? styles.statusInline! : styles.statusBar!}
     status={<SettingsStatus tone={snapshot.syncState === "current" ? "success" : "warning"}>
       {snapshot.syncState === "current" ? "配置已同步" : "配置需要处理"}
     </SettingsStatus>}

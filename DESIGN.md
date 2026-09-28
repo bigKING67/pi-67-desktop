@@ -2765,8 +2765,15 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
 - Catalog pages (models, extensions, skills, prompts, rules, usage) use the 1040px frame with
   catalog cards whose rows follow the same anatomy (`SettingsCatalogRow` has no leading slot;
   status sits in `trailing` as `SettingsStatus`, metadata is plain text, not pills). Extensions
-  keep their detail beside the list; model, skill and rule editors open as a drill-in page
-  because they are full editors. Other pages use grouped rows in the centered column.
+  keep their detail beside the list; model, skill and rule editors open as a drill-in page.
+  Decision (2026-09-28): no side-by-side detail for these three — their catalogs are short
+  (a handful of entries) and each detail is a full editor that a narrow pane would cramp.
+  Catalog rows that open a detail end with a chevron and keep no persistent selection
+  highlight. A catalog's sync status and refresh actions sit in its command band with the
+  tabs and search, not on a separate row, and a catalog does not repeat the page title as
+  a section heading. Other pages use grouped rows in the centered column.
+- Empty or not-yet-available content uses `SettingsEmpty` inside the card position, not a
+  notice; notices are for states that need action.
 - Lists show only what distinguishes an entry or needs attention. The normal state is not
   repeated on every row (all-active rules and providers in the 已配置 or 可配置 view show no
   status; a ready skill suite shows its update channel as plain tertiary text); only

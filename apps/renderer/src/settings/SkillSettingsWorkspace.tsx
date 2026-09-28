@@ -269,7 +269,7 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
       </span>}
       title="内置技能套件"
       description={suites.length > 0
-        ? `${suites.length} 个技能套件，共 ${skillCount} 个技能；随 Desktop 提供并对所有项目可用。`
+        ? `${suites.length} 个技能套件，共 ${skillCount} 个技能；由 Desktop 管理并对所有项目可用，同名技能以 Pi 的资源解析结果为准。`
         : "随 New Money 提供并对所有项目可用；不通过第三方扩展包重复安装。"}
     >
       {capability.error ? <SettingsNotice tone="danger">{capability.error}</SettingsNotice> : null}
@@ -322,9 +322,6 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
             : "当前版本没有可显示的内置技能套件。"}
         </SettingsNotice>
       )}
-      <SettingsNotice className={styles.scopeNotice!}>
-        内置技能对所有项目可用并由 Desktop 管理；当前任务最终使用哪个同名技能，以 Pi 的资源解析结果为准。
-      </SettingsNotice>
     </SettingsSectionBlock>
     {mutationDialog}
   </>;

@@ -669,3 +669,14 @@
 }
 
 .saveBarDiscard[data-hovered] { background: var(--surface-hover); color: var(--text-primary); }
+
+.empty {
+  padding: 20px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-interface);
+  line-height: 1.5;
+  text-align: center;
+}

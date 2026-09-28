@@ -13,6 +13,7 @@ import { useSessionProjectionStore } from "../session/session-projection-store.j
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import styles from "./SettingsWorkbench.module.css";
 import {
+  SettingsEmpty,
   SettingsInfo,
   SettingsNotice,
   SettingsRow,
@@ -73,11 +74,13 @@ export function SessionResourcePanel({
             ? <>{resource.label}<SettingsInfo label={`${resource.label} 资源路径`}><code className={styles.resourcePath}>{resource.path}</code></SettingsInfo></>
             : resource.label}
           description={resourceMetadata(resource, scope)}
-          value={<SettingsStatus tone={resource.status === "ready" ? "success" : resource.status === "failed" ? "danger" : "warning"}>{resourceStatusLabel(resource.status)}</SettingsStatus>}
+          {...(resource.status === "ready" ? {} : {
+            value: <SettingsStatus tone={resource.status === "failed" ? "danger" : "warning"}>{resourceStatusLabel(resource.status)}</SettingsStatus>
+          })}
         />
       ))}</SettingsRows> : resources === undefined ? (
-        <SettingsNotice>当前 Pi 会话尚未就绪；请返回工作台打开对话后再查看或重新加载资源。</SettingsNotice>
-      ) : resourceCatalog?.truncated ? null : <SettingsNotice>{empty}</SettingsNotice>}
+        <SettingsEmpty>当前 Pi 会话尚未就绪；请返回工作台打开对话后再查看或重新加载资源。</SettingsEmpty>
+      ) : resourceCatalog?.truncated ? null : <SettingsEmpty>{empty}</SettingsEmpty>}
     </SettingsSectionBlock>
   );
 }
