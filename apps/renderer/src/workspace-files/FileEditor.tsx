@@ -26,7 +26,8 @@ export function FileEditor({ content, fileName, onChange, onSave, navigation }: 
     let disposed = false;
     let view: EditorView | undefined;
     const focusOrigin = containerRef.current?.ownerDocument.activeElement;
-    // A language-load failure still mounts a plain editor with the same focus handoff.
+    // Any failure while loading or applying the language (not only a rejected chunk) falls back to a
+    // plain editor with the same focus handoff; an editor that already mounted is never duplicated.
     const mount = (language?: Awaited<ReturnType<typeof loadLanguage>>) => {
       if (disposed || !containerRef.current) return;
       view = createEditor(containerRef.current, initialContent, fileName, language);
@@ -37,7 +38,9 @@ export function FileEditor({ content, fileName, onChange, onSave, navigation }: 
         view.focus();
       }
     };
-    void loadLanguage(fileName).then(mount, () => mount());
+    void loadLanguage(fileName).then(mount).catch(() => {
+      if (!view) mount();
+    });
     return () => {
       disposed = true;
       viewRef.current = undefined;
