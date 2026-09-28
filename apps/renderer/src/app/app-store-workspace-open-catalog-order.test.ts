@@ -64,8 +64,7 @@ describe("Workspace open Catalog ordering", () => {
         expect(requestPayload).toEqual({
           cwd: initialSnapshot.cwd,
           sessionPath: initialSnapshot.sessionPath,
-          trust: "trusted",
-          approvalMode: "balanced"
+          trust: "trusted"
         });
         const context = options?.context;
         if (!context || context.scope !== "task") throw new Error("Expected Task context.");

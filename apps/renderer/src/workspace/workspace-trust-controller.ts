@@ -50,8 +50,7 @@ export async function updateWorkspaceTrust(
   });
   try {
     const result = await agentConnectionController.request("workspace.setTrust", {
-      trust,
-      approvalMode: state.approvalMode
+      trust
     });
     if (
       result.sessionId !== authority.sessionId

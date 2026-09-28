@@ -1,5 +1,4 @@
 import type {
-  ApprovalMode,
   OperationView,
   RuntimeStatus,
   WorkspaceTrust
@@ -23,7 +22,6 @@ export interface AppState {
   sessionTransitionPending: boolean;
   sessionBootstrapTransitionPending: boolean;
   workspaceOpenPending: boolean;
-  approvalMode: ApprovalMode;
   operation: OperationView | undefined;
   operationDetail: string | undefined;
   operationProgress: string | undefined;

@@ -1,4 +1,4 @@
-import type { ApprovalMode, WorkspaceTrust } from "@pi67/domain";
+import type { WorkspaceTrust } from "@pi67/domain";
 import type {
   AgentConnectionIdentity,
   ProjectionMutationAcknowledgement,
@@ -17,7 +17,6 @@ export interface SessionRecoveryInput {
   workspace: string;
   sessionPath?: string;
   trust: WorkspaceTrust;
-  approvalMode: ApprovalMode;
 }
 
 export function ensureAgentConnection(): Promise<AgentConnectionIdentity> {
@@ -40,8 +39,7 @@ export async function recoverSession(
   return agentConnectionController.request("runtime.initialize", {
     cwd: input.workspace,
     ...(input.sessionPath === undefined ? {} : { sessionPath: input.sessionPath }),
-    trust: input.trust,
-    approvalMode: input.approvalMode
+    trust: input.trust
   }, [], { context });
 }
 

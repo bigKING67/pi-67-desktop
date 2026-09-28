@@ -1,3 +1,4 @@
+import { DEFAULT_APPROVAL_MODE } from "@pi67/domain";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type {
@@ -99,7 +100,7 @@ export class HostTaskRuntimeLifecycle {
         cwd: command.payload.cwd,
         agentDir,
         trust: command.payload.trust,
-        approvalMode: command.payload.approvalMode,
+        approvalMode: command.payload.approvalMode ?? DEFAULT_APPROVAL_MODE,
         ...(process.env.PI67_SESSION_CATALOG_DIR === undefined
           ? {}
           : { sessionCatalogDirectory: process.env.PI67_SESSION_CATALOG_DIR }),

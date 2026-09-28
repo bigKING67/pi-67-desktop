@@ -268,6 +268,10 @@ describe("operationSubmissionIdentity", () => {
     )).resolves.toBe(reloadResult);
 
     expect(setWorkspacePolicy).toHaveBeenCalledWith("unknown", "balanced");
+
+    // approvalMode is deprecated on the wire: an omitted value uses the Host default.
+    await dispatchHostCommand(runtime, { type: "workspace.setTrust", payload: { trust: "unknown" } }, { sendEvent } as never);
+    expect(setWorkspacePolicy).toHaveBeenLastCalledWith("unknown", "balanced");
     expect(sendEvent).toHaveBeenCalledWith({
       type: "task.toolMode.changed",
       payload: { mode: "auto", reason: "trust-revoked" }

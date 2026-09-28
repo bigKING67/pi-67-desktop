@@ -88,7 +88,8 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
     agentDir: Type.Optional(PathSchema),
     sessionPath: Type.Optional(PathSchema),
     trust: TrustSchema,
-    approvalMode: ApprovalModeSchema
+    // Deprecated: ignored by the Host policy (AUTO is the only default); removed next protocol revision.
+    approvalMode: Type.Optional(ApprovalModeSchema)
   }),
   "runtime.getStatus": EmptyPayloadSchema,
   "projection.resync": EmptyPayloadSchema,
@@ -96,7 +97,7 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "workspace.open": WorkspaceRegisterPayloadSchema,
   "workspace.register": WorkspaceRegisterPayloadSchema,
   "workspace.unregister": EmptyPayloadSchema,
-  "workspace.setTrust": strictObject({ trust: TrustSchema, approvalMode: ApprovalModeSchema }),
+  "workspace.setTrust": strictObject({ trust: TrustSchema, approvalMode: Type.Optional(ApprovalModeSchema) }),
   "workspace.changes": EmptyPayloadSchema,
   "workspace.file.list": WorkspaceFileListPayloadSchema,
   "workspace.file.search": WorkspaceFileSearchPayloadSchema,

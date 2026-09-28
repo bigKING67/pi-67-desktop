@@ -1,4 +1,4 @@
-import { DEFAULT_APPROVAL_MODE, type WorkspaceDescriptor } from "@pi67/domain";
+import type { WorkspaceDescriptor } from "@pi67/domain";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
 import { shouldSuppressAgentHostFollowup } from "../connection/agent-host-startup-state.js";
@@ -40,8 +40,7 @@ async function ensureWorkspaceRegistration(key: string, workspace: WorkspaceDesc
     "workspace.register",
     {
       cwd: workspace.identity.canonicalPath,
-      trust: workspace.trust,
-      approvalMode: DEFAULT_APPROVAL_MODE
+      trust: workspace.trust
     },
     [],
     { context: { scope: "workspace", workspaceId: workspace.id } }

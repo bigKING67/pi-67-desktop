@@ -56,7 +56,6 @@ describe("new Host Session recovery", () => {
       connected: false,
       hostEpoch: 9,
       trust: "trusted",
-      approvalMode: "guided",
       runtime: { phase: "recovering", detail: "等待恢复", recoverable: true }
     });
     installSessionProjectionFixture(
@@ -100,8 +99,7 @@ describe("new Host Session recovery", () => {
     expect(request).toHaveBeenCalledWith("runtime.initialize", {
       cwd: "/workspace",
       sessionPath: "/sessions/session-1.jsonl",
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     }, [], { context: {
       scope: "task",
       workspaceId: "workspace-fixture",

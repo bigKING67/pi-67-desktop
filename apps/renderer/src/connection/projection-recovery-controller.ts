@@ -63,7 +63,6 @@ interface ConnectedProjectionRecoveryInput {
   workspace: string;
   workspaceId: WorkspaceId | undefined;
   trust: AppState["trust"];
-  approvalMode: AppState["approvalMode"];
   sameHost: boolean;
   onWorkspaceReady?: () => void;
 }
@@ -149,8 +148,7 @@ export function recoverConnectedRendererProjection(
   void recoverSession({
     workspace: input.workspace,
     ...(recoverySessionPath === undefined ? {} : { sessionPath: recoverySessionPath }),
-    trust: input.trust,
-    approvalMode: input.approvalMode
+    trust: input.trust
   }, recoverySelection.context).then((acknowledgement) => {
     if (!projectionRecoveryLedger.isCurrent(get(), input.identity.hostEpoch, revision)) {
       recoverySelection.restore();

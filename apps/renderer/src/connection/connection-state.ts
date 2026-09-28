@@ -72,7 +72,6 @@ export function handleConnected(
     workspace: state.workspace,
     workspaceId: workspaceIdForCanonicalPath(rendererWorkbenchStore.getState(), state.workspace),
     trust: state.trust,
-    approvalMode: state.approvalMode,
     sameHost,
     onWorkspaceReady: () => connectRendererReadQueriesIfCurrent(get, identity)
   });

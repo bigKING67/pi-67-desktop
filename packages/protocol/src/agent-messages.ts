@@ -201,15 +201,16 @@ export interface CommandPayloads extends WorkspaceFileCommandPayloads,
     agentDir?: string;
     sessionPath?: string;
     trust: WorkspaceTrust;
-    approvalMode: ApprovalMode;
+    /** @deprecated Ignored by the Host; removed next protocol revision. */
+    approvalMode?: ApprovalMode;
   };
   "runtime.getStatus": Record<string, never>;
   "projection.resync": Record<string, never>;
   "asset.read": { assetId: string; sessionGeneration: number; offset: number; length?: number };
-  "workspace.open": { cwd: string; trust: WorkspaceTrust; approvalMode: ApprovalMode };
-  "workspace.register": { cwd: string; trust: WorkspaceTrust; approvalMode: ApprovalMode };
+  "workspace.open": { cwd: string; trust: WorkspaceTrust; /** @deprecated */ approvalMode?: ApprovalMode };
+  "workspace.register": { cwd: string; trust: WorkspaceTrust; /** @deprecated */ approvalMode?: ApprovalMode };
   "workspace.unregister": Record<string, never>;
-  "workspace.setTrust": { trust: WorkspaceTrust; approvalMode: ApprovalMode };
+  "workspace.setTrust": { trust: WorkspaceTrust; /** @deprecated */ approvalMode?: ApprovalMode };
   "workspace.changes": Record<string, never>;
   "task.close": { mode: "stop" | "dispose" };
   "task.toolMode.set": { mode: TaskToolMode };

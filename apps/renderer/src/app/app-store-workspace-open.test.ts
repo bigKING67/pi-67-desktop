@@ -141,8 +141,7 @@ describe("App Store workspace open authority", () => {
         expect(payload).toEqual({
           cwd: descriptor.identity.canonicalPath,
           sessionPath,
-          trust: "trusted",
-          approvalMode: "balanced"
+          trust: "trusted"
         });
         const context = options?.context;
         if (!context || context.scope !== "task") throw new Error("Expected Task context.");

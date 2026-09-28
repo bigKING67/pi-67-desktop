@@ -1,5 +1,4 @@
 import {
-  DEFAULT_APPROVAL_MODE,
   type WorkspaceDescriptor
 } from "@pi67/domain";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
@@ -159,8 +158,7 @@ export async function openRendererWorkspaceDescriptor(
         {
           cwd: workspace,
           sessionPath: runtimeSessionPath,
-          trust: descriptor.trust,
-          approvalMode: DEFAULT_APPROVAL_MODE
+          trust: descriptor.trust
         },
         [],
         { context: workbenchProtocolContextForTask(task) }
@@ -169,8 +167,7 @@ export async function openRendererWorkspaceDescriptor(
         "workspace.open",
         {
           cwd: workspace,
-          trust: descriptor.trust,
-          approvalMode: DEFAULT_APPROVAL_MODE
+          trust: descriptor.trust
         },
         [],
         { context: workbenchProtocolContextForTask(task) }
@@ -360,7 +357,6 @@ function beginWorkspaceTransition(
     trustUpdating: false,
     sessionTransitionPending: true,
     workspaceOpenPending: true,
-    approvalMode: DEFAULT_APPROVAL_MODE,
     runtime: { phase: "starting", detail, recoverable: true }
   });
   return workspace;
