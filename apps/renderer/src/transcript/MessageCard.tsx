@@ -18,6 +18,7 @@ import { isImeConfirmationKey } from "../input/ime-keyboard.js";
 import { formatMessageDateTime, formatMessageDateTimeTitle } from "../localization/date-time.js";
 import { messages } from "../localization/message-catalog.js";
 import { ToolCard } from "../tool-cards/index.js";
+import { AnswerChangedFiles } from "./AnswerChangedFiles.js";
 import { AssetImage } from "./AssetImage.js";
 import { TranscriptMarkdownView } from "./TranscriptMarkdownView.js";
 import { ToolResultDisclosure } from "./ToolResultDisclosure.js";
@@ -41,6 +42,8 @@ interface MessageCardProps {
   localImages?: LocalMessageImage[];
   actionDisabledReason?: string | undefined;
   highlighted?: boolean;
+  /** Set on the last answer of a turn; shows the files that turn changed once settled. */
+  turnId?: string | undefined;
   onContinue?: (() => Promise<boolean>) | undefined;
   onRetry?: (() => Promise<boolean>) | undefined;
   onEditStart?: (() => void) | undefined;
@@ -61,6 +64,7 @@ export function MessageCard({
   localImages = [],
   actionDisabledReason,
   highlighted = false,
+  turnId,
   onContinue,
   onRetry,
   onEditStart,
@@ -174,6 +178,7 @@ export function MessageCard({
           {message.error}
         </div>
       ) : null}
+      {!edit && isSettled && isAssistant && turnId ? <AnswerChangedFiles turnId={turnId} /> : null}
       {!edit && !streaming && (isUser || isAssistant) ? (
         <MessageFooter
           actionDisabledReason={actionDisabledReason}

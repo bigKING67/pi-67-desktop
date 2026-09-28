@@ -1,0 +1,110 @@
+/* Reading-first phase 2: the files an answer's turn changed, quiet and inside the answer. */
+.changedFiles {
+  display: grid;
+  gap: 2px;
+  margin-top: 18px;
+  padding: 8px 4px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+}
+
+.heading,
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+  padding: 0 8px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-medium);
+}
+
+.footer {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+}
+
+.link {
+  min-height: 28px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--font-size-support);
+  cursor: pointer;
+}
+
+.link:hover { text-decoration: underline; }
+
+.list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+}
+
+.openable { cursor: pointer; }
+.openable:hover { background: var(--surface-muted); }
+
+.link:focus-visible,
+.openable:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.icon { color: var(--text-tertiary); }
+
+.name,
+.directory {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-medium);
+}
+
+.directory {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-support);
+}
+
+.metric {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
+.stats {
+  display: flex;
+  gap: 6px;
+  font-family: var(--font-code);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats b { color: var(--success); font-weight: var(--font-weight-semibold); }
+.stats i { color: var(--danger); font-style: normal; font-weight: var(--font-weight-semibold); }

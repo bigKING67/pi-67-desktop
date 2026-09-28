@@ -1,9 +1,11 @@
 import type { SessionMessageView } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
 import {
+  answerTurnIds,
   hasFinalAnswerAfterLatestUser,
   hasProcessGroupAfterLatestUser,
   projectTranscriptRows,
+  rowsHaveFileChangeCalls,
   transcriptRowContainsMessage
 } from "./transcript-rows.js";
 
@@ -290,3 +292,28 @@ function message(
 ): SessionMessageView {
   return { id, role, parts };
 }
+
+describe("answer turns and file changes", () => {
+  const user = (id: string): SessionMessageView => ({ id, role: "user", parts: [{ type: "text", text: id }] });
+  const call = (id: string, name: string): SessionMessageView => ({
+    id: `${id}-call`, role: "assistant", parts: [{ type: "tool-call", id, name, status: "completed" }]
+  });
+  const answer = (id: string): SessionMessageView => ({ id, role: "assistant", parts: [{ type: "text", text: "done" }] });
+
+  it("maps each answer to the user message that started its turn", () => {
+    const rows = projectTranscriptRows([user("u1"), call("r1", "read"), answer("a1"), user("u2"), answer("a2")]);
+    expect([...answerTurnIds(rows)]).toEqual([["a1", "u1"], ["a2", "u2"]]);
+    expect(rowsHaveFileChangeCalls(rows)).toBe(false);
+  });
+
+  it("keeps only the last answer of a turn", () => {
+    const rows = projectTranscriptRows([user("u1"), answer("a1"), answer("a2")]);
+    expect([...answerTurnIds(rows)]).toEqual([["a2", "u1"]]);
+  });
+
+  it("detects edit and write calls inside process groups only", () => {
+    expect(rowsHaveFileChangeCalls(projectTranscriptRows([user("u1"), call("w1", "write"), answer("a1")]))).toBe(true);
+    expect(rowsHaveFileChangeCalls(projectTranscriptRows([user("u1"), call("e1", "edit"), answer("a1")]))).toBe(true);
+  });
+});
+

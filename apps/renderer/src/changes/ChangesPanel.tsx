@@ -16,6 +16,7 @@ import {
   selectCommittedWorkspaceChangesProjection,
   useWorkspaceChangesStore
 } from "./workspace-changes-store.js";
+import { groupWorkspaceChangesByTurn } from "./changes-projection.js";
 import styles from "./ChangesPanel.module.css";
 import { selectedWorkbenchTask, useWorkbenchStore } from "../workbench/workbench-store.js";
 import { RepositoryWorkingTreePanel } from "./RepositoryWorkingTreePanel.js";
@@ -28,6 +29,7 @@ import {
   workspaceChangeViewed
 } from "./changes-read-store.js";
 import { ChangeReviewPanel } from "./ChangeReviewPanel.js";
+import { useShellStore } from "../shell/shell-store.js";
 
 export interface ChangesPanelProps {
   active: boolean;
@@ -37,6 +39,10 @@ export { classifyPatchLine, projectPatchLines } from "./PatchView.js";
 
 export function ChangesPanel({ active }: ChangesPanelProps) {
   const [view, setView] = useState<"session" | "worktree">("session");
+  const pendingFocus = useShellStore(selectPendingSessionChangeFocus);
+  useEffect(() => {
+    if (pendingFocus) setView("session");
+  }, [pendingFocus]);
   return (
     <div className={styles.inspector}>
       <div aria-label="修改来源" className={styles.viewTabs} role="tablist">
@@ -71,6 +77,8 @@ function SessionChangesPanel({ active }: ChangesPanelProps) {
   const [selectedToolCallId, setSelectedToolCallId] = useState<string>();
   const selectedTask = useWorkbenchStore(selectedWorkbenchTask);
   const autoRefreshAuthority = useRef<string | undefined>(undefined);
+  const listRef = useRef<HTMLDivElement>(null);
+  const pendingFocus = useShellStore(selectPendingSessionChangeFocus);
   const items = view.projection?.items ?? [];
   const groupedItems = useMemo(() => groupWorkspaceChangesByTurn(items).toReversed(), [items]);
   const selected = selectWorkspaceChange(items, selectedToolCallId);
@@ -95,6 +103,17 @@ function SessionChangesPanel({ active }: ChangesPanelProps) {
     autoRefreshAuthority.current = authorityKey;
     void refreshWorkspaceChanges();
   }, [active, authorityKey, view.status]);
+
+  useEffect(() => {
+    if (!active || !pendingFocus || items.length === 0) return;
+    setSelectedToolCallId(pendingFocus.toolCallId);
+    useShellStore.getState().acknowledgeSessionChangeFocus(pendingFocus.revision);
+    requestAnimationFrame(() => {
+      listRef.current
+        ?.querySelector(`[data-tool-call-id="${CSS.escape(pendingFocus.toolCallId)}"]`)
+        ?.scrollIntoView({ block: "nearest" });
+    });
+  }, [active, items.length, pendingFocus]);
 
   useEffect(() => {
     if (!active || !readSessionKey || !selected) return;
@@ -143,7 +162,7 @@ function SessionChangesPanel({ active }: ChangesPanelProps) {
         <ChangesPanelState icon={<CircleCheck size={20} />} text="当前活动分支还没有 edit 或 write 修改记录。" />
       ) : (
         <div className={styles.body}>
-          <div aria-label="当前会话修改记录" className={styles.list} role="list">
+          <div aria-label="当前会话修改记录" className={styles.list} ref={listRef} role="list">
             {groupedItems.map((group, groupIndex) => {
               const unreadCount = group.items.filter((change) => (
                 !workspaceChangeViewed(viewedFingerprints, change)
@@ -170,6 +189,7 @@ function SessionChangesPanel({ active }: ChangesPanelProps) {
                           aria-label={`${change.path}，${viewed ? "已查看" : "未查看"}`}
                           aria-pressed={selected?.toolCallId === change.toolCallId}
                           className={`${styles.row} ${selected?.toolCallId === change.toolCallId ? styles.selected : ""}`}
+                          data-tool-call-id={change.toolCallId}
                           data-viewed={viewed ? "true" : "false"}
                           onClick={() => setSelectedToolCallId(change.toolCallId)}
                           type="button"
@@ -203,6 +223,11 @@ function SessionChangesPanel({ active }: ChangesPanelProps) {
       )}
     </div>
   );
+}
+
+function selectPendingSessionChangeFocus(state: ReturnType<typeof useShellStore.getState>) {
+  const request = state.sessionChangeFocusRequest;
+  return request && request.revision > state.sessionChangeFocusHandledRevision ? request : undefined;
 }
 
 function ChangesNotices({ error, loading, stale, truncated }: {
@@ -320,30 +345,6 @@ export function selectWorkspaceChange(
 export function summarizeWorkspaceChanges(items: WorkspaceChangeView[], total: number): string {
   const fileCount = new Set(items.map((item) => item.path)).size;
   return `${fileCount} 个文件 · ${total} 条记录`;
-}
-
-export interface WorkspaceChangeTurnGroup {
-  key: string;
-  currentOperation: boolean;
-  items: WorkspaceChangeView[];
-}
-
-export function groupWorkspaceChangesByTurn(
-  items: readonly WorkspaceChangeView[]
-): WorkspaceChangeTurnGroup[] {
-  const groups: WorkspaceChangeTurnGroup[] = [];
-  const byKey = new Map<string, WorkspaceChangeTurnGroup>();
-  for (const change of items) {
-    const key = change.turnId ?? "current-operation";
-    let group = byKey.get(key);
-    if (!group) {
-      group = { key, currentOperation: change.turnId === undefined, items: [] };
-      byKey.set(key, group);
-      groups.push(group);
-    }
-    group.items.push(change);
-  }
-  return groups;
 }
 
 function statusIcon(status: WorkspaceChangeView["status"]): ReactNode {

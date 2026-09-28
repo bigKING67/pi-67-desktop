@@ -275,7 +275,9 @@ Application-level surfaces use a separate wide-window shell:
 - Resizable split handles, multiple editor panes/windows, media preview, and a
   mutation-capable Git client remain future capabilities. The Changes Inspector
   explicitly separates the Pi Session Tool projection (`会话修改`) from Electron
-  Main's bounded read-only Git observation (`工作区变更`). Files is the narrow
+  Main's bounded read-only Git observation (`工作区变更`); an answer's
+  `本轮修改的文件` link opens it on `会话修改` with that turn's record selected and
+  scrolled into view. Files is the narrow
   Workspace navigator; editable text opens in the central workbench rather than
   replacing the file tree or pretending to offer stage/discard/commit actions.
 
@@ -437,6 +439,14 @@ loading error where the operation can produce those states
   hairline; this changes emphasis only, never the expansion rules above. The empty
   Transcript is one left-aligned column with a display heading, the existing guidance,
   and flat starter rows separated by hairlines (44px minimum target, trailing arrow).
+- `本轮修改的文件` sits inside the settled answer above its footer as a quiet bordered
+  list (panel radius, border role, no fill): a support-size heading with the count and
+  an accent-text `在检查器中查看` link, then up to five 44px rows of file icon, file
+  name (interface role, medium), tertiary support-size directory, and a caption
+  metric (`新建或覆盖`, or success/danger `+A −D` in the code font). Openable rows are
+  buttons with the muted-surface hover and the focus ring; non-openable paths are
+  plain rows. A caption footer carries `N 项未完成` and `查看全部 N 个文件`. It never
+  appears while streaming and introduces no new region or token.
 - Process outcome is independent from individual Tool outcome. `running` reads
   `正在执行` and remains expanded; a clean final answer reads `执行已结束` and folds;
   a final answer with failed, interrupted, cancelled, lost, or unreconciled Tools

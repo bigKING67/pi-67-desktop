@@ -52,6 +52,22 @@ describe("shell store", () => {
     expect(useShellStore.getState().modelPickerHandledRevision).toBe(2);
   });
 
+  it("opens the Changes Inspector with a repeatable session change focus request", () => {
+    const shell = useShellStore.getState();
+    shell.setContextVisible(false);
+    shell.focusSessionChange("tool-1");
+    shell.focusSessionChange("tool-2");
+
+    expect(useShellStore.getState()).toMatchObject({
+      contextVisible: true,
+      contextTab: "changes",
+      sessionChangeFocusRequest: { toolCallId: "tool-2", revision: 2 },
+      sessionChangeFocusHandledRevision: 0
+    });
+    shell.acknowledgeSessionChangeFocus(2);
+    expect(useShellStore.getState().sessionChangeFocusHandledRevision).toBe(2);
+  });
+
   it("updates context visibility without changing the selected tab or palette", () => {
     useShellStore.getState().setContextVisible(false);
 

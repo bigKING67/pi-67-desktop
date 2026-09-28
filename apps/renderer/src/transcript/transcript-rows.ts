@@ -102,6 +102,30 @@ export function projectTranscriptRows(messages: readonly SessionMessageView[]): 
   return rows;
 }
 
+const FILE_CHANGE_TOOLS = new Set(["edit", "write"]);
+
+/**
+ * Maps the last Assistant answer of each turn to the Pi entry id of the user message that started its turn.
+ * The same id is the `turnId` of that turn's Workspace change facts.
+ */
+export function answerTurnIds(rows: readonly TranscriptRow[]): ReadonlyMap<string, string> {
+  const lastAnswerByTurn = new Map<string, string>();
+  let turnId: string | undefined;
+  for (const row of rows) {
+    if (row.kind !== "message") continue;
+    if (row.message.role === "user") turnId = row.message.id;
+    else if (row.message.role === "assistant" && turnId) lastAnswerByTurn.set(turnId, row.message.id);
+  }
+  return new Map([...lastAnswerByTurn].map(([turn, answerId]) => [answerId, turn]));
+}
+
+/** True when any process in view called Pi's file-changing Tools. */
+export function rowsHaveFileChangeCalls(rows: readonly TranscriptRow[]): boolean {
+  return rows.some((row) => row.kind === "process-group" && row.items.some((item) => (
+    item.kind === "tool" && FILE_CHANGE_TOOLS.has(item.call.name)
+  )));
+}
+
 function projectProcessItems(messages: readonly SessionMessageView[]): TranscriptProcessItem[] {
   const items: TranscriptProcessItem[] = [];
   const toolItemIndexes = new Map<string, number>();

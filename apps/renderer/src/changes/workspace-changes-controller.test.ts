@@ -169,6 +169,15 @@ describe("workspace changes controller", () => {
     });
   });
 
+  it("records a silent failure for the Inspector without publishing a notification", async () => {
+    vi.spyOn(agentConnectionController, "request").mockRejectedValue(new Error("read failed"));
+
+    await refreshWorkspaceChanges({ silent: true });
+
+    expect(useWorkspaceChangesStore.getState()).toMatchObject({ status: "error", error: "read failed" });
+    expect(useNotificationStore.getState().items).toHaveLength(0);
+  });
+
   it("rejects a response for another Session instead of remaining loading", async () => {
     vi.spyOn(agentConnectionController, "request").mockResolvedValue(
       projection("session-other", "tool-other") as never

@@ -109,7 +109,9 @@ design/protocol contracts; reference inclusion alone does not approve them.
    process as the primary result. The process stays expanded while work is active,
    collapses only after successful completion has a visible final answer, and
    remains fully inspectable on demand. Failure, cancellation, loss, or a missing
-   final answer keeps the process expanded for diagnosis.
+   final answer keeps the process expanded for diagnosis. A settled final answer
+   whose turn changed files lists those files under it (`本轮修改的文件`) so they
+   open in one step.
 4. Use skills, prompts, extension commands, session tree, rollback, and compact
    from a coherent graphical interface.
 5. Diagnose shell, configuration, extension, update, and runtime failures
@@ -1762,6 +1764,19 @@ design/protocol contracts; reference inclusion alone does not approve them.
   under `当前操作`. A selected record becomes `已查看` only for its exact content
   fingerprint; a later path/status/Patch/metrics revision for that `toolCallId`
   returns to `未查看` without silently changing the selected detail.
+- The last settled Assistant answer of a turn shows `本轮修改的文件` when the
+  `会话修改` projection retains at least one completed fact for that turn (`turnId`,
+  the Pi entry id of the turn's user message). It lists at most 5 files, newest
+  first and one row per path, with `新建或覆盖` for `write` and summed `+A −D` for
+  `edit`; failed or interrupted facts are counted as `N 项未完成`, and more files
+  collapse behind `查看全部 N 个文件`. A row opens the Workspace-relative file in the
+  central file surface through the normal Workspace file path; a path outside the
+  Workspace or a truncated path stays plain text. `在检查器中查看` opens Changes on
+  `会话修改` with that turn's newest record selected. The Transcript reads the
+  projection silently once per projection revision when its process contains an
+  `edit`/`write` Tool call; loading, failure, and turns outside the retained window
+  render no card, and the absence of a card never claims that nothing changed. The
+  card adds no data, protocol, persistence, editing, or Git state.
 - An `edit` record may expose the Host-bounded Patch, additions/deletions, first
   changed line, Tool status, and truncated-path/Patch notices. The Renderer caps
   the rendered Patch at 600 rows independently of the 64 KiB Host Patch budget.

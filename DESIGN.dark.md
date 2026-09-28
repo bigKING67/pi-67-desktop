@@ -273,4 +273,4 @@ full paths and file-size accessibility labels remain available.
 
 Settings V2 shares light-mode hierarchy, five groups, guarded subpage links and progressive disclosure. Advanced fields use semantic surfaces and visible focus; errors and unsaved changes cannot be hidden by disclosure. No dark-only navigation or save behavior is introduced.
 
-The reading-first Transcript hierarchy (answer emphasis, quiet process line, flat starter rows) uses the same token roles in dark mode; hairlines use the dark border role and no new accent is introduced.
+The reading-first Transcript hierarchy (answer emphasis, quiet process line, flat starter rows, and the `本轮修改的文件` list) uses the same token roles in dark mode; hairlines use the dark border role, additions/deletions keep the dark success/danger roles, and no new accent is introduced.

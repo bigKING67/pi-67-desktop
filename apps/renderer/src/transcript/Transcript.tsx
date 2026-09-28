@@ -37,13 +37,16 @@ import { editableUserMessageText } from "./message-actions.js";
 import { useTranscriptMessageFocus } from "./transcript-message-focus.js";
 import { subscribeTranscriptMessageJump } from "./transcript-navigation.js";
 import {
+  answerTurnIds,
   createLiveProcessRow,
   findTranscriptRowIndexByMessageId,
   hasFinalAnswerAfterLatestUser,
   hasProcessGroupAfterLatestUser,
   projectTranscriptRows,
+  rowsHaveFileChangeCalls,
   transcriptRowContainsMessage
 } from "./transcript-rows.js";
+import { useTurnChangesRefresh } from "./use-turn-changes-refresh.js";
 import styles from "./Transcript.module.css";
 import { ConversationFindBar } from "../search/ConversationFindBar.js";
 import { SessionCompatibilityBanner } from "./SessionCompatibilityBanner.js";
@@ -119,6 +122,9 @@ export function Transcript() {
   ) ? operationTimeline : undefined;
   const currentProcessRunning = operationMatchesSession
     && isActiveOperationLifecycle(operation.lifecycle);
+  const turnIdsByAnswer = useMemo(() => answerTurnIds(transcriptRows), [transcriptRows]);
+  const rowsChangedFiles = useMemo(() => rowsHaveFileChangeCalls(transcriptRows), [transcriptRows]);
+  useTurnChangesRefresh(rowsChangedFiles && !currentProcessRunning);
   const hasTurnActivity = !hasCurrentProcessGroup && (
     hasVisibleTurnActivity(runtime.phase, operation, sessionId, sessionGeneration)
     || (
@@ -317,6 +323,7 @@ export function Transcript() {
                 onSubmit: () => void submitMessageEdit(currentEdit)
               } : undefined}
               message={message}
+              turnId={turnIdsByAnswer.get(message.id)}
               onContinue={!historicalWindow && message.role === "assistant"
                 ? () => continueRendererSessionFrom(message.id)
                 : undefined}

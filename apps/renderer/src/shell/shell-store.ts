@@ -3,6 +3,11 @@ import { create } from "zustand";
 type ShellContextTab = "files" | "changes" | "messages" | "agents" | "context";
 type ShellContextDetailTab = "session" | "memory" | "experience";
 
+interface SessionChangeFocusRequest {
+  toolCallId: string;
+  revision: number;
+}
+
 interface ShellState {
   navigationVisible: boolean;
   sessionSearchFocusRevision: number;
@@ -12,6 +17,8 @@ interface ShellState {
   contextVisible: boolean;
   contextTab: ShellContextTab;
   contextDetailTab: ShellContextDetailTab;
+  sessionChangeFocusRequest: SessionChangeFocusRequest | undefined;
+  sessionChangeFocusHandledRevision: number;
   sessionTreeDialogOpen: boolean;
   commandPaletteOpen: boolean;
   keyboardShortcutsDialogOpen: boolean;
@@ -29,6 +36,8 @@ interface ShellState {
   setContextVisible: (visible: boolean) => void;
   setContextTab: (tab: ShellContextTab) => void;
   setContextDetailTab: (tab: ShellContextDetailTab) => void;
+  focusSessionChange: (toolCallId: string) => void;
+  acknowledgeSessionChangeFocus: (revision: number) => void;
   setSessionTreeDialogOpen: (open: boolean) => void;
   setCommandPaletteOpen: (open: boolean) => void;
   setKeyboardShortcutsDialogOpen: (open: boolean) => void;
@@ -50,6 +59,8 @@ export const useShellStore = create<ShellState>((set) => ({
   contextVisible: true,
   contextTab: "files",
   contextDetailTab: "session",
+  sessionChangeFocusRequest: undefined,
+  sessionChangeFocusHandledRevision: 0,
   sessionTreeDialogOpen: false,
   commandPaletteOpen: false,
   keyboardShortcutsDialogOpen: false,
@@ -82,6 +93,21 @@ export const useShellStore = create<ShellState>((set) => ({
   setContextVisible(contextVisible) { set({ contextVisible }); },
   setContextTab(contextTab) { set({ contextTab }); },
   setContextDetailTab(contextDetailTab) { set({ contextDetailTab }); },
+  focusSessionChange(toolCallId) {
+    set((state) => ({
+      contextVisible: true,
+      contextTab: "changes",
+      sessionChangeFocusRequest: {
+        toolCallId,
+        revision: (state.sessionChangeFocusRequest?.revision ?? 0) + 1
+      }
+    }));
+  },
+  acknowledgeSessionChangeFocus(revision) {
+    set((state) => ({
+      sessionChangeFocusHandledRevision: Math.max(state.sessionChangeFocusHandledRevision, revision)
+    }));
+  },
   setSessionTreeDialogOpen(sessionTreeDialogOpen) { set({ sessionTreeDialogOpen }); },
   setCommandPaletteOpen(commandPaletteOpen) { set({ commandPaletteOpen }); },
   setKeyboardShortcutsDialogOpen(keyboardShortcutsDialogOpen) { set({ keyboardShortcutsDialogOpen }); },

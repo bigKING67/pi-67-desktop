@@ -25,7 +25,12 @@ export function activateRendererSessionChanges(state: RendererSessionAuthoritySt
   return true;
 }
 
-export function refreshWorkspaceChanges(): Promise<void> {
+export interface RefreshWorkspaceChangesOptions {
+  /** Readers outside the Inspector skip the failure notification; the Inspector owns error reporting. */
+  silent?: boolean;
+}
+
+export function refreshWorkspaceChanges(options: RefreshWorkspaceChangesOptions = {}): Promise<void> {
   const store = useWorkspaceChangesStore.getState();
   if (store.status === "loading" && refreshFlight) return refreshFlight;
   const target = store.beginRefresh(useSessionProjectionStore.getState().authority);
@@ -36,7 +41,7 @@ export function refreshWorkspaceChanges(): Promise<void> {
     return Promise.resolve();
   }
 
-  const promise = executeRefresh(target, context).finally(() => {
+  const promise = executeRefresh(target, context, options.silent === true).finally(() => {
     if (refreshFlight === promise) refreshFlight = undefined;
   });
   refreshFlight = promise;
@@ -45,7 +50,8 @@ export function refreshWorkspaceChanges(): Promise<void> {
 
 async function executeRefresh(
   target: WorkspaceChangesTarget,
-  context: TaskProtocolContext
+  context: TaskProtocolContext,
+  silent: boolean
 ): Promise<void> {
   const store = useWorkspaceChangesStore.getState();
   try {
@@ -61,7 +67,7 @@ async function executeRefresh(
     store.finishRefresh(target, projection);
   } catch (error) {
     const message = errorMessage(error);
-    if (!store.failRefresh(target, message)) return;
+    if (!store.failRefresh(target, message) || silent) return;
     publishNotification({
       level: "warning",
       title: "无法加载本会话修改记录",

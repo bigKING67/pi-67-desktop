@@ -1,6 +1,6 @@
 # Workbench reading-first (direction A) promotion
 
-Status: phase 1 implemented; phase 2 awaiting a product decision
+Status: phase 1 and phase 2 implemented
 Owner: main
 Started: 2026-09-28
 Last updated: 2026-09-28
@@ -40,10 +40,53 @@ Likely files: transcript/TranscriptProcessGroup.tsx(+css), transcript/Transcript
 transcript/MessageCard.module.css, transcript/MarkdownView.module.css, composer/Composer.module.css,
 DESIGN.md / DESIGN.dark.md (Transcript, Composer sections). No protocol or persistence change.
 
-## Phase 2 — results on demand (needs a separate product decision)
-Define a "成果" projection from authoritative Pi data (write/edit Tool results or Changes), decide
-where it opens (central file surface vs Inspector tab; never a fourth permanent region), and add
-PRODUCT.md/DESIGN.md contracts before any UI. Not started.
+## Phase 2 — changed files beside the answer (confirmed 2026-09-28: "按你建议继续")
+Purpose: after a turn that changed files, the user sees which files right under the final answer and
+opens them in one step. This is A's "results on demand" limited to data the product already owns.
+
+Source (no new data, protocol or persistence):
+- The existing `会话修改` projection (`workspace.changes`, bounded to the newest 100 Pi `edit`/`write`
+  facts of the active branch). Each fact carries `turnId` = the Pi entry id of the user message that
+  started the turn, which is also that message's Transcript id. The card for a final answer shows the
+  facts whose `turnId` is the answer's turn. The Changes Inspector already groups by the same key
+  (ChangesPanel.tsx:337); that grouping moves into one shared function used by both.
+
+When it appears:
+- Only on the last settled answer of a turn whose turn has at least one retained completed fact.
+- Never while the turn is running; it appears after the Operation settles and the projection refreshes.
+- Absence of the card never claims "no files changed": a turn older than the retained window simply
+  has no card; the Inspector keeps owning truncation, stale and error states.
+
+What it shows:
+- Heading `本轮修改的文件` with the file count.
+- Up to 5 rows, newest first: file name, workspace-relative directory (secondary), `新建或覆盖` for
+  `write`, `+A −D` for `edit` when metrics exist. Completed facts only; failed or interrupted facts are
+  summarised as `N 项未完成` (the process group already shows their details).
+- More than 5 files: `查看全部 N 个文件`.
+
+Actions:
+- A row opens the file in the central file surface through the existing workspace file open path.
+  Paths outside the workspace or truncated paths render as text without an open action.
+- `查看全部` / `在检查器中查看` opens the Inspector Changes tab on `会话修改` with that turn's group.
+
+Loading and failure:
+- The Transcript requests the projection once per projection revision when a settled answer's
+  process contains an `edit`/`write` Tool call; this read is silent (no notification) because the
+  Inspector owns error reporting. Loading and failure render no card.
+
+Presentation: a quiet bordered list inside the answer, above the footer; existing roles (interface
+names, support/caption metadata), 44px row targets, focus ring, list semantics; dark parity via tokens.
+No new region, no new tokens.
+
+Out of scope: non-file artifacts, editing inside the card, version history, Git state (`工作区变更`).
+
+Contracts to update in the same change: PRODUCT.md (Changes section and job 3 wording about
+file changes), DESIGN.md (Transcript answer and Changes sections), DESIGN.dark.md parity line.
+
+Acceptance: unit tests for the turn grouping and card selection (answer turn match, truncation,
+completed-only, >5 files, outside-workspace path); e2e for open-in-central-surface and Inspector link;
+fixture captures light/dark × 1440/760 × with/without changes; `check` and full e2e pass; packaged
+smoke passes in CI.
 
 ## Acceptance (phase 1)
 - Contracts above unchanged except the deliberate DESIGN.md emphasis text, updated in the same change.
@@ -87,4 +130,23 @@ Observation (kept): at ≤760px the process summary stacks label and counts on t
 deliberate existing rule that keeps long outcome labels and 查看未成功步骤 readable; phase 1 did
 not change responsive behaviour. The prototype stays untracked for phase 2 reference.
 Unverified: packaged Electron, Windows, screen reader.
+
+## Phase 2 result (2026-09-28)
+Changed: `changes-projection.ts` (turn grouping moved from ChangesPanel and shared;
+`selectTurnChangedFiles`, `workspaceRelativeChangePath`), `transcript-rows.ts` (`answerTurnIds` for the
+last answer of each turn, `rowsHaveFileChangeCalls`), `AnswerChangedFiles.tsx`(+css) rendered by
+MessageCard for settled answers, `use-turn-changes-refresh.ts` (silent read once per projection
+revision while no Operation runs), `refreshWorkspaceChanges({ silent })`, shell-store
+`focusSessionChange` / `acknowledgeSessionChangeFocus` consumed by ChangesPanel (switches to
+`会话修改`, selects and scrolls to the record). PRODUCT.md (job 3, Changes), DESIGN.md (Transcript,
+Changes), DESIGN.dark.md updated. No protocol, persistence or token change.
+
+Evidence: unit tests (turn selection, answer turns, silent refresh, focus request); e2e
+`renderer-answer-changed-files.spec.ts` (open in central surface, outside-Workspace path inert,
+failed count, older turn separated, >5 collapse, Inspector focus). Captures from that spec in the
+project Playwright fixture (browser67 cannot provide the preload bridge and mock Agent Host), light/dark
+× 1440/760, `artifacts/visual-review/answer-changed-files-*.png` (800×369 at 1440, 732×369 at 760).
+Review found and fixed metric misalignment for files at the Workspace root. `check` passes.
+Unverified: packaged Electron, Windows, screen reader; macOS `/private` realpath prefixes can make an
+absolute Pi path fall back to plain text (Main still owns containment).
 

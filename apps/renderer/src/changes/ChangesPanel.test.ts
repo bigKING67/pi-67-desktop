@@ -2,11 +2,11 @@ import type { WorkspaceChangeView } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
 import {
   classifyPatchLine,
-  groupWorkspaceChangesByTurn,
   projectPatchLines,
   selectWorkspaceChange,
   summarizeWorkspaceChanges
 } from "./ChangesPanel.js";
+import { groupWorkspaceChangesByTurn } from "./changes-projection.js";
 
 describe("ChangesPanel projection helpers", () => {
   it("classifies unified diff headers separately from added and removed content", () => {
