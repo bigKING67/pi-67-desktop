@@ -266,13 +266,10 @@ async function verifyColdProviderRestoration(window) {
   if ((await providerPanel.getByLabel("Model ID").count()) !== 1) {
     throw new Error("Packaged cold restart did not render one selected model editor.");
   }
-  await window.getByRole("button", { name: /打开通知中心/u }).click();
-  const notifications = window.getByRole("dialog", { name: "通知中心" });
-  await notifications.waitFor({ state: "visible", timeout: 15_000 });
-  if (await notifications.getByText("无法读取 Pi Provider 配置", { exact: true }).count()) {
-    throw new Error(`Packaged Provider load timed out after a cold restart: ${JSON.stringify(await inspectRendererSurface(window))}`);
+  // Provider load failures render inline in the Provider panel, not as notifications.
+  if (await providerPanel.getByTestId("provider-configuration-error").count()) {
+    throw new Error(`Packaged Provider load failed after a cold restart: ${JSON.stringify(await inspectRendererSurface(window))}`);
   }
-  await window.keyboard.press("Escape");
   await settings.getByRole("button", { name: "返回工作台" }).click();
   await settings.waitFor({ state: "hidden", timeout: 15_000 });
 }

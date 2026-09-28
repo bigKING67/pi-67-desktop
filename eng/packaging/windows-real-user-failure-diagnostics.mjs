@@ -27,7 +27,7 @@ export async function inspectRealUserRuntimeSurface(window, privateRoot) {
       catalogError: workspaceGroup?.getAttribute("data-catalog-error") ?? null,
       catalogLoading: workspaceGroup?.getAttribute("data-catalog-loading") ?? null,
       errorNotificationCount: errorNotifications.length,
-      providerConfigurationFailed: bodyText.includes("无法读取 Pi Provider 配置"),
+      providerConfigurationFailed: Boolean(document.querySelector('[data-testid="provider-configuration-error"]')),
       runtimePhase: runtimeStatus?.getAttribute("data-runtime-phase") ?? null,
       runtimeStatus: runtimeStatus?.getAttribute("aria-label")?.slice(0, 160) ?? null,
       workspaceOpenFailed: bodyText.includes("无法打开工作区")

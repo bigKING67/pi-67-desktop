@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { verifyGitMetadataIsHidden } from "./windows-real-user-health.mjs";
+import { assertNoFailureNotifications, verifyGitMetadataIsHidden } from "./windows-real-user-health.mjs";
 
 describe("Windows real-user workbench health", () => {
   it("restores a task inspector opened by the file projection probe", async () => {
@@ -64,3 +64,28 @@ function healthFixture({ initiallyVisible, rootNames = ["README.md"] }) {
   };
   return { hide, inspector, show, window };
 }
+
+describe("Windows real-user failure notifications", () => {
+  function notificationFixture({ providerErrorCount }) {
+    const dialog = { waitFor: vi.fn(), textContent: vi.fn(async () => "") };
+    const bell = { click: vi.fn() };
+    return {
+      window: {
+        getByRole: vi.fn((role) => role === "dialog" ? dialog : bell),
+        getByTestId: vi.fn(() => ({ count: vi.fn(async () => providerErrorCount) })),
+        keyboard: { press: vi.fn() }
+      }
+    };
+  }
+
+  it("fails on the inline Provider configuration load error", async () => {
+    const { window } = notificationFixture({ providerErrorCount: 1 });
+    await expect(assertNoFailureNotifications(window)).rejects.toThrow(/Provider settings show a configuration load failure/u);
+    expect(window.getByTestId).toHaveBeenCalledWith("provider-configuration-error");
+  });
+
+  it("passes when no Provider load error is rendered", async () => {
+    const { window } = notificationFixture({ providerErrorCount: 0 });
+    await expect(assertNoFailureNotifications(window)).resolves.toBeUndefined();
+  });
+});

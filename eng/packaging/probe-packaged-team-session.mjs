@@ -53,6 +53,22 @@ const close = async () => {
   application = undefined; closed = true;
 };
 const phase = value => { stage = value; stageStarted = performance.now(); console.info(`Packaged team session: ${stage}`); };
+// New Money sign-in, logout and the service address live in Settings > 账户与数据; team/project
+// binding and sync stay in 上下文与记忆 > 团队经验.
+async function accountSettings(window) {
+  const open = window.getByLabel("New Money 设置");
+  if (await open.isVisible()) {
+    await open.getByRole("navigation", { name: "设置分类" }).getByRole("button", { name: /^账户与数据/u }).click();
+    return open;
+  }
+  await window.getByRole("list", { name: "工作区与对话" }).waitFor({ state: "visible", timeout: 60_000 });
+  return openSettingsSection(window, /^账户与数据/u);
+}
+async function teamSettingsFromAccount(settings) {
+  await settings.getByRole("button", { name: "团队经验设置", exact: true }).click();
+  await expect(settings.getByRole("tab", { name: "团队经验", exact: true })).toHaveAttribute("aria-selected", "true", { timeout: 30_000 });
+  return settings;
+}
 async function memorySettings(window) {
   await window.getByRole("list", { name: "工作区与对话" }).waitFor({ state: "visible", timeout: 60_000 });
   const settings = await openSettingsSection(window, /上下文与记忆/u);
@@ -127,12 +143,12 @@ try {
   fixture = await startLiveKnowledgeFixture(directory);
   assert.ok(fixture.webGovernance, "Requires the explicit extended Web fixture window");
   phase("device-login");
-  let settings = await memorySettings(window);
+  let settings = await accountSettings(window);
   await settings.locator("summary").filter({ hasText: "高级连接设置" }).click();
   await settings.getByRole("textbox", { name: "New Money 服务地址" }).fill(fixture.credential.endpoint);
-  await settings.getByRole("button", { name: "保存更改", exact: true }).click();
+  await settings.getByRole("button", { name: "保存服务地址", exact: true }).click();
   phase("device-begin");
-  await settings.getByRole("button", { name: "连接 New Money", exact: true }).click();
+  await settings.getByRole("button", { name: "登录 New Money", exact: true }).click();
   const code = settings.locator("code");
   await expect(code).toHaveCount(1);
   phase("device-approve");
@@ -140,8 +156,9 @@ try {
   phase("device-overview");
   // The real UI loads identity, teams, projects and binding after exchange.
   // Cross-host DB fixtures amplify these serial reads; individual product limits stay unchanged.
-  await expect(settings.getByRole("button", { name: "断开连接", exact: true })).toBeVisible({ timeout: 90_000 });
+  await expect(settings.getByRole("button", { name: "退出登录", exact: true })).toBeVisible({ timeout: 90_000 });
   phase("project-binding");
+  settings = await teamSettingsFromAccount(settings);
   await chooseScope(window);
   await settings.getByRole("button", { name: "绑定", exact: true }).click();
   // A successful binding may take the product's full 8-second request budget.
@@ -237,8 +254,9 @@ try {
   if (await resume.isVisible()) await resume.click();
   else if (await open.isVisible()) await open.click();
   await expect(origin).toContainText(fixture.scope.scopeId, { timeout: 60_000 });
-  settings = await memorySettings(window);
-  await expect(settings.getByRole("button", { name: "断开连接", exact: true })).toBeVisible({ timeout: 30_000 });
+  settings = await accountSettings(window);
+  await expect(settings.getByRole("button", { name: "退出登录", exact: true })).toBeVisible({ timeout: 30_000 });
+  settings = await teamSettingsFromAccount(settings);
   assert.ok((await sessions()).some(item => item.path === teamSession.path && JSON.stringify(item.origin) === JSON.stringify(teamSession.origin)));
   phase("revocation-and-denial");
   const detail = await fixture.api(`${base}/shared-assets/${fixture.candidateId}`);
@@ -262,16 +280,18 @@ try {
   await settings.getByRole("button", { name: "同步当前项目", exact: true }).click();
   await expect(settings.getByText(/同步未完成/u)).toBeVisible({ timeout: 60_000 });
   assert.ok(privateSession.bytes.equals(await readFile(privateSession.path)), "Private history changed after revocation");
-  await settings.getByRole("button", { name: "断开连接", exact: true }).click();
-  await expect(settings.getByRole("button", { name: "连接 New Money", exact: true })).toBeVisible();
+  settings = await accountSettings(window);
+  await settings.getByRole("button", { name: "退出登录", exact: true }).click();
+  await expect(settings.getByRole("button", { name: "登录 New Money", exact: true })).toBeVisible();
   assert.equal(fixture.diagnostics().sessionRevocations, 1);
   await close();
-  phase("cold-signed-out"); window = await launch(); settings = await memorySettings(window);
-  await expect(settings.getByRole("button", { name: "连接 New Money", exact: true })).toBeVisible({ timeout: 30_000 });
+  phase("cold-signed-out"); window = await launch(); settings = await accountSettings(window);
+  await expect(settings.getByRole("button", { name: "登录 New Money", exact: true })).toBeVisible({ timeout: 30_000 });
   await close();
   passed = true;
 } catch (cause) {
-  const knownControls = ["断开连接", "连接 New Money", "New Money 团队", "New Money 项目", "同步当前项目", "会话来源"];
+  const knownControls = ["高级连接设置", "保存服务地址", "退出登录", "登录 New Money", "团队经验设置",
+    "New Money 团队", "New Money 项目", "同步当前项目", "会话来源"];
   const control = knownControls.find(label => cause instanceof Error && cause.message.includes(label)) ?? "unknown";
   const kind = cause instanceof Error && ["Error", "TimeoutError", "AssertionError"].includes(cause.name) ? cause.name : "unknown";
   failureKind = kind;

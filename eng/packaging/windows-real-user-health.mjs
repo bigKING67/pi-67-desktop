@@ -24,8 +24,9 @@ export async function assertNoFailureNotifications(window) {
   if (/Agent request acknowledgement timed out|ENOENT|no such file or directory/iu.test(text)) {
     throw new Error("Windows real-user notification history exposed a raw transport or ENOENT error.");
   }
-  if (text.includes("无法读取 Pi Provider 配置")) {
-    throw new Error("Windows real-user notification history contains a Provider configuration failure.");
+  // Provider load failures render inline in the Provider panel rather than as notifications.
+  if (await window.getByTestId("provider-configuration-error").count()) {
+    throw new Error("Windows real-user Provider settings show a configuration load failure.");
   }
   await window.keyboard.press("Escape");
   await dialog.waitFor({ state: "hidden", timeout: 10_000 });

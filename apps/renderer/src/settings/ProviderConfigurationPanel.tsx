@@ -316,7 +316,7 @@ function GlobalProviderConfigurationPanel() {
             ) : <PanelEmpty title="选择或新建模型服务" detail="常用字段使用表单，高级兼容项使用 JSON。" />}
         </main>
       )}
-      {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
+      {error ? <SettingsNotice tone="danger" testId="provider-configuration-error">{error}</SettingsNotice> : null}
     </div>
     <SettingsDestructiveActionDialog
       busy={phase === "saving"}
