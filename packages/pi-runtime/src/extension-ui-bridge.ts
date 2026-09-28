@@ -15,6 +15,7 @@ import type {
 import { isHardStopRiskCategory } from "@pi67/domain";
 import type { AgentEvent } from "@pi67/protocol";
 import type { DesktopApprovalDecision } from "./safety-extension.js";
+import { extensionUiDialogShape, isAnswerForDialog, type ExtensionUiDialogShape } from "./extension-ui-answer.js";
 
 interface PendingUiRequestBase {
   resolve: (value: string | boolean | DesktopApprovalDecision | undefined) => void;
@@ -23,11 +24,7 @@ interface PendingUiRequestBase {
 }
 
 type PendingUiRequest =
-  | (PendingUiRequestBase & {
-      purpose: "extension";
-      kind: ExtensionUiRequestView["kind"];
-      options?: readonly string[];
-    })
+  | (PendingUiRequestBase & { purpose: "extension" } & ExtensionUiDialogShape)
   | (PendingUiRequestBase & {
       purpose: "approval";
       toolCallId: string;
@@ -144,7 +141,7 @@ export class DesktopExtensionUiBridge {
     const pending = this.pending.get(requestId);
     if (!pending || pending.purpose !== "extension") return false;
     // An answer must fit the dialog that asked for it; a mismatch leaves the request pending.
-    if (!cancelled && !isAnswerForRequest(pending, value)) return false;
+    if (!cancelled && !isAnswerForDialog(pending, value)) return false;
     this.pending.delete(requestId);
     clearTimeout(pending.timer);
     pending.abort?.();
@@ -306,14 +303,7 @@ export class DesktopExtensionUiBridge {
             toolCallId: (details as ApprovalRequestDetails).toolCallId,
             details: details as ApprovalRequestDetails
           }
-        : {
-            ...pendingBase,
-            purpose,
-            kind: (details as Pick<ExtensionUiRequestView, "kind">).kind,
-            ...((details as Pick<ExtensionUiRequestView, "options">).options
-              ? { options: (details as Pick<ExtensionUiRequestView, "options">).options }
-              : {})
-          });
+        : { ...pendingBase, purpose, ...extensionUiDialogShape(details as Pick<ExtensionUiRequestView, "kind" | "options">) });
       if (purpose === "approval") {
         this.emit({
           type: "approval.requested",
@@ -460,13 +450,4 @@ function createNeutralTheme(): Theme {
       return undefined;
     }
   }) as Theme;
-}
-
-function isAnswerForRequest(
-  request: { kind: ExtensionUiRequestView["kind"]; options?: readonly string[] },
-  value: string | boolean | undefined
-): boolean {
-  if (request.kind === "confirm") return typeof value === "boolean";
-  if (typeof value !== "string") return false;
-  return request.kind !== "select" || (request.options ?? []).includes(value);
 }

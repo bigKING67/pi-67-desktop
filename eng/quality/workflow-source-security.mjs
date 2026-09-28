@@ -143,7 +143,3 @@ function dedent(value) {
 function leadingWhitespace(value) {
   return /^\s*/u.exec(value)?.[0].length ?? 0;
 }
-
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-}
