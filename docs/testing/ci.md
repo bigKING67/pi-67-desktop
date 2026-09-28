@@ -22,6 +22,9 @@ base diffs retain conservative behavior; exact installer mode selection follows 
 Path allowlists live in the classifier and its dedicated scope modules, not a duplicate glob list
 in this document. New entries need caller/boundary evidence and mixed/unknown-path regressions.
 Quality-only still executes the complete source gate; it is not partial unit-test coverage.
+The quality lane also runs `pnpm run test:python-workers`: the stdlib-only authorization tests
+(account and asset filtering) for the bundled Python team workers. Tests that need the packaged
+`openviking`/`httpx` runtime run only with the native capability probes.
 
 ## Test execution and reports
 
