@@ -64,7 +64,6 @@
     "@pi67/agent-host",
     "@pi67/desktop",
     "@pi67/renderer",
-    "electron",
     "electron-builder",
     "pnpm"
   ],
