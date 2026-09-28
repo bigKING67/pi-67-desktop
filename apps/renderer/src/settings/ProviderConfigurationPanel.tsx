@@ -22,6 +22,7 @@ import { SettingsDestructiveActionDialog } from "./SettingsActionDialogs.js";
 import { useSettingsDraftRegistration } from "./SettingsDraftGuard.js";
 import {
   SettingsBackAction,
+  SettingsDetailHeader,
   SettingsNotice
 } from "./SettingsPrimitives.js";
 import {
@@ -243,17 +244,15 @@ function GlobalProviderConfigurationPanel() {
         <main className={styles.editor} data-testid="provider-configuration-editor">
             {draft ? (
               <>
-                <div className={styles.editorHeading}>
-                  <SettingsBackAction label="返回模型服务列表" onPress={closeProvider}>模型服务</SettingsBackAction>
-                  <span>
-                    <strong>{selectedProviderId ? (selectedView?.name ?? selectedProviderId) : "新建模型服务"}</strong>
-                    <small>{editable
-                      ? "写入当前用户共享的 Pi models.json；Pi TUI 同步使用，API Key 单独保存"
-                      : selectedView?.configured
-                        ? "Pi 内置服务已连接；Endpoint 与协议由 Pi 管理"
-                        : "先配置 API Key；Endpoint 与协议由 Pi 管理"}</small>
-                  </span>
-                  <div>
+                <SettingsDetailHeader
+                  back={<SettingsBackAction label="返回模型服务列表" onPress={closeProvider}>模型服务</SettingsBackAction>}
+                  title={selectedProviderId ? (selectedView?.name ?? selectedProviderId) : "新建模型服务"}
+                  meta={editable
+                    ? "写入当前用户共享的 Pi models.json；Pi TUI 同步使用，API Key 单独保存"
+                    : selectedView?.configured
+                      ? "Pi 内置服务已连接；Endpoint 与协议由 Pi 管理"
+                      : "先配置 API Key；Endpoint 与协议由 Pi 管理"}
+                  actions={<>
                     {selectedProviderId && (editable || section !== "configuration") ? (
                       <Button
                         className={selectedView?.configured ? "secondary-button" : "primary-button"}
@@ -268,7 +267,7 @@ function GlobalProviderConfigurationPanel() {
                         <Trash2 aria-hidden="true" size={14} />移除
                       </Button>
                     ) : null}
-                    {editable ? (
+                    {editable && (!selectedProviderId || dirty || providerApiKey.length > 0 || phase === "saving") ? (
                       <Button className="primary-button" isDisabled={!canSave} onPress={() => {
                         void saveProviderConfigurationWithCredential(workspaceId, providerApiKey || undefined).then((saved) => {
                           if (saved) setProviderApiKey("");
@@ -277,8 +276,8 @@ function GlobalProviderConfigurationPanel() {
                         <Save aria-hidden="true" size={14} />{phase === "saving" ? "保存中…" : "保存到 Pi"}
                       </Button>
                     ) : null}
-                  </div>
-                </div>
+                  </>}
+                />
                 <ProviderSectionTabs
                   activeSection={section}
                   builtIn={!editable}

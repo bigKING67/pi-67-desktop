@@ -166,7 +166,7 @@ export function PackageDetails({ row, workspaceName, updatesChecked, updateDisab
       <CapabilitySummary resourceTypes={resourceTypes} />
       <dl className={styles.facts}>
         <Fact label="来源" value={row.entry.source} code />
-        {row.entry.version ? <Fact label="版本" value={row.entry.version} code /> : null}
+        {row.entry.version ? <Fact label="版本" value={row.entry.version} /> : null}
         <Fact label="类型" value={sourceKindLabel(resolveSourceKind(row.entry))} />
         <Fact
           label="作用域"

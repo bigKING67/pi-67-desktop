@@ -36,7 +36,6 @@
 .table .tableHeader { min-height: 26px; border-top: 0; color: var(--text-tertiary); }
 .table > div > span:first-child { display: grid; min-width: 0; }
 .table small { overflow: hidden; color: var(--text-tertiary); text-overflow: ellipsis; white-space: nowrap; }
-.empty { padding: 24px; color: var(--text-tertiary); text-align: center; }
 .coverage { margin-top: 10px; color: var(--text-tertiary); font-size: var(--font-size-caption); }
 .spin { animation: usage-spin 0.8s linear infinite; }
 @keyframes usage-spin { to { transform: rotate(360deg); } }

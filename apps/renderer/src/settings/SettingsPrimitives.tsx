@@ -249,6 +249,31 @@ export function SettingsBackAction({ children, label, onPress }: {
   );
 }
 
+/** Header of a drill-in detail: back link, one title scale, one metadata line, then status and actions. */
+export function SettingsDetailHeader({ back, title, meta, detail, status, actions }: {
+  back: ReactNode;
+  title: ReactNode;
+  meta?: ReactNode;
+  /** Optional second line for an identifier such as a file path. */
+  detail?: ReactNode;
+  status?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <header className={styles.detailHeader}>
+      {back}
+      <div className={styles.detailHeading}>
+        <span className={styles.detailIdentity}>
+          <h2>{title}</h2>
+          {meta ? <span className={styles.detailMeta}>{meta}</span> : null}
+          {detail ? <span className={styles.detailMeta}>{detail}</span> : null}
+        </span>
+        {status || actions ? <span className={styles.detailActions}>{status}{actions}</span> : null}
+      </div>
+    </header>
+  );
+}
+
 export function SettingsToolbar({ status, actions, className }: {
   status: ReactNode;
   actions?: ReactNode;

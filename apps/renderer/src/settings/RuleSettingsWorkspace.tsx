@@ -32,10 +32,10 @@ import {
 } from "./RuleSettingsCatalog.js";
 import {
   SettingsBackAction,
+  SettingsDetailHeader,
   SettingsNotice,
-  SettingsRow,
-  SettingsRows,
   SettingsSectionBlock,
+  SettingsStatus,
   SettingsToolbar
 } from "./SettingsPrimitives.js";
 import styles from "./RuleSettingsWorkspace.module.css";
@@ -228,21 +228,16 @@ function ContextFileDetail({ mode, onBack, onModeChange, onReload }: {
     || tooLarge;
   return (
     <div className={styles.detail} data-testid="context-file-detail">
-      <SettingsBackAction label="返回工作规则" onPress={onBack}>返回工作规则</SettingsBackAction>
-      <div className={styles.detailHeading}>
-        <span>
-          <span className="dialog-eyebrow">{contextFileScopeLabel(item.scope)} · {originLabel(item)}</span>
-          <h2>{item.name}</h2>
-          <code>{item.path}</code>
-        </span>
-        <strong className={styles.accessBadge} data-access={item.access}>{contextFileAccessLabel(item)}</strong>
-      </div>
-      <SettingsRows>
-        <SettingsRow title="来源" value={originLabel(item)} />
-        <SettingsRow title="作用域" value={contextFileScopeLabel(item.scope)} />
-        <SettingsRow title="当前状态" value={contextFileStatusLabel(item)} />
-        {item.detail ? <SettingsRow title="说明" value={item.detail} /> : null}
-      </SettingsRows>
+      <SettingsDetailHeader
+        back={<SettingsBackAction label="返回工作规则" onPress={onBack}>返回工作规则</SettingsBackAction>}
+        title={item.name}
+        meta={<>{contextFileScopeLabel(item.scope)} · {originLabel(item)} · <span>{contextFileAccessLabel(item)}</span></>}
+        detail={<code className={styles.detailPath}>{item.path}</code>}
+        {...(item.presence === "present" && item.runtimeState === "active" ? {} : {
+          status: <SettingsStatus tone={item.presence === "missing" ? "neutral" : "warning"}>{contextFileStatusLabel(item)}</SettingsStatus>
+        })}
+      />
+      {item.detail ? <p className={styles.detailNote}>{item.detail}</p> : null}
       {state.error && !state.externalConflict ? <SettingsNotice tone="danger">{state.error}</SettingsNotice> : null}
       {state.externalConflict ? <SettingsNotice
         tone="warning"
@@ -267,12 +262,12 @@ function ContextFileDetail({ mode, onBack, onModeChange, onReload }: {
               <Eye aria-hidden="true" size={14} />预览
             </Button>
           </span>
-          {writable ? <Button
+          {writable && (state.dirty || state.phase === "saving") ? <Button
             className="secondary-button"
-            isDisabled={!state.dirty || state.phase === "saving"}
+            isDisabled={state.phase === "saving"}
             onPress={() => useContextFileStore.getState().discardDraft()}
           >取消修改</Button> : null}
-          {writable ? <Button
+          {writable && (state.dirty || state.phase === "saving") ? <Button
             className="primary-button"
             isDisabled={saveDisabled}
             onPress={() => void saveSelectedContextFile()}

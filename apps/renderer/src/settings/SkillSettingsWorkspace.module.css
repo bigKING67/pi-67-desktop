@@ -45,8 +45,8 @@
   display: grid;
   width: 100%;
   min-width: 0;
-  min-height: 76px;
-  grid-template-columns: 32px minmax(0, 1fr) auto auto;
+  min-height: 56px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
   padding: 12px 10px;
@@ -84,7 +84,7 @@
 .packCopy strong {
   color: var(--text-primary);
   font-size: var(--font-size-interface);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
 }
 
 .packCopy small,
@@ -96,29 +96,25 @@
 
 .packStatus {
   display: inline-flex;
-  min-height: 24px;
   align-items: center;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-muted);
+  gap: 6px;
   color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-support);
   white-space: nowrap;
 }
 
-.packStatus[data-status="ready"] {
-  color: var(--success);
+.packStatus::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--text-disabled);
+  content: "";
 }
 
-.packStatus[data-status="partial"] {
-  color: var(--warning);
-}
-
-.packStatus[data-status="unavailable"] {
-  color: var(--danger);
-}
+.packStatus[data-status="ready"]::before { background: var(--success); }
+.packStatus[data-status="partial"]::before { background: var(--warning); }
+.packStatus[data-status="unavailable"] { color: var(--danger); }
+.packStatus[data-status="unavailable"]::before { background: var(--danger); }
 
 .packUpdateButton {
   align-self: center;
@@ -156,28 +152,29 @@
 
 .detailStatus {
   display: inline-flex;
-  min-height: 26px;
   align-items: center;
-  padding: 0 9px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-muted);
+  gap: 6px;
   color: var(--text-secondary);
   font-size: var(--font-size-support);
-  font-weight: var(--font-weight-semibold);
 }
 
-.detailStatus[data-status="ready"] {
-  color: var(--success);
+.detailStatus::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--text-disabled);
+  content: "";
 }
 
-.detailStatus[data-status="partial"],
-.detailStatus[data-status="unavailable"] {
-  color: var(--warning);
-}
+.detailStatus[data-status="ready"]::before { background: var(--success); }
+.detailStatus[data-status="partial"]::before { background: var(--warning); }
+.detailStatus[data-status="unavailable"] { color: var(--danger); }
+.detailStatus[data-status="unavailable"]::before { background: var(--danger); }
 
-.detailStatus[data-status="unavailable"] {
-  color: var(--danger);
+.suiteBody {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
 }
 
 .detailActions {
@@ -350,7 +347,7 @@
 @media (max-width: 700px) {
 
   .packIdentity {
-    grid-template-columns: 32px minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .packIdentity > svg {

@@ -397,8 +397,7 @@
 
 .eyebrow {
   color: var(--text-tertiary);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-support);
 }
 
 .detailHeader h2,
@@ -413,8 +412,9 @@
 .discoverSurface h2,
 .runtimeSurface h2 {
   color: var(--text-primary);
-  font-size: var(--font-size-title);
-  letter-spacing: -0.02em;
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
 }
 
 .detailDescription {
@@ -443,17 +443,18 @@
 
 .capabilityBadges {
   flex-wrap: wrap;
-  gap: var(--space-1);
+  gap: 6px;
 }
 
 .capabilityBadges > span {
-  padding: 4px 7px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface-muted);
   color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-support);
+}
+
+.capabilityBadges > span + span::before {
+  margin-right: 6px;
+  color: var(--text-tertiary);
+  content: "·";
 }
 
 .statusLine {
@@ -461,33 +462,28 @@
   gap: 6px;
 }
 
+/* Same language as SettingsStatus: a dot plus a short label. */
 .statusLine > span {
-  padding: 3px 7px;
-  border-radius: 5px;
-  background: var(--surface-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--text-secondary);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-support);
 }
 
-.statusLine > span[data-state="ready"] {
-  background: color-mix(in srgb, var(--success) 10%, var(--surface));
-  color: var(--success);
+.statusLine > span::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--text-disabled);
+  content: "";
 }
 
-.statusLine > span[data-state="update"] {
-  background: color-mix(in srgb, var(--info) 10%, var(--surface));
-  color: var(--info);
-}
-
-.statusLine > span[data-state="warning"] {
-  background: color-mix(in srgb, var(--warning) 10%, var(--surface));
-  color: var(--warning);
-}
-
-.statusLine > span[data-state="danger"] {
-  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
-  color: var(--danger);
-}
+.statusLine > span[data-state="ready"]::before { background: var(--success); }
+.statusLine > span[data-state="update"]::before,
+.statusLine > span[data-state="warning"]::before { background: var(--warning); }
+.statusLine > span[data-state="danger"] { color: var(--danger); }
+.statusLine > span[data-state="danger"]::before { background: var(--danger); }
 
 .facts,
 .dialogFacts {

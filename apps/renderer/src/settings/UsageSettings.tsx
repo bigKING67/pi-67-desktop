@@ -6,7 +6,7 @@ import { useAppStore } from "../app/app-store.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { rendererWorkbenchStore, useWorkbenchStore } from "../workbench/workbench-store.js";
 import { registerRendererWorkspaceWithHost } from "../workbench/workspace-host-registration-controller.js";
-import { SettingsNotice, SettingsSectionBlock } from "./SettingsPrimitives.js";
+import { SettingsEmpty, SettingsNotice, SettingsSectionBlock } from "./SettingsPrimitives.js";
 import {
   createDailyUsageSeries,
   showUsageDateLabel,
@@ -148,14 +148,15 @@ export function UsageSettings() {
           />
         </div>
 
+        {report.buckets.length === 0 && modelRows.length === 0
+          ? <SettingsEmpty>当前时间窗口内没有 Pi 记录的 token 用量。</SettingsEmpty>
+          : <>
         <section className={styles.chartSection}>
           <header>
             <div><BarChart3 aria-hidden="true" size={15} /><strong>每日 Token</strong></div>
             <span>连续 {daily.length} 天 · UTC 日期</span>
           </header>
-          {report.buckets.length === 0 ? <p className={styles.empty}>当前窗口没有可用 usage 记录。</p> : (
-            <DailyUsageChart daily={daily} window={report.window} />
-          )}
+          <DailyUsageChart daily={daily} window={report.window} />
         </section>
 
         <section className={styles.tableSection}>
@@ -174,6 +175,7 @@ export function UsageSettings() {
           </div>
         </section>
 
+          </>}
         <footer className={styles.coverage}>
           生成于 {new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(report.generatedAt))}
           {report.coverage.futureVersionSessions > 0 ? ` · ${report.coverage.futureVersionSessions} 个较新格式会话` : ""}

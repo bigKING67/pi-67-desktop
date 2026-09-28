@@ -4,10 +4,12 @@ import { useMemo } from "react";
 import { Button } from "react-aria-components";
 import {
   SettingsBackAction,
+  SettingsDetailHeader,
+  SettingsEmpty,
   SettingsNotice,
   SettingsRow,
   SettingsRows,
-  SettingsSectionBlock,
+  SettingsStatus,
   type SettingsStatusTone
 } from "./SettingsPrimitives.js";
 import styles from "./SkillSettingsWorkspace.module.css";
@@ -35,10 +37,12 @@ export function BundledSkillSuiteDetail({ suite, pack, query, busy, onBack, onMu
   const status = suiteStatus(suite, pack);
   return (
     <div className={styles.suiteDetail!} data-testid="bundled-skill-suite-detail">
-      <SettingsBackAction label="返回全局可用技能" onPress={onBack}>返回全局可用</SettingsBackAction>
-      <SettingsSectionBlock
-        actions={<span className={styles.detailActions}>
-          <span className={styles.detailStatus} data-status={status.id}>{status.label}</span>
+      <SettingsDetailHeader
+        back={<SettingsBackAction label="返回全局可用技能" onPress={onBack}>返回全局可用</SettingsBackAction>}
+        title={suite.displayName}
+        meta={`${pack?.skillIds.length ?? suite.skills.length} 个技能 · ${suiteVersionSummary(suite, pack)}`}
+        status={<SettingsStatus tone={suiteStatusTone(status, pack)}>{status.label}</SettingsStatus>}
+        actions={<>
           {pack?.canInstall ? (
             <Button className="primary-button" isDisabled={busy} onPress={() => onMutation("install", pack)}>
               {pack.updateStatus === "sync-pending" ? "同步官方 Skills" : "安装 Lark CLI"}
@@ -54,10 +58,9 @@ export function BundledSkillSuiteDetail({ suite, pack, query, busy, onBack, onMu
               恢复内置版本
             </Button>
           ) : null}
-        </span>}
-        title={suite.displayName}
-        description={`${pack?.skillIds.length ?? suite.skills.length} 个技能 · ${suiteVersionSummary(suite, pack)}`}
-      >
+        </>}
+      />
+      <div className={styles.suiteBody}>
         <SettingsRows className={styles.suiteFacts!}>
           <SettingsRow
             title="内置基线"
@@ -130,12 +133,9 @@ export function BundledSkillSuiteDetail({ suite, pack, query, busy, onBack, onMu
               : `旧版受管 Overlay · ${pack?.installedVersion ?? "当前版本"}`}</span>
           </SettingsRow>
         ))}</SettingsRows> : (
-          <SettingsNotice className={styles.emptyResult!}>没有匹配的内置技能。</SettingsNotice>
+          <SettingsEmpty>没有匹配的内置技能。</SettingsEmpty>
         )}
-        <SettingsNotice className={styles.scopeNotice!}>
-          该内置套件对所有项目可用；当前任务最终使用哪个同名技能，以 Pi 的资源解析结果为准。
-        </SettingsNotice>
-      </SettingsSectionBlock>
+      </div>
     </div>
   );
 }

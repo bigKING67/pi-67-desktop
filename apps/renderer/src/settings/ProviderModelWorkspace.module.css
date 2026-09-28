@@ -21,8 +21,8 @@
 
 .modelFilters button {
   min-height: 32px;
-  padding: 0 10px;
-  border: 1px solid transparent;
+  padding: 0 8px;
+  border: 0;
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-secondary);
@@ -30,7 +30,6 @@
 }
 
 .modelFilters button:hover {
-  background: var(--surface-hover);
   color: var(--text-primary);
 }
 
@@ -40,9 +39,8 @@
 }
 
 .modelFilters .selectedModelFilter {
-  border-color: var(--border);
-  background: var(--surface-muted);
   color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
 }
 
 .modelResultsSummary {

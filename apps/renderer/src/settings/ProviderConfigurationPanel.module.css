@@ -38,7 +38,6 @@
 }
 
 .statusBar,
-.editorHeading,
 .sectionHeaderWithAction {
   display: flex;
   align-items: center;
@@ -48,12 +47,6 @@
 
 .statusBar {
   min-height: 40px;
-}
-
-.editorHeading > div {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .conflict,
@@ -75,7 +68,6 @@
 
 .conflict span,
 .invalid span,
-.editorHeading > span,
 .sectionHeaderWithAction > span,
 .headersEditor > span,
 .fileList span,
@@ -86,7 +78,6 @@
 
 .conflict small,
 .invalid small,
-.editorHeading small,
 .sectionHeaderWithAction small,
 .headersEditor small,
 .secondarySection header small,
@@ -322,11 +313,6 @@
   overscroll-behavior: contain;
 }
 
-.editorHeading {
-  min-height: 54px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-}
 
 .providerBackButton {
   display: none;
@@ -352,10 +338,6 @@
   outline-offset: -2px;
 }
 
-.editorHeading > div {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
 
 .dangerButton,
 .modelDeleteButton {
@@ -866,10 +848,6 @@
     display: inline-flex;
   }
 
-  .editorHeading {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
 
 }
 
@@ -891,18 +869,8 @@
   }
 
   .statusBar > div,
-  .editorHeading > div {
-    width: 100%;
-    justify-content: flex-start;
-  }
 
-  .editorHeading {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
 
-  .editorHeading > div {
-    grid-column: 1 / -1;
-  }
 
   .headerInputs {
     grid-template-columns: 1fr;
@@ -943,11 +911,6 @@
   background: transparent;
 }
 
-.editorHeading > span {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
-}
 
 .editor {
   min-height: 0;
@@ -955,20 +918,7 @@
   overflow: visible;
 }
 
-.editorHeading {
-  display: grid;
-  min-height: 0;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 16px;
-  padding: 0 0 20px;
-  border-bottom: 0;
-}
 
-.editorHeading > button {
-  grid-column: 1 / -1;
-  justify-self: start;
-}
 
 .sectionTabs {
   padding-inline: 0;
@@ -998,13 +948,7 @@
     min-height: 0;
   }
 
-  .editorHeading {
-    grid-template-columns: minmax(0, 1fr);
-  }
 
-  .editorHeading > div {
-    grid-column: 1;
-  }
 
 }
 

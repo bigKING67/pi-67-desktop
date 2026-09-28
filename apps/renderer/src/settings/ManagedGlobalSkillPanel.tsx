@@ -1,5 +1,5 @@
 import type { ResourceSummary, SkillPackEntry } from "@pi67/domain";
-import { ChevronRight, Layers3, RefreshCw, Search } from "lucide-react";
+import { ChevronRight, RefreshCw, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button, Dialog, Modal, ModalOverlay } from "react-aria-components";
 import { selectSessionResources } from "../session/session-projection-selectors.js";
@@ -188,9 +188,6 @@ function ManagedSkillPackRow({ pack, busy, onSelect, onInstall, onUpdate }: {
   return (
     <div className={styles.packRow} data-update={skillPackNeedsAction(pack) || undefined} role="listitem">
       <button className={styles.packIdentity} data-testid="managed-skill-pack-row" onClick={onSelect} type="button">
-        <span className={styles.suiteIcon} data-status={status.tone}>
-          <Layers3 aria-hidden="true" size={16} />
-        </span>
         <span className={styles.packCopy}>
           <strong>{pack.displayName}</strong>
           <small>{pack.description}</small>

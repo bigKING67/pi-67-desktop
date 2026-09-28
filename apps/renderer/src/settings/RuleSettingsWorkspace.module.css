@@ -116,45 +116,15 @@
   overflow-wrap: anywhere;
 }
 
-.accessBadge {
-  color: var(--text-tertiary);
-  font-size: var(--font-size-support);
-  font-weight: var(--font-weight-regular);
-  white-space: nowrap;
-}
 
 .rowChevron {
   flex: none;
   color: var(--text-tertiary);
 }
 
-.detailHeading {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-}
 
-.detailHeading > span {
-  display: grid;
-  min-width: 0;
-  gap: 6px;
-}
 
-.detailHeading h2 {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: var(--font-size-display);
-  letter-spacing: -0.02em;
-}
 
-.detailHeading code {
-  color: var(--text-tertiary);
-  font-family: var(--font-code);
-  font-size: var(--font-size-caption);
-  overflow-wrap: anywhere;
-}
 
 .toolbar {
   align-items: center;
@@ -271,14 +241,9 @@
     gap: 28px;
   }
 
-  .detailHeading,
   .toolbar {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .accessBadge {
-    align-self: flex-start;
   }
 
   .modeSwitch {
@@ -310,4 +275,16 @@
     grid-column: 2;
     grid-row: 1;
   }
+}
+
+.detailPath {
+  font-family: var(--font-code);
+  font-size: var(--font-size-caption);
+}
+
+.detailNote {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-support);
+  line-height: 1.5;
 }
