@@ -6,10 +6,11 @@ export function createRuntimePrivacyGuard(
   config: OVConfig,
   moduleUrl: string,
   onDisabled: () => void,
+  options: { managed?: boolean } = {},
 ): () => boolean {
   let reportedMode = config.privacyMode;
   return () => {
-    tightenRuntimePrivacyFromModuleUrl(config, moduleUrl);
+    tightenRuntimePrivacyFromModuleUrl(config, moduleUrl, options);
     if (reportedMode !== config.privacyMode) {
       reportedMode = config.privacyMode;
       emitContextDiagnostic({

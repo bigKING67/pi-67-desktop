@@ -103,6 +103,14 @@ describe("OpenViking runtime privacy", () => {
     });
   });
 
+  it("fails closed on an unrecognized privacy-mode override instead of widening capture", async () => {
+    await writeUserConfig("read-only");
+    process.env.PI67_MEMORY_PRIVACY_MODE = "OFF";
+    expect(loadConfig(extensionDir)).toMatchObject({ enabled: false, privacyMode: "off", privateWriteEnabled: false });
+    process.env.PI67_MEMORY_PRIVACY_MODE = "read-only";
+    expect(loadConfig(extensionDir)).toMatchObject({ privacyMode: "read-only", privateWriteEnabled: false });
+  });
+
   async function writeExtensionConfig(privacyMode: string): Promise<void> {
     await writeFile(join(extensionDir, "config.json"), JSON.stringify({
       enabled: true,

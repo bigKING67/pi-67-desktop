@@ -42,6 +42,18 @@ export interface ContextDiagnosticEvent {
   }>;
 }
 
+/** Developer-only trace to OV_DEBUG_LOG; best effort and never affects Pi. */
+export function debugLog(message: string): void {
+  const file = process.env.OV_DEBUG_LOG;
+  if (!file) return;
+  try {
+    mkdirSync(dirname(file), { recursive: true });
+    appendFileSync(file, `${new Date().toISOString()} ${message}\n`);
+  } catch {
+    // Best effort; logging must never affect Pi.
+  }
+}
+
 export function emitContextDiagnostic(
   event: Omit<ContextDiagnosticEvent, "schema" | "at" | "owner">,
 ): void {

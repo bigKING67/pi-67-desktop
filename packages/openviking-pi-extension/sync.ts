@@ -1,7 +1,6 @@
-import { appendFileSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
 import { buildCommitRequestBody, type OVClient, type OVCommitResult } from "./client.js";
 import type { OVConfig } from "./config.js";
+import { debugLog } from "./diagnostics.js";
 import { extractBranchCapturePayloads } from "./lib/capture-adapter.mjs";
 import { countUndeliveredForSession, estimatePayloadTokens } from "./lib/takeover-core.mjs";
 import { createScopedPendingQueue } from "./scoped-pending-queue.js";
@@ -37,17 +36,6 @@ interface SyncStateData {
 
 interface SyncManagerOptions {
   persistEntry?: (customType: string, data: SyncStateData) => void;
-}
-
-function debugLog(message: string): void {
-  const file = process.env.OV_DEBUG_LOG;
-  if (!file) return;
-  try {
-    mkdirSync(dirname(file), { recursive: true });
-    appendFileSync(file, `${new Date().toISOString()} ${message}\n`);
-  } catch {
-    // Best effort; logging must never affect Pi.
-  }
 }
 
 export class SyncManager {

@@ -27,6 +27,7 @@ function resetConfig(peerId = "") {
 
 vi.mock("./config.js", () => ({
   loadConfigFromModuleUrl: () => config,
+  admitManagedConfiguration: () => undefined,
   bindWorkspacePeer: (target: typeof config, cwd: string) => {
     if (!explicitPeerByConfig.get(target)) {
       target.peerId = createHash("sha256").update(cwd).digest("hex");
@@ -59,7 +60,7 @@ vi.mock("./sync.js", () => ({
 vi.mock("./recall.js", () => ({ RecallManager: class { state = "idle"; invalidate() {}; queueSearch() {}; injectContext() { return []; } } }));
 vi.mock("./takeover.js", () => ({ createTakeoverManager: () => ({ state: { syncedEntryCount: 0, pendingTokens: 0, coveredUserTurns: 0 }, restore() {}, onTurnSynced: async () => undefined, shutdown: async () => undefined, handleBeforeCompact: async () => undefined, commitAndAdvance: async () => false, transformContext: (value: unknown) => value }) }));
 vi.mock("./tools.js", () => ({ OPENVIKING_MODEL_RECALL_POLICY: "policy", registerTools() {} }));
-vi.mock("./diagnostics.js", () => ({ emitContextDiagnostic() {}, hashDiagnosticValue: () => "hash" }));
+vi.mock("./diagnostics.js", () => ({ debugLog() {}, emitContextDiagnostic() {}, hashDiagnosticValue: () => "hash" }));
 vi.mock("./memory-owner-policy.js", () => ({ detectMemoryOwnerConflict: () => null }));
 vi.mock("./runtime-privacy.js", () => ({ createRuntimePrivacyGuard: () => () => true }));
 vi.mock("./shared/profile-inject.mjs", () => ({ buildProfileBlock: async () => undefined }));

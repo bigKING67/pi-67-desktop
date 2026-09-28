@@ -3,9 +3,7 @@
  * Design references: OpenClaw recall, Claude Code plugin, Hermes lifecycle lessons.
  */
 import type { ExtensionAPI } from "@pi67/pi-runtime/pi-sdk-types";
-import { appendFileSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
-import { bindWorkspacePeer, loadConfigFromModuleUrl, type OVConfig } from "./config.js";
+import { admitManagedConfiguration, bindWorkspacePeer, loadConfigFromModuleUrl, type OVConfig } from "./config.js";
 import { OVClient } from "./client.js";
 import { RecallManager } from "./recall.js";
 import { SyncManager } from "./sync.js";
@@ -13,14 +11,16 @@ import { buildProfileBlock } from "./shared/profile-inject.mjs";
 import { guardVikingUriToolCall } from "./lib/uri-guard-adapter.mjs";
 import { OPENVIKING_MODEL_RECALL_POLICY, registerTools } from "./tools.js";
 import { createTakeoverManager } from "./takeover.js";
-import { emitContextDiagnostic, hashDiagnosticValue } from "./diagnostics.js";
+import { debugLog, emitContextDiagnostic, hashDiagnosticValue } from "./diagnostics.js";
 import { detectMemoryOwnerConflict } from "./memory-owner-policy.js";
 import { createRuntimePrivacyGuard } from "./runtime-privacy.js";
 import { resolveManagedMemoryConnection, type ManagedMemoryConnection } from "./managed-connection.js";
 import { registerDesktopMemoryCommit } from "./desktop-memory-commit.js";
 export default async function initializeOpenViking(pi: ExtensionAPI, managedConnection?: ManagedMemoryConnection) {
   const config = loadConfigFromModuleUrl(import.meta.url);
-  if (!config.enabled) return;
+  // Managed mode ignores the standalone endpoint (OPENVIKING_URL, ovcli.conf, ...).
+  const disabledReason = admitManagedConfiguration(config, managedConnection !== undefined);
+  if (disabledReason) return emitContextDiagnostic({ kind: "context.memoryDisabled", privacyMode: config.privacyMode, state: "disabled", reason: disabledReason });
 
   const agentDir = process.env.PI_CODING_AGENT_DIR || process.env.PI_AGENT_DIR || "";
   const conflict = agentDir ? detectMemoryOwnerConflict(agentDir) : null;
@@ -60,16 +60,6 @@ export default async function initializeOpenViking(pi: ExtensionAPI, managedConn
     persistEntry: (customType, data) => pi.appendEntry(customType, data),
   });
   const recall = new RecallManager(client, config, () => sync.sessionId);
-  const debugLog = (message: string) => {
-    const file = process.env.OV_DEBUG_LOG;
-    if (!file) return;
-    try {
-      mkdirSync(dirname(file), { recursive: true });
-      appendFileSync(file, `${new Date().toISOString()} ${message}\n`);
-    } catch {
-      // Best effort; logging must never affect pi.
-    }
-  };
   const takeover = createTakeoverManager({ pi, client, sync, config, log: debugLog });
   let bypassed = false;
   let profileBlock = "";
@@ -83,7 +73,8 @@ export default async function initializeOpenViking(pi: ExtensionAPI, managedConn
     profileBlock = "";
     archiveOverview = "";
   };
-  const refreshRuntimePrivacy = createRuntimePrivacyGuard(config, import.meta.url, invalidateMemoryContext);
+  const refreshRuntimePrivacy = createRuntimePrivacyGuard(config, import.meta.url, invalidateMemoryContext,
+    { managed: managedConnection !== undefined });
   registerDesktopMemoryCommit(pi, client, sync, refreshRuntimePrivacy);
   const start = async (ctx: any): Promise<void> => {
     const sessionCwd = typeof ctx?.sessionManager?.getCwd === "function" ? ctx.sessionManager.getCwd() : "";

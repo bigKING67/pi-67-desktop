@@ -192,7 +192,9 @@ export function loadConfig(extensionDir: string): OVConfig {
     config.recallQueryExpansionConfigured = true;
   }
   if (process.env.PI67_MEMORY_PRIVACY_MODE) {
-    config.privacyMode = normalizePrivacyMode(process.env.PI67_MEMORY_PRIVACY_MODE);
+    // Same fail-closed rule as an invalid file mode: an unrecognized override never widens capture.
+    if (isPrivacyMode(process.env.PI67_MEMORY_PRIVACY_MODE)) config.privacyMode = process.env.PI67_MEMORY_PRIVACY_MODE;
+    else invalidConfiguration = true;
   }
 
   config.recallLimit = clampInt(config.recallLimit, 1, 50, DEFAULT_CONFIG.recallLimit);
@@ -225,7 +227,10 @@ export function loadConfig(extensionDir: string): OVConfig {
     config.enabled = false;
     config.privacyMode = "off";
   }
-  if (!isSafeEndpoint(config.endpoint)) config.enabled = false;
+  if (!isSafeEndpoint(config.endpoint)) {
+    if (config.enabled) standaloneEndpointRejected.add(config);
+    config.enabled = false;
+  }
   config.privateWriteEnabled = config.privacyMode === "private-learning" || config.privacyMode === "full-learning";
   config.enterpriseCandidateEnabled = config.privacyMode === "full-learning";
   if (!config.privateWriteEnabled) {
@@ -238,6 +243,26 @@ export function loadConfig(extensionDir: string): OVConfig {
 }
 
 const explicitPeerByConfig = new WeakMap<OVConfig, boolean>();
+const standaloneEndpointRejected = new WeakSet<OVConfig>();
+
+/**
+ * Why a loaded configuration is disabled, as a fixed code (never the endpoint itself).
+ * `standalone-endpoint` means only the standalone endpoint check failed; a Desktop-managed
+ * connection replaces that endpoint with the Host loopback, so it does not apply there.
+ */
+export function configurationDisabledReason(config: OVConfig): "privacy-off" | "standalone-endpoint" | "disabled" | undefined {
+  if (config.enabled) return undefined;
+  if (config.privacyMode === "off") return "privacy-off";
+  return standaloneEndpointRejected.has(config) ? "standalone-endpoint" : "disabled";
+}
+
+/** Re-enables a managed Session disabled only by the standalone endpoint; returns any remaining reason. */
+export function admitManagedConfiguration(config: OVConfig, managed: boolean): ReturnType<typeof configurationDisabledReason> {
+  const reason = configurationDisabledReason(config);
+  if (reason !== "standalone-endpoint" || !managed) return reason;
+  config.enabled = true;
+  return undefined;
+}
 
 /** Bind the default peer to the actual Pi Session workspace. Explicit user/env peer IDs win. */
 export function bindWorkspacePeer(config: OVConfig, cwd: string): void {
@@ -258,8 +283,12 @@ export function bindWorkspacePeer(config: OVConfig, cwd: string): void {
 export function tightenRuntimePrivacyFromModuleUrl(
   current: OVConfig,
   moduleUrl: string,
+  options: { managed?: boolean } = {},
 ): OVConfig {
-  return tightenRuntimePrivacy(current, loadConfigFromModuleUrl(moduleUrl));
+  const requested = loadConfigFromModuleUrl(moduleUrl);
+  // A Desktop-managed Session never uses the standalone endpoint, so its rejection is not a tightening.
+  admitManagedConfiguration(requested, options.managed === true);
+  return tightenRuntimePrivacy(current, requested);
 }
 
 export function tightenRuntimePrivacy(current: OVConfig, requested: OVConfig): OVConfig {

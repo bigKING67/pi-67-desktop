@@ -17,7 +17,7 @@ afterEach(async () => {
   if (root) await rm(root, { recursive: true, force: true });
 });
 
-async function fixture(mode: string, takeover = false, managed = false) {
+async function fixture(mode: string, takeover = false, managed = false, standaloneUrl = "http://127.0.0.1:1933") {
   root = await mkdtemp(join(tmpdir(), "pi67-memory-privacy-"));
   const agent = join(root, "agent");
   const pending = join(root, "pending");
@@ -28,7 +28,7 @@ async function fixture(mode: string, takeover = false, managed = false) {
   await setMode(mode);
   for (const [key, value] of Object.entries({
     PI_CODING_AGENT_DIR: agent, OPENVIKING_PENDING_DIR: pending,
-    OPENVIKING_CREDENTIAL_SOURCE: "env", OPENVIKING_URL: "http://127.0.0.1:1933",
+    OPENVIKING_CREDENTIAL_SOURCE: "env", OPENVIKING_URL: standaloneUrl,
     OPENVIKING_API_KEY: "fixture-key", OPENVIKING_ACCOUNT: "fixture-account",
     OPENVIKING_USER: "fixture-user", OPENVIKING_PEER_ID: "fixture-peer"
   })) vi.stubEnv(key, value);
@@ -69,6 +69,24 @@ async function fixture(mode: string, takeover = false, managed = false) {
     commit: (sessionId = "fixture-session", canCommit = () => true) => requestPrivateMemoryCommit(services, sessionId, canCommit),
     setBranch: (value: any[]) => { branch = value; }, setHistory: (value: any[]) => { history = value; } };
 }
+
+describe("OpenViking managed mode and standalone configuration", () => {
+  it("keeps Desktop-managed memory on when an unrelated standalone endpoint is unsafe", async () => {
+    const managed = await fixture("private-learning", false, true, "http://nas.local:1933");
+    await managed.run("session_start");
+    expect(managed.tools.has("viking_search")).toBe(true);
+    // The runtime privacy guard re-reads configuration; the standalone endpoint must not tighten it.
+    await managed.run("before_agent_start");
+    expect(managed.requests.some(({ path }) => path.startsWith("/api/v1/"))).toBe(true);
+  });
+
+  it("still disables a standalone session whose own endpoint is unsafe", async () => {
+    const standalone = await fixture("private-learning", false, false, "http://nas.local:1933");
+    await standalone.run("session_start");
+    expect(standalone.tools.size).toBe(0);
+    expect(standalone.requests).toEqual([]);
+  });
+});
 
 describe("OpenViking lifecycle private write authority", () => {
   it.each([200, 503])("does not race automatic Commit against an in-flight Desktop Commit (%s)", async (status) => {
