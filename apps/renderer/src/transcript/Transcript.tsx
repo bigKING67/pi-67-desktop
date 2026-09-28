@@ -195,7 +195,7 @@ export function Transcript() {
       return (
         <div className={styles.error} role="alert">
           <CircleAlert size={22} />
-          <strong>无法创建会话</strong>
+          <strong>会话未能就绪</strong>
           <span>{runtime.detail}</span>
         </div>
       );

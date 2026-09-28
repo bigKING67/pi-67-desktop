@@ -39,6 +39,8 @@ export function NewMoneyAccountSettings() {
       try {
         const identity = await pollEnterpriseAuthorization(authorization.authorizationId);
         if (cancelled) return;
+        // A successful poll supersedes an earlier transient polling failure.
+        setError(undefined);
         if (identity.state === "signed-in" || identity.state === "expired" || identity.state === "signed-out") {
           setAuthorization(undefined);
           if (identity.state === "expired") setError("授权码已过期，请重新登录。");

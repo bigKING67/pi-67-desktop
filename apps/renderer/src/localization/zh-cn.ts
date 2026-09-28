@@ -38,10 +38,6 @@ export const zhCNMessages = {
         label: "模型",
         summary: "配置模型服务、认证、可用模型与默认模型。"
       },
-      packages: {
-        label: "扩展包",
-        summary: "安装和管理通过 npm、Git 或本地目录提供的 Pi 扩展包。"
-      },
       extensions: {
         label: "扩展",
         summary: "安装扩展包，并管理 New Money 内置扩展和本地扩展。"

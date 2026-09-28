@@ -63,6 +63,21 @@ test("device login publishes its result to the footer without a separate memory 
   await page.getByRole("button",{name:"返回工作台"}).click();
   await expect(page.getByTestId("account-settings-entry")).toContainText("New Money 测试账户");
 });
+test("a transient polling failure clears once device authorization succeeds", async ({page}) => {
+  await setup(page,{state:"signed-out"});
+  await setMockAgentResponseFailure(page,"enterprise.auth.poll",{code:"INTERNAL",message:"Synthetic poll offline",recoverable:true});
+  await page.getByTestId("account-settings-entry").click();
+  const account = page.getByTestId("new-money-account-settings");
+  await account.getByRole("button",{name:"登录 New Money",exact:true}).click();
+  await expect(account.getByRole("alert")).toContainText("暂时无法检查授权结果");
+  await page.evaluate(() => {
+    delete (window as unknown as { __pi67TestAgent: { responseFailures: Record<string, unknown> } })
+      .__pi67TestAgent.responseFailures["enterprise.auth.poll"];
+  });
+  await setMockAgentResponseResult(page,"enterprise.identity.get",signedIn);
+  await expect(account.getByRole("button",{name:"退出登录",exact:true})).toBeEnabled();
+  await expect(account.getByText("暂时无法检查授权结果", { exact: false })).toHaveCount(0);
+});
 test("identity read errors remain unconfirmed instead of becoming logged out", async ({page}) => {
   await setup(page);
   await page.getByTestId("account-settings-entry").click();
