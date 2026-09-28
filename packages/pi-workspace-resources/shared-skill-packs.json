@@ -36,7 +36,6 @@
       "owner": "pi67-first-party",
       "distribution": "bundled-release-only",
       "upstream": "https://github.com/bigKING67/commerce-growth-os",
-      "sync_helper": "scripts/pi67-sync-commerce-skill-pack.sh",
       "skills": [
         "commerce-growth-os",
         "commerce-commercial-strategy",
