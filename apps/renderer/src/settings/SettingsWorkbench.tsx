@@ -301,11 +301,11 @@ function UpdateSettings() {
     }
   };
   return (
-    <SettingsSectionBlock title="更新与诊断" description="更新检查不携带工作区、会话、模型服务或凭据信息；诊断仅在你点击后脱敏上传。">
+    <><SettingsSectionBlock title="更新">
       <SettingsRows>
         <SettingsRow
-          title="自动检查更新"
-          description="启动后自动检查，每天最多一次；下载和安装均由你确认。"
+          title={<>自动检查更新<SettingsInfo label="更新检查说明">更新检查不携带工作区、会话、模型服务或凭据信息。</SettingsInfo></>}
+          description="启动后检查，每天最多一次；下载和安装由你确认"
           value={initialized ? (update.automaticChecks ? "已开启" : "仅打包版可用") : "正在读取…"}
         />
         <SettingsRow
@@ -332,9 +332,13 @@ function UpdateSettings() {
                   : "立即检查"}
           </Button>}
         />
-        <SupportDiagnosticsUploadRow />
       </SettingsRows>
     </SettingsSectionBlock>
+    <SettingsSectionBlock title="诊断">
+      <SettingsRows>
+        <SupportDiagnosticsUploadRow />
+      </SettingsRows>
+    </SettingsSectionBlock></>
   );
 }
 

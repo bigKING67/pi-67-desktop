@@ -1,0 +1,36 @@
+.about {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
+/* About is the one page that opens with product identity instead of a section title. */
+.aboutIdentity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 4px 8px;
+}
+
+.aboutIdentity img {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 10px;
+}
+
+.aboutIdentity h2,
+.aboutIdentity p {
+  margin: 0;
+}
+
+.aboutIdentity h2 {
+  color: var(--text-primary);
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-semibold);
+}
+
+.aboutIdentity p {
+  color: var(--text-secondary);
+  font-size: var(--font-size-interface);
+}

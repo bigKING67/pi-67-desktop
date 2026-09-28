@@ -107,14 +107,14 @@ test("configures a user-managed Feishu app and keeps user authorization separate
   const applicationTab = settings.getByRole("tab", { name: "应用连接", exact: true });
   await expect(userTab).toHaveAttribute("aria-selected", "true");
   await expect(applicationTab).toHaveAttribute("aria-selected", "false");
-  await expect(settings.getByRole("heading", { name: "用户授权", exact: true })).toBeVisible();
-  await expect(settings.getByRole("heading", { name: "应用连接", exact: true })).toBeHidden();
+  await expect(settings.getByRole("heading", { name: "飞书账户", exact: true })).toBeVisible();
+  await expect(settings.getByRole("heading", { name: "自建应用", exact: true })).toBeHidden();
   await expect(settings.getByRole("button", { name: "登录飞书", exact: true })).toBeVisible();
 
   await applicationTab.click();
   await expect(applicationTab).toHaveAttribute("aria-selected", "true");
-  await expect(settings.getByRole("heading", { name: "应用连接", exact: true })).toBeVisible();
-  await expect(settings.getByRole("heading", { name: "用户授权", exact: true })).toBeHidden();
+  await expect(settings.getByRole("heading", { name: "自建应用", exact: true })).toBeVisible();
+  await expect(settings.getByRole("heading", { name: "飞书账户", exact: true })).toBeHidden();
   await expect(settings.getByText("Pi-67 Office", { exact: true })).toBeVisible();
   await expect(settings.getByText("cli_test123", { exact: true })).toBeVisible();
   await expect(settings.getByText("已安全保存", { exact: true })).toBeVisible();

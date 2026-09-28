@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   desktopAction,
   desktopShortcutAriaKeys,
+  desktopShortcutKeyParts,
   formatDesktopShortcut,
   matchDesktopAction
 } from "./desktop-action-registry.js";
@@ -13,6 +14,8 @@ describe("desktop action registry", () => {
     expect(formatDesktopShortcut(action, "win32")).toBe("Ctrl+Shift+F");
     expect(formatDesktopShortcut(action, "darwin")).toBe("⌘⇧F");
     expect(desktopShortcutAriaKeys(action)).toBe("Control+Shift+F Meta+Shift+F");
+    expect(desktopShortcutKeyParts(action, "win32")).toEqual([["Ctrl", "Shift", "F"]]);
+    expect(desktopShortcutKeyParts(desktopAction("new-session"), "darwin")).toEqual([["⌘", "N"], ["⌘", "T"]]);
   });
 
   it("matches exact primary-modifier search variants", () => {

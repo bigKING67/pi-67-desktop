@@ -81,6 +81,21 @@ export function SettingsInfo({ label, children }: { label: string; children: Rea
   );
 }
 
+/** Secondary page or row action shown as an icon; the label is its accessible name and tooltip. */
+export function SettingsIconAction({ label, icon, onPress, isDisabled = false }: {
+  label: string;
+  icon: ReactNode;
+  onPress: () => void;
+  isDisabled?: boolean;
+}) {
+  return (
+    <TooltipTrigger delay={400}>
+      <Button aria-label={label} className={styles.iconAction!} isDisabled={isDisabled} onPress={onPress}>{icon}</Button>
+      <Tooltip className={styles.infoTooltip!} offset={6}>{label}</Tooltip>
+    </TooltipTrigger>
+  );
+}
+
 export function SettingsCatalog({ children, className, label }: {
   children: ReactNode;
   className?: string;

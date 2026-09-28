@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 import {
   SettingsDetails,
+  SettingsIconAction,
   SettingsNotice,
   SettingsRow,
   SettingsRows,
@@ -52,22 +53,21 @@ export function Browser67IntegrationPanel() {
   return (
     <>
     <SettingsSectionBlock
-      actions={<Button className="secondary-button" isDisabled={phase === "loading" || operation !== undefined} onPress={() => void refresh()}>
-        <RefreshCw aria-hidden="true" size={14} />刷新
-      </Button>}
-      description="连接 Chrome 或 Edge，让 Agent 在受管浏览器中执行任务。安装后需验证真实连接。"
+      actions={<SettingsIconAction label="刷新浏览器集成状态" icon={<RefreshCw aria-hidden="true" size={14} />}
+        isDisabled={phase === "loading" || operation !== undefined} onPress={() => void refresh()} />}
+      description="让 Agent 在受管的 Chrome 或 Edge 中执行任务。"
       title="browser67"
     >
       {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
       <SettingsRows>
         <SettingsRow
           title="运行依赖"
-          description="依赖准备与随应用提供的源码是两个独立状态。"
+          description="浏览器操作所需的本机依赖"
           value={<SettingsStatus tone={integration?.dependencyState === "prepared" ? "success" : integration?.dependencyState === "failed" ? "danger" : "warning"}>{dependencyLabel(integration)}</SettingsStatus>}
         />
         <SettingsRow
           title="浏览器扩展"
-          description="扩展文件已准备不等于已经在 Chrome/Edge 中加载。"
+          description="需要在 Chrome 或 Edge 中加载"
           value={<SettingsStatus tone={extensionTone(integration)}>{extensionLabel(integration)}</SettingsStatus>}
         />
         <SettingsRow
@@ -77,7 +77,7 @@ export function Browser67IntegrationPanel() {
         />
         <SettingsRow
           title="安装与连接"
-          description="安装会准备 unpacked extension；首次加载需要你在浏览器扩展页确认。"
+          description="首次加载需要在浏览器扩展页确认"
           actions={<>
             <Button className="primary-button" isDisabled={operation !== undefined} onPress={() => setInstallerOpen(true)}>
               {integration?.extensionState === "connected"
@@ -92,7 +92,7 @@ export function Browser67IntegrationPanel() {
         />
       </SettingsRows>
       <SettingsDetails title="组件来源" summary="随应用提供">
-        <SettingsRows><SettingsRow title="源码与技能" description="固定第一方快照随应用提供；与依赖、扩展安装及连接状态分别检查。" value="内置第一方" /></SettingsRows>
+        <SettingsRows><SettingsRow title="源码与技能" description="固定的第一方快照随应用提供" value="内置第一方" /></SettingsRows>
       </SettingsDetails>
     </SettingsSectionBlock>
     <Browser67ExtensionInstallDialog

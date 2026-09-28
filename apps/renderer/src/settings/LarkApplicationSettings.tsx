@@ -84,8 +84,8 @@ export function LarkApplicationSettings({
   const configured = snapshot?.appStatus === "ready";
   const cliMissing = snapshot?.cliStatus === "missing";
   return <SettingsSectionBlock
-    title="应用连接"
-    description="可选高级入口：复用已有自建或组织应用。普通个人登录无需在此填写 App ID 或 App Secret。"
+    title="自建应用"
+    description="可选：复用已有的自建或组织应用。个人登录无需填写。"
   >
     {cliMissing ? <LarkCliRequiredNotice
       canInstall={canInstallLarkCli}
@@ -108,17 +108,17 @@ export function LarkApplicationSettings({
       />
       {snapshot?.appId ? <SettingsRow
         title="App ID"
-        description="当前生效的飞书开放平台应用标识。"
+        description="当前生效的开放平台应用标识"
         value={<code className={styles.appId}>{snapshot.appId}</code>}
       /> : null}
       <SettingsRow
         title="App Secret"
-        description="编辑时可以显隐核对；保存后由 lark-cli 保管，New Money 不回读明文。"
+        description="保存后由 lark-cli 保管，New Money 不回读明文"
         value={configured ? "已安全保存" : "未验证"}
       />
       <SettingsRow
         title="配置来源"
-        description="当前版本管理本机 lark-cli 的生效连接；一键准备或组织托管来源均由 CLI 保管。"
+        description="本机 lark-cli 当前生效的连接"
         value={snapshot?.appBrand === "lark" ? "本机 Lark CLI" : "本机飞书 CLI"}
       />
     </SettingsRows>

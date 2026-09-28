@@ -1,5 +1,6 @@
 import type { ContextMemoryConfiguration } from "@pi67/domain";
 import type { EnterpriseDeviceAuthorization } from "@pi67/protocol";
+import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button, Input } from "react-aria-components";
 import { beginEnterpriseAuthorization, disconnectEnterpriseAccount, loadEnterpriseIdentity,
@@ -7,7 +8,7 @@ import { beginEnterpriseAuthorization, disconnectEnterpriseAccount, loadEnterpri
 import { useNewMoneyAccount } from "../context-memory/use-new-money-account.js";
 import { newMoneyAccountLabel } from "../context-memory/new-money-account-store.js";
 
-import { SettingsDetails, SettingsNotice, SettingsRow, SettingsRows, SettingsSectionBlock } from "./SettingsPrimitives.js";
+import { SettingsDetails, SettingsIconAction, SettingsInfo, SettingsNotice, SettingsRow, SettingsRows, SettingsSectionBlock, SettingsStatus } from "./SettingsPrimitives.js";
 import { useSettingsDraftRegistration, useSettingsNavigation } from "./SettingsDraftGuard.js";
 import styles from "./ContextMemorySettings.module.css";
 
@@ -61,18 +62,18 @@ export function NewMoneyAccountSettings() {
   };
   const signedIn = account.identity?.state === "signed-in";
   return <div data-testid="new-money-account-settings">
-    <SettingsSectionBlock title="New Money 账户" description="查看登录状态，管理团队与项目。">
+    <SettingsSectionBlock title="New Money 账户">
       {error || account.error ? <SettingsNotice tone="danger" actions={!configuration ? <Button className="secondary-button" isDisabled={configurationLoading} onPress={() => setLoadAttempt(attempt => attempt + 1)}>重试读取配置</Button> : undefined}>{error ?? account.error}</SettingsNotice> : null}
       <SettingsRows>
         <SettingsRow title={newMoneyAccountLabel(account).title} description={newMoneyAccountLabel(account).detail}
           actions={<>
-            <Button className={styles.quietAction!} isDisabled={busy || !!authorization} onPress={() => void perform(async () => { await loadEnterpriseIdentity(true); })}>刷新状态</Button>
+            <SettingsIconAction label="刷新状态" icon={<RefreshCw aria-hidden="true" size={14} />} isDisabled={busy || !!authorization} onPress={() => void perform(async () => { await loadEnterpriseIdentity(true); })} />
             {signedIn || authorization || account.identity?.state === "pending" ? <Button className="secondary-button" isDisabled={busy}
               onPress={() => void perform(async () => { setAuthorization(undefined); await disconnectEnterpriseAccount(); })}>{signedIn ? "退出登录" : "取消登录"}</Button>
               : <Button className="primary-button" isDisabled={busy || changed || !configuration || !endpoint || account.loading}
                 onPress={() => void perform(async () => { setAuthorization(await beginEnterpriseAuthorization()); })}>登录 New Money</Button>}
           </>} />
-        <SettingsRow title="团队与项目" description="团队成员管理使用网页后台；当前工作区的团队项目绑定位于团队经验设置。"
+        <SettingsRow title="团队与项目" description="成员在网页后台管理；项目绑定在团队经验设置。"
           actions={<>
             <Button className="secondary-button" isDisabled={!signedIn || busy || !!authorization || changed || !configuration}
               onPress={() => void perform(async () => { if (configuration) await window.pi67.system.requestOpenExternal(configuration.enterpriseGatewayEndpoint); })}>打开管理网页</Button>
@@ -85,9 +86,15 @@ export function NewMoneyAccountSettings() {
         请在网页登录并确认此设备。验证码：<code>{authorization.userCode}</code>。确认后自动更新账户状态。
       </SettingsNotice> : null}
     </SettingsSectionBlock>
-    <SettingsSectionBlock title="本地数据与隐私" description="未登录仍可使用本地工作台，退出登录不会删除本地数据。">
-      <SettingsRows><SettingsRow title="会话与私人记忆" description="保存在本机，不会因登录自动上传。退出账户不会删除本地数据；模型处理会按配置发送给对应服务。" />
-        <SettingsRow title="团队共享知识" description="只有明确选择团队项目的会话才能使用获授权的共享知识，每次处理仍需校验当前权限。" /></SettingsRows>
+    <SettingsSectionBlock title="本地数据与隐私">
+      <SettingsRows>
+        <SettingsRow
+          title={<>会话与私人记忆<SettingsInfo label="会话与私人记忆说明">保存在本机，不会因登录自动上传；退出登录不会删除本地数据。模型处理会按你的配置发送给对应服务。</SettingsInfo></>}
+          value={<SettingsStatus tone="success">仅保存在本机</SettingsStatus>} />
+        <SettingsRow
+          title={<>团队共享知识<SettingsInfo label="团队共享知识说明">只有明确选择团队项目的会话才能使用获授权的共享知识，每次处理都会校验当前权限。</SettingsInfo></>}
+          value={<SettingsStatus tone="neutral">按项目授权</SettingsStatus>} />
+      </SettingsRows>
     </SettingsSectionBlock>
     <SettingsDetails title="高级连接设置" summary={configuration ? configuration.enterpriseGatewayEndpoint.replace(/^https?:\/\//u, "") : configurationLoading ? "正在读取服务地址" : "服务地址尚未读取"} requiredOpen={changed || (!configuration && !configurationLoading)}>
         <SettingsRow title="服务地址" description="远程服务使用 HTTPS；只有本机联调允许回环 HTTP。更换服务前请先退出登录。">

@@ -4,11 +4,12 @@ import type {
   LarkTokenStatus
 } from "@pi67/domain";
 import { LARK_CLI_SKILL_PACK_ID } from "@pi67/domain";
-import { Bot, ExternalLink, RefreshCw, UserRound } from "lucide-react";
+import { ExternalLink, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Tab, TabList, TabPanel, Tabs } from "react-aria-components";
 import {
   SettingsNotice,
+  SettingsInfo,
   SettingsRow,
   SettingsRows,
   SettingsSectionBlock
@@ -154,17 +155,17 @@ export function LarkOfficeSettings() {
   >
     <TabList aria-label="飞书身份设置" className={tabStyles.tabList!}>
       <Tab className={tabStyles.tab!} id="user">
-        <UserRound aria-hidden="true" size={15} />用户授权
+        用户授权
       </Tab>
       <Tab className={tabStyles.tab!} id="application">
-        <Bot aria-hidden="true" size={15} />应用连接
+        应用连接
       </Tab>
     </TabList>
 
     <TabPanel className={tabStyles.tabPanel!} id="user">
       <SettingsSectionBlock
-        title="用户授权"
-        description="使用你的飞书身份访问个人云空间、日历、消息、任务和邮箱；这是办公能力的主要授权入口。"
+        title="飞书账户"
+        description="用你的飞书身份访问云空间、日历、消息、任务和邮箱。"
       >
         {cliMissing ? <LarkCliRequiredNotice
           canInstall={larkPack?.canInstall === true}
@@ -188,8 +189,7 @@ export function LarkOfficeSettings() {
             </Button>}
           />
           <SettingsRow
-            title="本机授权"
-            description="OAuth Token 仅由本机 lark-cli 保存；New Money、Renderer 与 Pi Session 不读取或持久化它。"
+            title={<>本机授权<SettingsInfo label="本机授权说明">OAuth Token 仅由本机 lark-cli 保存；New Money、Renderer 与 Pi Session 不读取或持久化它。</SettingsInfo></>}
             value={tokenStatusLabel(snapshot?.tokenStatus)}
           />
           <SettingsRow

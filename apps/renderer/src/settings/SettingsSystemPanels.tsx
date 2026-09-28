@@ -1,10 +1,13 @@
 import { MAX_RUNNING_TASKS, taskConsumesRunSlot } from "@pi67/domain";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "react-aria-components";
+import piIconUrl from "../assets/pi-icon-64.png";
 import { useShellStore } from "../shell/shell-store.js";
+import styles from "./SettingsSystemPanels.module.css";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   SettingsDetails,
+  SettingsInfo,
   SettingsNotice,
   SettingsRow,
   SettingsRows,
@@ -18,16 +21,16 @@ export function RuntimeSettings() {
   const tasks = useWorkbenchStore((state) => state.tasks);
   const runningCount = Object.values(tasks).filter((task) => taskConsumesRunSlot(task.lifecycle)).length;
   return (
-    <SettingsSectionBlock title="Pi 运行服务" description="每个活动任务拥有独立的 Pi 运行服务；切换工作区或会话不会停止后台任务。">
+    <SettingsSectionBlock title="Pi 运行服务">
       <SettingsRows>
         <SettingsRow
-          title="正在占用运行名额"
-          description="正在执行、等待审批或等待交互的独立会话任务都会占用名额；任务内部的子代理不单独占用。"
+          title={<>正在占用运行名额<SettingsInfo label="运行名额说明">每个活动任务拥有独立的 Pi 运行服务，切换工作区或会话不会停止后台任务。</SettingsInfo></>}
+          description="执行中、等待审批或交互的任务会占用名额；任务内部的子代理不单独占用"
           value={`${runningCount} / ${MAX_RUNNING_TASKS}`}
         />
         <SettingsRow
           title="恢复与诊断"
-          description="检查运行环境、工作区与会话恢复；遇到运行异常时从这里开始。"
+          description="运行异常时从这里检查环境、工作区与会话恢复"
           actions={<Button aria-label="恢复与诊断" className="secondary-button" onPress={() => setDoctorDialogOpen(true)}>打开诊断</Button>}
         />
       </SettingsRows>
@@ -60,17 +63,19 @@ export function AboutSettings() {
   useEffect(() => { void load(); }, [load]);
 
   return (
-    <SettingsSectionBlock title="New Money" description="用 AI 创造新的价值。">
+    <div className={styles.about}>
+      <header className={styles.aboutIdentity}>
+        <img alt="" aria-hidden="true" src={piIconUrl} />
+        <span>
+          <h2>New Money</h2>
+          <p>用 AI 创造新的价值。</p>
+        </span>
+      </header>
       {error ? <SettingsNotice
         tone="danger"
         actions={<Button className="secondary-button" isDisabled={loading} onPress={() => void load()}>重试</Button>}
       >无法读取当前应用信息：{error}</SettingsNotice> : null}
       <SettingsRows>
-        <SettingsRow
-          title="New Money"
-          description="AI 工作台"
-          value="Windows / macOS"
-        />
         <SettingsRow title="当前版本" value={loading ? "正在读取…" : platformInfo?.version ?? "未知"} />
         <SettingsRow title="操作系统" value={platformLabel(platformInfo?.platform)} />
         <SettingsRow title="处理器架构" value={architectureLabel(platformInfo?.architecture)} />
@@ -84,7 +89,7 @@ export function AboutSettings() {
         <SettingsRow title="网络边界" value="生产环境无本地 HTTP 服务或业务网络监听" />
         </SettingsRows>
       </SettingsDetails>
-    </SettingsSectionBlock>
+    </div>
   );
 }
 

@@ -162,12 +162,23 @@ export function formatDesktopShortcut(
   action: DesktopActionDescriptor,
   platform: "darwin" | "win32" = currentDesktopPlatform()
 ): string {
-  return action.bindings.map((binding) => {
-    const modifier = platform === "darwin" ? "⌘" : "Ctrl+";
-    const alt = binding.alt ? (platform === "darwin" ? "⌥" : "Alt+") : "";
-    const shift = binding.shift ? (platform === "darwin" ? "⇧" : "Shift+") : "";
-    return `${modifier}${alt}${shift}${displayKey(binding.key)}`;
-  }).join(" / ");
+  return desktopShortcutKeyParts(action, platform)
+    .map((keys) => keys.join(platform === "darwin" ? "" : "+"))
+    .join(" / ");
+}
+
+/** One key list per binding (modifiers first), for rendering individual keycaps. */
+export function desktopShortcutKeyParts(
+  action: DesktopActionDescriptor,
+  platform: "darwin" | "win32" = currentDesktopPlatform()
+): string[][] {
+  const mac = platform === "darwin";
+  return action.bindings.map((binding) => [
+    mac ? "⌘" : "Ctrl",
+    ...(binding.alt ? [mac ? "⌥" : "Alt"] : []),
+    ...(binding.shift ? [mac ? "⇧" : "Shift"] : []),
+    displayKey(binding.key)
+  ]);
 }
 
 export function desktopShortcutAriaKeys(action: DesktopActionDescriptor): string {
