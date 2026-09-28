@@ -2762,8 +2762,15 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
   far right. Dirty or erroneous details still cannot collapse.
 - `SettingsNotice` is reserved for states that need action; info tone is a neutral muted
   surface, warning and danger use a light tint without a colored edge.
-- Catalog pages (models, extensions, skills, prompts, rules, shortcuts) use a list with a
-  detail pane; other pages use grouped rows in the centered column.
+- Catalog pages (models, extensions, skills, prompts, rules) use a list with a detail pane;
+  other pages use grouped rows in the centered column. Keyboard shortcuts live on the
+  standard Appearance page as compact rows: action, individual keycaps, reset only when
+  customized, detail and contexts in an on-demand info tip.
+- Choices use `SettingsSelect` and `SettingsCheckbox`; native select and checkbox controls
+  are not used. A select's accessible name is its current value followed by its label.
+- A page-level save unit shows `SettingsSaveBar` only while its draft differs from saved
+  state (放弃 / 保存更改, sticky at the bottom of the scroll region). Independent units such
+  as the local memory model keep their own save and undo actions, shown only while dirty.
 
 
 Settings uses General, Models and Memory, Capabilities and Instructions, Integrations, and System/Support groups while preserving all 16 section identities. Standard documents are a centered 760px column and catalogs a centered 1040px body (see Settings visual system). Page H1, section H2 and necessary inner H3 headings use existing typography roles. Account service editing belongs to advanced connection details; private/team boundaries stay visible. Renderer-only team links select the enterprise memory tab through the existing draft guard and consume their transient target. Dirty or erroneous details cannot collapse. Independent save units and existing save/restart semantics remain distinct; Settings navigation cannot interrupt a pending mutation; a blocked request shows a notice instead of doing nothing. Command palette, slash-command and native-notification exits pass the same draft guard before their flow starts, so keeping the draft leaves no partial session switch. Ordinary navigation starts at the page heading; cancelled navigation restores its trigger.

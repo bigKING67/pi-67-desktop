@@ -1,7 +1,7 @@
 import type { LocalMemoryActivationSnapshot, LocalMemoryHealthCheck } from "@pi67/protocol";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
-import { SettingsNotice, SettingsRow, SettingsRows, SettingsSectionBlock } from "./SettingsPrimitives.js";
+import { SettingsNotice, SettingsRow, SettingsRows, SettingsSectionBlock, SettingsStatus } from "./SettingsPrimitives.js";
 import { useSettingsDraftRegistration } from "./SettingsDraftGuard.js";
 
 type Available = Extract<LocalMemoryActivationSnapshot, { available: true }>;
@@ -88,12 +88,12 @@ export function LocalMemoryActivationSettings({ disabled = false, onPendingChang
   const unavailable = !current || !bridge;
   const locked = disabled || busy || checking || current?.busy || unavailable;
   const issue = current ? issues[current.issue] : undefined;
-  return <SettingsSectionBlock title="私人记忆启用" description="无需登录，记忆留在本机。模型处理使用你配置的服务，可能产生费用；不会上传到 New Money 团队后台。">
+  return <SettingsSectionBlock title="私人记忆启用" description="无需登录，记忆留在本机；模型处理使用你配置的服务，可能产生费用。">
     <SettingsRows>
-      <SettingsRow title="私人记忆服务" value={!snapshot ? "正在读取…" : !current ? "此平台暂不可用"
-        : current.preference === "enabled" ? "已保存启用偏好" : current.preference === "disabled" ? "未启用" : "启用偏好未确认"}
-        description="启用后需自行重启 New Money；不会中断当前会话。关闭会停止本地服务，不删除私人数据。"
-        actions={<Button className="secondary-button" isDisabled={locked} onPress={() => void change(current?.preference === "disabled")}>
+      <SettingsRow title="私人记忆服务" value={<SettingsStatus tone={current?.preference === "enabled" ? "success" : "neutral"}>{!snapshot ? "正在读取…" : !current ? "此平台暂不可用"
+        : current.preference === "enabled" ? "已保存启用偏好" : current.preference === "disabled" ? "未启用" : "启用偏好未确认"}</SettingsStatus>}
+        description="启用后需重启 New Money；关闭会停止本地服务，不删除私人数据。"
+        actions={snapshot && !current ? undefined : <Button className="secondary-button" isDisabled={locked} onPress={() => void change(current?.preference === "disabled")}>
           {busy ? "正在处理…" : current?.preference === "enabled" ? "关闭私人记忆" : current?.preference === "unknown" ? "关闭并保存" : "启用（重启后生效）"}
         </Button>} />
       {current ? <SettingsRow title="本次运行状态" value={states[current.lifecycle]}

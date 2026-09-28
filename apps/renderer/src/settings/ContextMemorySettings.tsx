@@ -31,6 +31,7 @@ import { rendererWorkbenchStore, useWorkbenchStore } from "../workbench/workbenc
 import {
   SettingsNotice,
   SettingsPageHeader,
+  SettingsSaveBar,
   SettingsRow,
   SettingsRows,
   SettingsSectionBlock
@@ -244,7 +245,6 @@ export function ContextMemorySettings() {
     <SettingsPageHeader
       title={messages.settings.sections.contextMemory.label}
       description={messages.settings.sections.contextMemory.summary}
-      actions={<Button className="primary-button" isDisabled={!changed || busy !== undefined} onPress={() => void save()}>{busy === "save" ? "正在保存…" : "保存更改"}</Button>}
     />
     {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
     {overview.status.conflictExtensions.length > 0 ? <SettingsNotice tone="danger">
@@ -258,7 +258,7 @@ export function ContextMemorySettings() {
       </TabList>
       <TabPanel className={tabStyles.tabPanel!} id="privacy">
         <LocalMemoryModelSettings onPendingChange={setModelPending}>
-        <SettingsSectionBlock title="记忆模式" description="选择默认的记忆使用方式。私人记忆保持独立，团队候选不会自动发布。">
+        <SettingsSectionBlock title="记忆模式" description="私人记忆保持独立，团队候选不会自动发布。">
           <RadioGroup aria-label="默认记忆模式" className={styles.privacyGroup!} value={draft.defaultPrivacyMode} isDisabled={busy !== undefined}
             onChange={(value) => {
               const mode = PRIVACY_MODES.find((item) => item.id === value);
@@ -344,5 +344,12 @@ export function ContextMemorySettings() {
         </details>
       </TabPanel>
     </Tabs>
+    <SettingsSaveBar
+      canSave={changed && busy === undefined}
+      dirty={changed}
+      saving={busy === "save"}
+      onDiscard={() => setDraft(overview.configuration)}
+      onSave={() => void save()}
+    />
   </div>;
 }

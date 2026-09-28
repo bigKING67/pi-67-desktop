@@ -97,8 +97,8 @@ for (const theme of ["light", "dark"] as const) {
           await expect(summary).toBeFocused();
         }
         if (category === "下载源与网络") {
-          const header = settings.getByRole("heading", { level: 1 }).locator("../..");
-          await expect(header.getByRole("button", { name: "保存更改", exact: true })).toBeDisabled();
+          await expect(settings.getByRole("region", { name: "未保存的更改" })).toHaveCount(0);
+          await expect(settings.getByRole("button", { name: "保存更改", exact: true })).toHaveCount(0);
         }
       }
       if (width > 720) {

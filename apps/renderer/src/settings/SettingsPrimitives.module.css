@@ -552,3 +552,134 @@
   outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
+
+.select {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.selectTrigger {
+  display: inline-flex;
+  width: 100%;
+  min-width: 220px;
+  min-height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: var(--font-size-interface);
+  text-align: left;
+}
+
+.selectTrigger svg {
+  flex: none;
+  color: var(--text-tertiary);
+}
+
+.selectTrigger[data-hovered] { border-color: var(--border-strong); }
+.selectTrigger[data-disabled] { color: var(--text-tertiary); }
+.selectTrigger[data-focus-visible] { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+.selectValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectPopover {
+  z-index: 80;
+  min-width: var(--trigger-width);
+  max-width: min(480px, calc(100vw - 24px));
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+}
+
+.selectList {
+  max-height: min(360px, 56vh);
+  padding: 4px;
+  overflow-y: auto;
+  outline: none;
+}
+
+.selectOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: var(--font-size-interface);
+  outline: none;
+}
+
+.selectOption[data-focused] { background: var(--surface-hover); }
+.selectCheck { visibility: hidden; color: var(--text-secondary); }
+.selectOption[data-selected] .selectCheck { visibility: visible; }
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: var(--font-size-interface);
+}
+
+.checkboxBox {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: transparent;
+}
+
+.checkbox[data-selected] .checkboxBox {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--canvas);
+}
+
+.checkbox[data-disabled] { color: var(--text-tertiary); }
+.checkbox[data-focus-visible] .checkboxBox { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.saveBar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 5;
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0 auto;
+  padding: 6px 6px 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+  color: var(--text-secondary);
+  font-size: var(--font-size-interface);
+}
+
+.saveBarDiscard {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-interface);
+}
+
+.saveBarDiscard[data-hovered] { background: var(--surface-hover); color: var(--text-primary); }

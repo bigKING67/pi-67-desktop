@@ -15,11 +15,14 @@ test("keeps Network drafts in memory until the user saves or discards them", asy
   const settings = page.getByLabel("New Money 设置");
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
   await navigation.getByRole("button", { name: "下载源与网络", exact: true }).click();
-  const npmMode = settings.getByRole("combobox", { name: "npm", exact: true });
+  const npmMode = settings.getByRole("button", { name: / npm$/u });
   const registry = settings.getByRole("textbox", { name: "自定义 Registry", exact: true });
-  await npmMode.selectOption("custom");
+  const saveBar = settings.getByRole("region", { name: "未保存的更改" });
+  await expect(saveBar).toHaveCount(0);
+  await npmMode.click();
+  await page.getByRole("option", { name: "自定义 HTTPS Registry", exact: true }).click();
   await registry.fill("https://registry.settings-draft.example.com");
-  const save = settings.getByRole("button", { name: "保存更改", exact: true });
+  const save = saveBar.getByRole("button", { name: "保存更改", exact: true });
   await expect(save).toBeEnabled();
 
   await settings.getByRole("button", { name: "检测全部源", exact: true }).click();
@@ -60,7 +63,7 @@ test("keeps Network drafts in memory until the user saves or discards them", asy
   expect((await settingsActionState(page)).packageResets).toBe(1);
 });
 
-test("keeps a failed Network save editable and retries the same draft from its header", async ({ page }) => {
+test("keeps a failed Network save editable and retries the same draft from the save bar", async ({ page }) => {
   await installMockDesktopBridge(page);
   await page.goto("/");
   await attachMockAgent(page);
@@ -76,16 +79,17 @@ test("keeps a failed Network save editable and retries the same draft from its h
       throw new Error(`无法保存下载源：${args[0].npmMode}`);
     };
   });
-  const npmMode = settings.getByRole("combobox", { name: "npm", exact: true });
-  await npmMode.selectOption("official-only");
-  const save = settings.getByRole("heading", { name: "下载源与网络", level: 1 })
-    .locator("../..").getByRole("button", { name: "保存更改", exact: true });
+  const npmMode = settings.getByRole("button", { name: / npm$/u });
+  await npmMode.click();
+  await page.getByRole("option", { name: "仅 npm 官方源", exact: true }).click();
+  const save = settings.getByRole("region", { name: "未保存的更改" })
+    .getByRole("button", { name: "保存更改", exact: true });
   await save.click();
   await expect(settings.getByRole("alert")).toContainText("无法保存下载源：official-only");
-  await expect(npmMode).toHaveValue("official-only");
+  await expect(npmMode).toContainText("仅 npm 官方源");
   await expect(save).toBeEnabled();
   await save.click();
-  await expect(save).toBeDisabled();
+  await expect(save).toBeHidden();
   await expect(settings.getByRole("alert")).toHaveCount(0);
   expect((await settingsActionState(page)).packageSaves).toBe(1);
 });

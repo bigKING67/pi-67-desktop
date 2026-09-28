@@ -3,7 +3,7 @@ import type {
   PiProviderConfigurationInput,
   PiProviderConfigurationSnapshot
 } from "@pi67/protocol";
-import { Eye, Plus, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Plus, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "react-aria-components";
 import {
@@ -11,6 +11,7 @@ import {
   setProjectVisionAssistantConfiguration
 } from "./provider-configuration-controller.js";
 import styles from "./ProviderVisionAssistantEditor.module.css";
+import { SettingsSelect } from "./SettingsPrimitives.js";
 
 const DISABLED_KEY = "disabled";
 const INHERIT_KEY = "inherit";
@@ -147,30 +148,28 @@ export function ProviderVisionAssistantEditor({
   return (
     <section className={styles.section} data-testid={`vision-assistant-${scope}`}>
       <div className={styles.heading}>
-        <span className={styles.icon}><Eye aria-hidden="true" size={16} /></span>
         <span>
-          <strong>{scope === "global" ? "视觉辅助" : "项目视觉辅助覆盖"}</strong>
+          <strong>{scope === "global" ? "全局设置" : "项目覆盖"}</strong>
           <small>{scope === "global"
-            ? "文本模型遇到静态图片时，先由这里选定的视觉模型生成可回放描述；原生视觉模型仍直接处理图片。"
-            : "仅影响当前可信 Workspace。可继承全局、明确关闭，或指定另一视觉模型。"}</small>
+            ? "文本模型遇到图片时，先由选定的视觉模型生成描述；原生视觉模型仍直接处理图片。"
+            : "仅影响当前可信工作区：继承全局、明确关闭，或指定另一视觉模型。"}</small>
         </span>
       </div>
       <div className={styles.controlRow}>
-        <label>
+        <div className={styles.field}>
           <span>{scope === "global" ? "辅助模型" : "项目策略"}</span>
-          <select
-            aria-label={scope === "global" ? "全局视觉辅助模型" : "项目视觉辅助策略"}
-            disabled={saving}
-            onChange={(event) => void update(event.target.value)}
+          <SettingsSelect
+            isDisabled={saving}
+            label={scope === "global" ? "全局视觉辅助模型" : "项目视觉辅助策略"}
+            options={[
+              ...(scope === "project" ? [{ id: INHERIT_KEY, label: "继承全局设置" }] : []),
+              { id: DISABLED_KEY, label: scope === "project" ? "当前项目关闭" : "关闭视觉辅助" },
+              ...(selectedUnavailable ? [{ id: selected, label: `当前配置不可用 · ${selectedUnavailableLabel}`, disabled: true }] : []),
+              ...imageModels.map((model) => ({ id: model.key, label: model.label }))
+            ]}
             value={selected}
-          >
-            {scope === "project" ? <option value={INHERIT_KEY}>继承全局设置</option> : null}
-            <option value={DISABLED_KEY}>{scope === "project" ? "当前项目关闭" : "关闭视觉辅助"}</option>
-            {selectedUnavailable ? (
-              <option disabled value={selected}>当前配置不可用 · {selectedUnavailableLabel}</option>
-            ) : null}
-            {imageModels.map((model) => <option key={model.key} value={model.key}>{model.label}</option>)}
-          </select>
+            onChange={(value) => void update(value)}
+          />
           {imageModels.length === 0 ? (
             <small className={styles.noModels} role="status">
               {scope === "global"
@@ -178,7 +177,7 @@ export function ProviderVisionAssistantEditor({
                 : "暂无可用于项目覆盖的已配置视觉模型；可以继续继承全局设置。"}
             </small>
           ) : null}
-        </label>
+        </div>
         <span
           aria-label={`${effectiveUnavailable ? "配置不可用" : "当前生效"}：${effective}`}
           className={`${styles.effective} ${effectiveUnavailable ? styles.effectiveWarning : ""}`}

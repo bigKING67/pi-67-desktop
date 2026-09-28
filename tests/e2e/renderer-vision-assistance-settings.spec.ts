@@ -67,11 +67,14 @@ test("keeps global visual-model settings available without Workspace registratio
   await expect(vision.getByText("Qwen3.7 Flash", { exact: true })).toBeVisible();
   await expect(vision.getByText("Doubao Seed 2.0 Mini", { exact: true })).toBeVisible();
   await expect(visionSettings.getByText("视觉辅助配置尚不可用", { exact: true })).toHaveCount(0);
-  const modelSelect = vision.getByLabel("全局视觉辅助模型");
-  await expect(modelSelect.getByRole("option", { name: "OpenAI / GPT Test" })).toBeAttached();
-  await expect(modelSelect.getByRole("option", { name: "OpenAI / GPT Vision Alt" })).toBeAttached();
-  await expect(modelSelect.getByRole("option", { name: "Anthropic / Claude Test" })).toHaveCount(0);
-  await expect(modelSelect.getByRole("option", { name: "Amazon Bedrock / Nova Pro" })).toHaveCount(0);
+  const modelSelect = vision.getByRole("button", { name: /全局视觉辅助模型$/u });
+  const modelOptions = page.getByRole("listbox", { name: "全局视觉辅助模型" });
+  await modelSelect.click();
+  await expect(modelOptions.getByRole("option", { name: "OpenAI / GPT Test" })).toBeVisible();
+  await expect(modelOptions.getByRole("option", { name: "OpenAI / GPT Vision Alt" })).toBeVisible();
+  await expect(modelOptions.getByRole("option", { name: "Anthropic / Claude Test" })).toHaveCount(0);
+  await expect(modelOptions.getByRole("option", { name: "Amazon Bedrock / Nova Pro" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
   await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
@@ -95,7 +98,8 @@ test("keeps global visual-model settings available without Workspace registratio
   ))).toHaveLength(0);
 
   await clearRecordedCommands(page);
-  await modelSelect.selectOption("openai::gpt-vision-alt");
+  await modelSelect.click();
+  await modelOptions.getByRole("option", { name: "OpenAI / GPT Vision Alt" }).click();
   await expect(vision.getByText("openai / gpt-vision-alt", { exact: true })).toBeVisible();
   expect(await recordedCommandDetails(page)).toContainEqual(expect.objectContaining({
     type: "vision.assistant.global.set",
@@ -130,14 +134,17 @@ test("keeps an unavailable saved helper explicit when no configured visual model
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "视觉辅助", exact: true }).click();
   const vision = settings.getByTestId("vision-assistant-global");
-  const modelSelect = vision.getByLabel("全局视觉辅助模型");
+  const modelSelect = vision.getByRole("button", { name: /全局视觉辅助模型$/u });
+  const modelOptions = page.getByRole("listbox", { name: "全局视觉辅助模型" });
 
-  await expect(modelSelect.getByRole("option")).toHaveText([
+  await modelSelect.click();
+  await expect(modelOptions.getByRole("option")).toHaveText([
     "关闭视觉辅助",
     "当前配置不可用 · OpenAI / GPT Test"
   ]);
-  await expect(modelSelect.getByRole("option", { name: "当前配置不可用 · OpenAI / GPT Test" }))
-    .toHaveAttribute("disabled", "");
+  await expect(modelOptions.getByRole("option", { name: "当前配置不可用 · OpenAI / GPT Test" }))
+    .toHaveAttribute("aria-disabled", "true");
+  await page.keyboard.press("Escape");
   await expect(vision.getByText("暂无已配置的视觉模型。请使用下方预设完成模型服务和 API Key 配置。"))
     .toBeVisible();
   await expect(vision.getByLabel("配置不可用：openai / gpt-test")).toBeVisible();

@@ -1,6 +1,16 @@
-import { ArrowLeft, Info } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Info } from "lucide-react";
 import { useState, type ReactNode, type SyntheticEvent } from "react";
-import { Button, Tooltip, TooltipTrigger } from "react-aria-components";
+import {
+  Button,
+  Checkbox,
+  ListBox,
+  ListBoxItem,
+  Popover,
+  Select,
+  SelectValue,
+  Tooltip,
+  TooltipTrigger
+} from "react-aria-components";
 import styles from "./SettingsPrimitives.module.css";
 
 export function SettingsPageHeader({ title, description, actions }: {
@@ -93,6 +103,82 @@ export function SettingsIconAction({ label, icon, onPress, isDisabled = false }:
       <Button aria-label={label} className={styles.iconAction!} isDisabled={isDisabled} onPress={onPress}>{icon}</Button>
       <Tooltip className={styles.infoTooltip!} offset={6}>{label}</Tooltip>
     </TooltipTrigger>
+  );
+}
+
+export interface SettingsSelectOption<T extends string> {
+  id: T;
+  label: string;
+  /** Shown for truthfulness (e.g. an unavailable saved value) but not selectable. */
+  disabled?: boolean;
+}
+
+/** Non-native single choice; the trigger is a button named by `label`, options have role "option". */
+export function SettingsSelect<T extends string>({ label, value, options, onChange, isDisabled = false, testId }: {
+  label: string;
+  value: T;
+  options: readonly SettingsSelectOption<T>[];
+  onChange: (value: T) => void;
+  isDisabled?: boolean;
+  testId?: string;
+}) {
+  return (
+    <Select
+      aria-label={label}
+      className={styles.select!}
+      disabledKeys={options.filter((option) => option.disabled).map((option) => option.id)}
+      isDisabled={isDisabled}
+      selectedKey={value}
+      onSelectionChange={(key) => { if (key !== null) onChange(String(key) as T); }}
+    >
+      <Button aria-label={label} className={styles.selectTrigger!} data-testid={testId}>
+        <SelectValue className={styles.selectValue!} />
+        <ChevronDown aria-hidden="true" size={14} />
+      </Button>
+      <Popover className={styles.selectPopover!} offset={4} placement="bottom start" shouldFlip>
+        <ListBox aria-label={label} className={styles.selectList!}>
+          {options.map((option) => (
+            <ListBoxItem className={styles.selectOption!} id={option.id} key={option.id} textValue={option.label}>
+              <span>{option.label}</span>
+              <Check aria-hidden="true" className={styles.selectCheck} size={14} />
+            </ListBoxItem>
+          ))}
+        </ListBox>
+      </Popover>
+    </Select>
+  );
+}
+
+export function SettingsCheckbox({ children, isSelected, onChange, isDisabled = false }: {
+  children: ReactNode;
+  isSelected: boolean;
+  onChange: (selected: boolean) => void;
+  isDisabled?: boolean;
+}) {
+  return (
+    <Checkbox className={styles.checkbox!} isDisabled={isDisabled} isSelected={isSelected} onChange={onChange}>
+      <span aria-hidden="true" className={styles.checkboxBox}><Check size={11} strokeWidth={3} /></span>
+      {children}
+    </Checkbox>
+  );
+}
+
+/** Appears only while a draft differs from saved state; replaces permanently disabled header save buttons. */
+export function SettingsSaveBar({ dirty, saving, canSave, onSave, onDiscard, saveLabel = "保存更改" }: {
+  dirty: boolean;
+  saving: boolean;
+  canSave: boolean;
+  onSave: () => void;
+  onDiscard: () => void;
+  saveLabel?: string;
+}) {
+  if (!dirty && !saving) return null;
+  return (
+    <div aria-label="未保存的更改" className={styles.saveBar} role="region">
+      <span>{saving ? "正在保存…" : "有未保存的更改"}</span>
+      <Button className={styles.saveBarDiscard!} isDisabled={saving} onPress={onDiscard}>放弃</Button>
+      <Button className="primary-button" isDisabled={!canSave || saving} onPress={onSave}>{saving ? "保存中…" : saveLabel}</Button>
+    </div>
   );
 }
 

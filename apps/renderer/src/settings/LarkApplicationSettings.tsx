@@ -11,7 +11,8 @@ import {
   SettingsNotice,
   SettingsRow,
   SettingsRows,
-  SettingsSectionBlock
+  SettingsSectionBlock,
+  SettingsSelect
 } from "./SettingsPrimitives.js";
 import { LarkCliRequiredNotice } from "./LarkCliRequiredNotice.js";
 import { saveLarkApplicationConfiguration } from "./lark-auth-controller.js";
@@ -150,18 +151,17 @@ export function LarkApplicationSettings({
           />
           <small>仅在管理员或开发者已提供应用凭据时填写，通常以 <code>cli_</code> 开头。</small>
         </label>
-        <label className={styles.field}>
+        <div className={styles.field}>
           <span>区域</span>
-          <select
-            disabled={saving}
+          <SettingsSelect<LarkAppBrand>
+            isDisabled={saving}
+            label="区域"
+            options={[{ id: "feishu", label: "飞书" }, { id: "lark", label: "Lark" }]}
             value={brand}
-            onChange={(event) => setBrand(event.target.value as LarkAppBrand)}
-          >
-            <option value="feishu">飞书</option>
-            <option value="lark">Lark</option>
-          </select>
+            onChange={setBrand}
+          />
           <small>中国大陆使用飞书；国际版使用 Lark。</small>
-        </label>
+        </div>
       </div>
       <label className={styles.field}>
         <span>App Secret</span>

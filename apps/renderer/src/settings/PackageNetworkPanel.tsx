@@ -6,18 +6,22 @@ import {
   type PackageNetworkSettings,
   type PackageNetworkSnapshot
 } from "@pi67/domain";
-import { RefreshCw, RotateCcw, Save } from "lucide-react";
+import { RefreshCw, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Button } from "react-aria-components";
+import { Button, Input } from "react-aria-components";
 import styles from "./PackageNetworkPanel.module.css";
 import { messages } from "../localization/message-catalog.js";
 import {
+  SettingsCheckbox,
   SettingsDetails,
+  SettingsInfo,
   SettingsNotice,
   SettingsPageHeader,
   SettingsRow,
   SettingsRows,
+  SettingsSaveBar,
   SettingsSectionBlock,
+  SettingsSelect,
   SettingsStatus
 } from "./SettingsPrimitives.js";
 import { SettingsDestructiveActionDialog } from "./SettingsActionDialogs.js";
@@ -130,55 +134,67 @@ export function PackageNetworkPanel() {
       <SettingsPageHeader
         title={messages.settings.sections.network.label}
         description={messages.settings.sections.network.summary}
-        actions={<Button className="primary-button" isDisabled={!canSave} onPress={() => void save()}><Save aria-hidden="true" size={14} />{phase === "saving" ? "保存中…" : "保存更改"}</Button>}
       />
     <div className={styles.stack}>
       <SettingsSectionBlock
-        actions={<>
-          <Button className="secondary-button" isDisabled={!validDraft || busy} onPress={() => void probe()}><RefreshCw aria-hidden="true" size={14} />{phase === "probing" ? "检测中…" : "检测全部源"}</Button>
-          <Button className="secondary-button" isDisabled={busy} onPress={() => setResetOpen(true)}><RotateCcw aria-hidden="true" size={14} />恢复默认</Button>
-        </>}
+        actions={<Button className={styles.quietButton!} isDisabled={busy} onPress={() => setResetOpen(true)}><RotateCcw aria-hidden="true" size={13} />恢复默认</Button>}
         title="下载源策略"
-        description="镜像只改变传输路径；npm integrity、Git commit 与内容哈希仍决定可信身份。"
       >
         {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
         {draft && !validDraft ? <SettingsNotice tone="warning">当前下载源草稿无效。自定义源必须是有效的公开 HTTPS URL，修正后才能保存或检测。</SettingsNotice> : null}
-        {draft ? <div className={styles.form}>
-          <label><span>npm</span><select disabled={busy} value={draft.npmMode} onChange={(event) => setDraft({ ...draft, npmMode: event.currentTarget.value as NpmSourceMode })}>
-            {NPM_MODES.map((mode) => <option key={mode.id} value={mode.id}>{mode.label}</option>)}
-          </select></label>
-          {draft.npmMode === "custom" ? <label><span>自定义 Registry</span><input disabled={busy} placeholder="https://registry.example.com" value={draft.npmCustomRegistry ?? ""} onChange={(event) => setDraft({ ...draft, npmCustomRegistry: event.currentTarget.value })} /></label> : null}
-          <label><span>Git / GitHub</span><select disabled={busy} value={draft.gitMode} onChange={(event) => setDraft({ ...draft, gitMode: event.currentTarget.value as GitSourceMode })}>
-            {GIT_MODES.map((mode) => <option key={mode.id} value={mode.id}>{mode.label}</option>)}
-          </select></label>
-          {draft.gitMode === "automatic" || draft.gitMode === "mirror-only" ? <fieldset>
-            <legend>公共 Git 镜像顺序</legend>
-            {(["gitclone", "ghproxy"] as const).map((mirror) => <label className={styles.checkbox} key={mirror}>
-              <input checked={draft.gitMirrors.includes(mirror)} disabled={busy} type="checkbox" onChange={(event) => setDraft({
-                ...draft,
-                gitMirrors: event.currentTarget.checked
-                  ? [...draft.gitMirrors, mirror]
-                  : draft.gitMirrors.filter((item) => item !== mirror)
-              })} />
-              <span>{mirror === "gitclone" ? "gitclone.com" : "ghproxy.net"}</span>
-            </label>)}
-          </fieldset> : null}
-          {draft.gitMode === "automatic" || draft.gitMode === "mirror-only" ? <label><span>自定义 Git 镜像前缀（可选）</span><input disabled={busy} placeholder="https://mirror.example.com" value={draft.gitCustomMirrorPrefix ?? ""} onChange={(event) => {
-            const value = event.currentTarget.value;
-            if (value) setDraft({ ...draft, gitCustomMirrorPrefix: value });
-            else {
-              const withoutCustomMirror = { ...draft };
-              delete withoutCustomMirror.gitCustomMirrorPrefix;
-              setDraft(withoutCustomMirror);
-            }
-          }} /></label> : null}
-        </div> : <SettingsNotice>正在读取下载源设置…</SettingsNotice>}
+        {draft ? <SettingsRows>
+          <SettingsRow
+            title={<>npm<SettingsInfo label="镜像与可信身份说明">镜像只改变传输路径；npm integrity、Git commit 与内容哈希仍决定可信身份。</SettingsInfo></>}
+            actions={<SettingsSelect label="npm" value={draft.npmMode} options={NPM_MODES} isDisabled={busy}
+              onChange={(npmMode) => setDraft({ ...draft, npmMode })} />}
+          />
+          {draft.npmMode === "custom" ? <SettingsRow title="自定义 Registry" actions={<Input aria-label="自定义 Registry" className={styles.textInput!}
+            disabled={busy} placeholder="https://registry.example.com" value={draft.npmCustomRegistry ?? ""}
+            onChange={(event) => setDraft({ ...draft, npmCustomRegistry: event.currentTarget.value })} />} /> : null}
+          <SettingsRow
+            title="Git / GitHub"
+            actions={<SettingsSelect label="Git / GitHub" value={draft.gitMode} options={GIT_MODES} isDisabled={busy}
+              onChange={(gitMode) => setDraft({ ...draft, gitMode })} />}
+          />
+          {draft.gitMode === "automatic" || draft.gitMode === "mirror-only" ? <SettingsRow
+            title="公共 Git 镜像"
+            description="按勾选顺序尝试"
+            actions={<div className={styles.mirrors} role="group" aria-label="公共 Git 镜像顺序">
+              {(["gitclone", "ghproxy"] as const).map((mirror) => <SettingsCheckbox
+                key={mirror}
+                isDisabled={busy}
+                isSelected={draft.gitMirrors.includes(mirror)}
+                onChange={(checked) => setDraft({
+                  ...draft,
+                  gitMirrors: checked ? [...draft.gitMirrors, mirror] : draft.gitMirrors.filter((item) => item !== mirror)
+                })}
+              >{mirror === "gitclone" ? "gitclone.com" : "ghproxy.net"}</SettingsCheckbox>)}
+            </div>}
+          /> : null}
+          {draft.gitMode === "automatic" || draft.gitMode === "mirror-only" ? <SettingsRow
+            title="自定义 Git 镜像前缀"
+            description="可选"
+            actions={<Input aria-label="自定义 Git 镜像前缀（可选）" className={styles.textInput!} disabled={busy}
+              placeholder="https://mirror.example.com" value={draft.gitCustomMirrorPrefix ?? ""} onChange={(event) => {
+                const value = event.currentTarget.value;
+                if (value) setDraft({ ...draft, gitCustomMirrorPrefix: value });
+                else {
+                  const withoutCustomMirror = { ...draft };
+                  delete withoutCustomMirror.gitCustomMirrorPrefix;
+                  setDraft(withoutCustomMirror);
+                }
+              }} />}
+          /> : null}
+        </SettingsRows> : <SettingsNotice>正在读取下载源设置…</SettingsNotice>}
       </SettingsSectionBlock>
 
       <SettingsSectionBlock
-        actions={displayedSnapshot?.checkedAt ? <time className={styles.checkedAt}>{new Date(displayedSnapshot.checkedAt).toLocaleString()}</time> : undefined}
+        actions={<>
+          {displayedSnapshot?.checkedAt ? <time className={styles.checkedAt}>{new Date(displayedSnapshot.checkedAt).toLocaleString()}</time> : null}
+          <SettingsInfo label="检测方式说明">检测使用公共 ping 或随应用提供的 Git ls-remote，不发送工作区、会话、模型服务或凭据。</SettingsInfo>
+          <Button className="secondary-button" isDisabled={!validDraft || busy} onPress={() => void probe()}><RefreshCw aria-hidden="true" size={14} />{phase === "probing" ? "检测中…" : "检测全部源"}</Button>
+        </>}
         title="源可达性"
-        description="检测使用公共 ping 或 bundled Git ls-remote，不发送工作区、会话、模型服务或凭据。"
       >
         {probeCompatible && dirty ? <SettingsNotice tone="warning">以下结果基于未保存配置；检测没有写入下载源设置。</SettingsNotice> : null}
         {probeStale ? <SettingsNotice>草稿已在上次检测后修改，当前结果需要重新检测。</SettingsNotice> : null}
@@ -201,6 +217,18 @@ export function PackageNetworkPanel() {
         </SettingsRows>
         <p>工具随应用提供，不依赖系统安装，也不会修改系统工具链。</p>
       </SettingsDetails>
+      <SettingsSaveBar
+        canSave={canSave}
+        dirty={dirty}
+        saving={phase === "saving"}
+        onDiscard={() => {
+          if (!snapshot) return;
+          setDraft(structuredClone(snapshot.settings));
+          setProbeSnapshot(undefined);
+          setError(undefined);
+        }}
+        onSave={() => void save()}
+      />
     </div>
     </div>
     <SettingsDestructiveActionDialog

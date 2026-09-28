@@ -9,96 +9,46 @@
   min-width: 0;
 }
 
-.form {
-  display: grid;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-}
-
-.form > label,
-.form fieldset {
-  display: grid;
-  min-height: 64px;
-  grid-template-columns: 170px minmax(0, 1fr);
-  align-items: center;
+.mirrors {
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
-  margin: 0;
-  padding: 12px 16px;
-  border: 0;
-  border-bottom: 1px solid var(--border);
 }
 
-.form > label:last-child,
-.form fieldset:last-child {
-  border-bottom: 0;
-}
-
-.form label > span,
-.form legend {
-  color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-}
-
-.form select,
-.form input[type="text"],
-.form label > input:not([type="checkbox"]) {
-  min-width: 0;
-  min-height: 34px;
-  padding: 0 9px;
-  border: 1px solid var(--border-strong);
+.textInput {
+  width: 280px;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  outline: 0;
-  background: var(--surface-muted);
+  background: var(--surface);
   color: var(--text-primary);
+  font: inherit;
   font-size: var(--font-size-interface);
 }
 
-.form select:focus-visible,
-.form input:focus-visible {
-  border-color: var(--focus);
-  box-shadow: var(--shadow-focus);
-}
+.textInput::placeholder { color: var(--text-tertiary); }
+.textInput[data-focused] { border-color: var(--border-strong); outline: none; }
+.textInput[data-focus-visible] { outline: 2px solid var(--focus); outline-offset: 1px; }
 
-.form fieldset {
-  display: grid;
-  grid-template-columns: 170px repeat(2, max-content);
-}
-
-.form legend {
-  display: contents;
-}
-
-.checkbox {
+.quietButton {
   display: inline-flex;
+  min-height: 30px;
   align-items: center;
   gap: 6px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-support);
 }
 
-
-
+.quietButton[data-hovered] { background: var(--surface-hover); color: var(--text-primary); }
+.quietButton[data-disabled] { opacity: 0.45; }
 
 .checkedAt {
-  color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-}
-
-@media (max-width: 720px) {
-  .form > label,
-  .form fieldset {
-    grid-template-columns: 1fr;
-    gap: 7px;
-  }
-
-  .form fieldset {
-    display: flex;
-    flex-wrap: wrap;
-  }
-
-  .form legend {
-    display: block;
-    width: 100%;
-  }
+  color: var(--text-tertiary);
+  font-size: var(--font-size-support);
 }

@@ -4,14 +4,12 @@
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
-  background: color-mix(in srgb, var(--surface-raised) 86%, var(--accent) 2%);
+  background: var(--surface);
 }
 
 .heading {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 10px;
-  align-items: start;
+  gap: 3px;
 }
 
 .heading > span:last-child {
@@ -22,25 +20,13 @@
 .heading strong {
   color: var(--text-primary);
   font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-medium);
 }
 
 .heading small {
-  max-width: 780px;
-  color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-  line-height: 1.55;
-}
-
-.icon {
-  display: inline-flex;
-  width: 32px;
-  height: 32px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--focus) 30%, var(--border));
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--focus) 9%, var(--surface));
-  color: var(--focus);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-support);
+  line-height: 1.5;
 }
 
 .controlRow {
@@ -50,28 +36,12 @@
   align-items: end;
 }
 
-.controlRow label {
+.field {
   display: grid;
+  min-width: 0;
   gap: 6px;
   color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-}
-
-.controlRow select {
-  width: 100%;
-  min-height: 36px;
-  padding: 0 34px 0 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text-primary);
-  font-size: var(--font-size-interface);
-}
-
-.controlRow select:focus-visible {
-  border-color: var(--focus);
-  outline: 2px solid color-mix(in srgb, var(--focus) 18%, transparent);
-  outline-offset: 1px;
+  font-size: var(--font-size-support);
 }
 
 .noModels {

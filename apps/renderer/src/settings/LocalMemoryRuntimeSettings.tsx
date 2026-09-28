@@ -1,7 +1,7 @@
 import type { LocalMemoryRuntimeInstallResult, LocalMemoryRuntimePurpose, LocalMemoryRuntimeStatus } from "@pi67/protocol";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
-import { SettingsNotice, SettingsRow, SettingsRows, SettingsSectionBlock } from "./SettingsPrimitives.js";
+import { SettingsNotice, SettingsRow, SettingsRows, SettingsSectionBlock, SettingsStatus } from "./SettingsPrimitives.js";
 import { useSettingsDraftRegistration } from "./SettingsDraftGuard.js";
 
 const messages: Record<LocalMemoryRuntimeInstallResult, string> = {
@@ -53,13 +53,16 @@ export function LocalMemoryRuntimeSettings({ onPendingChange, disabled = false }
     setCancelling(true);
     try { await bridge?.cancel(); } catch { if (mounted.current && activePurpose) { setResult({ purpose: activePurpose, value: "failed" }); setCancelling(false); } }
   };
-  return <SettingsSectionBlock title="本地运行包" description="仅安装已签名的本地目录，不下载、不覆盖已有版本，也不会自动开启记忆服务。">
+  return <SettingsSectionBlock title="本地运行包" description="仅安装已签名的本地目录；不下载、不覆盖已有版本。">
     <SettingsRows>{runtimes.map(({ purpose, title, description }) => {
       const status = statuses[purpose];
-      return <SettingsRow key={purpose} title={title} description={description} value={!status ? "正在检查…" : status === "present"
-        ? "检测到运行包 · 启动前仍需校验" : status === "missing" ? "尚未安装" : "此平台暂不可用"}
+      const unsupported = !!status && status !== "present" && status !== "missing";
+      return <SettingsRow key={purpose} title={title} description={description} value={!status ? <SettingsStatus tone="neutral">正在检查…</SettingsStatus>
+        : status === "present" ? <SettingsStatus tone="success">已检测到 · 启动前校验</SettingsStatus>
+          : status === "missing" ? <SettingsStatus tone="neutral">尚未安装</SettingsStatus> : <SettingsStatus tone="neutral">此平台暂不可用</SettingsStatus>}
         actions={activePurpose === purpose ? <Button className="secondary-button" isDisabled={cancelling} onPress={() => void cancel()}>{cancelling ? "正在取消…" : "取消安装"}</Button>
-          : <Button className="secondary-button" aria-label={`安装${title}`} isDisabled={disabled || busy || status !== "missing"} onPress={() => void install(purpose)}>选择运行包…</Button>} />;
+          : unsupported ? undefined
+            : <Button className="secondary-button" aria-label={`安装${title}`} isDisabled={disabled || busy || status !== "missing"} onPress={() => void install(purpose)}>选择运行包…</Button>} />;
     })}</SettingsRows>
     {busy ? <SettingsNotice tone="info">正在选择、验签或安装运行包，请稍候。取消会等待当前文件操作结束。</SettingsNotice> : null}
     {result ? <SettingsNotice tone={result.value === "failed" ? "danger" : "info"}>
