@@ -7,6 +7,27 @@ describe("DesktopExtensionUiBridge", () => {
     vi.useRealTimers();
   });
 
+  it("rejects an answer that does not fit the pending dialog and keeps it pending", async () => {
+    const events: AgentEvent[] = [];
+    const bridge = new DesktopExtensionUiBridge((event) => events.push(event));
+    const confirmed = bridge.context.confirm("Delete?", "Really delete");
+    const chosen = bridge.context.select("Choose", ["one", "two"]);
+    const [confirmRequest, selectRequest] = events.filter((event) => event.type === "extension.ui.requested");
+    if (confirmRequest?.type !== "extension.ui.requested" || selectRequest?.type !== "extension.ui.requested") {
+      throw new Error("Expected confirm and select requests.");
+    }
+
+    // A stale mapping that sends "false" as text must not become a truthy confirmation.
+    expect(bridge.resolve(confirmRequest.payload.requestId, "false")).toBe(false);
+    expect(bridge.resolve(selectRequest.payload.requestId, "three")).toBe(false);
+    expect(bridge.resolve(selectRequest.payload.requestId, true)).toBe(false);
+
+    expect(bridge.resolve(confirmRequest.payload.requestId, false)).toBe(true);
+    await expect(confirmed).resolves.toBe(false);
+    expect(bridge.resolve(selectRequest.payload.requestId, "two")).toBe(true);
+    await expect(chosen).resolves.toBe("two");
+  });
+
   it("emits blocking requests without inventing extension attribution", async () => {
     const events: AgentEvent[] = [];
     const bridge = new DesktopExtensionUiBridge((event) => events.push(event));
