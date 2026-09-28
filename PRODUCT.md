@@ -917,7 +917,9 @@ design/protocol contracts; reference inclusion alone does not approve them.
   restart, or Workspace trust revocation. They do not authorize another path,
   opaque Tool identity, upload, publish, remote action, system change, credential
   flow, or any recognized irreversible deletion; those keep their AUTO
-  confirmation boundary.
+  confirmation boundary. When the Host refuses a path or YOLO grant (untrusted
+  Workspace, hard-stop request, or bounded grant limit), the request stays pending and
+  the dialog stays open with the reason, so the user can still allow once or deny.
 - AUTO trusts an effective configured source, not an arbitrary registered Tool
   name. At Session resource load, Desktop builds a bounded in-memory capability
   catalog from the effective Task-local Package settings plus that Task's valid

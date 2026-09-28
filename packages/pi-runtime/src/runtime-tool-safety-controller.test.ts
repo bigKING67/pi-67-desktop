@@ -82,7 +82,7 @@ describe("RuntimeToolSafetyController", () => {
       request.payload.requestId,
       request.payload.toolCallId,
       "trust-task-paths-and-allow"
-    )).toEqual({ resolved: false, taskToolMode: "auto" });
+    )).toEqual({ resolved: false, taskToolMode: "auto", refusedDecision: "hard-stop" });
     expect(controller.policy.taskTrustedRoots).toEqual([]);
     bridge.dispose();
   });
@@ -112,7 +112,7 @@ describe("RuntimeToolSafetyController", () => {
       destructiveRequest.payload.requestId,
       destructiveRequest.payload.toolCallId,
       "enable-task-yolo-and-allow"
-    )).toEqual({ resolved: false, taskToolMode: "auto" });
+    )).toEqual({ resolved: false, taskToolMode: "auto", refusedDecision: "hard-stop" });
 
     expect(controller.resolveApproval(
       bridge,

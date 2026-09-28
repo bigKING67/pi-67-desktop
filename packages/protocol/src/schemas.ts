@@ -309,7 +309,12 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "extension.ui.respond": strictObject({ resolved: Type.Boolean() }),
   "approval.respond": strictObject({
     resolved: Type.Boolean(),
-    taskToolMode: TaskToolModeSchema
+    taskToolMode: TaskToolModeSchema,
+    refusedDecision: Type.Optional(Type.Union([
+      Type.Literal("workspace-untrusted"),
+      Type.Literal("hard-stop"),
+      Type.Literal("path-grant-rejected")
+    ]))
   }),
   "diagnostics.collect": RuntimeDiagnosticsSchema,
   "doctor.run": DoctorReportSchema

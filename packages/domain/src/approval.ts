@@ -14,9 +14,14 @@ export interface ApprovalTaskPathGrant {
   paths: string[];
 }
 
+/** Why the Host refused a grant decision while keeping the approval request pending. */
+export type ApprovalRefusedDecision = "workspace-untrusted" | "hard-stop" | "path-grant-rejected";
+
 export interface ApprovalResolution {
   resolved: boolean;
   taskToolMode: TaskToolMode;
+  /** Present only when the request is still pending and can be answered with allow-once or deny. */
+  refusedDecision?: ApprovalRefusedDecision;
 }
 
 export interface ApprovalRequestDetails {

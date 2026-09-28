@@ -5,6 +5,7 @@ import {
   MAX_TASK_TRUSTED_ROOTS,
   RuntimeError,
   type ApprovalMode,
+  type ApprovalRefusedDecision,
   type ApprovalResolution,
   type ApprovalResponseDecision,
   type TaskToolMode,
@@ -80,29 +81,16 @@ export class RuntimeToolSafetyController {
     if (!bridge.hasPendingApproval(requestId, toolCallId)) {
       return { resolved: false, taskToolMode: this.state.taskToolMode };
     }
-    if (decision === "enable-task-yolo-and-allow" && this.state.trust !== "trusted") {
-      return { resolved: false, taskToolMode: this.state.taskToolMode };
-    }
-    if (decision === "trust-task-paths-and-allow" && this.state.trust !== "trusted") {
-      return { resolved: false, taskToolMode: this.state.taskToolMode };
-    }
-    if (
-      decision === "enable-task-yolo-and-allow"
-      && bridge.hasPendingHardStopApproval(requestId, toolCallId)
-    ) {
-      return { resolved: false, taskToolMode: this.state.taskToolMode };
-    }
-    if (
-      decision === "trust-task-paths-and-allow"
-      && bridge.hasPendingHardStopApproval(requestId, toolCallId)
-    ) {
-      return { resolved: false, taskToolMode: this.state.taskToolMode };
-    }
+    // A refused grant decision leaves the request pending; say why so the dialog can stay open.
+    const refuse = (refusedDecision: ApprovalRefusedDecision): ApprovalResolution => (
+      { resolved: false, taskToolMode: this.state.taskToolMode, refusedDecision }
+    );
+    const grantDecision = decision === "enable-task-yolo-and-allow" || decision === "trust-task-paths-and-allow";
+    if (grantDecision && this.state.trust !== "trusted") return refuse("workspace-untrusted");
+    if (grantDecision && bridge.hasPendingHardStopApproval(requestId, toolCallId)) return refuse("hard-stop");
     if (decision === "trust-task-paths-and-allow") {
       const paths = bridge.pendingTaskPathGrant(requestId, toolCallId);
-      if (!paths || !this.addTaskTrustedRoots(paths)) {
-        return { resolved: false, taskToolMode: this.state.taskToolMode };
-      }
+      if (!paths || !this.addTaskTrustedRoots(paths)) return refuse("path-grant-rejected");
     }
     if (decision === "enable-task-yolo-and-allow") this.setTaskToolMode("yolo");
     const resolved = bridge.resolveApproval(requestId, toolCallId, decision);

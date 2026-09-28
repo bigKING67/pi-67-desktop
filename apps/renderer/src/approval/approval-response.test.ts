@@ -186,6 +186,17 @@ describe("respondToSafetyApproval", () => {
     ]);
   });
 
+  it("keeps a still-pending approval open when the Host refuses only the grant decision", async () => {
+    requestAgent.mockResolvedValue({ resolved: false, taskToolMode: "auto", refusedDecision: "hard-stop" });
+
+    await expect(respondToSafetyApproval(() => state, request.requestId, "enable-task-yolo-and-allow")).resolves.toBe(false);
+
+    expect(useApprovalStore.getState().requests).toEqual([request]);
+    expect(useNotificationStore.getState().items).toEqual([
+      expect.objectContaining({ level: "warning", title: "无法使用这种授权方式" })
+    ]);
+  });
+
   it("keeps the approval visible when transport submission fails", async () => {
     requestAgent.mockRejectedValue(new Error("connection closed"));
 

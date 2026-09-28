@@ -1,4 +1,4 @@
-import type { ApprovalRequestView, ApprovalResponseDecision } from "@pi67/domain";
+import type { ApprovalRefusedDecision, ApprovalRequestView, ApprovalResponseDecision } from "@pi67/domain";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import {
   hasCurrentInteractiveAuthority,
@@ -30,6 +30,11 @@ export async function respondToSafetyApproval(
 
   try {
     const result = await agentConnectionController.request("approval.respond", payload);
+    if (!result.resolved && result.refusedDecision) {
+      // The Host refused only this grant; the tool is still waiting, so keep the dialog open.
+      publishNotification({ level: "warning", title: "无法使用这种授权方式", message: refusedDecisionMessages[result.refusedDecision] });
+      return false;
+    }
     useApprovalStore.getState().removeRequestIfCurrent(request);
     if (result.resolved) return true;
     publishNotification({
@@ -78,6 +83,12 @@ export function approvalResponsePayload(
     decision
   };
 }
+
+const refusedDecisionMessages: Record<ApprovalRefusedDecision, string> = {
+  "workspace-untrusted": "当前工作区未受信任，不能授予路径或 YOLO 权限。请选择仅允许一次或拒绝。",
+  "hard-stop": "这个操作每次都需要单独确认，不能通过路径授权或 YOLO 放行。请选择仅允许一次或拒绝。",
+  "path-grant-rejected": "无法添加这些路径授权（可能已达到上限）。请选择仅允许一次或拒绝。"
+};
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Pi 运行服务连接异常";
