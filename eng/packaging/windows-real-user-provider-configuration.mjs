@@ -26,12 +26,16 @@ export async function verifyProviderConfiguration(window) {
     state: "visible",
     timeout: remainingTimeout(startedAt)
   });
-  const configuredProvider = panel.getByRole("button", { name: /^OpenAI\b/u });
+  // The configured view lists only configured Providers; its rows no longer repeat the state.
+  const configuredTab = panel.getByRole("tablist", { name: "模型服务分类" })
+    .getByRole("tab", { name: /^已配置 \d+$/u });
+  await configuredTab.click({ timeout: remainingTimeout(startedAt) });
+  if ((await configuredTab.getAttribute("aria-selected")) !== "true") {
+    throw new Error("Windows real-user Provider Catalog did not select the configured view.");
+  }
+  const configuredProvider = panel.getByTestId("provider-configuration-list")
+    .getByRole("button", { name: /^OpenAI\b/u });
   await configuredProvider.waitFor({
-    state: "visible",
-    timeout: remainingTimeout(startedAt)
-  });
-  await configuredProvider.getByText("已配置", { exact: true }).waitFor({
     state: "visible",
     timeout: remainingTimeout(startedAt)
   });

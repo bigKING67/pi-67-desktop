@@ -13,7 +13,11 @@ describe("Windows installed Provider configuration", () => {
     const panel = {
       getByRole: (role, options) => role === "textbox"
         ? waitLocator(actions, `provider:${options.name}`)
-        : configuredProvider,
+        : catalogTabsLocator(actions),
+      getByTestId: (testId) => {
+        expect(testId).toBe("provider-configuration-list");
+        return { getByRole: () => configuredProvider };
+      },
       or: (other) => {
         expect(other).toBe(unavailable);
         return waitLocator(actions, "provider-or-error");
@@ -46,8 +50,9 @@ describe("Windows installed Provider configuration", () => {
       "click:section:模型",
       "provider-or-error:visible",
       "provider:搜索 Pi Provider:visible",
+      "click:configured-view",
+      "configured-view:aria-selected",
       "configured-provider:visible",
-      "configured-state:visible",
       "click:configured-provider",
       "click:settings:更新 API Key",
       "credential-dialog:visible",
@@ -68,10 +73,25 @@ function navigationLocator(actions) {
   };
 }
 
+function catalogTabsLocator(actions) {
+  return {
+    getByRole: (role, options) => {
+      expect(role).toBe("tab");
+      expect("已配置 1").toMatch(options.name);
+      return {
+        click: async () => actions.push("click:configured-view"),
+        getAttribute: async (name) => {
+          actions.push(`configured-view:${name}`);
+          return "true";
+        }
+      };
+    }
+  };
+}
+
 function providerLocator(actions) {
   return {
     click: async () => actions.push("click:configured-provider"),
-    getByText: () => waitLocator(actions, "configured-state"),
     waitFor: async ({ state }) => actions.push(`configured-provider:${state}`)
   };
 }
