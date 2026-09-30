@@ -23,7 +23,7 @@ import {
   WorkbenchStateStore
 } from "./workbench-state.js";
 import { createNativeWorkspaceDescriptor, type NativeWorkspaceDescriptor } from "./workspace-identity.js";
-import { resolveRegisteredWorkspaceEntry } from "./workspace-entry.js";
+import { resolveRegisteredWorkspaceEntry, workspaceEntryRevealAction } from "./workspace-entry.js";
 import type { WorkspaceFileStateStore } from "./workspace-file-state.js";
 import type { ComposerDraftStateStore } from "./composer-draft-state.js";
 import { NativeNotificationManager } from "./native-notification-manager.js";
@@ -299,7 +299,7 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
   });
   ipcMain.handle("pi67:workspace-entry-reveal", async (_event, value: unknown) => {
     const entry = await resolveRegisteredWorkspaceEntry(workbenchState, value);
-    if (entry.kind === "file") shell.showItemInFolder(entry.absolutePath);
+    if (workspaceEntryRevealAction(entry) === "show-in-folder") shell.showItemInFolder(entry.absolutePath);
     else await openSystemPath(entry.absolutePath);
     return true;
   });

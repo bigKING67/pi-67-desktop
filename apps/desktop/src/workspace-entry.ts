@@ -12,6 +12,19 @@ export interface ResolvedWorkspaceEntry extends WorkspaceEntryRequest {
   absolutePath: string;
 }
 
+/**
+ * Reveal must never launch anything. Only a plain directory opens in the file manager; every other
+ * entry is selected in its parent. On macOS an `.app` directory is an application bundle that
+ * `shell.openPath` would run, so it is selected as well.
+ */
+export function workspaceEntryRevealAction(
+  entry: Pick<ResolvedWorkspaceEntry, "kind" | "absolutePath">,
+  platform: NodeJS.Platform = process.platform
+): "show-in-folder" | "open-directory" {
+  if (entry.kind !== "directory") return "show-in-folder";
+  return platform === "darwin" && entry.absolutePath.toLowerCase().endsWith(".app") ? "show-in-folder" : "open-directory";
+}
+
 function parseWorkspaceEntryRequest(value: unknown): WorkspaceEntryRequest {
   if (!isWorkspaceEntryRequest(value)) throw new Error("Workspace entry request is invalid.");
   // The protocol owns the shape; Main owns the filesystem policy for the relative path.

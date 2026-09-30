@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { addOrRefreshWorkspace, WorkbenchStateStore } from "./workbench-state.js";
-import { resolveRegisteredWorkspaceEntry } from "./workspace-entry.js";
+import { resolveRegisteredWorkspaceEntry, workspaceEntryRevealAction } from "./workspace-entry.js";
 import { createNativeWorkspaceDescriptor } from "./workspace-identity.js";
 
 const roots: string[] = [];
@@ -55,3 +55,17 @@ async function temporary(prefix: string): Promise<string> {
   roots.push(root);
   return root;
 }
+
+describe("workspaceEntryRevealAction", () => {
+  it("never launches an entry when revealing it", () => {
+    expect(workspaceEntryRevealAction({ kind: "file", absolutePath: "/w/run.command" }, "darwin")).toBe("show-in-folder");
+    expect(workspaceEntryRevealAction({ kind: "directory", absolutePath: "/w/Tool.app" }, "darwin")).toBe("show-in-folder");
+    expect(workspaceEntryRevealAction({ kind: "directory", absolutePath: "/w/Tool.APP" }, "darwin")).toBe("show-in-folder");
+    expect(workspaceEntryRevealAction({ kind: "other", absolutePath: "/w/socket" }, "darwin")).toBe("show-in-folder");
+  });
+
+  it("opens plain directories in the file manager", () => {
+    expect(workspaceEntryRevealAction({ kind: "directory", absolutePath: "/w/src" }, "darwin")).toBe("open-directory");
+    expect(workspaceEntryRevealAction({ kind: "directory", absolutePath: "C:\\w\\Tool.app" }, "win32")).toBe("open-directory");
+  });
+});
