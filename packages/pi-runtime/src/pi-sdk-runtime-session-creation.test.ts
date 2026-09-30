@@ -53,7 +53,6 @@ describe("PiSdkRuntime Session creation identity", () => {
         cwd,
         agentDir,
         trust: "trusted",
-        approvalMode: "guided",
         creationId: "session-creation-initial-task"
       });
       expect(await jsonlFiles(root)).toHaveLength(1);
@@ -116,7 +115,6 @@ describe("PiSdkRuntime Session creation identity", () => {
         cwd: inputSpelling,
         agentDir,
         trust: "trusted",
-        approvalMode: "guided",
         creationId: "workspace-authority-spelling"
       });
 
@@ -153,7 +151,7 @@ describe("PiSdkRuntime Session creation identity", () => {
     });
     const runtime = new PiSdkRuntime({ workspaceServices: services });
     try {
-      await runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" });
+      await runtime.initialize({ cwd, agentDir, trust: "trusted" });
       failCatalogUpsert = true;
 
       const snapshot = await runtime.createSession("session-creation-catalog-failure");
@@ -348,8 +346,7 @@ function runtimeInitializeOptions(fixture: Awaited<ReturnType<typeof createRunti
   return {
     cwd: fixture.cwd,
     agentDir: fixture.agentDir,
-    trust: "trusted" as const,
-    approvalMode: "guided" as const
+    trust: "trusted" as const
   };
 }
 

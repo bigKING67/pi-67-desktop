@@ -80,7 +80,7 @@ describe("controlled shutdown fixture", () => {
     const restoredRuntime = new PiSdkRuntime();
     let childPid;
     try {
-      await runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" });
+      await runtime.initialize({ cwd, agentDir, trust: "trusted" });
       const invocation = runtime.submitPrompt(CONTROLLED_PROMPT_TEXT);
       childPid = await readPositiveProcessId(childPidPath);
       const sessionPath = runtime.getIdentity().sessionPath;
@@ -97,8 +97,7 @@ describe("controlled shutdown fixture", () => {
         cwd,
         agentDir,
         sessionPath,
-        trust: "trusted",
-        approvalMode: "guided"
+        trust: "trusted"
       });
       expect(restoredRuntime.getIdentity().sessionPath).toBe(await realpath(sessionPath));
     } finally {

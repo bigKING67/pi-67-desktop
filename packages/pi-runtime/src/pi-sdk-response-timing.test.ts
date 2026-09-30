@@ -15,7 +15,7 @@ it("reports real Pi Session thinking/text and Host emission separately without p
   await writeResponseTimingFixture(join(extensions, "timing.ts"));
   const runtime = new PiSdkRuntime();
   try {
-    await runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" });
+    await runtime.initialize({ cwd, agentDir, trust: "trusted" });
     await runtime.selectModel("timing-fixture", "timed");
     await runtime.submitPrompt("synthetic prompt");
     const diagnostics = await runtime.collectDiagnostics();

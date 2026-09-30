@@ -68,8 +68,7 @@ describe("AgentHostServer session bootstrap", () => {
     const initialize = commandEnvelope("runtime.initialize", {
       cwd: "/tmp/workspace",
       agentDir: "/tmp/agent",
-      trust: "unknown",
-      approvalMode: "guided"
+      trust: "unknown"
     }, 5);
     port.emit(initialize);
     await waitForResponse(port, initialize.requestId);
@@ -156,8 +155,7 @@ describe("AgentHostServer session bootstrap", () => {
 
     const workspaceOpen = commandEnvelope("workspace.open", {
       cwd: "/tmp/workspace",
-      trust: "unknown",
-      approvalMode: "guided"
+      trust: "unknown"
     }, 6);
     port.emit(workspaceOpen);
     await waitForResponse(port, workspaceOpen.requestId);

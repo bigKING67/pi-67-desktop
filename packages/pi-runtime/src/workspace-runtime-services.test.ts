@@ -59,8 +59,8 @@ describe("Pi Workspace runtime services", () => {
 
     try {
       const [snapshotA, snapshotB] = await Promise.all([
-        runtimeA.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" }),
-        runtimeB.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" })
+        runtimeA.initialize({ cwd, agentDir, trust: "trusted" }),
+        runtimeB.initialize({ cwd, agentDir, trust: "trusted" })
       ]);
       const provider = snapshotA.models.find((model) => (
         !model.configured && snapshotB.models.some((candidate) => candidate.provider === model.provider)
@@ -147,8 +147,7 @@ describe("Pi Workspace runtime services", () => {
       await expect(runtime.initialize({
         cwd: otherCwd,
         agentDir,
-        trust: "unknown",
-        approvalMode: "guided"
+        trust: "unknown"
       })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
     } finally {
       await runtime.dispose();

@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getAgentDir, VERSION } from "@earendil-works/pi-coding-agent";
-import {
-  type ApprovalMode, type ApprovalResolution, type ApprovalResponseDecision,
+import { type ApprovalResolution, type ApprovalResponseDecision,
   type ConversationPage, type DoctorReport, type ExtensionCatalogResult,
   type ExtensionUiCancellationReason, type ModelSummary, type ResourceCatalogProjection,
   type RuntimeCapabilities, type RuntimeIdentity, type RuntimeOperationActivity,
@@ -267,8 +266,8 @@ export class PiSdkRuntime implements AgentRuntime {
     if (this.ownsRuntimeCredentialOverrides) await this.runtimeCredentialOverrides.clear();
     this.events.clear();
   }
-  setWorkspacePolicy(trust: WorkspaceTrust, approvalMode: ApprovalMode): TaskToolMode {
-    const mode = this.toolSafety.setWorkspacePolicy(trust, approvalMode);
+  setWorkspacePolicy(trust: WorkspaceTrust): TaskToolMode {
+    const mode = this.toolSafety.setWorkspacePolicy(trust);
     this.workspaceServices?.setProjectTrusted(trust === "trusted");
     return mode;
   }

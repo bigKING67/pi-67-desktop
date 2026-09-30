@@ -7,8 +7,9 @@ import { RuntimeToolSafetyController } from "./runtime-tool-safety-controller.js
 describe("RuntimeToolSafetyController", () => {
   it("normalizes legacy ASK inputs to AUTO", () => {
     const controller = new RuntimeToolSafetyController();
-    controller.initialize("/workspace", "trusted", "guided");
+    controller.initialize("/workspace", "trusted");
 
+    expect(controller.policy.approvalMode).toBe("balanced");
     expect(controller.getTaskToolMode()).toBe("auto");
     expect(controller.setTaskToolMode("ask")).toBe("auto");
   });
@@ -17,7 +18,7 @@ describe("RuntimeToolSafetyController", () => {
     const events: AgentEvent[] = [];
     const bridge = new DesktopExtensionUiBridge((event) => events.push(event));
     const controller = new RuntimeToolSafetyController();
-    controller.initialize("/workspace", "trusted", "balanced");
+    controller.initialize("/workspace", "trusted");
     const pending = bridge.requestApproval({
       ...approvalDetails("external", "external-path"),
       target: "ls /external/project",
@@ -35,7 +36,7 @@ describe("RuntimeToolSafetyController", () => {
     await expect(pending).resolves.toEqual({ status: "allowed" });
     expect(controller.policy.taskTrustedRoots).toEqual(["/external/project"]);
 
-    expect(controller.setWorkspacePolicy("unknown", "balanced")).toBe("auto");
+    expect(controller.setWorkspacePolicy("unknown")).toBe("auto");
     expect(controller.policy.taskTrustedRoots).toEqual([]);
   });
 
@@ -43,7 +44,7 @@ describe("RuntimeToolSafetyController", () => {
     const events: AgentEvent[] = [];
     const bridge = new DesktopExtensionUiBridge((event) => events.push(event));
     const controller = new RuntimeToolSafetyController();
-    controller.initialize("/workspace", "trusted", "balanced");
+    controller.initialize("/workspace", "trusted");
     const pending = bridge.requestApproval({
       ...approvalDetails("dispose", "external-path"),
       taskPathGrant: { kind: "paths", paths: ["/external/project"] }
@@ -69,7 +70,7 @@ describe("RuntimeToolSafetyController", () => {
     const events: AgentEvent[] = [];
     const bridge = new DesktopExtensionUiBridge((event) => events.push(event));
     const controller = new RuntimeToolSafetyController();
-    controller.initialize("/workspace", "trusted", "balanced");
+    controller.initialize("/workspace", "trusted");
     void bridge.requestApproval({
       ...approvalDetails("delete-path", "bulk-delete"),
       taskPathGrant: { kind: "paths", paths: ["/external/project"] }
@@ -91,7 +92,7 @@ describe("RuntimeToolSafetyController", () => {
     const events: AgentEvent[] = [];
     const bridge = new DesktopExtensionUiBridge((event) => events.push(event));
     const controller = new RuntimeToolSafetyController();
-    controller.initialize("/workspace", "trusted", "balanced");
+    controller.initialize("/workspace", "trusted");
 
     const ordinary = bridge.requestApproval(approvalDetails("ordinary", "git-external-action"));
     const destructive = bridge.requestApproval(approvalDetails("delete", "bulk-delete"));

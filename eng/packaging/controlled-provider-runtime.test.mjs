@@ -50,7 +50,7 @@ describe("controlled Provider runtime fixture", () => {
     const runtime = new PiSdkRuntime();
     let childPid;
     try {
-      await runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" });
+      await runtime.initialize({ cwd, agentDir, trust: "trusted" });
       expect(runtime.getSnapshot().selectedModel).toEqual({ provider: "openai", id: "gpt-5" });
       await expect(readFile(settingsPath, "utf8")).resolves.toBe(originalSettings);
 
@@ -84,7 +84,7 @@ describe("controlled Provider runtime fixture", () => {
     const runtime = new PiSdkRuntime();
     let childPid;
     try {
-      await runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" });
+      await runtime.initialize({ cwd, agentDir, trust: "trusted" });
       expect(runtime.getSnapshot().models).toContainEqual(expect.objectContaining({
         provider,
         id: modelId,

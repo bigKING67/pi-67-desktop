@@ -86,7 +86,7 @@ export class PiSdkRuntimeSessionLifecycle {
           () => this.options.sessionBindings.disposeRuntime()
         );
         this.options.setAgentDir(nextAgentDir);
-        this.options.toolSafety.initialize(workspaceCwd, input.trust, input.approvalMode);
+        this.options.toolSafety.initialize(workspaceCwd, input.trust);
         this.options.workspaceServices?.setProjectTrusted(input.trust === "trusted");
         await runRuntimeInitializationStage(observeStage, "create-session", async () => {
           if (input.creationId) {

@@ -66,7 +66,6 @@ export async function inspectAgentPilotAssembly(options) {
       cwd: workspace,
       agentDir,
       trust: "trusted",
-      approvalMode: "balanced",
     });
     const catalog = runtime.getExtensionCatalog();
     return {
@@ -147,7 +146,6 @@ export async function runAgentScenario(options) {
       cwd: workspace,
       agentDir,
       trust: "trusted",
-      approvalMode: "balanced",
     });
     await runtime.setSessionName(`OpenViking Agent Pilot ${options.sequence}`);
     await runtime.setRuntimeApiKey(providerId, options.provider.secret.providerKey);

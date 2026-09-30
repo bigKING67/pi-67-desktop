@@ -56,8 +56,7 @@ describe("AgentHostServer Workspace catalog", () => {
 
     expect((await hostCommand(firstPort, WORKSPACE, "workspace.register", {
       cwd: fixture.cwd,
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     }, "register-workspace-1")).response).toMatchObject({
       ok: true,
       result: { registered: true },
@@ -147,8 +146,7 @@ describe("AgentHostServer Workspace catalog", () => {
       await attach(server, port);
       expect((await hostCommand(port, WORKSPACE, "workspace.register", {
         cwd: fixture.cwd,
-        trust: "trusted",
-        approvalMode: "guided"
+        trust: "trusted"
       }, "register-usage-workspace")).response).toMatchObject({ ok: true });
 
       expect((await hostCommand(port, WORKSPACE, "workspace.usage.report", {
@@ -208,8 +206,7 @@ describe("AgentHostServer Workspace catalog", () => {
       await attach(server, port);
       expect((await hostCommand(port, WORKSPACE, "workspace.register", {
         cwd: fixture.cwd,
-        trust: "trusted",
-        approvalMode: "guided"
+        trust: "trusted"
       }, "register-creation-resolution-workspace")).response).toMatchObject({ ok: true });
 
       expect((await hostCommand(port, WORKSPACE, "session.creation.resolve", {
@@ -239,8 +236,7 @@ describe("AgentHostServer Workspace catalog", () => {
     await attach(server, port);
     const registration = {
       cwd: fixture.cwd,
-      trust: "trusted" as const,
-      approvalMode: "guided" as const
+      trust: "trusted" as const
     };
 
     expect((await hostCommand(port, WORKSPACE, "workspace.register", registration,
@@ -312,8 +308,7 @@ describe("AgentHostServer Workspace catalog", () => {
       await attach(server, port);
       expect((await hostCommand(port, WORKSPACE, "workspace.register", {
         cwd: canonicalCwd,
-        trust: "trusted",
-        approvalMode: "guided"
+        trust: "trusted"
       }, "register-custom-session-dir")).response).toMatchObject({ ok: true });
       expect(hostWorkspaceSettings(server, WORKSPACE.workspaceId).getSessionDir())
         .toBe(customSessionDir);

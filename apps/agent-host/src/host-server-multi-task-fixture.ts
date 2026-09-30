@@ -243,8 +243,7 @@ export function initialize(
     cwd: workspace.cwd,
     agentDir: workspace.agentDir,
     ...(sessionPath === undefined ? {} : { sessionPath }),
-    trust: "trusted",
-    approvalMode: "guided"
+    trust: "trusted"
   });
 }
 

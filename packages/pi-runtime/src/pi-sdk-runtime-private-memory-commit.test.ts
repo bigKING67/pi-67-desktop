@@ -32,7 +32,7 @@ describe("Pi SDK private memory Commit lifecycle", () => {
           pi.on("session_shutdown", () => { unsubscribe(); stopInspect(); });
         }
       `);
-      const first = await runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" });
+      const first = await runtime.initialize({ cwd, agentDir, trust: "trusted" });
       await expect(runtime.commitPrivateMemory(first.sessionId!)).resolves.toMatchObject({ task_id: first.sessionId });
       await expect(runtime.inspectPrivateMemory(first.sessionId!)).resolves.toMatchObject({ sessionId: first.sessionId, capturedTurns: 4 });
       await expect(runtime.commitPrivateMemory("not-current")).rejects.toThrow();

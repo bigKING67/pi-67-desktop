@@ -50,8 +50,7 @@ describe("PiSdkRuntime session persistence", () => {
         cwd,
         agentDir,
         sessionPath,
-        trust: "trusted",
-        approvalMode: "guided"
+        trust: "trusted"
       });
 
       expect(generate).toHaveBeenCalledOnce();
@@ -80,8 +79,7 @@ describe("PiSdkRuntime session persistence", () => {
       const initial = await runtime.initialize({
         cwd,
         agentDir,
-        trust: "trusted",
-        approvalMode: "guided"
+        trust: "trusted"
       });
       expect(externalChanges).toEqual([]);
       const initialPath = requireSessionPath(initial.sessionPath);
@@ -110,8 +108,7 @@ describe("PiSdkRuntime session persistence", () => {
         cwd,
         agentDir,
         sessionPath: initialPath,
-        trust: "trusted",
-        approvalMode: "guided"
+        trust: "trusted"
       });
       expect(restoredInitial).toMatchObject({
         sessionId: initial.sessionId,
@@ -123,8 +120,7 @@ describe("PiSdkRuntime session persistence", () => {
         cwd,
         agentDir,
         sessionPath: createdPath,
-        trust: "trusted",
-        approvalMode: "guided"
+        trust: "trusted"
       });
       expect(restoredCreated).toMatchObject({
         sessionId: created.sessionId,

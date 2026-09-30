@@ -37,14 +37,12 @@ describe("WorkspaceContextRegistry", () => {
     const first = registry.register("workspace-1", {
       cwd: "/workspace",
       agentDir: "/agent",
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     });
     const second = registry.register("workspace-1", {
       cwd: "/workspace/../workspace",
       agentDir: "/agent",
-      trust: "unknown",
-      approvalMode: "balanced"
+      trust: "unknown"
     });
     expect(second).toBe(first);
     expect(fixture.createServices).toHaveBeenCalledOnce();
@@ -52,8 +50,7 @@ describe("WorkspaceContextRegistry", () => {
     expect(first.initialization).toEqual({
       cwd: resolve("/workspace"),
       agentDir: "/agent",
-      trust: "unknown",
-      approvalMode: "balanced"
+      trust: "unknown"
     });
     expect(fixture.setProjectTrusted).toHaveBeenCalledWith(false);
 
@@ -67,22 +64,19 @@ describe("WorkspaceContextRegistry", () => {
     registry.register("workspace-1", {
       cwd: "/projects/one/../one",
       agentDir: "/agent",
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     });
 
     expect(registry.workspaceIdForCwd("/projects/one")).toBe("workspace-1");
     expect(() => registry.register("workspace-2", {
       cwd: "/projects/one",
       agentDir: "/agent",
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     })).toThrow(expect.objectContaining({ code: "DUPLICATE_REQUEST" }));
     expect(() => registry.register("workspace-1", {
       cwd: "/projects/two",
       agentDir: "/agent",
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     })).toThrow(expect.objectContaining({ code: "INVALID_PAYLOAD" }));
   });
 
@@ -98,8 +92,7 @@ describe("WorkspaceContextRegistry", () => {
     const record = registry.register("workspace-1", {
       cwd: alias,
       agentDir: "/agent",
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     });
     expect(fixture.createServices).toHaveBeenCalledWith(expect.objectContaining({
       cwd: resolve(alias)
@@ -111,8 +104,7 @@ describe("WorkspaceContextRegistry", () => {
     expect(() => registry.register("workspace-2", {
       cwd: target,
       agentDir: "/agent",
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     })).toThrow(expect.objectContaining({ code: "DUPLICATE_REQUEST" }));
   });
 
@@ -126,8 +118,7 @@ describe("WorkspaceContextRegistry", () => {
     registry.register("workspace-1", {
       cwd: "/workspace",
       agentDir: "/agent",
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     });
 
     await expect(registry.queryCatalog("workspace-1", { scope: "workspace", limit: 50 }))
@@ -148,8 +139,7 @@ describe("WorkspaceContextRegistry", () => {
     registry.register("workspace-1", {
       cwd: "/workspace",
       agentDir: "/agent",
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     });
 
     await registry.unregister("workspace-1");
@@ -164,8 +154,7 @@ describe("WorkspaceContextRegistry", () => {
     registry.register("workspace-1", {
       cwd: "/workspace",
       agentDir: "/agent",
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     });
 
     await expect(registry.unregister("workspace-1")).rejects.toThrow("flush failed");
@@ -194,14 +183,12 @@ describe("WorkspaceContextRegistry", () => {
     registry.register("workspace-1", {
       cwd: "/workspace-1",
       agentDir: "/agent",
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     });
     registry.register("workspace-2", {
       cwd: "/workspace-2",
       agentDir: "/agent",
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     });
 
     await expect(registry.disposeAll()).rejects.toThrow("workspace dispose failed");
@@ -234,7 +221,6 @@ describe("WorkspaceContextRegistry", () => {
       cwd: "/workspace-1",
       agentDir: "/agent",
       trust: "trusted",
-      approvalMode: "guided",
       sessionCatalogDirectory: "/storage/projections/session-catalog",
       storageRoot: "/storage"
     });
@@ -242,7 +228,6 @@ describe("WorkspaceContextRegistry", () => {
       cwd: "/workspace-2",
       agentDir: "/agent",
       trust: "trusted",
-      approvalMode: "guided",
       sessionCatalogDirectory: "/storage/projections/session-catalog",
       storageRoot: "/storage"
     });
@@ -264,7 +249,6 @@ describe("WorkspaceContextRegistry", () => {
       cwd: "/workspace-1",
       agentDir: "/agent",
       trust: "trusted",
-      approvalMode: "guided",
       sessionCatalogDirectory: "/storage-a/projections/session-catalog",
       storageRoot: "/storage-a"
     });
@@ -273,7 +257,6 @@ describe("WorkspaceContextRegistry", () => {
       cwd: "/workspace-2",
       agentDir: "/agent",
       trust: "trusted",
-      approvalMode: "guided",
       sessionCatalogDirectory: "/storage-b/projections/session-catalog",
       storageRoot: "/storage-b"
     })).toThrow(expect.objectContaining({ code: "INVALID_PAYLOAD" }));
@@ -301,7 +284,6 @@ describe("WorkspaceContextRegistry", () => {
           cwd,
           agentDir,
           trust: "trusted",
-          approvalMode: "guided",
           sessionCatalogDirectory,
           storageRoot
         });

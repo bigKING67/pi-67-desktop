@@ -263,11 +263,11 @@ describe("operationSubmissionIdentity", () => {
 
     await expect(dispatchHostCommand(
       runtime,
-      { type: "workspace.setTrust", payload: { trust: "unknown", approvalMode: "balanced" } },
+      { type: "workspace.setTrust", payload: { trust: "unknown" } },
       { sendEvent } as never
     )).resolves.toBe(reloadResult);
 
-    expect(setWorkspacePolicy).toHaveBeenCalledWith("unknown", "balanced");
+    expect(setWorkspacePolicy).toHaveBeenCalledWith("unknown");
     expect(sendEvent).toHaveBeenCalledWith({
       type: "task.toolMode.changed",
       payload: { mode: "auto", reason: "trust-revoked" }

@@ -1,4 +1,3 @@
-import { DEFAULT_APPROVAL_MODE } from "@pi67/domain";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import type {
   AgentCommand,
@@ -143,20 +142,13 @@ export async function dispatchHostCommand(
   switch (command.type) {
     case "runtime.initialize":
     case "workspace.open":
-      // approvalMode is deprecated on the wire; the Host default is the only policy input.
-      return context.initializeRuntime(runtime, {
-        ...command.payload,
-        approvalMode: command.payload.approvalMode ?? DEFAULT_APPROVAL_MODE
-      });
+      return context.initializeRuntime(runtime, command.payload);
     case "projection.resync":
       return context.captureProjectionResync(runtime);
     case "workspace.setTrust":
       {
         const previousMode = runtime.getTaskToolMode();
-        const taskToolMode = runtime.setWorkspacePolicy(
-          command.payload.trust,
-          command.payload.approvalMode ?? DEFAULT_APPROVAL_MODE
-        );
+        const taskToolMode = runtime.setWorkspacePolicy(command.payload.trust);
         const result = await runtime.reloadResources();
         if (taskToolMode !== previousMode) {
           context.sendEvent({

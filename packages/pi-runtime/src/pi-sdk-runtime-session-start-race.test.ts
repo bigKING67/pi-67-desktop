@@ -72,7 +72,7 @@ describe("PiSdkRuntime session-start projection binding", () => {
 
     const runtime = new PiSdkRuntime();
     try {
-      await runtime.initialize({ cwd, agentDir, trust: "unknown", approvalMode: "guided" });
+      await runtime.initialize({ cwd, agentDir, trust: "unknown" });
       const snapshot = await runtime.importSession(externalPath);
       const page = runtime.getMessagePage({ direction: "older", limit: 100 });
 

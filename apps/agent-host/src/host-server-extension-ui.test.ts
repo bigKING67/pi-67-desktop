@@ -54,8 +54,7 @@ describe("AgentHostServer extension UI", () => {
 
     const initialize = commandEnvelope("runtime.initialize", {
       cwd: "/tmp",
-      trust: "unknown",
-      approvalMode: "guided"
+      trust: "unknown"
     }, 9);
     port.emit(initialize);
     await vi.waitFor(() => {

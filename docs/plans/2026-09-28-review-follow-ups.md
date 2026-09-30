@@ -1,6 +1,6 @@
 # Full-repository review follow-ups
 
-Status: decisions 1-6 applied; approvalMode removal (stage 2) and device evidence open
+Status: decisions 1-6 applied, approvalMode stage 2 done; device evidence open
 Owner: main
 Started: 2026-09-28
 Last updated: 2026-09-30
@@ -26,9 +26,11 @@ manifest no-store, account poll error, authority document drift.
    fails on any runtime cycle; the known-cycle allowlist was removed.
 2. **Approval refused-but-pending** — done. `approval.respond` returns `refusedDecision`
    (`workspace-untrusted`, `hard-stop`, `path-grant-rejected`) and the renderer keeps the dialog open.
-3. **`approvalMode` wire field** — stage 1 done: optional on the wire, Host defaults it, renderer no
-   longer sends or stores it. Stage 2 (remove from schemas and runtime options) is due in the next
-   protocol revision.
+3. **`approvalMode` wire field** — done. Stage 1 made it optional and stopped the renderer sending it;
+   stage 2 (2026-09-30) removed it from the four command payloads and schemas (strict schemas now reject
+   it), from `AgentRuntime.initialize` and `setWorkspacePolicy`, and regenerated the protocol revision.
+   The runtime safety policy still carries `approvalMode`, fixed to the Host default; the projected
+   `WorkspaceState.approvalMode` field is left for a separate cleanup.
 4. **Protocol revision coverage** — done. Context-scope, event-context and replay-safe tables are part
    of the revision material.
 5. **commerce-growth-os `sync_helper`** — removed; the pack syncs through its own repository and the
@@ -59,7 +61,6 @@ Still open:
   alone does not delete claimed bytes because the active Task may still use `read_attachment` in a
   later turn") and the attachment read tool resolve old set ids for the rest of the Task. Evicting
   sets would change that product contract, so it needs a product decision, not a fix.
-- approvalMode stage 2 (see decision 3).
 
 ## Rollback
 Each landed fix is an independent commit; revert individually. Protocol revision regenerates from
@@ -71,3 +72,5 @@ source (`corepack pnpm --filter @pi67/protocol run generate:revision`).
 - 2026-09-28: deferred items closed except attachments-01 release and approvalMode stage 2.
 - 2026-09-30: Windows real-user probes closed with candidate run 36671645797; macOS title bar and
   packaged team-session device evidence plus approvalMode stage 2 remain.
+- 2026-09-30: approvalMode stage 2 landed; only attachments-01 (product decision) and device
+  evidence remain.

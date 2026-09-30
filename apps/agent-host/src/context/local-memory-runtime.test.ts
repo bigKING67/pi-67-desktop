@@ -32,7 +32,7 @@ it.each([true, false])("connects a real Pi Task through the Host broker without 
     await writeFile(join(agentDir, "openviking.json"), JSON.stringify({ enabled: true, privacyMode: "read-only",
       logLevel: "silent", takeover: { enabled: false }, endpoint: "http://127.0.0.1:1933" }));
     const runtime = await registry.load({ scope: "task", workspaceId: "fixture-workspace", taskId: "fixture-task", taskGeneration: 1 });
-    const session = await runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" });
+    const session = await runtime.initialize({ cwd, agentDir, trust: "trusted" });
     expect(session.sessionId).toEqual(expect.any(String));
     expect(parent.postMessage).toHaveBeenCalledTimes(1);
     expect(parent.postMessage).toHaveBeenCalledWith({ type: "local-memory-connect", requestId: expect.any(String) });

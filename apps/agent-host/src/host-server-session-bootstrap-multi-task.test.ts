@@ -60,8 +60,7 @@ describe("AgentHostServer multi-Task session bootstrap", () => {
 
     const openWorkspace = commandEnvelope("workspace.open", {
       cwd: workspaceCwd,
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     }, 12);
     port.emit(openWorkspace);
     await waitForResponse(port, openWorkspace.requestId);
@@ -85,7 +84,6 @@ describe("AgentHostServer multi-Task session bootstrap", () => {
         cwd: workspaceCwd,
         agentDir: expect.any(String),
         trust: "trusted",
-        approvalMode: "guided",
         creationId: "session-creation-second"
       },
       expect.any(Function)

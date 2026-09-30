@@ -70,8 +70,7 @@ describe("AgentHostServer Session Catalog", () => {
 
       const registration = commandEnvelopeForContext("workspace.register", {
         cwd,
-        trust: "trusted",
-        approvalMode: "guided"
+        trust: "trusted"
       }, context, 9, "register-workspace-catalog");
       port.emit(registration);
       await vi.waitFor(() => {
@@ -158,8 +157,7 @@ describe("AgentHostServer Session Catalog", () => {
 
       const registration = commandEnvelopeForContext("workspace.register", {
         cwd,
-        trust: "trusted",
-        approvalMode: "guided"
+        trust: "trusted"
       }, context, 9, "register-workspace-organize");
       port.emit(registration);
       expect(await responseFor(port, registration.requestId)).toMatchObject({

@@ -169,7 +169,7 @@ async function initializedRuntime(access: PromptAttachmentAccess): Promise<{
   const agentDir = join(root, "agent");
   await Promise.all([mkdir(cwd), mkdir(agentDir)]);
   const runtime = new PiSdkRuntime({ promptAttachmentAccess: access });
-  await runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" });
+  await runtime.initialize({ cwd, agentDir, trust: "trusted" });
   const session = (runtime as unknown as {
     sessionBindings: { requireSession(): AgentSession };
   }).sessionBindings.requireSession();

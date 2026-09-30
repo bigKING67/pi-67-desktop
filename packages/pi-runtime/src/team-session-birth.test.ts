@@ -16,7 +16,7 @@ it("registers canonical tools through real Pi initial and replacement runtimes w
   const runtime = new PiSdkRuntime({ teamKnowledgeAccess: access, sharedExperienceAccess: legacy,
     sharedSopAccess: legacy, authorizeTeamSession: async () => ({ identity, assertValid() {} }) });
   try {
-    await runtime.initialize({ cwd: root, agentDir: join(root, "agent"), trust: "unknown", approvalMode: "guided", creationId: "initial", teamScope: scope });
+    await runtime.initialize({ cwd: root, agentDir: join(root, "agent"), trust: "unknown", creationId: "initial", teamScope: scope });
     const bindings = (runtime as unknown as { sessionBindings: RuntimeSessionBindings }).sessionBindings;
     for (const next of [false, true]) {
       if (next) await runtime.createSession("replacement", scope);
@@ -42,8 +42,7 @@ it("creates immutable team identity in both initial and subsequent real Pi JSONL
   const authorizeTeamSession = vi.fn(async () => ({ identity, assertValid }));
   const runtime = new PiSdkRuntime({ authorizeTeamSession });
   try {
-    const initial = await runtime.initialize({ cwd: root, agentDir: join(root, "agent"), trust: "unknown", approvalMode: "guided",
-      creationId: "team-initial", teamScope: scope });
+    const initial = await runtime.initialize({ cwd: root, agentDir: join(root, "agent"), trust: "unknown", creationId: "team-initial", teamScope: scope });
     expect(initial.memoryOrigin).toEqual({ kind: "team", ...scope });
     const first = runtime.getIdentity();
     for (const creationId of [undefined, "team-next"]) {
@@ -68,7 +67,6 @@ it("rejects team creation without an authorization port before materializing a S
   const root = await mkdtemp(join(tmpdir(), "pi67-team-denied-"));
   const runtime = new PiSdkRuntime();
   try {
-    await expect(runtime.initialize({ cwd: root, agentDir: join(root, "agent"), trust: "unknown", approvalMode: "guided",
-      creationId: "team-denied", teamScope: scope })).rejects.toThrow("authorization is unavailable");
+    await expect(runtime.initialize({ cwd: root, agentDir: join(root, "agent"), trust: "unknown", creationId: "team-denied", teamScope: scope })).rejects.toThrow("authorization is unavailable");
   } finally { await runtime.dispose(); await rm(root, { recursive: true, force: true }); }
 });

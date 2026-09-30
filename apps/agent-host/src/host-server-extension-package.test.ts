@@ -60,8 +60,7 @@ describe("AgentHostServer Extension package commands", () => {
     await expect(command(port, TASK_CONTEXT, "runtime.initialize", {
       cwd: workspace.cwd,
       agentDir: workspace.agentDir,
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     })).resolves.toMatchObject({ ok: true });
 
     await expect(command(port, WORKSPACE_CONTEXT, "extension.package.list", {}))
@@ -131,8 +130,7 @@ describe("AgentHostServer Extension package commands", () => {
     await expect(command(port, TASK_CONTEXT, "runtime.initialize", {
       cwd: workspace.cwd,
       agentDir: workspace.agentDir,
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     })).resolves.toMatchObject({ ok: true });
     await expect(command(port, WORKSPACE_CONTEXT, "context.file.list", {}))
       .resolves.toMatchObject({ ok: true, result: files });
@@ -191,8 +189,7 @@ describe("AgentHostServer Extension package commands", () => {
     await expect(command(port, TASK_CONTEXT, "runtime.initialize", {
       cwd: workspace.cwd,
       agentDir: workspace.agentDir,
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     })).resolves.toMatchObject({ ok: true });
     await expect(command(port, WORKSPACE_CONTEXT, "skill.pack.list", {}))
       .resolves.toMatchObject({ ok: true, result: { items: [], total: 0 } });

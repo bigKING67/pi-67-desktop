@@ -129,7 +129,7 @@ async function probe() {
   for (const epoch of [1, 2]) {
     const host = await startHost(root, epoch);
     try {
-      await host.request("workspace.register", { cwd: host.workspace, trust: "trusted", approvalMode: "guided" }, workspaceContext);
+      await host.request("workspace.register", { cwd: host.workspace, trust: "trusted" }, workspaceContext);
       if (epoch === 1) {
         await host.request("session.create", { creationId: "denied-cold", teamScope }, task("cold-team"), true);
         assert.equal((await jsonlFiles(host.agentDir)).length, 0);
@@ -155,7 +155,7 @@ async function probe() {
       } else {
         assert.ok(stored);
         const reopened = await host.request("runtime.initialize", { cwd: host.workspace, agentDir: host.agentDir,
-          sessionPath: stored.sessionPath, trust: "trusted", approvalMode: "guided" }, task("restored")); assert.ok(reopened);
+          sessionPath: stored.sessionPath, trust: "trusted" }, task("restored")); assert.ok(reopened);
         assert.equal(reopened.sessionId, stored.sessionId);
         const projection = await host.request("projection.resync", {}, { ...task("restored"), sessionId: reopened.sessionId,
           sessionFileIdentity: reopened.sessionFileIdentity, sessionGeneration: reopened.sessionGeneration }); assert.ok(projection);

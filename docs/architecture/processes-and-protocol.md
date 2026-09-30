@@ -1853,7 +1853,8 @@ source and staged-tree verification still gates activation.
    只在 receipt 的 Operation ID 与断线前 active Operation 相同时恢复它，不采用无关历史。
    同一恢复 incident 内重复 Port 中断保留首次在途 Operation 身份，直到恢复收敛或 Host replacement；
    已清空的瞬态 AppState 不得覆盖该身份。只有
-   `hostEpoch` 变化才用当前 workspace、trust、approval mode 与 session path 重新初始化。
+   `hostEpoch` 变化才用当前 workspace、trust 与 session path 重新初始化；审批模式不在协议上传递，
+   由 Runtime 固定使用 Host 默认值。
 
 打包环境无条件忽略 `PI67_RENDERER_DEV_URL`，只加载 `app://pi67/index.html`；开发环境只接受
 精确的 `http://127.0.0.1:5173`。生产协议解析只接受 exact `app://pi67` authority，拒绝 credentials、

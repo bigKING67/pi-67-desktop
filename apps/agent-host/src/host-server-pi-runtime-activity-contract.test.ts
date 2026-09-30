@@ -58,7 +58,7 @@ describe("AgentHostServer Pi runtime activity contract", () => {
     const promptCompletion = new Promise<void>((resolve) => { finishPrompt = resolve; });
     let server: AgentHostServer | undefined;
     try {
-      await runtime.initialize({ cwd, agentDir, trust: "unknown", approvalMode: "guided" });
+      await runtime.initialize({ cwd, agentDir, trust: "unknown" });
       const session = runtimeInternals(runtime).sessionBindings.requireSession();
       expect(session.getAllTools().find((tool) => tool.name === "bash")?.sourceInfo).toMatchObject({
         path: "<builtin:bash>",

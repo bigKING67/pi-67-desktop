@@ -61,7 +61,7 @@ describe("Session import data integrity", () => {
     await writeFile(source, original);
     const runtime = new PiSdkRuntime();
     try {
-      await runtime.initialize({ cwd, agentDir, trust: "unknown", approvalMode: "guided" });
+      await runtime.initialize({ cwd, agentDir, trust: "unknown" });
       const imported = await runtime.importSession(source);
       await runtime.setSessionName("Renamed import");
       const persisted = await readFile(imported.sessionPath!, "utf8");
@@ -81,7 +81,7 @@ describe("Session import data integrity", () => {
     const { cwd, agentDir, source } = await fixture();
     const runtime = new PiSdkRuntime();
     try {
-      await runtime.initialize({ cwd, agentDir, trust: "unknown", approvalMode: "guided" });
+      await runtime.initialize({ cwd, agentDir, trust: "unknown" });
       const outgoing = runtime.getIdentity().sessionPath;
       vi.spyOn(RuntimeProjectionController.prototype, "bind")
         .mockRejectedValueOnce(new Error("post-switch binding failed"));

@@ -32,7 +32,7 @@ describe("PiSdkRuntime Session fork", () => {
     runtime.subscribe((event) => events.push(event));
     try {
       await runtime.initialize({ cwd: fixture.cwd, agentDir: fixture.agentDir,
-        sessionPath: fixture.sessionPath, trust: "unknown", approvalMode: "guided" });
+        sessionPath: fixture.sessionPath, trust: "unknown" });
       const identity = runtime.getIdentity();
       const before = await readFile(fixture.sessionPath, "utf8");
       const filesBefore = await readdir(join(fixture.agentDir, "sessions"));
@@ -57,8 +57,7 @@ describe("PiSdkRuntime Session fork", () => {
         cwd: fixture.cwd,
         agentDir: fixture.agentDir,
         sessionPath: fixture.sessionPath,
-        trust: "unknown",
-        approvalMode: "guided"
+        trust: "unknown"
       });
       const originalIdentity = runtime.getIdentity();
       const originalJsonl = await readFile(fixture.sessionPath, "utf8");
@@ -104,8 +103,7 @@ describe("PiSdkRuntime Session fork", () => {
         cwd: fixture.cwd,
         agentDir: fixture.agentDir,
         sessionPath: fixture.sessionPath,
-        trust: "unknown",
-        approvalMode: "guided"
+        trust: "unknown"
       });
       const originalIdentity = runtime.getIdentity();
       const originalJsonl = await readFile(fixture.sessionPath, "utf8");
@@ -131,8 +129,7 @@ describe("PiSdkRuntime Session fork", () => {
         cwd: fixture.cwd,
         agentDir: fixture.agentDir,
         sessionPath: fixture.sessionPath,
-        trust: "unknown",
-        approvalMode: "guided"
+        trust: "unknown"
       });
       const originalJsonl = await readFile(fixture.sessionPath, "utf8");
 
@@ -156,14 +153,12 @@ describe("PiSdkRuntime Session fork", () => {
         cwd: fixture.cwd,
         agentDir: fixture.agentDir,
         sessionPath: fixture.sessionPath,
-        trust: "unknown",
-        approvalMode: "guided"
+        trust: "unknown"
       });
       await targetRuntime.initialize({
         cwd: fixture.cwd,
         agentDir: fixture.agentDir,
-        trust: "unknown",
-        approvalMode: "guided"
+        trust: "unknown"
       });
       const sourceIdentity = sourceRuntime.getIdentity();
       const sourceJsonl = await readFile(fixture.sessionPath, "utf8");
@@ -204,8 +199,7 @@ describe("PiSdkRuntime Session fork", () => {
       await runtime.initialize({
         cwd: fixture.cwd,
         agentDir: fixture.agentDir,
-        trust: "unknown",
-        approvalMode: "guided"
+        trust: "unknown"
       });
       const sessionDirectory = join(fixture.agentDir, "sessions");
       const filesBefore = await readdir(sessionDirectory);
@@ -237,8 +231,7 @@ describe("PiSdkRuntime Session fork", () => {
       await runtime.initialize({
         cwd: fixture.cwd,
         agentDir: fixture.agentDir,
-        trust: "unknown",
-        approvalMode: "guided"
+        trust: "unknown"
       });
       const sessionDirectory = join(fixture.agentDir, "sessions");
       const filesBefore = await readdir(sessionDirectory);

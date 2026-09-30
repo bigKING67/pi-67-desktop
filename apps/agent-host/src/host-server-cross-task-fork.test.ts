@@ -71,8 +71,7 @@ describe("AgentHostServer cross-Task Session fork", () => {
 
     const sourceOpen = commandEnvelopeForContext("workspace.open", {
       cwd: "/tmp/workspace",
-      trust: "unknown",
-      approvalMode: "guided"
+      trust: "unknown"
     }, testTaskContext(1, { taskId: "task-source" }), 10, "open-source-task");
     port.emit(sourceOpen);
     await waitForResponse(port, sourceOpen.requestId);
@@ -246,8 +245,7 @@ async function createForkHarness() {
   const port = await connect(server);
   const sourceOpen = commandEnvelopeForContext("workspace.open", {
     cwd: "/tmp/workspace",
-    trust: "unknown",
-    approvalMode: "guided"
+    trust: "unknown"
   }, testTaskContext(1, { taskId: "task-source" }), 10, "open-source-task");
   port.emit(sourceOpen);
   await waitForResponse(port, sourceOpen.requestId);

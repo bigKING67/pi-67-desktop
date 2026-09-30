@@ -79,7 +79,7 @@ describe("PiSdkRuntime shutdown", () => {
     const restoredRuntime = new PiSdkRuntime();
     let childPid: number | undefined;
     try {
-      await runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" });
+      await runtime.initialize({ cwd, agentDir, trust: "trusted" });
       const initialPath = runtime.getIdentity().sessionPath;
       if (!initialPath) throw new Error("Pi runtime did not project a managed session path.");
       await mkdir(dirname(initialPath), { recursive: true });
@@ -121,8 +121,7 @@ describe("PiSdkRuntime shutdown", () => {
         cwd,
         agentDir,
         sessionPath,
-        trust: "trusted",
-        approvalMode: "guided"
+        trust: "trusted"
       }, (observation) => {
         if (observation.outcome === "started") stages.push(observation.stage);
       });

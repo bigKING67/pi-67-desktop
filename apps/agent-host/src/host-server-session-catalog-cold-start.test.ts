@@ -99,8 +99,7 @@ async function attachAndRegister(
   await vi.waitFor(() => expect(port.sent.some(isHostWelcome)).toBe(true));
   const registration = commandEnvelopeForContext("workspace.register", {
     cwd,
-    trust: "trusted",
-    approvalMode: "guided"
+    trust: "trusted"
   }, context, hostEpoch, `register-${hostEpoch}`);
   port.emit(registration);
   expect(await responseFor(port, registration.requestId)).toMatchObject({ ok: true });

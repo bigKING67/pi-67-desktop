@@ -26,8 +26,7 @@ describe("PiSdkRuntime Snapshot hot paths", () => {
       await runtime.initialize({
         cwd,
         agentDir,
-        trust: "unknown",
-        approvalMode: "guided"
+        trust: "unknown"
       });
       const session = activeSession(runtime);
       const compact = vi.spyOn(session, "compact").mockResolvedValue({

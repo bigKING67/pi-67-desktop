@@ -38,7 +38,6 @@ export interface RegisterWorkspaceContextOptions extends Omit<
   "settingsManager" | "projectTrusted" | "sessionCatalogOwner"
 > {
   trust: Parameters<AgentRuntime["initialize"]>[0]["trust"];
-  approvalMode: Parameters<AgentRuntime["initialize"]>[0]["approvalMode"];
 }
 
 export type WorkspaceServicesFactory = (
@@ -313,8 +312,7 @@ function initializationFrom(
   return {
     cwd,
     agentDir,
-    trust: options.trust,
-    approvalMode: options.approvalMode
+    trust: options.trust
   };
 }
 

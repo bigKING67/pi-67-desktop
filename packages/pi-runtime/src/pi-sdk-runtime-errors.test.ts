@@ -18,8 +18,8 @@ describe("PiSdkRuntime errors", () => {
     });
 
     try {
-      const initializing = runtime.initialize({ cwd, agentDir, trust: "unknown", approvalMode: "guided" });
-      await expect(runtime.initialize({ cwd, agentDir, trust: "unknown", approvalMode: "guided" }))
+      const initializing = runtime.initialize({ cwd, agentDir, trust: "unknown" });
+      await expect(runtime.initialize({ cwd, agentDir, trust: "unknown" }))
         .rejects.toMatchObject({ code: "BUSY", details: { retryable: true } });
       await initializing;
 

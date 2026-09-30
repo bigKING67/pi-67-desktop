@@ -6,13 +6,10 @@ const TrustSchema = Type.Union([
   Type.Literal("trusted"),
   Type.Literal("untrusted")
 ]);
-const ApprovalModeSchema = Type.Union([Type.Literal("guided"), Type.Literal("balanced")]);
 
 export const WorkspaceRegisterPayloadSchema = strictObject({
   cwd: PathSchema,
-  trust: TrustSchema,
-  // Deprecated: ignored by the Host policy (AUTO is the only default); removed next protocol revision.
-  approvalMode: Type.Optional(ApprovalModeSchema)
+  trust: TrustSchema
 });
 
 export const WorkspaceRegisterResultSchema = strictObject({ registered: Type.Literal(true) });

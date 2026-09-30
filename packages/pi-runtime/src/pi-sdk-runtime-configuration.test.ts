@@ -39,7 +39,7 @@ describe("PiSdkRuntime configuration reload", () => {
     const observations: RuntimeInitializationObservation[] = [];
     try {
       const failure = await Promise.race([
-        runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" }, (observation) => {
+        runtime.initialize({ cwd, agentDir, trust: "trusted" }, (observation) => {
           observations.push(observation);
         })
           .catch((error: unknown) => error),
@@ -61,8 +61,7 @@ describe("PiSdkRuntime configuration reload", () => {
       await expect(runtime.initialize({
         cwd,
         agentDir,
-        trust: "trusted",
-        approvalMode: "guided"
+        trust: "trusted"
       })).resolves.toMatchObject({ sessionId: expect.any(String) });
     } finally {
       createRuntime.mockRestore();
@@ -103,8 +102,7 @@ describe("PiSdkRuntime configuration reload", () => {
       const initial = await runtime.initialize({
         cwd,
         agentDir,
-        trust: "trusted",
-        approvalMode: "guided"
+        trust: "trusted"
       });
       expect(initial.selectedModel).toEqual({ provider: "pi67-test", id: "fixture-model" });
       expect(initial.models).toContainEqual(expect.objectContaining({

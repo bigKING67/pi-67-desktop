@@ -44,7 +44,7 @@ describe("PiSdkRuntime", () => {
       if (event.type === "extension.compatibilityChanged") extensionErrors.push(event.payload.detail);
     });
     try {
-      const initial = await runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" });
+      const initial = await runtime.initialize({ cwd, agentDir, trust: "trusted" });
       const created = await runtime.createSession("session-creation-lifecycle");
       expect(created.sessionId).not.toBe(initial.sessionId);
       expect(created.cwd).toBe(cwd);
@@ -146,7 +146,7 @@ describe("PiSdkRuntime", () => {
     const services = createPiWorkspaceRuntimeServices({ cwd, agentDir, settingsManager });
     const runtime = new PiSdkRuntime({ workspaceServices: services });
     try {
-      await runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" });
+      await runtime.initialize({ cwd, agentDir, trust: "trusted" });
       reloadSettings.mockClear();
       applyOverrides.mockClear();
       process.env.PI67_CAPABILITY_PACKAGE_PATHS = JSON.stringify([overlayPackage, bundledPackage]);
@@ -199,14 +199,12 @@ describe("PiSdkRuntime", () => {
       await runtime.initialize({
         cwd: workspaceA,
         agentDir,
-        trust: "trusted",
-        approvalMode: "balanced"
+        trust: "trusted"
       });
       const target = await runtime.initialize({
         cwd: workspaceB,
         agentDir,
-        trust: "unknown",
-        approvalMode: "guided"
+        trust: "unknown"
       });
 
       expect(target.cwd).toBe(workspaceB);
@@ -249,8 +247,7 @@ describe("PiSdkRuntime", () => {
       const snapshot = await runtime.initialize({
         cwd,
         agentDir,
-        trust: "unknown",
-        approvalMode: "guided"
+        trust: "unknown"
       });
 
       expect(snapshot.cwd).toBe(cwd);
@@ -394,8 +391,7 @@ describe("PiSdkRuntime", () => {
         cwd,
         agentDir,
         sessionPath: fixturePath,
-        trust: "unknown",
-        approvalMode: "guided"
+        trust: "unknown"
       });
       expect(restored.sessionId).toBe(fixture.getSessionId());
       expect(restored.sessionName).toBe("Restored SDK smoke");

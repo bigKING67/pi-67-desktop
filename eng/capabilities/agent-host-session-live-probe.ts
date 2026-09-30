@@ -24,7 +24,7 @@ export async function probeLiveHostSession(root: string, directory: string, star
   const closeHost = async () => { const current = host; host = undefined; await current?.close(); };
   async function boot(epoch: number) {
     host = await startHost(root, epoch, new EnterpriseCredentialSupervisor(() => store));
-    await host.request("workspace.register", { cwd: host.workspace, trust: "trusted", approvalMode: "guided" }, workspaceContext);
+    await host.request("workspace.register", { cwd: host.workspace, trust: "trusted" }, workspaceContext);
     return host;
   }
   async function resolveSession(creationId: string, result: CommandResults["session.create"]) {
@@ -68,7 +68,7 @@ export async function probeLiveHostSession(root: string, directory: string, star
     current = await boot(2);
     assert.equal((await current.request("enterprise.identity.get", {}, appContext))?.state, "signed-in");
     const restored = await current.request("runtime.initialize", { cwd: current.workspace, agentDir: current.agentDir,
-      sessionPath: teamFile.path, trust: "trusted", approvalMode: "guided" }, task("restored")); assert.ok(restored);
+      sessionPath: teamFile.path, trust: "trusted" }, task("restored")); assert.ok(restored);
     assert.equal(restored.sessionId, teamSession.sessionId);
     const context = { ...task("restored"), sessionId: restored.sessionId,
       sessionFileIdentity: restored.sessionFileIdentity, sessionGeneration: restored.sessionGeneration };

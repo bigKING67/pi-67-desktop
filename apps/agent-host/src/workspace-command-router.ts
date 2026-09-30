@@ -1,4 +1,3 @@
-import { DEFAULT_APPROVAL_MODE } from "@pi67/domain";
 import type { AgentCommand, CommandResults, WorkspaceProtocolContext } from "@pi67/protocol";
 import type { RuntimeCredentialOverrideStore } from "@pi67/pi-runtime";
 import type { HostEventChannel } from "./host-event-channel.js";
@@ -260,7 +259,6 @@ export class WorkspaceCommandRouter {
         cwd: command.payload.cwd,
         agentDir: resolveAgentDirectory(undefined),
         trust: command.payload.trust,
-        approvalMode: command.payload.approvalMode ?? DEFAULT_APPROVAL_MODE,
         runtimeCredentialOverrides: this.runtimeCredentialOverrides,
         ...(process.env.PI67_SESSION_CATALOG_DIR === undefined
           ? {}

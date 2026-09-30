@@ -36,8 +36,7 @@ describe("Workspace registration protocol", () => {
 
     const request = commandEnvelope("workspace.register", {
       cwd: "/workspace",
-      trust: "trusted",
-      approvalMode: "guided"
+      trust: "trusted"
     }, WORKSPACE_CONTEXT, 4, "register-workspace-1");
     expect(isRequestEnvelope(request)).toBe(true);
     expect(correlateInvalidRequest(request)).toEqual({
@@ -57,15 +56,16 @@ describe("Workspace registration protocol", () => {
   it("keeps register and unregister payloads strict and bounded", () => {
     const register = commandEnvelope("workspace.register", {
       cwd: "/workspace",
-      trust: "unknown",
-      approvalMode: "balanced"
+      trust: "unknown"
     }, WORKSPACE_CONTEXT, 4, "register-workspace-2");
+    expect(isRequestEnvelope(register)).toBe(true);
     for (const payload of [
       {},
-      { cwd: "", trust: "trusted", approvalMode: "guided" },
-      { cwd: "/workspace", trust: "implicit", approvalMode: "guided" },
-      { cwd: "/workspace", trust: "trusted", approvalMode: "always" },
-      { cwd: "/workspace", trust: "trusted", approvalMode: "guided", workspaceId: "shadow" }
+      { cwd: "", trust: "trusted" },
+      { cwd: "/workspace", trust: "implicit" },
+      // approvalMode was removed from the wire; the strict schema now rejects it.
+      { cwd: "/workspace", trust: "trusted", approvalMode: "guided" },
+      { cwd: "/workspace", trust: "trusted", workspaceId: "shadow" }
     ]) {
       expect(isRequestEnvelope({ ...register, payload })).toBe(false);
     }

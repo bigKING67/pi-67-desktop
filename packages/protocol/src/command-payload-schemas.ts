@@ -55,7 +55,6 @@ import {
 
 const EmptyPayloadSchema = strictObject({});
 const TrustSchema = Type.Union([Type.Literal("unknown"), Type.Literal("trusted"), Type.Literal("untrusted")]);
-const ApprovalModeSchema = Type.Union([Type.Literal("guided"), Type.Literal("balanced")]);
 const PathSchema = Type.String({ minLength: 1, maxLength: 32_768 });
 const PromptSchema = Type.String({ maxLength: MAX_PROMPT_TEXT_CHARS });
 const CompactionInstructionsSchema = Type.String({ maxLength: 2_000_000 });
@@ -81,9 +80,7 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
     cwd: PathSchema,
     agentDir: Type.Optional(PathSchema),
     sessionPath: Type.Optional(PathSchema),
-    trust: TrustSchema,
-    // Deprecated: ignored by the Host policy (AUTO is the only default); removed next protocol revision.
-    approvalMode: Type.Optional(ApprovalModeSchema)
+    trust: TrustSchema
   }),
   "runtime.getStatus": EmptyPayloadSchema,
   "projection.resync": EmptyPayloadSchema,
@@ -91,7 +88,7 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "workspace.open": WorkspaceRegisterPayloadSchema,
   "workspace.register": WorkspaceRegisterPayloadSchema,
   "workspace.unregister": EmptyPayloadSchema,
-  "workspace.setTrust": strictObject({ trust: TrustSchema, approvalMode: Type.Optional(ApprovalModeSchema) }),
+  "workspace.setTrust": strictObject({ trust: TrustSchema }),
   "workspace.changes": EmptyPayloadSchema,
   "workspace.file.list": WorkspaceFileListPayloadSchema,
   "workspace.file.search": WorkspaceFileSearchPayloadSchema,

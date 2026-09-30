@@ -4,7 +4,7 @@ import {
   MAX_APPROVAL_CWD_BYTES,
   MAX_TASK_TRUSTED_ROOTS,
   RuntimeError,
-  type ApprovalMode,
+
   type ApprovalRefusedDecision,
   type ApprovalResolution,
   type ApprovalResponseDecision,
@@ -26,11 +26,11 @@ export class RuntimeToolSafetyController {
 
   get policy(): SafetyPolicyState { return this.state; }
 
-  initialize(cwd: string, trust: WorkspaceTrust, approvalMode: ApprovalMode): void {
+  initialize(cwd: string, trust: WorkspaceTrust): void {
     this.state = {
       cwd,
       trust,
-      approvalMode,
+      approvalMode: DEFAULT_APPROVAL_MODE,
       taskToolMode: DEFAULT_TASK_TOOL_MODE,
       taskTrustedRoots: []
     };
@@ -38,11 +38,10 @@ export class RuntimeToolSafetyController {
 
   setCwd(cwd: string): void { this.state = { ...this.state, cwd }; }
 
-  setWorkspacePolicy(trust: WorkspaceTrust, approvalMode: ApprovalMode): TaskToolMode {
+  setWorkspacePolicy(trust: WorkspaceTrust): TaskToolMode {
     this.state = {
       ...this.state,
       trust,
-      approvalMode,
       ...(trust === "trusted"
         ? {}
         : { taskToolMode: DEFAULT_TASK_TOOL_MODE, taskTrustedRoots: [] })

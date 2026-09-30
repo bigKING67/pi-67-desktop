@@ -1,5 +1,4 @@
 import type {
-  ApprovalMode,
   ConversationPage,
   DoctorReport,
   ExtensionCatalogResult,
@@ -53,7 +52,6 @@ export interface RuntimeInitializeOptions {
   creationId?: string;
   teamScope?: import("@pi67/domain").TeamSessionScope;
   trust: WorkspaceTrust;
-  approvalMode: ApprovalMode;
 }
 
 export type RuntimeInitializationStage =
@@ -86,7 +84,7 @@ export interface AgentRuntime {
   subscribe(listener: (event: AgentEvent) => void): () => void;
   subscribeOperationActivity?(listener: (activity: RuntimeOperationActivity) => void): () => void;
   subscribeToolExecution?(listener: (execution: ToolExecutionView) => void): () => void;
-  setWorkspacePolicy(trust: WorkspaceTrust, approvalMode: ApprovalMode): TaskToolMode;
+  setWorkspacePolicy(trust: WorkspaceTrust): TaskToolMode;
   getTaskToolMode(): TaskToolMode;
   setTaskToolMode(mode: TaskToolMode): TaskToolMode;
   requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState>;
