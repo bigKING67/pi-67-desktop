@@ -79,7 +79,8 @@ Runtime initialization assets 0.492 MiB, Welcome owned memory p95 133.9 MiB, Run
 p95 829 ms. The first clean-profile launch after a fresh unsigned build took 2.79 s, spent in the
 Electron handshake before application code; the other nine took 0.49-0.55 s. With ten samples the
 nearest-rank p95 equals that first launch, so a first-launch-after-build outlier can dominate
-`cleanProfileLaunch`.
+`cleanProfileLaunch`. `performance:electron` therefore performs one discarded clean-profile warm-up
+launch of the packaged executable before sampling; the warm-up duration is only logged.
 
 ## Required scenarios
 

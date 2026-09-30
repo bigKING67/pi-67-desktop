@@ -95,6 +95,8 @@ const activeExtensionCommandCloseSamples = [];
 const closeSamples = [];
 const rendererResourceTransitions = [];
 
+await warmUpPackagedExecutable();
+
 for (let index = 0; index < samples; index += 1) {
   const sampleStarted = performance.now();
   console.log(`Electron performance sample ${index + 1}/${samples}: start`);
@@ -278,6 +280,28 @@ await writeElectronPerformanceReport({
     rendererResourceTransitions
   }
 });
+
+/**
+ * The first launch of a freshly written unsigned executable pays one-time OS work (macOS
+ * Gatekeeper/XProtect assessment) before Electron's handshake. It is discarded so a single
+ * post-build launch cannot become the ten-sample nearest-rank p95 of cleanProfileLaunch.
+ */
+async function warmUpPackagedExecutable() {
+  const profile = await mkdtemp(join(tmpdir(), "pi67-performance-warmup-"));
+  const agentDir = join(profile, "pi-agent");
+  let application;
+  try {
+    await mkdir(agentDir, { recursive: true });
+    const warmUp = await launch(profile, agentDir, true);
+    application = warmUp.application;
+    console.log(`Electron performance warm-up launch (discarded): ${Math.round(warmUp.durationMs)}ms`);
+    await close(application);
+    application = undefined;
+  } finally {
+    await application?.close().catch(() => undefined);
+    await rm(profile, { recursive: true, force: true });
+  }
+}
 
 function resolvePackagedExecutable() {
   if (process.platform === "darwin" && process.arch === "arm64") {
