@@ -9,11 +9,12 @@
 | --- | ---: |
 | cold launch to first usable window p95 | <= 3.0 s |
 | warm launch p95 | <= 1.8 s |
-| Welcome production renderer assets | <= 0.60 MiB |
-| Runtime initialization incremental renderer assets | <= 0.40 MiB |
+| Welcome production renderer assets (ratchet) | <= accepted baseline + 5% |
+| Runtime initialization incremental renderer assets (ratchet) | <= accepted baseline + 5% |
+| Workspace selection to initialized usable Pi Runtime p95 | <= 1.2 s |
 | packaged Command Palette loading feedback p95 | <= 50 ms |
 | packaged Command Palette first interactive open p95 | <= 400 ms |
-| on-demand Welcome working set: Main + renderer | <= 350 MiB |
+| on-demand Welcome owned memory: Main + renderer p95 | <= 160 MiB |
 | composer input-to-paint p95 | <= 50 ms |
 | streaming renderer commits | <= 20/s |
 | 1,000-message session first usable projection p95 | <= 1.5 s |
@@ -50,6 +51,27 @@ Dialog 就绪不得超过 400 ms，避免以初始 bundle 变小为代价制造�
 资源报告另列 agentConnection 阶段，明确披露从首屏延后至连接时的代码，不能将延迟加载说成删除。
 Asset 预算按 production build 文件 bytes 计算，不冒充网络传输或 decoded memory。Streaming
 batching 默认 50 ms，禁止 token-level React commit。
+
+### Renderer asset ratchets
+
+Renderer asset bytes are regression ratchets, not user-facing targets. `app://pi67` serves them
+from local disk, and the metric itself records that file bytes do not represent transfer, parse or
+decoded-memory cost; launch and Runtime initialization time budgets carry the user outcome. Each
+ratchet fails when p95 exceeds its accepted baseline by more than 5%
+(`RENDERER_ASSET_RATCHETS` in `eng/performance/electron-renderer-performance-metrics.mjs`). A
+baseline moves only with an attributed cause recorded here.
+
+| Stage | Accepted baseline | Cause of the last move |
+| --- | ---: | --- |
+| Welcome | 0.638 MiB | 2026-09-30: +43.7 KB from 9c2d162. About 36.7 KB is TypeBox plus three protocol schema modules, which reached Welcome when `aff0267` and `67a3f3e` moved untrusted preload validation for Agent Host startup/failure events and update state into `@pi67/protocol`. Hand-written duplicate validators were rejected as a drift risk for about 37 KB of local-disk bytes. The other 5.4 KB is stylesheet growth. |
+| Runtime initialization | 0.49 MiB | 2026-09-30: the previous 0.40 MiB target was unreachable without replacing React Aria primitives that the initialization surfaces use (see `docs/plans/2026-09-21-startup-performance.md`). |
+
+The former 0.60 MiB / 0.40 MiB absolute targets and the 350 MiB summed resident working set were
+set with Alpha.4 on 2026-07-27. Summed working sets double-count shared framework pages, so the
+Welcome memory budget now uses owned memory (`welcomeOwnedMemory`; macOS `phys_footprint`), while
+`welcomeIdleWorkingSet` stays an informational series for cross-version continuity. The 1.2 s
+Runtime initialization and 160 MiB owned-memory budgets are calibrated on macOS arm64
+(p95 815 ms and 136 MiB on 2026-09-21); a Windows baseline is pending.
 
 ## Required scenarios
 

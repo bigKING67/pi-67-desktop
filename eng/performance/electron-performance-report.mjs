@@ -35,12 +35,14 @@ export async function writeElectronPerformanceReport({
       label: "On-demand Welcome Main + renderer resident working set",
       unit: "MiB",
       samples: samples.welcomeMemory,
-      budget: 350,
       evidenceLevel: "packaged",
       method: platform === "win32"
         ? "Win32 WorkingSetSize for packaged Main and renderer before Agent Host demand"
         : "macOS RSS for packaged Main and renderer before Agent Host demand",
-      limitations: ["Summed process working sets can double-count shared pages; GPU and network utility processes are excluded."]
+      limitations: [
+        "Summed process working sets can double-count shared pages; GPU and network utility processes are excluded.",
+        "Informational: welcomeOwnedMemory carries the Welcome memory budget."
+      ]
     }),
     summarizeMetric({
       id: "warmRestoredWorkspaceWorkingSet",
@@ -81,9 +83,10 @@ export async function writeElectronPerformanceReport({
       label: "On-demand Welcome Main + renderer owned/effective memory",
       unit: "MiB",
       samples: samples.welcomeOwnedMemory,
+      budget: 160,
       evidenceLevel: "packaged",
       method: `${ownedMemoryMethod}; Main and renderer sum before Agent Host demand`,
-      limitations: ownedMemoryLimitations
+      limitations: [...ownedMemoryLimitations, "Budget calibrated on macOS arm64; a Windows baseline is pending."]
     }),
     summarizeMetric({
       id: "mainOwnedMemory",
@@ -229,9 +232,10 @@ export async function writeElectronPerformanceReport({
       label: "Workspace selection to initialized usable Pi Runtime",
       unit: "ms",
       samples: samples.runtimeInitialization,
+      budget: 1_200,
       evidenceLevel: "packaged",
       method: "User-visible workspace action through native dialog bridge, Pi SDK ready state, and lazy conversation shell paint",
-      limitations: ["Informational until representative Windows and macOS multi-version baselines establish a release budget."]
+      limitations: ["Budget calibrated on macOS arm64 (p95 815 ms on 2026-09-21); a Windows baseline is pending."]
     }),
     ...rendererMetrics.slice(2),
     summarizeMetric({
