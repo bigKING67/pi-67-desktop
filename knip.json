@@ -5,6 +5,7 @@
       "entry": [
         "eng/capabilities/ai-berkshire-skill-pack-sync.mjs",
         "eng/capabilities/probe-agent-host-session-electron.mjs",
+        "eng/capabilities/probe-openviking-native.mjs",
         "eng/capabilities/agent-host-session-electron-probe.ts",
         "eng/capabilities/local-memory-settings-electron-probe.ts",
         "eng/capabilities/probe-shared-knowledge-live-electron.mjs",

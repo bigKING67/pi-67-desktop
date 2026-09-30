@@ -112,6 +112,10 @@ failures in ten minutes block further session-local attempts. It does not restar
 in the background. The probe now calls the Main-owned `startNativeOpenViking`
 macOS adapter, which bounds readiness and cleanup and owns a detached process group.
 This is native adapter evidence, not production Main configuration wiring.
+`probe:openviking:native` first bundles this TypeScript-backed source graph into an
+isolated temporary entry, because production source imports intentionally name the
+emitted `.mjs` files. It removes that entry after success or failure; the bundle is
+not runtime content or retained evidence.
 
 The dedicated data root holds a non-secret `profile.json` (version and stable
 localProfileId), `embedding.json` (version and model-identity SHA-256),
@@ -192,6 +196,18 @@ before adopting an output that must remain a fixed external input or rollback.
   payload. This is a per-stage limit, not a global byte quota. Receipts/metadata
   remain after payload eviction. The in-progress operation can temporarily need
   one additional payload; a late protection change aborts retirement visibly.
+- A successfully signed runtime can make its byte-identical preparation payload,
+  an older same-purpose signed payload, or a diagnosed failed attempt redundant.
+  `corepack pnpm run memory:runtime:cleanup-local` produces a read-only plan that
+  lists exact payloads, allocated bytes, signed replacements and protected artifacts.
+  After review, `corepack pnpm run memory:runtime:cleanup-local -- apply
+  --confirm-openviking-native-cleanup` remeasures the preparation, fully admits the
+  signed copy with the same tree/signature/interpreter checks and source-pinned trust
+  anchor, refuses pinned/in-use/changed
+  inputs, removes only fixed generated payload directories, and marks the preparation
+  retired. It preserves the newest signed installation of each purpose, pinned or
+  in-use signed installations, failed attempts without a later successful
+  same-purpose preparation, receipts, manifests and ownership metadata. It never reads a signing key, installed runtime or user profile.
 - Preparation identity binds actual standalone interpreter bytes, purpose, retained
   test mode, Node version, capability code/locks, Desktop verifier and protocol
   source. Input revision v2 skips each source root's README, `*.test.*` JS/TS files,

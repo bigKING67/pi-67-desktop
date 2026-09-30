@@ -10,6 +10,7 @@ import { assembleOpenVikingTestInstallation } from "./assemble-openviking-test-i
 import { runtimeTreeIdentity } from "../../apps/desktop/src/openviking-runtime-tree.mts";
 import { applyPrivateRuntimePatch, normalizePrivateRuntimeLaunchers } from "./openviking-runtime-patches.mts";
 import { applyQueryEmbeddingPatch } from "./openviking-query-patch.mts";
+import { runBundledOpenVikingNativeProbe } from "./run-openviking-native-probe.mjs";
 export { runtimeTreeIdentity } from "../../apps/desktop/src/openviking-runtime-tree.mts";
 
 import { runNativeArtifact } from "./native-artifact-store.mjs";
@@ -174,12 +175,12 @@ async function buildPreparedRuntime(output, identity, purpose, offline, keepTest
   try {
     await run(relocatedPython, ["-I", "-B", join(repositoryRoot, "eng/capabilities/openviking-runtime/ark_sdk_probe.py")]);
     receipt.arkSdkProbe = "PASS";
-    await run(process.execPath, [join(repositoryRoot, "eng/capabilities/probe-openviking-native.mjs"), relocatedPython]);
+    await runBundledOpenVikingNativeProbe(relocatedPython);
     const afterProbe = await runtimeTreeIdentity(relocated);
     if (afterProbe.sha256 !== after.sha256) throw new Error("Native probe modified the prepared runtime.");
     const installed = await assembleOpenVikingTestInstallation(relocated, after.sha256, output);
     receipt.testInstallation = installed;
-    await run(process.execPath, [join(repositoryRoot, "eng/capabilities/probe-openviking-native.mjs"), installed.python]);
+    await runBundledOpenVikingNativeProbe(installed.python);
     const afterInstalledProbe = await runtimeTreeIdentity(join(installed.installationRoot, "runtime"));
     if (afterInstalledProbe.sha256 !== after.sha256) throw new Error("Native probe modified the assembled runtime.");
     receipt.nativeProbe = "PASS";

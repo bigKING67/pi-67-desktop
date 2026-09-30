@@ -108,35 +108,41 @@ async function selectVictims(entries, retain, probeInUse) {
   return victims;
 }
 
-async function retireNativeArtifact(entry, probeInUse) {
+export async function retireNativeArtifact(entry, probeInUse = nativeArtifactInUse) {
   const metadata = await lstat(entry.path);
   if (!metadata.isDirectory() || metadata.isSymbolicLink() || metadata.ino !== entry.inode || metadata.dev !== entry.device
     || await optionalStat(join(entry.path, ".keep")) || await probeInUse(entry.path)) {
     throw new Error("Native artifact became protected or changed before retirement.");
   }
   // Only fixed generated payload locations. Preserve all evidence files.
-  for (const name of await readdir(entry.path)) {
+  for (const path of await listNativeArtifactPayloads(entry.path)) await rm(path, { recursive: true });
+  const { path, inode: _inode, device: _device, ...record } = entry;
+  await writeFile(join(path, marker), JSON.stringify({ ...record, status: "RETIRED", retiredAt: new Date().toISOString() }, null, 2));
+}
+
+export async function listNativeArtifactPayloads(artifactPath) {
+  const payloads = [];
+  for (const name of await readdir(artifactPath)) {
     if (["runtime", "staging", "New Money 本地运行包"].includes(name)) {
-      const path = join(entry.path, name);
+      const path = join(artifactPath, name);
       const stat = await lstat(path);
       if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("Unsafe native artifact payload.");
-      await rm(path, { recursive: true });
+      payloads.push(path);
     } else if (/^test-installation-[a-zA-Z0-9]+$/u.test(name)) {
-      const testRoot = join(entry.path, name);
+      const testRoot = join(artifactPath, name);
       if (await realpath(testRoot) !== testRoot) throw new Error("Unsafe test installation path.");
       const runtime = join(testRoot, "runtime");
       if (await optionalStat(runtime)) {
         const stat = await lstat(runtime);
         if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("Unsafe test runtime payload.");
-        await rm(runtime, { recursive: true });
+        payloads.push(runtime);
       }
     }
   }
-  const { path, inode: _inode, device: _device, ...record } = entry;
-  await writeFile(join(path, marker), JSON.stringify({ ...record, status: "RETIRED", retiredAt: new Date().toISOString() }, null, 2));
+  return payloads;
 }
 
-async function nativeArtifactInUse(path) {
+export async function nativeArtifactInUse(path) {
   if (process.platform !== "darwin") throw new Error("Native artifact process protection requires macOS.");
   const { stdout } = await execute("/bin/ps", ["-ww", "-axo", "command="], { maxBuffer: 8 * 1024 * 1024, timeout: 10_000 });
   if (stdout.includes(`${path}${sep}`)) return true;
