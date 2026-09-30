@@ -8,7 +8,7 @@ import { rendererStageAssetMiBSamples } from "./electron-renderer-resources.mjs"
  */
 export const RENDERER_ASSET_RATCHETS = Object.freeze({
   welcome: Object.freeze({ baselineMiB: 0.638, tolerance: 0.05 }),
-  runtimeInitialization: Object.freeze({ baselineMiB: 0.49, tolerance: 0.05 })
+  runtimeInitialization: Object.freeze({ baselineMiB: 0.492, tolerance: 0.05 })
 });
 
 export function rendererAssetRatchetBudget({ baselineMiB, tolerance }) {

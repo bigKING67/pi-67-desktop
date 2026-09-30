@@ -1,6 +1,6 @@
 # Startup resource and memory optimization
 
-Status: partial — Inspector split reverted and restored preview passes; current ten-sample initialization assets and Welcome working set fail their budgets
+Status: closed — budgets reassessed on 2026-09-30; asset bytes became regression ratchets (docs/testing/performance.md "Renderer asset ratchets")
 Owner: Codex
 Started: 2026-09-21
 
@@ -262,3 +262,11 @@ and the pre-existing attachment test change. The latest local functional
 follow-up passed 7 native and 26 Renderer checks; performance and Windows/real
 Provider limitations remain open. Validation was performed in the dirty local
 checkout, not an isolated exact-commit candidate.
+
+## Closeout (2026-09-30)
+The unmet 0.60/0.40 MiB asset targets and the 350 MiB summed working set were replaced rather than
+pursued further: asset bytes are ratchets over attributed baselines (Welcome 0.638 MiB, Runtime
+initialization 0.492 MiB), Welcome memory is budgeted on owned memory (<= 160 MiB), and Runtime
+initialization has a 1.2 s budget. Ten packaged macOS samples at 141e8be pass. The Welcome growth since
+this plan's checkpoint is attributed to TypeBox and protocol schemas from aff0267/67a3f3e plus CSS.
+Main native RSS remains unattributed but no longer gates. Windows baselines are pending.

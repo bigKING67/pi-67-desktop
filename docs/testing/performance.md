@@ -64,7 +64,7 @@ baseline moves only with an attributed cause recorded here.
 | Stage | Accepted baseline | Cause of the last move |
 | --- | ---: | --- |
 | Welcome | 0.638 MiB | 2026-09-30: +43.7 KB from 9c2d162. About 36.7 KB is TypeBox plus three protocol schema modules, which reached Welcome when `aff0267` and `67a3f3e` moved untrusted preload validation for Agent Host startup/failure events and update state into `@pi67/protocol`. Hand-written duplicate validators were rejected as a drift risk for about 37 KB of local-disk bytes. The other 5.4 KB is stylesheet growth. |
-| Runtime initialization | 0.49 MiB | 2026-09-30: the previous 0.40 MiB target was unreachable without replacing React Aria primitives that the initialization surfaces use (see `docs/plans/2026-09-21-startup-performance.md`). |
+| Runtime initialization | 0.492 MiB | 2026-09-30: the previous 0.40 MiB target was unreachable without replacing React Aria primitives that the initialization surfaces use (see `docs/plans/2026-09-21-startup-performance.md`). |
 
 The former 0.60 MiB / 0.40 MiB absolute targets and the 350 MiB summed resident working set were
 set with Alpha.4 on 2026-07-27. Summed working sets double-count shared framework pages, so the
@@ -72,6 +72,14 @@ Welcome memory budget now uses owned memory (`welcomeOwnedMemory`; macOS `phys_f
 `welcomeIdleWorkingSet` stays an informational series for cross-version continuity. The 1.2 s
 Runtime initialization and 160 MiB owned-memory budgets are calibrated on macOS arm64
 (p95 815 ms and 136 MiB on 2026-09-21); a Windows baseline is pending.
+
+Baselines were confirmed on 2026-09-30 at 141e8be with ten packaged macOS arm64 samples
+(`artifacts/performance/budget-reassessment-electron.json`, verdict pass): Welcome assets 0.638 MiB,
+Runtime initialization assets 0.492 MiB, Welcome owned memory p95 133.9 MiB, Runtime initialization
+p95 829 ms. The first clean-profile launch after a fresh unsigned build took 2.79 s, spent in the
+Electron handshake before application code; the other nine took 0.49-0.55 s. With ten samples the
+nearest-rank p95 equals that first launch, so a first-launch-after-build outlier can dominate
+`cleanProfileLaunch`.
 
 ## Required scenarios
 
