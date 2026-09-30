@@ -3,7 +3,7 @@
 Status: decisions 1-6 applied; approvalMode removal (stage 2) and device evidence open
 Owner: main
 Started: 2026-09-28
-Last updated: 2026-09-28
+Last updated: 2026-09-30
 
 ## Goal and acceptance
 Close the remaining validated findings from the 2026-09-27 read-only full-repository review
@@ -40,7 +40,11 @@ manifest no-store, account poll error, authority document drift.
 - macOS title bar fix (54ba0fa) in the packaged app while switching system appearance.
 - Packaged team-session probe (a7d03f2): run `node eng/packaging/probe-packaged-team-session.mjs`
   with a live directory; the rewrite is source-verified only.
-- Windows real-user probes: Provider failure now detected via `provider-configuration-error`.
+- ~~Windows real-user probes~~ — closed 2026-09-30. Windows candidate run 36671645797 (source
+  fa120a1, alpha.41) ran the full installed real-user lifecycle on hosted Windows x64, including the
+  Provider configuration stage, and passed. The `provider-configuration-error` failure branch is
+  covered by `windows-real-user-health.test.mjs`; the failing path itself has no device run.
+  Closing this surfaced a stale selector: e7a46fe removed the per-row 已配置 badge, fixed in fa120a1.
 
 ## Deferred items
 Done on 2026-09-28: test-02 (Python worker tests in the CI quality lane), protocol-domain-06
@@ -65,3 +69,5 @@ source (`corepack pnpm --filter @pi67/protocol run generate:revision`).
 - 2026-09-28: plan recorded after landing the accepted fixes; decisions 1-6 pending.
 - 2026-09-28: decisions 1-6 applied (e543051..HEAD); approvalMode stage 2 remains.
 - 2026-09-28: deferred items closed except attachments-01 release and approvalMode stage 2.
+- 2026-09-30: Windows real-user probes closed with candidate run 36671645797; macOS title bar and
+  packaged team-session device evidence plus approvalMode stage 2 remain.
