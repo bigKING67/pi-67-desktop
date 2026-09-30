@@ -1,9 +1,26 @@
 # New Money Server 独立化与 Desktop 接入
 
-Status: active — local implementation verified in bounded checkpoints; source consolidation pending
+Status: source consolidated — Desktop in 5b0bfac; server Web and ingress committed on 2026-09-30 (994a0cf, 9185341); runtime acceptance gaps remain
 Owner: Codex
 Started: 2026-09-08
-Last updated: 2026-09-20
+Last updated: 2026-09-30
+
+## Source consolidation closeout (2026-09-30)
+
+- Desktop: the combined memory/team/account integration was committed as 5b0bfac
+  (525 files); the working tree is clean.
+- Server (`../new-money-server`, no remote by operator choice): the Web UI deployed
+  in the 2026-09-25 rollouts was uncommitted. A frozen local build of the working tree
+  produced `index-CdvAoKTB.js` and `index-FXJggwg6.css`, the exact assets the public
+  site served, and was committed as 994a0cf. The public ingress cutover was
+  committed as 9185341; its Compose file matches the recorded post-cutover SHA-256
+  `2d8c2490…`. Backup scripts, timer, `SCHEDULED_BACKUP.md` and the backup note in
+  `VPS_DATABASE.md` remain uncommitted and deferred. A verified full-history bundle
+  was written to `/Users/gaoqian/Documents/sixseven/new-money-server-20260930.bundle`.
+- Still unverified: a real-account restart showing the persisted display name,
+  real-member invitation acceptance, the packaged Desktop authorization and
+  project-binding round trip (blocked on 2026-09-25 by Computer Use), backups,
+  Windows, and formal distribution.
 
 ## Current closeout and source consolidation (2026-09-20)
 

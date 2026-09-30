@@ -153,3 +153,7 @@ SHA-256, and start the platform update handoff.
   lifecycle, later macOS startup failure after `open`, and unmeasured mainland carrier throughput.
 
 - 2026-09-30: Closed during plan hygiene: the R2 channel published Alpha.31–33 and 35–41 (receipts under artifacts/r2-release-receipts/). Its runbook is docs/release/internal-r2-update-distribution.md.
+
+- 2026-09-30: The operator confirmed an installed Alpha.40 updated in-app to Alpha.41 after the
+  legacy-prefix republish (Alpha.41 manifest names `Pi-67-Desktop-*`; see
+  docs/release/internal-r2-update-distribution.md).
