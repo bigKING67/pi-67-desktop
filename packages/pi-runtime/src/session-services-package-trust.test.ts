@@ -26,7 +26,7 @@ describe("Desktop Session package trust admission", () => {
     const settingsManager = SettingsManager.create(cwd, agentDir);
     const services = await createDesktopSessionServices({
       cwd, agentDir, settingsManager,
-      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
+      getSafety: () => ({ cwd, trust: "trusted", taskToolMode: "ask" }),
       requestApproval: async () => ({ status: "denied" })
     });
     expect(settingsManager.getCacheWarmingMode()).toBe("idle");
@@ -80,7 +80,7 @@ describe("Desktop Session package trust admission", () => {
         runtimePackageAllowed: () => false
       },
       runtimeApiKeys: new Map(),
-      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
+      getSafety: () => ({ cwd, trust: "trusted", taskToolMode: "ask" }),
       requestApproval: async () => ({ status: "denied" })
     });
     expect(refresh).toHaveBeenCalledOnce();
@@ -100,7 +100,7 @@ describe("Desktop Session package trust admission", () => {
       },
       packageTrustRefresh,
       runtimeApiKeys: new Map(),
-      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
+      getSafety: () => ({ cwd, trust: "trusted", taskToolMode: "ask" }),
       requestApproval: async () => ({ status: "denied" })
     });
     expect(admittedRefresh).toHaveBeenCalledOnce();
@@ -139,7 +139,7 @@ describe("Desktop Session package trust admission", () => {
       agentDir,
       settingsManager: trustedSettings,
       runtimeApiKeys: new Map(),
-      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
+      getSafety: () => ({ cwd, trust: "trusted", taskToolMode: "ask" }),
       requestApproval: async () => ({ status: "denied" })
     });
     expect(trustedSettings.isProjectTrusted()).toBe(true);
@@ -154,7 +154,7 @@ describe("Desktop Session package trust admission", () => {
       agentDir,
       settingsManager: untrustedSettings,
       runtimeApiKeys: new Map(),
-      getSafety: () => ({ cwd, trust: "untrusted", approvalMode: "guided", taskToolMode: "ask" }),
+      getSafety: () => ({ cwd, trust: "untrusted", taskToolMode: "ask" }),
       requestApproval: async () => ({ status: "denied" })
     });
     expect(untrustedSettings.isProjectTrusted()).toBe(false);

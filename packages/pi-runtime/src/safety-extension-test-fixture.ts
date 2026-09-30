@@ -14,7 +14,7 @@ export function trustedPolicy(): SafetyPolicyState {
   return {
     cwd: "/workspace",
     trust: "trusted",
-    approvalMode: "guided",
+   
     taskToolMode: "ask"
   };
 }

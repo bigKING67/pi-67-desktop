@@ -12,7 +12,7 @@ it("the installed Pi runner returns explicit cancellation for manual and automat
   initializePrivateMemoryProvenance(manager);
   const privateLeaf = manager.getLeafId()!;
   const services = await createDesktopSessionServices({ cwd: root, agentDir: join(root, "agent"),
-    getSafety: () => ({ cwd: root, trust: "unknown", approvalMode: "guided", taskToolMode: "ask" }),
+    getSafety: () => ({ cwd: root, trust: "unknown", taskToolMode: "ask" }),
     requestApproval: async () => ({ status: "denied" }) });
   const { session } = await createAgentSessionFromServices({ services, sessionManager: manager });
   try {

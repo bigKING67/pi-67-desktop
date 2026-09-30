@@ -144,7 +144,6 @@ function createBindings(
     getSafety: () => ({
       cwd: "/tmp/pi67-workspace",
       trust: "unknown",
-      approvalMode: "guided",
       taskToolMode: "ask"
     }),
     getWorkspaceServices,

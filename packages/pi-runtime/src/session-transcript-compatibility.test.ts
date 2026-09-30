@@ -14,7 +14,7 @@ it("persists and resumes Pi prompt/tool state without exposing control messages 
   const settingsManager = SettingsManager.inMemory({ compaction: { enabled: false }, retry: { enabled: false } });
   const services = await createDesktopSessionServices({ cwd: root, agentDir, settingsManager,
     runtimeApiKeys: new Map([["openai", "synthetic-only"]]),
-    getSafety: () => ({ cwd: root, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
+    getSafety: () => ({ cwd: root, trust: "trusted", taskToolMode: "ask" }),
     requestApproval: async () => ({ status: "denied" }) });
   const model = { id: "synthetic", name: "Synthetic", provider: "openai", api: "openai-responses" as const,
     baseUrl: "https://synthetic.invalid", reasoning: false, input: ["text" as const], contextWindow: 100_000,

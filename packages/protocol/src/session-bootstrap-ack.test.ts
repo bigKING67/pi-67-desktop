@@ -11,13 +11,11 @@ describe("Session bootstrap acknowledgements", () => {
   it.each([
     ["runtime.initialize", {
       cwd: "/workspace",
-      trust: "unknown" as const,
-      approvalMode: "guided" as const
+      trust: "unknown" as const
     }],
     ["workspace.open", {
       cwd: "/workspace",
-      trust: "unknown" as const,
-      approvalMode: "guided" as const
+      trust: "unknown" as const
     }],
     ["session.create", { creationId: "session-creation-bootstrap" }],
     ["session.open", { path: "/sessions/session-2.jsonl" }],

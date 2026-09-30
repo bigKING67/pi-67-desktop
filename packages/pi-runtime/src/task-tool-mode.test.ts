@@ -37,13 +37,11 @@ describe("PiSdkRuntime task Tool mode", () => {
     const trustedYolo = safetyHandler({
       cwd: "/workspace",
       trust: "trusted",
-      approvalMode: "balanced",
       taskToolMode: "yolo"
     }, requestApproval, tools);
     const untrustedYolo = safetyHandler({
       cwd: "/workspace",
       trust: "unknown",
-      approvalMode: "balanced",
       taskToolMode: "yolo"
     }, requestApproval, tools);
 

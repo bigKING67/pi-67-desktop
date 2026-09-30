@@ -16,7 +16,6 @@ describe("Desktop AUTO and YOLO safety order", () => {
     const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
     const handler = safetyHandler({
       ...trustedPolicy(),
-      approvalMode: "balanced",
       taskToolMode: "auto"
     }, requestApproval);
 
@@ -46,7 +45,6 @@ describe("Desktop AUTO and YOLO safety order", () => {
     const handler = safetyHandler({
       ...trustedPolicy(),
       cwd: workspace,
-      approvalMode: "balanced",
       taskToolMode: "auto"
     }, requestApproval, undefined, undefined, recordToolAuthorization);
 
@@ -73,7 +71,6 @@ describe("Desktop AUTO and YOLO safety order", () => {
     const handler = safetyHandler({
       ...trustedPolicy(),
       cwd: workspace,
-      approvalMode: "balanced",
       taskToolMode: "auto"
     }, requestApproval);
 
@@ -109,7 +106,6 @@ describe("Desktop AUTO and YOLO safety order", () => {
     const handler = safetyHandler({
       ...trustedPolicy(),
       cwd: workspace,
-      approvalMode: "balanced",
       taskToolMode: "auto",
       taskTrustedRoots: [canonicalTrustedRoot]
     }, requestApproval, undefined, undefined, recordToolAuthorization);
@@ -153,7 +149,6 @@ describe("Desktop AUTO and YOLO safety order", () => {
     const handler = safetyHandler({
       ...trustedPolicy(),
       cwd: workspace,
-      approvalMode: "balanced",
       taskToolMode: "auto",
       taskTrustedRoots: [canonicalTrustedRoot]
     }, requestApproval, () => [builtinTool("read"), builtinTool("write")], undefined, recordToolAuthorization);
@@ -194,7 +189,6 @@ describe("Desktop AUTO and YOLO safety order", () => {
     const handler = safetyHandler({
       ...trustedPolicy(),
       cwd: workspace,
-      approvalMode: "balanced",
       taskToolMode: "auto",
       taskTrustedRoots: [await realpath(homedir())]
     }, requestApproval, () => [builtinTool("read"), builtinTool("write"), builtinTool("edit")], undefined, recordToolAuthorization);
@@ -267,7 +261,6 @@ describe("Desktop AUTO and YOLO safety order", () => {
     const handler = safetyHandler({
       ...trustedPolicy(),
       cwd: workspace,
-      approvalMode: "balanced",
       taskToolMode: "auto",
       taskTrustedRoots: [canonicalTrustedRoot, await realpath(homedir())]
     }, requestApproval, undefined, undefined, recordToolAuthorization);
@@ -317,7 +310,6 @@ describe("Desktop AUTO and YOLO safety order", () => {
     const requestApproval = vi.fn<DesktopApprovalRequester>();
     const handler = safetyHandler({
       ...trustedPolicy(),
-      approvalMode: "balanced",
       taskToolMode: "auto"
     }, requestApproval);
 
@@ -340,7 +332,7 @@ describe("Desktop AUTO and YOLO safety order", () => {
   it("keeps recognized destructive operations behind exact confirmation in trusted YOLO", async () => {
     const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "allowed" });
     const handler = safetyHandler(
-      { ...trustedPolicy(), approvalMode: "balanced", taskToolMode: "yolo" },
+      { ...trustedPolicy(), taskToolMode: "yolo" },
       requestApproval
     );
 

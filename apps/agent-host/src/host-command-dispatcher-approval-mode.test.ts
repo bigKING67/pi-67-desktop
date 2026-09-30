@@ -2,7 +2,7 @@ import type { AgentRuntime } from "@pi67/pi-runtime";
 import { describe, expect, it, vi } from "vitest";
 import { dispatchHostCommand } from "./host-command-dispatcher.js";
 
-// approvalMode is no longer on the wire or a runtime input; the runtime applies the Host default.
+// approvalMode is no longer on the wire or a runtime input; the safety policy derives it from the Task tool mode.
 describe("Host workspace policy without approvalMode", () => {
   it("passes only trust to the runtime for workspace.setTrust", async () => {
     const setWorkspacePolicy = vi.fn(() => "auto" as const);

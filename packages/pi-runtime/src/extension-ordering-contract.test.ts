@@ -39,7 +39,7 @@ describe("Pi extension ordering contract", () => {
       cwd,
       agentDir,
       runtimeApiKeys: new Map(),
-      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
+      getSafety: () => ({ cwd, trust: "trusted", taskToolMode: "ask" }),
       requestApproval
     });
     const { session } = await createAgentSessionFromServices({
@@ -106,7 +106,7 @@ describe("Pi extension ordering contract", () => {
       cwd,
       agentDir,
       runtimeApiKeys: new Map(),
-      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
+      getSafety: () => ({ cwd, trust: "trusted", taskToolMode: "ask" }),
       requestApproval
     });
     const { session } = await createAgentSessionFromServices({

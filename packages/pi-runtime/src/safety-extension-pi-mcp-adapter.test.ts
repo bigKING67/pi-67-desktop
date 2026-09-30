@@ -221,11 +221,11 @@ describe("createDesktopSafetyExtension pi-mcp-adapter classification", () => {
 });
 
 function autoPolicy(): SafetyPolicyState {
-  return { cwd: "/workspace", trust: "trusted", approvalMode: "balanced", taskToolMode: "auto" };
+  return { cwd: "/workspace", trust: "trusted", taskToolMode: "auto" };
 }
 
 function askPolicy(): SafetyPolicyState {
-  return { cwd: "/workspace", trust: "trusted", approvalMode: "guided", taskToolMode: "ask" };
+  return { cwd: "/workspace", trust: "trusted", taskToolMode: "ask" };
 }
 
 async function safetyHandler(

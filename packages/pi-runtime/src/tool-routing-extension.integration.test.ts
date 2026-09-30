@@ -143,7 +143,7 @@ async function createSession(fixture: { cwd: string; agentDir: string }) {
     agentDir: fixture.agentDir,
     settingsManager,
     runtimeApiKeys: new Map(),
-    getSafety: () => ({ cwd: fixture.cwd, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
+    getSafety: () => ({ cwd: fixture.cwd, trust: "trusted", taskToolMode: "ask" }),
     requestApproval
   });
   const aliases = createDesktopToolAliasBinding();

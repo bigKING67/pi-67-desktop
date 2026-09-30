@@ -198,7 +198,7 @@ async function createWorkspace(): Promise<string> {
 }
 
 function autoPolicy(cwd: string): SafetyPolicyState {
-  return { cwd, trust: "trusted", approvalMode: "balanced", taskToolMode: "auto" };
+  return { cwd, trust: "trusted", taskToolMode: "auto" };
 }
 
 function safetyHandler(

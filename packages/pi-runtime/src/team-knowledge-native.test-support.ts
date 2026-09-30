@@ -59,7 +59,7 @@ export async function createKnowledgeAgentLoop(input: {
   const services = await createDesktopSessionServices({ cwd: input.directory, agentDir: join(input.directory, "agent-loop-profile"),
     noThirdPartyExtensions: true, runtimeApiKeys: new Map([["openai", "synthetic-loop-only"]]),
     settingsManager: SettingsManager.inMemory({ compaction: { enabled: false }, retry: { enabled: false } }),
-    getSafety: () => ({ cwd: input.directory, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
+    getSafety: () => ({ cwd: input.directory, trust: "trusted", taskToolMode: "ask" }),
     requestApproval: async () => ({ status: "allowed" }) });
   const model = { ...input.model, api: "openai-responses" as const, provider: "openai", name: "Synthetic loop model",
     reasoning: false, input: ["text" as const], contextWindow: 100_000, maxTokens: 128,

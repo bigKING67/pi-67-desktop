@@ -46,7 +46,6 @@ import { classifyPi67ContextToolIntent } from "./pi67-context-tool-safety.js";
 export interface SafetyPolicyState {
   cwd: string;
   trust: WorkspaceTrust;
-  approvalMode: ApprovalMode;
   taskToolMode: TaskToolMode;
   taskTrustedRoots?: readonly string[];
 }

@@ -1,5 +1,4 @@
 import {
-  DEFAULT_APPROVAL_MODE,
   DEFAULT_TASK_TOOL_MODE,
   MAX_APPROVAL_CWD_BYTES,
   MAX_TASK_TRUSTED_ROOTS,
@@ -19,7 +18,6 @@ export class RuntimeToolSafetyController {
   private state: SafetyPolicyState = {
     cwd: process.cwd(),
     trust: "unknown",
-    approvalMode: DEFAULT_APPROVAL_MODE,
     taskToolMode: DEFAULT_TASK_TOOL_MODE,
     taskTrustedRoots: []
   };
@@ -30,7 +28,6 @@ export class RuntimeToolSafetyController {
     this.state = {
       cwd,
       trust,
-      approvalMode: DEFAULT_APPROVAL_MODE,
       taskToolMode: DEFAULT_TASK_TOOL_MODE,
       taskTrustedRoots: []
     };

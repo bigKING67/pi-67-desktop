@@ -22,7 +22,7 @@ export async function createPrivateMemoryNativeSession(input: {
     localMemory: input.memory, runtimeApiKeys: new Map([["openai", "synthetic-only"]]),
     settingsManager: SettingsManager.inMemory({ packages: [extensionRoot],
       compaction: { enabled: false }, retry: { enabled: false } }),
-    getSafety: () => ({ cwd: input.directory, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
+    getSafety: () => ({ cwd: input.directory, trust: "trusted", taskToolMode: "ask" }),
     requestApproval: async () => ({ status: "denied" }) });
   const loaded = services.resourceLoader.getExtensions();
   expect(loaded.errors).toEqual([]);

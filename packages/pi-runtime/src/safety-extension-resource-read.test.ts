@@ -37,7 +37,6 @@ describe("Desktop safety loaded-resource integration", () => {
       () => ({
         cwd: workspace,
         trust: "trusted",
-        approvalMode: "balanced",
         taskToolMode: "auto"
       }),
       requestApproval,

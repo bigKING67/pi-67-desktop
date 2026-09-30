@@ -96,7 +96,6 @@ function trustedPolicy(): SafetyPolicyState {
   return {
     cwd: "/workspace",
     trust: "trusted",
-    approvalMode: "balanced",
     taskToolMode: "auto"
   };
 }

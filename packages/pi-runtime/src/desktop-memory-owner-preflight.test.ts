@@ -141,7 +141,6 @@ describe("Desktop Memory owner preflight", () => {
       getSafety: () => ({
         cwd: fixture.cwd,
         trust: "trusted",
-        approvalMode: "guided",
         taskToolMode: "ask"
       }),
       requestApproval: async () => ({ status: "denied" })

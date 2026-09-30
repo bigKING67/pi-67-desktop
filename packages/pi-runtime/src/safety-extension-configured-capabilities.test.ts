@@ -43,7 +43,7 @@ describe("createDesktopSafetyExtension configured capabilities", () => {
   it("keeps the same configured Package Tool behind one-shot approval in ASK", async () => {
     const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
     const handler = await safetyHandler(
-      { ...autoPolicy(), approvalMode: "guided", taskToolMode: "ask" },
+      { ...autoPolicy(), taskToolMode: "ask" },
       requestApproval,
       [packageTool("subagent", "npm:pi-subagents@0.18.0")],
       ["pi-subagents"]
@@ -217,7 +217,7 @@ async function safetyHandler(
 }
 
 function autoPolicy(): SafetyPolicyState {
-  return { cwd: "/workspace", trust: "trusted", approvalMode: "balanced", taskToolMode: "auto" };
+  return { cwd: "/workspace", trust: "trusted", taskToolMode: "auto" };
 }
 
 function packageTool(name: string, source: string): ReturnType<ExtensionAPI["getAllTools"]>[number] {

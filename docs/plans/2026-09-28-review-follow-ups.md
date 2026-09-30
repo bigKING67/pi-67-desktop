@@ -29,8 +29,9 @@ manifest no-store, account poll error, authority document drift.
 3. **`approvalMode` wire field** — done. Stage 1 made it optional and stopped the renderer sending it;
    stage 2 (2026-09-30) removed it from the four command payloads and schemas (strict schemas now reject
    it), from `AgentRuntime.initialize` and `setWorkspacePolicy`, and regenerated the protocol revision.
-   The runtime safety policy still carries `approvalMode`, fixed to the Host default; the projected
-   `WorkspaceState.approvalMode` field is left for a separate cleanup.
+   Follow-up the same day removed the dead remainder: the unreferenced domain `WorkspaceState` type
+   (it was never projected), `DEFAULT_APPROVAL_MODE`, and the write-only `SafetyPolicyState.approvalMode`
+   field; the safety extension derives the approval mode from the Task tool mode.
 4. **Protocol revision coverage** — done. Context-scope, event-context and replay-safe tables are part
    of the revision material.
 5. **commerce-growth-os `sync_helper`** — removed; the pack syncs through its own repository and the

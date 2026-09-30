@@ -99,7 +99,6 @@ describe("createDesktopSafetyExtension", () => {
     const recordToolAuthorization = vi.fn();
     const handler = safetyHandler({
       ...trustedPolicy(),
-      approvalMode: "balanced",
       taskToolMode: "auto"
     }, requestApproval, undefined, undefined, recordToolAuthorization);
 

@@ -38,7 +38,7 @@ describe("OpenViking Pi package loader", () => {
     });
     const services = await createDesktopSessionServices({ cwd, agentDir,
       settingsManager: SettingsManager.inMemory({ packages: [extensionRoot] }), localMemory: { connect },
-      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
+      getSafety: () => ({ cwd, trust: "trusted", taskToolMode: "ask" }),
       requestApproval: async () => ({ status: "denied" }) });
     const loaded = services.resourceLoader.getExtensions();
     expect(connect).toHaveBeenCalledTimes(state === "off" ? 0 : 1);

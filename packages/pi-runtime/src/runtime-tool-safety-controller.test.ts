@@ -9,7 +9,6 @@ describe("RuntimeToolSafetyController", () => {
     const controller = new RuntimeToolSafetyController();
     controller.initialize("/workspace", "trusted");
 
-    expect(controller.policy.approvalMode).toBe("balanced");
     expect(controller.getTaskToolMode()).toBe("auto");
     expect(controller.setTaskToolMode("ask")).toBe("auto");
   });
