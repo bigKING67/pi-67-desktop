@@ -197,6 +197,13 @@ source SHA; the publication receipt separately records the later release-tooling
 allows a release-only tooling fix without rebuilding different application bytes under the same
 version. `--bundle` can select another verified local bundle; unknown or duplicate flags fail closed.
 
+When `HTTPS_PROXY`/`HTTP_PROXY` is set, the release tool routes public-origin requests (public
+readback and manifest verification) through that proxy with `http.setGlobalProxyFromEnv`, because
+Node fetch ignores those variables and direct mainland routes to the Cloudflare edge can fall below
+100 KiB/s at peak. It adds `.r2.cloudflarestorage.com` to `NO_PROXY` so S3 traffic stays direct:
+on 2026-09-30 direct S3 readback ran at 9-15 MiB/s but about 136 KiB/s through the local proxy.
+Integrity does not depend on the route; every byte is still verified by size and SHA-256.
+
 The release tool uses Cloudflare R2's S3-compatible API for object listing, direct readback,
 conditional same-object metadata replacement, uploads, and deletion.
 Uploads stream from disk; the AWS high-level uploader automatically uses multipart transfer for

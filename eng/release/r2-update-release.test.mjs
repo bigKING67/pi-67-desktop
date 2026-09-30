@@ -4,6 +4,7 @@ import {
   createR2RetentionPlan
 } from "./r2-update-release-contract.mjs";
 import {
+  configureReleaseNetworkProxy,
   immutableArtifactCacheControl,
   publishR2Release
 } from "./r2-update-release.mjs";
@@ -401,3 +402,23 @@ function remoteVersion(remoteVersionName) {
     `New-Money-${remoteVersionName}-mac-arm64-unsigned-preview.zip`
   ].map((key, index) => ({ key, size: 100 + index }));
 }
+
+describe("release network proxy", () => {
+  it("leaves networking untouched without a proxy", () => {
+    const setProxy = vi.fn();
+    expect(configureReleaseNetworkProxy({ NO_PROXY: "localhost" }, setProxy)).toBe(false);
+    expect(setProxy).not.toHaveBeenCalled();
+  });
+
+  it("routes the public origin through the proxy and keeps the R2 S3 endpoint direct", () => {
+    const setProxy = vi.fn();
+    expect(configureReleaseNetworkProxy({ HTTPS_PROXY: "http://127.0.0.1:7890", NO_PROXY: "127.0.0.1,localhost" }, setProxy))
+      .toBe(true);
+    expect(setProxy).toHaveBeenCalledWith({
+      HTTPS_PROXY: "http://127.0.0.1:7890",
+      NO_PROXY: "127.0.0.1,localhost,.r2.cloudflarestorage.com"
+    });
+    configureReleaseNetworkProxy({ https_proxy: "http://127.0.0.1:7890" }, setProxy);
+    expect(setProxy).toHaveBeenLastCalledWith({ https_proxy: "http://127.0.0.1:7890", NO_PROXY: ".r2.cloudflarestorage.com" });
+  });
+});

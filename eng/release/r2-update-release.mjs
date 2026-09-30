@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import http from "node:http";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -187,7 +188,22 @@ export async function cleanupR2Release({
   return { targetVersion: confirmedVersion, deleted: oldArtifacts };
 }
 
+const R2_S3_NO_PROXY = ".r2.cloudflarestorage.com";
+
+/**
+ * Node fetch ignores HTTP(S)_PROXY by default. Operators behind a local proxy reach the public update
+ * origin through it (direct mainland routes to the Cloudflare edge are slow at peak), while the R2 S3
+ * endpoint stays direct because it is fast directly and slow when proxied.
+ */
+export function configureReleaseNetworkProxy(env = process.env, setProxy = http.setGlobalProxyFromEnv) {
+  if (![env.HTTPS_PROXY, env.https_proxy, env.HTTP_PROXY, env.http_proxy].some(Boolean)) return false;
+  const noProxy = [env.NO_PROXY ?? env.no_proxy, R2_S3_NO_PROXY].filter(Boolean).join(",");
+  setProxy({ ...env, NO_PROXY: noProxy });
+  return true;
+}
+
 async function main() {
+  configureReleaseNetworkProxy();
   const [command, ...args] = process.argv.slice(2);
   if (!new Set(["plan", "publish", "cleanup"]).has(command)) usage();
   const flags = parseReleaseCommandFlags(command, args);
