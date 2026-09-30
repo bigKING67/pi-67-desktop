@@ -72,7 +72,9 @@ async function probeNpmSource(
   try {
     const response = await fetcher(`${source.url}/-/ping`, {
       method: "GET",
-      redirect: "follow",
+      // A registry base URL answers /-/ping directly; refusing redirects keeps a public URL from
+      // bouncing the probe to loopback or LAN services.
+      redirect: "error",
       signal: AbortSignal.timeout(SOURCE_PROBE_TIMEOUT_MS),
       headers: { Accept: "application/json" }
     });

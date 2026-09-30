@@ -16,7 +16,10 @@ Main 创建 `MessageChannelMain`，把一端交给 Agent Host，另一端经 Pre
 Agent 消息不经过 IPC invoke、HTTP 或 WebSocket。Preload 的 invoke API（约 67 个 `pi67:*` 通道）
 承载不经 Agent 的系统能力：文件夹选择、诊断、通知、外部链接、更新，以及 Workbench/草稿/文件状态持久化、
 Git 仓库检查与 submodule 初始化、worktree 创建与恢复、prompt 附件与 Prompt Stash 图片、本地记忆设置
-（含一次性的 API key 显示）、签名运行包安装、browser67 与下载源设置。每个通道都是特权面，新增通道须按同等标准审查。更新状态（`pi67:update-*` 结果与 `pi67:update-state-changed`）
+（含一次性的 API key 显示）、签名运行包安装、browser67 与下载源设置。每个通道都是特权面，新增通道须按同等标准审查。
+Main 经 `createAuthorizedIpcHandle`（`authorized-ipc.ts`）注册 invoke 通道：只接受当前主窗口主 frame、且位于 renderer URL 的调用方，
+其他调用在处理函数运行前被拒绝。用系统默认应用打开会运行代码的 workspace entry，以及让新的自定义 npm/Git 下载源生效，
+都由 Main 原生对话框确认且默认取消；下载源探测拒绝重定向，避免公网地址把探测转到 loopback 或局域网。更新状态（`pi67:update-*` 结果与 `pi67:update-state-changed`）
 由 `@pi67/protocol` 的 `DesktopUpdateStateSchema` 定义并纳入 protocol revision；Main 按该类型构造，renderer 用
 `parseDesktopUpdateState` 校验后才使用。
 原生通知请求、workspace id、workspace entry 请求、关闭检查点请求/响应以及 `pi67:agent-host-startup`/`pi67:agent-host-failed`

@@ -31,9 +31,13 @@ describe("Package public source probes", () => {
     const snapshot = await probePackageSources({
       toolchain,
       settings: defaultPackageNetworkSettings(),
-      fetcher: async (url) => new Response(JSON.stringify({ ok: true }), {
-        status: String(url).includes("npmmirror") ? 200 : 503
-      }),
+      fetcher: async (url, init) => {
+        // A redirect could bounce a public URL to loopback or LAN services.
+        expect(init.redirect).toBe("error");
+        return new Response(JSON.stringify({ ok: true }), {
+          status: String(url).includes("npmmirror") ? 200 : 503
+        });
+      },
       gitRunner: async (_executable, url, gitExecPath) => {
         expect(gitExecPath).toBe("/private/toolchain/git/libexec/git-core");
         if (url.includes("ghproxy")) throw new Error("mirror unavailable\nsecret detail");

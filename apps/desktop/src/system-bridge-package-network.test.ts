@@ -3,14 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (...arguments_: unknown[]) => unknown>(),
   ipcHandle: vi.fn(),
-  probePackageSources: vi.fn()
+  probePackageSources: vi.fn(),
+  showMessageBox: vi.fn(async (..._arguments: unknown[]) => ({ response: 1 }))
 }));
 
 vi.mock("electron", () => ({
   app: { getVersion: vi.fn(() => "0.1.0"), isPackaged: false },
   clipboard: { writeText: vi.fn() },
   dialog: {
-    showMessageBox: vi.fn(async () => ({ response: 1 })),
+    showMessageBox: mocks.showMessageBox,
     showOpenDialog: vi.fn()
   },
   ipcMain: { handle: mocks.ipcHandle },
@@ -31,7 +32,7 @@ vi.mock("./browser67-integration.js", () => ({
 
 vi.mock("./package-source-probe.js", () => ({
   probePackageSources: mocks.probePackageSources,
-  unprobedPackageNetworkSnapshot: vi.fn()
+  unprobedPackageNetworkSnapshot: vi.fn((_toolchain: unknown, settings: unknown) => ({ settings }))
 }));
 
 import { registerSystemBridge } from "./system-bridge.js";
@@ -72,6 +73,37 @@ describe("system bridge package network probe", () => {
     expect(packageNetworkSettings.save).not.toHaveBeenCalled();
     expect(packageNetworkSettings.reset).not.toHaveBeenCalled();
     expect(mocks.probePackageSources).toHaveBeenCalledWith(expect.objectContaining({ settings }));
+  });
+
+  it("asks Main to confirm a newly effective custom source and keeps settings on cancel", async () => {
+    const current = { npmMode: "automatic", gitMode: "automatic", gitMirrors: ["gitclone"] };
+    const next = { ...current, npmMode: "custom", npmCustomRegistry: "https://registry.example.test" };
+    const packageNetworkSettings = registerFixture();
+    packageNetworkSettings.load.mockResolvedValue(current);
+    packageNetworkSettings.save.mockImplementation(async (value: unknown) => value);
+
+    mocks.showMessageBox.mockResolvedValueOnce({ response: 1 });
+    await expect(invoke("pi67:package-network-save", next)).resolves.toMatchObject({ settings: current });
+    expect(packageNetworkSettings.save).not.toHaveBeenCalled();
+    // showMessageBox(window, options): the options follow the parent window.
+    expect(mocks.showMessageBox.mock.calls.at(-1)?.[1]).toMatchObject({
+      detail: expect.stringContaining("https://registry.example.test")
+    });
+
+    mocks.showMessageBox.mockResolvedValueOnce({ response: 0 });
+    await expect(invoke("pi67:package-network-save", next)).resolves.toMatchObject({ settings: next });
+    expect(packageNetworkSettings.save).toHaveBeenCalledWith(next);
+  });
+
+  it("saves preset source changes without a confirmation", async () => {
+    const packageNetworkSettings = registerFixture();
+    packageNetworkSettings.load.mockResolvedValue({ npmMode: "automatic", gitMode: "automatic", gitMirrors: ["gitclone"] });
+    packageNetworkSettings.save.mockImplementation(async (value: unknown) => value);
+    mocks.showMessageBox.mockClear();
+
+    const next = { npmMode: "official-only", gitMode: "official-only", gitMirrors: [] };
+    await expect(invoke("pi67:package-network-save", next)).resolves.toMatchObject({ settings: next });
+    expect(mocks.showMessageBox).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid draft before starting network work", async () => {

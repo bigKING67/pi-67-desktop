@@ -25,6 +25,7 @@ import {
 import { createNativeWorkspaceDescriptor, type NativeWorkspaceDescriptor } from "./workspace-identity.js";
 import { resolveRegisteredWorkspaceEntry } from "./workspace-entry.js";
 import { registerWorkspaceEntryBridge } from "./workspace-entry-bridge.js";
+import { confirmCustomPackageSources, newlyEffectiveCustomSources } from "./package-network-confirmation.js";
 import { createAuthorizedIpcHandle } from "./authorized-ipc.js";
 import type { WorkspaceFileStateStore } from "./workspace-file-state.js";
 import type { ComposerDraftStateStore } from "./composer-draft-state.js";
@@ -311,12 +312,17 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
       await options.packageNetworkSettings.load()
     )
   ));
-  handle("pi67:package-network-save", async (_event, value: unknown) => (
-    unprobedPackageNetworkSnapshot(
+  handle("pi67:package-network-save", async (_event, value: unknown) => {
+    const next = parsePackageNetworkSettings(value);
+    if (!next) throw new Error("Package network settings are invalid.");
+    const current = await options.packageNetworkSettings.load();
+    const added = newlyEffectiveCustomSources(current, next);
+    const confirmed = added.length === 0 || await confirmCustomPackageSources(options.getMainWindow(), added);
+    return unprobedPackageNetworkSnapshot(
       options.desktopToolchain,
-      await options.packageNetworkSettings.save(value)
-    )
-  ));
+      confirmed ? await options.packageNetworkSettings.save(next) : current
+    );
+  });
   handle("pi67:package-network-reset", async () => (
     unprobedPackageNetworkSnapshot(
       options.desktopToolchain,

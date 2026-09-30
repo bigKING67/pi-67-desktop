@@ -110,6 +110,7 @@ export async function runWithNpmRegistryFallback<T>(
 
 async function probeNpmRegistry(url: string, timeoutMs: number, resourcePath: string): Promise<boolean> {
   const response = await fetch(`${url}${resourcePath}`, {
+    redirect: "error",
     signal: AbortSignal.timeout(timeoutMs),
     headers: { Accept: "application/json" }
   });
