@@ -25,11 +25,20 @@ compromised. This is an accepted boundary for the internal team channel.
 For version `<version>`, R2 contains:
 
 ```text
-New-Money-<version>-win-x64-unsigned-preview.exe
-New-Money-<version>-mac-arm64-unsigned-preview.dmg
-New-Money-<version>-mac-arm64-unsigned-preview.zip
+Pi-67-Desktop-<version>-win-x64-unsigned-preview.exe
+Pi-67-Desktop-<version>-mac-arm64-unsigned-preview.dmg
+Pi-67-Desktop-<version>-mac-arm64-unsigned-preview.zip
 unsigned-preview-manifest.json
 ```
+
+Published names keep the legacy `Pi-67-Desktop-` prefix (`UPDATE_PUBLICATION_PREFIX`) even though
+local build output, verified bundles and provenance use `New-Money-` names. Installed renderers up to
+Alpha.41 accept only `Pi-67-Desktop-` artifact names and show "无效的安装包信息" for any other
+name, although Main accepts both. `release:r2:bundle:prepare` copies each verified `New-Money-` file
+to its published name and rewrites only the manifest names; bytes and SHA-256 values are unchanged,
+and macOS provenance accepts exactly that legacy alias. Switch the prefix only after every supported
+installed client accepts `New-Money-` names. Alpha.41 was first published under `New-Money-` names,
+which blocked in-app updates from Alpha.40; those objects remain immutable and unreferenced.
 
 Artifact names are immutable. Never overwrite an existing versioned artifact with different
 bytes. `unsigned-preview-manifest.json` is the only mutable publication pointer.

@@ -8,6 +8,19 @@ import { readPiRuntimeContract } from "./pi-runtime-contract.mjs";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const defaultReleaseDirectory = join(root, "artifacts/release");
 
+/**
+ * Prefix of the names published to the update channel. Installed renderers up to Alpha.41 accept
+ * only `Pi-67-Desktop-` artifact names, so updates keep that prefix until every supported client
+ * also accepts `New-Money-`. Local build output and provenance keep the `New-Money` names.
+ */
+export const UPDATE_PUBLICATION_PREFIX = "Pi-67-Desktop";
+
+/** Maps a local `New-Money-` artifact name to its update-channel name; other names are rejected. */
+export function publishedUpdateArtifactName(localName, prefix = UPDATE_PUBLICATION_PREFIX) {
+  if (!localName.startsWith("New-Money-")) throw new Error(`Unexpected local update artifact name: ${localName}`);
+  return `${prefix}-${localName.slice("New-Money-".length)}`;
+}
+
 export function unsignedPreviewArtifactSpecs(version, prefix = "New-Money") {
   return [
     {

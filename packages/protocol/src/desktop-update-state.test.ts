@@ -33,6 +33,23 @@ describe("desktop update state contract", () => {
     expect(parseDesktopUpdateState({ ...available, phase: "verifying" })).toEqual({ ok: false, issue: "phase" });
   });
 
+  it("accepts the New-Money and legacy Pi-67-Desktop artifact prefixes for the exact version", () => {
+    for (const artifactName of [
+      "New-Money-0.1.0-alpha.2-win-x64-unsigned-preview.exe",
+      "New-Money-0.1.0-alpha.2-mac-arm64-unsigned-preview.zip",
+      "Pi-67-Desktop-0.1.0-alpha.2-mac-arm64-unsigned-preview.zip"
+    ]) {
+      expect(parseDesktopUpdateState({ ...available, artifactName }).ok, artifactName).toBe(true);
+    }
+    for (const artifactName of [
+      "New-Money-0.1.0-alpha.3-win-x64-unsigned-preview.exe",
+      "New-Money-0.1.0-alpha.2-mac-arm64-unsigned-preview.dmg",
+      "Other-0.1.0-alpha.2-win-x64-unsigned-preview.exe"
+    ]) {
+      expect(parseDesktopUpdateState({ ...available, artifactName }), artifactName).toEqual({ ok: false, issue: "artifact" });
+    }
+  });
+
   it("rejects fields outside the contract instead of silently dropping them", () => {
     expect(parseDesktopUpdateState({ ...available, downloadUrl: "https://example.invalid" }).ok).toBe(false);
   });

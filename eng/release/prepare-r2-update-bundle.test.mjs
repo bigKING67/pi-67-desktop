@@ -47,8 +47,21 @@ describe("R2 update bundle", () => {
     ]);
     expect(result.metadataLast).toBe("unsigned-preview-manifest.json");
     expect(await readdir(outputDirectory)).toHaveLength(8);
-    expect(JSON.parse(await readFile(join(outputDirectory, "unsigned-preview-manifest.json"), "utf8")))
-      .toMatchObject({ version, channel: "unsigned-preview", signed: false });
+    const published = JSON.parse(await readFile(join(outputDirectory, "unsigned-preview-manifest.json"), "utf8"));
+    const verified = JSON.parse(await readFile(join(releaseDirectory, "unsigned-preview-manifest.json"), "utf8"));
+    expect(published).toMatchObject({ version, channel: "unsigned-preview", signed: false });
+    // Installed renderers accept only the legacy prefix: publish the same bytes under that name.
+    expect(published.files.map((entry) => entry.name)).toEqual([
+      `Pi-67-Desktop-${version}-win-x64-unsigned-preview.exe`,
+      `Pi-67-Desktop-${version}-mac-arm64-unsigned-preview.dmg`,
+      `Pi-67-Desktop-${version}-mac-arm64-unsigned-preview.zip`
+    ]);
+    expect(published.files.map(({ bytes, sha256, target }) => ({ bytes, sha256, target })))
+      .toEqual(verified.files.map(({ bytes, sha256, target }) => ({ bytes, sha256, target })));
+    for (const entry of verified.files) {
+      expect(await readFile(join(outputDirectory, entry.name.replace(/^New-Money-/u, "Pi-67-Desktop-"))))
+        .toEqual(await readFile(join(releaseDirectory, entry.name)));
+    }
     await expect(loadLocalR2Release({
       directory: outputDirectory,
       version,
@@ -119,7 +132,7 @@ describe("R2 update bundle", () => {
     await prepareR2UpdateBundle({ releaseDirectory, outputDirectory, version, runtimeVersion });
     const artifactPath = join(
       outputDirectory,
-      `New-Money-${version}-mac-arm64-unsigned-preview.zip`
+      `Pi-67-Desktop-${version}-mac-arm64-unsigned-preview.zip`
     );
     const targetPath = join(root, "outside.zip");
     await writeFile(targetPath, "macos-zip");

@@ -322,7 +322,11 @@ function fileIdentity(identity, fileName, publishedFileName) {
 
 function assertExpectedArtifactName(path, identity, label) {
   const actual = basename(path);
-  if (actual !== identity.fileName && actual !== identity.publishedFileName) {
+  // The update channel may publish the bound New-Money file under the legacy Pi-67-Desktop prefix.
+  const legacyPublishedFileName = identity.publishedFileName?.startsWith("New-Money-")
+    ? `Pi-67-Desktop-${identity.publishedFileName.slice("New-Money-".length)}`
+    : undefined;
+  if (actual !== identity.fileName && actual !== identity.publishedFileName && actual !== legacyPublishedFileName) {
     throw new Error(`macOS preview ${label} filename does not match the candidate identity.`);
   }
 }

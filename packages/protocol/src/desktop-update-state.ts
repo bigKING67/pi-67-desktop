@@ -66,9 +66,15 @@ export function parseDesktopUpdateState(
   return { ok: true, state: { ...rest, ...(normalized ? { checkedAt: normalized } : {}) } };
 }
 
+/**
+ * Published artifacts use the current `New-Money` prefix or the legacy `Pi-67-Desktop` prefix, which
+ * Main also accepts. Releases stay on the legacy prefix while installed renderers only accept it.
+ */
+const ARTIFACT_PREFIXES = ["New-Money", "Pi-67-Desktop"] as const;
+
 export function isCanonicalArtifactName(version: string, artifactName: string): boolean {
-  return artifactName === `Pi-67-Desktop-${version}-win-x64-unsigned-preview.exe`
-    || artifactName === `Pi-67-Desktop-${version}-mac-arm64-unsigned-preview.zip`;
+  return ARTIFACT_PREFIXES.some((prefix) => artifactName === `${prefix}-${version}-win-x64-unsigned-preview.exe`
+    || artifactName === `${prefix}-${version}-mac-arm64-unsigned-preview.zip`);
 }
 
 function schemaIssue(value: unknown): DesktopUpdateStateIssue {
