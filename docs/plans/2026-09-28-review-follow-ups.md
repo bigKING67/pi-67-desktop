@@ -57,7 +57,8 @@ members kept per UPSTREAM.md), renderer-core-08 (source fix only; no automated t
 language chunk is not addressable in preview builds), settings-04/05/06/07, e2e-01, ps-01.
 
 Still open:
-- attachments-01 — closed as by design. The limit now raises RESOURCE_LIMIT_EXCEEDED with recovery
+- attachments-01 — closed as by design; owner delegated the decision on 2026-09-30 and it stays
+  unchanged (128 claimed sets per Task per app run; closing and reopening the Task resets it). The limit now raises RESOURCE_LIMIT_EXCEEDED with recovery
   guidance. Releasing completed sets was analysed and rejected: PRODUCT.md ("Operation acknowledgement
   alone does not delete claimed bytes because the active Task may still use `read_attachment` in a
   later turn") and the attachment read tool resolve old set ids for the rest of the Task. Evicting
@@ -75,3 +76,4 @@ source (`corepack pnpm --filter @pi67/protocol run generate:revision`).
   packaged team-session device evidence plus approvalMode stage 2 remain.
 - 2026-09-30: approvalMode stage 2 landed; only attachments-01 (product decision) and device
   evidence remain.
+- 2026-09-30: attachments-01 kept as by design; revisit only on a real user report of the limit.
