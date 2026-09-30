@@ -1,5 +1,5 @@
 import { cleanRemovedWorkspaceState } from "./workspace-removal-cleanup.js";
-import { app, clipboard, dialog, ipcMain, Menu, net, Notification, shell, type BrowserWindow } from "electron";
+import { app, clipboard, dialog, Menu, net, Notification, shell, type BrowserWindow } from "electron";
 import { join } from "node:path";
 import { DesktopUpdateController } from "./desktop-update-controller.js";
 import type { DesktopToolchain } from "./desktop-toolchain.js";
@@ -23,7 +23,9 @@ import {
   WorkbenchStateStore
 } from "./workbench-state.js";
 import { createNativeWorkspaceDescriptor, type NativeWorkspaceDescriptor } from "./workspace-identity.js";
-import { resolveRegisteredWorkspaceEntry, workspaceEntryRevealAction } from "./workspace-entry.js";
+import { resolveRegisteredWorkspaceEntry } from "./workspace-entry.js";
+import { registerWorkspaceEntryBridge } from "./workspace-entry-bridge.js";
+import { createAuthorizedIpcHandle } from "./authorized-ipc.js";
 import type { WorkspaceFileStateStore } from "./workspace-file-state.js";
 import type { ComposerDraftStateStore } from "./composer-draft-state.js";
 import { NativeNotificationManager } from "./native-notification-manager.js";
@@ -78,6 +80,8 @@ export interface SystemBridgeOptions extends LocalMemoryBridgeOptions {
 }
 export interface SystemBridgeRegistration { handlePowerResume(): void; dispose(): void; }
 export function registerSystemBridge(options: SystemBridgeOptions): SystemBridgeRegistration {
+  // Every system invoke channel rejects senders other than the main renderer frame.
+  const handle = createAuthorizedIpcHandle(options.getMainWindow, options.rendererUrl);
   const disposeLocalMemory = registerLocalMemoryBridge(options);
   const workbenchState = options.workbenchState;
   const nativeNotifications = new NativeNotificationManager({
@@ -144,43 +148,45 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     }
   );
   registerSupportDiagnosticsBridge({
+    handle,
     agentDirectory: options.agentDirectory,
     agentDirectorySource: options.agentDirectorySource,
     getAgentHostDiagnostics: options.getAgentHostDiagnostics,
     getMainWindow: options.getMainWindow,
     recoverySnapshot
   });
-  ipcMain.handle("pi67:platform-info", () => ({
+  handle("pi67:platform-info", () => ({
     platform: process.platform,
     architecture: process.arch,
     version: app.getVersion()
   }));
-  ipcMain.handle("pi67:context-panel-room", () => options.ensureContextPanelRoom?.() === true);
-  ipcMain.handle("pi67:agent-host-connect", (_event, replaceCurrent: unknown) => (
+  handle("pi67:context-panel-room", () => options.ensureContextPanelRoom?.() === true);
+  handle("pi67:agent-host-connect", (_event, replaceCurrent: unknown) => (
     options.connectAgentHost(replaceCurrent === true)
   ));
-  registerPromptInputBridge(options.promptAttachments, options.promptStashImages);
-  ipcMain.handle("pi67:workbench-load", async () => (await workbenchState.load()).state);
+  registerPromptInputBridge(handle, options.promptAttachments, options.promptStashImages);
+  handle("pi67:workbench-load", async () => (await workbenchState.load()).state);
   registerRepositoryEnvironmentBridge(
+    handle,
     options.repositoryEnvironmentInspection,
     options.repositoryWorkingTree,
     options.repositoryWorktreeActions
   );
-  registerWorktreeCreationBridge(options.worktreeCreation);
-  ipcMain.handle("pi67:composer-draft-state-load", () => options.composerDraftState.load());
-  ipcMain.handle("pi67:secure-storage-ensure", () => options.secureStorage.ensureAvailable());
-  ipcMain.handle("pi67:composer-draft-state-update", (_event, value: unknown) => (
+  registerWorktreeCreationBridge(handle, options.worktreeCreation);
+  handle("pi67:composer-draft-state-load", () => options.composerDraftState.load());
+  handle("pi67:secure-storage-ensure", () => options.secureStorage.ensureAvailable());
+  handle("pi67:composer-draft-state-update", (_event, value: unknown) => (
     options.composerDraftState.update(value)
   ));
-  ipcMain.handle("pi67:workspace-file-state-load", () => options.workspaceFileState.load());
-  ipcMain.handle("pi67:workspace-file-state-update", (_event, value: unknown) => (
+  handle("pi67:workspace-file-state-load", () => options.workspaceFileState.load());
+  handle("pi67:workspace-file-state-update", (_event, value: unknown) => (
     options.workspaceFileState.update(value)
   ));
-  ipcMain.handle("pi67:workbench-layout-update", (_event, value: unknown) => (
+  handle("pi67:workbench-layout-update", (_event, value: unknown) => (
     workbenchState.update((state) => replaceWorkbenchLayout(state, value))
   ));
-  ipcMain.handle("pi67:workspace-pick-and-add", pickAndRegisterWorkspace);
-  ipcMain.handle("pi67:workspace-repair", async (_event, workspaceId: unknown) => {
+  handle("pi67:workspace-pick-and-add", pickAndRegisterWorkspace);
+  handle("pi67:workspace-repair", async (_event, workspaceId: unknown) => {
     const id = assertWorkspaceId(workspaceId);
     const state = (await workbenchState.load()).state;
     const workspace = state.workspaces.find((candidate) => candidate.id === id);
@@ -201,20 +207,20 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     });
     return repaired;
   });
-  ipcMain.handle("pi67:workspace-remove", async (_event, workspaceId: unknown) => {
+  handle("pi67:workspace-remove", async (_event, workspaceId: unknown) => {
     const id = assertWorkspaceId(workspaceId);
     const state = await workbenchState.update((current) => removeWorkspaceRegistration(current, id));
     await cleanRemovedWorkspaceState(id, options);
     return state;
   });
-  ipcMain.handle("pi67:workspace-reorder", (_event, workspaceIds: unknown) => (
+  handle("pi67:workspace-reorder", (_event, workspaceIds: unknown) => (
     workbenchState.update((state) => reorderWorkspaceRegistrations(state, assertWorkspaceIds(workspaceIds)))
   ));
   // Keep the legacy string bridge for older call sites while Workbench V2 uses descriptors.
-  ipcMain.handle("pi67:select-workspace", async () => (
+  handle("pi67:select-workspace", async () => (
     (await pickAndRegisterWorkspace())?.identity.canonicalPath
   ));
-  ipcMain.handle("pi67:select-session-file", async () => {
+  handle("pi67:select-session-file", async () => {
     const result = await dialog.showOpenDialog(options.getMainWindow()!, {
       title: "导入 Pi JSONL session 到当前工作区",
       properties: ["openFile"],
@@ -225,16 +231,16 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     });
     return result.canceled ? undefined : result.filePaths[0];
   });
-  ipcMain.handle("pi67:recovery-snapshot", recoverySnapshot);
-  ipcMain.handle("pi67:native-notification-show", (_event, value: unknown) => {
+  handle("pi67:recovery-snapshot", recoverySnapshot);
+  handle("pi67:native-notification-show", (_event, value: unknown) => {
     const request = asNativeNotificationRequest(value);
     return request ? nativeNotifications.show(request) : false;
   });
-  ipcMain.handle("pi67:native-notification-dismiss", (_event, value: unknown) => {
+  handle("pi67:native-notification-dismiss", (_event, value: unknown) => {
     const notificationId = asNativeNotificationId(value);
     return notificationId ? nativeNotifications.dismiss(notificationId) : false;
   });
-  ipcMain.handle("pi67:open-external", async (_event, value: unknown) => {
+  handle("pi67:open-external", async (_event, value: unknown) => {
     const target = asExternalUrl(value);
     if (!target) return false;
     const result = await dialog.showMessageBox(options.getMainWindow()!, {
@@ -251,7 +257,7 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     await shell.openExternal(target.toString());
     return true;
   });
-  ipcMain.handle("pi67:workspace-entry-menu", async (_event, value: unknown, includeManagementValue: unknown) => {
+  handle("pi67:workspace-entry-menu", async (_event, value: unknown, includeManagementValue: unknown) => {
     if (includeManagementValue !== undefined && typeof includeManagementValue !== "boolean") {
       throw new Error("Workspace entry menu options are invalid.");
     }
@@ -297,59 +303,27 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
       });
     });
   });
-  ipcMain.handle("pi67:workspace-entry-reveal", async (_event, value: unknown) => {
-    const entry = await resolveRegisteredWorkspaceEntry(workbenchState, value);
-    if (workspaceEntryRevealAction(entry) === "show-in-folder") shell.showItemInFolder(entry.absolutePath);
-    else await openSystemPath(entry.absolutePath);
-    return true;
-  });
-  ipcMain.handle("pi67:workspace-entry-open-default", async (_event, value: unknown) => {
-    const entry = await resolveRegisteredWorkspaceEntry(workbenchState, value);
-    await openSystemPath(entry.absolutePath);
-    return true;
-  });
-  ipcMain.handle("pi67:workspace-entry-copy", async (_event, value: unknown, mode: unknown) => {
-    if (mode !== "absolute" && mode !== "relative") throw new Error("Workspace path copy mode is invalid.");
-    const entry = await resolveRegisteredWorkspaceEntry(workbenchState, value);
-    clipboard.writeText(mode === "absolute" ? entry.absolutePath : entry.relativePath);
-    return true;
-  });
-  ipcMain.handle("pi67:workspace-entry-trash", async (_event, value: unknown) => {
-    const entry = await resolveRegisteredWorkspaceEntry(workbenchState, value);
-    const result = await dialog.showMessageBox(options.getMainWindow()!, {
-      type: "warning",
-      title: "移到废纸篓",
-      message: `将“${entry.relativePath}”移到废纸篓？`,
-      detail: "可以从系统废纸篓恢复；New Money 不会执行永久删除。",
-      buttons: ["移到废纸篓", "取消"],
-      defaultId: 1,
-      cancelId: 1,
-      noLink: true
-    });
-    if (result.response !== 0) return false;
-    await shell.trashItem(entry.absolutePath);
-    return true;
-  });
-  ipcMain.handle("pi67:update-state", () => updateController.getState());
-  ipcMain.handle("pi67:package-network-snapshot", async () => (
+  registerWorkspaceEntryBridge(handle, workbenchState, options.getMainWindow);
+  handle("pi67:update-state", () => updateController.getState());
+  handle("pi67:package-network-snapshot", async () => (
     unprobedPackageNetworkSnapshot(
       options.desktopToolchain,
       await options.packageNetworkSettings.load()
     )
   ));
-  ipcMain.handle("pi67:package-network-save", async (_event, value: unknown) => (
+  handle("pi67:package-network-save", async (_event, value: unknown) => (
     unprobedPackageNetworkSnapshot(
       options.desktopToolchain,
       await options.packageNetworkSettings.save(value)
     )
   ));
-  ipcMain.handle("pi67:package-network-reset", async () => (
+  handle("pi67:package-network-reset", async () => (
     unprobedPackageNetworkSnapshot(
       options.desktopToolchain,
       await options.packageNetworkSettings.reset()
     )
   ));
-  ipcMain.handle("pi67:package-network-probe", async (_event, value: unknown) => {
+  handle("pi67:package-network-probe", async (_event, value: unknown) => {
     const settings = parsePackageNetworkSettings(value);
     if (!settings) throw new Error("Package network settings are invalid.");
     return probePackageSources({
@@ -358,8 +332,8 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
       fetcher: (input, init) => net.fetch(input, init)
     });
   });
-  ipcMain.handle("pi67:capability-snapshot", () => options.desktopCapabilities.snapshot());
-  ipcMain.handle("pi67:browser67-setup", async () => {
+  handle("pi67:capability-snapshot", () => options.desktopCapabilities.snapshot());
+  handle("pi67:browser67-setup", async () => {
     const result = await dialog.showMessageBox(options.getMainWindow()!, {
       type: "question",
       title: "准备 browser67 依赖",
@@ -374,8 +348,8 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
       ? options.desktopCapabilities.setupBrowser67()
       : options.desktopCapabilities.snapshot();
   });
-  ipcMain.handle("pi67:browser67-doctor", () => options.desktopCapabilities.doctorBrowser67());
-  ipcMain.handle("pi67:browser67-extension-prepare", async () => {
+  handle("pi67:browser67-doctor", () => options.desktopCapabilities.doctorBrowser67());
+  handle("pi67:browser67-extension-prepare", async () => {
     const result = await dialog.showMessageBox(options.getMainWindow()!, {
       type: "question",
       title: "安装 browser67 浏览器扩展",
@@ -390,20 +364,20 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
       ? options.desktopCapabilities.prepareBrowser67Extension()
       : options.desktopCapabilities.snapshot();
   });
-  ipcMain.handle("pi67:browser67-extension-open-browser", async (_event, value: unknown) => {
+  handle("pi67:browser67-extension-open-browser", async (_event, value: unknown) => {
     if (value !== "chrome" && value !== "edge") throw new Error("Browser selection is invalid.");
     return openBrowser67ExtensionPage(value as Browser67BrowserId);
   });
-  ipcMain.handle("pi67:browser67-extension-reveal", async () => {
+  handle("pi67:browser67-extension-reveal", async () => {
     shell.showItemInFolder(await options.desktopCapabilities.browser67ExtensionManifestPath());
     return true;
   });
-  ipcMain.handle("pi67:browser67-extension-copy", async () => {
+  handle("pi67:browser67-extension-copy", async () => {
     await options.desktopCapabilities.browser67ExtensionManifestPath();
     clipboard.writeText(options.desktopCapabilities.browser67ExtensionDirectory());
     return true;
   });
-  ipcMain.handle("pi67:browser67-extension-verify", async (_event, value: unknown) => {
+  handle("pi67:browser67-extension-verify", async (_event, value: unknown) => {
     if (
       !isRecord(value)
       || typeof value.startHub !== "boolean"
@@ -426,9 +400,9 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
       ? options.desktopCapabilities.verifyBrowser67Extension({ startHub: true })
       : options.desktopCapabilities.snapshot();
   });
-  ipcMain.handle("pi67:update-check", () => updateController.checkNow());
-  ipcMain.handle("pi67:update-start", () => updateController.startUpdate());
-  ipcMain.handle("pi67:update-cancel", () => updateController.cancelUpdate());
+  handle("pi67:update-check", () => updateController.checkNow());
+  handle("pi67:update-start", () => updateController.startUpdate());
+  handle("pi67:update-cancel", () => updateController.cancelUpdate());
   updateController.startAutomaticChecks();
   return {
     handlePowerResume: () => updateController.checkIfDue(),
@@ -443,10 +417,6 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
       options.promptStashImages.dispose();
     }
   };
-}
-async function openSystemPath(path: string): Promise<void> {
-  const failure = await shell.openPath(path);
-  if (failure) throw new Error(failure);
 }
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

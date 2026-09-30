@@ -1,7 +1,8 @@
 import { ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from "electron";
 import { isLocalMemoryActivationSnapshot, isLocalMemoryHealthCheck, parseLocalMemoryActivationRequest } from "@pi67/protocol";
 import type { LocalMemoryActivationController } from "./local-memory-activation-controller.js";
-import { isExpectedRendererLocation, PACKAGED_RENDERER_URL } from "./renderer-security.js";
+import { isAuthorizedRendererSender } from "./authorized-ipc.js";
+import { PACKAGED_RENDERER_URL } from "./renderer-security.js";
 
 export function registerLocalMemoryActivationBridge(
   getWindow: () => BrowserWindow | undefined,
@@ -10,10 +11,7 @@ export function registerLocalMemoryActivationBridge(
 ) {
   let disposed = false;
   function authorize(event: IpcMainInvokeEvent) {
-    const window = getWindow();
-    if (disposed || !window || window.isDestroyed() || window.webContents.isDestroyed()
-      || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame
-      || !event.senderFrame || !isExpectedRendererLocation(event.senderFrame.url, rendererUrl)) {
+    if (disposed || !isAuthorizedRendererSender(event, getWindow(), rendererUrl)) {
       throw new Error("Memory activation sender is not authorized.");
     }
   }

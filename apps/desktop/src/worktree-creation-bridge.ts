@@ -1,4 +1,4 @@
-import { ipcMain } from "electron";
+import type { AuthorizedIpcHandle } from "./authorized-ipc.js";
 import {
   isWorktreeCreationAdvanceResult,
   isWorktreeCreationActivityResult,
@@ -31,20 +31,20 @@ export interface WorktreeCreationBridge {
   dispose?(): void;
 }
 
-export function registerWorktreeCreationBridge(creation: WorktreeCreationBridge): void {
-  ipcMain.handle("pi67:worktree-environment-activity", async (_event, value: unknown) => {
+export function registerWorktreeCreationBridge(handle: AuthorizedIpcHandle, creation: WorktreeCreationBridge): void {
+  handle("pi67:worktree-environment-activity", async (_event, value: unknown) => {
     const request = parseWorktreeCreationActivityRequest(value);
     if (!request) return { status: "inactive" };
     const result = await creation.activity(request);
     return isWorktreeCreationActivityResult(result) ? result : { status: "inactive" };
   });
-  ipcMain.handle("pi67:worktree-environment-cancel", async (_event, value: unknown) => {
+  handle("pi67:worktree-environment-cancel", async (_event, value: unknown) => {
     const request = parseWorktreeCreationCancelRequest(value);
     if (!request) return { status: "inactive" };
     const result = await creation.cancel(request);
     return isWorktreeCreationCancelResult(result) ? result : { status: "inactive" };
   });
-  ipcMain.handle("pi67:worktree-environment-create", async (_event, value: unknown) => {
+  handle("pi67:worktree-environment-create", async (_event, value: unknown) => {
     const request = parseWorktreeCreationRequest(value);
     if (!request) return rejected("request", "invalid-request", false);
     try {
@@ -56,7 +56,7 @@ export function registerWorktreeCreationBridge(creation: WorktreeCreationBridge)
     console.error("Worktree creation failed with an invalid internal result.");
     return rejected("state", "internal", true);
   });
-  ipcMain.handle("pi67:worktree-environment-advance", async (_event, value: unknown) => {
+  handle("pi67:worktree-environment-advance", async (_event, value: unknown) => {
     const request = parseWorktreeCreationAdvanceRequest(value);
     if (!request) return rejected("request", "invalid-request", false);
     try {
@@ -68,7 +68,7 @@ export function registerWorktreeCreationBridge(creation: WorktreeCreationBridge)
     console.error("Worktree creation advance failed with an invalid internal result.");
     return rejected("state", "internal", true);
   });
-  ipcMain.handle("pi67:worktree-environment-rollback", async (_event, value: unknown) => {
+  handle("pi67:worktree-environment-rollback", async (_event, value: unknown) => {
     const request = parseWorktreeCreationRollbackRequest(value);
     if (!request) return rejected("request", "invalid-request", false);
     try {

@@ -25,6 +25,30 @@ export function workspaceEntryRevealAction(
   return platform === "darwin" && entry.absolutePath.toLowerCase().endsWith(".app") ? "show-in-folder" : "open-directory";
 }
 
+const LAUNCH_EXTENSIONS: Partial<Record<NodeJS.Platform, ReadonlySet<string>>> = {
+  darwin: new Set([".app", ".command", ".tool", ".sh", ".pkg", ".mpkg", ".terminal", ".workflow", ".scpt", ".applescript", ".jar"]),
+  win32: new Set([".exe", ".com", ".bat", ".cmd", ".msi", ".msix", ".appx", ".ps1", ".vbs", ".vbe", ".js", ".jse",
+    ".wsf", ".wsh", ".scr", ".hta", ".lnk", ".reg", ".cpl", ".jar"]),
+  linux: new Set([".sh", ".desktop", ".appimage", ".run", ".jar"])
+};
+
+/**
+ * Whether opening the entry with the system default application would run code rather than show a
+ * document: known launcher extensions, a macOS `.app` bundle, or a file with an execute bit on POSIX.
+ */
+export function workspaceEntryLaunchesCode(
+  entry: Pick<ResolvedWorkspaceEntry, "kind" | "absolutePath">,
+  mode: number,
+  platform: NodeJS.Platform = process.platform
+): boolean {
+  const lower = entry.absolutePath.toLowerCase();
+  const extension = lower.slice(Math.max(lower.lastIndexOf("."), lower.lastIndexOf("/") + 1, lower.lastIndexOf("\\") + 1));
+  if (entry.kind === "directory") return platform === "darwin" && extension === ".app";
+  if (entry.kind !== "file") return false;
+  if (LAUNCH_EXTENSIONS[platform]?.has(extension)) return true;
+  return platform !== "win32" && (mode & 0o111) !== 0;
+}
+
 function parseWorkspaceEntryRequest(value: unknown): WorkspaceEntryRequest {
   if (!isWorkspaceEntryRequest(value)) throw new Error("Workspace entry request is invalid.");
   // The protocol owns the shape; Main owns the filesystem policy for the relative path.

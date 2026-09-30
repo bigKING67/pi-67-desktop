@@ -29,6 +29,9 @@ vi.mock("./browser67-integration.js", () => ({
 }));
 
 import { registerSystemBridge } from "./system-bridge.js";
+import { authorizedRendererSender } from "./authorized-ipc.test-support.js";
+
+const sender = authorizedRendererSender();
 
 describe("Workspace removal cleanup", () => {
   beforeEach(() => {
@@ -89,7 +92,7 @@ function fixture() {
   const update = vi.fn(async () => ({ workspaces: [] }));
   registerSystemBridge({
     connectAgentHost: vi.fn(), secureStorage: { ensureAvailable: () => "available" },
-    getMainWindow: () => undefined, activateMainWindow: async () => undefined,
+    getMainWindow: () => sender.window, activateMainWindow: async () => undefined,
     desktopToolchain: {}, desktopCapabilities: {}, packageNetworkSettings: {}, promptAttachments: {},
     workbenchState: { update },
     composerDraftState: { removeWorkspace: cleanups[0] },
@@ -98,5 +101,5 @@ function fixture() {
     repositoryEnvironmentInspection: { removeWorkspace: cleanups[3] },
     repositoryWorkingTree: { removeWorkspace: cleanups[4] }
   } as unknown as Parameters<typeof registerSystemBridge>[0]);
-  return { cleanups, update, remove: async () => mocks.handlers.get("pi67:workspace-remove")!(undefined, "workspace-a") };
+  return { cleanups, update, remove: async () => mocks.handlers.get("pi67:workspace-remove")!(sender.event, "workspace-a") };
 }

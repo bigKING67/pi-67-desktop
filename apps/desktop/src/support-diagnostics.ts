@@ -1,10 +1,10 @@
+import type { AuthorizedIpcHandle } from "./authorized-ipc.js";
 import { createHash } from "node:crypto";
 import { lstat, readFile, writeFile } from "node:fs/promises";
 import { normalize, resolve, join } from "node:path";
 import {
   app,
   dialog,
-  ipcMain,
   net,
   type BrowserWindow
 } from "electron";
@@ -78,13 +78,14 @@ const CONFIGURATION_FILES: readonly PiConfigurationDiagnosticFileName[] = [
 ];
 
 export function registerSupportDiagnosticsBridge(options: {
+  handle: AuthorizedIpcHandle;
   agentDirectory: string;
   agentDirectorySource: "default" | "environment";
   getAgentHostDiagnostics: () => AgentHostSupervisorDiagnostics;
   getMainWindow: () => BrowserWindow | undefined;
   recoverySnapshot: () => Promise<DesktopRecoverySnapshot>;
 }): void {
-  ipcMain.handle("pi67:upload-diagnostics", async (_event, value: unknown) => {
+  options.handle("pi67:upload-diagnostics", async (_event, value: unknown) => {
     if (!isSupportDiagnosticsExportRequest(value)) throw new Error("Invalid diagnostic payload.");
     const composed = await composeSupportDiagnostics(value, options);
     return uploadSupportDiagnostics({
@@ -94,7 +95,7 @@ export function registerSupportDiagnosticsBridge(options: {
       fetcher: (input, init) => net.fetch(input, init)
     });
   });
-  ipcMain.handle("pi67:save-diagnostics", async (_event, value: unknown) => {
+  options.handle("pi67:save-diagnostics", async (_event, value: unknown) => {
     if (!isSupportDiagnosticsExportRequest(value)) throw new Error("Invalid diagnostic payload.");
     const request: SupportDiagnosticsExportRequest = value;
     const result = await dialog.showSaveDialog(options.getMainWindow()!, {

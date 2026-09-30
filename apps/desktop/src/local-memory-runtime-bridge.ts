@@ -1,7 +1,8 @@
 import { dialog, ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from "electron";
 import type { LocalMemoryRuntimeInstallResult, LocalMemoryRuntimePurpose } from "@pi67/protocol";
 import type { LocalMemoryRuntimeController } from "./local-memory-runtime-controller.js";
-import { isExpectedRendererLocation, PACKAGED_RENDERER_URL } from "./renderer-security.js";
+import { isAuthorizedRendererSender } from "./authorized-ipc.js";
+import { PACKAGED_RENDERER_URL } from "./renderer-security.js";
 
 const purposeTitles: Record<LocalMemoryRuntimePurpose, string> = {
   private: "私人记忆运行包", "team-index-v1": "团队索引运行包", "team-query-v1": "团队检索运行包"
@@ -19,11 +20,9 @@ export function registerLocalMemoryRuntimeBridge(
 ) {
   let disposed = false;
   let active: AbortController | undefined;
-  function authorize(event: IpcMainInvokeEvent) {
+  function authorize(event: IpcMainInvokeEvent): BrowserWindow {
     const window = getWindow();
-    if (disposed || !window || window.isDestroyed() || window.webContents.isDestroyed()
-      || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame
-      || !event.senderFrame || !isExpectedRendererLocation(event.senderFrame.url, rendererUrl)) {
+    if (disposed || !window || !isAuthorizedRendererSender(event, window, rendererUrl)) {
       throw new Error("Runtime installation sender is not authorized.");
     }
     return window;

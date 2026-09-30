@@ -1698,7 +1698,11 @@ design/protocol contracts; reference inclusion alone does not approve them.
   only an individual icon action receives transient interaction feedback. The row
   menu and native right-click menu order `在 New Money 中打开`, system-default open,
   relative-path copy, absolute-path copy, Finder/Explorer reveal, rename, and
-  confirmed trash operations. Search results show the file name and relative
+  confirmed trash operations. System-default open of an entry that would run code
+  (launcher extensions such as `.exe`/`.command`/`.sh`, a macOS `.app` bundle, or a
+  POSIX-executable file) first requires a native Main confirmation whose default is
+  cancel. Reveal never runs an entry: only a plain directory opens in the file
+  manager, and every other entry is selected in its parent. Search results show the file name and relative
   path so duplicate names remain distinguishable. Dependency and generated
   directories are hidden from both the tree and search by default; changing
   `显示依赖/生成目录` refreshes both while retaining expansion, selection, and

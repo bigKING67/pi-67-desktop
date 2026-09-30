@@ -14,6 +14,10 @@ import {
   registerWorktreeCreationBridge,
   type WorktreeCreationBridge
 } from "./worktree-creation-bridge.js";
+import { createAuthorizedIpcHandle } from "./authorized-ipc.js";
+import { authorizedRendererSender } from "./authorized-ipc.test-support.js";
+
+const sender = authorizedRendererSender();
 
 describe("Worktree creation bridge", () => {
   beforeEach(() => {
@@ -27,7 +31,7 @@ describe("Worktree creation bridge", () => {
 
   it("rejects unvalidated path, branch, force, and Git arguments before calling the service", async () => {
     const create = vi.fn();
-    registerWorktreeCreationBridge(bridge({ create }));
+    registerWorktreeCreationBridge(createAuthorizedIpcHandle(() => sender.window), bridge({ create }));
 
     for (const extra of [
       { cwd: "C:\\private\\repository" },
@@ -52,7 +56,7 @@ describe("Worktree creation bridge", () => {
   it("forwards only the parsed opaque intent and validates the public response", async () => {
     const result = createdResult();
     const create = vi.fn(async () => result);
-    registerWorktreeCreationBridge(bridge({ create }));
+    registerWorktreeCreationBridge(createAuthorizedIpcHandle(() => sender.window), bridge({ create }));
 
     await expect(invoke({
       requestId: "request-1",
@@ -79,7 +83,7 @@ describe("Worktree creation bridge", () => {
       }
     }));
     const cancel = vi.fn(() => ({ status: "cancel-requested" as const }));
-    registerWorktreeCreationBridge(bridge({ activity, cancel }));
+    registerWorktreeCreationBridge(createAuthorizedIpcHandle(() => sender.window), bridge({ activity, cancel }));
 
     await expect(invokeChannel("pi67:worktree-environment-activity", {
       creationId: "creation-1"
@@ -124,7 +128,7 @@ describe("Worktree creation bridge", () => {
       vi.fn(async () => { throw new Error("private Git executable and arguments"); })
     ]) {
       mocks.handlers.clear();
-      registerWorktreeCreationBridge(bridge({
+      registerWorktreeCreationBridge(createAuthorizedIpcHandle(() => sender.window), bridge({
         create: create as unknown as WorktreeCreationBridge["create"]
       }));
       const result = await invoke({
@@ -151,7 +155,7 @@ describe("Worktree creation bridge", () => {
         sessionFileIdentity: "session-file-1"
       }
     }));
-    registerWorktreeCreationBridge(bridge({ advance }));
+    registerWorktreeCreationBridge(createAuthorizedIpcHandle(() => sender.window), bridge({ advance }));
 
     await expect(invokeChannel("pi67:worktree-environment-advance", {
       creationId: "creation-1",
@@ -202,7 +206,7 @@ describe("Worktree creation bridge", () => {
         state: "rolled-back" as const
       }
     }));
-    registerWorktreeCreationBridge(bridge({ rollback }));
+    registerWorktreeCreationBridge(createAuthorizedIpcHandle(() => sender.window), bridge({ rollback }));
 
     const request = {
       requestId: "request-1",
@@ -242,7 +246,7 @@ async function invoke(value: unknown): Promise<unknown> {
 async function invokeChannel(channel: string, value: unknown): Promise<unknown> {
   const handler = mocks.handlers.get(channel);
   if (!handler) throw new Error(`Missing Worktree IPC handler: ${channel}`);
-  return handler(undefined, value);
+  return handler(sender.event, value);
 }
 
 function bridge(overrides: Partial<WorktreeCreationBridge>): WorktreeCreationBridge {

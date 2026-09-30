@@ -1,4 +1,4 @@
-import { ipcMain } from "electron";
+import type { AuthorizedIpcHandle } from "./authorized-ipc.js";
 import {
   isAppOwnedWorktreeRecoveryResult,
   isRepositoryChangeDetail,
@@ -41,11 +41,12 @@ export interface RepositoryWorktreeActionBridge {
 }
 
 export function registerRepositoryEnvironmentBridge(
+  handle: AuthorizedIpcHandle,
   inspection: RepositoryEnvironmentInspectionBridge,
   workingTree: RepositoryWorkingTreeBridge,
   actions: RepositoryWorktreeActionBridge
 ): void {
-  ipcMain.handle("pi67:repository-environment-inspect", async (_event, value: unknown) => {
+  handle("pi67:repository-environment-inspect", async (_event, value: unknown) => {
     const request = parseRepositoryEnvironmentInspectionRequest(value);
     if (!request) throw new Error("Repository environment inspection request is invalid.");
     const snapshot = await inspection.inspect(request);
@@ -54,21 +55,21 @@ export function registerRepositoryEnvironmentBridge(
     }
     return snapshot;
   });
-  ipcMain.handle("pi67:repository-working-tree-inspect", async (_event, value: unknown) => {
+  handle("pi67:repository-working-tree-inspect", async (_event, value: unknown) => {
     const request = parseRepositoryWorkingTreeInspectionRequest(value);
     if (!request) throw new Error("Invalid repository working tree inspection request.");
     const snapshot = await workingTree.inspect(request);
     if (!isRepositoryWorkingTreeSnapshot(snapshot)) throw new Error("Invalid repository working tree snapshot.");
     return snapshot;
   });
-  ipcMain.handle("pi67:repository-change-detail", async (_event, value: unknown) => {
+  handle("pi67:repository-change-detail", async (_event, value: unknown) => {
     const request = parseRepositoryChangeDetailRequest(value);
     if (!request) throw new Error("Invalid repository change detail request.");
     const detail = await workingTree.detail(request);
     if (!isRepositoryChangeDetail(detail)) throw new Error("Invalid repository change detail.");
     return detail;
   });
-  ipcMain.handle("pi67:repository-submodules-initialize", async (_event, value: unknown) => {
+  handle("pi67:repository-submodules-initialize", async (_event, value: unknown) => {
     const request = parseRepositorySubmoduleInitializationRequest(value);
     if (!request) return { status: "rejected", error: "invalid-request" };
     try {
@@ -80,7 +81,7 @@ export function registerRepositoryEnvironmentBridge(
       return { status: "rejected", error: "internal" };
     }
   });
-  ipcMain.handle("pi67:app-owned-worktree-recover", async (_event, value: unknown) => {
+  handle("pi67:app-owned-worktree-recover", async (_event, value: unknown) => {
     const request = parseAppOwnedWorktreeRecoveryRequest(value);
     if (!request) return { status: "rejected", error: "invalid-request", recoverable: false };
     try {

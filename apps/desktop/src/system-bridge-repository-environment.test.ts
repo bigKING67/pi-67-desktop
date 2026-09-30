@@ -29,6 +29,9 @@ vi.mock("./browser67-integration.js", () => ({
 }));
 
 import { registerSystemBridge } from "./system-bridge.js";
+import { authorizedRendererSender } from "./authorized-ipc.test-support.js";
+
+const sender = authorizedRendererSender();
 
 describe("system bridge repository environment inspection", () => {
   beforeEach(() => {
@@ -236,7 +239,7 @@ function registerFixture(
   registerSystemBridge({
     connectAgentHost: vi.fn(),
     secureStorage: { ensureAvailable: () => "available" },
-    getMainWindow: () => undefined,
+    getMainWindow: () => sender.window,
     activateMainWindow: async () => undefined,
     desktopToolchain: {},
     desktopCapabilities: {},
@@ -256,5 +259,5 @@ function registerFixture(
 async function invoke(channel: string, value?: unknown): Promise<unknown> {
   const handler = mocks.handlers.get(channel);
   if (!handler) throw new Error(`Missing IPC handler: ${channel}`);
-  return handler(undefined, value);
+  return handler(sender.event, value);
 }

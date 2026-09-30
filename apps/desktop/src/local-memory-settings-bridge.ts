@@ -1,7 +1,8 @@
 import { ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from "electron";
 import type { LocalMemorySettingsController } from "./local-memory-settings-controller.js";
 import { isLocalMemorySettingsSnapshot } from "@pi67/protocol";
-import { isExpectedRendererLocation, PACKAGED_RENDERER_URL } from "./renderer-security.js";
+import { isAuthorizedRendererSender } from "./authorized-ipc.js";
+import { PACKAGED_RENDERER_URL } from "./renderer-security.js";
 
 export function registerLocalMemorySettingsBridge(
   getWindow: () => BrowserWindow | undefined,
@@ -9,10 +10,7 @@ export function registerLocalMemorySettingsBridge(
   rendererUrl = PACKAGED_RENDERER_URL
 ): () => void {
   function authorize(event: IpcMainInvokeEvent) {
-    const window = getWindow();
-    if (!window || window.isDestroyed() || window.webContents.isDestroyed()
-      || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame
-      || !event.senderFrame || !isExpectedRendererLocation(event.senderFrame.url, rendererUrl)) {
+    if (!isAuthorizedRendererSender(event, getWindow(), rendererUrl)) {
       throw new Error("Memory settings sender is not authorized.");
     }
   }
