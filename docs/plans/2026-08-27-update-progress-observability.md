@@ -1,9 +1,9 @@
 # Update progress observability and Alpha.36 internal publication
 
-Status: active
+Status: closed — shipped with Alpha.36 (R2 receipt 2026-08-28)
 Owner: Codex
 Started: 2026-08-27
-Last updated: 2026-08-27
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -356,3 +356,5 @@ publish the same accepted Candidate through the internal R2 update channel.
 - Commit/push/release state: Alpha.36 source freeze, Candidate builds, Feishu
   upload, Windows acceptance, and R2 publication are active checkpoints; no Tag,
   GitHub Release, signing, notarization, or stable promotion is authorized.
+
+- 2026-09-30: Closed during plan hygiene: Alpha.36 publication receipt exists; publish progress stages are part of the current R2 tooling.

@@ -1,9 +1,9 @@
 # Windows acceptance integration
 
-Status: active
+Status: closed — superseded by later Windows candidates; items not individually re-verified
 Owner: Codex root agent
 Started: 2026-08-20
-Last updated: 2026-08-21
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -126,3 +126,5 @@ data rewrite or remote cleanup.
   debugger connected without a specific application error; no residual smoke process remained. A
   retry against the exact same packaged artifact passed, and that artifact was opened and observed
   live. No Windows target-machine acceptance was inferred from this result.
+
+- 2026-09-30: Closed during plan hygiene as superseded by later Windows candidates and manual tests (Alpha.31–41). Items were not individually re-verified during this cleanup.

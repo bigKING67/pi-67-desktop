@@ -1,9 +1,9 @@
 # Windows Abort Acknowledgement Timeout
 
-Status: active
+Status: closed — later Windows cross-version lifecycles pass
 Owner: Codex primary session
 Started: 2026-08-29
-Last updated: 2026-08-29
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -152,3 +152,5 @@ diagnostic coverage and revise the hypothesis before further product changes.
 - Validation not completed:
 - Remaining risks:
 - Commit/push/release state:
+
+- 2026-09-30: Closed during plan hygiene: Windows candidate run 36671645797 (Alpha.41) passed the full cross-version NSIS lifecycle and real-user launch; no acknowledgement timeout recurred in Alpha.39–41 candidates.

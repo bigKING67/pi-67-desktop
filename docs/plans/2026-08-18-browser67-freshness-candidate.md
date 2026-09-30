@@ -1,9 +1,9 @@
 # Browser67 remote freshness and internal candidate
 
-Status: active
+Status: closed — freshness gate and Browser67 live smoke landed (Alpha.27); superseded by later releases
 Owner: Codex
 Started: 2026-08-18
-Last updated: 2026-08-18
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -74,3 +74,5 @@ Last updated: 2026-08-18
 - 2026-08-18: Branch-tracked source freshness now compares immutable locks with canonical remote refs; the Windows candidate workflow retains the bounded report before dependency installation.
 - 2026-08-18: Freshness exposed stale design-craft and AI Berkshire locks. Both were refreshed to their current reviewed source revisions, prepared capability hashes were regenerated, and all five locked sources now pass reachability and freshness.
 - 2026-08-18: Full source gates passed with 568 test files, 2,938 passed tests and 3 skips. Alpha.27 packaged Electron smoke and exact Browser67 live smoke passed with 18 tmwd_browser and 60 js-reverse Tools.
+
+- 2026-09-30: Closed during plan hygiene: the progress log already records passing gates and live smoke; later candidates run the same freshness gate.

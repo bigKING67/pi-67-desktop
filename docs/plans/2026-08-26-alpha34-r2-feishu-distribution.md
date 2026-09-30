@@ -1,9 +1,9 @@
 # Alpha.34 R2 and Feishu distribution
 
-Status: blocked
+Status: closed — superseded by Alpha.35; Alpha.34 was never published to R2
 Owner: Codex CLI
 Started: 2026-08-26
-Last updated: 2026-08-27
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -155,3 +155,5 @@ three versioned product files through the configured Feishu Drive folder.
 - Validation not completed: pending
 - Remaining risks: pending
 - Commit/push/release state: pending
+
+- 2026-09-30: Closed during plan hygiene: no Alpha.34 R2 receipt exists; Alpha.35 was rebuilt and published instead (see 2026-08-27-alpha35-rebuild-publish.md).

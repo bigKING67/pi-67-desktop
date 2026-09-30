@@ -1,9 +1,9 @@
 # Alpha.37 Release Readiness Remediation
 
-Status: active — source freeze and exact-SHA candidate delivery authorized
+Status: closed — Alpha.37 published to R2 (receipt 2026-08-28)
 Owner: Codex primary session
 Started: 2026-08-28
-Last updated: 2026-08-28
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -123,3 +123,5 @@ Close the validated pre-package blockers for the next Pi-67 Desktop prerelease: 
 - Validation pending after freeze: clean exact-SHA macOS rebuild, Windows exact-SHA candidate, target-machine manual testing, Feishu/R2 publication.
 - Remaining risks: the rehearsed macOS evidence is intentionally not release-eligible because the source was dirty. One existing Agent Host timing test produced one non-reproducible full-suite failure before passing five isolated repeats and the final full suite.
 - Commit/push state: explicitly authorized for this scope. Upload, Tag, Release, R2 promotion, and publication remain gated behind the exact Windows manual result.
+
+- 2026-09-30: Closed during plan hygiene: Alpha.37 publication receipt exists.

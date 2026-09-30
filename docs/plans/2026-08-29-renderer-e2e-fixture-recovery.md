@@ -1,9 +1,9 @@
 # Renderer E2E Fixture Recovery
 
-Status: active
+Status: closed — Renderer E2E lane restored; 278/278 passed on 2026-09-30
 Owner: Codex primary session
 Started: 2026-08-29
-Last updated: 2026-08-29
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -232,3 +232,5 @@ protocol, Worker, R2, Feishu permission, or migration rollback is required.
 - Validation not completed:
 - Remaining risks:
 - Commit/push/release state:
+
+- 2026-09-30: Closed during plan hygiene: `corepack pnpm run test:e2e` passed 278/278 while verifying d8f5672 (2026-09-30); Alpha.38 shipped after this plan.

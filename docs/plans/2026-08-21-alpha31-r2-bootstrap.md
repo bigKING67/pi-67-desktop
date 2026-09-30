@@ -1,9 +1,9 @@
 # Alpha.31 R2 bootstrap publication
 
-Status: active
+Status: closed — Alpha.31 published to R2 (receipt 2026-08-21)
 Owner: root agent
 Started: 2026-08-21
-Last updated: 2026-08-21
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -119,3 +119,5 @@ authorized; do not rewrite Git history.
 - Validation not completed: R2 live publication and target-OS in-app upgrades
 - Remaining risks: credentials and macOS installed upgrade evidence
 - Commit/push/release state: no new commit, push, upload, manifest write, or remote delete
+
+- 2026-09-30: Closed during plan hygiene: Alpha.31 publication receipt exists (artifacts/r2-release-receipts/2026-08-21T12-02-07.322Z-publish-0.1.0-alpha.31.json).

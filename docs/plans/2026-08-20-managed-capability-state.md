@@ -1,9 +1,9 @@
 # Managed capability updates and verification receipts
 
-Status: active
+Status: closed — superseded by later releases; its Windows manual retest is not separately recorded
 Owner: Codex root agent
 Started: 2026-08-20
-Last updated: 2026-08-21
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -147,3 +147,5 @@ untouched unless a separately validated activation succeeds.
 - Remaining risks: Windows-specific official Skills subprocess behavior, live browser extension
   convergence on the installed Windows candidate, and receipt freshness
 - Commit/push/release state: not authorized
+
+- 2026-09-30: Closed during plan hygiene. Later Windows candidates carried operator-confirmed manual tests (R2 receipts Alpha.31–41), but the Windows-specific items listed under Closeout were not individually re-verified.

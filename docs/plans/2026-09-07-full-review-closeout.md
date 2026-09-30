@@ -1,9 +1,9 @@
 # 全仓审查覆盖闭合
 
-Status: active
+Status: closed — superseded by the 2026-09-27 full review; GAP001-004 and GAP008 carried as unverified
 Owner: Codex
 Started: 2026-09-07
-Last updated: 2026-09-08
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -142,3 +142,5 @@ packaged/macOS/Windows：独立记录已验证与未验证，不由源码门禁�
 - 2026-09-08 Windows运行34179907471在production dependency audit停止：直接undici7.28.0命中GHSA-4cwx-7wf7-3272，Windows打包未运行。用户明确授权修复/提交/推送/重建，直接依赖升7.29.0并更新冻结锁；网络请求/DNS绑定/取消清理等目标回归23/23、runtime typecheck及聚合check退出0，production audit为0 high/0 critical。证据/tmp/pi67-undici729-{tests,typecheck,audit,check}.log。首次运行34179849113误传短SHA而checkout失败，保留失败记录；后续候选必须使用本修复的新完整SHA。
 
 - Windows候选0323f20运行34180391233通过provenance/build/smoke后因所选baseline同为alpha.40停止；改用已核验alpha.39运行33289266938后，34181163191再次通过build/smoke，但baseline-install后的资源检查错误要求新版pi-workspace-resources。旧SHA0178a574源码证实alpha.39使用pi67-core及pi-observational-memory；修正既有版本合同在alpha.40前检查旧资源，当前版本仍严格检查新资源。33项fixture/lifecycle回归通过，原生lint通过；不把baseline验证器失败报告为新安装包漏装资源，保留所有失败回执。
+
+- 2026-09-30: Closed during plan hygiene as superseded by the 2026-09-27 review (2026-09-28-review-follow-ups.md). The 42 confirmed findings were remediated here; GAP001-004 (aborted automated security review) and GAP008 (Windows zero dev/ino long path) were not re-verified and remain open risks.

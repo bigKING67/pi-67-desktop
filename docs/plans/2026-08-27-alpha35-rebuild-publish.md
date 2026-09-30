@@ -1,9 +1,9 @@
 # Alpha.35 rebuild and internal publication
 
-Status: active
+Status: closed — Alpha.35 published to R2 (receipt 2026-08-27)
 Owner: Codex CLI
 Started: 2026-08-27
-Last updated: 2026-08-27
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -209,3 +209,5 @@ that same accepted Candidate through the internal R2 update channel.
 - Validation not completed: pending
 - Remaining risks: pending
 - Commit/push/release state: pending
+
+- 2026-09-30: Closed during plan hygiene: Alpha.35 publication receipt exists.

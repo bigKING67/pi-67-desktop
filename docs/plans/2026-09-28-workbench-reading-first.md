@@ -1,9 +1,9 @@
 # Workbench reading-first (direction A) promotion
 
-Status: phase 1 and phase 2 implemented
+Status: closed — phase 1 and phase 2 implemented; CI run 36401812917
 Owner: main
 Started: 2026-09-28
-Last updated: 2026-09-28
+Last updated: 2026-09-30
 
 ## Selection
 Direction A「阅读优先」from `apps/renderer/design-preview` (`?preview=baseline`), selected by the owner
@@ -154,3 +154,4 @@ absolute Pi path fall back to plain text (Main still owns containment).
 Phase 2 CI passed (run 36401812917). The prototype directory was deleted and
 `2026-09-20-workbench-design-prototypes.md` marked superseded.
 
+- 2026-09-30: Status line aligned with the existing Closeout section.

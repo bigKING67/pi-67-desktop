@@ -1,9 +1,9 @@
 # Alpha.38 support diagnostics R2 release
 
-Status: active
+Status: closed — Alpha.38 published to R2 (receipt 2026-08-29)
 Owner: Codex with operator confirmation
 Started: 2026-08-29
-Last updated: 2026-08-29
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -106,3 +106,5 @@ Before manifest cutover, stop and leave Alpha.37 public. After manifest cutover,
 - Validation not completed: pending
 - Remaining risks: pending
 - Commit/push/release state: pending
+
+- 2026-09-30: Closed during plan hygiene: Alpha.38 publication receipt exists.

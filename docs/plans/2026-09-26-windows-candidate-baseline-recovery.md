@@ -1,9 +1,9 @@
 # Windows candidate baseline recovery
 
-Status: active
+Status: closed — immutable-update baseline transport used in production on 2026-09-30
 Owner: Codex
 Started: 2026-09-26
-Last updated: 2026-09-26
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -247,3 +247,5 @@ failure or delete prior artifacts. No public update state is changed by this pla
 - Validation not completed:
 - Remaining risks:
 - Commit/push/release state:
+
+- 2026-09-30: Closed: on 2026-09-30 the Alpha.40 Actions artifact had expired; preflight selected `immutable-update` from the pinned catalog record, and candidate run 36671645797 downloaded, verified and upgraded from it through the full NSIS lifecycle.

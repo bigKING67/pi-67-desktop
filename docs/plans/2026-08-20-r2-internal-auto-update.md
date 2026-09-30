@@ -1,9 +1,9 @@
 # R2 internal unsigned auto-update
 
-Status: Alpha.31 candidate preparation in progress; unpublished
+Status: closed — channel in production; Alpha.31 through Alpha.41 published (R2 receipts)
 Owner: Codex
 Started: 2026-08-20
-Last updated: 2026-08-21
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -151,3 +151,5 @@ SHA-256, and start the platform update handoff.
   Alpha.30-to-Alpha.31 Windows/macOS upgrade, R2 publication, carrier throughput, or cleanup.
 - Remaining risks: unsigned publisher trust, Cloudflare/build-authority compromise, target-OS
   lifecycle, later macOS startup failure after `open`, and unmeasured mainland carrier throughput.
+
+- 2026-09-30: Closed during plan hygiene: the R2 channel published Alpha.31–33 and 35–41 (receipts under artifacts/r2-release-receipts/). Its runbook is docs/release/internal-r2-update-distribution.md.

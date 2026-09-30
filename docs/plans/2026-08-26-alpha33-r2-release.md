@@ -1,9 +1,9 @@
 # Alpha.33 R2 release
 
-Status: published; Windows target upgrade failed; remediation moved to Alpha.34 candidate
+Status: closed — Alpha.33 published; Windows remediation shipped in later versions
 Owner: root agent
 Started: 2026-08-26
-Last updated: 2026-08-26
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -199,3 +199,5 @@ clients that already installed Alpha.33 or change the source-side Alpha.32 updat
   separately authorized Alpha.34 Candidate. No Alpha.34 R2 mutation, Tag, GitHub
   Release, promotion, signing, notarization, deletion, or cache purge is
   authorized by this remediation step.
+
+- 2026-09-30: Closed during plan hygiene: Alpha.33 receipt exists; the Windows remediation moved to Alpha.34 and shipped through Alpha.35+.

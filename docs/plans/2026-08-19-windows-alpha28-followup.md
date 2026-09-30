@@ -1,9 +1,9 @@
 # Windows Alpha.28 follow-up
 
-Status: active
+Status: closed — superseded by later releases; no per-item closeout was recorded here
 Owner: Codex
 Started: 2026-08-19
-Last updated: 2026-08-19
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -131,3 +131,5 @@ profiles are never rewritten by this plan.
 - 2026-08-19: User authorized the Pi SDK `0.83.0` to `0.84.2` migration,
   Alpha.28 commit/push, candidate construction, Feishu upload, and removal of
   superseded candidate files after replacement verification.
+
+- 2026-09-30: Closed during plan hygiene as superseded by Alpha.29–41. This plan has no per-item closeout record; its items were not individually re-verified during this cleanup.
