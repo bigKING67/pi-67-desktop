@@ -53,6 +53,11 @@ URI scope, user-feedback filtering, untrusted result envelopes, and bounded
 diagnostics after the official retrieval result; it does not add a second
 cheap-first/expansion router or a hidden result cache.
 
+The Recall score threshold defaults to 0.45 instead of upstream's 0.35. The
+retrieval baseline in `eng/evals/openviking-recall-baseline` showed equal hit
+rates on both splits with roughly half the injected tokens and fewer unrelated
+injections; a saved user value is preserved.
+
 Session Profile and each current-prompt Recall are bounded to 1,200-token
 baselines and default to one private plus one shared Experience. Recall and
 OpenViking Tool results remain untrusted user-level context and are never

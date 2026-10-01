@@ -23,6 +23,7 @@ describe("ContextMemoryConfigurationStore", () => {
       privateExperienceLimit: 1,
       localResourceRecallLimit: 1,
       sharedExperienceLimit: 1,
+      scoreThreshold: 0.45,
       revision: expect.stringMatching(/^[a-f0-9]{64}$/)
     });
   });
