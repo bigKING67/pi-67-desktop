@@ -191,8 +191,43 @@ corepack pnpm run release:local:retain
 corepack pnpm run release:local:retain -- apply --confirm-local-artifact-retention
 ```
 
-此处两版本自动策略不限制旧的 candidates/上传 staging 或未知目录；这些仍由上面的
-精确整批清理流程管理。小型历史证据保留也不等于全仓有固定字节上限。
+归档版本选择本身不回收旧的 candidates/上传 staging；下面的已消费副本规则只接管
+有精确 retained replacement 的已知产品副本。其他历史/未知目录仍由上面的精确整批
+清理流程管理。小型历史证据保留也不等于全仓有固定字节上限。
+
+### Verified installer pool and consumed copies
+
+默认受管流程把 `release` 与 `verified-unsigned-preview` 视为同一个成功版本保留池。
+后者只有通过完整 manifest、三件套大小/哈希、Windows 人工 receipt 与 macOS provenance
+联合准入后才贡献当前版本；它始终受保护。归档选择计入该版本，而不是让两个目录
+各自再保留两版。失败归档继续独立保留，不挤掉当前 verified 输入；pin 仍是显式例外。
+
+`release:preview:bundle:prepare` 在同一个 `.archive-retention.lock` 下先准备并完整验证
+独占 staging，然后切换当前 verified bundle。切换前将上一 verified 三件套以精确字节
+保留到 `release`，将其六个小型证据文件保留到
+`artifacts/candidates/unsigned-preview-<version>-<evidence-digest>/`。存在不同字节的同名
+回退文件时拒绝覆盖；同一 version 已有不同的 verified 产品字节时要求使用新 version。
+输出中的未知成员和 `.keep` 会阻止替换。验证/激活失败恢复或保留上一输入，不在
+`finally` 中强删不确定的旧目录。自定义路径不自动加入默认保留池。
+
+成功切换后回收固定本地边界内有 retained replacement 的重复安装包，并运行归档保留。
+文件大小与 SHA-256 必须完全一致；不同字节的同版本构建继续保留并报告 `DIFFERENT_BYTES`。
+Windows 解包目录还必须有候选 identity，且 installer 与其中 executable 均匹配该 identity，
+才能判为已消费输入。JSON/text 证据、截图、当前 macOS `.app`、未知目录和原生运行包不
+在此自动回收集合中。占用、pin、符号链接、identity/替代文件漂移和并发操作均阻止删除。
+部分退役后若发生错误，命令报错；此前已完成的删除不具备事务回滚。
+
+可单独查看重复副本计划；默认只读，且不把未发布的 R2 staging 纳入手动副本回收：
+
+```bash
+corepack pnpm run release:local:copies
+corepack pnpm run release:local:copies -- apply --confirm-local-artifact-retention
+```
+
+该窄范围命令不删除当前应用，macOS 预览可继续运行；Windows 运行中的解包树仍受占用
+检查保护。原有 `release:local:cleanup` 是整批删除命令，继续要求预览退出与独立精确确认，
+不能用它代替保留当前/上一版的日常管理。R2 staging 的回收顺序见内部更新分发合同。
+历史未知目录、未解决的失败现场及旧截图/日志不按年龄自动删除；本流程不引入定时清理。
 
 ### Repository storage budget
 

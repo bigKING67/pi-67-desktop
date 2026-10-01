@@ -90,4 +90,13 @@ describe("release archive retention", () => {
     await expect(planReleaseArchiveRetention({ releaseRoot })).rejects.toThrow("Unsafe archive");
     expect(await readFile(target, "utf8")).toBe("1.0.0");
   });
+
+  it("honors a companion pin created after planning before deleting any archive in that version", async () => {
+    const { releaseRoot, add, apply } = await fixture();
+    for (const version of ["1.0.0", "1.1.0", "1.2.0"]) await add(version);
+    await expect(apply({ probeInUse: async () => {
+      await writeFile(join(releaseRoot, "New-Money-1.0.0-mac-arm64.zip.blockmap.keep"), "late pin"); return [];
+    } })).rejects.toThrow("pinned");
+    expect((await readdir(releaseRoot)).filter(name => !name.endsWith(".keep"))).toHaveLength(12);
+  });
 });

@@ -1,10 +1,11 @@
 import { execFile } from "node:child_process";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, readdir, readFile, realpath, rm } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { rcompare, valid } from "semver";
+import { loadRetainedPreview } from "./retained-preview.mjs";
 
 const execute = promisify(execFile);
 const defaultRoot = fileURLToPath(new URL("../../artifacts/release", import.meta.url));
@@ -33,6 +34,8 @@ export async function planReleaseArchiveRetention({ releaseRoot = defaultRoot, c
   if (!rootStat) return { targets: [], retained: [], bytes: 0 };
   if (!rootStat.isDirectory() || await realpath(releaseRoot) !== resolve(releaseRoot)) throw new Error("Unsafe release directory.");
   const states = await readBuildStates(releaseRoot);
+  const retainedPreview = basename(releaseRoot) === "release" && basename(dirname(releaseRoot)) === "artifacts"
+    ? await loadRetainedPreview(dirname(dirname(releaseRoot))) : undefined;
   const files = [];
   for (const name of await readdir(releaseRoot)) {
     const match = name.match(archiveName);
@@ -48,9 +51,16 @@ export async function planReleaseArchiveRetention({ releaseRoot = defaultRoot, c
   const targets = []; const retained = [];
   for (const platform of ["mac-arm64", "win-x64"]) {
     const group = files.filter(file => file.platform === platform);
-    const versions = [...new Set(group.filter(file => file.state === "COMPLETE").map(file => file.version))].sort(rcompare);
+    const versions = [...new Set([
+      ...group.filter(file => file.state === "COMPLETE").map(file => file.version),
+      ...(retainedPreview ? [retainedPreview.version] : [])
+    ])].sort(rcompare);
     const failedVersions = [...new Set(group.filter(file => file.state !== "COMPLETE").map(file => file.version))].sort(rcompare);
-    const keep = new Set([...new Set([...(currentVersion && versions.includes(currentVersion) ? [currentVersion] : []), ...versions])].slice(0, 2));
+    const keep = new Set([...new Set([
+      ...(retainedPreview ? [retainedPreview.version] : []),
+      ...(currentVersion && versions.includes(currentVersion) ? [currentVersion] : []),
+      ...versions
+    ])].slice(0, 2));
     if (failedVersions[0]) keep.add(failedVersions.includes(currentVersion) ? currentVersion : failedVersions[0]);
     // Pinning any member preserves the entire version set, including blockmaps.
     const pins = new Set(group.filter(file => file.pinned).map(file => file.version));
@@ -115,24 +125,29 @@ async function readBuildStates(releaseRoot) {
 
 async function assertArchiveUnchanged(file) {
   const stat = await lstat(file.path);
+  const versionPinned = (await readdir(dirname(file.path))).some(name => {
+    const match = name.endsWith(".keep") ? name.slice(0, -5).match(archiveName) : undefined;
+    return match?.[1] === file.version && match?.[2] === file.platform;
+  });
   if (!stat.isFile() || stat.isSymbolicLink() || stat.ino !== file.inode || stat.dev !== file.device
     || stat.size !== file.bytes || stat.mtimeMs !== file.mtimeMs || stat.ctimeMs !== file.ctimeMs
-    || await optionalStat(`${file.path}.keep`)) throw new Error("Release archive changed or was pinned after planning.");
+    || versionPinned) throw new Error("Release archive changed or was pinned after planning.");
 }
 
-async function archivePathsInUse(paths) {
+export async function archivePathsInUse(paths) {
   if (process.platform === "darwin") {
     let stdout;
     try { ({ stdout } = await execute("/usr/sbin/lsof", ["-nP", "-Fn"], { maxBuffer: 32 * 1024 * 1024, timeout: 15_000 })); }
     catch (error) { if (error.code === 1 && !error.stdout && !error.stderr) return []; throw error; }
     const opened = new Set(stdout.split("\n").filter(line => line.startsWith("n")).map(line => line.slice(1)));
-    return paths.filter(path => opened.has(path));
+    return paths.filter(path => [...opened].some(name => name === path || name.startsWith(`${path}/`)));
   }
   if (process.platform === "win32") {
     const { stdout } = await execute("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
       "Get-CimInstance Win32_Process | Select-Object -ExpandProperty ExecutablePath"], { maxBuffer: 4 * 1024 * 1024, timeout: 15_000 });
     const opened = new Set(stdout.split(/\r?\n/u).map(path => path.trim().toLowerCase()));
-    return paths.filter(path => opened.has(path.toLowerCase()));
+    return paths.filter(path => [...opened].some(name => name === path.toLowerCase()
+      || name.startsWith(`${path.toLowerCase()}\\`)));
   }
   throw new Error("Archive retention requires a supported host process probe.");
 }

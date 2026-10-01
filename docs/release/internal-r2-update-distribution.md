@@ -124,6 +124,12 @@ drifted, dirty-source, or cross-source macOS evidence and requires it to match t
 repository/source/version/runtime. The command prints the four-file upload order with
 `unsigned-preview-manifest.json` last.
 
+Default bundle preparation shares the local archive lock. It builds and fully admits an owned
+sibling staging directory before replacing the prior bundle. Invalid new inputs leave the prior
+bundle intact; unknown/pinned members, unsafe files or active use stop replacement. Previously
+retired product files may be absent while their manifest and provenance remain. Activation failures
+restore or preserve the prior directory; only this invocation's unactivated staging is disposable.
+
 ## Read-only publication plan
 
 Before any write, configure least-privilege R2 S3 credentials outside the repository and run:
@@ -220,6 +226,20 @@ The credential-free receipt records the completed stage, transfer timings, retai
 deleted recognized artifact names so later work can audit both performance and storage behavior.
 Successful publish writes a credential-free receipt under ignored
 `artifacts/r2-release-receipts/`.
+
+For the default local `artifacts/r2-update-bundle`, publication holds the same local
+`.archive-retention.lock` as packaging and bundle preparation from input admission through
+receipt persistence and local retirement. After remote publication/verification/retention succeeds
+and its publication receipt has been saved, the CLI re-admits `verified-unsigned-preview` and
+reclaims only exact size/SHA-256 duplicate local product files. The retained version, source SHA
+and three artifact identities must match the published release. It preserves the manifest and all
+four local provenance files, the current app and retained installer pool, then records a separate
+local-retention receipt. An upload, verification, or publication-receipt failure leaves local retry
+inputs intact. A later local-retention failure is explicitly reported as a local failure after
+successful remote publication; the already persisted publication receipt remains authoritative.
+Custom `--bundle` paths do not receive automatic local deletion. This lifecycle does not authorize
+running publication or any additional remote operation; exact-version publication authorization
+is still required.
 
 Uploading metadata first is forbidden because clients could retain a reference to a missing
 artifact. The JSON/YML/SIG cache rule bypasses edge caching for the mutable manifest, and the R2

@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import http from "node:http";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   createCloudflareR2Client,
@@ -27,6 +27,8 @@ import {
   createR2ReleaseProgressReporter,
   silentR2ReleaseProgress
 } from "./r2-release-progress.mjs";
+import { maintainLocalArtifactCopies } from "./local-artifact-retention.mjs";
+import { withReleaseArchiveLock } from "./release-archive-retention.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const defaultBundleDirectory = join(root, "artifacts/r2-update-bundle");
@@ -188,6 +190,21 @@ export async function cleanupR2Release({
   return { targetVersion: confirmedVersion, deleted: oldArtifacts };
 }
 
+export async function recordPublishedR2Release({ release, result, sourceRoot = root,
+  persistReceipt = writeReceipt, probeInUse, lockHeld = false }) {
+  if (result.published !== true || result.targetVersion !== release.version) throw new Error("Cannot retire an unpublished release.");
+  await persistReceipt("publish", release.version, result);
+  if (resolve(release.manifestPath) !== join(resolve(sourceRoot), "artifacts/r2-update-bundle", R2_UPDATE_MANIFEST_NAME)) return result;
+  try {
+    const retained = await maintainLocalArtifactCopies({ root: sourceRoot, apply: true, publishedRelease: release, probeInUse, lockHeld });
+    const localArtifactRetention = { removed: retained.removed, reclaimedBytes: retained.bytes };
+    await persistReceipt("local-retention", release.version, localArtifactRetention);
+    return { ...result, localArtifactRetention };
+  } catch (error) {
+    throw new Error("R2 publication succeeded and its receipt was saved, but local artifact retention failed.", { cause: error });
+  }
+}
+
 const R2_S3_NO_PROXY = ".r2.cloudflarestorage.com";
 
 /**
@@ -229,41 +246,45 @@ async function main() {
     return;
   }
 
-  let release = await loadLocalR2Release({
-    directory: flags.get("bundle") ?? defaultBundleDirectory,
-    version,
-    runtimeVersion
-  });
-  if (command === "publish") {
-    const sourceCommit = flags.get("source-commit");
-    const authority = await verifyR2PublicationSource({ root, sourceCommit });
-    assertCleanPreviewCandidateSource({ root });
-    if (release.provenance.sourceCommit !== sourceCommit) {
-      throw new Error("R2 bundle source commit does not match --source-commit.");
-    }
-    release = {
-      ...release,
-      provenance: {
-        ...release.provenance,
-        releaseToolCommit: authority.releaseToolCommit
+  const execute = async (lockHeld = false) => {
+    let release = await loadLocalR2Release({
+      directory: flags.get("bundle") ?? defaultBundleDirectory,
+      version,
+      runtimeVersion
+    });
+    if (command === "publish") {
+      const sourceCommit = flags.get("source-commit");
+      const authority = await verifyR2PublicationSource({ root, sourceCommit });
+      assertCleanPreviewCandidateSource({ root });
+      if (release.provenance.sourceCommit !== sourceCommit) {
+        throw new Error("R2 bundle source commit does not match --source-commit.");
       }
-    };
-  }
-  if (command === "plan") {
-    printJson(await planR2Release({ release, client }));
-    return;
-  }
-  let result;
-  try {
-    result = await publishR2Release({ release, client, progress });
-    result = { ...result, publicationProgress: progress.finish() };
-  } catch (error) {
-    progress.fail(error);
-    progress.finish();
-    throw error;
-  }
-  await writeReceipt(command, version, result);
-  printJson(result);
+      release = {
+        ...release,
+        provenance: {
+          ...release.provenance,
+          releaseToolCommit: authority.releaseToolCommit
+        }
+      };
+    }
+    if (command === "plan") {
+      printJson(await planR2Release({ release, client }));
+      return;
+    }
+    let result;
+    try {
+      result = await publishR2Release({ release, client, progress });
+      result = { ...result, publicationProgress: progress.finish() };
+    } catch (error) {
+      progress.fail(error);
+      progress.finish();
+      throw error;
+    }
+    printJson(await recordPublishedR2Release({ release, result, lockHeld }));
+  };
+  if (command === "publish" && resolve(flags.get("bundle") ?? defaultBundleDirectory) === defaultBundleDirectory) {
+    await withReleaseArchiveLock(join(root, "artifacts/release"), () => execute(true));
+  } else await execute();
 }
 
 function createClientFromEnvironment(command, onTransferProgress) {

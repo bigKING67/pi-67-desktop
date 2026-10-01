@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -30,6 +30,7 @@ describe("R2 update bundle", () => {
     await writeWindowsProvenance(releaseDirectory, version, runtimeVersion);
     await writeMacosProvenance(releaseDirectory, version, runtimeVersion);
     await prepareUnsignedPreview(releaseDirectory, version, runtimeVersion);
+    await mkdir(outputDirectory);
 
     const result = await prepareR2UpdateBundle({
       releaseDirectory,
@@ -153,15 +154,68 @@ describe("R2 update bundle", () => {
     await writeWindowsProvenance(releaseDirectory, version, runtimeVersion);
     await writeMacosProvenance(releaseDirectory, version, runtimeVersion, "b".repeat(40));
     await prepareUnsignedPreview(releaseDirectory, version, runtimeVersion);
-    await prepareR2UpdateBundle({ releaseDirectory, outputDirectory, version, runtimeVersion });
-
-    await expect(loadLocalR2Release({ directory: outputDirectory, version, runtimeVersion }))
+    await expect(prepareR2UpdateBundle({ releaseDirectory, outputDirectory, version, runtimeVersion }))
       .rejects.toThrow("source commit mismatch");
+  });
+
+  it("preserves a previous R2 bundle when the next verified input fails admission", async () => {
+    const root = await temporaryDirectory();
+    const releaseDirectory = join(root, "release");
+    const outputDirectory = join(root, "r2");
+    const version = "0.1.0-alpha.30";
+    const runtimeVersion = "0.55.3";
+    await writeSources(releaseDirectory, version);
+    await writeWindowsProvenance(releaseDirectory, version, runtimeVersion);
+    await writeMacosProvenance(releaseDirectory, version, runtimeVersion);
+    await prepareUnsignedPreview(releaseDirectory, version, runtimeVersion);
+    const options = { releaseDirectory, outputDirectory, version, runtimeVersion, probeInUse: async () => [] };
+    await prepareR2UpdateBundle(options);
+    const before = await snapshot(outputDirectory);
+    await writeFile(join(releaseDirectory, `New-Money-${version}-mac-arm64-unsigned-preview.zip`), "failed replacement");
+    await expect(prepareR2UpdateBundle(options)).rejects.toThrow("verification failed");
+    expect(await snapshot(outputDirectory)).toEqual(before);
+  });
+
+  it("refuses unknown, pinned, occupied and unsafe old R2 inputs; accepts metadata left by successful retirement", async () => {
+    const root = await temporaryDirectory();
+    const releaseDirectory = join(root, "release");
+    const outputDirectory = join(root, "r2");
+    const version = "0.1.0-alpha.30";
+    const runtimeVersion = "0.55.3";
+    await writeSources(releaseDirectory, version);
+    await writeWindowsProvenance(releaseDirectory, version, runtimeVersion);
+    await writeMacosProvenance(releaseDirectory, version, runtimeVersion);
+    await prepareUnsignedPreview(releaseDirectory, version, runtimeVersion);
+    const options = { releaseDirectory, outputDirectory, version, runtimeVersion, probeInUse: async () => [] };
+    await prepareR2UpdateBundle(options);
+    const before = await snapshot(outputDirectory);
+    for (const name of ["notes.txt", ".keep"]) {
+      await writeFile(join(outputDirectory, name), "protected");
+      await expect(prepareR2UpdateBundle(options)).rejects.toThrow("unknown or pinned");
+      await rm(join(outputDirectory, name));
+      expect(await snapshot(outputDirectory)).toEqual(before);
+    }
+    await expect(prepareR2UpdateBundle({ ...options, probeInUse: async paths => paths })).rejects.toThrow("in use");
+    expect(await snapshot(outputDirectory)).toEqual(before);
+    const path = join(outputDirectory, "windows-preview-manual-test.json");
+    await rm(path);
+    await symlink(join(releaseDirectory, "windows-preview-manual-test.json"), path);
+    await expect(prepareR2UpdateBundle(options)).rejects.toThrow("unsafe files");
+    await rm(path);
+    await writeFile(path, before["windows-preview-manual-test.json"]);
+    for (const name of r2UpdateUploadOrder(version).slice(0, 3)) await rm(join(outputDirectory, name));
+    await prepareR2UpdateBundle(options);
+    expect(await snapshot(outputDirectory)).toEqual(before);
+    expect((await readdir(root)).filter(name => name.startsWith(".r2-bundle-"))).toEqual([]);
   });
 });
 
+async function snapshot(directory) {
+  return Object.fromEntries(await Promise.all((await readdir(directory)).sort().map(async name => [name, await readFile(join(directory, name), "utf8")])));
+}
+
 async function temporaryDirectory() {
-  const path = await mkdtemp(join(tmpdir(), "pi67-r2-update-bundle-"));
+  const path = await realpath(await mkdtemp(join(tmpdir(), "pi67-r2-update-bundle-")));
   temporaryDirectories.push(path);
   return path;
 }
