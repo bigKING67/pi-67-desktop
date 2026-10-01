@@ -83,6 +83,9 @@ class TeamAsyncTransport(httpx.AsyncBaseTransport):
         return response_for(request, result)
 
 
+_BROKER_HTTP_CLIENT = object()
+
+
 class TeamOpenAIClients:
     """Narrow OpenAI constructor facade for the two pinned OpenViking backends.
 
@@ -91,12 +94,24 @@ class TeamOpenAIClients:
     Unsupported Azure/other backends deliberately have no constructors here.
     """
     APIError = openai.APIError
+    DEFAULT_CONNECTION_LIMITS = openai.DEFAULT_CONNECTION_LIMITS
+
+    # OpenViking 0.4.22 builds its own httpx client before constructing the SDK
+    # client. Hand back an inert placeholder so no real network client exists;
+    # the constructors below accept only that placeholder and bind the broker.
+    def DefaultHttpxClient(self, **_kwargs):
+        return _BROKER_HTTP_CLIENT
+
+    def DefaultAsyncHttpxClient(self, **_kwargs):
+        return _BROKER_HTTP_CLIENT
 
     def __init__(self, route, exchange, exchange_async):
         self.route, self.exchange, self.exchange_async = route, exchange, exchange_async
 
     def _validate(self, kwargs):
-        if (set(kwargs) - {"base_url", "api_key", "timeout", "max_retries"}
+        if kwargs.get("http_client", _BROKER_HTTP_CLIENT) is not _BROKER_HTTP_CLIENT:
+            raise ValueError("Team clients accept only the broker HTTP placeholder")
+        if (set(kwargs) - {"base_url", "api_key", "timeout", "max_retries", "http_client"}
                 or kwargs.get("base_url") != self.route.endpoint or kwargs.get("api_key") != "team-broker-only"):
             raise ValueError("Team client configuration must use the bound broker route")
         timeout = kwargs.get("timeout", 60)

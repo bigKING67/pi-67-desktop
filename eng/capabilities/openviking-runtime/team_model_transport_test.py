@@ -125,6 +125,10 @@ class TeamModelTransportTest(unittest.IsolatedAsyncioTestCase):
         facade, calls = self.facade("embedding")
         with self.assertRaises(ValueError):
             facade.OpenAI(api_key="team-broker-only", base_url=facade.route.endpoint, default_headers={"x-extra": "unsupported"})
+        with httpx.Client() as real_client, self.assertRaises(ValueError):
+            facade.OpenAI(api_key="team-broker-only", base_url=facade.route.endpoint, http_client=real_client)
+        placeholder = facade.DefaultHttpxClient(limits=facade.DEFAULT_CONNECTION_LIMITS)
+        self.assertIsNotNone(facade.OpenAI(api_key="team-broker-only", base_url=facade.route.endpoint, http_client=placeholder))
         transport = adapter.TeamSyncTransport(facade.route, facade.exchange)
         with self.assertRaises(ValueError):
             transport.handle_request(httpx.Request("POST", facade.route.endpoint + "/embeddings", content=b"x" * (adapter.MAX_BYTES + 1)))

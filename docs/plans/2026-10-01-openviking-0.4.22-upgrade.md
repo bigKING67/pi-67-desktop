@@ -86,10 +86,10 @@ cache, extraction reliability, honest extraction failure).
 - [x] 1. URI canonicalization in Extension/Agent Host with tests, verified against 0.4.16 (team workers had no uid-less URIs).
 - [x] 2. Recompile macOS and Windows requirements locks for 0.4.22; verify wheels.
 - [x] 3. Rebase runtime patch, keep the unshipped query patch 0.4.16-only; move every version pin together.
-- [ ] 4. `ov.conf` decisions (extraction format, output token cap) and Commit-failure handling test.
+- [x] 4. `ov.conf`: JSON extraction output and `vlm.max_tokens` 8192; Commit observation already maps failed/cancelled.
 - [x] 5. Recalibrate on 0.4.22: settings stay raw cosine and convert per server version (no saved-value migration); defaults 0.48 + recallLimit 15.
-- [ ] 6. Port selected upstream pi fixes (archive-safe takeover #5321, camelCase toolResult #4940, non-blocking session_start #4506, batched replay #4692).
-- [ ] 7. Team worker compatibility and cross-version gating.
+- [ ] 6. DEFERRED to a separate change: upstream shared libs drifted by hundreds of lines (recall-core 357, credentials 319, profile-inject 263) against our privacy-gate edits; not required for 0.4.22 compatibility.
+- [x] 7. Team workers on 0.4.22: broker shim supports `DefaultHttpxClient` placeholders; worker tests 22/22. Team index is a local per-member projection, so no cross-member version gate is needed.
 - [ ] 8. Data-root snapshot/rollback procedure; packaged macOS smoke and native probes; Windows lock/wheel evidence.
 
 ## Validation matrix
@@ -145,4 +145,12 @@ already written by 0.4.22.
   Hit@1 72% Hit@3 88% MRR 0.800, false injection 29%/25%, ~385 tokens, versus
   shipped 0.4.16@0.45: 79.5%/0.767, 76%/88%/0.820, 71%/50%, ~393. Test Hit@1/MRR
   regress by the one directory-overview case (upstream behaviour, no API filter).
+- 2026-10-01: Checkpoints 4/7. Team-index and team-query runtimes prepared on
+  0.4.22 (native probes PASS). `team_model_transport_test` caught a real break:
+  0.4.22 SDK backends build `openai.DefaultHttpxClient` first; the broker facade
+  now returns an inert placeholder and rejects any real HTTP client. Team search
+  only ranks scores, so the cosine normalization does not affect it. Automatic
+  ended/long-session Commits do not observe extraction outcome; a failed archive
+  is not re-extracted automatically (unchanged behaviour, now visible as failed
+  in explicit Commits).
 
