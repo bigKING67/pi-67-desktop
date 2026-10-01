@@ -16,6 +16,7 @@ import { detectMemoryOwnerConflict } from "./memory-owner-policy.js";
 import { createRuntimePrivacyGuard } from "./runtime-privacy.js";
 import { resolveManagedMemoryConnection, type ManagedMemoryConnection } from "./managed-connection.js";
 import { registerDesktopMemoryCommit } from "./desktop-memory-commit.js";
+import { commitEndedSession } from "./shutdown-commit.js";
 export default async function initializeOpenViking(pi: ExtensionAPI, managedConnection?: ManagedMemoryConnection) {
   const config = loadConfigFromModuleUrl(import.meta.url);
   // Managed mode ignores the standalone endpoint (OPENVIKING_URL, ovcli.conf, ...).
@@ -303,13 +304,16 @@ export default async function initializeOpenViking(pi: ExtensionAPI, managedConn
   });
 
   // --- session_shutdown ---
-  pi.on("session_shutdown", async (_event, _ctx) => {
+  pi.on("session_shutdown", async (event, _ctx) => {
     recall.invalidate();
     if (!refreshRuntimePrivacy() || !config.privateWriteEnabled || !client.connected || bypassed) return;
 
     await sync.shutdown();
     if (config.takeoverEnabled) {
       await takeover.shutdown();
+      const outcome = await commitEndedSession(event.reason, sync, client, config)
+        .catch(() => "failed" as const);
+      debugLog(`session_shutdown: ended-session commit ${outcome}`);
     } else {
       await sync.commit();
     }

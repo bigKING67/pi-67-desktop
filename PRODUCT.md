@@ -294,6 +294,13 @@ design/protocol contracts; reference inclusion alone does not approve them.
   The inspector refreshes after turn/archive completion and connection recovery;
   its captured count measures messages, not conversational rounds. Background
   refresh only reads diagnostics; it never retries Commit or starts model work.
+  When context takeover owns automatic Commit, a Session that actually ends
+  (Task close, archive, snooze or stop; new, opened or forked Session; app quit)
+  with at least `shutdownCommitMinTokens` (default 1,000) uncommitted tokens is
+  committed once in full under the same privacy, ownership and delivery gates.
+  Reload never commits. The attempt is bounded to 1.5 seconds and is not retried
+  on timeout; extraction then runs from OpenViking's durable queue on the user's
+  configured model. Shorter exchanges stay uncommitted until manual archive.
   Manual archive preserves recent-turn retention and distinguishes no eligible
   messages from accepted work. Only an exact owner task/Session/archive receipt
   confirms processing completion; bounded observation failure stays unconfirmed,

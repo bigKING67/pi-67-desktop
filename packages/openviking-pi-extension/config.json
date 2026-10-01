@@ -18,6 +18,7 @@
   "resumeContextBudget": 32000,
   "commitTokenThreshold": 20000,
   "commitKeepRecentCount": 10,
+  "shutdownCommitMinTokens": 1000,
   "takeover": {
     "enabled": true,
     "tokenThreshold": 30000,

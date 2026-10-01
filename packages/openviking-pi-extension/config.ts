@@ -42,6 +42,8 @@ export interface OVConfig {
   resumeContextBudget: number;
   commitTokenThreshold: number;
   commitKeepRecentCount: number;
+  /** Minimum uncommitted tokens for archiving an ended Session when takeover owns commits. */
+  shutdownCommitMinTokens: number;
   takeoverEnabled: boolean;
   takeoverTokenThreshold: number;
   takeoverKeepRecentTurns: number;
@@ -91,6 +93,7 @@ const DEFAULT_CONFIG: OVConfig = {
   resumeContextBudget: 32000,
   commitTokenThreshold: 20000,
   commitKeepRecentCount: 10,
+  shutdownCommitMinTokens: 1000,
   takeoverEnabled: true,
   takeoverTokenThreshold: 30000,
   takeoverKeepRecentTurns: 3,
@@ -211,6 +214,7 @@ export function loadConfig(extensionDir: string): OVConfig {
   config.resumeContextBudget = clampInt(config.resumeContextBudget, 1024, 128000, DEFAULT_CONFIG.resumeContextBudget);
   config.commitTokenThreshold = clampInt(config.commitTokenThreshold, 1000, 1000000, DEFAULT_CONFIG.commitTokenThreshold);
   config.commitKeepRecentCount = clampInt(config.commitKeepRecentCount, 0, 1000, DEFAULT_CONFIG.commitKeepRecentCount);
+  config.shutdownCommitMinTokens = clampInt(config.shutdownCommitMinTokens, 1, 1000000, DEFAULT_CONFIG.shutdownCommitMinTokens);
   config.takeoverEnabled = config.takeoverEnabled !== false;
   config.takeoverTokenThreshold = clampInt(config.takeoverTokenThreshold, 1, 1000000, DEFAULT_CONFIG.takeoverTokenThreshold);
   config.takeoverKeepRecentTurns = clampInt(config.takeoverKeepRecentTurns, 0, 100, DEFAULT_CONFIG.takeoverKeepRecentTurns);

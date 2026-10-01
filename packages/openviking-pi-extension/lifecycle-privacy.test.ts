@@ -187,6 +187,35 @@ describe("OpenViking lifecycle private write authority", () => {
   });
 });
 
+describe("ended-Session Commit under takeover", () => {
+  async function shutdown(mode: string, pendingTokens: number, reason: string) {
+    const f = await fixture(mode, true);
+    const transport = globalThis.fetch, commitBodies: unknown[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const path = new URL(typeof input === "string" ? input : input instanceof URL ? input : input.url).pathname;
+      if (!init?.method && path === "/api/v1/sessions/pi-fixture-session") {
+        return new Response(JSON.stringify({ status: "ok", result: { pending_tokens: pendingTokens } }), { status: 200 });
+      }
+      if (path.endsWith("/commit") && typeof init?.body === "string") commitBodies.push(JSON.parse(init.body));
+      return transport(input, init);
+    }));
+    await f.run("session_start");
+    await f.run("session_shutdown", { reason });
+    return { commitBodies, writes: f.writes() };
+  }
+
+  it("archives an ended conversation in full without waiting for takeover pressure", async () => {
+    expect((await shutdown("private-learning", 1500, "quit")).commitBodies).toEqual([{ keep_recent_count: 0 }]);
+  });
+
+  it.each([["private-learning", 1500, "reload"], ["private-learning", 200, "quit"], ["read-only", 50_000, "quit"]])(
+    "does not commit in %s with %i pending tokens on %s", async (mode, pending, reason) => {
+      const result = await shutdown(mode, pending, reason);
+      expect(result.commitBodies).toEqual([]);
+      if (mode === "read-only") expect(result.writes).toEqual([]);
+    });
+});
+
 describe("restored lifecycle boundaries", () => {
   it("restores a committed lineage for reads but never realigns, captures, replays or appends in read-only", async () => {
     const f = await fixture("read-only", true);

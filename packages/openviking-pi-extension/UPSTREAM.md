@@ -58,6 +58,12 @@ retrieval baseline in `eng/evals/openviking-recall-baseline` showed equal hit
 rates on both splits with roughly half the injected tokens and fewer unrelated
 injections; a saved user value is preserved.
 
+With takeover enabled, upstream commits only under context pressure (30,000
+tokens) or before compaction, so ordinary conversations never reached memory
+extraction. Pi-67 also commits an ended Session (`quit`, `new`, `resume`,
+`fork`; never `reload`) in full when it holds at least
+`shutdownCommitMinTokens` uncommitted tokens, bounded to 1.5 seconds.
+
 Session Profile and each current-prompt Recall are bounded to 1,200-token
 baselines and default to one private plus one shared Experience. Recall and
 OpenViking Tool results remain untrusted user-level context and are never
