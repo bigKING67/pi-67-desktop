@@ -1,6 +1,6 @@
 # OpenViking 0.4.16 → 0.4.22 upgrade
 
-Status: active
+Status: completed locally
 Owner: Claude Code
 Started: 2026-10-01
 Last updated: 2026-10-01
@@ -90,7 +90,7 @@ cache, extraction reliability, honest extraction failure).
 - [x] 5. Recalibrate on 0.4.22: settings stay raw cosine and convert per server version (no saved-value migration); defaults 0.48 + recallLimit 15.
 - [ ] 6. DEFERRED to a separate change: upstream shared libs drifted by hundreds of lines (recall-core 357, credentials 319, profile-inject 263) against our privacy-gate edits; not required for 0.4.22 compatibility.
 - [x] 7. Team workers on 0.4.22: broker shim supports `DefaultHttpxClient` placeholders; worker tests 22/22. Team index is a local per-member projection, so no cross-member version gate is needed.
-- [~] 8. Backup, signing, install, packaged smoke and isolated packaged private-memory probe done; real-data switch waits for merge into main; Windows evidence and packaged team-session probe not run.
+- [x] 8. Backup, signing, install, packaged smoke, isolated packaged private-memory probe, merge, and real-data switch done; Windows evidence and packaged team-session probe not run.
 
 ## Validation matrix
 
@@ -170,4 +170,26 @@ already written by 0.4.22.
 - Next: merge `openviking-0.4.22` into main after the team-chat work lands,
   then switch the real data root (backup above is the rollback), then the
   query-planner plan.
+- 2026-10-01: Team-chat work landed on main; branch rebased cleanly, aggregate
+  gate PASS (913 files / 5,913 tests), fast-forwarded into main, worktree and
+  branch removed (6.5 GB freed). App quit, fresh backup
+  `openviking-backup-0.4.16-20261001-194419-preswitch` (diff identical), main
+  preview packaged (smoke PASS, asar `907b2bd9…`). The real data root now runs
+  `openviking-0.4.22-python-3.12.10-sdk-0.1.10-darwin-arm64`; 16 Sessions and 4
+  memory files match the backup; 0.4.22 wrote `backend_meta.json` (forward-only).
+  Rollback: quit the app, restore the pre-switch backup, run a 0.4.16 build.
+
+## Closeout
+
+- Changed: Extension URI policy, score scale, defaults (0.48 raw, recallLimit
+  15), Agent Host URIs and score scale, runtime pins/locks/patch, ov.conf
+  extraction settings, team broker shim, eval harness, this plan.
+- Validation completed: unit and aggregate gates, native probes (private,
+  team-index, team-query), team worker Python tests, recall baseline on 0.4.22,
+  isolated packaged private-memory probe, packaged smoke, real-data start.
+- Not completed: Windows, packaged team-session probe, upstream pi shared-lib
+  port (deferred), observation of real Commits/extraction under 0.4.22.
+- Remaining risk: memory directory overviews compete for single category slots
+  (one baseline case); automatic Commits do not observe extraction failure.
+- Commit/push: local commits only; no push.
 
