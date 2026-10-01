@@ -19,6 +19,8 @@
     "lint": "oxlint --type-aware --type-check --deny-warnings apps packages tests eng",
     "test": "corepack pnpm --filter @pi67/pi-runtime run build:runtime && vitest run",
     "eval:openviking-recall": "vitest run eng/evals/openviking-recall-golden.test.mjs",
+    "eval:openviking-baseline": "vitest run eng/evals/openviking-recall-baseline",
+    "eval:openviking-baseline:live": "node eng/evals/openviking-recall-baseline/run-baseline.mjs",
     "probe:openviking:native": "node eng/capabilities/run-openviking-native-probe.mjs",
     "probe:openviking:query-coalescing": "node eng/capabilities/probe-query-embedding-coalescing.mjs",
     "probe:openviking:query-native": "node eng/capabilities/probe-query-embedding-native.mjs",
