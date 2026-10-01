@@ -25,7 +25,8 @@ macOS。RPC 方案需要发现系统 Pi、处理版本漂移、严格 JSONL fram
 - Pi SDK 运行在 Electron utility process Agent Host；
 - renderer 运行于 sandbox，只通过 MessagePort 使用版本化 protocol；
 - Main 只负责桌面系统能力和进程生命周期；
-- 生产 renderer 使用 `app://pi67`，不启动 localhost Server 或业务 WebSocket；
+- 生产 renderer 使用 `app://pi67`，不启动 localhost Server 或本地进程间业务 WebSocket；
+  唯一例外是 ADR 0003 中 Agent Host 发起的出站 New Money Team Chat `wss://` 连接；
 - 不实现 RPC Adapter、系统 Pi fallback 或非 Pi Provider；
 - 上游升级先通过 Pi contract tests，再修改锁定版本。
 

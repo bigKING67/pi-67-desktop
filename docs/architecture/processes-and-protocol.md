@@ -2629,6 +2629,30 @@ gap 后保留旧 Host 或旧 Session 的 Extension 状态。
   UI is a declaration, not live verification, and a sent native request must never
   silently fall back.
 
+## Team Chat transport
+
+ADR 0003 是权威合同。Team Chat 不经过 Pi Runtime、Task Scheduler 或 Session 权限：
+
+- Protocol：`teamChat.connection.get`、`teamChat.directory.get`、`teamChat.messages.list`、
+  `teamChat.message.send`、`teamChat.read.mark`、`teamChat.channel.create`、`teamChat.channel.join`、
+  `teamChat.dm.open` 均为 `app` scope 命令；`teamChat.pushed` 与 `teamChat.connectionChanged` 是 `app`
+  scope 事件。Schema 位于 `packages/protocol/src/team-chat-schemas.ts`；字符长度按字素校验，Host 再按
+  服务端的码点上限精确校验。`message.send` 不是 replay-safe control mutation：幂等由 caller 的
+  `clientKey` 与服务端唯一约束承担，Renderer 重试复用同一 key。
+- Host：`team-chat/team-chat-command-router.ts` 由 `ContextMemoryCommandRouter` 持有并随其 shutdown；
+  凭据经 `EnterpriseContextController.newMoneySession()` 取得，沿用现有刷新与 endpoint 一致性检查。
+  HTTP 走 `context/new-money-http.ts`（无重定向、8 秒超时、只透传白名单服务错误码）。
+- Push：`team-chat/team-chat-realtime.ts` 是生产代码中唯一允许 `WebSocket` 的文件
+  （`eng/quality/production-transport-policy.mjs` 精确豁免）。它在首次 `teamChat.connection.get` 时启动，
+  先经 REST 取得单次 60 秒 ticket，再把 HTTPS endpoint 升级为 `wss:`（仅 loopback HTTP 可用 `ws:`），
+  只接收不发送业务帧。凭据 broker signal 退役时立即断开；无凭据为 `signed-out`；服务端
+  `entitlement_inactive` 与 `team_not_found`/`device_team_scope` 映射为 `unavailable`，等待凭据变化；
+  其他失败按 0.5–30 秒带抖动退避。60 秒无帧（服务端 25 秒心跳）、畸形帧或关闭码视为断线；4001
+  （access token 到期）立即重连。每次 `ready` 递增 `live.generation`。
+- Renderer：`team-chat/team-chat-controller.ts` 订阅 Port 事件，在每个新 generation、sequence gap 或
+  重连后重新读取目录并对已打开会话做 `after=<tail>` 补齐；跳号 push 从推送前的 tail 补齐。所有状态是
+  可丢弃的内存缓存，登出时清空并忽略迟到响应。日志与诊断不记录消息正文、ticket 或 token。
+
 ## Source layout
 
 - Desktop Main：`app-protocol`、`main-window`、`agent-host-supervisor`、`system-bridge` 分别拥有
@@ -2643,4 +2667,4 @@ gap 后保留旧 Host 或旧 Session 的 Extension 状态。
   流式 chunk，`approval` 独占 Safety Approval projection/response lifecycle，`extension-ui` 独占普通 Extension UI
   projection/response lifecycle，`notifications` 独占内存通知历史、
   Toast 生命周期和 terminal dedupe；`operation`、`tool-cards` 和 feature 目录拥有 UI。基础样式位于 `styles`，
-  feature-specific 样式使用 colocated CSS Modules。
+  feature-specific 样式使用 colocated CSS Modules。`team-chat` 拥有 Team Chat 状态、控制器与 UI。

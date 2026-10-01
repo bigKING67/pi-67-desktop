@@ -1051,3 +1051,33 @@
 }
 
 .activeConversation .conversationCopy strong { font-weight: var(--font-weight-medium); }
+
+/* Work/Chat mode switch (ADR 0003): one segmented control under the brand row. */
+.railTop { display: grid; gap: 2px; padding-bottom: var(--space-1); }
+.modeSwitch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0 10px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+}
+.modeOption {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-support);
+  transition: background-color var(--motion-fast) var(--motion-ease-out), color var(--motion-fast) var(--motion-ease-out);
+}
+.modeOption[data-hovered] { color: var(--text-primary); }
+.modeOption.modeSelected { background: var(--surface); box-shadow: 0 0 0 1px var(--border); color: var(--text-primary); font-weight: var(--font-weight-semibold); }
+.modeOption[data-focus-visible] { box-shadow: var(--shadow-focus); outline: none; }
+.modeBadge { min-width: 16px; padding: 0 4px; border-radius: 5px; background: var(--accent); color: var(--canvas); font-size: var(--font-size-caption); font-variant-numeric: tabular-nums; font-weight: var(--font-weight-semibold); line-height: 16px; }

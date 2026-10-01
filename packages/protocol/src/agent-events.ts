@@ -25,6 +25,7 @@ import type {
 import type { ProtocolError } from "./protocol-error.js";
 import type { PiProviderConfigurationChanged } from "./provider-configuration-schemas.js";
 import type { ContextMemoryEventPayloads } from "./context-memory-messages.js";
+import type { TeamChatEventPayloads } from "./team-chat-command-messages.js";
 
 export interface StreamDelta {
   assistantMessageEvent: {
@@ -33,7 +34,7 @@ export interface StreamDelta {
   };
 }
 
-export interface EventPayloads extends ContextMemoryEventPayloads {
+export interface EventPayloads extends ContextMemoryEventPayloads, TeamChatEventPayloads {
   "runtime.statusChanged": RuntimeStatus;
   "runtime.ready": {
     capabilities: RuntimeCapabilities;

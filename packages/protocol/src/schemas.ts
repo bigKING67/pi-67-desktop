@@ -76,6 +76,7 @@ import {
   SessionResourceCatalogResultSchema
 } from "./session-resource-schemas.js";
 import { LarkCommandResultSchemas } from "./lark-auth-schemas.js";
+import { TeamChatCommandResultSchemas, TeamChatEventPayloadSchemas } from "./team-chat-schemas.js";
 import {
   SkillPackListResultSchema,
   SkillPackMutationResultSchema
@@ -298,6 +299,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "skill.pack.restore": SkillPackMutationResultSchema,
   ...LarkCommandResultSchemas,
   ...ContextMemoryCommandResultSchemas,
+  ...TeamChatCommandResultSchemas,
   "extension.ui.respond": strictObject({ resolved: Type.Boolean() }),
   "approval.respond": strictObject({
     resolved: Type.Boolean(),
@@ -415,5 +417,6 @@ export const EventPayloadSchemas: Record<AgentEventType, TSchema> = {
   "resource.changed": strictObject({ reason: Type.String() }),
   "diagnostics.progress": strictObject({ step: Type.String(), completed: Type.Boolean() }),
   "doctor.completed": DoctorReportSchema,
-  ...ContextMemoryEventPayloadSchemas
+  ...ContextMemoryEventPayloadSchemas,
+  ...TeamChatEventPayloadSchemas
 };

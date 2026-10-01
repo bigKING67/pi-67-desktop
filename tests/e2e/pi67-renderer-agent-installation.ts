@@ -9,6 +9,7 @@ import { installMockSessionRotationHandler } from "./pi67-renderer-session-fixtu
 import { installMockContextFileCommandHandler } from "./pi67-context-file-fixture.js";
 import { installMockInspectorCommandHandler } from "./pi67-renderer-inspector-command-fixture.js";
 import { installMockLarkCommandHandler } from "./pi67-lark-command-fixture.js";
+import { installMockTeamChatCommandHandler } from "./pi67-team-chat-command-fixture.js";
 import { installMockProviderConfigurationCommandHandler } from "./pi67-provider-configuration-command-fixture.js";
 import { installMockPayloadSanitizer } from "./pi67-renderer-payload-sanitizer.js";
 import { installMockOperationFactories } from "./pi67-renderer-operation-fixture.js";
@@ -23,6 +24,7 @@ export async function installMockAgentHandlers(page: Page): Promise<void> {
   await page.evaluate(installMockContextFileCommandHandler);
   await page.evaluate(installMockInspectorCommandHandler);
   await page.evaluate(installMockLarkCommandHandler);
+  await page.evaluate(installMockTeamChatCommandHandler);
   await page.evaluate(installMockProviderConfigurationCommandHandler);
   await page.evaluate(installMockConversationCommandHandler);
   await page.evaluate<void, Parameters<typeof installMockCommandResponseHandler>[0]>(installMockCommandResponseHandler, {

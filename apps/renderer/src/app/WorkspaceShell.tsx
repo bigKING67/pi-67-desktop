@@ -1,4 +1,4 @@
-import { lazy, Suspense, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { WorkspaceDescriptor } from "@pi67/domain";
 import { rendererWorkbenchStore, selectedWorkbenchTask, type RendererWorkbenchTask } from "../workbench/workbench-store.js";
 import { useAppStore } from "./app-store.js";
@@ -13,11 +13,7 @@ import {
   useSessionCatalogStore
 } from "../navigation/session-catalog-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
-import {
-  selectSessionFileIdentity,
-  selectSessionGeneration,
-  selectSessionId
-} from "../session/session-projection-selectors.js";
+import { selectSessionFileIdentity, selectSessionGeneration, selectSessionId } from "../session/session-projection-selectors.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { activateRendererTask, resumeRendererTask } from "../workbench/task-activation-controller.js";
 import { repairAndOpenRendererWorkspace } from "../workbench/workspace-registration-controller.js";
@@ -40,6 +36,8 @@ const WorkspaceFileSurface = lazy(() => import("../workspace-files/WorkspaceFile
 })));
 
 interface WorkspaceShellProps {
+  /** Replaces the Work surface (Team Chat mode) while keeping navigation and drawers. */
+  centralOverride?: ReactNode;
   contextVisible: boolean;
   navigationIsDrawer: boolean;
   navigationVisible: boolean;
@@ -48,6 +46,7 @@ interface WorkspaceShellProps {
 }
 
 export function WorkspaceShell({
+  centralOverride,
   contextVisible,
   navigationIsDrawer,
   navigationVisible,
@@ -94,7 +93,7 @@ export function WorkspaceShell({
     && liveRuntime.phase === "recovering"
   );
   const effectiveContextVisible = Boolean(selectedWorkspace) && !settingsSelected && !taskRecoveryPending && contextVisible;
-  const centralSurface = taskRecoveryPending ? (
+  const centralSurface = centralOverride ?? (taskRecoveryPending ? (
     <TaskRecoveryState detail={liveRuntime.detail} />
   ) : liveTaskSelected ? (
     <LazySurfaceBoundary
@@ -128,7 +127,7 @@ export function WorkspaceShell({
       />
   ) : (
     <WorkspaceEmptyState />
-  );
+  ));
 
   useLayoutEffect(() => {
     if (!navigationIsDrawer || !navigationVisible) return;
@@ -200,7 +199,7 @@ export function WorkspaceShell({
           type="button"
         />
       ) : null}
-      {selectedWorkspace && selectedWorkspaceHasFileTabs ? (
+      {selectedWorkspace && selectedWorkspaceHasFileTabs && !centralOverride ? (
         <LazySurfaceBoundary
           description="对话仍保持可用；可重新打开文件标签以恢复编辑器。"
           kind="workspace"

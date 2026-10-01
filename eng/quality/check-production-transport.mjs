@@ -51,7 +51,7 @@ if (failures.length > 0) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
-console.log(`Production transport check passed: ${files.length} files, app:// assets, MessagePort IPC, no business listener/WebSocket; bounded native sidecar reservation.`);
+console.log(`Production transport check passed: ${files.length} files, app:// assets, MessagePort IPC, no business listener, one Host-owned Team Chat push socket; bounded native sidecar reservation.`);
 
 async function collect(directory) {
   const output = [];

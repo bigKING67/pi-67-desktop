@@ -17,6 +17,7 @@ import { ContextMemoryConfigurationStore } from "./context-memory-configuration.
 import { ContextSessionCommitController, type PrivateSessionCommit } from "./context-session-commit-controller.js";
 import type { EnterpriseCredentialBrokerClient } from "./enterprise-credential-broker-client.js";
 import { EnterpriseContextController } from "./enterprise-context-controller.js";
+import { TeamChatCommandRouter } from "../team-chat/team-chat-command-router.js";
 import {
   readContextRuntimeDoctor,
   readContextRuntimeStatus,
@@ -60,6 +61,7 @@ export class ContextMemoryCommandRouter {
   private readonly experience: ExperienceGovernanceController;
   private readonly sessionCommit: ContextSessionCommitController;
   private readonly recall: RecallObservationStore;
+  readonly teamChat: TeamChatCommandRouter;
 
   constructor(
     private readonly agentDir: string,
@@ -78,6 +80,8 @@ export class ContextMemoryCommandRouter {
       enterpriseCredentials,
       this.recall
     );
+    this.teamChat = new TeamChatCommandRouter({ session: () => this.enterprise.newMoneySession(), events,
+      ...(enterpriseCredentials === undefined ? {} : { credentials: enterpriseCredentials }) });
     const experienceCandidates = new ExperienceCandidateStore(agentDir);
     this.experience = new ExperienceGovernanceController(experienceCandidates, this.enterprise, events);
     this.sessionCommit = new ContextSessionCommitController(
@@ -91,6 +95,7 @@ export class ContextMemoryCommandRouter {
   }
 
   async shutdown(): Promise<void> {
+    this.teamChat.shutdown();
     await Promise.allSettled(this.pending);
     this.enterprise.shutdown();
   }

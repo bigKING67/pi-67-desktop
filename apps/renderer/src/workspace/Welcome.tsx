@@ -1,6 +1,7 @@
-import { FolderOpen, HardDrive, History } from "lucide-react";
+import { FolderOpen, HardDrive, History, MessagesSquare } from "lucide-react";
 import piIconUrl from "../assets/pi-icon-64.png";
 import { messages } from "../localization/message-catalog.js";
+import { useShellStore } from "../shell/shell-store.js";
 import { openRendererWorkspace } from "./workspace-open-controller.js";
 import styles from "./Welcome.module.css";
 
@@ -16,15 +17,26 @@ export function Welcome() {
           </div>
         </div>
         <p>{messages.workspace.description}</p>
-        <button
-          className={`primary-button ${styles.action}`}
-          data-testid="workspace-open-action"
-          onClick={() => void openRendererWorkspace()}
-          type="button"
-        >
-          <FolderOpen size={17} />
-          {messages.workspace.openAction}
-        </button>
+        <div className={styles.actions}>
+          <button
+            className={`primary-button ${styles.action}`}
+            data-testid="workspace-open-action"
+            onClick={() => void openRendererWorkspace()}
+            type="button"
+          >
+            <FolderOpen size={17} />
+            {messages.workspace.openAction}
+          </button>
+          <button
+            className={`secondary-button ${styles.action}`}
+            data-testid="team-chat-open-action"
+            onClick={() => useShellStore.getState().setWorkspaceMode("chat")}
+            type="button"
+          >
+            <MessagesSquare size={17} />
+            {messages.teamChat.openChat}
+          </button>
+        </div>
         <div className={styles.facts}>
           <div><History size={17} /><span><strong>{messages.workspace.existingConfiguration}</strong><small>{messages.workspace.existingConfigurationDetail}</small></span></div>
           <div><HardDrive size={17} /><span><strong>{messages.workspace.localData}</strong><small>{messages.workspace.localDataDetail}</small></span></div>

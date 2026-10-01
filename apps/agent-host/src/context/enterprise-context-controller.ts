@@ -86,23 +86,21 @@ export class EnterpriseContextController {
     return this.authorization.disconnect();
   }
 
-  async listTeams(): Promise<{ items: EnterpriseTeamSummary[]; total: number }> {
+  /** Current endpoint and device credential; refreshes the access token near expiry. */
+  async newMoneySession() {
     const configuration = await this.configuration.read();
-    const credential = await this.authorization.activeCredential(configuration);
-    const items = await new EnterpriseContextGatewayClient(
-      configuration.enterpriseGatewayEndpoint,
-      credential.accessToken
-    ).listTeams();
+    return { endpoint: configuration.enterpriseGatewayEndpoint, credential: await this.authorization.activeCredential(configuration) };
+  }
+
+  async listTeams(): Promise<{ items: EnterpriseTeamSummary[]; total: number }> {
+    const { endpoint, credential } = await this.newMoneySession();
+    const items = await new EnterpriseContextGatewayClient(endpoint, credential.accessToken).listTeams();
     return { items, total: items.length };
   }
 
   async listProjects(teamId: string): Promise<{ items: EnterpriseProjectSummary[]; total: number }> {
-    const configuration = await this.configuration.read();
-    const credential = await this.authorization.activeCredential(configuration);
-    const items = await new EnterpriseContextGatewayClient(
-      configuration.enterpriseGatewayEndpoint,
-      credential.accessToken
-    ).listProjects(teamId);
+    const { endpoint, credential } = await this.newMoneySession();
+    const items = await new EnterpriseContextGatewayClient(endpoint, credential.accessToken).listProjects(teamId);
     if (items.some((item) => item.accountId !== teamId)) {
       throw new HostCommandError(
         "INVALID_PAYLOAD",

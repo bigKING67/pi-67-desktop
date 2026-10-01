@@ -87,10 +87,11 @@ completing a real session without learning terminal UI conventions first.
   graphical mark (`pi-icon-64.png`, the current 67 identity). Do not redraw,
   recolor, decorate or replace it with a mode icon. Public brand copy expresses
   `用 AI 创造新的价值。`
-- Brand identity and mode identity are separate: Work uses a bull and future
-  Chat uses a horse when those mode controls are designed. This naming change
-  adds neither mode controls nor mode assets. Do not explain private wordplay
-  in product copy or add financial symbols.
+- Brand identity and mode identity are separate: Work uses a bull and Chat uses a
+  horse inside the `工作 | 聊天` mode switch (see `Team Chat`). The bull is a
+  Desktop-owned 24px-grid, 2px round-stroke glyph matching Lucide; the horse is
+  Lucide `ChessKnight`. Do not explain private wordplay in product copy or add
+  financial symbols.
 - Native application assets remain the existing white rotationally symmetric
   glyph on a black rounded square. Technical release identifiers retain
   `Pi-67 Desktop` during this bounded in-product naming change.
@@ -2010,6 +2011,33 @@ loading error where the operation can produce those states
   then allows newly submitted work to continue after the barrier. Per-item edit,
   delete, reorder, and restore are not exposed until Pi provides an authoritative
   mutation contract.
+
+### Team Chat
+
+- The mode switch sits directly under the navigation brand row: one full-width
+  segmented control with control radius (not a pill), two equal segments with a
+  15px mode glyph and label. The selected segment uses the surface token, a
+  1px border ring and semibold text; Work shows a solid accent unread count on
+  the Chat segment and includes it in the accessible name. The header action
+  becomes `新建频道` in Chat and `添加或创建工作区` in Work.
+- The Chat rail has `频道` and `同事` sections with caption headings. Rows are
+  32px single-line buttons: `#`/lock glyph or a 20px initial tile, an ellipsized
+  name and a trailing solid accent unread count; joinable channels use tertiary
+  text and `可加入`. Selection matches Work conversations: neutral active surface
+  and medium title, no leading stripe.
+- The center surface uses the conversation track width. Short timelines sit
+  above the composer. A channel intro (name, visibility, member count) precedes
+  day separators (`今天`, `昨天`, dates) and sender groups that repeat the name and
+  time only after a sender change or five minutes. Message text is primary,
+  pre-wrapped and selectable; pending text is secondary and failures use the
+  danger role with text actions. `加载更早的消息` preserves scroll position.
+- The composer shares the timeline text column, uses the raised Composer surface,
+  grows to 200px and shows a remaining-character count only within 400 of the
+  limit. A non-member public channel replaces it with a join card.
+- Connection progress, reconnection and unavailability use one quiet status band
+  above the timeline; signed-out and no-selection states use the centered empty
+  state with one next action. The TitleBar shows `# channel`, the teammate name or
+  `聊天`, and omits Inspector and Repository controls in Chat.
 
 ### Session navigation
 

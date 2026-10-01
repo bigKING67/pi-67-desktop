@@ -40,3 +40,23 @@ describe("OpenViking loopback default endpoint", () => {
       'const defaults = { endpoint: "http://127.0.0.1:8080" };').length).toBeGreaterThan(0);
   });
 });
+
+describe("approved Team Chat push socket", async () => {
+  const chatPath = "apps/agent-host/src/team-chat/team-chat-realtime.ts";
+  const chatSource = await readFile(resolve(import.meta.dirname, "../..", chatPath), "utf8");
+  it("admits the client socket only at its Agent Host path", () => {
+    expect(productionTransportViolations(chatPath, chatSource)).toEqual([]);
+    expect(productionTransportViolations("apps/renderer/src/team-chat/socket.ts", chatSource).length).toBeGreaterThan(0);
+    expect(productionTransportViolations("apps/agent-host/src/team-chat/team-chat-gateway.ts", chatSource).length)
+      .toBeGreaterThan(0);
+  });
+  it("rejects a second socket, servers, literal endpoints and a downgraded origin", () => {
+    for (const modified of [`${chatSource}\nnew WebSocket(other);`,
+      `${chatSource}\nimport { WebSocketServer } from "ws";`,
+      `${chatSource}\nconst endpoint = "wss://example.test";`,
+      `${chatSource}\nserver.listen(0);`,
+      chatSource.replace('if (url.protocol === "https:") url.protocol = "wss:";', 'url.protocol = "ws:";')]) {
+      expect(productionTransportViolations(chatPath, modified).length).toBeGreaterThan(0);
+    }
+  });
+});

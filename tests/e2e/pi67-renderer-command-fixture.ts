@@ -6,6 +6,7 @@ import type { FixtureSessionCatalogStatus } from "./pi67-session-catalog-fixture
 import type { MockContextFileCommandHandler } from "./pi67-context-file-fixture.js";
 import type { MockProviderConfigurationCommandHandler } from "./pi67-provider-configuration-command-fixture.js";
 import type { MockLarkCommandHandler } from "./pi67-lark-command-fixture.js";
+import type { MockTeamChatCommandHandler } from "./pi67-team-chat-command-fixture.js";
 import type { RuntimeDiagnostics } from "../../packages/protocol/src/index.js";
 
 interface MockCommandResponseFixture {
@@ -32,6 +33,7 @@ export function installMockCommandResponseHandler({
     __pi67ResolveMockContextFileCommand: MockContextFileCommandHandler;
     __pi67ResolveMockInspectorCommand: MockInspectorCommandHandler;
     __pi67ResolveMockLarkCommand: MockLarkCommandHandler;
+    __pi67ResolveMockTeamChatCommand: MockTeamChatCommandHandler;
     __pi67ResolveMockProviderConfigurationCommand: MockProviderConfigurationCommandHandler;
     __pi67ResolveMockCommand?: MockCommandResponseHandler;
   };
@@ -40,6 +42,7 @@ export function installMockCommandResponseHandler({
   const resolveMockContextFileCommand = testWindow.__pi67ResolveMockContextFileCommand;
   const resolveMockInspectorCommand = testWindow.__pi67ResolveMockInspectorCommand;
   const resolveMockLarkCommand = testWindow.__pi67ResolveMockLarkCommand;
+  const resolveMockTeamChatCommand = testWindow.__pi67ResolveMockTeamChatCommand;
   const resolveMockProviderConfigurationCommand = testWindow.__pi67ResolveMockProviderConfigurationCommand;
 
   const resolveMockCommand: MockCommandResponseHandler = (type, payload, current, hostEpoch) => {
@@ -49,6 +52,8 @@ export function installMockCommandResponseHandler({
     if (type === "enterprise.identity.get") return { state: "signed-out" };
     const larkResult = resolveMockLarkCommand(type, payload);
     if (larkResult !== undefined) return larkResult;
+    const teamChatResult = resolveMockTeamChatCommand(type, payload);
+    if (teamChatResult !== undefined) return teamChatResult;
     if (type === "runtime.initialize" || type === "workspace.open") return {};
     if (
       type === "session.create"

@@ -1,4 +1,5 @@
 import { zhCNApprovalMessages } from "./zh-cn-approval.js";
+import { zhCNTeamChatMessages } from "./zh-cn-team-chat.js";
 import { zhCNCommandPaletteMessages } from "./zh-cn-command-palette.js";
 import { zhCNComposerMessages } from "./zh-cn-composer.js";
 import { zhCNExtensionPackageMessages } from "./zh-cn-extension-packages.js";
@@ -312,6 +313,7 @@ export const zhCNMessages = {
     clearedAfterHostReplacement: "任何仅在本次运行内存中的 Provider API 密钥均已清除。"
   },
   approval: zhCNApprovalMessages,
+  teamChat: zhCNTeamChatMessages,
   extensionUi: {
     requestDialogLabel: "Pi Extension 请求",
     defaultExtensionLabel: "Pi Extension",

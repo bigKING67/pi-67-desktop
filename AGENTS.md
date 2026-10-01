@@ -84,7 +84,10 @@
 
 - Release only Windows x64 NSIS and macOS arm64 DMG/ZIP artifacts.
 - Production renderer assets load through `app://pi67`; do not add an internal
-  HTTP server, localhost listener, or business WebSocket.
+  HTTP server, localhost listener, renderer network access, or a WebSocket between
+  local processes. The only permitted business WebSocket is the Agent Host-owned
+  outbound `wss://` Team Chat connection to the configured New Money origin
+  (`docs/adr/0003-team-chat.md`).
 - Development may use Vite on `127.0.0.1` for assets and HMR only.
 - Pi runs inside the Electron Agent Host utility process. The renderer must not
   import Electron, Node, the Pi SDK, or filesystem APIs.

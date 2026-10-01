@@ -240,8 +240,12 @@ spacing, component states, and motion as `DESIGN.md`.
 Retain the existing production graphical mark beside the New Money wordmark in
 both themes. The wordmark inherits the primary text token; keep existing brand
 scale, spacing and context-title hierarchy. Mode symbols are separate from
-brand identity and are not introduced by this naming change. Native application
-assets remain unchanged.
+brand identity; the `工作 | 聊天` switch uses the same glyphs and token roles in
+both themes. Native application assets remain unchanged.
+
+Team Chat shares DESIGN.md hierarchy in dark mode: solid accent unread counts,
+neutral row selection, dark border hairlines for day separators, the dark raised
+Composer surface, and danger-role send failures. No dark-only Chat color exists.
 
 Workbench polish follows DESIGN.md in both themes: matching pane/reading widths,
 quieter navigation weights, transparent model/parameter utilities, labelled file

@@ -49,6 +49,7 @@ import type {
   SessionNameMutation
 } from "./conversation-organization-messages.js";
 import type { LarkCommandPayloads, LarkCommandResults } from "./lark-command-messages.js";
+import type { TeamChatCommandPayloads, TeamChatCommandResults } from "./team-chat-command-messages.js";
 import type { ContextMemoryCommandPayloads, ContextMemoryCommandResults } from "./context-memory-messages.js";
 import type {
   PiCredentialRevealResult, PiModelCatalogRefreshResult,
@@ -194,7 +195,8 @@ export type SessionCatalogPageResult = Omit<SessionCatalogPage, "items"> & {
 };
 
 export interface CommandPayloads extends WorkspaceFileCommandPayloads,
-  ConversationOrganizationCommandPayloads, LarkCommandPayloads, ContextMemoryCommandPayloads {
+  ConversationOrganizationCommandPayloads, LarkCommandPayloads, ContextMemoryCommandPayloads,
+  TeamChatCommandPayloads {
   "runtime.initialize": {
     cwd: string;
     agentDir?: string;
@@ -331,7 +333,8 @@ export interface CommandPayloads extends WorkspaceFileCommandPayloads,
 }
 
 export interface CommandResults extends WorkspaceFileCommandResults,
-  ConversationOrganizationCommandResults, LarkCommandResults, ContextMemoryCommandResults {
+  ConversationOrganizationCommandResults, LarkCommandResults, ContextMemoryCommandResults,
+  TeamChatCommandResults {
   "runtime.initialize": ProjectionMutationAcknowledgement;
   "runtime.getStatus": RuntimeStatusResult;
   "projection.resync": ProjectionResyncResult;

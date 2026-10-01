@@ -44,6 +44,7 @@ import {
 } from "../workbench/workbench-store.js";
 import { taskMatchesLiveSessionAuthority } from "../workbench/live-task-authority.js";
 import styles from "./TitleBar.module.css";
+import { useTeamChatTitle } from "../team-chat/use-team-chat-title.js";
 import { toggleRendererContext } from "./context-panel-controller.js";
 
 interface TitleBarProps {
@@ -75,6 +76,8 @@ export function TitleBar({
   const selectedTask = useWorkbenchStore(selectedWorkbenchTask);
   const selectedSurface = useWorkbenchStore((state) => state.selectedSurface);
   const settingsSelected = selectedSurface?.kind === "settings";
+  const chatTitle = useTeamChatTitle();
+  const workMode = chatTitle === undefined;
   const selectedConversation = selectedSurface?.kind === "conversation"
     ? selectedSurface.conversation
     : undefined;
@@ -134,16 +137,16 @@ export function TitleBar({
     sessionName,
     sessionId
   });
-  const currentTitle = settingsSelected ? "设置" : activeSessionName || workspaceName || "New Money";
+  const currentTitle = settingsSelected ? "设置" : chatTitle ?? (activeSessionName || workspaceName || "New Money");
   const navigationDocked = navigationAvailable && navigationVisible && !navigationIsDrawer && !settingsSelected;
-  const inspectorDocked = Boolean(selectedWorkspace) && contextVisible && !contextIsDrawer && !settingsSelected;
-  const contextWorkspaceName = !settingsSelected && !navigationDocked && activeSessionName && workspaceName
+  const inspectorDocked = workMode && Boolean(selectedWorkspace) && contextVisible && !contextIsDrawer && !settingsSelected;
+  const contextWorkspaceName = workMode && !settingsSelected && !navigationDocked && activeSessionName && workspaceName
     ? workspaceName
     : undefined;
   const fullContextTitle = contextWorkspaceName
     ? `${contextWorkspaceName} / ${currentTitle}`
     : currentTitle;
-  const showBrandMark = !settingsSelected && !navigationAvailable && currentTitle === "New Money";
+  const showBrandMark = workMode && !settingsSelected && !navigationAvailable && currentTitle === "New Money";
   const navigationShortcut = desktopAction("toggle-navigation");
   const paletteShortcut = desktopAction("command-palette");
   const contextShortcut = desktopAction("toggle-context");
@@ -178,7 +181,7 @@ export function TitleBar({
         <Command aria-hidden="true" size={16} />
         <ControlTooltip id="command-palette-tooltip">{`${messages.shell.commandPalette} · ${formatDesktopShortcut(paletteShortcut)}`}</ControlTooltip>
       </button>
-      {selectedWorkspace && !settingsSelected ? (
+      {selectedWorkspace && !settingsSelected && workMode ? (
         <button
           className={`icon-button context-toggle ${styles.iconButton}`}
           aria-controls="task-inspector"
@@ -215,7 +218,7 @@ export function TitleBar({
       <div className={styles.workbenchZone} data-testid="title-workbench-zone">
         <div className={styles.leadingControls}>
           {!navigationDocked && !settingsSelected ? navigationControl : null}
-          {!settingsSelected ? <RepositoryEnvironmentStatus workspaceId={selectedWorkspace?.id} /> : null}
+          {!settingsSelected && workMode ? <RepositoryEnvironmentStatus workspaceId={selectedWorkspace?.id} /> : null}
         </div>
         <div className={`brand-lockup ${styles.brand}`} title={fullContextTitle}>
           {showBrandMark ? (

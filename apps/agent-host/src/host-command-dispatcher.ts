@@ -15,6 +15,7 @@ import {
   completeInteractiveResponse
 } from "./host-interactive-response.js";
 import { HostCommandError } from "./protocol-error.js";
+import type { TeamChatCommandType } from "./team-chat/team-chat-command-router.js";
 export { operationSubmissionIdentity } from "./operation-submission-identity.js";
 export type RuntimeLoadedCommand = Exclude<
   AgentCommand,
@@ -102,6 +103,7 @@ export type RuntimeLoadedCommand = Exclude<
       | "lark.auth.status"
       | "lark.auth.login.begin"
       | "lark.app.configuration.save"
+      | TeamChatCommandType
       | "session.creation.resolve"
       | "session.catalog.contentSearch"
       | "workspace.usage.report"

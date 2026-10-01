@@ -1,5 +1,6 @@
 import {
   FolderPlus,
+  MessageSquarePlus,
   Settings,
   UserRound
 } from "lucide-react";
@@ -24,6 +25,9 @@ import {
 import { useNavigationMessageSearch } from "./use-navigation-message-search.js";
 import { useNewMoneyAccount } from "../context-memory/use-new-money-account.js";
 import { newMoneyAccountLabel } from "../context-memory/new-money-account-store.js";
+import { TeamChatNavigation } from "../team-chat/TeamChatNavigation.js";
+import chatStyles from "../team-chat/TeamChat.module.css";
+import { WorkspaceModeSwitch } from "./WorkspaceModeSwitch.js";
 
 const WorkspaceRemovalDialog = lazy(async () => {
   const module = await import("./WorkspaceRemovalDialog.js");
@@ -34,6 +38,9 @@ const ConversationRenameDialog = lazy(() => import("./ConversationRenameDialog.j
 })));
 const ConversationDraftDiscardDialog = lazy(() => import("./ConversationDraftDiscardDialog.js").then((module) => ({
   default: module.ConversationDraftDiscardDialog
+})));
+const NewChannelDialog = lazy(() => import("../team-chat/NewChannelDialog.js").then((module) => ({
+  default: module.NewChannelDialog
 })));
 const ArchivedConversationsDialog = lazy(() => import("./ArchivedConversationsDialog.js").then((module) => ({
   default: module.ArchivedConversationsDialog
@@ -70,44 +77,64 @@ export function NavigationRail({
   const renameTarget = useConversationDialogStore((state) => state.renameTarget);
   const draftDiscardTarget = useConversationDialogStore((state) => state.draftDiscardTarget);
   const archivedWorkspace = archivedWorkspaceId ? workspaces[archivedWorkspaceId] : undefined;
+  const chatMode = useShellStore((state) => state.workspaceMode === "chat");
+  const [channelDialogOpen, setChannelDialogOpen] = useState(false);
 
   return (
     <aside
       ref={containerRef}
-      className={`navigation-rail ${styles.rail}`}
+      className={`navigation-rail ${styles.rail} ${chatMode ? chatStyles.chatRail : ""}`}
       id="session-navigation"
       aria-label={messages.navigation.region}
     >
-      <header className={styles.railHeader}>
-        <div className={styles.railBrand} aria-label="New Money 工作台" data-testid="navigation-brand">
-          <img alt="" aria-hidden="true" src={piIconUrl} />
-          <strong>New Money</strong>
-        </div>
-        <Button
-          className={styles.workspaceAdd!}
-          aria-label="添加或创建工作区"
-          data-testid="workspace-add"
-          onPress={() => void openRendererWorkspace()}
-        >
-          <FolderPlus aria-hidden="true" size={15} />
-        </Button>
-      </header>
-
-      <div className={styles.actions}>
-        <SessionCatalogSearch
-          focusRevision={sessionSearchFocusRevision}
-          handledRevision={sessionSearchHandledRevision}
-          query={query}
-          onFocusHandled={acknowledgeSessionSearchFocus}
-          onQueryChange={setQuery}
-        />
+      <div className={styles.railTop}>
+        <header className={styles.railHeader}>
+          <div className={styles.railBrand} aria-label="New Money 工作台" data-testid="navigation-brand">
+            <img alt="" aria-hidden="true" src={piIconUrl} />
+            <strong>New Money</strong>
+          </div>
+          {chatMode ? (
+            <Button
+              className={styles.workspaceAdd!}
+              aria-label={messages.teamChat.newChannel}
+              data-testid="team-chat-new-channel"
+              onPress={() => setChannelDialogOpen(true)}
+            >
+              <MessageSquarePlus aria-hidden="true" size={15} />
+            </Button>
+          ) : (
+            <Button
+              className={styles.workspaceAdd!}
+              aria-label="添加或创建工作区"
+              data-testid="workspace-add"
+              onPress={() => void openRendererWorkspace()}
+            >
+              <FolderPlus aria-hidden="true" size={15} />
+            </Button>
+          )}
+        </header>
+        <WorkspaceModeSwitch />
       </div>
 
-      <WorkspaceConversationList
-        messageSearchByWorkspace={messageSearchByWorkspace}
-        query={query}
-        onRequestRemoval={(workspaceId) => requestWorkspaceRemoval(workspaceId, setRemovalWorkspaceId)}
-      />
+      {chatMode ? <TeamChatNavigation onCreateChannel={() => setChannelDialogOpen(true)} /> : (
+        <>
+          <div className={styles.actions}>
+            <SessionCatalogSearch
+              focusRevision={sessionSearchFocusRevision}
+              handledRevision={sessionSearchHandledRevision}
+              query={query}
+              onFocusHandled={acknowledgeSessionSearchFocus}
+              onQueryChange={setQuery}
+            />
+          </div>
+
+          <WorkspaceConversationList
+            messageSearchByWorkspace={messageSearchByWorkspace}
+            query={query}
+            onRequestRemoval={(workspaceId) => requestWorkspaceRemoval(workspaceId, setRemovalWorkspaceId)}
+          />
+        </>
+      )}
 
       <footer className={`navigation-footer ${styles.footer}`}>
         <Button
@@ -151,6 +178,11 @@ export function NavigationRail({
       {draftDiscardTarget ? (
         <Suspense fallback={<span className="sr-only" role="status">正在打开丢弃草稿确认</span>}>
           <ConversationDraftDiscardDialog />
+        </Suspense>
+      ) : null}
+      {channelDialogOpen ? (
+        <Suspense fallback={<span className="sr-only" role="status">{messages.teamChat.creating}</span>}>
+          <NewChannelDialog onClose={() => setChannelDialogOpen(false)} />
         </Suspense>
       ) : null}
       {archivedWorkspace ? (

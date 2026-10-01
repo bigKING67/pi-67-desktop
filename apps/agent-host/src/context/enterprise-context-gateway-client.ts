@@ -9,11 +9,10 @@ import type {
   SharedSopSearchItem
 } from "@pi67/domain";
 import type { EnterpriseAccessCredential, EnterpriseDeviceAuthorization } from "@pi67/protocol";
-import { RuntimeError, isRuntimeError } from "@pi67/domain";
 import { parseScopeAuthorization } from "./enterprise-scope-authorization.js";
 import { readKnowledgeSyncResponse, type KnowledgeSyncResponse } from "./enterprise-knowledge-sync-transport.js";
 import type { KnowledgeSyncExpectation } from "./enterprise-knowledge-sync-page.js";
-import { HostCommandError } from "../protocol-error.js";
+import { requestNewMoney } from "./new-money-http.js";
 import {
   asRecord,
   boundedInteger,
@@ -75,8 +74,6 @@ export interface EnterpriseCandidateSubmissionReceipt {
   createdAt: number;
   updatedAt: number;
 }
-
-const REQUEST_TIMEOUT_MS = 8_000;
 
 export class EnterpriseContextGatewayClient {
   readonly #rootBase: string;
@@ -358,66 +355,10 @@ export class EnterpriseContextGatewayClient {
   }
 
   async #requestUrl(url: string, init: RequestInit, readResponse?: (response: Response, signal: AbortSignal) => Promise<unknown>): Promise<unknown> {
-    const controller = new AbortController();
-    const callerSignal = init.signal;
-    const abortFromCaller = () => controller.abort();
-    if (callerSignal?.aborted) controller.abort();
-    else callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    timeout.unref?.();
-    try {
-      controller.signal.throwIfAborted();
-      const headers = new Headers(init.headers);
-      headers.set("Accept", "application/json");
-      if (init.body !== undefined) headers.set("Content-Type", "application/json");
-      if (this.accessToken) headers.set("Authorization", `Bearer ${this.accessToken}`);
-      const response = await fetch(url, {
-        ...init,
-        headers,
-        redirect: "error",
-        signal: controller.signal
-      });
-      if (response.status === 428 && readResponse === undefined) {
-        void response.body?.cancel().catch(() => undefined);
-        return { state: "pending" };
-      }
-      if (!response.ok) {
-        void response.body?.cancel().catch(() => undefined);
-        if (response.status >= 500 || response.status === 408 || response.status === 429) {
-          throw new RuntimeError("RUNTIME_NOT_READY", `New Money request temporarily failed (${response.status}).`,
-            { details: { kind: "enterprise-transport-unavailable" } });
-        }
-        throw new HostCommandError(
-          "RUNTIME_NOT_READY",
-          response.status === 401
-            ? "New Money sign-in expired or was rejected."
-            : response.status === 403
-              ? "The New Money team does not have permission for this operation."
-              : `New Money request failed (${response.status}).`,
-          response.status >= 500 || response.status === 408 || response.status === 429
-        );
-      }
-      if (readResponse !== undefined) return await readResponse(response, controller.signal);
-      const text = await response.text();
-      if (response.status === 204 || text.length === 0) return undefined;
-      try {
-        return JSON.parse(text) as unknown;
-      } catch {
-        throw invalidResponse("json");
-      }
-    } catch (error) {
-      if (error instanceof HostCommandError || isRuntimeError(error)) throw error;
-      throw new RuntimeError(
-        "RUNTIME_NOT_READY",
-        error instanceof Error && error.name === "AbortError"
-          ? "New Money request timed out."
-          : "New Money is unavailable.",
-        { details: { kind: "enterprise-transport-unavailable" } }
-      );
-    } finally {
-      clearTimeout(timeout);
-      callerSignal?.removeEventListener("abort", abortFromCaller);
-    }
+    return requestNewMoney(url, init, {
+      ...(this.accessToken === undefined ? {} : { accessToken: this.accessToken }),
+      ...(readResponse === undefined ? {} : { readResponse })
+    });
   }
 }
 

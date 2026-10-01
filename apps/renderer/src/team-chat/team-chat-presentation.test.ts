@@ -1,0 +1,34 @@
+import type { TeamChatMessage } from "@pi67/domain";
+import { describe, expect, it } from "vitest";
+import { formatTeamChatTime, teamChatRemainingCharacters, teamChatTimeline } from "./team-chat-presentation.js";
+
+const at = (day: number, hour: number, minute: number) => new Date(2026, 9, day, hour, minute).getTime();
+const message = (id: string, sender: string, createdAt: number): TeamChatMessage => ({
+  id, conversationId: "c1", seq: Number(id.slice(1)), senderUserId: sender, body: id, clientKey: `key-${id}-0000`, createdAt
+});
+
+describe("team chat presentation", () => {
+  it("groups by day and sender, and appends pending sends as the reader", () => {
+    const now = at(3, 12, 0);
+    const entries = teamChatTimeline([
+      message("m1", "u2", at(1, 9, 0)),
+      message("m2", "u2", at(2, 9, 0)),
+      message("m3", "u2", at(2, 9, 3)),
+      message("m4", "u2", at(2, 9, 30)),
+      message("m5", "me", at(3, 11, 0))
+    ], [{ clientKey: "p1-000000", conversationId: "c1", body: "hi", createdAt: at(3, 11, 1), status: "failed", error: "x" }], "me", now);
+    expect(entries.map((entry) => entry.kind === "day" ? entry.label : `${entry.key}:${entry.showHeader}`)).toEqual([
+      "10月1日", "m1:true", "昨天", "m2:true", "m3:false", "m4:true", "今天", "m5:true", "pending-p1-000000:false"
+    ]);
+    expect(entries.at(-1)).toMatchObject({ senderUserId: "me", pending: { status: "failed", error: "x" } });
+    expect(teamChatTimeline([message("m1", "u2", new Date(2025, 0, 2).getTime())], [], "me", now)[0])
+      .toMatchObject({ label: "2025年1月2日" });
+  });
+
+  it("formats times and reveals the remaining budget only near the limit", () => {
+    expect(formatTeamChatTime(at(1, 9, 5))).toBe("09:05");
+    expect(teamChatRemainingCharacters("a".repeat(100), 4_000)).toBeUndefined();
+    expect(teamChatRemainingCharacters("😀".repeat(3_700), 4_000)).toBe(300);
+    expect(teamChatRemainingCharacters("a".repeat(4_010), 4_000)).toBe(-10);
+  });
+});

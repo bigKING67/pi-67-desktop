@@ -8,7 +8,11 @@ interface SessionChangeFocusRequest {
   revision: number;
 }
 
+export type WorkspaceMode = "work" | "chat";
+
 interface ShellState {
+  /** Work (local Pi Sessions) or Chat (New Money Team Chat); layout state only. */
+  workspaceMode: WorkspaceMode;
   navigationVisible: boolean;
   sessionSearchFocusRevision: number;
   sessionSearchHandledRevision: number;
@@ -28,6 +32,7 @@ interface ShellState {
   credentialDialogOpen: boolean;
   credentialDialogProviderId: string | undefined;
   updateDialogOpen: boolean;
+  setWorkspaceMode: (mode: WorkspaceMode) => void;
   setNavigationVisible: (visible: boolean) => void;
   openSessionCatalog: () => void;
   acknowledgeSessionSearchFocus: (revision: number) => void;
@@ -51,6 +56,7 @@ interface ShellState {
 }
 
 export const useShellStore = create<ShellState>((set) => ({
+  workspaceMode: "work",
   navigationVisible: true,
   sessionSearchFocusRevision: 0,
   sessionSearchHandledRevision: 0,
@@ -70,6 +76,7 @@ export const useShellStore = create<ShellState>((set) => ({
   credentialDialogOpen: false,
   credentialDialogProviderId: undefined,
   updateDialogOpen: false,
+  setWorkspaceMode(workspaceMode) { set({ workspaceMode }); },
   setNavigationVisible(navigationVisible) { set({ navigationVisible }); },
   openSessionCatalog() {
     set((state) => ({

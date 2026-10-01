@@ -15,6 +15,7 @@ import {
   type AppConfigurationCommandRouter
 } from "./app-configuration-command-router.js";
 import { HostCommandError } from "./protocol-error.js";
+import { isTeamChatCommand, type TeamChatCommandType } from "./team-chat/team-chat-command-router.js";
 
 export async function dispatchHostAppCommand(
   command: AgentCommand,
@@ -51,6 +52,9 @@ export async function dispatchHostAppCommand(
       command as AgentCommand<import("./context/context-memory-command-router.js").ContextMemoryAppCommandType>,
       options.idempotencyKey, options.signal
     );
+  }
+  if (isTeamChatCommand(command.type)) {
+    return options.contextMemory.teamChat.dispatch(command as AgentCommand<TeamChatCommandType>, options.signal);
   }
   if (command.type === "lark.auth.status") return options.larkAuth.status();
   if (command.type === "lark.auth.login.begin") return options.larkAuth.beginLogin();

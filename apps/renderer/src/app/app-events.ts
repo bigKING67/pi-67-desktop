@@ -106,6 +106,9 @@ export function handleAgentEvent<TState extends AppEventState>(
     case "experience.candidateRejected":
     case "enterprise.authChanged":
     case "enterprise.workspaceBindingChanged":
+    // Team Chat subscribes to its app-scoped events directly (team-chat-instance.ts).
+    case "teamChat.pushed":
+    case "teamChat.connectionChanged":
       return true;
     default:
       assertNever(event);

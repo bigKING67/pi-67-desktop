@@ -1,5 +1,6 @@
 import { isDesktopAgentHostFailureState, isDesktopAgentHostStartupState } from "@pi67/protocol";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { teamChat } from "../team-chat/team-chat-instance.js";
 import { useApprovalStore } from "../approval/approval-store.js";
 import { DEFAULT_APPLICATION_TITLE } from "../extension-ui/extension-ui-state.js";
 import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
@@ -32,6 +33,7 @@ import { closeKeyboardShortcutsDialog } from "../help/keyboard-shortcuts-dialog-
 import { CONTEXT_DRAWER_MEDIA_QUERY } from "../shell/context-panel-controller.js";
 
 const WorkspaceShell = lazy(() => import("./WorkspaceShell.js").then((module) => ({ default: module.WorkspaceShell })));
+const TeamChatWorkbench = lazy(() => import("../team-chat/TeamChatWorkbench.js").then((module) => ({ default: module.TeamChatWorkbench })));
 const ApprovalDialog = lazy(() => import("../approval/ApprovalDialog.js").then((module) => ({ default: module.ApprovalDialog })));
 const CommandPalette = lazy(() => import("../command-palette/CommandPalette.js").then((module) => ({ default: module.CommandPalette })));
 const DoctorDialog = lazy(() => import("../doctor/DoctorDialog.js").then((module) => ({ default: module.DoctorDialog })));
@@ -49,6 +51,7 @@ export function App() {
   const navigationVisible = useShellStore((state) => state.navigationVisible);
   const setNavigationVisible = useShellStore((state) => state.setNavigationVisible);
   const contextVisible = useShellStore((state) => state.contextVisible);
+  const workspaceMode = useShellStore((state) => state.workspaceMode);
   const setContextVisible = useShellStore((state) => state.setContextVisible);
   const extensionTitle = useExtensionUiStore((state) => state.title);
   const approvalDialogOpen = useApprovalStore((state) => state.requests.length > 0);
@@ -70,6 +73,9 @@ export function App() {
   );
   const blockingOverlayOpen = approvalDialogOpen || extensionDialogOpen;
   const selectedSurface = useWorkbenchStore((state) => state.selectedSurface);
+  const chatMode = workspaceMode === "chat" && selectedSurface?.kind !== "settings";
+  useEffect(() => { teamChat.start(); }, []);
+  useEffect(() => { if (chatMode) teamChat.activate(); }, [chatMode]);
   const workbenchWorkspaceCount = useWorkbenchStore((state) => state.workspaceOrder.length);
   const [navigationIsDrawer, setNavigationIsDrawer] = useState(() => window.matchMedia("(max-width: 760px)").matches);
   const [contextIsDrawer, setContextIsDrawer] = useState(() => window.matchMedia(CONTEXT_DRAWER_MEDIA_QUERY).matches);
@@ -227,12 +233,12 @@ export function App() {
       <WorkbenchProjectionBridge />
       <TitleBar
         contextIsDrawer={contextIsDrawer}
-        navigationAvailable={Boolean(workspace) || workbenchWorkspaceCount > 0}
+        navigationAvailable={Boolean(workspace) || workbenchWorkspaceCount > 0 || chatMode}
         navigationIsDrawer={navigationIsDrawer}
         navigationVisible={navigationVisible}
         onToggleNavigation={toggleNavigation}
       />
-      {!workspace && workbenchWorkspaceCount === 0 && selectedSurface?.kind !== "settings" ? (
+      {!workspace && workbenchWorkspaceCount === 0 && selectedSurface?.kind !== "settings" && !chatMode ? (
         <Welcome />
       ) : (
         <LazySurfaceBoundary
@@ -243,7 +249,8 @@ export function App() {
         >
           <Suspense fallback={<WorkspaceShellFallback />}>
             <WorkspaceShell
-              contextVisible={contextVisible}
+              {...(chatMode ? { centralOverride: <TeamChatWorkbench /> } : {})}
+              contextVisible={contextVisible && !chatMode}
               navigationIsDrawer={navigationIsDrawer}
               navigationVisible={navigationVisible}
               onCloseContextDrawer={closeContextDrawer}

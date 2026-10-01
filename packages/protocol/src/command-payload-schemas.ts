@@ -20,6 +20,7 @@ import {
   PiProviderConfigurationInputSchema
 } from "./provider-configuration-schemas.js";
 import { LarkAppConfigurationInputSchema } from "./lark-auth-schemas.js";
+import { TeamChatCommandPayloadSchemas } from "./team-chat-schemas.js";
 import { SessionCatalogQuerySchema } from "./session-catalog-schemas.js";
 import { SessionCreationIdSchema } from "./session-creation-schemas.js";
 import { SkillPackTargetSchema } from "./skill-pack-schemas.js";
@@ -289,6 +290,7 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "lark.auth.login.begin": EmptyPayloadSchema,
   "lark.app.configuration.save": LarkAppConfigurationInputSchema,
   ...ContextMemoryCommandPayloadSchemas,
+  ...TeamChatCommandPayloadSchemas,
   "extension.ui.respond": strictObject({
     requestId: Type.String({ minLength: 1, maxLength: 512 }),
     sessionId: Type.String({ minLength: 1, maxLength: 512 }),

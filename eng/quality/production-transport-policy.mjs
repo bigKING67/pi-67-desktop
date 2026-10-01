@@ -1,4 +1,6 @@
 const nativeAdapter = "apps/desktop/src/openviking-native-process.mts";
+// ADR 0003: the one Agent Host-owned outbound Team Chat push socket.
+const teamChatRealtime = "apps/agent-host/src/team-chat/team-chat-realtime.ts";
 // ADR 0002: the authenticated loopback OpenViking sidecar's default client endpoint.
 const OPENVIKING_LOOPBACK_DEFAULT = "http://127.0.0.1:1933";
 const openVikingDefaultConfig = new Set([
@@ -28,6 +30,20 @@ export function productionTransportViolations(path, source) {
     if (/reservation\.(?:on|once|addListener|prependListener|prependOnceListener)\s*\(/u.test(events)) {
       failures.push(`${path} attaches a reservation event handler`);
     }
+  }
+  if (path === teamChatRealtime) {
+    // Exactly one client socket, upgraded from the HTTPS origin; never a server,
+    // listener, Node socket library, or literal endpoint.
+    if ((checked.match(/\bnew WebSocket\(/gu) ?? []).length !== 1) {
+      failures.push(`${path} must construct exactly one client WebSocket`);
+    }
+    if (!checked.includes('if (url.protocol === "https:") url.protocol = "wss:";')) {
+      failures.push(`${path} lacks its Team Chat invariant: HTTPS origins upgrade only to wss:`);
+    }
+    if (/WebSocketServer|from "(?:ws|node:net|node:http|node:https)"/u.test(checked)) {
+      failures.push(`${path} imports or creates a socket server`);
+    }
+    checked = checked.replace(/\bWebSocket\b/gu, "PushSocket");
   }
   for (const [label, pattern] of forbidden) {
     if (pattern.test(checked)) failures.push(`${path} contains ${label}`);

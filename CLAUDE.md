@@ -24,7 +24,7 @@ Pi-67 Desktop —— 面向 Windows x64 与 macOS Apple Silicon 的 Pi-first Ele
 
 - `@earendil-works/pi-coding-agent` 是唯一 agent runtime；**不加** Pi RPC adapter、系统 `pi` 回退或非 Pi Provider adapter。内置和自定义 Provider 通过 Pi 支持的机制接入，以 Pi 配置为真源，不另建 Runtime 或模型路由。
 - renderer **不得**导入 Electron、Node、Pi SDK 或文件系统 API；保持 `contextIsolation`、sandbox、严格 CSP 与窄 preload 桥。
-- 生产渲染资源经 `app://pi67` 加载；**不加**生产 localhost server、业务 WebSocket、Pi RPC adapter。开发时 Vite 仅用于 `127.0.0.1` 上的资源和 HMR。
+- 生产渲染资源经 `app://pi67` 加载；**不加**生产 localhost server、本地进程间 WebSocket、Pi RPC adapter；唯一允许的业务 WebSocket 是 Agent Host 出站连接 New Money 的 Team Chat `wss://`（ADR 0003）。开发时 Vite 仅用于 `127.0.0.1` 上的资源和 HMR。
 - 不创建 `utils`/`helpers`/`common`/`misc`/`legacy` 等兜底目录（共享代码需两个真实调用方）。
 - 不记录/持久化 API key、token、cookie、凭据、prompt、源码正文或原始 tool payload。
 - 不提交 build/installer 输出、日志、数据库、截图、trace、用户 session 或凭据。

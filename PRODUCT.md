@@ -27,8 +27,9 @@ session, configuration, resource, model, and extension contracts.
 `New Money` is the public-facing brand: use AI to create new value. The current
 workspace is Work. The existing 67 graphical mark remains the product identity
 alongside the New Money wordmark. Mode symbols are a separate layer: a bull
-represents Work and a horse represents future Chat. They must never replace the
-brand mark. Mode controls/icons and Chat are not added by this naming change.
+represents Work and a horse represents Chat. They must never replace the
+brand mark. The navigation rail's `工作 | 聊天` switch carries these symbols;
+Team Chat behavior is defined under `Team Chat` below and in ADR 0003.
 Public-facing renderer copy, window/menu labels and platform display metadata
 use New Money, including application bundles, executables, Helpers and installer
 filenames. The npm package name `pi-67-desktop`, application ID `com.pi67.desktop`,
@@ -123,6 +124,40 @@ design/protocol contracts; reference inclusion alone does not approve them.
 8. Install and operate Pi Extensions, Skills, Prompts, and Rules; configure
    external MCP services; and prepare supported browser integrations without
    requiring a system Node, npm, Git, pnpm, or Pi CLI.
+
+9. Talk with New Money teammates in Chat: see the device-authorized team's
+   members, open direct messages, create or join channels, and follow unread
+   messages without leaving Desktop. Work stays available without an account.
+
+## Team Chat
+
+Contract: `docs/adr/0003-team-chat.md`. P1 scope:
+
+- Mode is renderer layout state. `工作` shows the existing Workspaces and
+  conversations; `聊天` replaces the rail lists and center surface with Team Chat
+  and hides the Inspector. Switching never changes a Session, Workspace, running
+  task or team scope. Settings keeps priority over either mode. The Welcome screen
+  offers `打开团队聊天` so Chat is reachable before any Workspace exists.
+- Chat requires New Money sign-in and uses only the device-authorized team. Signed
+  out, inactive entitlement and lost membership each show their own state; Work is
+  unaffected.
+- The rail lists channels (joined and joinable public channels) and teammates.
+  Selecting a teammate opens or reuses the single direct message. Direct messages
+  whose teammate left the team stay listed and read-only.
+- Messages are plain text up to 4000 characters. Enter sends, Shift+Enter inserts
+  a newline, and IME composition never sends. A send shows `发送中`, then either
+  merges into the timeline or stays as `发送失败` with `重新发送` (same client key,
+  so a retry never duplicates) and `丢弃`.
+- Unread counts come from the service read cursor and exclude your own messages.
+  A conversation is marked read only while it is visible in a focused window. The
+  Chat switch shows the total unread count while Work is active.
+- Real-time push arrives through Agent Host. After every (re)connection Desktop
+  re-reads the directory and catches up open conversations, so push loss never
+  hides messages. Chat bodies are hosted team content: they are never logged,
+  persisted locally, or captured into private memory.
+- Not in P1: Work Cards and handoff, Agents as members, threads, edits/deletes,
+  reactions, attachments, search, notifications, team invitations (use the New
+  Money web console).
 
 ## Success criteria
 
