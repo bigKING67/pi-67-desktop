@@ -52,10 +52,40 @@ describe.skipIf(process.platform !== "darwin" || process.arch !== "arm64")("nati
     const parsed = JSON.parse(config.replaceAll("\\u0024", "$"));
     expect(parsed.memory).toEqual({ extraction_output_format: "json" });
     expect(parsed.vlm).toMatchObject({ api_key: "${NEWMONEY_OV_EXTRACTION_KEY}", max_tokens: 8192 });
+    expect(parsed.retrieval).toEqual({ enable_intent: false });
+    expect(parsed).not.toHaveProperty("query_planner");
     await handle.stop();
     await handle.stop();
     expect(onExit).toHaveBeenCalledTimes(1);
     expect(await readdir(configuration.dataRoot)).toEqual(["data"]);
+  });
+
+  it("enables query expansion only with a dedicated planner whose key stays in the environment", async () => {
+    const configuration = { ...await options(), queryPlanner: { ...model, model: "planner", apiKey: "synthetic-planner-key",
+      thinkingOffBody: { thinking: { type: "disabled" } } } };
+    const child = Object.assign(new EventEmitter(), { pid: 12346 });
+    native.spawn.mockReturnValue(child);
+    vi.spyOn(process, "kill").mockImplementation((_pid, signal) => {
+      if (signal === "SIGTERM") queueMicrotask(() => child.emit("exit", 0));
+      return true;
+    });
+    vi.stubGlobal("fetch", vi.fn(async (url: string | URL | Request) => {
+      const path = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+      if (path.endsWith("/health")) return new Response("{}", { status: 200 });
+      if (path.endsWith("/users")) return Response.json({ result: { user_key: "scoped-only" } });
+      return Response.json({ result: {} });
+    }));
+    const handle = await startNativeOpenViking(configuration, new AbortController().signal, vi.fn());
+    const runDirectory = (await readdir(configuration.dataRoot)).find((name) => name.startsWith(".run-"))!;
+    const config = await readFile(join(configuration.dataRoot, runDirectory, "ov.conf"), "utf8");
+    expect(config).not.toContain("synthetic-planner-key");
+    const parsed = JSON.parse(config.replaceAll("\\u0024", "$"));
+    expect(parsed.retrieval).toEqual({ enable_intent: true });
+    expect(parsed.query_planner).toEqual({ provider: "openai", model: "planner", api_base: model.endpoint,
+      api_key: "${NEWMONEY_OV_QUERY_PLANNER_KEY}", extra_request_body: { thinking: { type: "disabled" } } });
+    const environment = native.spawn.mock.calls[0]?.[2]?.env as Record<string, string>;
+    expect(environment.NEWMONEY_OV_QUERY_PLANNER_KEY).toBe("synthetic-planner-key");
+    await handle.stop();
   });
 
   it("fails closed before spawn on missing models or canceled startup", async () => {

@@ -116,11 +116,16 @@ async function verifyPackagedLocalMemorySettings({ application, window, workspac
   const guard = window.getByRole("dialog", { name: "放弃未保存的修改" });
   await expect(guard).toBeVisible();
   await guard.getByRole("button", { name: "继续编辑", exact: true }).click();
+  await form.getByLabel("召回改写模型 ID（可选）", { exact: true }).fill("planner");
+  await form.getByRole("button", { name: "保存模型配置", exact: true }).click();
+  await expect(form.getByText("召回改写模型需要同时填写 Provider ID 和模型 ID；都留空则关闭召回改写。", { exact: true })).toBeVisible();
+  await form.getByLabel("召回改写 Provider ID（可选）", { exact: true }).fill("synthetic");
   await form.getByRole("button", { name: "保存模型配置", exact: true }).click();
   await expect(form.getByText("模型配置已保存，下次服务启动时生效。本次保存没有改变启用设置，也未调用模型。", { exact: true })).toBeVisible();
   await expect(key).toHaveValue("");
   const saved = await window.evaluate(() => window.pi67.system.localMemoryModels.get());
   if (saved.status !== "configured" || JSON.stringify(saved).includes(synthetic)) throw new Error("Unsafe memory settings snapshot.");
+  if (saved.queryPlanner?.provider !== "synthetic" || saved.queryPlanner?.model !== "planner") throw new Error("Query planner selection was not saved.");
   const persisted = await readFile(join(userDataDirectory, "openviking/settings/models.enc.json"), "utf8");
   if (persisted.includes(synthetic)) throw new Error("Memory key was persisted in plaintext.");
   await form.getByRole("button", { name: "显示 Embedding API Key", exact: true }).click();
@@ -137,6 +142,7 @@ async function verifyPackagedLocalMemorySettings({ application, window, workspac
   await expect(key).toHaveAttribute("type", "password");
   await expect(key).toHaveValue("");
   await expect(form.getByLabel("Embedding 模型 ID", { exact: true })).toHaveValue("synthetic");
+  await expect(form.getByLabel("召回改写模型 ID（可选）", { exact: true })).toHaveValue("planner");
   await form.getByRole("button", { name: "启用（重启后生效）", exact: true }).click();
   await expect(form.getByRole("button", { name: "关闭私人记忆", exact: true })).toBeVisible();
   const enabled = await activation();

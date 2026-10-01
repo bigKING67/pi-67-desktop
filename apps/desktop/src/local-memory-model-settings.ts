@@ -6,6 +6,8 @@ import type { DesktopTextEncryption } from "./desktop-text-encryption.js";
 
 export interface LocalMemoryModelSettings {
   extraction: { provider: string; model: string };
+  /** Optional Pi selection for OpenViking Recall query planning; absent disables query expansion. */
+  queryPlanner?: { provider: string; model: string };
   embedding: { protocol: "openai-compatible"; endpoint: string; model: string; dimension: number; apiKey: string };
 }
 
@@ -17,7 +19,11 @@ function text(value: unknown, max: number): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.length <= max && !value.includes("\0");
 }
 function valid(value: unknown): value is LocalMemoryModelSettings {
-  if (!record(value, ["extraction", "embedding"]) || !record(value.extraction, ["provider", "model"])
+  const planned = typeof value === "object" && value !== null && "queryPlanner" in value;
+  if (!record(value, planned ? ["extraction", "queryPlanner", "embedding"] : ["extraction", "embedding"])
+    || !record(value.extraction, ["provider", "model"])
+    || (planned && (!record(value.queryPlanner, ["provider", "model"])
+      || !text(value.queryPlanner.provider, 256) || !text(value.queryPlanner.model, 512)))
     || !record(value.embedding, ["protocol", "endpoint", "model", "dimension", "apiKey"])) return false;
   const { extraction, embedding } = value;
   if (!text(extraction.provider, 256) || !text(extraction.model, 512) || embedding.protocol !== "openai-compatible"

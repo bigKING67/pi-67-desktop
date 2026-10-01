@@ -1000,7 +1000,12 @@ loading error where the operation can produce those states
   versions are not overwritten. Pending installation participates in the standard
   settings navigation guard; cancellation waits for owned staging cleanup.
 - Local memory model configuration follows the runtime group, with its own local
-  Save/Discard transaction and the standard unsaved-settings guard. The embedding
+  Save/Discard transaction and the standard unsaved-settings guard. The optional
+  Recall query planner uses the same plain Provider ID / model ID field pair as
+  extraction, labelled `（可选）`, placed after extraction; its description states the
+  latency cost and a thinking-off lightweight example. Saving with exactly one of
+  the two filled shows an inline danger notice and keeps the draft; both empty
+  means expansion off. The embedding
   key is hidden by default; an adjacent eye button explicitly reveals the saved
   key without marking the draft dirty. Hide, blur, document hiding and unmount
   clear displayed saved-key references; cancellation ignores late replies. A draft

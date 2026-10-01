@@ -19,6 +19,12 @@ export function createLocalMemoryConfigurationLoader(options: {
     signal.throwIfAborted();
     const extraction = await options.models.resolve(settings.extraction, signal);
     signal.throwIfAborted();
-    return { ...runtime, extraction, embedding: { ...settings.embedding } };
+    // The planner is optional: if Pi can no longer resolve it, start with query
+    // expansion off rather than failing memory or borrowing another model.
+    const queryPlanner = settings.queryPlanner
+      ? await options.models.resolve(settings.queryPlanner, signal).catch(() => { signal.throwIfAborted(); return undefined; })
+      : undefined;
+    signal.throwIfAborted();
+    return { ...runtime, extraction, ...(queryPlanner ? { queryPlanner } : {}), embedding: { ...settings.embedding } };
   };
 }

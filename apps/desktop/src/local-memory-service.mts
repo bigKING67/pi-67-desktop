@@ -14,6 +14,7 @@ export interface LocalMemoryServiceConfiguration {
   dataRoot: string;
   embedding: OpenVikingModelConfiguration & { dimension: number };
   extraction: OpenVikingModelConfiguration;
+  queryPlanner?: OpenVikingModelConfiguration & { thinkingOffBody?: Readonly<Record<string, unknown>> };
 }
 
 /** Concrete broker service. Config and trust provisioning remain Main-owned. */
@@ -51,7 +52,8 @@ export class LocalMemoryService {
         });
         signal.throwIfAborted();
         const handle = await trace.measure("native-start", () => startNativeOpenViking({ python, dataRoot: configuration.dataRoot, localProfileId,
-          embedding: configuration.embedding, extraction: configuration.extraction, startupTrace: trace }, signal, onExit));
+          embedding: configuration.embedding, extraction: configuration.extraction,
+          ...(configuration.queryPlanner ? { queryPlanner: configuration.queryPlanner } : {}), startupTrace: trace }, signal, onExit));
         outcome = "completed";
         return handle;
       } finally {

@@ -53,9 +53,8 @@ function plannerSwitches(section) {
   }
   const extra = section?.extra_request_body;
   if (extra !== undefined) {
-    if (!extra || typeof extra !== "object" || Array.isArray(extra)
-      || Object.values(extra).some((value) => !["boolean", "number", "string"].includes(typeof value))) {
-      throw new Error("vlm.extra_request_body must be a flat object of primitive values.");
+    if (!extra || typeof extra !== "object" || Array.isArray(extra) || JSON.stringify(extra).length > 1024) {
+      throw new Error("vlm.extra_request_body must be a small JSON object.");
     }
     switches.extraRequestBody = extra;
   }

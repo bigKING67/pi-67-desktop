@@ -9,10 +9,11 @@ import styles from "./ContextMemorySettings.module.css";
 import { LocalMemoryRuntimeSettings } from "./LocalMemoryRuntimeSettings.js";
 import { LocalMemoryActivationSettings } from "./LocalMemoryActivationSettings.js";
 
-const empty = { provider: "", extraction: "", endpoint: "", model: "", dimension: "" };
+const empty = { provider: "", extraction: "", plannerProvider: "", planner: "", endpoint: "", model: "", dimension: "" };
 function fields(snapshot: LocalMemorySettingsSnapshot) {
   return snapshot.status !== "configured" ? { ...empty } : {
     provider: snapshot.extraction.provider, extraction: snapshot.extraction.model,
+    plannerProvider: snapshot.queryPlanner?.provider ?? "", planner: snapshot.queryPlanner?.model ?? "",
     endpoint: snapshot.embedding.endpoint, model: snapshot.embedding.model, dimension: String(snapshot.embedding.dimension)
   };
 }
@@ -63,9 +64,15 @@ export function LocalMemoryModelSettings({ onPendingChange, children }: { onPend
   };
   const save = async () => {
     if (!bridge) return;
+    const plannerProvider = draft.plannerProvider.trim(), planner = draft.planner.trim();
+    if (!plannerProvider !== !planner) {
+      setError("召回改写模型需要同时填写 Provider ID 和模型 ID；都留空则关闭召回改写。");
+      return;
+    }
     hide(); setBusy(true); setError(undefined); setNotice(undefined);
     try {
-      const value = await bridge.save({ extraction: { provider: draft.provider, model: draft.extraction }, embedding: {
+      const value = await bridge.save({ extraction: { provider: draft.provider, model: draft.extraction },
+        ...(planner ? { queryPlanner: { provider: plannerProvider, model: planner } } : {}), embedding: {
         protocol: "openai-compatible", endpoint: draft.endpoint, model: draft.model, dimension: Number(draft.dimension),
         apiKey: replacement ? { action: "replace", value: replacement } : { action: "keep" }
       } });
@@ -90,6 +97,8 @@ export function LocalMemoryModelSettings({ onPendingChange, children }: { onPend
           {([
             ["provider", "提取 Provider ID", "使用已有 Pi Provider，不另存其密钥。"],
             ["extraction", "提取模型 ID", "当前支持 API Key 认证的 OpenAI Chat Completions 模型。"],
+            ["plannerProvider", "召回改写 Provider ID（可选）", "使用已有 Pi Provider。与下方模型 ID 同时留空则关闭召回改写。"],
+            ["planner", "召回改写模型 ID（可选）", "有对话历史时先用它把追问改写成检索词，通常多等 2–4 秒。建议选关闭思考的轻量模型，如方舟 doubao-seed-2-0-mini；需在 Pi 模型配置声明 thinkingFormat 才能关闭思考。"],
             ["endpoint", "Embedding 服务地址", "HTTPS 或本机 loopback 地址；更换地址需要重新输入密钥。"],
             ["model", "Embedding 模型 ID", "更换模型可能需要重建现有索引。"],
             ["dimension", "向量维度", "须与模型输出一致；修改后不会自动迁移索引。"]

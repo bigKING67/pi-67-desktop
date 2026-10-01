@@ -32,6 +32,17 @@ describe("memory model settings projection", () => {
     expect(await controller.get()).toEqual(saved);
     expect(isLocalMemorySettingsSnapshot({ ...saved, apiKey: "leak" })).toBe(false);
   });
+  it("round-trips an optional query planner selection without secrets", async () => {
+    const { controller, store } = fixture();
+    const planned = { ...input, queryPlanner: { provider: "fixture", model: "planner" } };
+    const saved = await controller.save(planned);
+    expect(saved).toMatchObject({ status: "configured", queryPlanner: { provider: "fixture", model: "planner" } });
+    expect(isLocalMemorySettingsSnapshot(saved)).toBe(true);
+    expect(store.save).toHaveBeenLastCalledWith(expect.objectContaining({ queryPlanner: { provider: "fixture", model: "planner" } }));
+    const cleared = await controller.save(input);
+    expect(cleared).not.toHaveProperty("queryPlanner");
+    expect(parseLocalMemorySettingsRequest({ ...input, queryPlanner: { provider: "fixture" } })).toBeUndefined();
+  });
   it("serializes queued replacement and retention and snapshots caller input", async () => {
     const { controller, store } = fixture(); const draft = structuredClone(input);
     const save = controller.save(draft); draft.embedding.endpoint = "https://mutated.invalid/v1";

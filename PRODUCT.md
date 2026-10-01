@@ -384,8 +384,14 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
 - Recall follows OpenViking's official current-prompt lifecycle: every current
   Prompt submission synchronously asks the server for one actor/Workspace-scoped context block
   before the provider request, including task switches inside one Session. Server
-  query expansion and cross-turn dedup use the active OpenViking Session; the client
-  adds no task classifier or manual refresh workflow. The model uses `viking_search`
+  cross-turn dedup uses the active OpenViking Session; the client adds no task
+  classifier or manual refresh workflow. Server query expansion runs only when the
+  user selects an optional Recall query planner (a Pi Provider/model, sent with
+  Pi's thinking-off switch when its `compat.thinkingFormat` declares one). Without
+  a planner, or when Pi can no longer resolve it, expansion is off and the
+  extraction model is never borrowed for it, because the extraction model reliably
+  exceeds OpenViking's 5 s intent budget. With a planner, prompts that have Session
+  history wait roughly 2–4 s longer before the provider request. The model uses `viking_search`
   only when inline Recall is absent or insufficient, the user explicitly requests a
   history search, or a specific prior decision still needs discovery. That Tool
   follows upstream with one bounded `/find`; abstracts and URIs come before bounded

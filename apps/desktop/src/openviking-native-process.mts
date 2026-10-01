@@ -21,6 +21,8 @@ interface NativeOptions {
   localProfileId: string;
   embedding: OpenVikingModelConfiguration & { dimension: number };
   extraction: OpenVikingModelConfiguration;
+  /** Optional Recall query planner; without it query expansion is disabled server-side. */
+  queryPlanner?: OpenVikingModelConfiguration & { thinkingOffBody?: Readonly<Record<string, unknown>> };
   startupTrace?: LocalMemoryStartupTrace;
 }
 
@@ -62,6 +64,7 @@ export async function startNativeOpenViking(
     || options.embedding.dimension > 65_536) throw new Error("Invalid native OpenViking startup configuration.");
   const embedding = modelConfiguration(options.embedding);
   const extraction = modelConfiguration(options.extraction);
+  const queryPlanner = options.queryPlanner ? modelConfiguration(options.queryPlanner) : undefined;
   await mkdir(options.dataRoot, { recursive: true, mode: 0o700 });
   const rootMetadata = await lstat(options.dataRoot);
   if (rootMetadata.isSymbolicLink() || !rootMetadata.isDirectory()) throw new Error("Unsafe native data directory.");
@@ -94,12 +97,18 @@ export async function startNativeOpenViking(
       // OpenViking 0.4.22 defaults extraction to a Python DSL and a 32,768-token
       // output cap; keep the verified JSON protocol and a cap common providers accept.
       vlm: { ...extraction, api_key: "${NEWMONEY_OV_EXTRACTION_KEY}", max_tokens: 8192 },
-      memory: { extraction_output_format: "json" }
+      memory: { extraction_output_format: "json" },
+      // Expansion through the extraction model reliably exceeds OpenViking's 5 s
+      // intent budget, so it runs only with a dedicated, thinking-off planner.
+      retrieval: { enable_intent: queryPlanner !== undefined },
+      ...(queryPlanner ? { query_planner: { ...queryPlanner, api_key: "${NEWMONEY_OV_QUERY_PLANNER_KEY}",
+        ...(options.queryPlanner?.thinkingOffBody ? { extra_request_body: options.queryPlanner.thinkingOffBody } : {}) } } : {})
     }).replaceAll("$", "\\u0024");
-    // Expand only our three secret fields. User paths/model names/URLs containing
+    // Expand only our secret fields. User paths/model names/URLs containing
     // dollars must not be interpreted as references to the child credentials.
     for (const [field, variable] of [["root_api_key", "NEWMONEY_OV_ROOT_KEY"],
-      ["api_key", "NEWMONEY_OV_EMBEDDING_KEY"], ["api_key", "NEWMONEY_OV_EXTRACTION_KEY"]] as const) {
+      ["api_key", "NEWMONEY_OV_EMBEDDING_KEY"], ["api_key", "NEWMONEY_OV_EXTRACTION_KEY"],
+      ["api_key", "NEWMONEY_OV_QUERY_PLANNER_KEY"]] as const) {
       const reference = JSON.stringify({ [field]: "${" + variable + "}" }).slice(1, -1);
       serialized = serialized.replace(reference.replaceAll("$", "\\u0024"), reference);
     }
@@ -119,7 +128,8 @@ export async function startNativeOpenViking(
       // string contents so quotes/backslashes in configured keys cannot alter JSON.
       NEWMONEY_OV_ROOT_KEY: JSON.stringify(rootKey).slice(1, -1),
       NEWMONEY_OV_EMBEDDING_KEY: JSON.stringify(options.embedding.apiKey).slice(1, -1),
-      NEWMONEY_OV_EXTRACTION_KEY: JSON.stringify(options.extraction.apiKey).slice(1, -1) }
+      NEWMONEY_OV_EXTRACTION_KEY: JSON.stringify(options.extraction.apiKey).slice(1, -1),
+      ...(options.queryPlanner ? { NEWMONEY_OV_QUERY_PLANNER_KEY: JSON.stringify(options.queryPlanner.apiKey).slice(1, -1) } : {}) }
     });
   } catch {
     await rm(runDirectory, { recursive: true, force: true });

@@ -30,7 +30,8 @@ export class LocalMemorySettingsController {
         }
         key = current.embedding.apiKey;
       } else key = apiKey.value;
-      const settings = { extraction: input.extraction, embedding: { ...embedding, apiKey: key } };
+      const settings = { extraction: input.extraction, ...(input.queryPlanner ? { queryPlanner: input.queryPlanner } : {}),
+        embedding: { ...embedding, apiKey: key } };
       await this.store.save(settings);
       return project(settings);
     });
@@ -43,7 +44,8 @@ export class LocalMemorySettingsController {
 }
 function project(value: LocalMemoryModelSettings | undefined): LocalMemorySettingsSnapshot {
   if (!value) return { status: "unconfigured" };
-  return { status: "configured", extraction: { ...value.extraction }, embedding: {
+  return { status: "configured", extraction: { ...value.extraction },
+    ...(value.queryPlanner ? { queryPlanner: { ...value.queryPlanner } } : {}), embedding: {
     protocol: value.embedding.protocol, endpoint: value.embedding.endpoint,
     model: value.embedding.model, dimension: value.embedding.dimension, hasApiKey: true
   }, appliesOn: "next-start" };

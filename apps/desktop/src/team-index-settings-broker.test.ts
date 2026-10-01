@@ -68,3 +68,10 @@ it("returns an unavailable result when no memory store is installed", async () =
   const requestId = randomUUID(); broker.handleMessage(host, { type: "team-index-settings-read", requestId });
   await vi.waitFor(() => expect(host.postMessage).toHaveBeenCalledWith({ type: "team-index-settings-result", requestId, ok: false, errorCode: "UNAVAILABLE" })); broker.stop();
 });
+it("projects away the private Recall planner so the strict team schema still accepts settings", async () => {
+  const f = fixture();
+  f.store.load.mockResolvedValue({ ...structuredClone(settings), queryPlanner: { provider: "fixture", model: "planner" } } as never);
+  const id = f.read();
+  await vi.waitFor(() => expect(f.host.postMessage).toHaveBeenCalledWith({ type: "team-index-settings-result", requestId: id, ok: true, settings }));
+  f.broker.stop();
+});

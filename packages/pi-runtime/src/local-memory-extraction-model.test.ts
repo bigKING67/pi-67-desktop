@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { resolveLocalMemoryExtractionModel } from "./local-memory-extraction-model.js";
+import { resolveLocalMemoryExtractionModel, thinkingOffBodyFor } from "./local-memory-extraction-model.js";
 import { createPiConfigurationFixture } from "./pi-configuration-service-test-fixture.js";
 
 const fixtures: Awaited<ReturnType<typeof createPiConfigurationFixture>>[] = [];
@@ -95,5 +95,22 @@ describe("Pi-owned memory extraction configuration", () => {
     auth.mockResolvedValue({ auth: { apiKey: "synthetic" }, env: { SYNTHETIC_ACCOUNT: "fixture" } });
     await expect(resolveLocalMemoryExtractionModel(configuration, selection, new AbortController().signal))
       .rejects.toThrow(/provider environment/u);
+  });
+});
+
+describe("thinking-off body", () => {
+  it("mirrors Pi's no-effort payload for declared thinking formats", () => {
+    expect(thinkingOffBodyFor({ reasoning: true, compat: { thinkingFormat: "qwen" } })).toEqual({ enable_thinking: false });
+    expect(thinkingOffBodyFor({ reasoning: true, compat: { thinkingFormat: "zai" } })).toEqual({ thinking: { type: "disabled" } });
+    expect(thinkingOffBodyFor({ reasoning: true, compat: { thinkingFormat: "deepseek" } })).toEqual({ thinking: { type: "disabled" } });
+    expect(thinkingOffBodyFor({ reasoning: true, compat: { thinkingFormat: "qwen-chat-template" } }))
+      .toEqual({ chat_template_kwargs: { enable_thinking: false } });
+  });
+
+  it("sends nothing for non-reasoning, undeclared, or always-thinking models", () => {
+    expect(thinkingOffBodyFor({ reasoning: false, compat: { thinkingFormat: "qwen" } })).toBeUndefined();
+    expect(thinkingOffBodyFor({ reasoning: true })).toBeUndefined();
+    expect(thinkingOffBodyFor({ reasoning: true, compat: { thinkingFormat: "openai" } })).toBeUndefined();
+    expect(thinkingOffBodyFor({ reasoning: true, compat: { thinkingFormat: "deepseek" }, thinkingLevelMap: { off: null } })).toBeUndefined();
   });
 });

@@ -60,7 +60,9 @@ export class TeamIndexSettingsBroker {
       const generation = store.signal;
       const settings = await store.load();
       if (generation.aborted || owner.signal.aborted || this.getStore() !== store) return;
-      const message = { type: "team-index-settings-result" as const, requestId, ok: true as const, settings };
+      // Team indexing needs only extraction and embedding; the Recall planner stays private to the local runtime.
+      const projected = settings && { extraction: settings.extraction, embedding: settings.embedding };
+      const message = { type: "team-index-settings-result" as const, requestId, ok: true as const, settings: projected };
       if (!isTeamIndexSettingsMessage(message)) throw new Error();
       this.#send(host, message);
     } catch {

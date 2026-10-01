@@ -128,6 +128,26 @@ describe("Main encrypted memory model settings", () => {
     models.resolve.mockRejectedValue(new Error("broker unavailable"));
     await expect(load(signal)).rejects.toThrow(/broker unavailable/u);
   });
+  it("stores an optional query planner and starts without it when Pi cannot resolve it", async () => {
+    const { store, encryption, root } = await fixture();
+    const planned = { ...settings, queryPlanner: { provider: "pi-fixture", model: "planner" } };
+    await store.save(planned);
+    expect(await new LocalMemoryModelSettingsStore(join(root, "settings"), encryption).load()).toEqual(planned);
+    await expect(store.save({ ...settings, queryPlanner: { provider: "", model: "planner" } } as never)).rejects.toThrow();
+    const extraction = { protocol: "openai-compatible" as const, endpoint: "https://pi.invalid/v1", model: "extract", apiKey: "pi-secret" };
+    const planner = { ...extraction, model: "planner", thinkingOffBody: { enable_thinking: false } as const };
+    const runtime = { runtimeRoot: "/approved/runtime", dataRoot: "/private/data", manifest: Buffer.alloc(0), signature: Buffer.alloc(0) };
+    const models = { resolve: vi.fn(async (selection: { model: string }) => selection.model === "planner" ? planner : extraction) };
+    const load = createLocalMemoryConfigurationLoader({ settings: store, models, loadRuntime: async () => runtime });
+    const signal = new AbortController().signal;
+    expect(await load(signal)).toEqual({ ...runtime, extraction, queryPlanner: planner, embedding: settings.embedding });
+    models.resolve.mockImplementation(async (selection: { model: string }) => {
+      if (selection.model === "planner") throw new Error("removed from Pi");
+      return extraction;
+    });
+    expect(await load(signal)).toEqual({ ...runtime, extraction, embedding: settings.embedding });
+  });
+
   it("stops configuration composition after cancellation without resolving a model", async () => {
     const { store } = await fixture(); await store.save(settings);
     const controller = new AbortController();
