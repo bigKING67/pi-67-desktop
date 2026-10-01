@@ -103,7 +103,8 @@ export type TeamChatConnectionState =
   | { status: "connecting" }
   | { status: "live"; generation: number }
   | { status: "reconnecting"; retryAt: number }
-  | { status: "unavailable"; reason: "entitlement-inactive" | "not-member" };
+  /** `rejected`: the service refused this device (revoked session or removed member). */
+  | { status: "unavailable"; reason: "entitlement-inactive" | "not-member" | "rejected" };
 
 /** Merges by `seq`, keeping one ascending copy of each message. */
 export function mergeTeamChatMessages(

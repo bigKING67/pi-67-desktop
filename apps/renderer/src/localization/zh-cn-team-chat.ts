@@ -22,6 +22,7 @@ export const zhCNTeamChatMessages = {
   openAccount: "打开账户设置",
   unavailableEntitlement: "团队的托管服务未激活，聊天暂不可用。历史消息仍保留在服务端。",
   unavailableMember: "当前设备授权的团队已不可用。请在账户设置中重新登录。",
+  unavailableRejected: "New Money 拒绝了这台设备的聊天连接（登录可能已失效，或已被移出团队）。请在账户设置中重新登录。",
   connecting: "正在连接聊天服务…",
   reconnecting: "聊天连接已中断，正在重连。期间发送的消息会在恢复后补齐。",
   live: "已连接",

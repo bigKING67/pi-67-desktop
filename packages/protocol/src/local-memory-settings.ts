@@ -5,14 +5,16 @@ const text = (maxLength: number) => Type.String({ minLength: 1, maxLength, patte
 const extraction = Type.Object({ provider: text(256), model: text(512) }, strict);
 const embedding = { protocol: Type.Literal("openai-compatible"), endpoint: text(2048),
   model: text(512), dimension: Type.Integer({ minimum: 1, maximum: 65536 }) };
-export const LocalMemorySettingsRequestSchema = Type.Object({ extraction, embedding: Type.Object({ ...embedding,
+/** Optional dedicated Recall query planner; absent means current-prompt query expansion is off. */
+const queryPlanner = Type.Optional(extraction);
+export const LocalMemorySettingsRequestSchema = Type.Object({ extraction, queryPlanner, embedding: Type.Object({ ...embedding,
   apiKey: Type.Union([Type.Object({ action: Type.Literal("keep") }, strict),
     Type.Object({ action: Type.Literal("replace"), value: text(4096) }, strict)])
 }, strict) }, strict);
 export const LocalMemorySettingsSnapshotSchema = Type.Union([
   Type.Object({ status: Type.Literal("unavailable") }, strict),
   Type.Object({ status: Type.Literal("unconfigured") }, strict),
-  Type.Object({ status: Type.Literal("configured"), extraction,
+  Type.Object({ status: Type.Literal("configured"), extraction, queryPlanner,
     embedding: Type.Object({ ...embedding, hasApiKey: Type.Literal(true) }, strict), appliesOn: Type.Literal("next-start") }, strict)
 ]);
 export type LocalMemorySettingsRequest = Static<typeof LocalMemorySettingsRequestSchema>;

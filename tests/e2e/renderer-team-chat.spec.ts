@@ -176,11 +176,12 @@ test("virtualizes long history, opens at the newest message and pages older hist
   expect(await log.locator("article").count()).toBeLessThan(50);
   await expect(log.getByText("复盘记录 110", { exact: true })).toHaveCount(0);
 
-  for (let attempt = 0; attempt < 30; attempt += 1) {
+  // Re-scroll each poll; virtualization renders only the rows near the top, so assert
+  // that some row older than the first loaded page (seq 111) is now rendered.
+  await expect.poll(async () => {
     await log.evaluate((element) => { element.scrollTop = 0; });
-    if (await log.getByText("复盘记录 110", { exact: true }).count()) break;
-    await page.waitForTimeout(100);
-  }
-  await expect(log.getByText("复盘记录 110", { exact: true })).toHaveCount(1);
+    const rendered = await log.locator("article p").allTextContents();
+    return Math.min(...rendered.map((text) => Number(/复盘记录 (\d+)/u.exec(text)?.[1] ?? Infinity)));
+  }, { timeout: 15_000 }).toBeLessThan(111);
   expect(await log.locator("article").count()).toBeLessThan(80);
 });

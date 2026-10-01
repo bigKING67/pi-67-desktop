@@ -9,9 +9,18 @@ export const LocalMemoryModelRequestSchema = Type.Object({
 export const LocalMemoryModelCancelSchema = Type.Object({
   type: Type.Literal("local-memory-extraction-cancel"), requestId: RequestId
 }, { additionalProperties: false });
+const strict = { additionalProperties: false };
+/** The only thinking-off shapes Pi emits for OpenAI-compatible models (qwen, zai/deepseek, qwen-chat-template). */
+const ThinkingOffBody = Type.Union([
+  Type.Object({ enable_thinking: Type.Literal(false) }, strict),
+  Type.Object({ thinking: Type.Object({ type: Type.Literal("disabled") }, strict) }, strict),
+  Type.Object({ chat_template_kwargs: Type.Object({ enable_thinking: Type.Literal(false) }, strict) }, strict)
+]);
 const Model = Type.Object({ protocol: Type.Literal("openai-compatible"),
   endpoint: Type.String({ minLength: 1, maxLength: 2_048 }),
-  model: Type.String({ minLength: 1, maxLength: 512 }), apiKey: Type.String({ minLength: 1, maxLength: 4_096 })
+  model: Type.String({ minLength: 1, maxLength: 512 }), apiKey: Type.String({ minLength: 1, maxLength: 4_096 }),
+  /** Request-body fragment that turns the model's thinking off, derived from Pi model metadata. */
+  thinkingOffBody: Type.Optional(ThinkingOffBody)
 }, { additionalProperties: false });
 export const LocalMemoryModelResultSchema = Type.Union([
   Type.Object({ type: Type.Literal("local-memory-extraction-result"), requestId: RequestId,
@@ -24,6 +33,7 @@ export type LocalMemoryModelRequest = Static<typeof LocalMemoryModelRequestSchem
 export type LocalMemoryModelCancel = Static<typeof LocalMemoryModelCancelSchema>;
 export type LocalMemoryModelResult = Static<typeof LocalMemoryModelResultSchema>;
 export type LocalMemoryResolvedModel = Static<typeof Model>;
+export type LocalMemoryThinkingOffBody = Static<typeof ThinkingOffBody>;
 export function isLocalMemoryModelRequest(value: unknown): value is LocalMemoryModelRequest {
   return Value.Check(LocalMemoryModelRequestSchema, value);
 }

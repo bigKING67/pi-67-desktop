@@ -43,7 +43,8 @@ function ConnectionBanner() {
   const text = connection?.status === "reconnecting" ? copy.reconnecting
     : connection?.status === "connecting" ? copy.connecting
       : connection?.status === "unavailable"
-        ? connection.reason === "entitlement-inactive" ? copy.unavailableEntitlement : copy.unavailableMember
+        ? connection.reason === "entitlement-inactive" ? copy.unavailableEntitlement
+          : connection.reason === "rejected" ? copy.unavailableRejected : copy.unavailableMember
         : undefined;
   if (!text) return null;
   return (

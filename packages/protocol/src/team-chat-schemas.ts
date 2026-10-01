@@ -95,7 +95,7 @@ const ConnectionStateSchema = Type.Union([
   strictObject({ status: Type.Literal("reconnecting"), retryAt: TimestampSchema }),
   strictObject({
     status: Type.Literal("unavailable"),
-    reason: Type.Union([Type.Literal("entitlement-inactive"), Type.Literal("not-member")])
+    reason: Type.Union([Type.Literal("entitlement-inactive"), Type.Literal("not-member"), Type.Literal("rejected")])
   })
 ]);
 

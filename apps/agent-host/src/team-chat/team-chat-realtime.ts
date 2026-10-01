@@ -181,10 +181,17 @@ function openWebSocket(url: string): TeamChatSocket {
   return new WebSocket(url) as unknown as TeamChatSocket;
 }
 
-function unavailableReason(error: unknown): "entitlement-inactive" | "not-member" | undefined {
-  const code = error instanceof HostCommandError ? error.details?.serviceError : undefined;
+/**
+ * Service refusals stop reconnecting until the credential changes; transport and
+ * 5xx failures (RuntimeError or recoverable errors) keep the bounded backoff.
+ */
+function unavailableReason(error: unknown): "entitlement-inactive" | "not-member" | "rejected" | undefined {
+  if (!(error instanceof HostCommandError)) return undefined;
+  const code = error.details?.serviceError;
   if (code === "entitlement_inactive") return "entitlement-inactive";
   if (code === "team_not_found" || code === "device_team_scope") return "not-member";
+  // Generic 401/403/4xx from New Money, including a refused credential refresh.
+  if (error.code === "RUNTIME_NOT_READY" && !error.recoverable) return "rejected";
   return undefined;
 }
 

@@ -1,4 +1,4 @@
-import type { PiDefaultModelSelection } from "@pi67/protocol";
+import type { LocalMemoryThinkingOffBody, PiDefaultModelSelection } from "@pi67/protocol";
 import type { PiConfigurationService } from "./pi-configuration-service.js";
 
 /** Secret-bearing Host/Main-only value. Never include it in a Renderer snapshot. */
@@ -7,6 +7,24 @@ export interface LocalMemoryExtractionModel {
   endpoint: string;
   model: string;
   apiKey: string;
+  thinkingOffBody?: LocalMemoryThinkingOffBody;
+}
+
+/**
+ * Mirror Pi's own OpenAI-completions payload for "no reasoning effort" so a
+ * delegated OpenViking call disables thinking exactly as Pi would. Only the
+ * model's explicit `compat.thinkingFormat` is trusted; Pi's URL auto-detection
+ * is not exported, so an undeclared format sends no switch.
+ */
+export function thinkingOffBodyFor(model: { reasoning?: boolean; compat?: unknown; thinkingLevelMap?: Record<string, unknown> }):
+  LocalMemoryThinkingOffBody | undefined {
+  if (!model.reasoning || typeof model.compat !== "object" || model.compat === null) return undefined;
+  const format = (model.compat as { thinkingFormat?: unknown }).thinkingFormat;
+  if (format === "qwen") return { enable_thinking: false };
+  if (format === "zai") return { thinking: { type: "disabled" } };
+  if (format === "deepseek") return model.thinkingLevelMap?.off === null ? undefined : { thinking: { type: "disabled" } };
+  if (format === "qwen-chat-template") return { chat_template_kwargs: { enable_thinking: false } };
+  return undefined;
 }
 
 /** Resolve through Pi, never by rereading auth.json or constructing a second catalog. */
@@ -58,5 +76,7 @@ export async function resolveLocalMemoryExtractionModel(
       && ["127.0.0.1", "[::1]"].includes(parsed.hostname)))) {
     throw new Error("Memory extraction requires HTTPS or an exact loopback endpoint.");
   }
-  return { protocol: "openai-compatible", endpoint, model: model.id, apiKey: resolved.auth.apiKey };
+  const thinkingOffBody = thinkingOffBodyFor(model);
+  return { protocol: "openai-compatible", endpoint, model: model.id, apiKey: resolved.auth.apiKey,
+    ...(thinkingOffBody ? { thinkingOffBody } : {}) };
 }

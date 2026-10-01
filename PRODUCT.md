@@ -139,8 +139,10 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   task or team scope. Settings keeps priority over either mode. The Welcome screen
   offers `打开团队聊天` so Chat is reachable before any Workspace exists.
 - Chat requires New Money sign-in and uses only the device-authorized team. Signed
-  out, inactive entitlement and lost membership each show their own state; Work is
-  unaffected.
+  out, inactive entitlement, lost membership and a service refusal (revoked session
+  or removed member) each show their own state and stop reconnecting until the
+  sign-in changes; transient network or service failures retry with bounded backoff.
+  Work is unaffected.
 - The rail lists channels (joined and joinable public channels) and teammates.
   Selecting a teammate opens or reuses the single direct message. Direct messages
   whose teammate left the team stay listed and read-only.

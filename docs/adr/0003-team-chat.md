@@ -68,6 +68,23 @@ Real-time team messaging needs a push channel from the hosted service.
   `LISTEN/NOTIFY` (or equivalent) fan-out before scaling.
 - Chat message bodies are hosted team content. They are never logged by either side.
 
+## Evolution triggers (decided 2026-10-01)
+
+Language is not the scaling lever at New Money's team scale; the service stays one
+Rust (Axum/tokio) codebase. A second service language (for example Go for business
+APIs) is reconsidered only at the last stage below. Thresholds are estimates to be
+replaced by measurements from the `chat hub stats` log.
+
+| Stage | Trigger | Change |
+| --- | --- | --- |
+| Now | Up to a few thousand concurrent sockets on one VPS | One API replica (Compose `scale: 1`); watch sockets, connects, `dropped_full_queue`, `evicted_over_cap`, `send_p95_ms` |
+| 2 | Need for more than one replica (HA or rolling deploys) or ~10k concurrent sockets | Shared fan-out (Postgres `LISTEN/NOTIFY` or Redis pub/sub); split the socket gateway and REST API into separate Rust processes |
+| 3 | Sustained message writes of hundreds per second, or hot channels contending on the per-conversation row lock | Dedicated sequence allocation or partitioned conversations; partitioned message storage; a queue between write and push |
+| 4 | Hundreds of thousands to millions of concurrent sockets | Dedicated gateway cluster, sharded storage, multi-region; evaluate a second language only here |
+
+Independently of stage, denormalize conversation list unread/preview columns once a
+member's list reaches hundreds of conversations or the list query shows up in p95.
+
 ## Phases
 
 - P0: this ADR, execution plan, protocol and migration design, authority updates.

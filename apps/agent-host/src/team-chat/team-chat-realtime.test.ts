@@ -140,6 +140,21 @@ describe("TeamChatRealtime", () => {
     realtime.stop();
   });
 
+  it("stops reconnecting after a service refusal but keeps backing off on transport failures", async () => {
+    const { realtime, states, resolveUrl, replaceCredential } = harness();
+    resolveUrl.mockRejectedValueOnce(new HostCommandError("RUNTIME_NOT_READY", "New Money sign-in expired or was rejected.", false));
+    realtime.start();
+    await flush();
+    expect(states.at(-1)).toEqual({ status: "unavailable", reason: "rejected" });
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(resolveUrl).toHaveBeenCalledTimes(1);
+    resolveUrl.mockRejectedValueOnce(new HostCommandError("RUNTIME_NOT_READY", "Sign in to New Money first.", true));
+    replaceCredential(true);
+    await flush();
+    expect(states.at(-1)).toMatchObject({ status: "reconnecting" });
+    realtime.stop();
+  });
+
   it("closes the socket and waits while signed out", async () => {
     const { realtime, states, sockets, replaceCredential, last } = harness();
     realtime.start();
