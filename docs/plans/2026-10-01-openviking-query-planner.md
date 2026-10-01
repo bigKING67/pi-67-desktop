@@ -1,6 +1,6 @@
 # Dedicated OpenViking query planner for Recall expansion
 
-Status: proposed
+Status: active
 Owner: Claude Code
 Started: 2026-10-01
 Last updated: 2026-10-01
@@ -77,10 +77,10 @@ expansion wait when no suitable planner is configured.
 ## Checkpoints
 
 - [x] 1. Measure Ark and SiliconFlow candidates on the baseline; recommendation doubao-seed-2-0-mini.
-- [ ] 2. Protocol + settings store + controller + team broker projection with tests.
-- [ ] 3. Host resolution + thinking-off derivation with tests.
-- [ ] 4. Native process `ov.conf`/env and expansion on/off wiring with tests.
-- [ ] 5. Settings UI field (design-craft), PRODUCT/DESIGN updates.
+- [x] 2. Protocol + settings store + controller + team broker projection with tests.
+- [x] 3. Host resolution + thinking-off derivation (explicit `compat.thinkingFormat` only) with tests.
+- [x] 4. Native process `ov.conf`/env; `retrieval.enable_intent` false without a planner; tests.
+- [x] 5. Settings UI Provider/model field pair (design-craft L1-F), PRODUCT/DESIGN updates, packaged smoke extended.
 - [ ] 6. Aggregate gate, baseline re-run, packaged macOS smoke and visual verification.
 
 ## Validation matrix
@@ -112,3 +112,13 @@ changes together.
 - 2026-10-01: Expansion timeout root cause, model sweep, upstream guidance, and
   integration scope recorded; plan proposed.
 - 2026-10-01: Ark sweep completed; doubao-seed-2-0-mini recommended, deepseek-v4-1-flash as alternative.
+- 2026-10-01: Implemented in `bb2762ac` (Host resolver, protocol schemas and
+  revision landed in `a3a40a65` via a concurrent session's broad commit). On
+  0.4.22 the OpenAI-compatible path with `extra_request_body:
+  {"thinking":{"type":"disabled"}}` expanded 8/8 follow-ups with
+  doubao-seed-2-0-mini (p50 2.4 s, max 3.75 s; follow-up Hit@1 5/6). Gates:
+  lint, architecture, references, structure, transport, workflows, coverage
+  (913 files / 5,920 tests) PASS; knip fails only on another session's
+  uncommitted `eng/release` files. Packaged smoke and settings screenshot are
+  pending until that session's preview/release script changes settle.
+
