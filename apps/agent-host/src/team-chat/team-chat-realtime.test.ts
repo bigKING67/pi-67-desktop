@@ -229,5 +229,6 @@ describe("Team Chat realtime helpers", () => {
     expect(parseFrame(JSON.stringify({ type: 7 }))).toBeUndefined();
     expect(parseFrame(JSON.stringify({ type: "message.created", message: { ...message, seq: 0 } }))).toBeUndefined();
     expect(parseFrame(JSON.stringify({ type: "read.changed", conversationId: "c1", lastReadSeq: -1 }))).toBeUndefined();
+    expect(parseFrame(JSON.stringify({ type: "policy.changed" }))).toEqual({ type: "policy.changed" });
   });
 });

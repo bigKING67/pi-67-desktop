@@ -26,6 +26,7 @@ export interface TeamChatPendingMessage {
   createdAt: number;
   status: "sending" | "failed";
   error?: string;
+  mentionUserIds?: string[];
 }
 
 /** Disposable presentation cache; New Money remains the chat truth. */
@@ -112,11 +113,13 @@ export function applyMessage(state: TeamChatState, message: TeamChatMessage): Te
   const conversation = state.directory?.conversations.find((item) => item.id === message.conversationId);
   if (!conversation) return next;
   const advances = message.seq > conversation.lastSeq;
+  const mentionsSelf = !fromSelf && advances && selfUserId !== undefined && (message.mentionUserIds?.includes(selfUserId) ?? false);
   next = upsertConversation(next, {
     ...conversation,
     lastSeq: Math.max(conversation.lastSeq, message.seq),
     lastReadSeq: fromSelf ? Math.max(conversation.lastReadSeq, message.seq) : conversation.lastReadSeq,
     unreadCount: fromSelf ? 0 : advances ? Math.min(100, conversation.unreadCount + 1) : conversation.unreadCount,
+    mentionCount: fromSelf ? 0 : mentionsSelf ? Math.min(100, conversation.mentionCount + 1) : conversation.mentionCount,
     ...(advances ? {
       lastMessageAt: message.createdAt,
       lastSenderUserId: message.senderUserId,
@@ -132,7 +135,8 @@ export function applyReadCursor(state: TeamChatState, conversationId: string, la
   return upsertConversation(state, {
     ...conversation,
     lastReadSeq,
-    unreadCount: lastReadSeq >= conversation.lastSeq ? 0 : conversation.unreadCount
+    unreadCount: lastReadSeq >= conversation.lastSeq ? 0 : conversation.unreadCount,
+    mentionCount: lastReadSeq >= conversation.lastSeq ? 0 : conversation.mentionCount
   });
 }
 
@@ -159,6 +163,7 @@ export function applyPush(state: TeamChatState, event: TeamChatPushEvent): { sta
     case "read.changed":
       return { state: applyReadCursor(state, event.conversationId, event.lastReadSeq), refreshDirectory: false };
     case "conversation.changed":
+    case "policy.changed":
       return { state, refreshDirectory: true };
     case "work_card.changed":
       return { state: applyWorkCard(state, event.card), refreshDirectory: false };

@@ -2056,6 +2056,19 @@ loading error where the operation can produce those states
   acceptance and summary are captioned sections. References are single-line
   links opened through the desktop bridge. Actions are compact buttons; the
   primary action is `接手` or `在工作中开始`.
+- Mentions (P2.5): `@name` runs use the accent-soft fill with accent-strong
+  semibold text; the reader's own mention uses the solid accent fill, and a message
+  that mentions the reader gets a 2px accent rail in its left gutter. Unread
+  mentions show an `@N` count in the accent outline (accent border, accent-soft
+  fill) beside the solid unread count, never the warning role. The mention list
+  floats above the composer on the raised surface with the floating shadow, at most
+  280px wide and eight 32px rows (avatar tile and name); the active row uses
+  accent-soft. Loading and no-match states are one tertiary line.
+- `频道设置` is a small button at the end of the channel intro. Its dialog reuses the
+  new-channel dialog layout: rename field with an inline save, a roster of 38px rows
+  (avatar, name, outlined `负责人` chip, trailing small buttons), an add-member
+  select, tertiary hints, then footer actions. Destructive steps arm on the first
+  press (danger outline and tint, explicit `确认…` label) and run on the second.
 - Plain messages expose `在工作中处理` as a tertiary text action revealed on hover
   or keyboard focus. The hand-off and start-work dialogs open with a muted privacy
   notice, use labelled native selects, textareas and checkboxes, scroll within a

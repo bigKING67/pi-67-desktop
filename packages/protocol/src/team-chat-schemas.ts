@@ -2,6 +2,7 @@ import {
   TEAM_CHAT_CHANNEL_NAME_MAX_CHARS,
   TEAM_CHAT_CLIENT_KEY_PATTERN,
   TEAM_CHAT_MEMBER_BATCH_MAX,
+  TEAM_CHAT_MENTION_MAX,
   TEAM_CHAT_MESSAGE_MAX_CHARS,
   TEAM_CHAT_PAGE_MAX,
   TEAM_CHAT_WORK_CARD_LIMITS
@@ -21,6 +22,22 @@ const TimestampSchema = Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTE
 const BodySchema = Type.String({ minLength: 1, maxLength: TEAM_CHAT_MESSAGE_MAX_CHARS });
 const ChannelNameSchema = Type.String({ minLength: 1, maxLength: TEAM_CHAT_CHANNEL_NAME_MAX_CHARS });
 const ClientKeySchema = Type.String({ minLength: 8, maxLength: 64, pattern: TEAM_CHAT_CLIENT_KEY_PATTERN });
+const MentionsSchema = Type.Array(IdSchema, { maxItems: TEAM_CHAT_MENTION_MAX });
+const PolicySchema = strictObject({
+  channelCreation: Type.Union([Type.Literal("members"), Type.Literal("admins")]),
+  viewersCanPost: Type.Boolean(),
+  retentionDays: Type.Optional(Type.Union([Type.Literal(90), Type.Literal(180), Type.Literal(365)])),
+  revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })
+});
+const ChannelActionSchema = Type.Union([
+  strictObject({ type: Type.Literal("rename"), name: ChannelNameSchema }),
+  strictObject({ type: Type.Literal("archive") }),
+  strictObject({ type: Type.Literal("unarchive") }),
+  strictObject({ type: Type.Literal("addMembers"), userIds: Type.Array(IdSchema, { minItems: 1, maxItems: TEAM_CHAT_MEMBER_BATCH_MAX }) }),
+  strictObject({ type: Type.Literal("removeMember"), userId: IdSchema }),
+  strictObject({ type: Type.Literal("transferOwner"), userId: IdSchema }),
+  strictObject({ type: Type.Literal("leave") })
+]);
 const VisibilitySchema = Type.Union([Type.Literal("public"), Type.Literal("private")]);
 const RoleSchema = Type.Union([
   Type.Literal("owner"),
@@ -40,6 +57,8 @@ export const TeamChatConversationSchema = strictObject({
   lastSeq: SeqSchema,
   lastReadSeq: SeqSchema,
   unreadCount: Type.Integer({ minimum: 0, maximum: 100 }),
+  mentionCount: Type.Integer({ minimum: 0, maximum: 100 }),
+  ownerUserId: Type.Optional(IdSchema),
   lastMessageAt: Type.Optional(TimestampSchema),
   lastSenderUserId: Type.Optional(IdSchema),
   lastPreview: Type.Optional(Type.String({ maxLength: 140 })),
@@ -85,7 +104,8 @@ export const TeamChatMessageSchema = strictObject({
   body: BodySchema,
   clientKey: ClientKeySchema,
   createdAt: TimestampSchema,
-  workCard: Type.Optional(TeamChatWorkCardSchema)
+  workCard: Type.Optional(TeamChatWorkCardSchema),
+  mentionUserIds: Type.Optional(MentionsSchema)
 });
 
 const ConnectionStateSchema = Type.Union([
@@ -110,7 +130,12 @@ export const TeamChatCommandPayloadSchemas: Record<keyof TeamChatCommandPayloads
     after: Type.Optional(SeqSchema),
     limit: Type.Optional(Type.Integer({ minimum: 1, maximum: TEAM_CHAT_PAGE_MAX }))
   }),
-  "teamChat.message.send": strictObject({ conversationId: IdSchema, clientKey: ClientKeySchema, body: BodySchema }),
+  "teamChat.message.send": strictObject({
+    conversationId: IdSchema,
+    clientKey: ClientKeySchema,
+    body: BodySchema,
+    mentionUserIds: Type.Optional(MentionsSchema)
+  }),
   "teamChat.read.mark": strictObject({ conversationId: IdSchema, lastReadSeq: SeqSchema }),
   "teamChat.channel.create": strictObject({
     name: ChannelNameSchema,
@@ -118,6 +143,8 @@ export const TeamChatCommandPayloadSchemas: Record<keyof TeamChatCommandPayloads
     memberUserIds: Type.Array(IdSchema, { maxItems: TEAM_CHAT_MEMBER_BATCH_MAX })
   }),
   "teamChat.channel.join": strictObject({ conversationId: IdSchema }),
+  "teamChat.channel.members": strictObject({ conversationId: IdSchema }),
+  "teamChat.channel.manage": strictObject({ conversationId: IdSchema, action: ChannelActionSchema }),
   "teamChat.dm.open": strictObject({ userId: IdSchema }),
   "teamChat.workCard.create": strictObject({
     conversationId: IdSchema,
@@ -146,7 +173,8 @@ export const TeamChatCommandResultSchemas: Record<keyof TeamChatCommandResults, 
       displayName: Type.String({ minLength: 1, maxLength: 160 }),
       role: RoleSchema
     }), { maxItems: 100_000 }),
-    conversations: Type.Array(TeamChatConversationSchema, { maxItems: 500 })
+    conversations: Type.Array(TeamChatConversationSchema, { maxItems: 500 }),
+    policy: PolicySchema
   }),
   "teamChat.messages.list": strictObject({
     messages: Type.Array(TeamChatMessageSchema, { maxItems: TEAM_CHAT_PAGE_MAX }),
@@ -156,6 +184,11 @@ export const TeamChatCommandResultSchemas: Record<keyof TeamChatCommandResults, 
   "teamChat.read.mark": strictObject({ lastReadSeq: SeqSchema }),
   "teamChat.channel.create": TeamChatConversationSchema,
   "teamChat.channel.join": TeamChatConversationSchema,
+  "teamChat.channel.members": strictObject({
+    ownerUserId: IdSchema,
+    members: Type.Array(strictObject({ userId: IdSchema, joinedAt: TimestampSchema }), { maxItems: 100_000 })
+  }),
+  "teamChat.channel.manage": EmptySchema,
   "teamChat.dm.open": TeamChatConversationSchema,
   "teamChat.workCard.create": TeamChatMessageSchema,
   "teamChat.workCard.act": TeamChatWorkCardSchema
@@ -166,7 +199,8 @@ export const TeamChatEventPayloadSchemas: Record<keyof TeamChatEventPayloads, TS
     strictObject({ type: Type.Literal("message.created"), message: TeamChatMessageSchema }),
     strictObject({ type: Type.Literal("conversation.changed"), conversationId: IdSchema }),
     strictObject({ type: Type.Literal("work_card.changed"), card: TeamChatWorkCardSchema }),
-    strictObject({ type: Type.Literal("read.changed"), conversationId: IdSchema, lastReadSeq: SeqSchema })
+    strictObject({ type: Type.Literal("read.changed"), conversationId: IdSchema, lastReadSeq: SeqSchema }),
+    strictObject({ type: Type.Literal("policy.changed") })
   ]),
   "teamChat.connectionChanged": ConnectionStateSchema
 };

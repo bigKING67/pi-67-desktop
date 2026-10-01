@@ -2635,7 +2635,8 @@ ADR 0003 是权威合同。Team Chat 不经过 Pi Runtime、Task Scheduler 或 S
 
 - Protocol：`teamChat.connection.get`、`teamChat.directory.get`、`teamChat.messages.list`、
   `teamChat.message.send`、`teamChat.read.mark`、`teamChat.channel.create`、`teamChat.channel.join`、
-  `teamChat.dm.open`、`teamChat.workCard.create`、`teamChat.workCard.act` 均为 `app` scope 命令；`teamChat.pushed` 与 `teamChat.connectionChanged` 是 `app`
+  `teamChat.channel.members`、`teamChat.channel.manage`、`teamChat.dm.open`、`teamChat.workCard.create`、
+  `teamChat.workCard.act` 均为 `app` scope 命令；`teamChat.pushed` 与 `teamChat.connectionChanged` 是 `app`
   scope 事件。Schema 位于 `packages/protocol/src/team-chat-schemas.ts`；字符长度按字素校验，Host 再按
   服务端的码点上限精确校验。`message.send` 不是 replay-safe control mutation：幂等由 caller 的
   `clientKey` 与服务端唯一约束承担，Renderer 重试复用同一 key。
@@ -2657,6 +2658,11 @@ ADR 0003 是权威合同。Team Chat 不经过 Pi Runtime、Task Scheduler 或 S
 - Work Card：卡片是带 `workCard` 的消息；`work_card.changed` 推送按 revision 替换已加载线程中的卡片，
   revision 冲突会重载该线程。Chat→Work 只经 `team-chat/team-chat-work-bridge.ts` 打开带 `teamScope`
   的草稿（`beginRendererSessionIntentInWorkspace` + 草稿 `setText`），从不自动发送，也不创建私人范围 Session。
+- 频道治理（P2.5）：`teamChat.channel.manage` 用一个判别联合承载 rename/archive/unarchive/addMembers/
+  removeMember/transferOwner/leave，Host 映射到对应 REST 路由，成功后 Renderer 重读目录。`directory.get`
+  同时读取团队聊天策略；读取失败时退回默认策略（服务端仍按真实策略执行）。`policy.changed` 推送只触发
+  目录重读。`message.send` 可带 `mentionUserIds`（至多 50，服务端校验为会话成员）；Renderer 只发送用户
+  从提及列表中选中且仍保留在正文中的成员，频道成员列表在首次输入 `@` 时按需读取。
 
 ## Source layout
 

@@ -361,7 +361,7 @@
 .composer > small.overLimit { color: var(--danger); }
 
 .composerNotice {
-  margin: 0;
+  margin: var(--space-2) 0 0;
   color: var(--text-secondary);
   font-size: var(--font-size-support);
 }
@@ -447,6 +447,10 @@
 }
 
 .channelDialog h2 { margin: 0; }
+
+/* React Aria focuses the dialog container on open; the ring belongs to its controls. */
+.channelDialog:focus,
+.channelDialog:focus-visible { outline: none; }
 
 /* The dialog already pads its content; override the global `.modal-surface form` padding. */
 .channelDialog .channelForm {

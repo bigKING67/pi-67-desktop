@@ -14,6 +14,8 @@ interface MockConversation {
   lastSeq: number;
   lastReadSeq: number;
   unreadCount: number;
+  mentionCount: number;
+  ownerUserId?: string;
   lastMessageAt?: number;
   lastSenderUserId?: string;
   lastPreview?: string;
@@ -46,6 +48,7 @@ interface MockMessage {
   clientKey: string;
   createdAt: number;
   workCard?: MockWorkCard;
+  mentionUserIds?: string[];
 }
 
 export interface MockTeamChatState {
@@ -55,8 +58,10 @@ export interface MockTeamChatState {
     selfUserId: string;
     members: Array<{ userId: string; displayName: string; role: string }>;
     conversations: MockConversation[];
+    policy: { channelCreation: string; viewersCanPost: boolean; retentionDays?: number; revision: number };
   };
   messages: Record<string, MockMessage[]>;
+  rosters: Record<string, string[]>;
 }
 
 /** Stateful New Money Team Chat stand-in. Signed out by default so Work-only specs are unaffected. */
@@ -71,7 +76,7 @@ export function installMockTeamChatCommandHandler(): void {
     { id: "msg-1", conversationId: "conv-research", seq: 1, senderUserId: "user-wang", body: "宏观周报草稿已经放到工作区了，今天下午能帮忙看一下估值部分吗？", clientKey: "seed-key-0001", createdAt: start },
     { id: "msg-2", conversationId: "conv-research", seq: 2, senderUserId: "user-wang", body: "重点是第三节的折现率假设。", clientKey: "seed-key-0002", createdAt: start + 60_000 },
     { id: "msg-3", conversationId: "conv-research", seq: 3, senderUserId: self, body: "可以，我先在工作里跑一遍敏感性分析。", clientKey: "seed-key-0003", createdAt: start + 600_000 },
-    { id: "msg-4", conversationId: "conv-research", seq: 4, senderUserId: "user-li", body: "顺便把港股那几家的口径对齐一下。", clientKey: "seed-key-0004", createdAt: start + 3_600_000 }
+    { id: "msg-4", conversationId: "conv-research", seq: 4, senderUserId: "user-li", body: "@高乾 顺便把港股那几家的口径对齐一下。", clientKey: "seed-key-0004", createdAt: start + 3_600_000, mentionUserIds: [self] }
   ];
   const liCard: MockWorkCard = {
     id: "card-li-1", conversationId: "dm-li", createdBy: "user-li", assigneeUserId: self, title: "港股口径对齐",
@@ -91,15 +96,19 @@ export function installMockTeamChatCommandHandler(): void {
       ],
       conversations: [
         { id: "conv-research", kind: "channel", visibility: "public", name: "宏观研究", joined: true, memberCount: 3,
-          memberUserIds: [], lastSeq: 4, lastReadSeq: 3, unreadCount: 1, lastMessageAt: start + 3_600_000,
-          lastSenderUserId: "user-li", lastPreview: "顺便把港股那几家的口径对齐一下。", createdAt: start - 86_400_000 },
+          memberUserIds: [], lastSeq: 4, lastReadSeq: 3, unreadCount: 1, mentionCount: 1, ownerUserId: "user-wang",
+          lastMessageAt: start + 3_600_000, lastSenderUserId: "user-li", lastPreview: "@高乾 顺便把港股那几家的口径对齐一下。",
+          createdAt: start - 86_400_000 },
         { id: "conv-ops", kind: "channel", visibility: "public", name: "交易复盘", joined: false, memberCount: 2,
-          memberUserIds: [], lastSeq: 0, lastReadSeq: 0, unreadCount: 0, createdAt: start - 3_600_000 },
+          memberUserIds: [], lastSeq: 0, lastReadSeq: 0, unreadCount: 0, mentionCount: 0, ownerUserId: "user-li",
+          createdAt: start - 3_600_000 },
         { id: "dm-li", kind: "dm", visibility: "private", joined: true, memberCount: 2, memberUserIds: [self, "user-li"].sort(),
-          lastSeq: 1, lastReadSeq: 1, unreadCount: 0, lastMessageAt: start + 7_200_000, lastSenderUserId: "user-li",
+          lastSeq: 1, lastReadSeq: 1, unreadCount: 0, mentionCount: 0, lastMessageAt: start + 7_200_000, lastSenderUserId: "user-li",
           lastPreview: "港股口径对齐", createdAt: start }
-      ]
+      ],
+      policy: { channelCreation: "members", viewersCanPost: true, revision: 0 }
     },
+    rosters: { "conv-research": [self, "user-wang", "user-li"], "conv-ops": ["user-wang", "user-li"] },
     messages: {
       "conv-research": history,
       "dm-li": [{ id: "msg-card-1", conversationId: "dm-li", seq: 1, senderUserId: "user-li", body: "港股口径对齐",
@@ -109,13 +118,14 @@ export function installMockTeamChatCommandHandler(): void {
   let nextId = 100;
 
   const conversation = (id: unknown) => state.directory.conversations.find((item) => item.id === id);
-  const append = (conversationId: string, senderUserId: string, body: string, clientKey: string): MockMessage => {
+  const append = (conversationId: string, senderUserId: string, body: string, clientKey: string, mentions?: unknown): MockMessage => {
     const target = conversation(conversationId)!;
-    const message = { id: `msg-${nextId++}`, conversationId, seq: target.lastSeq + 1, senderUserId, body, clientKey, createdAt: Date.now() };
+    const message: MockMessage = { id: `msg-${nextId++}`, conversationId, seq: target.lastSeq + 1, senderUserId, body, clientKey,
+      createdAt: Date.now(), ...(Array.isArray(mentions) && mentions.length > 0 ? { mentionUserIds: mentions as string[] } : {}) };
     (state.messages[conversationId] ??= []).push(message);
     Object.assign(target, { lastSeq: message.seq, lastMessageAt: message.createdAt, lastSenderUserId: senderUserId,
       lastPreview: body.slice(0, 140) });
-    if (senderUserId === self) Object.assign(target, { lastReadSeq: message.seq, unreadCount: 0 });
+    if (senderUserId === self) Object.assign(target, { lastReadSeq: message.seq, unreadCount: 0, mentionCount: 0 });
     return message;
   };
 
@@ -138,25 +148,49 @@ export function installMockTeamChatCommandHandler(): void {
       case "teamChat.message.send": {
         const existing = (state.messages[String(payload.conversationId)] ?? [])
           .find((message) => message.clientKey === payload.clientKey);
-        return existing ?? append(String(payload.conversationId), self, String(payload.body), String(payload.clientKey));
+        return existing ?? append(String(payload.conversationId), self, String(payload.body), String(payload.clientKey), payload.mentionUserIds);
       }
       case "teamChat.read.mark": {
         const target = conversation(payload.conversationId)!;
         target.lastReadSeq = Math.max(target.lastReadSeq, Math.min(Number(payload.lastReadSeq), target.lastSeq));
-        if (target.lastReadSeq >= target.lastSeq) target.unreadCount = 0;
+        if (target.lastReadSeq >= target.lastSeq) Object.assign(target, { unreadCount: 0, mentionCount: 0 });
         return { lastReadSeq: target.lastReadSeq };
       }
       case "teamChat.channel.create": {
         const created: MockConversation = { id: `conv-${nextId++}`, kind: "channel", visibility: payload.visibility as "public",
           name: String(payload.name), joined: true, memberCount: 1 + (payload.memberUserIds as string[]).length,
-          memberUserIds: [], lastSeq: 0, lastReadSeq: 0, unreadCount: 0, createdAt: Date.now() };
+          memberUserIds: [], lastSeq: 0, lastReadSeq: 0, unreadCount: 0, mentionCount: 0, ownerUserId: self, createdAt: Date.now() };
         state.directory.conversations.push(created);
+        state.rosters[created.id] = [self, ...(payload.memberUserIds as string[])];
         return created;
       }
       case "teamChat.channel.join": {
         const target = conversation(payload.conversationId)!;
         Object.assign(target, { joined: true, memberCount: target.memberCount + 1 });
+        (state.rosters[target.id] ??= []).push(self);
         return target;
+      }
+      case "teamChat.channel.members": {
+        const target = conversation(payload.conversationId)!;
+        return { ownerUserId: target.ownerUserId, members: (state.rosters[target.id] ?? []).map((userId) => ({ userId, joinedAt: start })) };
+      }
+      case "teamChat.channel.manage": {
+        const target = conversation(payload.conversationId)!;
+        const action = payload.action as { type: string; name?: string; userId?: string; userIds?: string[] };
+        const roster = state.rosters[target.id] ??= [];
+        const remove = (userId: string) => {
+          if (userId === target.ownerUserId) throw Object.assign(new Error("owner"), { details: { serviceError: "chat_owner_must_transfer" } });
+          state.rosters[target.id] = roster.filter((item) => item !== userId);
+          target.memberCount = state.rosters[target.id]!.length;
+          if (userId === self) target.joined = false;
+        };
+        if (action.type === "rename") target.name = action.name!;
+        if (action.type === "archive") state.directory.conversations = state.directory.conversations.filter((item) => item !== target);
+        if (action.type === "addMembers") { roster.push(...action.userIds!); target.memberCount = roster.length; }
+        if (action.type === "removeMember") remove(action.userId!);
+        if (action.type === "leave") remove(self);
+        if (action.type === "transferOwner") target.ownerUserId = action.userId!;
+        return {};
       }
       case "teamChat.workCard.create": {
         const conversationId = String(payload.conversationId);
@@ -189,7 +223,8 @@ export function installMockTeamChatCommandHandler(): void {
         const existing = state.directory.conversations.find((item) => item.kind === "dm" && item.memberUserIds.includes(String(payload.userId)));
         if (existing) return existing;
         const created: MockConversation = { id: `dm-${nextId++}`, kind: "dm", visibility: "private", joined: true, memberCount: 2,
-          memberUserIds: [self, String(payload.userId)].sort(), lastSeq: 0, lastReadSeq: 0, unreadCount: 0, createdAt: Date.now() };
+          memberUserIds: [self, String(payload.userId)].sort(), lastSeq: 0, lastReadSeq: 0, unreadCount: 0, mentionCount: 0,
+          createdAt: Date.now() };
         state.directory.conversations.push(created);
         return created;
       }

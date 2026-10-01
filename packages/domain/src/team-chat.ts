@@ -1,4 +1,5 @@
 import type { EnterpriseTeamSummary } from "./context-memory.js";
+import type { TeamChatPolicy } from "./team-chat-governance.js";
 
 /** Team Chat (ADR 0003). New Money owns the truth; Desktop state is disposable. */
 export const TEAM_CHAT_MESSAGE_MAX_CHARS = 4_000;
@@ -30,6 +31,10 @@ export interface TeamChatConversation {
   lastReadSeq: number;
   /** Messages from others after `lastReadSeq`, capped at 100 by the service. */
   unreadCount: number;
+  /** Unread messages that mention the reader, capped at 100. */
+  mentionCount: number;
+  /** Channel owner; absent for direct messages. */
+  ownerUserId?: string;
   lastMessageAt?: number;
   lastSenderUserId?: string;
   lastPreview?: string;
@@ -74,6 +79,8 @@ export interface TeamChatMessage {
   clientKey: string;
   createdAt: number;
   workCard?: TeamChatWorkCard;
+  /** Conversation members the sender mentioned; absent when none. */
+  mentionUserIds?: string[];
 }
 
 export interface TeamChatMessagePage {
@@ -86,13 +93,15 @@ export interface TeamChatDirectory {
   selfUserId: string;
   members: TeamChatMember[];
   conversations: TeamChatConversation[];
+  policy: TeamChatPolicy;
 }
 
 export type TeamChatPushEvent =
   | { type: "message.created"; message: TeamChatMessage }
   | { type: "conversation.changed"; conversationId: string }
   | { type: "work_card.changed"; card: TeamChatWorkCard }
-  | { type: "read.changed"; conversationId: string; lastReadSeq: number };
+  | { type: "read.changed"; conversationId: string; lastReadSeq: number }
+  | { type: "policy.changed" };
 
 /**
  * `live` carries a generation that increases on every successful connect, so the

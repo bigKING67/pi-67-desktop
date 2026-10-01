@@ -129,6 +129,8 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "teamChat.read.mark": "app",
   "teamChat.channel.create": "app",
   "teamChat.channel.join": "app",
+  "teamChat.channel.members": "app",
+  "teamChat.channel.manage": "app",
   "teamChat.dm.open": "app",
   "teamChat.workCard.create": "app",
   "teamChat.workCard.act": "app",

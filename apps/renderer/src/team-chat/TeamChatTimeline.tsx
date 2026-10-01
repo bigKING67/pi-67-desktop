@@ -7,10 +7,11 @@ import { messages } from "../localization/message-catalog.js";
 import { memberById } from "./team-chat-model.js";
 import { teamChat } from "./team-chat-instance.js";
 import { useTeamChatDialogStore } from "./team-chat-dialog-store.js";
-import { formatTeamChatTime, type TeamChatTimelineEntry } from "./team-chat-presentation.js";
+import { formatTeamChatTime, teamChatMentionSegments, type TeamChatTimelineEntry } from "./team-chat-presentation.js";
 import { chatMessageWorkBrief } from "./team-chat-work-bridge.js";
 import { TeamChatWorkCard } from "./TeamChatWorkCard.js";
 import styles from "./TeamChat.module.css";
+import governance from "./TeamChatGovernance.module.css";
 
 /** Large base so prepending older pages keeps indices positive (Virtuoso prepend contract). */
 const FIRST_ITEM_BASE = 1_000_000_000;
@@ -90,17 +91,18 @@ function TimelineMessage({ directory, entry, target }: { directory: TeamChatDire
   const sender = entry.senderUserId === directory.selfUserId
     ? copy.you
     : memberById(directory, entry.senderUserId)?.displayName ?? copy.unknownTeammate;
+  const mentionsSelf = entry.senderUserId !== directory.selfUserId && (entry.mentionUserIds?.includes(directory.selfUserId) ?? false);
   return (
     <>
       {entry.dayLabel ? <div className={styles.daySeparator}><span>{entry.dayLabel}</span></div> : null}
-      <article className={`${styles.message} ${entry.showHeader ? styles.messageGroupStart : ""} ${entry.pending ? styles.messagePending : ""}`}>
+      <article className={`${styles.message} ${entry.showHeader ? styles.messageGroupStart : ""} ${entry.pending ? styles.messagePending : ""} ${mentionsSelf ? governance.messageMentionsSelf : ""}`}>
         {entry.showHeader ? (
           <header>
             <strong>{sender}</strong>
             <time dateTime={new Date(entry.createdAt).toISOString()}>{formatTeamChatTime(entry.createdAt)}</time>
           </header>
         ) : null}
-        {entry.workCard ? <TeamChatWorkCard card={entry.workCard} directory={directory} /> : <p>{entry.body}</p>}
+        {entry.workCard ? <TeamChatWorkCard card={entry.workCard} directory={directory} /> : <MessageBody directory={directory} entry={entry} />}
         {!entry.pending && !entry.workCard ? (
           <Button
             className={styles.messageAction!}
@@ -121,5 +123,23 @@ function TimelineMessage({ directory, entry, target }: { directory: TeamChatDire
         ) : null}
       </article>
     </>
+  );
+}
+
+/** Message text with `@name` runs styled for mentioned members; the reader's own mention stands out. */
+function MessageBody({ directory, entry }: { directory: TeamChatDirectory; entry: TeamChatTimelineEntry }) {
+  const mentioned = (entry.mentionUserIds ?? []).flatMap((userId) => {
+    const member = memberById(directory, userId);
+    return member ? [{ userId, displayName: member.displayName }] : [];
+  });
+  if (mentioned.length === 0) return <p>{entry.body}</p>;
+  return (
+    <p>
+      {teamChatMentionSegments(entry.body, mentioned).map((segment, index) => segment.userId === undefined ? segment.text : (
+        <span className={`${governance.mention} ${segment.userId === directory.selfUserId ? governance.mentionSelf : ""}`} key={index}>
+          {segment.text}
+        </span>
+      ))}
+    </p>
   );
 }

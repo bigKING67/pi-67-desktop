@@ -1,4 +1,6 @@
 import type {
+  TeamChatChannelAction,
+  TeamChatChannelRoster,
   TeamChatConnectionState,
   TeamChatVisibility,
   TeamChatWorkCard,
@@ -158,9 +160,11 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
     }
   }
 
-  async function deliver(conversationId: string, clientKey: string, body: string): Promise<void> {
+  async function deliver(conversationId: string, clientKey: string, body: string, mentionUserIds: readonly string[] = []): Promise<void> {
     try {
-      const message = await port.request("teamChat.message.send", { conversationId, clientKey, body });
+      const message = await port.request("teamChat.message.send", {
+        conversationId, clientKey, body, ...(mentionUserIds.length === 0 ? {} : { mentionUserIds: [...mentionUserIds] })
+      });
       guarded((state) => applyMessage(state, message))();
     } catch (error) {
       guarded((state) => failPending(state, clientKey, teamChatErrorMessage(error)))();
@@ -222,16 +226,19 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
     markRead,
     selectConversation,
     reloadThread: loadLatest,
-    async send(conversationId: string, body: string): Promise<void> {
+    async send(conversationId: string, body: string, mentionUserIds: readonly string[] = []): Promise<void> {
       const clientKey = port.newClientKey();
-      update((state) => addPending(state, { clientKey, conversationId, body, createdAt: Date.now(), status: "sending" }));
-      await deliver(conversationId, clientKey, body);
+      update((state) => addPending(state, {
+        clientKey, conversationId, body, createdAt: Date.now(), status: "sending",
+        ...(mentionUserIds.length === 0 ? {} : { mentionUserIds: [...mentionUserIds] })
+      }));
+      await deliver(conversationId, clientKey, body, mentionUserIds);
     },
     async retrySend(clientKey: string): Promise<void> {
       const pending = store.getState().pending.find((item) => item.clientKey === clientKey);
       if (!pending || pending.status !== "failed") return;
       update((state) => addPending(state, { ...pending, status: "sending" }));
-      await deliver(pending.conversationId, clientKey, pending.body);
+      await deliver(pending.conversationId, clientKey, pending.body, pending.mentionUserIds);
     },
     discardPending: (clientKey: string) => update((state) => removePending(state, clientKey)),
     async openDirectMessage(userId: string): Promise<void> {
@@ -258,6 +265,12 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
         if (serviceErrorCode(error) === "work_card_revision_conflict") await loadLatest(card.conversationId);
         throw error;
       }
+    },
+    channelRoster: (conversationId: string): Promise<TeamChatChannelRoster> => port.request("teamChat.channel.members", { conversationId }),
+    /** Applies one governance action, then re-reads the directory (renames, archives and departures change it). */
+    async manageChannel(conversationId: string, action: TeamChatChannelAction): Promise<void> {
+      await port.request("teamChat.channel.manage", { conversationId, action });
+      await loadDirectory();
     },
     async joinChannel(conversationId: string): Promise<void> {
       const conversation = await port.request("teamChat.channel.join", { conversationId });

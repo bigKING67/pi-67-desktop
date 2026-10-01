@@ -1,3 +1,4 @@
+import type { TeamChatChannelAction } from "@pi67/domain";
 import type { AgentCommand } from "@pi67/protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HostEventChannel } from "../host-event-channel.js";
@@ -61,13 +62,15 @@ describe("TeamChatCommandRouter", () => {
   it("assembles the directory from teammates and conversations with the device identity", async () => {
     const { router, run, calls } = setup({
       "GET /members": () => json({ members: [{ userId: "me", email: "me@example.com", displayName: "Me", role: "owner", joinedAt: "x" }] }),
-      "GET /chat/conversations": () => json({ conversations: [conversation] })
+      "GET /chat/conversations": () => json({ conversations: [conversation] }),
+      "GET /chat/policy": () => json({ channelCreation: "admins", viewersCanPost: false, retentionDays: null, revision: 2 })
     });
     await expect(run("teamChat.directory.get", {})).resolves.toEqual({
       teamId: "team-1",
       selfUserId: "me",
       members: [{ userId: "me", displayName: "Me", role: "owner" }],
-      conversations: [parseConversation(conversation)]
+      conversations: [parseConversation(conversation)],
+      policy: { channelCreation: "admins", viewersCanPost: false, revision: 2 }
     });
     expect(new Headers(calls[0]!.init.headers).get("Authorization")).toBe("Bearer access");
     router.shutdown();
@@ -169,6 +172,46 @@ describe("TeamChatCommandRouter", () => {
     await expect(run("teamChat.workCard.create", { ...input, title: "  " })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
     await expect(run("teamChat.workCard.create", { ...input, summary: "字".repeat(8_001) })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
     expect(calls).toHaveLength(3);
+    router.shutdown();
+  });
+
+  it("reads channel rosters and maps governance actions onto the service routes", async () => {
+    const ok = () => new Response(null, { status: 204 });
+    const { router, run, calls } = setup({
+      "GET /chat/conversations/c1/members": () => json({ ownerUserId: "me", members: [{ userId: "me", joinedAt: "2026-10-01T00:00:00Z" }] }),
+      "PATCH /chat/conversations/c1": ok,
+      "POST /chat/conversations/c1/archive": ok,
+      "POST /chat/conversations/c1/unarchive": ok,
+      "POST /chat/conversations/c1/members": () => json(conversation),
+      "DELETE /chat/conversations/c1/members/u2": ok,
+      "PUT /chat/conversations/c1/owner": ok,
+      "POST /chat/conversations/c1/leave": ok,
+      "POST /chat/conversations/c1/messages": () => json({ ...message, mentionUserIds: ["u2"] }, 201),
+      "GET /chat/policy": () => json({ error: { code: "not_found" } }, 404),
+      "GET /members": () => json({ members: [] }),
+      "GET /chat/conversations": () => json({ conversations: [{ ...conversation, mentionCount: 3, ownerUserId: "u2" }] })
+    });
+    await expect(run("teamChat.channel.members", { conversationId: "c1" }))
+      .resolves.toEqual({ ownerUserId: "me", members: [{ userId: "me", joinedAt: Date.parse("2026-10-01T00:00:00Z") }] });
+    const actions: TeamChatChannelAction[] = [
+      { type: "rename", name: " 新名字 " }, { type: "archive" }, { type: "unarchive" }, { type: "addMembers", userIds: ["u2"] },
+      { type: "removeMember", userId: "u2" }, { type: "transferOwner", userId: "u2" }, { type: "leave" }
+    ];
+    for (const action of actions) {
+      await expect(run("teamChat.channel.manage", { conversationId: "c1", action })).resolves.toEqual({});
+    }
+    await expect(run("teamChat.channel.manage", { conversationId: "c1", action: { type: "rename", name: "  " } }))
+      .rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    await expect(run("teamChat.message.send", { conversationId: "c1", clientKey: "client-key-2", body: "@李雷", mentionUserIds: ["u2"] }))
+      .resolves.toMatchObject({ mentionUserIds: ["u2"] });
+    const directory = await run("teamChat.directory.get", {});
+    expect(directory.policy).toEqual({ channelCreation: "members", viewersCanPost: true, revision: 0 });
+    expect(directory.conversations[0]).toMatchObject({ mentionCount: 3, ownerUserId: "u2" });
+    const bodies = calls.filter((call) => call.init.body !== undefined).map((call) => JSON.parse(call.init.body as string));
+    expect(bodies).toEqual([
+      { name: "新名字" }, { userIds: ["u2"] }, { userId: "u2" },
+      { clientKey: "client-key-2", body: "@李雷", mentionUserIds: ["u2"] }
+    ]);
     router.shutdown();
   });
 });

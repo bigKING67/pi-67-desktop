@@ -26,6 +26,8 @@ import { useNavigationMessageSearch } from "./use-navigation-message-search.js";
 import { useNewMoneyAccount } from "../context-memory/use-new-money-account.js";
 import { newMoneyAccountLabel } from "../context-memory/new-money-account-store.js";
 import { TeamChatNavigation } from "../team-chat/TeamChatNavigation.js";
+import { useTeamChat } from "../team-chat/team-chat-instance.js";
+import { teamChatCanCreateChannel } from "@pi67/domain";
 import chatStyles from "../team-chat/TeamChat.module.css";
 import { WorkspaceModeSwitch } from "./WorkspaceModeSwitch.js";
 import { useTeamChatDialogStore } from "../team-chat/team-chat-dialog-store.js";
@@ -86,6 +88,8 @@ export function NavigationRail({
   const archivedWorkspace = archivedWorkspaceId ? workspaces[archivedWorkspaceId] : undefined;
   const chatMode = useShellStore((state) => state.workspaceMode === "chat");
   const [channelDialogOpen, setChannelDialogOpen] = useState(false);
+  // Hidden only once the directory says this member may not create channels (team policy).
+  const channelCreationAllowed = useTeamChat((state) => state.directory === undefined || teamChatCanCreateChannel(state.directory));
   const handoffSource = useTeamChatDialogStore((state) => state.handoff);
   const startWorkSource = useTeamChatDialogStore((state) => state.startWork);
 
@@ -102,7 +106,7 @@ export function NavigationRail({
             <img alt="" aria-hidden="true" src={piIconUrl} />
             <strong>New Money</strong>
           </div>
-          {chatMode ? (
+          {chatMode ? channelCreationAllowed ? (
             <Button
               className={styles.workspaceAdd!}
               aria-label={messages.teamChat.newChannel}
@@ -111,7 +115,7 @@ export function NavigationRail({
             >
               <MessageSquarePlus aria-hidden="true" size={15} />
             </Button>
-          ) : (
+          ) : null : (
             <Button
               className={styles.workspaceAdd!}
               aria-label="添加或创建工作区"

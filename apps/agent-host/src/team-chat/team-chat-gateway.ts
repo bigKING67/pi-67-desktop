@@ -1,12 +1,17 @@
-import type {
-  TeamChatConversation,
-  TeamChatMember,
-  TeamChatMessage,
-  TeamChatMessagePage,
-  TeamChatVisibility,
-  TeamChatWorkCard,
-  TeamChatWorkCardAction,
-  TeamChatWorkCardRef
+import {
+  TEAM_CHAT_DEFAULT_POLICY,
+  TEAM_CHAT_MENTION_MAX,
+  type TeamChatChannelAction,
+  type TeamChatChannelRoster,
+  type TeamChatConversation,
+  type TeamChatMember,
+  type TeamChatMessage,
+  type TeamChatMessagePage,
+  type TeamChatPolicy,
+  type TeamChatVisibility,
+  type TeamChatWorkCard,
+  type TeamChatWorkCardAction,
+  type TeamChatWorkCardRef
 } from "@pi67/domain";
 import {
   asRecord,
@@ -39,6 +44,14 @@ const TEAM_CHAT_SERVICE_ERRORS: ReadonlySet<string> = new Set([
   "chat_member_not_in_team",
   "chat_client_key_reused",
   "chat_body_invalid",
+  "chat_channel_creation_restricted",
+  "chat_viewer_read_only",
+  "chat_conversation_archived",
+  "chat_mention_invalid",
+  "chat_channel_manager_required",
+  "chat_owner_must_transfer",
+  "chat_owner_not_member",
+  "chat_member_not_found",
   "work_card_not_found",
   "work_card_invalid",
   "work_card_assignee_invalid",
@@ -97,11 +110,68 @@ export class TeamChatGateway {
     return { messages: value.messages.map(parseMessage), hasMore: value.hasMore };
   }
 
-  async postMessage(conversationId: string, clientKey: string, body: string, signal?: AbortSignal): Promise<TeamChatMessage> {
+  async postMessage(
+    conversationId: string,
+    input: { clientKey: string; body: string; mentionUserIds?: string[] },
+    signal?: AbortSignal
+  ): Promise<TeamChatMessage> {
     return parseMessage(await this.#request(`${conversationPath(conversationId)}/messages`, {
       method: "POST",
-      body: JSON.stringify({ clientKey, body })
+      body: JSON.stringify(input)
     }, signal));
+  }
+
+  async getPolicy(signal?: AbortSignal): Promise<TeamChatPolicy> {
+    const record = asRecord(await this.#request("/chat/policy", { method: "GET" }, signal));
+    const channelCreation = record.channelCreation;
+    if (channelCreation !== "members" && channelCreation !== "admins") throw invalidResponse("policy.channelCreation");
+    if (typeof record.viewersCanPost !== "boolean") throw invalidResponse("policy.viewersCanPost");
+    const retentionDays = nullable(record.retentionDays, (item) => {
+      if (item !== 90 && item !== 180 && item !== 365) throw invalidResponse("policy.retentionDays");
+      return item;
+    });
+    return {
+      channelCreation,
+      viewersCanPost: record.viewersCanPost,
+      ...(retentionDays === undefined ? {} : { retentionDays }),
+      revision: boundedInteger(record.revision, "policy.revision", 0)
+    };
+  }
+
+  /** The policy, or defaults when it cannot be read; New Money still enforces the real one. */
+  async getPolicyOrDefault(signal?: AbortSignal): Promise<TeamChatPolicy> {
+    return this.getPolicy(signal).catch(() => TEAM_CHAT_DEFAULT_POLICY);
+  }
+
+  async channelMembers(conversationId: string, signal?: AbortSignal): Promise<TeamChatChannelRoster> {
+    const record = asRecord(await this.#request(`${conversationPath(conversationId)}/members`, { method: "GET" }, signal));
+    if (!Array.isArray(record.members) || record.members.length > MAX_MEMBERS) throw invalidResponse("roster.members");
+    return {
+      ownerUserId: boundedString(record.ownerUserId, "roster.ownerUserId", 128),
+      members: record.members.map((item, index) => {
+        const member = asRecord(item);
+        return {
+          userId: boundedString(member.userId, `roster.members.${index}.userId`, 128),
+          joinedAt: parseTimestamp(member.joinedAt, `roster.members.${index}.joinedAt`)
+        };
+      })
+    };
+  }
+
+  async manageChannel(conversationId: string, action: TeamChatChannelAction, signal?: AbortSignal): Promise<void> {
+    const path = conversationPath(conversationId);
+    const [suffix, init]: [string, RequestInit] = (() => {
+      switch (action.type) {
+        case "rename": return ["", { method: "PATCH", body: JSON.stringify({ name: action.name }) }];
+        case "archive": return ["/archive", { method: "POST" }];
+        case "unarchive": return ["/unarchive", { method: "POST" }];
+        case "addMembers": return ["/members", { method: "POST", body: JSON.stringify({ userIds: action.userIds }) }];
+        case "removeMember": return [`/members/${encodeURIComponent(action.userId)}`, { method: "DELETE" }];
+        case "transferOwner": return ["/owner", { method: "PUT", body: JSON.stringify({ userId: action.userId }) }];
+        case "leave": return ["/leave", { method: "POST" }];
+      }
+    })();
+    await this.#request(`${path}${suffix}`, init, signal);
   }
 
   async markRead(conversationId: string, lastReadSeq: number, signal?: AbortSignal): Promise<number> {
@@ -180,6 +250,7 @@ export function parseConversation(value: unknown): TeamChatConversation {
   if ((kind === "channel") !== (name !== undefined)) throw invalidResponse("conversation.name");
   const lastMessageAt = nullable(record.lastMessageAt, (item) => parseTimestamp(item, "conversation.lastMessageAt"));
   const lastSenderUserId = nullable(record.lastSenderUserId, (item) => boundedString(item, "conversation.lastSenderUserId", 128));
+  const ownerUserId = nullable(record.ownerUserId, (item) => boundedString(item, "conversation.ownerUserId", 128));
   const lastPreview = nullable(record.lastPreview, (item) => {
     if (typeof item !== "string" || item.length > 280) throw invalidResponse("conversation.lastPreview");
     return item;
@@ -195,6 +266,8 @@ export function parseConversation(value: unknown): TeamChatConversation {
     lastSeq: boundedInteger(record.lastSeq, "conversation.lastSeq", 0),
     lastReadSeq: boundedInteger(record.lastReadSeq, "conversation.lastReadSeq", 0),
     unreadCount: boundedInteger(record.unreadCount, "conversation.unreadCount", 0, 100),
+    mentionCount: record.mentionCount === undefined ? 0 : boundedInteger(record.mentionCount, "conversation.mentionCount", 0, 100),
+    ...(ownerUserId === undefined ? {} : { ownerUserId }),
     ...(lastMessageAt === undefined ? {} : { lastMessageAt }),
     ...(lastSenderUserId === undefined ? {} : { lastSenderUserId }),
     ...(lastPreview === undefined ? {} : { lastPreview }),
@@ -205,8 +278,13 @@ export function parseConversation(value: unknown): TeamChatConversation {
 export function parseMessage(value: unknown): TeamChatMessage {
   const record = asRecord(value);
   const workCard = nullable(record.workCard, parseWorkCard);
+  const mentions = nullable(record.mentionUserIds, (item) => {
+    if (!Array.isArray(item) || item.length > TEAM_CHAT_MENTION_MAX) throw invalidResponse("message.mentionUserIds");
+    return item.map((userId, index) => boundedString(userId, `message.mentionUserIds.${index}`, 128));
+  });
   return {
     ...(workCard === undefined ? {} : { workCard }),
+    ...(mentions === undefined || mentions.length === 0 ? {} : { mentionUserIds: mentions }),
     id: boundedString(record.id, "message.id", 128),
     conversationId: boundedString(record.conversationId, "message.conversationId", 128),
     seq: boundedInteger(record.seq, "message.seq", 1),

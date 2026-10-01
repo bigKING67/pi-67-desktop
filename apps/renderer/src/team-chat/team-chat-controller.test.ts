@@ -1,4 +1,4 @@
-import type { TeamChatConversation, TeamChatDirectory, TeamChatMessage } from "@pi67/domain";
+import { TEAM_CHAT_DEFAULT_POLICY, type TeamChatConversation, type TeamChatDirectory, type TeamChatMessage } from "@pi67/domain";
 import type { AgentEvent, EventEnvelope } from "@pi67/protocol";
 import { describe, expect, it, vi } from "vitest";
 import type { ConnectionSubscriber } from "../connection/agent-connection-controller-contract.js";
@@ -6,10 +6,11 @@ import { createTeamChatController, teamChatErrorMessage, type TeamChatPort } fro
 
 const conversation: TeamChatConversation = {
   id: "c1", kind: "channel", visibility: "public", name: "研究", joined: true, memberCount: 2, memberUserIds: [],
-  lastSeq: 2, lastReadSeq: 1, unreadCount: 1, createdAt: 1
+  lastSeq: 2, lastReadSeq: 1, unreadCount: 1, mentionCount: 0, createdAt: 1
 };
 const directory: TeamChatDirectory = {
-  teamId: "t", selfUserId: "me", members: [{ userId: "me", displayName: "Me", role: "owner" }], conversations: [conversation]
+  teamId: "t", selfUserId: "me", members: [{ userId: "me", displayName: "Me", role: "owner" }], conversations: [conversation],
+  policy: TEAM_CHAT_DEFAULT_POLICY
 };
 const message = (seq: number, patch: Partial<TeamChatMessage> = {}): TeamChatMessage => ({
   id: `m${seq}`, conversationId: "c1", seq, senderUserId: "u2", body: `m${seq}`, clientKey: `client-${seq}`, createdAt: seq, ...patch
@@ -234,5 +235,34 @@ describe("team chat controller", () => {
     const listsBefore = calls.filter((call) => call.type === "teamChat.messages.list").length;
     await expect(controller.actOnWorkCard(card, "claim")).rejects.toThrow("stale");
     expect(calls.filter((call) => call.type === "teamChat.messages.list").length).toBe(listsBefore + 1);
+  });
+
+  it("sends and retries mentions, reads rosters, and re-reads the directory after governance", async () => {
+    let fail = true;
+    const { controller, calls, connect } = harness({
+      "teamChat.connection.get": () => ({ status: "connecting" }),
+      "teamChat.directory.get": () => directory,
+      "teamChat.channel.members": () => ({ ownerUserId: "me", members: [{ userId: "me", joinedAt: 1 }] }),
+      "teamChat.channel.manage": () => ({}),
+      "teamChat.message.send": (payload: { clientKey: string }) => {
+        if (fail) throw new Error("offline");
+        return message(3, { senderUserId: "me", clientKey: payload.clientKey, mentionUserIds: ["u2"] });
+      }
+    });
+    controller.start();
+    connect();
+    await flush();
+    await controller.send("c1", "@小王 看下", ["u2"]);
+    fail = false;
+    await controller.retrySend("client-key-new");
+    expect(calls.filter((call) => call.type === "teamChat.message.send").map((call) => call.payload)).toEqual([
+      { conversationId: "c1", clientKey: "client-key-new", body: "@小王 看下", mentionUserIds: ["u2"] },
+      { conversationId: "c1", clientKey: "client-key-new", body: "@小王 看下", mentionUserIds: ["u2"] }
+    ]);
+    await expect(controller.channelRoster("c1")).resolves.toMatchObject({ ownerUserId: "me" });
+    const before = calls.filter((call) => call.type === "teamChat.directory.get").length;
+    await controller.manageChannel("c1", { type: "archive" });
+    expect(calls.find((call) => call.type === "teamChat.channel.manage")?.payload).toEqual({ conversationId: "c1", action: { type: "archive" } });
+    expect(calls.filter((call) => call.type === "teamChat.directory.get").length).toBe(before + 1);
   });
 });

@@ -1,6 +1,13 @@
 import type { TeamChatMessage } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
-import { formatTeamChatTime, teamChatRemainingCharacters, teamChatTimeline } from "./team-chat-presentation.js";
+import {
+  formatTeamChatTime,
+  teamChatMentionCandidates,
+  teamChatMentionQuery,
+  teamChatMentionSegments,
+  teamChatRemainingCharacters,
+  teamChatTimeline
+} from "./team-chat-presentation.js";
 
 const at = (day: number, hour: number, minute: number) => new Date(2026, 9, day, hour, minute).getTime();
 const message = (id: string, sender: string, createdAt: number): TeamChatMessage => ({
@@ -30,5 +37,28 @@ describe("team chat presentation", () => {
     expect(teamChatRemainingCharacters("a".repeat(100), 4_000)).toBeUndefined();
     expect(teamChatRemainingCharacters("😀".repeat(3_700), 4_000)).toBe(300);
     expect(teamChatRemainingCharacters("a".repeat(4_010), 4_000)).toBe(-10);
+  });
+
+  it("finds the @query before the caret but not inside emails", () => {
+    expect(teamChatMentionQuery("你好 @李", 5)).toEqual({ start: 3, query: "李" });
+    expect(teamChatMentionQuery("@", 1)).toEqual({ start: 0, query: "" });
+    expect(teamChatMentionQuery("你好@李", 4)).toEqual({ start: 2, query: "李" });
+    expect(teamChatMentionQuery("me@example.com", 14)).toBeUndefined();
+    expect(teamChatMentionQuery("@李 雷", 4)).toBeUndefined();
+  });
+
+  it("ranks prefix matches first and caps candidates", () => {
+    const members = [{ userId: "a", displayName: "王小李" }, { userId: "b", displayName: "李雷" }, { userId: "c", displayName: "韩梅梅" }];
+    expect(teamChatMentionCandidates("李", members).map((item) => item.userId)).toEqual(["b", "a"]);
+    expect(teamChatMentionCandidates("", Array.from({ length: 12 }, (_, index) => ({ userId: `${index}`, displayName: `u${index}` })))).toHaveLength(8);
+  });
+
+  it("splits bodies into mention runs, preferring the longest name", () => {
+    const mentioned = [{ userId: "a", displayName: "李" }, { userId: "b", displayName: "李雷" }];
+    expect(teamChatMentionSegments("请 @李雷 和 @李 看@王", mentioned)).toEqual([
+      { text: "请 " }, { text: "@李雷", userId: "b" }, { text: " 和 " }, { text: "@李", userId: "a" }, { text: " 看@王" }
+    ]);
+    expect(teamChatTimeline([{ ...message("m1", "u2", at(1, 9, 0)), mentionUserIds: ["me"] }], [], "me", at(1, 10, 0))[0])
+      .toMatchObject({ mentionUserIds: ["me"] });
   });
 });

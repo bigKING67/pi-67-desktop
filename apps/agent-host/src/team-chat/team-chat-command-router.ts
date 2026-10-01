@@ -29,6 +29,8 @@ const TEAM_CHAT_COMMANDS: ReadonlySet<string> = new Set<TeamChatCommandType>([
   "teamChat.read.mark",
   "teamChat.channel.create",
   "teamChat.channel.join",
+  "teamChat.channel.members",
+  "teamChat.channel.manage",
   "teamChat.dm.open",
   "teamChat.workCard.create",
   "teamChat.workCard.act"
@@ -84,11 +86,12 @@ export class TeamChatCommandRouter {
     const gateway = new TeamChatGateway(access);
     switch (command.type) {
       case "teamChat.directory.get": {
-        const [members, conversations] = await Promise.all([
+        const [members, conversations, policy] = await Promise.all([
           gateway.listMembers(signal),
-          gateway.listConversations(signal)
+          gateway.listConversations(signal),
+          gateway.getPolicyOrDefault(signal)
         ]);
-        return { teamId: access.teamId, selfUserId: access.userId, members, conversations };
+        return { teamId: access.teamId, selfUserId: access.userId, members, conversations, policy };
       }
       case "teamChat.messages.list": {
         const { conversationId, before, after, limit } = command.payload as TeamChatCommandPayloads["teamChat.messages.list"];
@@ -100,11 +103,15 @@ export class TeamChatCommandRouter {
         }, signal);
       }
       case "teamChat.message.send": {
-        const { conversationId, clientKey, body } = command.payload as TeamChatCommandPayloads["teamChat.message.send"];
+        const { conversationId, clientKey, body, mentionUserIds } = command.payload as TeamChatCommandPayloads["teamChat.message.send"];
         if (!body.trim() || teamChatCodePointLength(body) > TEAM_CHAT_MESSAGE_MAX_CHARS || body.includes("\0")) {
           throw invalid("Messages need 1 to 4000 characters.");
         }
-        return gateway.postMessage(conversationId, clientKey, body, signal);
+        return gateway.postMessage(conversationId, {
+          clientKey,
+          body,
+          ...(mentionUserIds === undefined || mentionUserIds.length === 0 ? {} : { mentionUserIds })
+        }, signal);
       }
       case "teamChat.read.mark": {
         const { conversationId, lastReadSeq } = command.payload as TeamChatCommandPayloads["teamChat.read.mark"];
@@ -112,14 +119,22 @@ export class TeamChatCommandRouter {
       }
       case "teamChat.channel.create": {
         const input = command.payload as TeamChatCommandPayloads["teamChat.channel.create"];
-        const name = input.name.trim();
-        if (!name || teamChatCodePointLength(name) > TEAM_CHAT_CHANNEL_NAME_MAX_CHARS || teamChatHasControlCharacter(name)) {
-          throw invalid("Channel names need 1 to 80 printable characters.");
-        }
-        return gateway.createChannel({ ...input, name }, signal);
+        return gateway.createChannel({ ...input, name: channelName(input.name) }, signal);
       }
       case "teamChat.channel.join":
         return gateway.joinChannel((command.payload as TeamChatCommandPayloads["teamChat.channel.join"]).conversationId, signal);
+      case "teamChat.channel.members":
+        return gateway.channelMembers((command.payload as TeamChatCommandPayloads["teamChat.channel.members"]).conversationId, signal);
+      case "teamChat.channel.manage": {
+        const { conversationId, action } = command.payload as TeamChatCommandPayloads["teamChat.channel.manage"];
+        if (action.type === "rename") {
+          const name = channelName(action.name);
+          await gateway.manageChannel(conversationId, { type: "rename", name }, signal);
+        } else {
+          await gateway.manageChannel(conversationId, action, signal);
+        }
+        return {};
+      }
       case "teamChat.workCard.create": {
         const { conversationId, ...input } = command.payload as TeamChatCommandPayloads["teamChat.workCard.create"];
         const title = input.title.trim();
@@ -148,6 +163,14 @@ export class TeamChatCommandRouter {
     const { endpoint, credential } = await this.dependencies.session();
     return { endpoint, accessToken: credential.accessToken, teamId: credential.accountId, userId: credential.userId };
   }
+}
+
+function channelName(value: string): string {
+  const name = value.trim();
+  if (!name || teamChatCodePointLength(name) > TEAM_CHAT_CHANNEL_NAME_MAX_CHARS || teamChatHasControlCharacter(name)) {
+    throw invalid("Channel names need 1 to 80 printable characters.");
+  }
+  return name;
 }
 
 function invalid(message: string): HostCommandError {

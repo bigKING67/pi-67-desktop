@@ -1,6 +1,6 @@
 # ADR 0003: Team Chat beside Work
 
-Status: accepted; P1 and P2 implemented in source (not deployed); target-OS validation pending.
+Status: accepted; P1, P2 and P2.5 implemented in source (not deployed); target-OS validation pending.
 Date: 2026-10-01
 
 ## Context
@@ -90,6 +90,10 @@ member's list reaches hundreds of conversations or the list query shows up in p9
 - P0: this ADR, execution plan, protocol and migration design, authority updates.
 - P1: mode switch, teammates, channels, DMs, text messages, unread, real-time push.
 - P2: Work Cards and both handoff directions with status receipts.
+- P2.5: channel governance (owner, rename, members, transfer, leave, archive),
+  `@mentions`, and a team chat policy (channel creation, viewer posting, message
+  retention with Work Cards kept) managed in the web console, which shows channel
+  metadata only and never message content.
 - P3: Agents as conversation members.
 - P4: attachments, search, Activity inbox, native notifications, Windows evidence.
 

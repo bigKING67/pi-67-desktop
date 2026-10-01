@@ -39,7 +39,7 @@ test("switches between Work and Chat and exchanges team messages", async ({ page
 
   await signIn(page);
   const navigation = page.getByTestId("team-chat-navigation");
-  await navigation.getByRole("button", { name: "宏观研究，1 条未读" }).click();
+  await navigation.getByRole("button", { name: "宏观研究，1 条未读，1 条提及你" }).click();
   const log = page.getByRole("log", { name: "#宏观研究" });
   await expect(log.getByText("重点是第三节的折现率假设。")).toBeVisible();
   await expect(page.getByTestId("title-context-current")).toHaveText("# 宏观研究");
@@ -185,3 +185,63 @@ test("virtualizes long history, opens at the newest message and pages older hist
   }, { timeout: 15_000 }).toBeLessThan(111);
   expect(await log.locator("article").count()).toBeLessThan(80);
 });
+
+test("mentions channel members, manages the channel and follows the team chat policy", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.getByRole("group", { name: "工作模式" }).getByRole("button", { name: "聊天" }).click();
+  await signIn(page);
+  const navigation = page.getByTestId("team-chat-navigation");
+  const mentionedRow = navigation.getByRole("button", { name: "宏观研究，1 条未读，1 条提及你" });
+  // Mention and unread counts share the row's trailing cell instead of wrapping.
+  expect((await mentionedRow.boundingBox())!.height).toBeLessThan(40);
+  await mentionedRow.click();
+  const log = page.getByRole("log", { name: "#宏观研究" });
+  await expect(log.getByText("@高乾", { exact: true })).toBeVisible();
+  await expect(navigation.getByRole("button", { name: "宏观研究", exact: true })).toBeVisible();
+
+  const composer = page.getByRole("textbox", { name: "发送到 #宏观研究" });
+  await composer.pressSequentially("@王");
+  const options = page.getByRole("listbox", { name: "提及成员" });
+  await expect(options.getByRole("option", { name: "王一凡" })).toBeVisible();
+  await expect(options.getByRole("option", { name: "高乾" })).toHaveCount(0);
+  await composer.press("Enter");
+  await expect(composer).toHaveValue("@王一凡 ");
+  await composer.pressSequentially("帮忙看下");
+  await composer.press("Enter");
+  await expect(log.getByText("@王一凡", { exact: true })).toBeVisible();
+  const sent = await page.evaluate(() => {
+    const state = (window as unknown as { __pi67MockTeamChat: MockTeamChatState }).__pi67MockTeamChat;
+    return state.messages["conv-research"]!.at(-1);
+  });
+  expect(sent).toMatchObject({ body: "@王一凡 帮忙看下", mentionUserIds: ["user-wang"] });
+
+  await page.getByRole("button", { name: "频道设置" }).click();
+  const settings = page.getByRole("dialog", { name: "#宏观研究 设置" });
+  await expect(settings.getByText("负责人", { exact: true })).toBeVisible();
+  await settings.getByRole("button", { name: "移出 李若溪" }).click();
+  await settings.getByRole("button", { name: "确认移出 李若溪" }).click();
+  await expect(settings.getByRole("heading", { name: "成员 · 2" })).toBeVisible();
+  await settings.getByRole("textbox", { name: "频道名称" }).fill("宏观研究组");
+  await settings.getByRole("button", { name: "保存名称" }).click();
+  await expect(navigation.getByRole("button", { name: "宏观研究组", exact: true })).toBeVisible();
+  const renamed = page.getByRole("dialog", { name: "#宏观研究组 设置" });
+  await renamed.getByRole("button", { name: "归档频道" }).click();
+  await renamed.getByRole("button", { name: "确认归档" }).click();
+  await expect(renamed).toHaveCount(0);
+  await expect(navigation.getByRole("button", { name: "宏观研究组", exact: true })).toHaveCount(0);
+
+  await page.evaluate(() => {
+    const state = (window as unknown as { __pi67MockTeamChat: MockTeamChatState }).__pi67MockTeamChat;
+    state.directory.members[0]!.role = "viewer";
+    state.directory.policy = { channelCreation: "admins", viewersCanPost: false, revision: 1 };
+  });
+  await emitMockAgentEvent(page, { type: "teamChat.pushed", payload: { type: "policy.changed" } }, { context: "app" });
+  await expect(page.getByTestId("team-chat-new-channel")).toHaveCount(0);
+  await expect(navigation.getByRole("button", { name: "新建频道" })).toHaveCount(0);
+  await navigation.getByRole("button", { name: "李若溪" }).click();
+  await expect(page.getByText("团队设置为只读成员不能发言。你仍可以阅读这里的消息。")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "发送到 李若溪" })).toBeDisabled();
+});
+

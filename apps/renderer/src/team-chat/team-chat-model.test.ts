@@ -1,4 +1,4 @@
-import { teamChatCodePointLength, type TeamChatConversation, type TeamChatDirectory, type TeamChatMessage } from "@pi67/domain";
+import { TEAM_CHAT_DEFAULT_POLICY, teamChatCodePointLength, type TeamChatConversation, type TeamChatDirectory, type TeamChatMessage } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
 import {
   addPending,
@@ -20,16 +20,17 @@ import {
 
 const channel = (patch: Partial<TeamChatConversation> = {}): TeamChatConversation => ({
   id: "c1", kind: "channel", visibility: "public", name: "研究", joined: true, memberCount: 2, memberUserIds: [],
-  lastSeq: 2, lastReadSeq: 2, unreadCount: 0, createdAt: 10, ...patch
+  lastSeq: 2, lastReadSeq: 2, unreadCount: 0, mentionCount: 0, createdAt: 10, ...patch
 });
 const dm: TeamChatConversation = {
   id: "d1", kind: "dm", visibility: "private", joined: true, memberCount: 2, memberUserIds: ["me", "u2"],
-  lastSeq: 0, lastReadSeq: 0, unreadCount: 0, createdAt: 5
+  lastSeq: 0, lastReadSeq: 0, unreadCount: 0, mentionCount: 0, createdAt: 5
 };
 const directory: TeamChatDirectory = {
   teamId: "t", selfUserId: "me",
   members: [{ userId: "me", displayName: "我自己", role: "owner" }, { userId: "u2", displayName: "小王", role: "member" }],
-  conversations: [channel(), dm]
+  conversations: [channel(), dm],
+  policy: TEAM_CHAT_DEFAULT_POLICY
 };
 const message = (seq: number, patch: Partial<TeamChatMessage> = {}): TeamChatMessage => ({
   id: `m${seq}`, conversationId: "c1", seq, senderUserId: "u2", body: `m${seq}`, clientKey: `key-000${seq}`, createdAt: 100 + seq, ...patch
@@ -102,6 +103,20 @@ describe("team chat model", () => {
     expect(applyPush(state, { type: "message.created", message: message(3) }).refreshDirectory).toBe(false);
     expect(applyPush(state, { type: "read.changed", conversationId: "c1", lastReadSeq: 2 }))
       .toEqual({ state, refreshDirectory: false });
+    expect(applyPush(state, { type: "policy.changed" })).toEqual({ state, refreshDirectory: true });
+  });
+
+  it("counts mentions of the reader apart from unread and clears both when read", () => {
+    let state = ready();
+    state = applyMessage(state, message(3, { mentionUserIds: ["me"] }));
+    state = applyMessage(state, message(4, { mentionUserIds: ["u9"] }));
+    state = applyMessage(state, message(4, { mentionUserIds: ["me"] }));
+    expect(state.directory?.conversations.find((item) => item.id === "c1")).toMatchObject({ unreadCount: 2, mentionCount: 1 });
+    state = applyReadCursor(state, "c1", 4);
+    expect(state.directory?.conversations.find((item) => item.id === "c1")).toMatchObject({ unreadCount: 0, mentionCount: 0 });
+    state = applyMessage(state, message(5, { mentionUserIds: ["me"] }));
+    state = applyMessage(state, message(6, { senderUserId: "me" }));
+    expect(state.directory?.conversations.find((item) => item.id === "c1")).toMatchObject({ mentionCount: 0 });
   });
 
   it("tracks pending failures and removal", () => {

@@ -1,13 +1,13 @@
 import { Hash, Lock, Plus } from "lucide-react";
 import { Button } from "react-aria-components";
-import { teamChatDirectPeer, type TeamChatConversation, type TeamChatMember } from "@pi67/domain";
+import { teamChatCanCreateChannel, teamChatDirectPeer, type TeamChatConversation, type TeamChatMember } from "@pi67/domain";
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { teamChatErrorMessage } from "./team-chat-controller.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { conversationTitle, directMessageWith } from "./team-chat-model.js";
 import { teamChat, useTeamChat } from "./team-chat-instance.js";
-import { TeamChatAvatar, UnreadCount } from "./TeamChatParts.js";
+import { RowCounts, TeamChatAvatar } from "./TeamChatParts.js";
 import styles from "./TeamChat.module.css";
 
 export function TeamChatNavigation({ onCreateChannel }: { onCreateChannel: () => void }) {
@@ -51,9 +51,11 @@ export function TeamChatNavigation({ onCreateChannel }: { onCreateChannel: () =>
       <section aria-labelledby="team-chat-channels" className={styles.railSection}>
         <header>
           <h2 id="team-chat-channels">{copy.channels}</h2>
-          <Button aria-label={copy.newChannel} className={styles.railIconButton!} onPress={onCreateChannel}>
-            <Plus aria-hidden="true" size={14} />
-          </Button>
+          {teamChatCanCreateChannel(directory) ? (
+            <Button aria-label={copy.newChannel} className={styles.railIconButton!} onPress={onCreateChannel}>
+              <Plus aria-hidden="true" size={14} />
+            </Button>
+          ) : null}
         </header>
         {channels.length === 0 ? <p className={styles.railEmpty}>{copy.noChannels}</p> : (
           <ul>
@@ -104,7 +106,8 @@ function ConversationRow({ conversation, selected, title }: {
       aria-current={selected ? "page" : false}
       aria-label={[title, conversation.visibility === "private" ? copy.privateChannel : undefined,
         conversation.joined ? undefined : copy.joinableChannel,
-        conversation.unreadCount > 0 ? copy.unread(conversation.unreadCount) : undefined].filter(Boolean).join("，")}
+        conversation.unreadCount > 0 ? copy.unread(conversation.unreadCount) : undefined,
+        conversation.mentionCount > 0 ? copy.mentions(conversation.mentionCount) : undefined].filter(Boolean).join("，")}
       className={`${styles.railRow} ${selected ? styles.railRowSelected : ""} ${conversation.joined ? "" : styles.railRowMuted}`}
       onPress={() => void teamChat.selectConversation(conversation.id)}
     >
@@ -112,7 +115,9 @@ function ConversationRow({ conversation, selected, title }: {
         ? <Icon aria-hidden="true" className={styles.railRowIcon} size={15} />
         : <TeamChatAvatar name={title} />}
       <span className={styles.railRowTitle}>{title}</span>
-      {conversation.joined ? <UnreadCount count={conversation.unreadCount} /> : <small>{copy.joinableChannel}</small>}
+      {conversation.joined
+        ? <RowCounts mentions={conversation.mentionCount} unread={conversation.unreadCount} />
+        : <small>{copy.joinableChannel}</small>}
     </Button>
   );
 }
@@ -124,10 +129,12 @@ function TeammateRow({ conversation, member, selected }: {
 }) {
   const copy = messages.teamChat;
   const unread = conversation?.unreadCount ?? 0;
+  const mentioned = conversation?.mentionCount ?? 0;
   return (
     <Button
       aria-current={selected ? "page" : false}
-      aria-label={unread > 0 ? `${member.displayName}，${copy.unread(unread)}` : member.displayName}
+      aria-label={[member.displayName, unread > 0 ? copy.unread(unread) : undefined,
+        mentioned > 0 ? copy.mentions(mentioned) : undefined].filter(Boolean).join("，")}
       className={`${styles.railRow} ${selected ? styles.railRowSelected : ""}`}
       data-testid="team-chat-teammate"
       onPress={() => void teamChat.openDirectMessage(member.userId).catch((error: unknown) => publishNotification({
@@ -136,7 +143,7 @@ function TeammateRow({ conversation, member, selected }: {
     >
       <TeamChatAvatar name={member.displayName} />
       <span className={styles.railRowTitle}>{member.displayName}</span>
-      <UnreadCount count={unread} />
+      <RowCounts mentions={mentioned} unread={unread} />
     </Button>
   );
 }

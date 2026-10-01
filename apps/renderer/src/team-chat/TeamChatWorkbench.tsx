@@ -1,16 +1,19 @@
-import { ArrowUp, Hash, Lock, MessagesSquare } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Hash, Lock, MessagesSquare, Settings2 } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Button } from "react-aria-components";
-import { TEAM_CHAT_MESSAGE_MAX_CHARS, type TeamChatConversation, type TeamChatDirectory } from "@pi67/domain";
+import type { TeamChatConversation, TeamChatDirectory } from "@pi67/domain";
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
-import { canSendTo, conversationTitle } from "./team-chat-model.js";
+import { conversationTitle } from "./team-chat-model.js";
 import { teamChatErrorMessage } from "./team-chat-controller.js";
 import { teamChat, useTeamChat } from "./team-chat-instance.js";
-import { teamChatRemainingCharacters, teamChatTimeline } from "./team-chat-presentation.js";
+import { teamChatTimeline } from "./team-chat-presentation.js";
 import { TeamChatAvatar } from "./TeamChatParts.js";
+import { TeamChatChannelSettings } from "./TeamChatChannelSettings.js";
+import { TeamChatComposer } from "./TeamChatComposer.js";
 import { TeamChatTimeline } from "./TeamChatTimeline.js";
 import styles from "./TeamChat.module.css";
+import governance from "./TeamChatGovernance.module.css";
 
 const EMPTY: readonly never[] = [];
 
@@ -74,6 +77,7 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
   const timeline = useMemo(() => teamChatTimeline(thread?.messages ?? EMPTY, conversationPending, directory.selfUserId, Date.now()),
     [thread?.messages, conversationPending, directory.selfUserId]);
   const [scrollRequest, setScrollRequest] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Mark read while this conversation is visible and focused.
   useEffect(() => {
@@ -89,7 +93,13 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
       <header className={styles.conversationIntro}>
         {conversation.kind === "channel"
           ? <><Icon aria-hidden="true" size={16} /><strong>{title}</strong>
-            <span>{`${conversation.visibility === "private" ? copy.privateChannel : copy.publicChannel} · ${conversation.memberCount} 位成员`}</span></>
+            <span>{`${conversation.visibility === "private" ? copy.privateChannel : copy.publicChannel} · ${conversation.memberCount} 位成员`}</span>
+            {conversation.joined ? (
+              <Button aria-label={copy.channelSettings} className={`small-button ${governance.headerAction}`}
+                onPress={() => setSettingsOpen(true)}>
+                <Settings2 aria-hidden="true" size={14} />{copy.channelSettings}
+              </Button>
+            ) : null}</>
           : <><TeamChatAvatar name={title} /><strong>{title}</strong><span>{copy.directMessages}</span></>}
       </header>
       {!thread || thread.status === "loading" ? <p className={styles.timelineStatus} role="status">{copy.loadingMessages}</p> : null}
@@ -125,8 +135,9 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
         <div className={styles.timelinePending}><div className={styles.timelineColumn}>{header}</div></div>
       )}
       {conversation.joined
-        ? <Composer conversation={conversation} directory={directory} onSent={() => setScrollRequest((value) => value + 1)} target={target} />
+        ? <TeamChatComposer conversation={conversation} directory={directory} onSent={() => setScrollRequest((value) => value + 1)} target={target} />
         : <JoinCard conversation={conversation} title={title} />}
+      {settingsOpen ? <TeamChatChannelSettings conversation={conversation} directory={directory} onClose={() => setSettingsOpen(false)} /> : null}
     </>
   );
 }
@@ -147,65 +158,5 @@ function JoinCard({ conversation, title }: { conversation: TeamChatConversation;
           .finally(() => setJoining(false));
       }}>{copy.join}</Button>
     </div>
-  );
-}
-
-function Composer({ conversation, directory, target, onSent }: {
-  conversation: TeamChatConversation;
-  directory: TeamChatDirectory;
-  target: string;
-  onSent: () => void;
-}) {
-  const copy = messages.teamChat;
-  const [draft, setDraft] = useState("");
-  const input = useRef<HTMLTextAreaElement>(null);
-  const writable = canSendTo(directory, conversation);
-  const remaining = teamChatRemainingCharacters(draft, TEAM_CHAT_MESSAGE_MAX_CHARS);
-  const sendable = writable && draft.trim().length > 0 && (remaining === undefined || remaining >= 0);
-
-  useLayoutEffect(() => {
-    const element = input.current;
-    if (!element) return;
-    element.style.height = "auto";
-    element.style.height = `${Math.min(element.scrollHeight, 200)}px`;
-  }, [draft]);
-
-  const send = () => {
-    if (!sendable) return;
-    const body = draft;
-    setDraft("");
-    onSent();
-    void teamChat.send(conversation.id, body);
-  };
-
-  return (
-    <form className={styles.composer} onSubmit={(event) => { event.preventDefault(); send(); }}>
-      {!writable ? <p className={styles.composerNotice} role="status">{copy.peerLeft}</p> : null}
-      <div className={styles.composerField}>
-        <textarea
-          aria-label={copy.composerLabel(target)}
-          disabled={!writable}
-          onChange={(event) => setDraft(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              send();
-            }
-          }}
-          placeholder={copy.composerPlaceholder(target)}
-          ref={input}
-          rows={1}
-          value={draft}
-        />
-        <Button aria-label={copy.send} className={styles.sendButton!} isDisabled={!sendable} type="submit">
-          <ArrowUp aria-hidden="true" size={16} />
-        </Button>
-      </div>
-      {remaining !== undefined ? (
-        <small className={remaining < 0 ? styles.overLimit : undefined} role="status">
-          {remaining < 0 ? copy.overLimit(-remaining) : copy.charactersLeft(remaining)}
-        </small>
-      ) : null}
-    </form>
   );
 }

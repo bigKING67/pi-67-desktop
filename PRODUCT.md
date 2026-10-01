@@ -175,6 +175,26 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
     write private memory and re-check team authorization on every model call.
   - Card status does not yet follow the Work Session automatically; status receipts
     are explicit card actions.
+- Channel governance and policy (P2.5):
+  - Every channel has an owner (its creator until transferred). `频道设置` on a
+    joined channel lists members with the owner marked. Anyone in the channel adds
+    teammates. The owner or a team owner/admin also renames the channel, removes
+    members, transfers ownership and archives it; removing, transferring, leaving
+    and archiving each take a second confirming press. The owner must transfer
+    before leaving. Archived channels disappear from the rail and become read-only;
+    team owners/admins restore them in the web console.
+  - Typing `@` in the composer offers the conversation's members (channel roster or
+    the direct-message peer) by name; arrow keys, Enter/Tab and Escape drive the list.
+    Only picked names still present in the text are sent as mentions. Mentions are
+    highlighted in messages (the reader's own most strongly, with a quiet accent
+    rail on the message), and unread mentions show an `@N` count beside the unread
+    count until the conversation is read.
+  - The team chat policy is set by owners/admins in the web console: who may create
+    channels (all members or owners/admins only), whether viewers may post, and how
+    long plain messages are kept (forever by default, or 90/180/365 days; Work Card
+    messages are always kept). Desktop hides `新建频道` and makes the composer
+    read-only with an explanation when the policy says so; New Money enforces the
+    same rules. Policy changes arrive by push.
 - Not yet: Agents as members, threads, edits/deletes, reactions, attachments,
   search, notifications, team invitations (use the New Money web console).
 

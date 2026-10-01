@@ -1,4 +1,6 @@
 import type {
+  TeamChatChannelAction,
+  TeamChatChannelRoster,
   TeamChatConnectionState,
   TeamChatConversation,
   TeamChatDirectory,
@@ -15,10 +17,12 @@ export interface TeamChatCommandPayloads {
   "teamChat.connection.get": Record<string, never>;
   "teamChat.directory.get": Record<string, never>;
   "teamChat.messages.list": { conversationId: string; before?: number; after?: number; limit?: number };
-  "teamChat.message.send": { conversationId: string; clientKey: string; body: string };
+  "teamChat.message.send": { conversationId: string; clientKey: string; body: string; mentionUserIds?: string[] };
   "teamChat.read.mark": { conversationId: string; lastReadSeq: number };
   "teamChat.channel.create": { name: string; visibility: TeamChatVisibility; memberUserIds: string[] };
   "teamChat.channel.join": { conversationId: string };
+  "teamChat.channel.members": { conversationId: string };
+  "teamChat.channel.manage": { conversationId: string; action: TeamChatChannelAction };
   "teamChat.dm.open": { userId: string };
   "teamChat.workCard.create": {
     conversationId: string;
@@ -41,6 +45,8 @@ export interface TeamChatCommandResults {
   "teamChat.read.mark": { lastReadSeq: number };
   "teamChat.channel.create": TeamChatConversation;
   "teamChat.channel.join": TeamChatConversation;
+  "teamChat.channel.members": TeamChatChannelRoster;
+  "teamChat.channel.manage": Record<string, never>;
   "teamChat.dm.open": TeamChatConversation;
   "teamChat.workCard.create": TeamChatMessage;
   "teamChat.workCard.act": TeamChatWorkCard;

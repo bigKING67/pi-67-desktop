@@ -1,0 +1,177 @@
+/* Team Chat P2.5: @mentions, channel settings and policy-aware states. */
+
+.composerAnchor { position: relative; }
+
+.mentionPicker {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 5;
+  width: min(280px, 100%);
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+}
+
+.mentionPicker ul {
+  display: grid;
+  gap: 1px;
+  max-height: 240px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.mentionPicker li {
+  display: grid;
+  min-height: 32px;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 8px;
+  border-radius: var(--radius-control);
+  color: var(--text-primary);
+  font-size: var(--font-size-support);
+  cursor: pointer;
+}
+
+.mentionPicker li span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.mentionPicker li.mentionActive { background: var(--accent-soft); }
+
+.mentionPicker p {
+  margin: 0;
+  padding: 6px 8px;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-support);
+}
+
+.mention {
+  padding: 0 2px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mentionSelf {
+  background: var(--accent);
+  color: var(--canvas);
+}
+
+/* A message that mentions the reader keeps a quiet rail so it is findable when scrolling. */
+.messageMentionsSelf {
+  margin-left: -10px;
+  padding-left: 8px;
+  border-left: 2px solid var(--accent);
+}
+
+/* Mentions read as "@N" in the accent outline; unread counts stay solid accent. */
+.mentionBadge {
+  min-width: 18px;
+  padding: 0 4px;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+}
+
+.rowCounts { display: inline-flex; align-items: center; gap: 4px; }
+
+.headerAction { margin-left: auto; }
+
+/* Beats the global `.modal-surface form` padding; the dialog already pads its content. */
+:global(.modal-surface) form.inlineRow { padding: 0; }
+
+.inlineRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+.inlineRow select {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.inlineRow select:focus-visible { border-color: var(--accent); box-shadow: var(--shadow-focus); outline: 0; }
+
+.hint {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+  line-height: 1.55;
+}
+
+.roster h3 {
+  margin: 0 0 6px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.roster ul {
+  display: grid;
+  max-height: 260px;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.roster li {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 3px 6px;
+  border-radius: var(--radius-control);
+}
+
+.roster li:hover { background: var(--surface-hover); }
+
+.rosterName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--font-size-support);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ownerChip {
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.rosterActions { display: flex; flex-shrink: 0; gap: 4px; margin-left: auto; }
+
+.armed { border-color: var(--accent); color: var(--accent-strong); }
+
+.armedDanger,
+.armedDanger:hover {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+  color: var(--danger);
+}
+
+.footer { flex-wrap: wrap; align-items: center; }
+
+.spacer { flex: 1; }

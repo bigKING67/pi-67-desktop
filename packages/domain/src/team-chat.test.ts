@@ -35,6 +35,7 @@ const conversation = (patch: Partial<TeamChatConversation>): TeamChatConversatio
   lastSeq: 0,
   lastReadSeq: 0,
   unreadCount: 0,
+  mentionCount: 0,
   createdAt: 0,
   ...patch
 });
