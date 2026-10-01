@@ -69,7 +69,18 @@ export function buildSummary(results) {
   return arms;
 }
 
+const CREDENTIAL_PATTERNS = [
+  /ark-[A-Za-z0-9-]{20,}/,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+  /\bBearer\s+[A-Za-z0-9._-]{16,}/i,
+  /"(?:apiKey|api_key|rootKey|root_key|userKey|user_key|accessToken|refreshToken)"\s*:/i,
+];
+
+/** Rejects credential-shaped material and exact known secret literals in generated evidence. */
 export function assertNoSecretLiterals(serialized, secrets) {
+  if (CREDENTIAL_PATTERNS.some((pattern) => pattern.test(serialized))) {
+    throw new Error("Generated evaluation artifact contains credential-like material.");
+  }
   for (const secret of secrets) {
     if (typeof secret === "string" && secret.length >= 8 && serialized.includes(secret)) {
       throw new Error("Generated evaluation artifact contains a credential literal.");

@@ -7,7 +7,6 @@ import { dirname, join, relative, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
-import { assertArtifactSafe } from "../openviking-ab/metrics.mjs";
 import { flattenCases, loadCorpus, memoryUri, otherPeerPrefix } from "./corpus.mjs";
 import { assertNoSecretLiterals, buildSummary, scoreCase } from "./metrics.mjs";
 import { renderReport } from "./report.mjs";
@@ -101,7 +100,6 @@ async function runLive() {
     "report.md": renderReport(receipt),
   };
   for (const content of Object.values(artifacts)) {
-    assertArtifactSafe(content);
     assertNoSecretLiterals(content, secrets);
   }
   await mkdir(output, { recursive: true, mode: 0o700 });

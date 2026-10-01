@@ -17,8 +17,7 @@
         "eng/capabilities/team-worker-utility-probe.ts",
         "eng/capabilities/team-index-deadline-probe.ts",
         "eng/packaging/probe-packaged-team-runtimes.mjs",
-        "eng/packaging/probe-packaged-team-session.mjs",
-        "eng/evals/openviking-agent-pilot/evaluation-extension.mjs"
+        "eng/packaging/probe-packaged-team-session.mjs"
       ]
     },
     "apps/agent-host": {

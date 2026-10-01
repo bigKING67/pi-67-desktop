@@ -105,6 +105,7 @@ describe("recall baseline credential handling", () => {
       expect(() => readCredentials(path, { withExpansion: true })).toThrow(/vlm/u);
       expect(() => assertNoSecretLiterals(`x${secretValue}x`, [secretValue])).toThrow(/credential literal/u);
       expect(() => assertNoSecretLiterals("clean", [secretValue, null])).not.toThrow();
+      expect(() => assertNoSecretLiterals('{"api_key": "x"}', [])).toThrow(/credential-like/u);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

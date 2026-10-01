@@ -238,3 +238,14 @@ count is noted as a separate extraction question, not investigated here.
   thresholds are bge-m3 specific; quota changes deferred until real memories
   accumulate.
 - Commit/push/release state: none authorized.
+- 2026-10-01: Follow-up commits fixed sparse memory: takeover never committed
+  ordinary Sessions (15 of 16 local Sessions had no Commit). `1ad09ef` commits
+  ended Sessions at >= 1,000 pending tokens; `ceb06a6` commits long-open
+  Sessions after a prompt at >= 8,000. Real-use acceptance (commit_count and
+  memories_extracted rising) is pending user activity.
+- 2026-10-01: Removed the retired `openviking-ab`, `openviking-agent-pilot`,
+  adaptive-policy, and Golden Set evaluations and their scripts. They measured
+  the retired adaptive router over Resource ingestion and depended on the
+  removed Docker Lab; their 2026-09-03 plans and receipts remain historical.
+  The credential-pattern guard moved into this evaluation.
+
