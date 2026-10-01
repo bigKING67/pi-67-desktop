@@ -90,7 +90,7 @@ cache, extraction reliability, honest extraction failure).
 - [x] 5. Recalibrate on 0.4.22: settings stay raw cosine and convert per server version (no saved-value migration); defaults 0.48 + recallLimit 15.
 - [ ] 6. DEFERRED to a separate change: upstream shared libs drifted by hundreds of lines (recall-core 357, credentials 319, profile-inject 263) against our privacy-gate edits; not required for 0.4.22 compatibility.
 - [x] 7. Team workers on 0.4.22: broker shim supports `DefaultHttpxClient` placeholders; worker tests 22/22. Team index is a local per-member projection, so no cross-member version gate is needed.
-- [ ] 8. Data-root snapshot/rollback procedure; packaged macOS smoke and native probes; Windows lock/wheel evidence.
+- [~] 8. Backup, signing, install, packaged smoke and isolated packaged private-memory probe done; real-data switch waits for merge into main; Windows evidence and packaged team-session probe not run.
 
 ## Validation matrix
 
@@ -153,4 +153,21 @@ already written by 0.4.22.
   ended/long-session Commits do not observe extraction outcome; a failed archive
   is not re-extracted automatically (unchanged behaviour, now visible as failed
   in explicit Commits).
+- 2026-10-01: Checkpoint 8 (user-authorized). App quit, then `data` and
+  `settings` copied to `New Money/openviking-backup-0.4.16-20261001-184337`
+  (4.3 MB, mode 700, `diff -r` identical). Signed with the persistent key:
+  private `signed-local-installation-7PNex0`, team-index `Zbsdrw` (re-prepared:
+  running unit tests with the prepared Python wrote `__pycache__` and the signer
+  correctly rejected the changed tree), team-query `NJ1yZF`; all three installed
+  beside the retained 0.4.16 runtimes. Worktree preview packaged and smoke PASS,
+  but the root checkout's 0.4.16 app (concurrent team-chat session) held the
+  single-instance lock on the shared user data, so the real data root was not
+  switched (user decision: isolated verification first). Packaged private
+  memory probe on 0.4.22 with isolated userData and a synthetic model:
+  install-and-enable, first session, cold recovery, explicit archive and
+  extraction, cold new-session recall — PASS (asar `b4f95f6a…`, model calls
+  agent 5 / embedding 66 / extraction 2 / rejected 0).
+- Next: merge `openviking-0.4.22` into main after the team-chat work lands,
+  then switch the real data root (backup above is the rollback), then the
+  query-planner plan.
 
