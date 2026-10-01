@@ -49,6 +49,9 @@ describe.skipIf(process.platform !== "darwin" || process.arch !== "arm64")("nati
     expect(config).not.toContain(model.apiKey);
     expect(config).toContain("${NEWMONEY_OV_EMBEDDING_KEY}");
     expect(config).toContain("literal-\\u0024NEWMONEY_OV_ROOT_KEY");
+    const parsed = JSON.parse(config.replaceAll("\\u0024", "$"));
+    expect(parsed.memory).toEqual({ extraction_output_format: "json" });
+    expect(parsed.vlm).toMatchObject({ api_key: "${NEWMONEY_OV_EXTRACTION_KEY}", max_tokens: 8192 });
     await handle.stop();
     await handle.stop();
     expect(onExit).toHaveBeenCalledTimes(1);

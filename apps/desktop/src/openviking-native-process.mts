@@ -91,7 +91,10 @@ export async function startNativeOpenViking(
       storage: { workspace: data }, server: { host: "127.0.0.1", port, root_api_key: "${NEWMONEY_OV_ROOT_KEY}" },
       embedding: { dense: { ...embedding, api_key: "${NEWMONEY_OV_EMBEDDING_KEY}",
         dimension: options.embedding.dimension, input: "text", encoding_format: "float" } },
-      vlm: { ...extraction, api_key: "${NEWMONEY_OV_EXTRACTION_KEY}" }
+      // OpenViking 0.4.22 defaults extraction to a Python DSL and a 32,768-token
+      // output cap; keep the verified JSON protocol and a cap common providers accept.
+      vlm: { ...extraction, api_key: "${NEWMONEY_OV_EXTRACTION_KEY}", max_tokens: 8192 },
+      memory: { extraction_output_format: "json" }
     }).replaceAll("$", "\\u0024");
     // Expand only our three secret fields. User paths/model names/URLs containing
     // dollars must not be interpreted as references to the child credentials.
