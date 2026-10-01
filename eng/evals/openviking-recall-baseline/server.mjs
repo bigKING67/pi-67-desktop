@@ -30,20 +30,35 @@ export function readCredentials(path, { withExpansion }) {
     secret: { embeddingKey: embedding.apiKey, vlmKey: vlm?.apiKey ?? null },
     public: {
       embedding: { apiBase: embedding.apiBase, model: embedding.model, dimension },
-      vlm: vlm ? { apiBase: vlm.apiBase, model: vlm.model, ...extraRequestBody(config.vlm) } : null,
+      vlm: vlm ? { apiBase: vlm.apiBase, model: vlm.model, ...plannerSwitches(config.vlm) } : null,
     },
   };
 }
 
-/** Optional non-secret provider switches such as `{"enable_thinking": false}` for hybrid-reasoning models. */
-function extraRequestBody(section) {
-  const extra = section?.extra_request_body;
-  if (extra === undefined) return {};
-  if (!extra || typeof extra !== "object" || Array.isArray(extra)
-    || Object.values(extra).some((value) => !["boolean", "number", "string"].includes(typeof value))) {
-    throw new Error("vlm.extra_request_body must be a flat object of primitive values.");
+/**
+ * Optional non-secret switches: `provider` ("openai" default, or "volcengine" for
+ * Ark), Ark's `thinking` flag, and `extra_request_body` such as
+ * `{"enable_thinking": false}` for OpenAI-compatible hybrid-reasoning models.
+ */
+function plannerSwitches(section) {
+  const switches = {};
+  if (section?.provider !== undefined) {
+    if (!["openai", "volcengine"].includes(section.provider)) throw new Error("vlm.provider must be openai or volcengine.");
+    switches.provider = section.provider;
   }
-  return { extraRequestBody: extra };
+  if (section?.thinking !== undefined) {
+    if (typeof section.thinking !== "boolean") throw new Error("vlm.thinking must be a boolean.");
+    switches.thinking = section.thinking;
+  }
+  const extra = section?.extra_request_body;
+  if (extra !== undefined) {
+    if (!extra || typeof extra !== "object" || Array.isArray(extra)
+      || Object.values(extra).some((value) => !["boolean", "number", "string"].includes(typeof value))) {
+      throw new Error("vlm.extra_request_body must be a flat object of primitive values.");
+    }
+    switches.extraRequestBody = extra;
+  }
+  return switches;
 }
 
 function modelSection(section, name) {
@@ -107,8 +122,9 @@ export async function startDisposableServer({ python, credentials, withExpansion
       } },
       retrieval: { enable_intent: withExpansion, ...(intentTimeoutS ? { recall_intent_timeout_s: intentTimeoutS } : {}) },
       ...(withExpansion ? { vlm: {
-        provider: "openai", model: credentials.public.vlm.model, api_base: credentials.public.vlm.apiBase,
+        provider: credentials.public.vlm.provider ?? "openai", model: credentials.public.vlm.model, api_base: credentials.public.vlm.apiBase,
         api_key: "${PI67_EVAL_VLM_KEY}",
+        ...(credentials.public.vlm.thinking === undefined ? {} : { thinking: credentials.public.vlm.thinking }),
         ...(credentials.public.vlm.extraRequestBody ? { extra_request_body: credentials.public.vlm.extraRequestBody } : {}),
       } } : {}),
     };

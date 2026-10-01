@@ -87,7 +87,8 @@ async function runLive() {
     corpus: { sha256: corpusSha256, memories: corpus.memories.length, cases: cases.length, splitSeed: corpus.splitSeed },
     server: { version: server.version, runtime: relative(repositoryRoot, python), mode: "dev-loopback-disposable", intentTimeoutS: options.intentTimeoutS || "default" },
     embedding: { host: new URL(credentials.public.embedding.apiBase).host, model: credentials.public.embedding.model, dimension: credentials.public.embedding.dimension },
-    vlm: credentials.public.vlm ? { host: new URL(credentials.public.vlm.apiBase).host, model: credentials.public.vlm.model, extraRequestBody: credentials.public.vlm.extraRequestBody ?? null } : null,
+    vlm: credentials.public.vlm ? { host: new URL(credentials.public.vlm.apiBase).host, model: credentials.public.vlm.model, provider: credentials.public.vlm.provider ?? "openai",
+      thinking: credentials.public.vlm.thinking ?? null, extraRequestBody: credentials.public.vlm.extraRequestBody ?? null } : null,
     arms, repetitions: options.repetitions, productRequestTemplate: (await productRecall(false)).template,
     variants: await Promise.all(options.variants.map(async (variant) => ({
       ...variant, requestTemplate: (await productRecall(false, variant.overrides)).template,
