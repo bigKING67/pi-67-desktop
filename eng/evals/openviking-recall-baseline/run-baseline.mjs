@@ -48,7 +48,7 @@ async function runLive() {
   const runId = `${new Date().toISOString().replace(/[-:.]/gu, "").slice(0, 15)}Z-${randomUUID().slice(0, 8)}`;
   const output = options.outputDirectory ? resolve(options.outputDirectory) : join(repositoryRoot, "artifacts/evidence/openviking-recall-baseline", runId);
   const startedAt = new Date().toISOString();
-  const server = await startDisposableServer({ python, credentials, withExpansion: options.withExpansion });
+  const server = await startDisposableServer({ python, credentials, withExpansion: options.withExpansion, intentTimeoutS: options.intentTimeoutS });
   const scratch = mkdtempSync(join(tmpdir(), "pi67-ov-baseline-state-"));
   let cleanup = null;
   const results = [];
@@ -85,9 +85,9 @@ async function runLive() {
     runId, startedAt, finishedAt: new Date().toISOString(),
     source: { gitHead: git(["rev-parse", "HEAD"]), dirty: git(["status", "--porcelain"]) !== "", runnerSha256: hashSources() },
     corpus: { sha256: corpusSha256, memories: corpus.memories.length, cases: cases.length, splitSeed: corpus.splitSeed },
-    server: { version: server.version, runtime: relative(repositoryRoot, python), mode: "dev-loopback-disposable" },
+    server: { version: server.version, runtime: relative(repositoryRoot, python), mode: "dev-loopback-disposable", intentTimeoutS: options.intentTimeoutS || "default" },
     embedding: { host: new URL(credentials.public.embedding.apiBase).host, model: credentials.public.embedding.model, dimension: credentials.public.embedding.dimension },
-    vlm: credentials.public.vlm ? { host: new URL(credentials.public.vlm.apiBase).host, model: credentials.public.vlm.model } : null,
+    vlm: credentials.public.vlm ? { host: new URL(credentials.public.vlm.apiBase).host, model: credentials.public.vlm.model, extraRequestBody: credentials.public.vlm.extraRequestBody ?? null } : null,
     arms, repetitions: options.repetitions, productRequestTemplate: (await productRecall(false)).template,
     variants: await Promise.all(options.variants.map(async (variant) => ({
       ...variant, requestTemplate: (await productRecall(false, variant.overrides)).template,
@@ -274,7 +274,7 @@ function round(value) {
 }
 
 function parseArguments(argv) {
-  const parsed = { credentialsPath: "", pythonPath: "", outputDirectory: "", repetitions: 3, withExpansion: false, dryRun: false, failureBudget: 5, variants: [], skipCeiling: false };
+  const parsed = { credentialsPath: "", pythonPath: "", outputDirectory: "", repetitions: 3, withExpansion: false, dryRun: false, failureBudget: 5, variants: [], skipCeiling: false, intentTimeoutS: 0 };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     const value = () => {
@@ -289,6 +289,7 @@ function parseArguments(argv) {
     else if (argument === "--with-expansion") parsed.withExpansion = true;
     else if (argument === "--dry-run") parsed.dryRun = true;
     else if (argument === "--skip-ceiling") parsed.skipCeiling = true;
+    else if (argument === "--intent-timeout-s") parsed.intentTimeoutS = Math.max(1, Math.min(60, Number(value()) || 5));
     else if (argument === "--variant") parsed.variants.push(parseVariant(value(), parsed.variants));
     else if (argument === "--") continue;
     else throw new Error(`Unknown argument ${argument}.`);

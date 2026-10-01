@@ -30,9 +30,20 @@ export function readCredentials(path, { withExpansion }) {
     secret: { embeddingKey: embedding.apiKey, vlmKey: vlm?.apiKey ?? null },
     public: {
       embedding: { apiBase: embedding.apiBase, model: embedding.model, dimension },
-      vlm: vlm ? { apiBase: vlm.apiBase, model: vlm.model } : null,
+      vlm: vlm ? { apiBase: vlm.apiBase, model: vlm.model, ...extraRequestBody(config.vlm) } : null,
     },
   };
+}
+
+/** Optional non-secret provider switches such as `{"enable_thinking": false}` for hybrid-reasoning models. */
+function extraRequestBody(section) {
+  const extra = section?.extra_request_body;
+  if (extra === undefined) return {};
+  if (!extra || typeof extra !== "object" || Array.isArray(extra)
+    || Object.values(extra).some((value) => !["boolean", "number", "string"].includes(typeof value))) {
+    throw new Error("vlm.extra_request_body must be a flat object of primitive values.");
+  }
+  return { extraRequestBody: extra };
 }
 
 function modelSection(section, name) {
@@ -64,7 +75,7 @@ export function resolvePython(explicit) {
  * `withExpansion` no VLM is configured and intent analysis is disabled, so no
  * LLM call is possible; only embeddings are requested.
  */
-export async function startDisposableServer({ python, credentials, withExpansion }) {
+export async function startDisposableServer({ python, credentials, withExpansion, intentTimeoutS }) {
   const root = await mkdtemp(join(tmpdir(), "pi67-ov-baseline-"));
   await chmod(root, 0o700);
   let child;
@@ -94,10 +105,11 @@ export async function startDisposableServer({ python, credentials, withExpansion
         api_key: "${PI67_EVAL_EMBEDDING_KEY}", dimension: credentials.public.embedding.dimension,
         input: "text", encoding_format: "float",
       } },
-      retrieval: { enable_intent: withExpansion },
+      retrieval: { enable_intent: withExpansion, ...(intentTimeoutS ? { recall_intent_timeout_s: intentTimeoutS } : {}) },
       ...(withExpansion ? { vlm: {
         provider: "openai", model: credentials.public.vlm.model, api_base: credentials.public.vlm.apiBase,
         api_key: "${PI67_EVAL_VLM_KEY}",
+        ...(credentials.public.vlm.extraRequestBody ? { extra_request_body: credentials.public.vlm.extraRequestBody } : {}),
       } } : {}),
     };
     const configPath = join(root, "ov.conf");
