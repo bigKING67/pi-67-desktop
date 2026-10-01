@@ -301,6 +301,9 @@ design/protocol contracts; reference inclusion alone does not approve them.
   Reload never commits. The attempt is bounded to 1.5 seconds and is not retried
   on timeout; extraction then runs from OpenViking's durable queue on the user's
   configured model. Shorter exchanges stay uncommitted until manual archive.
+  Because Tasks stay loaded while the user switches between them, a long-open
+  Session also commits after a prompt run once it holds `activeCommitMinTokens`
+  (default 8,000) uncommitted tokens, keeping the takeover live tail.
   Manual archive preserves recent-turn retention and distinguishes no eligible
   messages from accepted work. Only an exact owner task/Session/archive receipt
   confirms processing completion; bounded observation failure stays unconfirmed,

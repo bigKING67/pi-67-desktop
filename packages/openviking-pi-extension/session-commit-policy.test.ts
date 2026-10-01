@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { commitEndedSession } from "./shutdown-commit.js";
+import { commitEndedSession, commitLongSession } from "./session-commit-policy.js";
 
 function fakes(pendingTokens: number | undefined, options: { flushed?: boolean; committed?: boolean; sessionId?: string | null } = {}) {
   const sync = {
@@ -8,7 +8,7 @@ function fakes(pendingTokens: number | undefined, options: { flushed?: boolean; 
     commit: vi.fn(async () => options.committed === false ? null : { status: "accepted", archived: true } as never),
   };
   const client = { getSession: vi.fn(async () => pendingTokens === undefined ? null : { pending_tokens: pendingTokens } as never) };
-  return { sync, client, config: { shutdownCommitMinTokens: 1000 } };
+  return { sync, client, config: { shutdownCommitMinTokens: 1000, activeCommitMinTokens: 8000, takeoverKeepRecentTurns: 3 } };
 }
 
 describe("ended-Session Commit", () => {
@@ -60,5 +60,14 @@ describe("ended-Session Commit", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("commits a long-open Session between prompts while keeping the takeover live tail", async () => {
+    const long = fakes(8000);
+    await expect(commitLongSession(long.sync, long.client, long.config)).resolves.toBe("committed");
+    expect(long.sync.commit).toHaveBeenCalledWith({ keepRecentTurns: 3 });
+    const short = fakes(7999);
+    await expect(commitLongSession(short.sync, short.client, short.config)).resolves.toBe("below-threshold");
+    expect(short.sync.commit).not.toHaveBeenCalled();
   });
 });

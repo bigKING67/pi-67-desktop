@@ -16,7 +16,7 @@ import { detectMemoryOwnerConflict } from "./memory-owner-policy.js";
 import { createRuntimePrivacyGuard } from "./runtime-privacy.js";
 import { resolveManagedMemoryConnection, type ManagedMemoryConnection } from "./managed-connection.js";
 import { registerDesktopMemoryCommit } from "./desktop-memory-commit.js";
-import { commitEndedSession } from "./shutdown-commit.js";
+import { commitEndedSession, commitLongSession } from "./session-commit-policy.js";
 export default async function initializeOpenViking(pi: ExtensionAPI, managedConnection?: ManagedMemoryConnection) {
   const config = loadConfigFromModuleUrl(import.meta.url);
   // Managed mode ignores the standalone endpoint (OPENVIKING_URL, ovcli.conf, ...).
@@ -324,6 +324,9 @@ export default async function initializeOpenViking(pi: ExtensionAPI, managedConn
   // for one Pi agent run and cannot survive into an idle Session.
   pi.on("agent_end", async (_event, _ctx) => {
     recall.invalidate();
+    if (!config.takeoverEnabled || !refreshRuntimePrivacy() || !config.privateWriteEnabled || !client.connected || bypassed) return;
+    const outcome = await commitLongSession(sync, client, config).catch(() => "failed" as const);
+    if (outcome === "committed" || outcome === "failed") debugLog(`agent_end: long-session commit ${outcome}`);
   });
 
   // Commands

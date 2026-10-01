@@ -187,8 +187,8 @@ describe("OpenViking lifecycle private write authority", () => {
   });
 });
 
-describe("ended-Session Commit under takeover", () => {
-  async function shutdown(mode: string, pendingTokens: number, reason: string) {
+describe("memory Commit points under takeover", () => {
+  async function shutdown(mode: string, pendingTokens: number, reason: string, hook = "session_shutdown") {
     const f = await fixture(mode, true);
     const transport = globalThis.fetch, commitBodies: unknown[] = [];
     vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -200,17 +200,20 @@ describe("ended-Session Commit under takeover", () => {
       return transport(input, init);
     }));
     await f.run("session_start");
-    await f.run("session_shutdown", { reason });
+    await f.run(hook, { reason });
     return { commitBodies, writes: f.writes() };
   }
 
   it("archives an ended conversation in full without waiting for takeover pressure", async () => {
     expect((await shutdown("private-learning", 1500, "quit")).commitBodies).toEqual([{ keep_recent_count: 0 }]);
+    expect((await shutdown("private-learning", 9000, "", "agent_end")).commitBodies)
+      .toEqual([{ retention_mode: "turn_budget", keep_recent_turn_count: 3 }]);
   });
 
-  it.each([["private-learning", 1500, "reload"], ["private-learning", 200, "quit"], ["read-only", 50_000, "quit"]])(
+  it.each([["private-learning", 1500, "reload"], ["private-learning", 200, "quit"], ["read-only", 50_000, "quit"],
+    ["private-learning", 7999, "agent_end"], ["read-only", 50_000, "agent_end"]])(
     "does not commit in %s with %i pending tokens on %s", async (mode, pending, reason) => {
-      const result = await shutdown(mode, pending, reason);
+      const result = reason === "agent_end" ? await shutdown(mode, pending, "", "agent_end") : await shutdown(mode, pending, reason);
       expect(result.commitBodies).toEqual([]);
       if (mode === "read-only") expect(result.writes).toEqual([]);
     });

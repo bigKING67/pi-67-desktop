@@ -19,6 +19,7 @@
   "commitTokenThreshold": 20000,
   "commitKeepRecentCount": 10,
   "shutdownCommitMinTokens": 1000,
+  "activeCommitMinTokens": 8000,
   "takeover": {
     "enabled": true,
     "tokenThreshold": 30000,
