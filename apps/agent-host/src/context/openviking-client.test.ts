@@ -3,7 +3,7 @@ import {
   type ContextMemoryConfiguration
 } from "@pi67/domain";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { OpenVikingClient } from "./openviking-client.js";
+import { normalizesCosine, OpenVikingClient } from "./openviking-client.js";
 
 const NO_CREDENTIALS = { source: "none" as const };
 
@@ -81,6 +81,20 @@ describe("OpenVikingClient", () => {
       expect.objectContaining({ uri: "viking://resources/team", score: 0, context_type: "resource", abstract: "" })
     ]);
   });
+
+  it.each([["0.4.22", true], ["0.4.16", false], [undefined, true]])(
+    "sends the raw-cosine threshold on the server's score scale (%s)", async (version, normalized) => {
+      const bodies: unknown[] = [];
+      vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        if (requestUrl(input).endsWith("/health")) return jsonResponse({ status: "ok", result: version ? { version } : {} });
+        if (typeof init?.body === "string") bodies.push(JSON.parse(init.body));
+        return jsonResponse({ status: "ok", result: { memories: [] } });
+      }));
+      await new OpenVikingClient(configuration, undefined, NO_CREDENTIALS).search("q", { limit: 1 });
+      const raw = configuration.scoreThreshold;
+      expect(bodies).toEqual([expect.objectContaining({ score_threshold: normalized ? (raw + 1) / 2 : raw })]);
+      expect(normalizesCosine(version)).toBe(normalized);
+    });
 
   it("reads abstract and full-content variants and issues a non-recursive private delete", async () => {
     const replies: unknown[] = [

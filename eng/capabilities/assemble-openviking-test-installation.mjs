@@ -24,7 +24,7 @@ export async function assembleOpenVikingTestInstallation(sourceRuntime, expected
     const copied = await runtimeTreeIdentity(runtimeRoot);
     if (copied.sha256 !== expectedTreeSha256) throw new Error("Copied runtime differs from the verified tree.");
     const identity = { platform: "darwin", arch: "arm64", pythonVersion: "3.12.10",
-      openvikingVersion: "0.4.16", sdkVersion: "0.1.10", treeSha256: copied.sha256 };
+      openvikingVersion: "0.4.22", sdkVersion: "0.1.10", treeSha256: copied.sha256 };
     const manifest = Buffer.from(JSON.stringify({ schema: "new-money.openviking-runtime.v1", ...identity }));
     const testKey = generateKeyPairSync("ed25519");
     const signature = sign(null, manifest, testKey.privateKey);

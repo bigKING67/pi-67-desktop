@@ -8,7 +8,8 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const EXPECTED_SERVER_VERSION = "0.4.16";
+/** Supported prepared runtimes, newest first; the receipt records the server-reported version. */
+const SUPPORTED_SERVER_VERSIONS = ["0.4.22", "0.4.16"];
 
 /**
  * Reads the repository-external credential file. Only key-free identity fields
@@ -71,17 +72,22 @@ function modelSection(section, name) {
   return { apiBase, model, apiKey };
 }
 
-/** Newest prepared native runtime that contains the expected OpenViking version. */
-export function resolvePython(explicit) {
+/**
+ * Newest prepared native runtime of the requested (or newest supported)
+ * OpenViking version. Comparing versions needs an explicit `serverVersion`.
+ */
+export function resolvePython(explicit, serverVersion) {
   if (explicit) return resolve(explicit);
   const root = join(repositoryRoot, "artifacts/openviking-native");
-  const candidates = existsSync(root) ? readdirSync(root)
-    .map((name) => join(root, name, "runtime"))
-    .filter((runtime) => existsSync(join(runtime, "bin/python"))
-      && existsSync(join(runtime, `lib/python3.12/site-packages/openviking-${EXPECTED_SERVER_VERSION}.dist-info`)))
-    .sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs) : [];
-  if (!candidates.length) throw new Error(`No prepared OpenViking ${EXPECTED_SERVER_VERSION} runtime under artifacts/openviking-native; pass --python.`);
-  return join(candidates[0], "bin/python");
+  for (const version of serverVersion ? [serverVersion] : SUPPORTED_SERVER_VERSIONS) {
+    const candidates = existsSync(root) ? readdirSync(root)
+      .map((name) => join(root, name, "runtime"))
+      .filter((runtime) => existsSync(join(runtime, "bin/python"))
+        && existsSync(join(runtime, `lib/python3.12/site-packages/openviking-${version}.dist-info`)))
+      .sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs) : [];
+    if (candidates.length) return join(candidates[0], "bin/python");
+  }
+  throw new Error("No prepared OpenViking runtime under artifacts/openviking-native; pass --python or --server-version.");
 }
 
 /**

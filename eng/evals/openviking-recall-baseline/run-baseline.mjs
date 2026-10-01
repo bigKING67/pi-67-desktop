@@ -44,7 +44,7 @@ if (options.dryRun) {
 async function runLive() {
   const credentials = readCredentials(options.credentialsPath, { withExpansion: options.withExpansion });
   const secrets = [credentials.secret.embeddingKey, credentials.secret.vlmKey];
-  const python = resolvePython(options.pythonPath);
+  const python = resolvePython(options.pythonPath, options.serverVersion);
   const runId = `${new Date().toISOString().replace(/[-:.]/gu, "").slice(0, 15)}Z-${randomUUID().slice(0, 8)}`;
   const output = options.outputDirectory ? resolve(options.outputDirectory) : join(repositoryRoot, "artifacts/evidence/openviking-recall-baseline", runId);
   const startedAt = new Date().toISOString();
@@ -55,11 +55,12 @@ async function runLive() {
   try {
     const client = createClient(server.endpoint, corpus.identity);
     await seedMemories(client);
+    const scale = await serverScoreScale(server.version);
     const recalls = {
-      product: await productRecall(false),
-      ...(options.withExpansion ? { "product-expansion": await productRecall(true) } : {}),
+      product: await productRecall(false, {}, scale),
+      ...(options.withExpansion ? { "product-expansion": await productRecall(true, {}, scale) } : {}),
     };
-    for (const variant of options.variants) recalls[variant.name] = await productRecall(false, variant.overrides);
+    for (const variant of options.variants) recalls[variant.name] = await productRecall(false, variant.overrides, scale);
     const otherPrefix = otherPeerPrefix(corpus);
     let failures = 0;
     for (let repetition = 1; repetition <= options.repetitions; repetition += 1) {
@@ -114,7 +115,7 @@ async function runLive() {
  * isolated HOME and no OpenViking/Pi environment, so no user config or
  * credential file can be read. The request is then built by the product core.
  */
-async function productRecall(withExpansion, overrides = {}) {
+async function productRecall(withExpansion, overrides = {}, scale = "raw-cosine") {
   const isolatedHome = mkdtempSync(join(tmpdir(), "pi67-ov-baseline-home-"));
   const saved = { ...process.env };
   try {
@@ -127,6 +128,8 @@ async function productRecall(withExpansion, overrides = {}) {
     const cfg = {
       ...config,
       peerId: corpus.identity.actorPeer,
+      // Mirror recall.ts: configured thresholds are raw cosine, converted per server scale.
+      scoreThreshold: (await import(join(extensionDirectory, "server-score.ts"))).toServerScore(config.scoreThreshold, scale),
       recallMaxTokens: config.recallTokenBudget,
       recallMaxTokensConfigured: true,
       ...(withExpansion ? {} : { recallQueryExpansion: "off" }),
@@ -255,7 +258,7 @@ function hashSources() {
   for (const name of readdirSync(evalDirectory).filter((file) => /\.(mjs|json)$/u.test(file)).sort()) {
     hash.update(name).update("\0").update(readFileSync(join(evalDirectory, name))).update("\0");
   }
-  for (const file of ["config.json", "config.ts", "shared/recall-core.mjs"]) {
+  for (const file of ["config.json", "config.ts", "server-score.ts", "shared/recall-core.mjs"]) {
     hash.update(file).update("\0").update(readFileSync(join(extensionDirectory, file))).update("\0");
   }
   return hash.digest("hex");
@@ -275,7 +278,7 @@ function round(value) {
 }
 
 function parseArguments(argv) {
-  const parsed = { credentialsPath: "", pythonPath: "", outputDirectory: "", repetitions: 3, withExpansion: false, dryRun: false, failureBudget: 5, variants: [], skipCeiling: false, intentTimeoutS: 0 };
+  const parsed = { credentialsPath: "", pythonPath: "", outputDirectory: "", repetitions: 3, withExpansion: false, dryRun: false, failureBudget: 5, variants: [], skipCeiling: false, intentTimeoutS: 0, serverVersion: "" };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     const value = () => {
@@ -290,6 +293,7 @@ function parseArguments(argv) {
     else if (argument === "--with-expansion") parsed.withExpansion = true;
     else if (argument === "--dry-run") parsed.dryRun = true;
     else if (argument === "--skip-ceiling") parsed.skipCeiling = true;
+    else if (argument === "--server-version") parsed.serverVersion = value();
     else if (argument === "--intent-timeout-s") parsed.intentTimeoutS = Math.max(1, Math.min(60, Number(value()) || 5));
     else if (argument === "--variant") parsed.variants.push(parseVariant(value(), parsed.variants));
     else if (argument === "--") continue;
@@ -309,4 +313,8 @@ function parseVariant(text, existing) {
     if (!VARIANT_FIELDS.has(key) || typeof value !== "number" || !Number.isFinite(value)) throw new Error(`Unsupported override ${key} in ${name}.`);
   }
   return { name, overrides };
+}
+
+async function serverScoreScale(version) {
+  return (await import(join(extensionDirectory, "server-score.ts"))).scoreScaleForVersion(version);
 }

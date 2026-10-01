@@ -320,7 +320,7 @@ export const DEFAULT_CONTEXT_MEMORY_CONFIGURATION: Omit<ContextMemoryConfigurati
   enterpriseGatewayEndpoint: "https://newmoney.52671314.xyz",
   defaultPrivacyMode: "private-learning",
   recallTokenBudget: 1_200,
-  scoreThreshold: 0.45,
+  scoreThreshold: 0.48,
   commitTokenThreshold: 20_000,
   captureAssistantTurns: true,
   captureToolResults: false,

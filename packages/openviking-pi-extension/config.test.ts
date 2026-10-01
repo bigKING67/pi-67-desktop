@@ -47,8 +47,8 @@ describe("OpenViking runtime privacy", () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  it("defaults Recall to the evaluated 0.45 threshold but keeps a saved user value", async () => {
-    expect(loadConfig(extensionDir).scoreThreshold).toBe(0.45);
+  it("defaults Recall to the evaluated raw-cosine 0.48 threshold but keeps a saved user value", async () => {
+    expect(loadConfig(extensionDir).scoreThreshold).toBe(0.48);
     await writeFile(join(agentDir, "openviking.json"), JSON.stringify({ privacyMode: "full-learning", scoreThreshold: 0.35 }), "utf8");
     expect(loadConfig(extensionDir).scoreThreshold).toBe(0.35);
   });

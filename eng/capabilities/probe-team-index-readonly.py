@@ -50,7 +50,7 @@ def main():
     config = json.loads(marker.read_text())
     if config != {"schema": "newmoney.synthetic-readonly-probe.v1", "dimension": 8}:
         raise ValueError("Invalid synthetic fixture marker")
-    if version("openviking") != "0.4.16" or version("openviking-sdk") != "0.1.10":
+    if version("openviking") != "0.4.22" or version("openviking-sdk") != "0.1.10":
         raise ValueError("Pinned synthetic probe packages required")
     os.environ["OPENVIKING_CONFIG_FILE"] = str(root / "no-default-config")
     os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"

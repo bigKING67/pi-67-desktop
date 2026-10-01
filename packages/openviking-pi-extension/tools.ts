@@ -1,3 +1,4 @@
+import { toRawCosine } from "./server-score.js";
 import { Type } from "typebox";
 import type { OVClient } from "./client.js";
 import type { SyncManager } from "./sync.js";
@@ -285,7 +286,8 @@ export function registerTools(
         })).filter((entry) => isAuthorizedPrivateMemoryUri(entry.uri, client.cfg));
         if (_signal.aborted) return cancelledResult();
         const strongest = results[0];
-        if (strongest && strongest.score > 0.8) {
+        // The safety gate is a raw-cosine similarity, independent of the server scale.
+        if (strongest && toRawCosine(strongest.score, client.scoreScale) > 0.8) {
           const stat = await client.stat(strongest.uri, _signal);
           if (!stat || stat.isDir) return rejectedPrivateUriResult("Only one exact private Memory file can be deleted.");
           const ok = await client.delete(strongest.uri, false, _signal);

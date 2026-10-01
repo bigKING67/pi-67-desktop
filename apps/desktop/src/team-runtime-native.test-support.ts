@@ -34,7 +34,7 @@ export async function installNativeTeamFixture(python: string, temporary: string
   const tree = await runtimeTreeIdentity(runtime, signal);
   const keys = generateKeyPairSync("ed25519");
   const manifest = Buffer.from(JSON.stringify({ schema: "new-money.openviking-runtime.v1", platform: "darwin",
-    arch: "arm64", pythonVersion: "3.12.10", openvikingVersion: "0.4.16", sdkVersion: "0.1.10", treeSha256: tree.sha256 }));
+    arch: "arm64", pythonVersion: "3.12.10", openvikingVersion: "0.4.22", sdkVersion: "0.1.10", treeSha256: tree.sha256 }));
   await writeFile(join(source, "manifest.json"), manifest, { flag: "wx", mode: 0o600 });
   const signature = sign(null, manifest, keys.privateKey);
   await writeFile(join(source, "manifest.sig"), signature, { flag: "wx", mode: 0o600 });

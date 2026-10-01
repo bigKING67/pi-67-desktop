@@ -24,8 +24,8 @@ spec.loader.exec_module(adapter)
 class TeamModelTransportTest(unittest.IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
-        if version("openviking") != "0.4.16" or sys.version_info[:3] != (3, 12, 10):
-            raise RuntimeError("This probe requires pinned OpenViking 0.4.16 / Python 3.12.10")
+        if version("openviking") != "0.4.22" or sys.version_info[:3] != (3, 12, 10):
+            raise RuntimeError("This probe requires pinned OpenViking 0.4.22 / Python 3.12.10")
 
     def facade(self, purpose):
         route = adapter.ModelRoute(purpose, "https://model.invalid/v1", "fixture")

@@ -89,7 +89,7 @@ const DEFAULT_CONFIG: OVConfig = {
   sharedExperienceLimit: 1,
   recallTimeoutMs: 1000,
   healthTimeoutMs: 800,
-  scoreThreshold: 0.45,
+  scoreThreshold: 0.48,
   minQueryLength: 3,
   profileTokenBudget: 1200,
   resumeContextBudget: 32000,

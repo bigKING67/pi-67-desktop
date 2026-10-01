@@ -23,7 +23,7 @@ async function fixture() {
   await writeFile(join(runtimeRoot, "bin/python3.12"), "synthetic-interpreter");
   const tree = await runtimeTreeIdentity(runtimeRoot);
   const manifest = Buffer.from(JSON.stringify({ schema: "new-money.openviking-runtime.v1", platform: process.platform,
-    arch: process.arch, pythonVersion: "3.12.10", openvikingVersion: "0.4.16", sdkVersion: "0.1.10", treeSha256: tree.sha256 }));
+    arch: process.arch, pythonVersion: "3.12.10", openvikingVersion: "0.4.22", sdkVersion: "0.1.10", treeSha256: tree.sha256 }));
   await writeFile(join(installationRoot, "manifest.json"), manifest);
   await writeFile(join(installationRoot, "manifest.sig"), sign(null, manifest, keys.privateKey));
   const options = { memoryRoot, installationRoot, trustedKey: keys.publicKey,

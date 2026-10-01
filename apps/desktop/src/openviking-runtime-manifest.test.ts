@@ -4,7 +4,7 @@ import { verifyOpenVikingManifest } from "./openviking-runtime-manifest.mjs";
 
 const expected = {
   platform: "darwin", arch: "arm64", pythonVersion: "3.12.10",
-  openvikingVersion: "0.4.16", sdkVersion: "0.1.10", treeSha256: "a".repeat(64)
+  openvikingVersion: "0.4.22", sdkVersion: "0.1.10", treeSha256: "a".repeat(64)
 };
 const keys = generateKeyPairSync("ed25519");
 const bytes = Buffer.from(JSON.stringify({ schema: "new-money.openviking-runtime.v1", ...expected }));

@@ -16,7 +16,7 @@ def load(name):
     return module
 
 
-if sys.version_info[:3] != (3, 12, 10) or version("openviking") != "0.4.16":
+if sys.version_info[:3] != (3, 12, 10) or version("openviking") != "0.4.22":
     raise RuntimeError("Pinned synthetic runtime required")
 mode = sys.argv[1]
 if mode == "descendant":

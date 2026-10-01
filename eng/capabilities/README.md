@@ -3,7 +3,7 @@
 ## Native OpenViking feasibility probe
 
 `corepack pnpm run probe:openviking:native <absolute-isolated-python>`
-requires OpenViking 0.4.16 installed in an isolated Python 3.12 environment. It
+requires OpenViking 0.4.22 installed in an isolated Python 3.12 environment. It
 starts a native loopback server with generated credentials, synthetic accounts and
 a local vectors-only model stub. It verifies content and vector scope isolation,
 restart persistence and physical resource deletion. Each run creates a temporary
@@ -303,7 +303,7 @@ runtime delivery, model setup and default consumer activation remain pending.
 Main now composes the service after app readiness using its existing
 `DesktopSafeStorage` and private Host model client. On macOS arm64 the fixed root is
 `app.getPath("appData")/New Money/openviking`, with the selected installation under
-`runtime/openviking-0.4.16-python-3.12.10-sdk-0.1.10-darwin-arm64`. Construction does
+`runtime/openviking-0.4.22-python-3.12.10-sdk-0.1.10-darwin-arm64`. Construction does
 not create/read storage, invoke secure storage or launch the sidecar. Missing model
 settings fail before runtime/model resolution; a missing installation does not
 fall back to Lab, artifacts or another executable. Windows remains unbound until
@@ -311,7 +311,7 @@ its native containment is verified. The Host managed flag remains off: wiring th
 service is not authorization to adopt a diagnostic package or enable memory.
 
 Team preparation and its pre-launch re-admission select the separate fixed child
-`runtime/openviking-0.4.16-python-3.12.10-sdk-0.1.10-darwin-arm64-team-index-v1`
+`runtime/openviking-0.4.22-python-3.12.10-sdk-0.1.10-darwin-arm64-team-index-v1`
 under the same normal or explicitly isolated profile root. A missing/invalid team
 installation never falls back to the private package or development artifacts.
 The private service keeps its original path and settings; production composition

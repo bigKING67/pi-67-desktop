@@ -1,3 +1,4 @@
+import { scoreScaleForVersion, toServerScore, type ServerScoreScale } from "./server-score.js";
 import { createHash } from "node:crypto";
 import type { OVConfig } from "./config.js";
 import { readContextServerTiming } from "./recall-timing.js";
@@ -28,6 +29,8 @@ export class OVClient {
   private connectionState = false;
   private lastHealthAttemptAt = 0;
   private healthPromise: Promise<boolean> | null = null;
+  /** Score scale reported by the last healthy `/health`; see server-score.ts. */
+  scoreScale: ServerScoreScale = scoreScaleForVersion(undefined);
   private connectionListeners = new Set<(connected: boolean) => void>();
 
   private resolvedSpaces: Map<string, string> = new Map();
@@ -150,6 +153,7 @@ export class OVClient {
       this.cfg.healthTimeoutMs,
     );
     this.setConnected(res.ok);
+    if (res.ok) this.scoreScale = scoreScaleForVersion(res.result?.version ?? res.result?.result?.version);
     return res.ok;
   }
 
@@ -341,7 +345,7 @@ export class OVClient {
       mode: "context",
       purpose: "coding",
       peer_scope: "actor",
-      score_threshold: this.cfg.scoreThreshold,
+      score_threshold: toServerScore(this.cfg.scoreThreshold, this.scoreScale),
       max_tokens: this.cfg.recallTokenBudget,
       quotas: {
         events: 1,

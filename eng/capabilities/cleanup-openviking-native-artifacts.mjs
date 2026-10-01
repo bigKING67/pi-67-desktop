@@ -182,7 +182,7 @@ async function validateRedundantPreparation(target) {
   const signedTree = await runtimeTreeIdentity(installation.runtimeRoot, signal);
   verifyOpenVikingManifest(installation.manifest, installation.signature, openVikingRuntimeTrustedKey(), {
     platform: process.platform, arch: process.arch, pythonVersion: "3.12.10",
-    openvikingVersion: "0.4.16", sdkVersion: "0.1.10", treeSha256: signedTree.sha256
+    openvikingVersion: "0.4.22", sdkVersion: "0.1.10", treeSha256: signedTree.sha256
   });
   if (signedTree.sha256 !== target.treeSha256) throw new Error("Signed runtime no longer matches the prepared runtime.");
   const runtimeRoot = await realpath(installation.runtimeRoot);

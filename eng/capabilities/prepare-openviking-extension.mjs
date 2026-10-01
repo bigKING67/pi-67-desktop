@@ -32,6 +32,7 @@ export async function prepareOpenVikingPiExtension(
     "recall-tool-support.ts",
     "runtime-privacy.ts",
     "scoped-pending-queue.ts",
+    "server-score.ts",
     "session-commit-policy.ts",
     "shared",
     "sync.ts",

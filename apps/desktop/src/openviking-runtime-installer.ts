@@ -7,7 +7,7 @@ import { runtimeTreeIdentity } from "./openviking-runtime-tree.mjs";
 import { openVikingRuntimeTrustedKey } from "./openviking-runtime-trust.js";
 import { locateTeamQueryBootstrap, locateTeamWorkerBootstrap } from "./team-worker-bootstrap.js";
 
-export const OPENVIKING_INSTALLATION_NAME = "openviking-0.4.16-python-3.12.10-sdk-0.1.10-darwin-arm64";
+export const OPENVIKING_INSTALLATION_NAME = "openviking-0.4.22-python-3.12.10-sdk-0.1.10-darwin-arm64";
 export const OPENVIKING_TEAM_INSTALLATION_NAME = `${OPENVIKING_INSTALLATION_NAME}-team-index-v1`;
 export const OPENVIKING_QUERY_INSTALLATION_NAME = `${OPENVIKING_INSTALLATION_NAME}-team-query-v1`;
 
@@ -70,7 +70,7 @@ export async function installOpenVikingRuntime(options: {
     const installed = await loadOpenVikingRuntimeInstallation(root, signal);
     const tree = await runtimeTreeIdentity(installed.runtimeRoot, signal);
     verifyOpenVikingManifest(installed.manifest, installed.signature, trustedKey, {
-      platform: "darwin", arch: "arm64", pythonVersion: "3.12.10", openvikingVersion: "0.4.16",
+      platform: "darwin", arch: "arm64", pythonVersion: "3.12.10", openvikingVersion: "0.4.22",
       sdkVersion: "0.1.10", treeSha256: tree.sha256
     });
     // A suffix is not evidence of capability. The signed tree must contain the

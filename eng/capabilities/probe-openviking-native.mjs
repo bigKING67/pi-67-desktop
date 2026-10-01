@@ -15,7 +15,7 @@ const python = process.argv[2];
 assert(python && isAbsolute(python), "Pass an absolute isolated Python executable");
 const version = spawnSync(python, ["-I", "-B", "-c", "from importlib.metadata import version; print(version('openviking'))"], { encoding: "utf8" });
 assert.equal(version.status, 0, "Cannot identify the isolated runtime");
-assert.equal(version.stdout.trim(), "0.4.16", "This probe is version-pinned");
+assert.equal(version.stdout.trim(), "0.4.22", "This probe is version-pinned");
 const root = await mkdtemp(join(tmpdir(), "new-money-native-probe-"));
 const redactions = new Set();
 let embeddingCalls = 0;
@@ -76,7 +76,7 @@ async function stop() {
 }
 
 const receipt = { schema: "new-money.native-openviking-probe.v1", platform: process.platform,
-  arch: process.arch, version: "0.4.16", model: "synthetic-vectors-only", root,
+  arch: process.arch, version: "0.4.22", model: "synthetic-vectors-only", root,
   checks: [], semanticQuality: "UNVERIFIED", packagedDesktop: "UNVERIFIED" };
 try {
   await start();

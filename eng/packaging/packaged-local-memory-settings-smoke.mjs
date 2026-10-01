@@ -95,7 +95,7 @@ async function verifyPackagedLocalMemorySettings({ application, window, workspac
   if (status === "missing") {
     await form.getByRole("button", { name: "启用（重启后生效）", exact: true }).click();
     await expect(form.getByText("请先安装私人记忆运行包，再启用。团队运行包不能代替私人运行包。", { exact: true })).toBeVisible();
-    await mkdir(join(userDataDirectory, "openviking/runtime/openviking-0.4.16-python-3.12.10-sdk-0.1.10-darwin-arm64"), { recursive: true, mode: 0o700 });
+    await mkdir(join(userDataDirectory, "openviking/runtime/openviking-0.4.22-python-3.12.10-sdk-0.1.10-darwin-arm64"), { recursive: true, mode: 0o700 });
   }
   await form.getByRole("button", { name: "启用（重启后生效）", exact: true }).click();
   await expect(form.getByText("请先保存完整的本地记忆模型配置，再启用。", { exact: true })).toBeVisible();

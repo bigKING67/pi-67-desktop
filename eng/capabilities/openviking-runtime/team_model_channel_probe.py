@@ -16,7 +16,7 @@ def load(name):
 
 
 async def main():
-    if version("openviking") != "0.4.16" or sys.version_info[:3] != (3, 12, 10):
+    if version("openviking") != "0.4.22" or sys.version_info[:3] != (3, 12, 10):
         raise RuntimeError("Pinned runtime required")
     adapter, ipc = load("team_model_transport"), load("team_model_channel")
     from openviking.models.embedder import openai_embedders

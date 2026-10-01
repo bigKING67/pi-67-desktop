@@ -185,7 +185,7 @@ it.skipIf(!installation)("captures, extracts and recalls private memory through 
       const patchedTree = await runtimeTreeIdentity(runtimeRoot);
       expect(patchedTree.sha256).not.toBe(originalTree.sha256);
       const identity = { platform: "darwin", arch: "arm64", pythonVersion: "3.12.10",
-        openvikingVersion: "0.4.16", sdkVersion: "0.1.10", treeSha256: patchedTree.sha256 };
+        openvikingVersion: "0.4.22", sdkVersion: "0.1.10", treeSha256: patchedTree.sha256 };
       const testKey = generateKeyPairSync("ed25519");
       manifest = Buffer.from(JSON.stringify({ schema: "new-money.openviking-runtime.v1", ...identity }));
       signature = sign(null, manifest, testKey.privateKey);

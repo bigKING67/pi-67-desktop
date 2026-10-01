@@ -1,4 +1,4 @@
-"""One-shot vector lookup on a Main-owned working copy, OV 0.4.16 only.
+"""One-shot vector lookup on a Main-owned working copy, OV 0.4.22 only.
 
 Admitted only from a separately signed query-v1 runtime. Never add this to an
 installed index-v1 tree or use a repository path as a production fallback.
@@ -115,7 +115,7 @@ def query(collection_path, request):
 def main():
     os.umask(0o077)
     if (len(sys.argv) != 1 or sys.version_info[:3] != (3, 12, 10)
-            or version("openviking") != "0.4.16" or version("openviking-sdk") != "0.1.10"):
+            or version("openviking") != "0.4.22" or version("openviking-sdk") != "0.1.10"):
         raise ValueError("Pinned query runtime required")
     root = Path.cwd()
     os.environ["OPENVIKING_CONFIG_FILE"] = str(root / "no-default-config")

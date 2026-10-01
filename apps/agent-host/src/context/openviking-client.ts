@@ -88,7 +88,17 @@ export class OpenVikingClient {
       this.configuration.healthTimeoutMs
     );
     const version = typeof result.version === "string" ? result.version : undefined;
+    this.#scoreScale = Promise.resolve(normalizesCosine(version));
     return { ...(version === undefined ? {} : { version }), latencyMs: Date.now() - startedAt };
+  }
+
+  #scoreScale: Promise<boolean> | undefined;
+
+  /** Whether the server reports cosine as (cos + 1) / 2; read once per client. */
+  #normalizedScores(): Promise<boolean> {
+    this.#scoreScale ??= this.request<Record<string, unknown>>("/health", undefined, this.configuration.healthTimeoutMs)
+      .then((result) => normalizesCosine(result.version), () => true);
+    return this.#scoreScale;
   }
 
   getSession(sessionId: string): Promise<OpenVikingSessionMeta> {
@@ -174,7 +184,10 @@ export class OpenVikingClient {
     const payload: Record<string, unknown> = {
       query,
       limit: options.limit,
-      score_threshold: this.configuration.scoreThreshold
+      // Settings keep raw cosine; OpenViking 0.4.22+ scores (cos + 1) / 2.
+      score_threshold: await this.#normalizedScores()
+        ? (this.configuration.scoreThreshold + 1) / 2
+        : this.configuration.scoreThreshold
     };
     if (options.targetUri) payload.target_uri = options.targetUri;
     const result = await this.request<Record<string, unknown>>(
@@ -334,4 +347,12 @@ function invalidOpenVikingResponse(field: string): HostCommandError {
     `OpenViking returned an invalid ${field}.`,
     true
   );
+}
+
+/** OpenViking 0.4.22 (#5358) normalizes local cosine scores; unknown versions count as normalized (stricter). */
+export function normalizesCosine(version: unknown): boolean {
+  const match = typeof version === "string" ? /^(\d+)\.(\d+)\.(\d+)/u.exec(version.trim()) : null;
+  if (!match) return true;
+  const [major, minor, patch] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  return !(major === 0 && (minor < 4 || (minor === 4 && patch < 22)));
 }

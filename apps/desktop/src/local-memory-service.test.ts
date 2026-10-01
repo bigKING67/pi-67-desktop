@@ -26,7 +26,7 @@ async function fixture() {
   const tree = await runtimeTreeIdentity(runtimeRoot);
   const manifest = Buffer.from(JSON.stringify({ schema: "new-money.openviking-runtime.v1",
     platform: process.platform, arch: process.arch, pythonVersion: "3.12.10",
-    openvikingVersion: "0.4.16", sdkVersion: "0.1.10", treeSha256: tree.sha256 }));
+    openvikingVersion: "0.4.22", sdkVersion: "0.1.10", treeSha256: tree.sha256 }));
   const model = { protocol: "openai-compatible" as const, endpoint: "https://example.test/v1", model: "synthetic", apiKey: "synthetic-secret" };
   const configuration = { runtimeRoot, manifest, signature: sign(null, manifest, keys.privateKey),
     dataRoot: join(directory, "private"), embedding: { ...model, dimension: 8 }, extraction: model };

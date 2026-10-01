@@ -1,4 +1,4 @@
-"""Bounded unpublished team vector-index job, pinned to OV 0.4.16.
+"""Bounded unpublished team vector-index job, pinned to OV 0.4.22.
 
 Main admits this file and its two siblings inside the signed runtime tree before
 launch. Only fixed job.json in a fresh owned cwd is input; no paths, credentials,
@@ -210,7 +210,7 @@ def main():
     os.umask(0o077)
     with failure_stage(71):
         if (len(sys.argv) != 1 or sys.version_info[:3] != (3, 12, 10)
-                or version("openviking") != "0.4.16" or version("openviking-sdk") != "0.1.10"):
+                or version("openviking") != "0.4.22" or version("openviking-sdk") != "0.1.10"):
             raise RuntimeError("Pinned team worker runtime required")
     root = Path.cwd()
     with failure_stage(72):

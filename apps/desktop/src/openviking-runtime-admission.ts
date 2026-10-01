@@ -16,7 +16,7 @@ export async function admitOpenVikingRuntime(configuration: {
   const tree = await runtimeTreeIdentity(runtimeRoot, signal);
   verifyOpenVikingManifest(manifest, signature, trustedKey, {
     platform: process.platform, arch: process.arch, pythonVersion: "3.12.10",
-    openvikingVersion: "0.4.16", sdkVersion: "0.1.10", treeSha256: tree.sha256
+    openvikingVersion: "0.4.22", sdkVersion: "0.1.10", treeSha256: tree.sha256
   });
   const root = await realpath(runtimeRoot), python = await realpath(join(root, "bin/python3.12"));
   if (!python.startsWith(`${root}${sep}`) || !(await stat(python)).isFile()) throw new Error("Invalid managed OpenViking interpreter.");

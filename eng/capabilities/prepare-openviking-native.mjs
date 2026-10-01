@@ -146,7 +146,7 @@ async function buildPreparedRuntime(output, identity, purpose, offline, keepTest
   // Exercise the admission primitive without inventing a release signing identity.
   // These disposable keys are neither persisted nor trusted by the Desktop product.
   const testIdentity = { platform: process.platform, arch: process.arch, pythonVersion: identity.version,
-    openvikingVersion: "0.4.16", sdkVersion: "0.1.10", treeSha256: after.sha256 };
+    openvikingVersion: "0.4.22", sdkVersion: "0.1.10", treeSha256: after.sha256 };
   const manifest = Buffer.from(JSON.stringify({ schema: "new-money.openviking-runtime.v1", ...testIdentity }));
   const testKey = generateKeyPairSync("ed25519");
   verifyOpenVikingManifest(manifest, sign(null, manifest, testKey.privateKey), testKey.publicKey, testIdentity);
@@ -154,7 +154,7 @@ async function buildPreparedRuntime(output, identity, purpose, offline, keepTest
   const { stdout: versions } = await execFileAsync(relocatedPython, ["-I", "-B", "-c",
     "import sys,json; from importlib.metadata import version; print(json.dumps(dict(prefix=sys.prefix,openviking=version('openviking'),sdk=version('openviking-sdk'))))"]);
   const actual = JSON.parse(versions);
-  if (actual.prefix !== relocated || actual.openviking !== "0.4.16" || actual.sdk !== "0.1.10") {
+  if (actual.prefix !== relocated || actual.openviking !== "0.4.22" || actual.sdk !== "0.1.10") {
     throw new Error("Relocated runtime identity does not match the native contract.");
   }
   if (launchers) await execFileAsync(join(relocated, "lib/python3.12/site-packages/bin/normalizer"), ["--help"],

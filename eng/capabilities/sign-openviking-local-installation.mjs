@@ -33,7 +33,7 @@ export async function adoptSignedOpenVikingInstallation(installationRoot, expect
     const trustedKey = openVikingRuntimeTrustedKey();
     const loaded = await loadOpenVikingRuntimeInstallation(installationRoot, new AbortController().signal);
     verifyOpenVikingManifest(loaded.manifest, loaded.signature, trustedKey, { platform: "darwin", arch: "arm64",
-      pythonVersion: "3.12.10", openvikingVersion: "0.4.16", sdkVersion: "0.1.10", treeSha256: tree.sha256 });
+      pythonVersion: "3.12.10", openvikingVersion: "0.4.22", sdkVersion: "0.1.10", treeSha256: tree.sha256 });
     const receipt = JSON.parse(await readFile(join(installationRoot, "assembly-receipt.json"), "utf8"));
     if (receipt.schema !== "new-money.signed-local-installation.v1" || receipt.status !== "PASS"
       || receipt.installationRoot !== installationRoot || receipt.tree?.sha256 !== tree.sha256
@@ -78,7 +78,7 @@ export async function signOpenVikingLocalInstallation(sourceRuntime, expectedTre
       if (tree.sha256 !== expectedTreeSha256) throw new Error("Cached signed runtime changed.");
       const loaded = await loadOpenVikingRuntimeInstallation(installationRoot, new AbortController().signal);
       verifyOpenVikingManifest(loaded.manifest, loaded.signature, trustedKey, { platform: "darwin", arch: "arm64",
-        pythonVersion: "3.12.10", openvikingVersion: "0.4.16", sdkVersion: "0.1.10", treeSha256: tree.sha256 });
+        pythonVersion: "3.12.10", openvikingVersion: "0.4.22", sdkVersion: "0.1.10", treeSha256: tree.sha256 });
       if (createHash("sha256").update(loaded.manifest).digest("hex") !== receipt.manifestSha256) {
         throw new Error("Cached signed manifest changed.");
       }
@@ -103,7 +103,7 @@ async function buildSignedInstallation(source, expectedTreeSha256, installationR
     await cp(source, runtimeRoot, { recursive: true, verbatimSymlinks: true, force: false, errorOnExist: true });
     const tree = await runtimeTreeIdentity(runtimeRoot);
     if (tree.sha256 !== expectedTreeSha256) throw new Error("Copied runtime identity mismatch.");
-    const identity = { platform: "darwin", arch: "arm64", pythonVersion: "3.12.10", openvikingVersion: "0.4.16",
+    const identity = { platform: "darwin", arch: "arm64", pythonVersion: "3.12.10", openvikingVersion: "0.4.22",
       sdkVersion: "0.1.10", treeSha256: tree.sha256 };
     const manifest = Buffer.from(JSON.stringify({ schema: "new-money.openviking-runtime.v1", ...identity }));
     await writeFile(join(installationRoot, "manifest.json"), manifest, { flag: "wx", mode: 0o600 });

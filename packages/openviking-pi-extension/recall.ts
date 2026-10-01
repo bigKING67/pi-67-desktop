@@ -1,3 +1,4 @@
+import { toServerScore } from "./server-score.js";
 import type { OVClient } from "./client.js";
 import type { OVConfig } from "./config.js";
 import { hashDiagnosticValue } from "./diagnostics.js";
@@ -148,6 +149,7 @@ export class RecallManager {
       },
       {
         ...this.config,
+        scoreThreshold: toServerScore(this.config.scoreThreshold, this.client.scoreScale),
         recallMaxTokens: this.config.recallTokenBudget,
         recallMaxTokensConfigured: true,
       } as any,

@@ -41,7 +41,7 @@ it.skipIf(!runtimeRoot)("admits, isolates and restarts real native private profi
     if (!address || typeof address === "string") throw new Error("Missing synthetic model listener");
     const tree = await runtimeTreeIdentity(runtimeRoot!);
     const manifest = Buffer.from(JSON.stringify({ schema: "new-money.openviking-runtime.v1",
-      platform: "darwin", arch: "arm64", pythonVersion: "3.12.10", openvikingVersion: "0.4.16",
+      platform: "darwin", arch: "arm64", pythonVersion: "3.12.10", openvikingVersion: "0.4.22",
       sdkVersion: "0.1.10", treeSha256: tree.sha256 }));
     const configuration = { runtimeRoot: runtimeRoot!, manifest, signature: sign(null, manifest, keys.privateKey),
       dataRoot: join(directory, "private"),

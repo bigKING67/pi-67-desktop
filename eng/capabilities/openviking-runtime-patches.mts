@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { lstat, readFile, readdir, realpath, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
-// Exact OpenViking 0.4.16 source transformations. Preserve upstream headers and
+// Exact OpenViking 0.4.22 source transformations. Preserve upstream headers and
 // dependencies; only defer unused LiteLLM imports. Update the revision on change.
 const edits: { path: string; sha256: string; replacements: [string, string][]; suffix: string }[] = [
   {
@@ -20,7 +20,7 @@ const edits: { path: string; sha256: string; replacements: [string, string][]; s
   },
   {
     path: "openviking_cli/utils/config/embedding_config.py",
-    sha256: "f1c4dda944539e8d80cde9f99ad8a05e3b34abf8abc3537b6754a0c38695bc9b",
+    sha256: "ff2b9f86d3db8dfdb836563a871955a94d1c3594bdc37cf61a5cb133df6e2737",
     replacements: [["            JinaDenseEmbedder,\n            LiteLLMDenseEmbedder,\n            LocalDenseEmbedder,", "            JinaDenseEmbedder,\n            LocalDenseEmbedder,"],
       ['        if provider == "litellm" and LiteLLMDenseEmbedder is None:\n', '        LiteLLMDenseEmbedder = None\n        if provider == "litellm":\n            from openviking.models.embedder import LiteLLMDenseEmbedder\n\n        if provider == "litellm" and LiteLLMDenseEmbedder is None:\n']],
     suffix: ""
@@ -116,7 +116,7 @@ export async function applyPrivateRuntimePatch(stagingRoot: string) {
   }));
   const records = await planWheelRecords(join(root, "lib/python3.12/site-packages"), new Map(pending.map(file => [file.record.path, file])));
   const receipt = { schema: "new-money.openviking-patches.v1", revision: "lazy-litellm-v1",
-    upstreamVersion: "0.4.16", recipeSha256: digest(JSON.stringify(edits)), files: pending.map(file => file.record) };
+    upstreamVersion: "0.4.22", recipeSha256: digest(JSON.stringify(edits)), files: pending.map(file => file.record) };
   for (const file of [...pending, ...records]) await writeFile(file.path, file.content);
   await writeFile(marker, `${JSON.stringify(receipt, null, 2)}\n`, { flag: "wx", mode: 0o600 });
   return receipt;

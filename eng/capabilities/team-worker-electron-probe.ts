@@ -22,7 +22,7 @@ else {
     const runtimeRoot = await realpath(dirname(dirname(python)));
     const tree = await runtimeTreeIdentity(runtimeRoot, AbortSignal.timeout(60_000));
     const manifest = Buffer.from(JSON.stringify({ schema: "new-money.openviking-runtime.v1", platform: process.platform,
-      arch: process.arch, pythonVersion: "3.12.10", openvikingVersion: "0.4.16", sdkVersion: "0.1.10", treeSha256: tree.sha256 }));
+      arch: process.arch, pythonVersion: "3.12.10", openvikingVersion: "0.4.22", sdkVersion: "0.1.10", treeSha256: tree.sha256 }));
     // Ephemeral TEST trust only: do not sign, alter or adopt an installed bundle.
     installation = { runtimeRoot, manifest, signature: sign(null, manifest, keys.privateKey) };
     for (const mode of ["success", "deny", "cancel", "host-exit"] as const) await probe(mode);

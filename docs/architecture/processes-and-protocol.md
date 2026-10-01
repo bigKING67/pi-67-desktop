@@ -426,7 +426,7 @@ into these admitted production bootstrap files.
 An old installation without them remains usable for its existing private path but
 cannot perform team indexing. The local installer accepts an explicit
 `purpose: "team-index-v1"` for the parallel fixed installation name
-`openviking-0.4.16-python-3.12.10-sdk-0.1.10-darwin-arm64-team-index-v1`.
+`openviking-0.4.22-python-3.12.10-sdk-0.1.10-darwin-arm64-team-index-v1`.
 Both the source and copied staging must pass full signature/tree verification and
 the fixed bootstrap checks before publication; a directory suffix is not capability
 evidence. Each target has its own exclusive lock and refuses replacement. The
@@ -734,7 +734,7 @@ not a measured hot query path: batch result validation rather than invoking a fu
 scan per hit/token. Real query latency, native database read-only behavior and
 Windows support remain unverified.
 
-The pinned native OV 0.4.16 ordinary local-collection reopen/query/close path is now
+The pinned native OV 0.4.22 ordinary local-collection reopen/query/close path is now
 verified unsuitable for direct read-only access to a published generation. Its
 PersistentDict initialization rewrites metadata; collection recovery also owns
 background maintenance and close-time persistence. The isolated native probe
@@ -1726,7 +1726,7 @@ not download, adopt a development runtime, generate trust or start a process.
 After app readiness, `createApplicationLocalMemory` binds macOS arm64 Main to
 `app.getPath("appData")/New Money/openviking`, using the existing `DesktopSafeStorage`
 and Supervisor's private model client. Runtime selection is the fixed child
-`runtime/openviking-0.4.16-python-3.12.10-sdk-0.1.10-darwin-arm64` for private memory;
+`runtime/openviking-0.4.22-python-3.12.10-sdk-0.1.10-darwin-arm64` for private memory;
 team preparation uses the separate child with the `-team-index-v1` suffix, and
 query preparation uses `-team-query-v1`. Settings and data remain outside all three
 children. No Renderer/shell path override, development artifact
