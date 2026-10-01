@@ -152,7 +152,7 @@ export function candidateFlowFetch(expiresAt: number) {
     }
     if (url.includes("/fs/ls")) {
       const target = new URL(url).searchParams.get("uri");
-      return jsonResponse({ status: "ok", result: target === "viking://user/memories"
+      return jsonResponse({ status: "ok", result: target === "viking://~/memories" || target === "viking://user/local/memories"
         ? ["viking://user/local/memories/experiences"]
         : [experienceUri] });
     }

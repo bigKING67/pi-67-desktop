@@ -1,6 +1,6 @@
 # OpenViking 0.4.16 → 0.4.22 upgrade
 
-Status: proposed
+Status: active
 Owner: Claude Code
 Started: 2026-10-01
 Last updated: 2026-10-01
@@ -83,7 +83,7 @@ cache, extraction reliability, honest extraction failure).
 
 ## Checkpoints
 
-- [ ] 1. URI canonicalization in Extension/Agent Host/team workers with tests, verified against 0.4.16 first.
+- [x] 1. URI canonicalization in Extension/Agent Host with tests, verified against 0.4.16 (team workers had no uid-less URIs).
 - [ ] 2. Recompile macOS and Windows requirements locks for 0.4.22; verify wheels.
 - [ ] 3. Rebase or retire runtime and query patches; move every version/sha pin together.
 - [ ] 4. `ov.conf` decisions (extraction format, output token cap) and Commit-failure handling test.
@@ -122,3 +122,11 @@ already written by 0.4.22.
 ## Progress log
 
 - 2026-10-01: Upgrade-impact research completed; plan proposed for confirmation.
+- 2026-10-01: Confirmed; status active. Checkpoint 1: Extension policy and Agent
+  Host emit `viking://user/<uid>/…` (or `viking://~/…` without identity) and
+  rewrite legacy uid-less input. On 0.4.16 with a user key, `~`, explicit, and
+  uid-less forms all resolve and results are explicit; under ROOT/dev mode `~`
+  returns 400 INVALID_URI and uid-less returns 404/empty, so managed Desktop
+  (always has a user) uses the explicit form. Pre-existing gap kept: a standalone
+  config without a user filters explicit result URIs. Aggregate gate passed.
+

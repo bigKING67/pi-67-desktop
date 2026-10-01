@@ -172,7 +172,9 @@ describe("Experience candidate assembly", () => {
     const root = "viking://user/local/memories/experiences";
     const uri = `${root}/recovery.md`;
     const client = {
-      listDirectory: vi.fn(async (target: string) => target === "viking://user/memories" ? [root] : [uri]),
+      currentUser: "local",
+      // OpenViking 0.4.17+ rejects the uid-less viking://user/memories root.
+      listDirectory: vi.fn(async (target: string) => target === "viking://user/local/memories" ? [root] : [uri]),
       read: vi.fn(async () => "Situation: Host restarted\nApproach: Reload state\nReflect: Verify epoch")
     } as unknown as OpenVikingClient;
     await expect(listPrivateExperienceSummaries(client, "workspace-1", 20)).resolves.toEqual([

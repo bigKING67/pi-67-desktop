@@ -71,6 +71,15 @@ export function assertPrivateMemoryUri(uri: string): void {
   }
 }
 
+/**
+ * OpenViking 0.4.17+ rejects uid-less `viking://user/memories`-style URIs, so
+ * requests name the current user explicitly, or use the server-expanded `~`
+ * when the identity is unknown.
+ */
+export function privateUserRoot(currentUser?: string): string {
+  return currentUser && /^[A-Za-z0-9_-]+$/u.test(currentUser) ? `viking://user/${currentUser}` : "viking://~";
+}
+
 export function isPrivateMemoryUri(uri: string): boolean {
   return /^viking:\/\/user\/memories\/.+/.test(uri)
     || /^viking:\/\/user\/peers\/[a-f0-9]{64}\/memories\/.+/.test(uri)

@@ -18,7 +18,7 @@ describe("viking_search official on-demand execution", () => {
     expect(second).toEqual(first);
     expect(find).toHaveBeenCalledTimes(2);
     expect(find).toHaveBeenNthCalledWith(1, "host recovery", {
-      targetUri: "viking://user/peers/peer-1/memories",
+      targetUri: "viking://user/local-owner/peers/peer-1/memories",
       topK: 2,
       timeoutMs: 1_000,
       signal: expect.any(AbortSignal)
@@ -47,7 +47,7 @@ describe("viking_search official on-demand execution", () => {
     expect((value.details as { mode: string }).mode).toBe("scoped-find");
     expect(find).toHaveBeenCalledTimes(1);
     expect(find).toHaveBeenCalledWith("workspace recovery", {
-      targetUri: "viking://user/memories",
+      targetUri: "viking://user/local-owner/memories",
       topK: 10,
       timeoutMs: 1_000,
       signal: expect.any(AbortSignal)

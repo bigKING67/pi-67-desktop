@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { ExperienceCandidateSummary, ExperienceEvidenceSummary } from "@pi67/domain";
 import type { ExperienceCandidateReview } from "@pi67/protocol";
 import { HostCommandError } from "../protocol-error.js";
-import { assertPrivateMemoryUri, titleForUri } from "./context-memory-support.js";
+import { assertPrivateMemoryUri, privateUserRoot, titleForUri } from "./context-memory-support.js";
 import type {
   CandidateCommitReceipt,
   StoredExperienceCandidate
@@ -67,7 +67,7 @@ export async function listPrivateExperienceSummaries(
   limit: number
 ): Promise<ExperienceCandidateSummary[]> {
   const boundedLimit = Math.max(1, Math.min(100, Math.floor(limit)));
-  const memoryRoots = await client.listDirectory("viking://user/memories", 32).catch((error) => {
+  const memoryRoots = await client.listDirectory(`${privateUserRoot(client.currentUser)}/memories`, 32).catch((error) => {
     if (isNotFound(error)) return [];
     throw error;
   });

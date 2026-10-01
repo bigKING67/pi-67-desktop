@@ -24,6 +24,11 @@ the local adapter, bounds and escapes current-Session Archive expansion, and
 selects credentials as one endpoint-matched source rather than mixing
 environment, `ovcli.conf`, and server configuration fields.
 
+Private Tool scopes and URIs are sent in canonical form: `viking://user/<uid>/…`
+when the identity is known, else the server-expanded `viking://~/…`. Legacy
+uid-less input (`viking://user/memories/…`) is rewritten before authorization,
+because OpenViking 0.4.17+ rejects it with HTTP 400.
+
 Actor-scoped Recall is fail-closed across server versions. If a legacy server
 rejects `peer_scope`, the adapter skips Recall for that prompt; it never removes
 the scope field, retries more broadly, or falls through to a wider raw search.

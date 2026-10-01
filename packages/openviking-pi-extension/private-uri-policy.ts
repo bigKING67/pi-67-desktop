@@ -15,10 +15,18 @@ export type PrivateUriDecision = AuthorizedPrivateUri | RejectedPrivateUri;
 const MAX_URI_CHARS = 2_048;
 const SAFE_IDENTITY_SEGMENT = /^[A-Za-z0-9_-]+$/u;
 
-export function defaultPrivateMemoryScope(config: Pick<OVConfig, "peerId">): string {
+/** Reserved user-root children that OpenViking 0.4.17+ rejects without an explicit uid. */
+const USER_RESERVED = new Set(["memories", "resources", "skills", "peers", "privacy", "sessions"]);
+
+/** `viking://user/<uid>` when the identity is known, else the server-expanded `viking://~`. */
+function userRoot(config: Pick<OVConfig, "user">): string {
+  return safeIdentity(config.user) ? `viking://user/${config.user}` : "viking://~";
+}
+
+export function defaultPrivateMemoryScope(config: Pick<OVConfig, "user" | "peerId">): string {
   return config.peerId
-    ? `viking://user/peers/${config.peerId}/memories`
-    : "viking://user/memories";
+    ? `${userRoot(config)}/peers/${config.peerId}/memories`
+    : `${userRoot(config)}/memories`;
 }
 
 export function resolvePrivateMemoryScope(
@@ -29,7 +37,7 @@ export function resolvePrivateMemoryScope(
   if (!raw || raw === "workspace") {
     return authorizePrivateMemoryUri(defaultPrivateMemoryScope(config), config);
   }
-  if (raw === "user") return authorizePrivateMemoryUri("viking://user/memories", config);
+  if (raw === "user") return authorizePrivateMemoryUri(`${userRoot(config)}/memories`, config);
   return authorizePrivateMemoryUri(raw, config);
 }
 
@@ -38,7 +46,7 @@ export function authorizePrivateMemoryUri(
   config: Pick<OVConfig, "user" | "peerId">,
 ): PrivateUriDecision {
   const raw = typeof value === "string" ? value.trim().replace(/\/+$/u, "") : "";
-  const segments = safeVikingSegments(raw);
+  const segments = canonicalUserSegments(safeVikingSegments(raw), config);
   if (!segments) return reject("A canonical viking:// private Memory URI is required.");
 
   const roots = authorizedRoots(config);
@@ -67,15 +75,21 @@ export function isPrivateMemoryRoot(
 }
 
 function authorizedRoots(config: Pick<OVConfig, "user" | "peerId">): string[][] {
-  const roots: string[][] = [["user", "memories"]];
-  if (safeIdentity(config.user)) roots.push(["user", config.user, "memories"]);
-  if (safeIdentity(config.peerId)) {
-    roots.push(["user", "peers", config.peerId, "memories"]);
-    if (safeIdentity(config.user)) {
-      roots.push(["user", config.user, "peers", config.peerId, "memories"]);
-    }
-  }
+  const base = safeIdentity(config.user) ? ["user", config.user] : ["~"];
+  const roots: string[][] = [[...base, "memories"]];
+  if (safeIdentity(config.peerId)) roots.push([...base, "peers", config.peerId, "memories"]);
   return roots;
+}
+
+/**
+ * Model- or legacy-supplied uid-less paths (`viking://user/memories/...`) are
+ * rewritten to the current user's canonical root before authorization, so a
+ * stale prompt still resolves inside the same boundary instead of a server 400.
+ */
+function canonicalUserSegments(segments: string[] | null, config: Pick<OVConfig, "user">): string[] | null {
+  if (!segments || segments[0] !== "user" || !USER_RESERVED.has(segments[1] ?? "")) return segments;
+  const base = safeIdentity(config.user) ? ["user", config.user] : ["~"];
+  return [...base, ...segments.slice(1)];
 }
 
 function safeVikingSegments(uri: string): string[] | null {

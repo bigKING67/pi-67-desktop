@@ -10,6 +10,7 @@ import {
 import {
   appContextAuthority,
   assertPrivateMemoryUri,
+  privateUserRoot,
   contextStatusResult,
   deriveWorkspacePeerId,
   isPrivateMemoryUri,
@@ -130,5 +131,13 @@ describe("context memory support", () => {
       retiredOwners: owners,
       blockedOwners: owners
     });
+  });
+});
+
+describe("private user root", () => {
+  it("names the current user explicitly and never falls back to a uid-less root", () => {
+    expect(privateUserRoot("desktop")).toBe("viking://user/desktop");
+    expect(privateUserRoot(undefined)).toBe("viking://~");
+    expect(privateUserRoot("../other")).toBe("viking://~");
   });
 });

@@ -29,14 +29,26 @@ describe("OpenViking private URI policy", () => {
     expect(authorizePrivateMemoryUri(uri, config).ok).toBe(false);
   });
 
-  it("maps simple Tool scopes to bounded private roots", () => {
-    expect(defaultPrivateMemoryScope(config)).toBe("viking://user/peers/workspace-peer/memories");
+  it("maps simple Tool scopes to canonical current-user roots", () => {
+    expect(defaultPrivateMemoryScope(config)).toBe("viking://user/local-owner/peers/workspace-peer/memories");
     expect(resolvePrivateMemoryScope("workspace", config)).toEqual({
       ok: true,
-      uri: "viking://user/peers/workspace-peer/memories",
+      uri: "viking://user/local-owner/peers/workspace-peer/memories",
     });
-    expect(resolvePrivateMemoryScope("user", config)).toEqual({ ok: true, uri: "viking://user/memories" });
+    expect(resolvePrivateMemoryScope("user", config)).toEqual({ ok: true, uri: "viking://user/local-owner/memories" });
     expect(isPrivateMemoryRoot("viking://user/memories", config)).toBe(true);
     expect(isPrivateMemoryRoot("viking://user/memories/events/item.md", config)).toBe(false);
+  });
+
+  it("never emits uid-less user URIs, which OpenViking 0.4.17+ rejects", () => {
+    expect(authorizePrivateMemoryUri("viking://user/memories/events/item.md", config))
+      .toEqual({ ok: true, uri: "viking://user/local-owner/memories/events/item.md" });
+    expect(authorizePrivateMemoryUri("viking://user/peers/workspace-peer/memories/cases/c.md", config))
+      .toEqual({ ok: true, uri: "viking://user/local-owner/peers/workspace-peer/memories/cases/c.md" });
+    const anonymous = { user: "", peerId: "workspace-peer" };
+    expect(defaultPrivateMemoryScope(anonymous)).toBe("viking://~/peers/workspace-peer/memories");
+    expect(resolvePrivateMemoryScope("user", anonymous)).toEqual({ ok: true, uri: "viking://~/memories" });
+    expect(authorizePrivateMemoryUri("viking://user/memories/a.md", anonymous)).toEqual({ ok: true, uri: "viking://~/memories/a.md" });
+    expect(authorizePrivateMemoryUri("viking://user/someone/memories/a.md", anonymous).ok).toBe(false);
   });
 });

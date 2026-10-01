@@ -30,6 +30,7 @@ import {
   isPrivateMemoryUri,
   memoryScopeForUri,
   memorySummary,
+  privateUserRoot,
   titleForUri
 } from "./context-memory-support.js";
 import { OpenVikingClient } from "./openviking-client.js";
@@ -286,9 +287,10 @@ export class ContextMemoryCommandRouter {
     actorPeerId: string
   ): Promise<CommandResults["memory.search"]> {
     if (scope === "team" || scope === "company") return { items: [], total: 0 };
+    const root = privateUserRoot(client.currentUser);
     const targetUri = scope === "workspace"
-      ? `viking://user/peers/${actorPeerId}/memories`
-      : scope === "user" ? "viking://user/memories" : "viking://user";
+      ? `${root}/peers/${actorPeerId}/memories`
+      : scope === "user" ? `${root}/memories` : root;
     const results = await client.search(query, {
       limit,
       ...(scope === undefined ? {} : { scope }),
