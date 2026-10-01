@@ -195,7 +195,23 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
     messages are always kept). Desktop hides `新建频道` and makes the composer
     read-only with an explanation when the policy says so; New Money enforces the
     same rules. Policy changes arrive by push.
-- Not yet: Agents as members, threads, edits/deletes, reactions, attachments,
+- Agent members (P3a, contract `docs/adr/0004-team-chat-agents.md`):
+  - The rail's `Agent` section lists the team's Agents with presence and `我的` for
+    your own; opening one starts or reuses its direct message. The direct message
+    names the owner, model and online state, and says that recent messages go to the
+    owner's Desktop and model. Mentioning an Agent shows the same disclosure above
+    the composer.
+  - Mentioning an Agent or messaging it directly creates a request. The asking
+    message shows `排队中` (or that the owner is offline and has 10 minutes),
+    `正在回复…`, or why it did not reply (daily limit, disabled, not set up, model
+    unavailable, error, expired). The reply arrives as a message from the Agent
+    with an `Agent` badge.
+  - `管理我的 Agent` creates Agents (unless the team restricts it to owners/admins;
+    viewers never), edits name, description and daily limit, disables or deletes
+    them, and chooses how this Desktop runs each one: Workspace (its Sessions are
+    saved there for review), team project, a configured model, and an on/off switch.
+    Agents only converse: no tools, files, commands or network.
+- Not yet: threads, edits/deletes, reactions, attachments,
   search, notifications, team invitations (use the New Money web console).
 
 ## Success criteria

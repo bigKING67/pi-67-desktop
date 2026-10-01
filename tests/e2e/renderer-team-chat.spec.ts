@@ -222,7 +222,7 @@ test("mentions channel members, manages the channel and follows the team chat po
   await expect(settings.getByText("负责人", { exact: true })).toBeVisible();
   await settings.getByRole("button", { name: "移出 李若溪" }).click();
   await settings.getByRole("button", { name: "确认移出 李若溪" }).click();
-  await expect(settings.getByRole("heading", { name: "成员 · 2" })).toBeVisible();
+  await expect(settings.getByRole("heading", { name: "成员 · 3" })).toBeVisible();
   await settings.getByRole("textbox", { name: "频道名称" }).fill("宏观研究组");
   await settings.getByRole("button", { name: "保存名称" }).click();
   await expect(navigation.getByRole("button", { name: "宏观研究组", exact: true })).toBeVisible();
@@ -235,7 +235,7 @@ test("mentions channel members, manages the channel and follows the team chat po
   await page.evaluate(() => {
     const state = (window as unknown as { __pi67MockTeamChat: MockTeamChatState }).__pi67MockTeamChat;
     state.directory.members[0]!.role = "viewer";
-    state.directory.policy = { channelCreation: "admins", viewersCanPost: false, revision: 1 };
+    state.directory.policy = { channelCreation: "admins", viewersCanPost: false, agentCreation: "members", revision: 1 };
   });
   await emitMockAgentEvent(page, { type: "teamChat.pushed", payload: { type: "policy.changed" } }, { context: "app" });
   await expect(page.getByTestId("team-chat-new-channel")).toHaveCount(0);
@@ -243,5 +243,54 @@ test("mentions channel members, manages the channel and follows the team chat po
   await navigation.getByRole("button", { name: "李若溪" }).click();
   await expect(page.getByText("团队设置为只读成员不能发言。你仍可以阅读这里的消息。")).toBeVisible();
   await expect(page.getByRole("textbox", { name: "发送到 李若溪" })).toBeDisabled();
+});
+
+test("asks an Agent member, follows its request state and manages own Agents", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.getByRole("group", { name: "工作模式" }).getByRole("button", { name: "聊天" }).click();
+  await signIn(page);
+  const navigation = page.getByTestId("team-chat-navigation");
+  await navigation.getByRole("button", { name: "宏观助手，Agent，在线" }).click();
+  const intro = page.getByTestId("team-chat-agent-intro");
+  await expect(intro).toContainText("由 李若溪 的桌面运行 · 在线");
+  await expect(intro).toContainText("anthropic · claude-sonnet");
+  const composer = page.getByRole("textbox", { name: "发送到 宏观助手" });
+  await composer.fill("下周 CPI 预期？");
+  await composer.press("Enter");
+  const log = page.getByRole("log", { name: "宏观助手" });
+  await expect(log.getByText("宏观助手 已收到，排队中")).toBeVisible();
+
+  const asked = await page.evaluate(() => {
+    const state = (window as unknown as { __pi67MockTeamChat: MockTeamChatState }).__pi67MockTeamChat;
+    const dm = state.directory.conversations.find((item) => item.kind === "dm" && item.memberUserIds.includes("agent-macro"))!;
+    const message = state.messages[dm.id]!.at(-1)!;
+    return { conversationId: dm.id, messageId: message.id, invocation: message.agentInvocations![0]! };
+  });
+  const changed = (status: string) => ({ type: "teamChat.pushed", payload: { type: "agent_invocation.changed",
+    conversationId: asked.conversationId, messageId: asked.messageId, invocation: { ...asked.invocation, status } } });
+  await emitMockAgentEvent(page, changed("running"), { context: "app" });
+  await expect(log.getByText("宏观助手 正在回复…")).toBeVisible();
+  await emitMockAgentEvent(page, { type: "teamChat.pushed", payload: { type: "message.created", message: {
+    id: "agent-reply-1", conversationId: asked.conversationId, seq: 2, senderUserId: "agent-macro", body: "市场一致预期同比 2.9%。",
+    clientKey: `agent-${asked.invocation.id}`, createdAt: Date.now() } } }, { context: "app" });
+  await emitMockAgentEvent(page, changed("replied"), { context: "app" });
+  await expect(log.getByText("市场一致预期同比 2.9%。")).toBeVisible();
+  await expect(log.getByText("宏观助手 正在回复…")).toHaveCount(0);
+  await expect(log.getByRole("article").filter({ hasText: "2.9%" }).getByText("Agent", { exact: true })).toBeVisible();
+
+  await page.getByTestId("team-chat-manage-agents").click();
+  const dialog = page.getByRole("dialog", { name: "我的 Agent" });
+  await expect(dialog.getByText("你还没有 Agent。")).toBeVisible();
+  await dialog.getByRole("textbox", { name: "名称" }).fill("写作助手");
+  await dialog.getByRole("button", { name: "新建" }).click();
+  const card = dialog.getByRole("article", { name: "写作助手" });
+  await expect(card).toBeVisible();
+  await expect(card.getByText("未在这台电脑上运行。同事的请求会在 10 分钟后过期。")).toBeVisible();
+  await card.getByRole("button", { name: "停用" }).click();
+  await expect(card.getByText("已停用")).toBeVisible();
+  await dialog.getByRole("button", { name: "关闭" }).click();
+  await expect(navigation.getByRole("button", { name: "写作助手，Agent，已停用，我的" })).toBeVisible();
 });
 

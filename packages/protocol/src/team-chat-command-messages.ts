@@ -1,4 +1,7 @@
 import type {
+  TeamChatAgent,
+  TeamChatAgentActivity,
+  TeamChatAgentBinding,
   TeamChatChannelAction,
   TeamChatChannelRoster,
   TeamChatConnectionState,
@@ -35,6 +38,19 @@ export interface TeamChatCommandPayloads {
     assigneeUserId?: string;
   };
   "teamChat.workCard.act": { cardId: string; action: TeamChatWorkCardAction; expectedRevision: number };
+  "teamChat.agent.create": { name: string; description: string };
+  "teamChat.agent.update": { agentUserId: string; name?: string; description?: string; dailyLimit?: number };
+  "teamChat.agent.setDisabled": { agentUserId: string; disabled: boolean };
+  "teamChat.agent.remove": { agentUserId: string };
+  "teamChat.agent.host.get": Record<string, never>;
+  "teamChat.agent.host.bind": { binding: TeamChatAgentBinding };
+  "teamChat.agent.host.unbind": { agentUserId: string };
+}
+
+/** This Desktop's hosting state for the current team's Agents. */
+export interface TeamChatAgentHostState {
+  bindings: TeamChatAgentBinding[];
+  activity: TeamChatAgentActivity[];
 }
 
 export interface TeamChatCommandResults {
@@ -50,9 +66,17 @@ export interface TeamChatCommandResults {
   "teamChat.dm.open": TeamChatConversation;
   "teamChat.workCard.create": TeamChatMessage;
   "teamChat.workCard.act": TeamChatWorkCard;
+  "teamChat.agent.create": TeamChatAgent;
+  "teamChat.agent.update": TeamChatAgent;
+  "teamChat.agent.setDisabled": TeamChatAgent;
+  "teamChat.agent.remove": Record<string, never>;
+  "teamChat.agent.host.get": TeamChatAgentHostState;
+  "teamChat.agent.host.bind": TeamChatAgentHostState;
+  "teamChat.agent.host.unbind": TeamChatAgentHostState;
 }
 
 export interface TeamChatEventPayloads {
   "teamChat.pushed": TeamChatPushEvent;
   "teamChat.connectionChanged": TeamChatConnectionState;
+  "teamChat.agentHostChanged": TeamChatAgentHostState;
 }

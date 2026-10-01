@@ -4,7 +4,7 @@
 import type { TeamChatConnectionState, TeamChatPushEvent } from "@pi67/domain";
 import { asRecord, boundedInteger, boundedString } from "../context/enterprise-context-gateway-validation.js";
 import { HostCommandError } from "../protocol-error.js";
-import { parseMessage, parseWorkCard } from "./team-chat-gateway.js";
+import { parseInvocationSummary, parseMessage, parseWorkCard } from "./team-chat-gateway.js";
 
 const MAX_FRAME_CHARS = 64 * 1024;
 const MAX_BACKOFF_MS = 30_000;
@@ -20,6 +20,14 @@ export interface TeamChatSocket {
   close(code?: number, reason?: string): void;
 }
 
+/** Owner-only frame the Host handles itself (ADR 0004); never forwarded to the renderer. */
+export interface TeamChatAgentInvokedFrame {
+  type: "agent.invoked";
+  invocationId: string;
+  agentUserId: string;
+  conversationId: string;
+}
+
 export interface TeamChatRealtimeOptions {
   /** Resolves the socket URL, including a freshly issued single-use ticket. */
   resolveUrl(signal: AbortSignal): Promise<string>;
@@ -27,7 +35,7 @@ export interface TeamChatRealtimeOptions {
   /** Aborted before any credential replacement or clear. */
   credentialSignal(): AbortSignal;
   onState(state: TeamChatConnectionState): void;
-  onPush(event: TeamChatPushEvent): void;
+  onPush(event: TeamChatPushEvent | TeamChatAgentInvokedFrame): void;
   openSocket?: (url: string) => TeamChatSocket;
   heartbeatTimeoutMs?: number;
   random?: () => number;
@@ -46,6 +54,8 @@ export function teamChatRealtimeUrl(endpoint: string, teamId: string, ticket: st
 
 export class TeamChatRealtime {
   readonly #lifetime = new AbortController();
+  /** Aborted to reconnect with a fresh ticket (for example after Agent hosting changes). */
+  #refresh = new AbortController();
   #running = false;
   #generation = 0;
   #state: TeamChatConnectionState = { status: "signed-out" };
@@ -62,10 +72,17 @@ export class TeamChatRealtime {
 
   stop(): void { this.#lifetime.abort(); }
 
+  /** Drops the current socket and reconnects at once with a newly issued ticket. */
+  reconnect(): void {
+    const previous = this.#refresh;
+    this.#refresh = new AbortController();
+    previous.abort();
+  }
+
   async #run(): Promise<void> {
     let attempt = 0;
     while (!this.#lifetime.signal.aborted) {
-      const credentialSignal = this.options.credentialSignal();
+      const credentialSignal = AbortSignal.any([this.options.credentialSignal(), this.#refresh.signal]);
       if (!this.options.hasCredential()) {
         this.#setState({ status: "signed-out" });
         await this.#waitForCredentialChange(credentialSignal);
@@ -196,7 +213,9 @@ function unavailableReason(error: unknown): "entitlement-inactive" | "not-member
 }
 
 /** Returns a push event, a control/ignored frame, or undefined for a malformed frame. */
-export function parseFrame(data: unknown): TeamChatPushEvent | "ready" | "heartbeat" | "ignored" | undefined {
+export function parseFrame(
+  data: unknown
+): TeamChatPushEvent | TeamChatAgentInvokedFrame | "ready" | "heartbeat" | "ignored" | undefined {
   if (typeof data !== "string" || data.length > MAX_FRAME_CHARS) return undefined;
   try {
     const record = asRecord(JSON.parse(data) as unknown);
@@ -210,6 +229,22 @@ export function parseFrame(data: unknown): TeamChatPushEvent | "ready" | "heartb
         return { type: "work_card.changed", card: parseWorkCard(record.card) };
       case "policy.changed":
         return { type: "policy.changed" };
+      case "agents.changed":
+        return { type: "agents.changed" };
+      case "agent_invocation.changed":
+        return {
+          type: "agent_invocation.changed",
+          conversationId: boundedString(record.conversationId, "conversationId", 128),
+          messageId: boundedString(record.messageId, "messageId", 128),
+          invocation: parseInvocationSummary(record.invocation)
+        };
+      case "agent.invoked":
+        return {
+          type: "agent.invoked",
+          invocationId: boundedString(record.invocationId, "invocationId", 128),
+          agentUserId: boundedString(record.agentUserId, "agentUserId", 128),
+          conversationId: boundedString(record.conversationId, "conversationId", 128)
+        };
       case "conversation.changed":
         return { type: "conversation.changed", conversationId: boundedString(record.conversationId, "conversationId", 128) };
       case "read.changed":

@@ -66,7 +66,10 @@ export function TeamChatChannelSettings({ conversation, directory, onClose }: {
   const members = roster && roster !== "error" ? roster.members : [];
   const ownerUserId = roster && roster !== "error" ? roster.ownerUserId : conversation.ownerUserId;
   const inChannel = new Set(members.map((member) => member.userId));
-  const addable = directory.members.filter((member) => !inChannel.has(member.userId));
+  const addable = [
+    ...directory.members,
+    ...directory.agents.filter((agent) => agent.status === "active").map((agent) => ({ userId: agent.userId, displayName: `${agent.name}（${copy.agentBadge}）` }))
+  ].filter((member) => !inChannel.has(member.userId));
   const trimmed = name.trim();
   const renamable = trimmed.length > 0 && trimmed !== channelName && teamChatCodePointLength(trimmed) <= TEAM_CHAT_CHANNEL_NAME_MAX_CHARS;
   const selfIsOwner = ownerUserId === directory.selfUserId;

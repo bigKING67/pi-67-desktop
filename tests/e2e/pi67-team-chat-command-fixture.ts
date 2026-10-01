@@ -49,6 +49,12 @@ interface MockMessage {
   createdAt: number;
   workCard?: MockWorkCard;
   mentionUserIds?: string[];
+  agentInvocations?: Array<{ id: string; agentUserId: string; status: string; reason?: string }>;
+}
+
+interface MockAgent {
+  userId: string; name: string; description: string; ownerUserId: string; modelLabel: string; dailyLimit: number;
+  status: "active" | "disabled"; disabledByAdmin: boolean; online: boolean; createdAt: number;
 }
 
 export interface MockTeamChatState {
@@ -58,8 +64,10 @@ export interface MockTeamChatState {
     selfUserId: string;
     members: Array<{ userId: string; displayName: string; role: string }>;
     conversations: MockConversation[];
-    policy: { channelCreation: string; viewersCanPost: boolean; retentionDays?: number; revision: number };
+    policy: { channelCreation: string; viewersCanPost: boolean; retentionDays?: number; agentCreation: string; revision: number };
+    agents: MockAgent[];
   };
+  agentHost: { bindings: unknown[]; activity: unknown[] };
   messages: Record<string, MockMessage[]>;
   rosters: Record<string, string[]>;
 }
@@ -95,7 +103,7 @@ export function installMockTeamChatCommandHandler(): void {
         { userId: "user-li", displayName: "李若溪", role: "admin" }
       ],
       conversations: [
-        { id: "conv-research", kind: "channel", visibility: "public", name: "宏观研究", joined: true, memberCount: 3,
+        { id: "conv-research", kind: "channel", visibility: "public", name: "宏观研究", joined: true, memberCount: 4,
           memberUserIds: [], lastSeq: 4, lastReadSeq: 3, unreadCount: 1, mentionCount: 1, ownerUserId: "user-wang",
           lastMessageAt: start + 3_600_000, lastSenderUserId: "user-li", lastPreview: "@高乾 顺便把港股那几家的口径对齐一下。",
           createdAt: start - 86_400_000 },
@@ -106,9 +114,12 @@ export function installMockTeamChatCommandHandler(): void {
           lastSeq: 1, lastReadSeq: 1, unreadCount: 0, mentionCount: 0, lastMessageAt: start + 7_200_000, lastSenderUserId: "user-li",
           lastPreview: "港股口径对齐", createdAt: start }
       ],
-      policy: { channelCreation: "members", viewersCanPost: true, revision: 0 }
+      policy: { channelCreation: "members", viewersCanPost: true, agentCreation: "members", revision: 0 },
+      agents: [{ userId: "agent-macro", name: "宏观助手", description: "回答宏观数据问题", ownerUserId: "user-li",
+        modelLabel: "anthropic · claude-sonnet", dailyLimit: 50, status: "active", disabledByAdmin: false, online: true, createdAt: start }]
     },
-    rosters: { "conv-research": [self, "user-wang", "user-li"], "conv-ops": ["user-wang", "user-li"] },
+    agentHost: { bindings: [], activity: [] },
+    rosters: { "conv-research": [self, "user-wang", "user-li", "agent-macro"], "conv-ops": ["user-wang", "user-li"] },
     messages: {
       "conv-research": history,
       "dm-li": [{ id: "msg-card-1", conversationId: "dm-li", seq: 1, senderUserId: "user-li", body: "港股口径对齐",
@@ -122,6 +133,11 @@ export function installMockTeamChatCommandHandler(): void {
     const target = conversation(conversationId)!;
     const message: MockMessage = { id: `msg-${nextId++}`, conversationId, seq: target.lastSeq + 1, senderUserId, body, clientKey,
       createdAt: Date.now(), ...(Array.isArray(mentions) && mentions.length > 0 ? { mentionUserIds: mentions as string[] } : {}) };
+    const addressed = state.directory.agents.filter((agent) => agent.status === "active"
+      && (message.mentionUserIds?.includes(agent.userId) || (target.kind === "dm" && target.memberUserIds.includes(agent.userId))));
+    if (senderUserId === self && addressed.length > 0) {
+      message.agentInvocations = addressed.map((agent) => ({ id: `inv-${nextId++}`, agentUserId: agent.userId, status: "queued" }));
+    }
     (state.messages[conversationId] ??= []).push(message);
     Object.assign(target, { lastSeq: message.seq, lastMessageAt: message.createdAt, lastSenderUserId: senderUserId,
       lastPreview: body.slice(0, 140) });
@@ -219,6 +235,36 @@ export function installMockTeamChatCommandHandler(): void {
         card.updatedAt = Date.now();
         return card;
       }
+      case "teamChat.agent.create": {
+        const agent: MockAgent = { userId: `agent-${nextId++}`, name: String(payload.name), description: String(payload.description),
+          ownerUserId: self, modelLabel: "", dailyLimit: 50, status: "active", disabledByAdmin: false, online: false, createdAt: Date.now() };
+        state.directory.agents.push(agent);
+        return agent;
+      }
+      case "teamChat.agent.update": {
+        const agent = state.directory.agents.find((item) => item.userId === payload.agentUserId)!;
+        Object.assign(agent, Object.fromEntries(Object.entries(payload).filter(([key]) => key !== "agentUserId")));
+        return agent;
+      }
+      case "teamChat.agent.setDisabled": {
+        const agent = state.directory.agents.find((item) => item.userId === payload.agentUserId)!;
+        agent.status = payload.disabled ? "disabled" : "active";
+        return agent;
+      }
+      case "teamChat.agent.remove":
+        state.directory.agents = state.directory.agents.filter((item) => item.userId !== payload.agentUserId);
+        return {};
+      case "teamChat.agent.host.get": return state.agentHost;
+      case "teamChat.agent.host.bind": {
+        const binding = payload.binding as { agentUserId: string; model: { provider: string; id: string } };
+        state.agentHost = { ...state.agentHost, bindings: [...state.agentHost.bindings.filter((item) => (item as { agentUserId: string }).agentUserId !== binding.agentUserId), binding] };
+        const agent = state.directory.agents.find((item) => item.userId === binding.agentUserId);
+        if (agent) Object.assign(agent, { online: true, modelLabel: `${binding.model.provider} · ${binding.model.id}` });
+        return state.agentHost;
+      }
+      case "teamChat.agent.host.unbind":
+        state.agentHost = { ...state.agentHost, bindings: state.agentHost.bindings.filter((item) => (item as { agentUserId: string }).agentUserId !== payload.agentUserId) };
+        return state.agentHost;
       case "teamChat.dm.open": {
         const existing = state.directory.conversations.find((item) => item.kind === "dm" && item.memberUserIds.includes(String(payload.userId)));
         if (existing) return existing;

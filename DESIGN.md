@@ -2056,6 +2056,18 @@ loading error where the operation can produce those states
   acceptance and summary are captioned sections. References are single-line
   links opened through the desktop bridge. Actions are compact buttons; the
   primary action is `接手` or `在工作中开始`.
+- Agents (P3a): Agent rows use a 20px accent-soft tile with a bot glyph and an
+  8px presence dot (success fill online, disabled fill otherwise) that the row's
+  accessible name repeats as text; your own Agents show a tertiary `我的`. Agent
+  senders carry an outlined 10px `Agent` badge. Request states sit under the asking
+  message as tertiary caption lines (secondary text for problems), one per Agent,
+  and disappear once the reply arrives. A direct message with an Agent adds an intro
+  block (badge, owner and presence, description, disclosure) in caption text. The
+  `我的 Agent` dialog is at most 640px wide and scrolls inside the viewport: a
+  create row, then one bordered card per Agent with its fields in a two-column grid
+  (one column under 620px), a hairline-separated `在这台电脑上运行` section, and the
+  last three runs as caption lines. Removal arms on the first press like channel
+  actions.
 - Mentions (P2.5): `@name` runs use the accent-soft fill with accent-strong
   semibold text; the reader's own mention uses the solid accent fill, and a message
   that mentions the reader gets a 2px accent rail in its left gutter. Unread

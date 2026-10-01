@@ -1,13 +1,23 @@
-import { Hash, Lock, Plus } from "lucide-react";
+import { Hash, Lock, Plus, Settings2 } from "lucide-react";
+import { useState } from "react";
 import { Button } from "react-aria-components";
-import { teamChatCanCreateChannel, teamChatDirectPeer, type TeamChatConversation, type TeamChatMember } from "@pi67/domain";
+import {
+  teamChatCanCreateAgent,
+  teamChatCanCreateChannel,
+  teamChatDirectPeer,
+  type TeamChatAgent,
+  type TeamChatConversation,
+  type TeamChatMember
+} from "@pi67/domain";
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { teamChatErrorMessage } from "./team-chat-controller.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { conversationTitle, directMessageWith } from "./team-chat-model.js";
 import { teamChat, useTeamChat } from "./team-chat-instance.js";
-import { RowCounts, TeamChatAvatar } from "./TeamChatParts.js";
+import { agentPresenceLabel, RowCounts, TeamChatAgentAvatar, TeamChatAvatar } from "./TeamChatParts.js";
+import { TeamChatAgentsDialog } from "./TeamChatAgentsDialog.js";
+import agentStyles from "./TeamChatAgents.module.css";
 import styles from "./TeamChat.module.css";
 
 export function TeamChatNavigation({ onCreateChannel }: { onCreateChannel: () => void }) {
@@ -16,6 +26,7 @@ export function TeamChatNavigation({ onCreateChannel }: { onCreateChannel: () =>
   const directory = useTeamChat((state) => state.directory);
   const directoryStatus = useTeamChat((state) => state.directoryStatus);
   const selectedId = useTeamChat((state) => state.selectedConversationId);
+  const [agentsOpen, setAgentsOpen] = useState(false);
 
   if (connection?.status === "signed-out") {
     return (
@@ -43,8 +54,11 @@ export function TeamChatNavigation({ onCreateChannel }: { onCreateChannel: () =>
   const teammates = directory.members.filter((member) => member.userId !== directory.selfUserId);
   const orphanDirectMessages = directory.conversations.filter((conversation) => {
     const peer = teamChatDirectPeer(conversation, directory.selfUserId);
-    return conversation.kind === "dm" && !directory.members.some((member) => member.userId === peer);
+    return conversation.kind === "dm" && !directory.members.some((member) => member.userId === peer)
+      && !directory.agents.some((agent) => agent.userId === peer);
   });
+  const canCreateAgent = teamChatCanCreateAgent(directory);
+  const ownsAgents = directory.agents.some((agent) => agent.ownerUserId === directory.selfUserId);
 
   return (
     <nav aria-label={copy.region} className={styles.railLists} data-testid="team-chat-navigation">
@@ -90,7 +104,60 @@ export function TeamChatNavigation({ onCreateChannel }: { onCreateChannel: () =>
           </ul>
         )}
       </section>
+      <section aria-labelledby="team-chat-agents" className={styles.railSection}>
+        <header>
+          <h2 id="team-chat-agents">{copy.agents}</h2>
+          {canCreateAgent || ownsAgents ? (
+            <Button aria-label={copy.manageAgents} className={styles.railIconButton!} data-testid="team-chat-manage-agents"
+              onPress={() => setAgentsOpen(true)}>
+              <Settings2 aria-hidden="true" size={14} />
+            </Button>
+          ) : null}
+        </header>
+        {directory.agents.length === 0 ? (
+          <p className={styles.railEmpty}>{canCreateAgent ? copy.noAgents : copy.noAgentsReadOnly}</p>
+        ) : (
+          <ul>
+            {directory.agents.map((agent) => {
+              const conversation = directMessageWith(directory, agent.userId);
+              return (
+                <li key={agent.userId}>
+                  <AgentRow agent={agent} conversation={conversation} mine={agent.ownerUserId === directory.selfUserId}
+                    selected={conversation !== undefined && conversation.id === selectedId} />
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+      {agentsOpen ? <TeamChatAgentsDialog onClose={() => setAgentsOpen(false)} /> : null}
     </nav>
+  );
+}
+
+function AgentRow({ agent, conversation, mine, selected }: {
+  agent: TeamChatAgent;
+  conversation: TeamChatConversation | undefined;
+  mine: boolean;
+  selected: boolean;
+}) {
+  const copy = messages.teamChat;
+  const unread = conversation?.unreadCount ?? 0;
+  return (
+    <Button
+      aria-current={selected ? "page" : false}
+      aria-label={[agent.name, copy.agentBadge, agentPresenceLabel(agent), mine ? copy.agentMine : undefined,
+        unread > 0 ? copy.unread(unread) : undefined].filter(Boolean).join("，")}
+      className={`${styles.railRow} ${selected ? styles.railRowSelected : ""} ${agent.status === "disabled" ? styles.railRowMuted : ""}`}
+      data-testid="team-chat-agent"
+      onPress={() => void teamChat.openDirectMessage(agent.userId).catch((error: unknown) => publishNotification({
+        level: "warning", title: copy.openDirectMessageFailed, message: teamChatErrorMessage(error)
+      }))}
+    >
+      <TeamChatAgentAvatar agent={agent} />
+      <span className={styles.railRowTitle}>{agent.name}</span>
+      {unread > 0 ? <RowCounts mentions={0} unread={unread} /> : mine ? <small className={agentStyles.rowMeta}>{copy.agentMine}</small> : null}
+    </Button>
   );
 }
 

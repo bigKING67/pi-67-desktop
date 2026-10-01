@@ -94,7 +94,7 @@ member's list reaches hundreds of conversations or the list query shows up in p9
   `@mentions`, and a team chat policy (channel creation, viewer posting, message
   retention with Work Cards kept) managed in the web console, which shows channel
   metadata only and never message content.
-- P3: Agents as conversation members.
+- P3: Agents as conversation members (contract: `docs/adr/0004-team-chat-agents.md`).
 - P4: attachments, search, Activity inbox, native notifications, Windows evidence.
 
 ## Rejected alternatives

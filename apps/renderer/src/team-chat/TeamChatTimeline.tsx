@@ -7,7 +7,9 @@ import { messages } from "../localization/message-catalog.js";
 import { memberById } from "./team-chat-model.js";
 import { teamChat } from "./team-chat-instance.js";
 import { useTeamChatDialogStore } from "./team-chat-dialog-store.js";
-import { formatTeamChatTime, teamChatMentionSegments, type TeamChatTimelineEntry } from "./team-chat-presentation.js";
+import { formatTeamChatTime, teamChatInvocationText, teamChatMentionSegments, type TeamChatTimelineEntry } from "./team-chat-presentation.js";
+import { TeamChatAgentBadge } from "./TeamChatParts.js";
+import agentStyles from "./TeamChatAgents.module.css";
 import { chatMessageWorkBrief } from "./team-chat-work-bridge.js";
 import { TeamChatWorkCard } from "./TeamChatWorkCard.js";
 import styles from "./TeamChat.module.css";
@@ -88,9 +90,8 @@ const TIMELINE_COMPONENTS = {
 
 function TimelineMessage({ directory, entry, target }: { directory: TeamChatDirectory; entry: TeamChatTimelineEntry; target: string }) {
   const copy = messages.teamChat;
-  const sender = entry.senderUserId === directory.selfUserId
-    ? copy.you
-    : memberById(directory, entry.senderUserId)?.displayName ?? copy.unknownTeammate;
+  const participant = memberById(directory, entry.senderUserId);
+  const sender = entry.senderUserId === directory.selfUserId ? copy.you : participant?.displayName ?? copy.unknownTeammate;
   const mentionsSelf = entry.senderUserId !== directory.selfUserId && (entry.mentionUserIds?.includes(directory.selfUserId) ?? false);
   return (
     <>
@@ -99,10 +100,12 @@ function TimelineMessage({ directory, entry, target }: { directory: TeamChatDire
         {entry.showHeader ? (
           <header>
             <strong>{sender}</strong>
+            {participant?.agent ? <TeamChatAgentBadge /> : null}
             <time dateTime={new Date(entry.createdAt).toISOString()}>{formatTeamChatTime(entry.createdAt)}</time>
           </header>
         ) : null}
         {entry.workCard ? <TeamChatWorkCard card={entry.workCard} directory={directory} /> : <MessageBody directory={directory} entry={entry} />}
+        <InvocationStates directory={directory} entry={entry} />
         {!entry.pending && !entry.workCard ? (
           <Button
             className={styles.messageAction!}
@@ -141,5 +144,24 @@ function MessageBody({ directory, entry }: { directory: TeamChatDirectory; entry
         </span>
       ))}
     </p>
+  );
+}
+
+/** One line per Agent this message asked, until its reply arrives. */
+function InvocationStates({ directory, entry }: { directory: TeamChatDirectory; entry: TeamChatTimelineEntry }) {
+  const lines = (entry.agentInvocations ?? []).flatMap((invocation) => {
+    const agent = directory.agents.find((item) => item.userId === invocation.agentUserId);
+    const text = teamChatInvocationText(invocation, agent?.name ?? messages.teamChat.agentBadge, agent?.online ?? false);
+    return text === undefined ? [] : [{ id: invocation.id, text, problem: invocation.status !== "queued" && invocation.status !== "running" }];
+  });
+  if (lines.length === 0) return null;
+  return (
+    <div className={agentStyles.invocations}>
+      {lines.map((line) => (
+        <small className={`${agentStyles.invocation} ${line.problem ? agentStyles.invocationProblem : ""}`} key={line.id} role="status">
+          {line.text}
+        </small>
+      ))}
+    </div>
   );
 }

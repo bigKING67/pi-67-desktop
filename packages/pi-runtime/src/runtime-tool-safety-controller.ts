@@ -29,11 +29,16 @@ export class RuntimeToolSafetyController {
       cwd,
       trust,
       taskToolMode: DEFAULT_TASK_TOOL_MODE,
-      taskTrustedRoots: []
+      taskTrustedRoots: [],
+      // An Agent turn marks the runtime before its Session exists; keep the mark.
+      ...(this.state.toolsDisabled ? { toolsDisabled: true } : {})
     };
   }
 
   setCwd(cwd: string): void { this.state = { ...this.state, cwd }; }
+
+  /** One-way for this runtime: a Team Chat Agent turn never regains tools, and its Session loads the Agent profile. */
+  disableAllTools(): void { this.state = { ...this.state, toolsDisabled: true }; }
 
   setWorkspacePolicy(trust: WorkspaceTrust): TaskToolMode {
     this.state = {

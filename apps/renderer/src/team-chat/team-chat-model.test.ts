@@ -6,7 +6,9 @@ import {
   applyMessagePage,
   applyPush,
   applyReadCursor,
+  applyInvocation,
   applyWorkCard,
+  memberById,
   canSendTo,
   conversationTitle,
   directMessageWith,
@@ -30,7 +32,8 @@ const directory: TeamChatDirectory = {
   teamId: "t", selfUserId: "me",
   members: [{ userId: "me", displayName: "我自己", role: "owner" }, { userId: "u2", displayName: "小王", role: "member" }],
   conversations: [channel(), dm],
-  policy: TEAM_CHAT_DEFAULT_POLICY
+  policy: TEAM_CHAT_DEFAULT_POLICY,
+  agents: []
 };
 const message = (seq: number, patch: Partial<TeamChatMessage> = {}): TeamChatMessage => ({
   id: `m${seq}`, conversationId: "c1", seq, senderUserId: "u2", body: `m${seq}`, clientKey: `key-000${seq}`, createdAt: 100 + seq, ...patch
@@ -151,5 +154,23 @@ describe("team chat model", () => {
     expect(applyWorkCard(next, { ...card, conversationId: "unloaded", revision: 9 })).toBe(next);
     expect(applyPush(next, { type: "work_card.changed", card: { ...card, status: "done", revision: 4 } }))
       .toMatchObject({ refreshDirectory: false, state: { threads: { c1: { messages: [{ workCard: { status: "done" } }, {}] } } } });
+  });
+
+  it("names Agent members and tracks request states on the asking message", () => {
+    const agent = { userId: "a1", name: "研究助手", description: "", ownerUserId: "me", modelLabel: "", dailyLimit: 50,
+      status: "active" as const, disabledByAdmin: false, online: true, createdAt: 1 };
+    let state = ready();
+    state = replaceDirectory(state, { ...directory, agents: [agent] });
+    state = applyMessagePage(state, "c1", { messages: [message(1), message(2)], hasMore: false }, "latest");
+    expect(memberById(state.directory, "a1")).toMatchObject({ displayName: "研究助手", agent });
+    expect(memberById(state.directory, "u2")).toMatchObject({ displayName: "小王" });
+    expect(applyPush(state, { type: "agents.changed" }).refreshDirectory).toBe(true);
+    const queued = { id: "i1", agentUserId: "a1", status: "queued" as const };
+    state = applyInvocation(state, "c1", "m2", queued);
+    state = applyInvocation(state, "c1", "m2", { ...queued, status: "replied" });
+    expect(state.threads.c1?.messages[1]?.agentInvocations).toEqual([{ ...queued, status: "replied" }]);
+    expect(applyInvocation(state, "c1", "missing", queued)).toBe(state);
+    const pushed = applyPush(state, { type: "agent_invocation.changed", conversationId: "c1", messageId: "m1", invocation: queued });
+    expect(pushed.state.threads.c1?.messages[0]?.agentInvocations).toEqual([queued]);
   });
 });

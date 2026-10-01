@@ -1,7 +1,7 @@
 import type { TeamChatConnectionState, TeamChatPushEvent } from "@pi67/domain";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HostCommandError } from "../protocol-error.js";
-import { parseFrame, TeamChatRealtime, teamChatRealtimeUrl, type TeamChatSocket } from "./team-chat-realtime.js";
+import { parseFrame, TeamChatRealtime, teamChatRealtimeUrl, type TeamChatSocket , type TeamChatAgentInvokedFrame } from "./team-chat-realtime.js";
 
 class FakeSocket implements TeamChatSocket {
   onmessage: TeamChatSocket["onmessage"] = null;
@@ -22,7 +22,7 @@ const message = {
 function harness() {
   const sockets: FakeSocket[] = [];
   const states: TeamChatConnectionState[] = [];
-  const pushes: TeamChatPushEvent[] = [];
+  const pushes: Array<TeamChatPushEvent | TeamChatAgentInvokedFrame> = [];
   const credential = { present: true, lifetime: new AbortController() };
   const resolveUrl = vi.fn(async (_signal: AbortSignal) => "wss://chat.example.test/realtime?ticket=t");
   const realtime = new TeamChatRealtime({

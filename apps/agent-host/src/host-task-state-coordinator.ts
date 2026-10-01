@@ -227,6 +227,13 @@ export class HostTaskStateCoordinator {
     this.runAdmission.release(lease);
   }
 
+  /** Forgets a disposed Host-internal Task so its state never accumulates. */
+  forget(taskKey: string): void {
+    this.states.delete(taskKey);
+    this.runAdmission.releaseTask(taskKey);
+    this.clearActiveTask(taskKey);
+  }
+
   releaseTaskRun(taskKey: string): void {
     this.runAdmission.releaseTask(taskKey);
   }

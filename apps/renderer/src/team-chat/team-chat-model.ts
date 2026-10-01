@@ -2,14 +2,16 @@ import {
   mergeTeamChatMessages,
   teamChatCodePointPrefix,
   teamChatDirectPeer,
+  type TeamChatAgent,
+  type TeamChatAgentInvocationSummary,
   type TeamChatConnectionState,
   type TeamChatConversation,
   type TeamChatDirectory,
-  type TeamChatMember,
   type TeamChatMessage,
   type TeamChatPushEvent,
   type TeamChatWorkCard
 } from "@pi67/domain";
+import type { TeamChatAgentHostState } from "@pi67/protocol";
 
 export interface TeamChatThread {
   messages: TeamChatMessage[];
@@ -37,6 +39,8 @@ export interface TeamChatState {
   selectedConversationId: string | undefined;
   threads: Readonly<Record<string, TeamChatThread>>;
   pending: readonly TeamChatPendingMessage[];
+  /** This Desktop's Agent hosting (bindings and recent runs); undefined until read. */
+  agentHost: TeamChatAgentHostState | undefined;
 }
 
 export const INITIAL_TEAM_CHAT_STATE: TeamChatState = {
@@ -45,7 +49,8 @@ export const INITIAL_TEAM_CHAT_STATE: TeamChatState = {
   directoryStatus: "idle",
   selectedConversationId: undefined,
   threads: {},
-  pending: []
+  pending: [],
+  agentHost: undefined
 };
 
 const PREVIEW_CHARS = 140;
@@ -164,10 +169,29 @@ export function applyPush(state: TeamChatState, event: TeamChatPushEvent): { sta
       return { state: applyReadCursor(state, event.conversationId, event.lastReadSeq), refreshDirectory: false };
     case "conversation.changed":
     case "policy.changed":
+    case "agents.changed":
       return { state, refreshDirectory: true };
     case "work_card.changed":
       return { state: applyWorkCard(state, event.card), refreshDirectory: false };
+    case "agent_invocation.changed":
+      return { state: applyInvocation(state, event.conversationId, event.messageId, event.invocation), refreshDirectory: false };
   }
+}
+
+/** Replaces one Agent request's state on the loaded message that made it. */
+export function applyInvocation(
+  state: TeamChatState,
+  conversationId: string,
+  messageId: string,
+  invocation: TeamChatAgentInvocationSummary
+): TeamChatState {
+  const thread = state.threads[conversationId];
+  if (!thread?.messages.some((message) => message.id === messageId)) return state;
+  const messages = thread.messages.map((message) => message.id !== messageId ? message : {
+    ...message,
+    agentInvocations: [...(message.agentInvocations ?? []).filter((item) => item.id !== invocation.id), invocation]
+  });
+  return { ...state, threads: { ...state.threads, [conversationId]: { ...thread, messages } } };
 }
 
 export function addPending(state: TeamChatState, pending: TeamChatPendingMessage): TeamChatState {
@@ -191,9 +215,19 @@ function sortConversations(conversations: readonly TeamChatConversation[]): Team
   ));
 }
 
-export function memberById(directory: TeamChatDirectory | undefined, userId: string | undefined): TeamChatMember | undefined {
+/** A teammate or an Agent member, as shown in Chat. */
+export interface TeamChatParticipant {
+  userId: string;
+  displayName: string;
+  agent?: TeamChatAgent;
+}
+
+export function memberById(directory: TeamChatDirectory | undefined, userId: string | undefined): TeamChatParticipant | undefined {
   if (!directory || userId === undefined) return undefined;
-  return directory.members.find((member) => member.userId === userId);
+  const member = directory.members.find((item) => item.userId === userId);
+  if (member) return member;
+  const agent = directory.agents.find((item) => item.userId === userId);
+  return agent ? { userId, displayName: agent.name, agent } : undefined;
 }
 
 /** Channel name, or the peer's display name for a direct message. */

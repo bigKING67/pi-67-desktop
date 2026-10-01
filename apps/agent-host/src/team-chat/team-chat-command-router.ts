@@ -16,7 +16,10 @@ import type { HostEventChannel } from "../host-event-channel.js";
 import { HostCommandError } from "../protocol-error.js";
 import { appContextAuthority } from "../context/context-memory-support.js";
 import type { EnterpriseCredentialBrokerClient } from "../context/enterprise-credential-broker-client.js";
-import { TeamChatGateway, type TeamChatAccess } from "./team-chat-gateway.js";
+import { TeamChatAgentGateway } from "./team-chat-agent-gateway.js";
+import { TEAM_CHAT_AGENT_COMMANDS, TeamChatAgentHost, type TeamChatAgentCommandType } from "./team-chat-agent-host.js";
+import type { TeamChatAgentTurns } from "./team-chat-agent-turns.js";
+import type { TeamChatAccess } from "./team-chat-gateway.js";
 import { TeamChatRealtime, teamChatRealtimeUrl, type TeamChatRealtimeOptions } from "./team-chat-realtime.js";
 
 export type TeamChatCommandType = keyof TeamChatCommandPayloads;
@@ -33,7 +36,8 @@ const TEAM_CHAT_COMMANDS: ReadonlySet<string> = new Set<TeamChatCommandType>([
   "teamChat.channel.manage",
   "teamChat.dm.open",
   "teamChat.workCard.create",
-  "teamChat.workCard.act"
+  "teamChat.workCard.act",
+  ...TEAM_CHAT_AGENT_COMMANDS
 ]);
 
 export function isTeamChatCommand(type: AgentCommandType): type is TeamChatCommandType {
@@ -45,29 +49,58 @@ export interface TeamChatRouterDependencies {
   events: HostEventChannel;
   credentials?: EnterpriseCredentialBrokerClient;
   realtime?: Partial<Pick<TeamChatRealtimeOptions, "openSocket" | "heartbeatTimeoutMs" | "random">>;
+  /** Where this Desktop records which Agents it hosts (ADR 0004). */
+  storageRoot?: string;
+  /** Runs Agent turns; absent in hosts that cannot (Agents are then never claimed here). */
+  agentTurns?: TeamChatAgentTurns;
 }
 
 export class TeamChatCommandRouter {
   readonly #realtime: TeamChatRealtime;
   readonly #idle = new AbortController();
+  readonly #agents: TeamChatAgentHost;
+  #liveGeneration = 0;
 
   constructor(private readonly dependencies: TeamChatRouterDependencies) {
     const { credentials, events } = dependencies;
+    this.#agents = new TeamChatAgentHost({
+      access: () => this.#access(),
+      storageRoot: dependencies.storageRoot ?? process.env.PI67_STORAGE_ROOT ?? process.cwd(),
+      turns: dependencies.agentTurns,
+      refreshHosting: () => { this.#realtime.start(); this.#realtime.reconnect(); },
+      onHostChanged: (payload) => events.sendFor({ type: "teamChat.agentHostChanged", payload }, appContextAuthority())
+    });
     this.#realtime = new TeamChatRealtime({
       ...dependencies.realtime,
       resolveUrl: async (signal) => {
         const access = await this.#access();
-        const ticket = await new TeamChatGateway(access).issueRealtimeTicket(signal);
+        const gateway = new TeamChatAgentGateway(access);
+        const ticket = await gateway.issueRealtimeTicket(signal, await this.#agents.ticketAgentIds(access, signal));
         return teamChatRealtimeUrl(access.endpoint, access.teamId, ticket);
       },
       hasCredential: () => credentials?.snapshot().credential !== undefined,
       credentialSignal: () => credentials?.signal ?? this.#idle.signal,
-      onState: (payload) => events.sendFor({ type: "teamChat.connectionChanged", payload }, appContextAuthority()),
-      onPush: (payload) => events.sendFor({ type: "teamChat.pushed", payload }, appContextAuthority())
+      onState: (payload) => {
+        events.sendFor({ type: "teamChat.connectionChanged", payload }, appContextAuthority());
+        if (payload.status === "live" && payload.generation !== this.#liveGeneration) {
+          this.#liveGeneration = payload.generation;
+          void this.#agents.runner.catchUp().catch(() => undefined);
+        }
+      },
+      onPush: (payload) => {
+        if (payload.type === "agent.invoked") this.#agents.runner.enqueue(payload.invocationId, payload.agentUserId);
+        else events.sendFor({ type: "teamChat.pushed", payload }, appContextAuthority());
+      }
     });
+    // A Desktop hosting Agents connects at startup, not only when Chat is opened.
+    void this.#agents.bindings.hasEnabled().then((hosting) => { if (hosting) this.#realtime.start(); }, () => undefined);
+    this.#agents.runner.startPolling();
   }
 
-  shutdown(): void { this.#realtime.stop(); }
+  shutdown(): void {
+    this.#agents.runner.stop();
+    this.#realtime.stop();
+  }
 
   async dispatch<T extends TeamChatCommandType>(
     command: AgentCommand<T>,
@@ -83,15 +116,18 @@ export class TeamChatCommandRouter {
     this.#realtime.start();
     if (command.type === "teamChat.connection.get") return this.#realtime.state;
     const access = await this.#access();
-    const gateway = new TeamChatGateway(access);
+    const gateway = new TeamChatAgentGateway(access);
+    if (isAgentCommand(command)) return this.#agents.dispatch(command.type, command.payload, signal);
     switch (command.type) {
       case "teamChat.directory.get": {
-        const [members, conversations, policy] = await Promise.all([
+        const [members, conversations, policy, agents] = await Promise.all([
           gateway.listMembers(signal),
           gateway.listConversations(signal),
-          gateway.getPolicyOrDefault(signal)
+          gateway.getPolicyOrDefault(signal),
+          // Services before Agent members lack the route; Chat works without Agents.
+          gateway.listAgents(signal).catch(() => [])
         ]);
-        return { teamId: access.teamId, selfUserId: access.userId, members, conversations, policy };
+        return { teamId: access.teamId, selfUserId: access.userId, members, conversations, policy, agents };
       }
       case "teamChat.messages.list": {
         const { conversationId, before, after, limit } = command.payload as TeamChatCommandPayloads["teamChat.messages.list"];
@@ -163,6 +199,10 @@ export class TeamChatCommandRouter {
     const { endpoint, credential } = await this.dependencies.session();
     return { endpoint, accessToken: credential.accessToken, teamId: credential.accountId, userId: credential.userId };
   }
+}
+
+function isAgentCommand(command: AgentCommand<TeamChatCommandType>): command is AgentCommand<TeamChatAgentCommandType> {
+  return (TEAM_CHAT_AGENT_COMMANDS as readonly string[]).includes(command.type);
 }
 
 function channelName(value: string): string {

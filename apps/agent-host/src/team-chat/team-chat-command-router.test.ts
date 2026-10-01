@@ -1,5 +1,8 @@
 import type { TeamChatChannelAction } from "@pi67/domain";
 import type { AgentCommand } from "@pi67/protocol";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HostEventChannel } from "../host-event-channel.js";
 import { isTeamChatCommand, TeamChatCommandRouter, type TeamChatCommandType } from "./team-chat-command-router.js";
@@ -27,7 +30,7 @@ function json(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });
 }
 
-function setup(routes: Record<string, (init: RequestInit) => Response>) {
+function setup(routes: Record<string, (init: RequestInit) => Response>, live?: { frames: string[] }) {
   const calls: Array<{ url: string; init: RequestInit }> = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
     calls.push({ url, init });
@@ -39,7 +42,17 @@ function setup(routes: Record<string, (init: RequestInit) => Response>) {
   const events = { sendFor: vi.fn() };
   const router = new TeamChatCommandRouter({
     session: async () => ({ endpoint, credential }),
-    events: events as unknown as HostEventChannel
+    events: events as unknown as HostEventChannel,
+    storageRoot: mkdtempSync(join(tmpdir(), "pi67-chat-router-")),
+    agentTurns: { ready: () => true, run: async () => "unused" },
+    ...(live === undefined ? {} : {
+      credentials: { snapshot: () => ({ credential }), signal: new AbortController().signal } as never,
+      realtime: { openSocket: () => {
+        const socket = { onmessage: null as ((event: { data: unknown }) => void) | null, onclose: null, onerror: null, close: () => undefined };
+        setTimeout(() => { for (const data of live.frames) socket.onmessage?.({ data }); }, 0);
+        return socket;
+      } }
+    })
   });
   const run = <T extends TeamChatCommandType>(type: T, payload: AgentCommand<T>["payload"]) =>
     router.dispatch({ type, payload } as AgentCommand<T>);
@@ -70,7 +83,8 @@ describe("TeamChatCommandRouter", () => {
       selfUserId: "me",
       members: [{ userId: "me", displayName: "Me", role: "owner" }],
       conversations: [parseConversation(conversation)],
-      policy: { channelCreation: "admins", viewersCanPost: false, revision: 2 }
+      policy: { channelCreation: "admins", viewersCanPost: false, agentCreation: "members", revision: 2 },
+      agents: []
     });
     expect(new Headers(calls[0]!.init.headers).get("Authorization")).toBe("Bearer access");
     router.shutdown();
@@ -205,7 +219,7 @@ describe("TeamChatCommandRouter", () => {
     await expect(run("teamChat.message.send", { conversationId: "c1", clientKey: "client-key-2", body: "@李雷", mentionUserIds: ["u2"] }))
       .resolves.toMatchObject({ mentionUserIds: ["u2"] });
     const directory = await run("teamChat.directory.get", {});
-    expect(directory.policy).toEqual({ channelCreation: "members", viewersCanPost: true, revision: 0 });
+    expect(directory.policy).toEqual({ channelCreation: "members", viewersCanPost: true, agentCreation: "members", revision: 0 });
     expect(directory.conversations[0]).toMatchObject({ mentionCount: 3, ownerUserId: "u2" });
     const bodies = calls.filter((call) => call.init.body !== undefined).map((call) => JSON.parse(call.init.body as string));
     expect(bodies).toEqual([
@@ -214,4 +228,57 @@ describe("TeamChatCommandRouter", () => {
     ]);
     router.shutdown();
   });
+
+  it("manages Agents, binds one to this Desktop and names it in the realtime ticket", async () => {
+    const agent = { userId: "agent-1", name: "研究助手", description: "", ownerUserId: "me", modelLabel: "", dailyLimit: 50,
+      status: "active", disabledByAdmin: false, online: false, createdAt: "2026-10-01T00:00:00Z" };
+    const ok = () => new Response(null, { status: 204 });
+    const { router, run, calls, events } = setup({
+      "GET /chat/agents": () => json({ agents: [agent, { ...agent, userId: "agent-2", ownerUserId: "u2" }] }),
+      "POST /chat/agents": () => json(agent, 201),
+      "PATCH /chat/agents/agent-1": () => json(agent),
+      "POST /chat/agents/agent-1/disable": () => json({ ...agent, status: "disabled" }),
+      "DELETE /chat/agents/agent-1": ok,
+      "GET /members": () => json({ members: [] }),
+      "GET /chat/conversations": () => json({ conversations: [] }),
+      "GET /chat/policy": () => json({ channelCreation: "members", viewersCanPost: true, retentionDays: null, agentCreation: "admins", revision: 1 })
+    });
+    await expect(run("teamChat.agent.create", { name: " 研究助手 ", description: "宏观" })).resolves.toMatchObject({ userId: "agent-1", createdAt: Date.parse(agent.createdAt) });
+    await expect(run("teamChat.agent.create", { name: "  ", description: "" })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    const directory = await run("teamChat.directory.get", {});
+    expect(directory.agents.map((item) => item.userId)).toEqual(["agent-1", "agent-2"]);
+    expect(directory.policy.agentCreation).toBe("admins");
+    const binding = { agentUserId: "agent-1", workspaceId: "w1", projectId: "p1", model: { provider: "anthropic", id: "claude" }, enabled: true };
+    await expect(run("teamChat.agent.host.bind", { binding: { ...binding, agentUserId: "agent-2" } })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    await expect(run("teamChat.agent.host.bind", { binding })).resolves.toEqual({ bindings: [binding], activity: [] });
+    expect(events.sendFor).toHaveBeenCalledWith({ type: "teamChat.agentHostChanged", payload: { bindings: [binding], activity: [] } }, expect.anything());
+    await expect(run("teamChat.agent.host.get", {})).resolves.toEqual({ bindings: [binding], activity: [] });
+    await expect(run("teamChat.agent.setDisabled", { agentUserId: "agent-1", disabled: true })).resolves.toMatchObject({ status: "disabled" });
+    await expect(run("teamChat.agent.remove", { agentUserId: "agent-1" })).resolves.toEqual({});
+    await expect(run("teamChat.agent.host.get", {})).resolves.toEqual({ bindings: [], activity: [] });
+    const bodies = calls.filter((call) => call.init.body !== undefined).map((call) => JSON.parse(call.init.body as string));
+    expect(bodies).toEqual([{ name: "研究助手", description: "宏观" }, { modelLabel: "anthropic · claude" }]);
+    router.shutdown();
+  });
+
+  it("hosts bound Agents on the realtime ticket and hands agent.invoked to the runner, not the renderer", async () => {
+    const agent = { userId: "agent-1", name: "研究助手", description: "", ownerUserId: "me", modelLabel: "", dailyLimit: 50,
+      status: "active", disabledByAdmin: false, online: false, createdAt: "2026-10-01T00:00:00Z" };
+    const claimed = vi.fn(() => json({ error: { code: "chat_agent_invocation_unavailable" } }, 409));
+    const { router, run, calls, events } = setup({
+      "GET /chat/agents": () => json({ agents: [agent] }),
+      "PATCH /chat/agents/agent-1": () => json(agent),
+      "POST /chat/realtime-tickets": () => json({ ticket: "t", expiresAt: "2026-10-01T00:01:00Z" }, 201),
+      "GET /chat/agent-invocations": () => json({ invocations: [] }),
+      "POST /chat/agent-invocations/i1/claim": claimed
+    }, { frames: [JSON.stringify({ type: "ready" }), JSON.stringify({ type: "agent.invoked", invocationId: "i1", agentUserId: "agent-1", conversationId: "c1" })] });
+    await run("teamChat.agent.host.bind", { binding: { agentUserId: "agent-1", workspaceId: "w1", projectId: "p1",
+      model: { provider: "anthropic", id: "claude" }, enabled: true } });
+    await vi.waitFor(() => expect(claimed).toHaveBeenCalled());
+    const ticket = calls.find((call) => call.url.endsWith("/chat/realtime-tickets") && call.init.body !== undefined);
+    expect(JSON.parse(ticket!.init.body as string)).toEqual({ hostAgentIds: ["agent-1"] });
+    expect(events.sendFor.mock.calls.some(([event]) => (event as { type: string }).type === "teamChat.pushed")).toBe(false);
+    router.shutdown();
+  });
 });
+

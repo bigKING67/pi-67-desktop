@@ -1,0 +1,222 @@
+/* Agent members (ADR 0004): rail rows, badges, request states and the management dialog. */
+
+.agentAvatar {
+  position: relative;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--accent-strong);
+}
+
+/* Presence reads from the dot's fill and the row's accessible name, never color alone. */
+.presence {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--text-disabled);
+}
+
+.presenceOnline { background: var(--success); }
+
+.badge {
+  padding: 0 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  line-height: 16px;
+}
+
+.rowMeta {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+}
+
+.railFooter {
+  padding: 2px 8px 4px;
+}
+
+.invocations {
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.invocation {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+}
+
+.invocationProblem { color: var(--text-secondary); }
+
+.disclosure {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+  line-height: 1.55;
+}
+
+.intro {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.introTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.agentsModal { width: min(640px, calc(100vw - 40px)); }
+
+.agentsDialog {
+  display: grid;
+  max-height: min(760px, calc(100vh - 80px));
+  gap: 14px;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.agentsDialog:focus,
+.agentsDialog:focus-visible { outline: none; }
+
+.agentsDialog h2 { margin: 0; }
+
+.agentsDialog form { padding: 0; }
+
+.createRow {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) auto;
+  align-items: end;
+  gap: 14px;
+}
+
+.createRow > :global(.primary-button) { min-height: 38px; }
+
+/* Keeps 关闭 reachable while the cards scroll. */
+.stickyActions {
+  position: sticky;
+  bottom: -20px;
+  margin: 0 -20px -20px;
+  padding: 12px 20px 20px;
+  border-top: 1px solid var(--border);
+  /* Follows the modal's rounded bottom corners instead of covering its border. */
+  border-radius: 0 0 13px 13px;
+  background: var(--surface-raised);
+}
+
+.card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cardHeader strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardHeader .spacer { flex: 1; }
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  /* Hints under one field must not stretch its neighbour. */
+  align-items: start;
+  gap: 12px 14px;
+}
+
+.fieldGrid .wide { grid-column: 1 / -1; }
+
+.fieldGrid select,
+.fieldGrid input[type="number"] {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.fieldGrid select:focus-visible,
+.fieldGrid input[type="number"]:focus-visible { border-color: var(--accent); box-shadow: var(--shadow-focus); outline: 0; }
+
+.hostSection {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.hostSection h3 {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: var(--font-size-support);
+}
+
+.toggle input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.activity {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+  list-style: none;
+}
+
+@media (max-width: 620px) {
+  .createRow,
+  .fieldGrid { grid-template-columns: 1fr; }
+}
+
+.armedDanger,
+.armedDanger:hover {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+  color: var(--danger);
+}

@@ -29,6 +29,8 @@ export interface TaskRuntimeRegistryOptions {
   localMemory?: PiSdkRuntimeOptions["localMemory"];
   authorizeTeamSession?: PiSdkRuntimeOptions["authorizeTeamSession"];
   onRuntimeLoaded?: (record: TaskRuntimeRecord, runtime: AgentRuntime) => void;
+  /** A disposed Host-internal Task was dropped; per-Task state keyed by it can go too. */
+  onRecordForgotten?: (taskKey: string) => void;
   sharedExperienceAccessForWorkspace?: (workspaceId: string) => SharedExperienceAccess;
   sharedSopAccessForWorkspace?: (workspaceId: string) => SharedSopAccess;
   teamKnowledgeAccessForWorkspace?: (workspaceId: string) => NonNullable<PiSdkRuntimeOptions["teamKnowledgeAccess"]>;
@@ -239,6 +241,15 @@ export class TaskRuntimeRegistry {
     }
     await this.releaseAttachments(record);
     return disposed;
+  }
+
+  /** Drops a fully disposed Task record (Host-internal Tasks such as Agent turns). */
+  forget(context: TaskProtocolContext): void {
+    const taskKey = taskRuntimeKey(context.workspaceId, context.taskId);
+    const record = this.records.get(taskKey);
+    if (!record?.closed || record.runtime || record.runtimeLoad || record.attachmentCleanupPending) return;
+    this.records.delete(taskKey);
+    this.options.onRecordForgotten?.(taskKey);
   }
 
   async disposeAll(): Promise<void> {

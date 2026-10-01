@@ -2,6 +2,7 @@ import type { TeamChatMessage } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
 import {
   formatTeamChatTime,
+  teamChatInvocationText,
   teamChatMentionCandidates,
   teamChatMentionQuery,
   teamChatMentionSegments,
@@ -60,5 +61,15 @@ describe("team chat presentation", () => {
     ]);
     expect(teamChatTimeline([{ ...message("m1", "u2", at(1, 9, 0)), mentionUserIds: ["me"] }], [], "me", at(1, 10, 0))[0])
       .toMatchObject({ mentionUserIds: ["me"] });
+  });
+
+  it("describes Agent request states and hides them once the reply arrives", () => {
+    expect(teamChatInvocationText({ status: "queued" }, "研究助手", true)).toBe("研究助手 已收到，排队中");
+    expect(teamChatInvocationText({ status: "queued" }, "研究助手", false)).toContain("离线");
+    expect(teamChatInvocationText({ status: "running" }, "研究助手", true)).toBe("研究助手 正在回复…");
+    expect(teamChatInvocationText({ status: "replied" }, "研究助手", true)).toBeUndefined();
+    expect(teamChatInvocationText({ status: "rejected", reason: "daily_limit" }, "研究助手", true)).toBe("研究助手 没有处理：今日次数已用完");
+    expect(teamChatInvocationText({ status: "failed", reason: "model_unavailable" }, "研究助手", true)).toContain("模型不可用");
+    expect(teamChatInvocationText({ status: "expired" }, "研究助手", false)).toContain("10 分钟");
   });
 });

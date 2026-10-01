@@ -1,14 +1,15 @@
 import { Hash, Lock, MessagesSquare, Settings2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Button } from "react-aria-components";
-import type { TeamChatConversation, TeamChatDirectory } from "@pi67/domain";
+import { teamChatDirectPeer, type TeamChatConversation, type TeamChatDirectory } from "@pi67/domain";
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
-import { conversationTitle } from "./team-chat-model.js";
+import { conversationTitle, memberById } from "./team-chat-model.js";
 import { teamChatErrorMessage } from "./team-chat-controller.js";
 import { teamChat, useTeamChat } from "./team-chat-instance.js";
 import { teamChatTimeline } from "./team-chat-presentation.js";
-import { TeamChatAvatar } from "./TeamChatParts.js";
+import { agentPresenceLabel, TeamChatAgentAvatar, TeamChatAgentBadge, TeamChatAvatar } from "./TeamChatParts.js";
+import agentStyles from "./TeamChatAgents.module.css";
 import { TeamChatChannelSettings } from "./TeamChatChannelSettings.js";
 import { TeamChatComposer } from "./TeamChatComposer.js";
 import { TeamChatTimeline } from "./TeamChatTimeline.js";
@@ -88,6 +89,9 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
   }, [conversation.id, conversation.lastSeq]);
 
   const Icon = conversation.visibility === "private" ? Lock : Hash;
+  const peerAgent = conversation.kind === "dm"
+    ? directory.agents.find((agent) => agent.userId === teamChatDirectPeer(conversation, directory.selfUserId))
+    : undefined;
   const header = (
     <>
       <header className={styles.conversationIntro}>
@@ -100,8 +104,10 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
                 <Settings2 aria-hidden="true" size={14} />{copy.channelSettings}
               </Button>
             ) : null}</>
-          : <><TeamChatAvatar name={title} /><strong>{title}</strong><span>{copy.directMessages}</span></>}
+          : <>{peerAgent ? <TeamChatAgentAvatar agent={peerAgent} /> : <TeamChatAvatar name={title} />}
+            <strong>{title}</strong><span>{copy.directMessages}</span></>}
       </header>
+      <AgentIntro conversation={conversation} directory={directory} />
       {!thread || thread.status === "loading" ? <p className={styles.timelineStatus} role="status">{copy.loadingMessages}</p> : null}
       {thread?.status === "error" ? (
         <div className={styles.timelineStatus} role="alert">
@@ -157,6 +163,27 @@ function JoinCard({ conversation, title }: { conversation: TeamChatConversation;
           .catch((error: unknown) => publishNotification({ level: "warning", title: copy.join, message: teamChatErrorMessage(error) }))
           .finally(() => setJoining(false));
       }}>{copy.join}</Button>
+    </div>
+  );
+}
+
+/** For a direct message with an Agent: who runs it, with what model, and whether it is online. */
+function AgentIntro({ conversation, directory }: { conversation: TeamChatConversation; directory: TeamChatDirectory }) {
+  const copy = messages.teamChat;
+  if (conversation.kind !== "dm") return null;
+  const peer = teamChatDirectPeer(conversation, directory.selfUserId);
+  const agent = directory.agents.find((item) => item.userId === peer);
+  if (!agent) return null;
+  const owner = memberById(directory, agent.ownerUserId)?.displayName ?? copy.unknownTeammate;
+  return (
+    <div className={agentStyles.intro} data-testid="team-chat-agent-intro">
+      <div className={agentStyles.introTitle}>
+        <TeamChatAgentBadge />
+        <span className={agentStyles.rowMeta}>{`${copy.agentOwnedBy(owner)} · ${agentPresenceLabel(agent)}`}</span>
+      </div>
+      {agent.description ? <p className={agentStyles.disclosure}>{agent.description}</p> : null}
+      <p className={agentStyles.disclosure}>{copy.agentDisclosure(owner, agent.modelLabel)}</p>
+      {!agent.online && agent.status === "active" ? <p className={agentStyles.disclosure}>{copy.agentOfflineHint}</p> : null}
     </div>
   );
 }

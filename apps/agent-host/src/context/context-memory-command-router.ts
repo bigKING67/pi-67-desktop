@@ -18,6 +18,7 @@ import { ContextSessionCommitController, type PrivateSessionCommit } from "./con
 import type { EnterpriseCredentialBrokerClient } from "./enterprise-credential-broker-client.js";
 import { EnterpriseContextController } from "./enterprise-context-controller.js";
 import { TeamChatCommandRouter } from "../team-chat/team-chat-command-router.js";
+import type { TeamChatAgentTurns } from "../team-chat/team-chat-agent-turns.js";
 import {
   readContextRuntimeDoctor,
   readContextRuntimeStatus,
@@ -69,7 +70,8 @@ export class ContextMemoryCommandRouter {
     private readonly events: HostEventChannel,
     enterpriseCredentials?: EnterpriseCredentialBrokerClient,
     commitPrivateSession?: PrivateSessionCommit,
-    private readonly managedMemory?: ManagedMemoryInspection
+    private readonly managedMemory?: ManagedMemoryInspection,
+    agentTurns?: TeamChatAgentTurns
   ) {
     this.configuration = new ContextMemoryConfigurationStore(agentDir);
     this.recall = new RecallObservationStore(agentDir);
@@ -81,6 +83,7 @@ export class ContextMemoryCommandRouter {
       this.recall
     );
     this.teamChat = new TeamChatCommandRouter({ session: () => this.enterprise.newMoneySession(), events,
+      storageRoot: process.env.PI67_STORAGE_ROOT ?? agentDir, ...(agentTurns === undefined ? {} : { agentTurns }),
       ...(enterpriseCredentials === undefined ? {} : { credentials: enterpriseCredentials }) });
     const experienceCandidates = new ExperienceCandidateStore(agentDir);
     this.experience = new ExperienceGovernanceController(experienceCandidates, this.enterprise, events);

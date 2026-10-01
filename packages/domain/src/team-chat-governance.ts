@@ -10,11 +10,15 @@ export interface TeamChatPolicy {
   viewersCanPost: boolean;
   /** Plain messages older than this are purged; absent keeps them forever. Work Cards are always kept. */
   retentionDays?: TeamChatRetentionDays;
+  /** Who may add Agents (viewers never can). */
+  agentCreation: "members" | "admins";
   /** 0 until an owner/admin first saves the policy. */
   revision: number;
 }
 
-export const TEAM_CHAT_DEFAULT_POLICY: TeamChatPolicy = { channelCreation: "members", viewersCanPost: true, revision: 0 };
+export const TEAM_CHAT_DEFAULT_POLICY: TeamChatPolicy = {
+  channelCreation: "members", viewersCanPost: true, agentCreation: "members", revision: 0
+};
 
 export interface TeamChatChannelRoster {
   ownerUserId: string;

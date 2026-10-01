@@ -1,4 +1,5 @@
 import type {
+  TeamChatAgentBinding,
   TeamChatChannelAction,
   TeamChatChannelRoster,
   TeamChatConnectionState,
@@ -199,6 +200,7 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
         onEvent: (event, envelope) => {
           if (envelope.context.scope !== "app") return;
           if (event.type === "teamChat.connectionChanged") onConnection(event.payload);
+          if (event.type === "teamChat.agentHostChanged") update((state) => ({ ...state, agentHost: event.payload }));
           if (event.type !== "teamChat.pushed") return;
           const before = event.payload.type === "message.created"
             ? store.getState().threads[event.payload.message.conversationId]?.messages.at(-1)?.seq
@@ -271,6 +273,36 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
     async manageChannel(conversationId: string, action: TeamChatChannelAction): Promise<void> {
       await port.request("teamChat.channel.manage", { conversationId, action });
       await loadDirectory();
+    },
+    /** Agent members (ADR 0004): every change re-reads the directory, which carries the Agents. */
+    async createAgent(input: { name: string; description: string }): Promise<string> {
+      const agent = await port.request("teamChat.agent.create", input);
+      await loadDirectory();
+      return agent.userId;
+    },
+    async updateAgent(input: { agentUserId: string; name?: string; description?: string; dailyLimit?: number }): Promise<void> {
+      await port.request("teamChat.agent.update", input);
+      await loadDirectory();
+    },
+    async setAgentDisabled(agentUserId: string, disabled: boolean): Promise<void> {
+      await port.request("teamChat.agent.setDisabled", { agentUserId, disabled });
+      await loadDirectory();
+    },
+    async removeAgent(agentUserId: string): Promise<void> {
+      await port.request("teamChat.agent.remove", { agentUserId });
+      await loadDirectory();
+    },
+    async loadAgentHost(): Promise<void> {
+      const host = await port.request("teamChat.agent.host.get", {});
+      guarded((state) => ({ ...state, agentHost: host }))();
+    },
+    async hostAgent(binding: TeamChatAgentBinding): Promise<void> {
+      const host = await port.request("teamChat.agent.host.bind", { binding });
+      guarded((state) => ({ ...state, agentHost: host }))();
+    },
+    async stopHostingAgent(agentUserId: string): Promise<void> {
+      const host = await port.request("teamChat.agent.host.unbind", { agentUserId });
+      guarded((state) => ({ ...state, agentHost: host }))();
     },
     async joinChannel(conversationId: string): Promise<void> {
       const conversation = await port.request("teamChat.channel.join", { conversationId });

@@ -48,6 +48,8 @@ export interface SafetyPolicyState {
   trust: WorkspaceTrust;
   taskToolMode: TaskToolMode;
   taskTrustedRoots?: readonly string[];
+  /** Team Chat Agent turns run with no tools at all (ADR 0004). */
+  toolsDisabled?: boolean;
 }
 
 export type DesktopApprovalDecision =
@@ -92,8 +94,9 @@ export function createDesktopSafetyExtension(
     hidden: true,
     factory: (pi: ExtensionAPI) => {
       pi.on("tool_call", async (event, ctx) => {
-        if (isVerifiedDesktopAttachmentTool(pi, event.toolName, event.input)) return undefined;
         const state = getState();
+        if (state.toolsDisabled) return { block: true, reason: "AGENT_TURN_NO_TOOLS: Team Chat Agent turns have no tools." };
+        if (isVerifiedDesktopAttachmentTool(pi, event.toolName, event.input)) return undefined;
         let intent: ClassifiedToolIntent;
         try {
           intent = await classifyToolIntent(

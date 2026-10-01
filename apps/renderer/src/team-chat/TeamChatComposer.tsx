@@ -17,7 +17,7 @@ import {
   teamChatRemainingCharacters,
   type TeamChatMentionCandidate
 } from "./team-chat-presentation.js";
-import { TeamChatAvatar } from "./TeamChatParts.js";
+import { TeamChatAgentAvatar, TeamChatAgentBadge, TeamChatAvatar } from "./TeamChatParts.js";
 import styles from "./TeamChat.module.css";
 import governance from "./TeamChatGovernance.module.css";
 
@@ -54,7 +54,7 @@ function useMentionableMembers(conversation: TeamChatConversation, directory: Te
     const ids = conversation.kind === "dm" ? conversation.memberUserIds : roster ?? [];
     const members = ids.flatMap((userId) => {
       const member = userId === directory.selfUserId ? undefined : memberById(directory, userId);
-      return member ? [{ userId, displayName: member.displayName }] : [];
+      return member ? [{ userId, displayName: member.displayName, ...(member.agent ? { agent: true } : {}) }] : [];
     });
     return { members, loading };
   }, [conversation.kind, conversation.memberUserIds, roster, loading, directory]);
@@ -72,6 +72,8 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
   const [query, setQuery] = useState<{ start: number; query: string }>();
   const [active, setActive] = useState(0);
   const input = useRef<HTMLTextAreaElement>(null);
+  /** Caret to restore right after a picked mention is committed, before the next keystroke. */
+  const pendingCaret = useRef<number | undefined>(undefined);
   const listId = useId();
   const noticeId = useId();
   const mentionable = useMentionableMembers(conversation, directory, query !== undefined);
@@ -88,6 +90,11 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
     if (!element) return;
     element.style.height = "auto";
     element.style.height = `${Math.min(element.scrollHeight, 200)}px`;
+    if (pendingCaret.current !== undefined) {
+      element.focus();
+      element.setSelectionRange(pendingCaret.current, pendingCaret.current);
+      pendingCaret.current = undefined;
+    }
   }, [draft]);
 
   const track = (element: HTMLTextAreaElement) => {
@@ -102,11 +109,7 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
     setDraft(`${before}${inserted}${draft.slice(query.start + 1 + query.query.length)}`);
     setPicks((current) => [...current.filter((item) => item.userId !== candidate.userId), candidate]);
     setQuery(undefined);
-    const caret = before.length + inserted.length;
-    requestAnimationFrame(() => {
-      input.current?.focus();
-      input.current?.setSelectionRange(caret, caret);
-    });
+    pendingCaret.current = before.length + inserted.length;
   };
 
   const send = () => {
@@ -147,9 +150,15 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
   };
 
   const notice = !policyAllows ? copy.viewerReadOnly : !writable ? copy.peerLeft : undefined;
+  const askedAgents = picks.filter((pick) => pick.agent && draft.includes(`@${pick.displayName}`));
   return (
     <form className={styles.composer} onSubmit={(event) => { event.preventDefault(); send(); }}>
       {notice ? <p className={styles.composerNotice} id={noticeId} role="status">{notice}</p> : null}
+      {askedAgents.length > 0 ? (
+        <p className={styles.composerNotice} data-testid="team-chat-agent-disclosure">
+          {copy.agentMentionDisclosure(askedAgents.map((pick) => `@${pick.displayName}`).join("、"))}
+        </p>
+      ) : null}
       <div className={`${styles.composerField} ${governance.composerAnchor}`}>
         {pickerOpen ? (
           <div className={governance.mentionPicker}>
@@ -165,8 +174,8 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
                     onMouseEnter={() => setActive(index)}
                     role="option"
                   >
-                    <TeamChatAvatar name={candidate.displayName} />
-                    <span>{candidate.displayName}</span>
+                    {candidate.agent ? <TeamChatAgentAvatar /> : <TeamChatAvatar name={candidate.displayName} />}
+                    <span>{candidate.displayName}{candidate.agent ? <> <TeamChatAgentBadge /></> : null}</span>
                   </li>
                 ))}
               </ul>

@@ -47,7 +47,7 @@ describe("Team Chat protocol schemas", () => {
     expect(Value.Check(CommandResultSchemas["teamChat.message.send"], { ...message, seq: 0 })).toBe(false);
     expect(Value.Check(CommandResultSchemas["teamChat.directory.get"], {
       teamId: "t", selfUserId: "u1", members: [{ userId: "u1", displayName: "Me", role: "viewer" }], conversations: [conversation],
-      policy: { channelCreation: "members", viewersCanPost: true, revision: 0 }
+      policy: { channelCreation: "members", viewersCanPost: true, agentCreation: "members", revision: 0 }, agents: []
     })).toBe(true);
     const pushed = EventPayloadSchemas["teamChat.pushed"];
     expect(Value.Check(pushed, { type: "message.created", message })).toBe(true);
@@ -74,8 +74,30 @@ describe("Team Chat protocol schemas", () => {
     expect(Value.Check(CommandResultSchemas["teamChat.message.send"], { ...message, mentionUserIds: ["u2"] })).toBe(true);
     expect(Value.Check(CommandResultSchemas["teamChat.channel.members"], { ownerUserId: "u1", members: [{ userId: "u1", joinedAt: 1 }] })).toBe(true);
     const directory = CommandResultSchemas["teamChat.directory.get"];
-    const policy = (value: object) => ({ teamId: "t", selfUserId: "u1", members: [], conversations: [], policy: value });
-    expect(Value.Check(directory, policy({ channelCreation: "admins", viewersCanPost: false, retentionDays: 90, revision: 3 }))).toBe(true);
-    expect(Value.Check(directory, policy({ channelCreation: "admins", viewersCanPost: false, retentionDays: 30, revision: 3 }))).toBe(false);
+    const policy = (value: object) => ({ teamId: "t", selfUserId: "u1", members: [], conversations: [], policy: value, agents: [] });
+    expect(Value.Check(directory, policy({ channelCreation: "admins", viewersCanPost: false, retentionDays: 90, agentCreation: "admins", revision: 3 }))).toBe(true);
+    expect(Value.Check(directory, policy({ channelCreation: "admins", viewersCanPost: false, retentionDays: 30, agentCreation: "admins", revision: 3 }))).toBe(false);
+  });
+
+  it("bounds Agent commands, invocation states and the host state", () => {
+    expect(COMMAND_CONTEXT_SCOPE_REQUIREMENTS["teamChat.agent.host.bind"]).toBe("app");
+    expect(EVENT_CONTEXT_REQUIREMENTS["teamChat.agentHostChanged"].requiredScope).toBe("app");
+    const create = CommandPayloadSchemas["teamChat.agent.create"];
+    expect(Value.Check(create, { name: "研究助手", description: "" })).toBe(true);
+    expect(Value.Check(create, { name: "名".repeat(41), description: "" })).toBe(false);
+    const binding = { agentUserId: "a1", workspaceId: "w1", projectId: "p1", model: { provider: "anthropic", id: "claude" }, enabled: true };
+    expect(Value.Check(CommandPayloadSchemas["teamChat.agent.host.bind"], { binding })).toBe(true);
+    expect(Value.Check(CommandPayloadSchemas["teamChat.agent.host.bind"], { binding: { ...binding, model: { provider: "" , id: "x" } } })).toBe(false);
+    const asked = { ...message, agentInvocations: [{ id: "i1", agentUserId: "a1", status: "rejected", reason: "daily_limit" }] };
+    expect(Value.Check(CommandResultSchemas["teamChat.message.send"], asked)).toBe(true);
+    expect(Value.Check(CommandResultSchemas["teamChat.message.send"], { ...asked, agentInvocations: [{ id: "i1", agentUserId: "a1", status: "thinking" }] })).toBe(false);
+    const pushed = EventPayloadSchemas["teamChat.pushed"];
+    expect(Value.Check(pushed, { type: "agents.changed" })).toBe(true);
+    expect(Value.Check(pushed, { type: "agent_invocation.changed", conversationId: "c1", messageId: "m1",
+      invocation: { id: "i1", agentUserId: "a1", status: "running" } })).toBe(true);
+    expect(Value.Check(pushed, { type: "agent.invoked", invocationId: "i1", agentUserId: "a1", conversationId: "c1" })).toBe(false);
+    expect(Value.Check(EventPayloadSchemas["teamChat.agentHostChanged"], {
+      bindings: [binding], activity: [{ agentUserId: "a1", invocationId: "i1", state: "failed", reason: "model_unavailable", at: 1 }]
+    })).toBe(true);
   });
 });

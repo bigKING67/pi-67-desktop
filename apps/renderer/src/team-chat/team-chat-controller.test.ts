@@ -10,7 +10,8 @@ const conversation: TeamChatConversation = {
 };
 const directory: TeamChatDirectory = {
   teamId: "t", selfUserId: "me", members: [{ userId: "me", displayName: "Me", role: "owner" }], conversations: [conversation],
-  policy: TEAM_CHAT_DEFAULT_POLICY
+  policy: TEAM_CHAT_DEFAULT_POLICY,
+  agents: []
 };
 const message = (seq: number, patch: Partial<TeamChatMessage> = {}): TeamChatMessage => ({
   id: `m${seq}`, conversationId: "c1", seq, senderUserId: "u2", body: `m${seq}`, clientKey: `client-${seq}`, createdAt: seq, ...patch
@@ -264,5 +265,37 @@ describe("team chat controller", () => {
     await controller.manageChannel("c1", { type: "archive" });
     expect(calls.find((call) => call.type === "teamChat.channel.manage")?.payload).toEqual({ conversationId: "c1", action: { type: "archive" } });
     expect(calls.filter((call) => call.type === "teamChat.directory.get").length).toBe(before + 1);
+  });
+
+  it("manages Agents through the directory and tracks this Desktop's hosting", async () => {
+    const host = { bindings: [{ agentUserId: "a1", workspaceId: "w1", projectId: "p1", model: { provider: "anthropic", id: "claude" }, enabled: true }], activity: [] };
+    const { controller, calls, connect, emit } = harness({
+      "teamChat.connection.get": () => ({ status: "connecting" }),
+      "teamChat.directory.get": () => directory,
+      "teamChat.agent.create": () => ({ userId: "a1" }),
+      "teamChat.agent.update": () => ({}),
+      "teamChat.agent.setDisabled": () => ({}),
+      "teamChat.agent.remove": () => ({}),
+      "teamChat.agent.host.get": () => ({ bindings: [], activity: [] }),
+      "teamChat.agent.host.bind": () => host,
+      "teamChat.agent.host.unbind": () => ({ bindings: [], activity: [] })
+    });
+    controller.start();
+    connect();
+    await flush();
+    const reads = () => calls.filter((call) => call.type === "teamChat.directory.get").length;
+    const before = reads();
+    await expect(controller.createAgent({ name: "研究助手", description: "" })).resolves.toBe("a1");
+    await controller.updateAgent({ agentUserId: "a1", dailyLimit: 10 });
+    await controller.setAgentDisabled("a1", true);
+    await controller.removeAgent("a1");
+    expect(reads()).toBe(before + 4);
+    await controller.loadAgentHost();
+    expect(controller.store.getState().agentHost).toEqual({ bindings: [], activity: [] });
+    await controller.hostAgent(host.bindings[0]!);
+    expect(controller.store.getState().agentHost).toEqual(host);
+    emit({ type: "teamChat.agentHostChanged", payload: { bindings: [], activity: [] } });
+    expect(controller.store.getState().agentHost?.bindings).toEqual([]);
+    await controller.stopHostingAgent("a1");
   });
 });

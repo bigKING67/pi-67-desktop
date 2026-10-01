@@ -2636,7 +2636,8 @@ ADR 0003 是权威合同。Team Chat 不经过 Pi Runtime、Task Scheduler 或 S
 - Protocol：`teamChat.connection.get`、`teamChat.directory.get`、`teamChat.messages.list`、
   `teamChat.message.send`、`teamChat.read.mark`、`teamChat.channel.create`、`teamChat.channel.join`、
   `teamChat.channel.members`、`teamChat.channel.manage`、`teamChat.dm.open`、`teamChat.workCard.create`、
-  `teamChat.workCard.act` 均为 `app` scope 命令；`teamChat.pushed` 与 `teamChat.connectionChanged` 是 `app`
+  `teamChat.workCard.act`、`teamChat.agent.create|update|setDisabled|remove`、`teamChat.agent.host.get|bind|unbind`
+  均为 `app` scope 命令（`teamChat.agentHostChanged` 为 `app` scope 事件）；`teamChat.pushed` 与 `teamChat.connectionChanged` 是 `app`
   scope 事件。Schema 位于 `packages/protocol/src/team-chat-schemas.ts`；字符长度按字素校验，Host 再按
   服务端的码点上限精确校验。`message.send` 不是 replay-safe control mutation：幂等由 caller 的
   `clientKey` 与服务端唯一约束承担，Renderer 重试复用同一 key。
@@ -2663,6 +2664,13 @@ ADR 0003 是权威合同。Team Chat 不经过 Pi Runtime、Task Scheduler 或 S
   同时读取团队聊天策略；读取失败时退回默认策略（服务端仍按真实策略执行）。`policy.changed` 推送只触发
   目录重读。`message.send` 可带 `mentionUserIds`（至多 50，服务端校验为会话成员）；Renderer 只发送用户
   从提及列表中选中且仍保留在正文中的成员，频道成员列表在首次输入 `@` 时按需读取。
+- Agent 成员（P3a，`docs/adr/0004-team-chat-agents.md`）：`team-chat/team-chat-agent-host.ts` 处理管理命令与本机托管，
+  binding 写入 `PI67_STORAGE_ROOT/team-chat/agents.json`（0600，无凭据与正文）。有启用的 binding 时 Host 启动即连接，
+  realtime ticket 携带 `hostAgentIds`（已停用或被删除的 Agent 会先被剔除，避免重连失败循环）。`agent.invoked`
+  只由 Host 处理、不转发 Renderer；`team-chat-agent-runner.ts` 串行领取请求、构造提示词并调用
+  `team-chat-agent-turns.ts`：以 `chat-agent-<invocationId>` 的 Host 内部 Task 在绑定 Workspace 创建团队范围 Session，
+  先经 `AgentRuntime.agentTurn.disableAllTools()` 去掉全部工具并让安全策略拦截任何工具调用，再选模型、运行一轮，
+  150 秒超时中止，结束后释放 Task。日志与错误回报只含原因码，不含正文。
 
 ## Source layout
 

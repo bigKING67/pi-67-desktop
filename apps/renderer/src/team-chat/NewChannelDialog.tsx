@@ -4,7 +4,7 @@ import { TEAM_CHAT_CHANNEL_NAME_MAX_CHARS, teamChatCodePointLength, type TeamCha
 import { messages } from "../localization/message-catalog.js";
 import { teamChatErrorMessage } from "./team-chat-controller.js";
 import { teamChat, useTeamChat } from "./team-chat-instance.js";
-import { TeamChatAvatar } from "./TeamChatParts.js";
+import { TeamChatAgentAvatar, TeamChatAgentBadge, TeamChatAvatar } from "./TeamChatParts.js";
 import styles from "./TeamChat.module.css";
 
 export function NewChannelDialog({ onClose }: { onClose: () => void }) {
@@ -15,7 +15,11 @@ export function NewChannelDialog({ onClose }: { onClose: () => void }) {
   const [members, setMembers] = useState<ReadonlySet<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
-  const teammates = directory?.members.filter((member) => member.userId !== directory.selfUserId) ?? [];
+  // Agents can join channels too, so teammates can @mention them there (ADR 0004).
+  const teammates = directory ? [
+    ...directory.members.filter((member) => member.userId !== directory.selfUserId),
+    ...directory.agents.filter((agent) => agent.status === "active").map((agent) => ({ userId: agent.userId, displayName: agent.name, agent: true }))
+  ] : [];
   const valid = name.trim().length > 0 && teamChatCodePointLength(name.trim()) <= TEAM_CHAT_CHANNEL_NAME_MAX_CHARS;
 
   const create = async () => {
@@ -78,8 +82,8 @@ export function NewChannelDialog({ onClose }: { onClose: () => void }) {
                         }}
                         type="checkbox"
                       />
-                      <TeamChatAvatar name={member.displayName} />
-                      <span>{member.displayName}</span>
+                      {"agent" in member ? <TeamChatAgentAvatar /> : <TeamChatAvatar name={member.displayName} />}
+                      <span>{member.displayName}{"agent" in member ? <> <TeamChatAgentBadge /></> : null}</span>
                     </label>
                   ))}
                 </div>

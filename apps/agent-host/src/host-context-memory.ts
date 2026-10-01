@@ -4,6 +4,7 @@ import type { WorkspaceContextRegistry } from "./workspace-context-registry.js";
 import type { TaskRuntimeRegistry } from "./task-runtime-registry.js";
 import { ContextMemoryCommandRouter } from "./context/context-memory-command-router.js";
 import { ManagedMemoryInspection } from "./context/managed-memory-inspection.js";
+import { createTeamChatAgentTurns } from "./team-chat/team-chat-agent-turns.js";
 
 export type HostContextMemory = ContextMemoryCommandRouter;
 
@@ -14,5 +15,5 @@ export function createHostContextMemory(agentDir: string, workspaces: WorkspaceC
     options.managedLocalMemory ? new ManagedMemoryInspection(
       () => options.localMemoryBroker?.inspect() ?? Promise.reject(new Error("Managed memory broker is unavailable.")),
       (workspaceId, sessionId) => tasks.inspectPrivateMemory(workspaceId, sessionId)
-    ) : undefined);
+    ) : undefined, createTeamChatAgentTurns(workspaces, tasks));
 }

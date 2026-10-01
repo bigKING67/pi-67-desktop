@@ -155,5 +155,7 @@ export interface AgentRuntime {
   stopSubagent(id: string): Promise<NativeSubagentView>;
   resumeSubagent(id: string, mode?: NativeSubagentMode): Promise<NativeSubagentView>;
   collectDiagnostics(): Promise<RuntimeDiagnostics>;
+  /** Present on the Pi SDK runtime; Team Chat Agent turns require it. */
+  agentTurn?: import("./runtime-agent-turn.js").RuntimeAgentTurnControls;
   runDoctor(): Promise<DoctorReport>;
 }

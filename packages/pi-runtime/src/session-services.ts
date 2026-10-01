@@ -37,6 +37,7 @@ import type { SessionInteractionMode } from "@pi67/domain";
 import { createLocalMemoryEventBus, type LocalMemoryAccess } from "./local-memory-extension-bridge.js";
 import { bindPrivateMemoryCommitBus } from "./private-memory-commit.js";
 import { createSharedHistoryTransitionExtension } from "./shared-history-transition-extension.js";
+import { createAgentTurnSystemPromptExtension } from "./agent-turn-profile.js";
 
 interface DesktopSessionServicesOptions {
   localMemory?: LocalMemoryAccess;
@@ -60,6 +61,8 @@ export async function createDesktopSessionServices(
   options: DesktopSessionServicesOptions
 ): Promise<AgentSessionServices> {
   const getInteractionMode = options.getInteractionMode ?? (() => "execute" as const);
+  // Team Chat Agent turns (ADR 0004) load nothing from the owner's machine into the prompt.
+  const agentTurn = options.getSafety().toolsDisabled === true;
   await (options.packageTrustRefresh ?? options.packageTrustRegistry?.refresh());
   const loadedResourceReadAccess = createLoadedResourceReadAccess();
   const projectTrusted = options.getSafety().trust === "trusted";
@@ -114,7 +117,10 @@ export async function createDesktopSessionServices(
     ...(options.modelRuntime === undefined ? {} : { modelRuntime: options.modelRuntime }),
     resourceLoaderOptions: {
       eventBus,
-      ...(options.noThirdPartyExtensions
+      ...(agentTurn ? {
+        noExtensions: true, noSkills: true, noPromptTemplates: true, noContextFiles: true,
+        systemPrompt: "", appendSystemPrompt: []
+      } : options.noThirdPartyExtensions
         ? {
             noExtensions: true,
             additionalExtensionPaths: managedDesktopExtensionPaths(
@@ -138,7 +144,8 @@ export async function createDesktopSessionServices(
           getInteractionMode
         ),
         createDesktopPlanModeExtension(getInteractionMode),
-        createDesktopEnvironmentExtension()
+        createDesktopEnvironmentExtension(),
+        ...(agentTurn ? [createAgentTurnSystemPromptExtension()] : [])
       ]
     }
   });

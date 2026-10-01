@@ -35,11 +35,8 @@ import { PiRuntimeSessionActions } from "./pi-runtime-session-actions.js";
 import { PiRuntimeConversationActions } from "./pi-runtime-conversation-actions.js";
 import { PiRuntimePromptActions } from "./pi-runtime-prompt-actions.js";
 import { PiRuntimeEventBus } from "./pi-runtime-event-bus.js";
-import {
-  collectPiRuntimeDiagnostics,
-  getPiRuntimeIdentity,
-  runPiRuntimeDoctor
-} from "./pi-runtime-observability.js";
+import { collectPiRuntimeDiagnostics, getPiRuntimeIdentity, runPiRuntimeDoctor } from "./pi-runtime-observability.js";
+import { createRuntimeAgentTurnControls } from "./runtime-agent-turn.js";
 import { NativeSubagentCoordinator } from "./native-subagent-coordinator.js";
 import { NativeSubagentAdmission } from "./native-subagent-admission.js";
 import type { PiSdkRuntimeOptions } from "./pi-sdk-runtime-options.js";
@@ -56,6 +53,7 @@ export class PiSdkRuntime implements AgentRuntime {
   private configurationRuntimeUnsubscribe: (() => void) | undefined;
   private readonly configurationReload: PiRuntimeConfigurationReload;
   private readonly toolSafety = new RuntimeToolSafetyController();
+  readonly agentTurn = createRuntimeAgentTurnControls(() => this.sessionBindings.requireSession(), this.toolSafety);
   private readonly toolAuthorizations = new ToolAuthorizationTracker();
   private agentDir = getAgentDir();
   private readonly externalSessionChangeGuard = new SessionExternalChangeGuard();

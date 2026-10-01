@@ -1,4 +1,5 @@
 import type { EnterpriseTeamSummary } from "./context-memory.js";
+import type { TeamChatAgent, TeamChatAgentInvocationSummary } from "./team-chat-agents.js";
 import type { TeamChatPolicy } from "./team-chat-governance.js";
 
 /** Team Chat (ADR 0003). New Money owns the truth; Desktop state is disposable. */
@@ -81,6 +82,8 @@ export interface TeamChatMessage {
   workCard?: TeamChatWorkCard;
   /** Conversation members the sender mentioned; absent when none. */
   mentionUserIds?: string[];
+  /** Agents this message addressed and the state of each request. */
+  agentInvocations?: TeamChatAgentInvocationSummary[];
 }
 
 export interface TeamChatMessagePage {
@@ -94,6 +97,8 @@ export interface TeamChatDirectory {
   members: TeamChatMember[];
   conversations: TeamChatConversation[];
   policy: TeamChatPolicy;
+  /** The team's Agent members (never part of `members`). */
+  agents: TeamChatAgent[];
 }
 
 export type TeamChatPushEvent =
@@ -101,7 +106,9 @@ export type TeamChatPushEvent =
   | { type: "conversation.changed"; conversationId: string }
   | { type: "work_card.changed"; card: TeamChatWorkCard }
   | { type: "read.changed"; conversationId: string; lastReadSeq: number }
-  | { type: "policy.changed" };
+  | { type: "policy.changed" }
+  | { type: "agents.changed" }
+  | { type: "agent_invocation.changed"; conversationId: string; messageId: string; invocation: TeamChatAgentInvocationSummary };
 
 /**
  * `live` carries a generation that increases on every successful connect, so the

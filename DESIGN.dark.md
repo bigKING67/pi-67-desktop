@@ -251,7 +251,8 @@ hand-off and start-work dialogs reuse the dark field and notice surfaces. Mentio
 runs, the `@N` outline count and the reader's mention rail use the dark accent,
 accent-soft and accent-strong roles; the mention list uses the dark raised surface
 and floating shadow; the channel settings dialog reuses the dark dialog and danger
-roles. No dark-only Chat color exists.
+roles. Agent tiles, presence dots, badges and the Agent dialog use the same dark
+accent, success, border and surface roles. No dark-only Chat color exists.
 
 Workbench polish follows DESIGN.md in both themes: matching pane/reading widths,
 quieter navigation weights, transparent model/parameter utilities, labelled file

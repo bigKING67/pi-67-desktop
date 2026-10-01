@@ -1,4 +1,5 @@
-import { teamChatCodePointLength, type TeamChatMessage, type TeamChatWorkCard } from "@pi67/domain";
+import { teamChatCodePointLength, type TeamChatAgentInvocationSummary, type TeamChatMessage, type TeamChatWorkCard } from "@pi67/domain";
+import { messages } from "../localization/message-catalog.js";
 import type { TeamChatPendingMessage } from "./team-chat-model.js";
 
 /** Consecutive messages from one sender within this window share a header. */
@@ -17,6 +18,7 @@ export interface TeamChatTimelineEntry {
   pending?: Pick<TeamChatPendingMessage, "clientKey" | "status" | "error">;
   workCard?: TeamChatWorkCard;
   mentionUserIds?: string[];
+  agentInvocations?: TeamChatAgentInvocationSummary[];
 }
 
 /** Orders confirmed then pending messages into day-labelled sender groups. */
@@ -45,7 +47,8 @@ export function teamChatTimeline(
   for (const message of messages) {
     push({ key: message.id, senderUserId: message.senderUserId, body: message.body, createdAt: message.createdAt,
       ...(message.workCard === undefined ? {} : { workCard: message.workCard }),
-      ...(message.mentionUserIds === undefined ? {} : { mentionUserIds: message.mentionUserIds }) });
+      ...(message.mentionUserIds === undefined ? {} : { mentionUserIds: message.mentionUserIds }),
+      ...(message.agentInvocations === undefined ? {} : { agentInvocations: message.agentInvocations }) });
   }
   for (const item of pending) {
     push({
@@ -96,6 +99,8 @@ export function teamChatRemainingCharacters(body: string, limit: number): number
 export interface TeamChatMentionCandidate {
   userId: string;
   displayName: string;
+  /** Agent members are labelled, and mentioning one discloses what it reads. */
+  agent?: boolean;
 }
 
 /** Splits a body into text and `@name` runs for the mentioned members, longest name first. */
@@ -145,4 +150,22 @@ export function teamChatMentionCandidates(
     .sort((left, right) => (left.position === 0 ? 0 : 1) - (right.position === 0 ? 0 : 1)
       || left.member.displayName.localeCompare(right.member.displayName, "zh-CN"));
   return scored.slice(0, 8).map((item) => item.member);
+}
+
+/** Status line for one Agent request on the message that made it; replies speak for themselves. */
+export function teamChatInvocationText(
+  invocation: Pick<TeamChatAgentInvocationSummary, "status" | "reason">,
+  agentName: string,
+  agentOnline: boolean
+): string | undefined {
+  const copy = messages.teamChat;
+  const reason = invocation.reason === undefined ? copy.invocationReasons.runtime_error! : copy.invocationReasons[invocation.reason] ?? invocation.reason;
+  switch (invocation.status) {
+    case "queued": return agentOnline ? copy.invocationQueued(agentName) : copy.invocationWaiting(agentName);
+    case "running": return copy.invocationRunning(agentName);
+    case "replied": return undefined;
+    case "failed": return copy.invocationFailed(agentName, reason);
+    case "expired": return copy.invocationExpired(agentName);
+    case "rejected": return copy.invocationRejected(agentName, reason);
+  }
 }

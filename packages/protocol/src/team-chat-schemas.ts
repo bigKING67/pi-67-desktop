@@ -1,4 +1,5 @@
 import {
+  TEAM_CHAT_AGENT_LIMITS,
   TEAM_CHAT_CHANNEL_NAME_MAX_CHARS,
   TEAM_CHAT_CLIENT_KEY_PATTERN,
   TEAM_CHAT_MEMBER_BATCH_MAX,
@@ -27,6 +28,7 @@ const PolicySchema = strictObject({
   channelCreation: Type.Union([Type.Literal("members"), Type.Literal("admins")]),
   viewersCanPost: Type.Boolean(),
   retentionDays: Type.Optional(Type.Union([Type.Literal(90), Type.Literal(180), Type.Literal(365)])),
+  agentCreation: Type.Union([Type.Literal("members"), Type.Literal("admins")]),
   revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })
 });
 const ChannelActionSchema = Type.Union([
@@ -38,6 +40,49 @@ const ChannelActionSchema = Type.Union([
   strictObject({ type: Type.Literal("transferOwner"), userId: IdSchema }),
   strictObject({ type: Type.Literal("leave") })
 ]);
+const InvocationReasonSchema = Type.Union(["daily_limit", "agent_disabled", "not_configured", "model_unavailable",
+  "runtime_error", "lease_expired", "cancelled"].map((reason) => Type.Literal(reason)));
+const InvocationSummarySchema = strictObject({
+  id: IdSchema,
+  agentUserId: IdSchema,
+  status: Type.Union(["queued", "running", "replied", "failed", "expired", "rejected"].map((status) => Type.Literal(status))),
+  reason: Type.Optional(InvocationReasonSchema)
+});
+const AgentNameSchema = Type.String({ minLength: 1, maxLength: TEAM_CHAT_AGENT_LIMITS.name });
+const AgentDescriptionSchema = Type.String({ maxLength: TEAM_CHAT_AGENT_LIMITS.description });
+const AgentSchema = strictObject({
+  userId: IdSchema,
+  name: AgentNameSchema,
+  description: AgentDescriptionSchema,
+  ownerUserId: IdSchema,
+  modelLabel: Type.String({ maxLength: 120 }),
+  dailyLimit: Type.Integer({ minimum: 1, maximum: TEAM_CHAT_AGENT_LIMITS.dailyLimit }),
+  status: Type.Union([Type.Literal("active"), Type.Literal("disabled")]),
+  disabledByAdmin: Type.Boolean(),
+  online: Type.Boolean(),
+  createdAt: TimestampSchema
+});
+const ModelRefSchema = strictObject({
+  provider: Type.String({ minLength: 1, maxLength: 128 }),
+  id: Type.String({ minLength: 1, maxLength: 256 })
+});
+const AgentBindingSchema = strictObject({
+  agentUserId: IdSchema,
+  workspaceId: Type.String({ minLength: 1, maxLength: 256 }),
+  projectId: IdSchema,
+  model: ModelRefSchema,
+  enabled: Type.Boolean()
+});
+const AgentHostStateSchema = strictObject({
+  bindings: Type.Array(AgentBindingSchema, { maxItems: TEAM_CHAT_AGENT_LIMITS.perOwner }),
+  activity: Type.Array(strictObject({
+    agentUserId: IdSchema,
+    invocationId: IdSchema,
+    state: Type.Union([Type.Literal("running"), Type.Literal("replied"), Type.Literal("failed")]),
+    reason: Type.Optional(InvocationReasonSchema),
+    at: TimestampSchema
+  }), { maxItems: 20 })
+});
 const VisibilitySchema = Type.Union([Type.Literal("public"), Type.Literal("private")]);
 const RoleSchema = Type.Union([
   Type.Literal("owner"),
@@ -105,7 +150,8 @@ export const TeamChatMessageSchema = strictObject({
   clientKey: ClientKeySchema,
   createdAt: TimestampSchema,
   workCard: Type.Optional(TeamChatWorkCardSchema),
-  mentionUserIds: Type.Optional(MentionsSchema)
+  mentionUserIds: Type.Optional(MentionsSchema),
+  agentInvocations: Type.Optional(Type.Array(InvocationSummarySchema, { maxItems: TEAM_CHAT_MENTION_MAX }))
 });
 
 const ConnectionStateSchema = Type.Union([
@@ -160,7 +206,19 @@ export const TeamChatCommandPayloadSchemas: Record<keyof TeamChatCommandPayloads
     cardId: IdSchema,
     action: WorkCardActionSchema,
     expectedRevision: Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER })
-  })
+  }),
+  "teamChat.agent.create": strictObject({ name: AgentNameSchema, description: AgentDescriptionSchema }),
+  "teamChat.agent.update": strictObject({
+    agentUserId: IdSchema,
+    name: Type.Optional(AgentNameSchema),
+    description: Type.Optional(AgentDescriptionSchema),
+    dailyLimit: Type.Optional(Type.Integer({ minimum: 1, maximum: TEAM_CHAT_AGENT_LIMITS.dailyLimit }))
+  }),
+  "teamChat.agent.setDisabled": strictObject({ agentUserId: IdSchema, disabled: Type.Boolean() }),
+  "teamChat.agent.remove": strictObject({ agentUserId: IdSchema }),
+  "teamChat.agent.host.get": EmptySchema,
+  "teamChat.agent.host.bind": strictObject({ binding: AgentBindingSchema }),
+  "teamChat.agent.host.unbind": strictObject({ agentUserId: IdSchema })
 };
 
 export const TeamChatCommandResultSchemas: Record<keyof TeamChatCommandResults, TSchema> = {
@@ -174,7 +232,8 @@ export const TeamChatCommandResultSchemas: Record<keyof TeamChatCommandResults, 
       role: RoleSchema
     }), { maxItems: 100_000 }),
     conversations: Type.Array(TeamChatConversationSchema, { maxItems: 500 }),
-    policy: PolicySchema
+    policy: PolicySchema,
+    agents: Type.Array(AgentSchema, { maxItems: 50 })
   }),
   "teamChat.messages.list": strictObject({
     messages: Type.Array(TeamChatMessageSchema, { maxItems: TEAM_CHAT_PAGE_MAX }),
@@ -191,7 +250,14 @@ export const TeamChatCommandResultSchemas: Record<keyof TeamChatCommandResults, 
   "teamChat.channel.manage": EmptySchema,
   "teamChat.dm.open": TeamChatConversationSchema,
   "teamChat.workCard.create": TeamChatMessageSchema,
-  "teamChat.workCard.act": TeamChatWorkCardSchema
+  "teamChat.workCard.act": TeamChatWorkCardSchema,
+  "teamChat.agent.create": AgentSchema,
+  "teamChat.agent.update": AgentSchema,
+  "teamChat.agent.setDisabled": AgentSchema,
+  "teamChat.agent.remove": EmptySchema,
+  "teamChat.agent.host.get": AgentHostStateSchema,
+  "teamChat.agent.host.bind": AgentHostStateSchema,
+  "teamChat.agent.host.unbind": AgentHostStateSchema
 };
 
 export const TeamChatEventPayloadSchemas: Record<keyof TeamChatEventPayloads, TSchema> = {
@@ -200,7 +266,15 @@ export const TeamChatEventPayloadSchemas: Record<keyof TeamChatEventPayloads, TS
     strictObject({ type: Type.Literal("conversation.changed"), conversationId: IdSchema }),
     strictObject({ type: Type.Literal("work_card.changed"), card: TeamChatWorkCardSchema }),
     strictObject({ type: Type.Literal("read.changed"), conversationId: IdSchema, lastReadSeq: SeqSchema }),
-    strictObject({ type: Type.Literal("policy.changed") })
+    strictObject({ type: Type.Literal("policy.changed") }),
+    strictObject({ type: Type.Literal("agents.changed") }),
+    strictObject({
+      type: Type.Literal("agent_invocation.changed"),
+      conversationId: IdSchema,
+      messageId: IdSchema,
+      invocation: InvocationSummarySchema
+    })
   ]),
-  "teamChat.connectionChanged": ConnectionStateSchema
+  "teamChat.connectionChanged": ConnectionStateSchema,
+  "teamChat.agentHostChanged": AgentHostStateSchema
 };

@@ -81,7 +81,7 @@ export class AgentHostServer {
       this.runtimeLoader,
       this.runtimeCredentialOverrides,
       {
-        onRuntimeLoaded: (record, runtime) => this.tasks.bindRuntime(record, runtime),
+        onRuntimeLoaded: (record, runtime) => this.tasks.bindRuntime(record, runtime), onRecordForgotten: (taskKey) => this.tasks.forget(taskKey),
         authorizeTeamSession: (scope, model, signal) => this.contextMemory.authorizeTeamSession(scope, model, signal), sharedExperienceAccessForWorkspace: (workspaceId) => this.contextMemory.sharedExperienceAccess(workspaceId),
         sharedSopAccessForWorkspace: (workspaceId) => this.contextMemory.sharedSopAccess(workspaceId),
         ...(options.canonicalTeamKnowledgeTools === true && options.teamIndexSettings ? { teamKnowledgeAccessForWorkspace: (workspaceId: string) => this.teamKnowledge.forWorkspace(workspaceId) } : {}),
