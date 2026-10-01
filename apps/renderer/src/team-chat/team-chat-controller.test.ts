@@ -202,4 +202,37 @@ describe("team chat controller", () => {
     expect(teamChatErrorMessage(new Error("x"))).toBe("操作没有完成，请稍后重试。");
     expect(teamChatErrorMessage({ details: { serviceError: "chat_channel_name_taken" } })).toBe("团队里已有同名频道。");
   });
+
+  it("creates Work Cards, applies actions and reloads the thread on a stale revision", async () => {
+    const card = { id: "w1", conversationId: "c1", createdBy: "me", title: "t", goal: "", acceptance: "", summary: "", refs: [],
+      status: "todo" as const, revision: 1, createdAt: 0, updatedAt: 0 };
+    let stale = false;
+    const { controller, calls, connect } = harness({
+      "teamChat.connection.get": () => ({ status: "connecting" }),
+      "teamChat.directory.get": () => directory,
+      "teamChat.messages.list": () => ({ messages: [message(1)], hasMore: false }),
+      "teamChat.read.mark": () => ({ lastReadSeq: 2 }),
+      "teamChat.dm.open": () => ({ ...conversation, id: "d9", kind: "dm", visibility: "private", memberUserIds: ["me", "u5"] }),
+      "teamChat.workCard.create": () => message(3, { senderUserId: "me", body: "t", workCard: card }),
+      "teamChat.workCard.act": () => {
+        if (stale) throw Object.assign(new Error("stale"), { details: { serviceError: "work_card_revision_conflict" } });
+        return { ...card, status: "in_progress", claimedBy: "me", revision: 2 };
+      }
+    });
+    controller.start();
+    connect();
+    await flush();
+    await controller.selectConversation("c1");
+    await expect(controller.ensureDirectMessage("u5")).resolves.toBe("d9");
+    expect(controller.store.getState().selectedConversationId).toBe("c1");
+    await controller.createWorkCard("c1", { title: "t", goal: "", acceptance: "", summary: "", refs: [] });
+    expect(calls.find((call) => call.type === "teamChat.workCard.create")?.payload).toMatchObject({ conversationId: "c1", clientKey: "client-key-new" });
+    expect(controller.store.getState().threads.c1?.messages.at(-1)?.workCard?.status).toBe("todo");
+    await controller.actOnWorkCard(card, "claim");
+    expect(controller.store.getState().threads.c1?.messages.at(-1)?.workCard).toMatchObject({ status: "in_progress", revision: 2 });
+    stale = true;
+    const listsBefore = calls.filter((call) => call.type === "teamChat.messages.list").length;
+    await expect(controller.actOnWorkCard(card, "claim")).rejects.toThrow("stale");
+    expect(calls.filter((call) => call.type === "teamChat.messages.list").length).toBe(listsBefore + 1);
+  });
 });

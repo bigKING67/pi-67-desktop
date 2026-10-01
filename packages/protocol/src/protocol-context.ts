@@ -130,6 +130,8 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "teamChat.channel.create": "app",
   "teamChat.channel.join": "app",
   "teamChat.dm.open": "app",
+  "teamChat.workCard.create": "app",
+  "teamChat.workCard.act": "app",
   "context.session.get": "workspace",
   "context.session.commit": "workspace",
   "context.recall.list": "workspace",

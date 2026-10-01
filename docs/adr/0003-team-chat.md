@@ -1,6 +1,6 @@
 # ADR 0003: Team Chat beside Work
 
-Status: accepted; P1 implementation in progress, packaged and target-OS validation pending.
+Status: accepted; P1 and P2 implemented in source (not deployed); target-OS validation pending.
 Date: 2026-10-01
 
 ## Context

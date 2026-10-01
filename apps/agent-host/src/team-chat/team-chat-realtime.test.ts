@@ -68,11 +68,15 @@ describe("TeamChatRealtime", () => {
     last().frame({ type: "message.created", conversationId: "c1", message });
     last().frame({ type: "read.changed", conversationId: "c1", lastReadSeq: 4 });
     last().frame({ type: "conversation.changed", conversationId: "c2" });
+    last().frame({ type: "work_card.changed", conversationId: "c1", card: {
+      id: "w1", conversationId: "c1", createdBy: "u1", assigneeUserId: null, claimedBy: null, title: "t", goal: "", acceptance: "",
+      summary: "", refs: [], status: "todo", revision: 1, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" } });
     expect(states.at(-1)).toEqual({ status: "live", generation: 1 });
     expect(pushes).toEqual([
       { type: "message.created", message: { ...message, createdAt: Date.parse(message.createdAt) } },
       { type: "read.changed", conversationId: "c1", lastReadSeq: 4 },
-      { type: "conversation.changed", conversationId: "c2" }
+      { type: "conversation.changed", conversationId: "c2" },
+      { type: "work_card.changed", card: expect.objectContaining({ id: "w1", status: "todo", revision: 1 }) }
     ]);
     realtime.stop();
   });

@@ -1,23 +1,24 @@
-import { teamChatCodePointLength, type TeamChatMessage } from "@pi67/domain";
+import { teamChatCodePointLength, type TeamChatMessage, type TeamChatWorkCard } from "@pi67/domain";
 import type { TeamChatPendingMessage } from "./team-chat-model.js";
 
 /** Consecutive messages from one sender within this window share a header. */
 const GROUP_WINDOW_MS = 5 * 60 * 1_000;
 
-export type TeamChatTimelineEntry =
-  | { kind: "day"; key: string; label: string }
-  | {
-    kind: "message";
-    key: string;
-    senderUserId: string;
-    body: string;
-    createdAt: number;
-    /** First message of a sender group shows the name and time. */
-    showHeader: boolean;
-    pending?: Pick<TeamChatPendingMessage, "clientKey" | "status" | "error">;
-  };
+/** One message per entry; the first message of each day carries its day label. */
+export interface TeamChatTimelineEntry {
+  key: string;
+  senderUserId: string;
+  body: string;
+  createdAt: number;
+  /** Set on the first message of a calendar day. */
+  dayLabel?: string;
+  /** First message of a sender group shows the name and time. */
+  showHeader: boolean;
+  pending?: Pick<TeamChatPendingMessage, "clientKey" | "status" | "error">;
+  workCard?: TeamChatWorkCard;
+}
 
-/** Orders confirmed then pending messages into day-separated sender groups. */
+/** Orders confirmed then pending messages into day-labelled sender groups. */
 export function teamChatTimeline(
   messages: readonly TeamChatMessage[],
   pending: readonly TeamChatPendingMessage[],
@@ -28,21 +29,21 @@ export function teamChatTimeline(
   let lastDay: string | undefined;
   let lastSender: string | undefined;
   let lastAt = 0;
-  const push = (item: { key: string; senderUserId: string; body: string; createdAt: number;
-    pending?: Pick<TeamChatPendingMessage, "clientKey" | "status" | "error"> }) => {
+  const push = (item: Omit<TeamChatTimelineEntry, "showHeader" | "dayLabel">) => {
     const day = dayKey(item.createdAt);
-    if (day !== lastDay) {
-      entries.push({ kind: "day", key: `day-${day}`, label: dayLabel(item.createdAt, now) });
+    const newDay = day !== lastDay;
+    if (newDay) {
       lastDay = day;
       lastSender = undefined;
     }
     const showHeader = item.senderUserId !== lastSender || item.createdAt - lastAt > GROUP_WINDOW_MS;
-    entries.push({ kind: "message", ...item, showHeader });
+    entries.push({ ...item, showHeader, ...(newDay ? { dayLabel: dayLabel(item.createdAt, now) } : {}) });
     lastSender = item.senderUserId;
     lastAt = item.createdAt;
   };
   for (const message of messages) {
-    push({ key: message.id, senderUserId: message.senderUserId, body: message.body, createdAt: message.createdAt });
+    push({ key: message.id, senderUserId: message.senderUserId, body: message.body, createdAt: message.createdAt,
+      ...(message.workCard === undefined ? {} : { workCard: message.workCard }) });
   }
   for (const item of pending) {
     push({

@@ -143,4 +143,32 @@ describe("TeamChatCommandRouter", () => {
     await expect(run("teamChat.dm.open", { userId: "u2" })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
     router.shutdown();
   });
+
+  it("creates Work Cards and applies lifecycle actions with strict parsing", async () => {
+    const card = {
+      id: "w1", conversationId: "c1", createdBy: "me", assigneeUserId: "u2", claimedBy: null, title: "修复登录",
+      goal: "回跳", acceptance: "", summary: "", refs: [{ kind: "branch", label: "fix/login" }], status: "todo", revision: 1,
+      createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z"
+    };
+    const { router, run, calls } = setup({
+      "POST /chat/conversations/c1/work-cards": () => json({ ...message, body: "修复登录", workCard: card }, 201),
+      "POST /chat/work-cards/w1/actions": () => json({ ...card, status: "in_progress", claimedBy: "u2", revision: 2 }),
+      "POST /chat/work-cards/bad/actions": () => json({ ...card, refs: [{ kind: "link", label: "x", url: "http://insecure" }] })
+    });
+    const input = { conversationId: "c1", clientKey: "card-key-01", title: " 修复登录 ", goal: "回跳", acceptance: "", summary: "",
+      refs: [{ kind: "branch" as const, label: "fix/login" }], assigneeUserId: "u2" };
+    await expect(run("teamChat.workCard.create", input)).resolves.toMatchObject({
+      workCard: { id: "w1", status: "todo", assigneeUserId: "u2", refs: [{ kind: "branch", label: "fix/login" }] }
+    });
+    expect(JSON.parse(calls[0]!.init.body as string)).toMatchObject({ title: "修复登录", clientKey: "card-key-01" });
+    await expect(run("teamChat.workCard.act", { cardId: "w1", action: "claim", expectedRevision: 1 }))
+      .resolves.toMatchObject({ status: "in_progress", claimedBy: "u2", revision: 2 });
+    expect(JSON.parse(calls[1]!.init.body as string)).toEqual({ action: "claim", expectedRevision: 1 });
+    await expect(run("teamChat.workCard.act", { cardId: "bad", action: "claim", expectedRevision: 1 }))
+      .rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    await expect(run("teamChat.workCard.create", { ...input, title: "  " })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    await expect(run("teamChat.workCard.create", { ...input, summary: "字".repeat(8_001) })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    expect(calls).toHaveLength(3);
+    router.shutdown();
+  });
 });

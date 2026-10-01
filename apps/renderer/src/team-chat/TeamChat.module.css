@@ -208,28 +208,29 @@
   line-height: 1.6;
 }
 
+/* Virtuoso scroller; alignToBottom keeps short conversations above the composer. */
 .timeline {
   grid-row: 2;
   min-height: 0;
-  overflow-y: auto;
+  height: 100%;
   overscroll-behavior: contain;
 }
 
-/* Short conversations sit above the composer, as in other IM timelines. */
+.timeline:focus-visible { box-shadow: inset 0 0 0 2px var(--focus); outline: none; }
+
+/* Item spacing uses padding: margins can collapse outside Virtuoso's measured items. */
 .timelineColumn {
   display: grid;
-  min-height: 100%;
-  align-content: end;
   width: min(var(--conversation-track-width, 800px), 100%);
   margin: 0 auto;
-  padding: var(--space-5) var(--space-5) var(--space-3);
+  padding: 0 var(--space-5);
 }
 
 .conversationIntro {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding-bottom: var(--space-4);
+  padding: var(--space-5) 0 var(--space-4);
   color: var(--text-tertiary);
   font-size: var(--font-size-support);
 }
@@ -268,7 +269,7 @@
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: var(--space-3);
-  margin: var(--space-4) 0 var(--space-1);
+  padding: var(--space-4) 0 var(--space-1);
   color: var(--text-tertiary);
   font-size: var(--font-size-caption);
 }
@@ -279,13 +280,9 @@
   content: "";
 }
 
-.message {
-  padding: 1px 0;
-  content-visibility: auto;
-  contain-intrinsic-size: auto 24px;
-}
+.message { position: relative; padding: 1px 0; }
 
-.messageGroupStart { margin-top: var(--space-3); }
+.messageGroupStart { padding-top: var(--space-3); }
 
 .message header {
   display: flex;
@@ -586,4 +583,193 @@
 
 @media (prefers-reduced-motion: reduce) {
   .timeline { scroll-behavior: auto; }
+}
+
+/* Work Cards (ADR 0003 P2): status uses icon + text, never color alone. */
+.workCard {
+  display: grid;
+  gap: 6px;
+  max-width: 560px;
+  margin-top: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.workCard > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.workCardKind {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.workCardStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.workCardStatus[data-status="in_progress"] { color: var(--info); }
+.workCardStatus[data-status="in_review"] { color: var(--warning); }
+.workCardStatus[data-status="done"] { color: var(--success); }
+.workCardStatus[data-status="closed"] { color: var(--text-tertiary); }
+
+.workCard h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.4;
+}
+
+.workCard[data-status="closed"] h3 { color: var(--text-secondary); text-decoration: line-through; }
+
+/* Scoped under .workCard to outrank the timeline's `.message p` text rule. */
+.workCard .workCardOwner {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+}
+
+.workCardSection {
+  display: grid;
+  gap: 2px;
+}
+
+.workCardSection strong {
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.workCardSection p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-support);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.workCardRefs {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workCardRefs li {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.workCardRefs a,
+.workCardRefs span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workCardRefs a { color: var(--accent-strong); }
+
+.workCard > footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.workCard > footer button {
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: var(--font-size-support);
+}
+
+.timelinePending {
+  display: grid;
+  grid-row: 2;
+  min-height: 0;
+  align-content: end;
+  overflow-y: auto;
+}
+
+/* Revealed on hover or keyboard focus at the row's top-right; takes no layout space. */
+.messageAction {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--canvas);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--motion-ease-out);
+}
+
+.message:hover .messageAction,
+.messageAction[data-focus-visible] { opacity: 1; }
+.messageAction[data-hovered] { background: var(--surface-hover); color: var(--text-primary); }
+.messageAction[data-focus-visible] { box-shadow: var(--shadow-focus); outline: none; }
+
+.handoffModal {
+  width: min(600px, calc(100vw - 40px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.formNotice {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: 1.55;
+}
+
+.field select,
+.field textarea {
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  outline: 0;
+  background: var(--surface-muted);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--font-size-support);
+}
+
+.field textarea { min-height: 64px; resize: vertical; line-height: 1.5; }
+
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-focus);
+}
+
+.field input[aria-invalid="true"] { border-color: var(--danger); }
+.field small.fieldError { color: var(--danger); }
+
+.refPicker label { grid-template-columns: auto minmax(0, 1fr); }
+
+@media (prefers-reduced-motion: reduce) {
+  .messageAction { transition: none; }
 }

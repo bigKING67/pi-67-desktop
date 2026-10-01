@@ -1,6 +1,7 @@
 import {
   TEAM_CHAT_CHANNEL_NAME_MAX_CHARS,
   TEAM_CHAT_MESSAGE_MAX_CHARS,
+  TEAM_CHAT_WORK_CARD_LIMITS,
   teamChatCodePointLength,
   teamChatHasControlCharacter
 } from "@pi67/domain";
@@ -28,7 +29,9 @@ const TEAM_CHAT_COMMANDS: ReadonlySet<string> = new Set<TeamChatCommandType>([
   "teamChat.read.mark",
   "teamChat.channel.create",
   "teamChat.channel.join",
-  "teamChat.dm.open"
+  "teamChat.dm.open",
+  "teamChat.workCard.create",
+  "teamChat.workCard.act"
 ]);
 
 export function isTeamChatCommand(type: AgentCommandType): type is TeamChatCommandType {
@@ -117,6 +120,22 @@ export class TeamChatCommandRouter {
       }
       case "teamChat.channel.join":
         return gateway.joinChannel((command.payload as TeamChatCommandPayloads["teamChat.channel.join"]).conversationId, signal);
+      case "teamChat.workCard.create": {
+        const { conversationId, ...input } = command.payload as TeamChatCommandPayloads["teamChat.workCard.create"];
+        const title = input.title.trim();
+        const limits = TEAM_CHAT_WORK_CARD_LIMITS;
+        const tooLong = (text: string, maximum: number) => teamChatCodePointLength(text) > maximum || text.includes("\0");
+        if (!title || tooLong(title, limits.title) || teamChatHasControlCharacter(title)
+          || tooLong(input.goal, limits.section) || tooLong(input.acceptance, limits.section)
+          || tooLong(input.summary, limits.summary)) {
+          throw invalid("Work Card fields exceed their limits.");
+        }
+        return gateway.createWorkCard(conversationId, { ...input, title }, signal);
+      }
+      case "teamChat.workCard.act": {
+        const { cardId, action, expectedRevision } = command.payload as TeamChatCommandPayloads["teamChat.workCard.act"];
+        return gateway.actOnWorkCard(cardId, action, expectedRevision, signal);
+      }
       case "teamChat.dm.open": {
         const { userId } = command.payload as TeamChatCommandPayloads["teamChat.dm.open"];
         if (userId === access.userId) throw invalid("Choose a teammate other than yourself.");

@@ -6,6 +6,7 @@ import {
   applyMessagePage,
   applyPush,
   applyReadCursor,
+  applyWorkCard,
   canSendTo,
   conversationTitle,
   directMessageWith,
@@ -121,5 +122,19 @@ describe("team chat model", () => {
     expect(canSendTo(directory, channel({ joined: false }))).toBe(false);
     expect(canSendTo(directory, dm)).toBe(true);
     expect(canSendTo(directory, { ...dm, memberCount: 1, memberUserIds: ["me"] })).toBe(false);
+  });
+
+  it("replaces carried Work Cards by revision and ignores stale or unknown updates", () => {
+    const card = { id: "w1", conversationId: "c1", createdBy: "me", title: "t", goal: "", acceptance: "", summary: "", refs: [],
+      status: "todo" as const, revision: 2, createdAt: 0, updatedAt: 0 };
+    const state = applyMessagePage(replaceDirectory(INITIAL_TEAM_CHAT_STATE, directory), "c1",
+      { messages: [message(1, { workCard: card }), message(2)], hasMore: false }, "latest");
+    const next = applyWorkCard(state, { ...card, status: "in_progress", revision: 3 });
+    expect(next.threads.c1?.messages[0]?.workCard).toMatchObject({ status: "in_progress", revision: 3 });
+    expect(applyWorkCard(next, { ...card, status: "done", revision: 2 })).toBe(next);
+    expect(applyWorkCard(next, { ...card, id: "other", revision: 9 })).toBe(next);
+    expect(applyWorkCard(next, { ...card, conversationId: "unloaded", revision: 9 })).toBe(next);
+    expect(applyPush(next, { type: "work_card.changed", card: { ...card, status: "done", revision: 4 } }))
+      .toMatchObject({ refreshDirectory: false, state: { threads: { c1: { messages: [{ workCard: { status: "done" } }, {}] } } } });
   });
 });

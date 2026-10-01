@@ -2635,7 +2635,7 @@ ADR 0003 是权威合同。Team Chat 不经过 Pi Runtime、Task Scheduler 或 S
 
 - Protocol：`teamChat.connection.get`、`teamChat.directory.get`、`teamChat.messages.list`、
   `teamChat.message.send`、`teamChat.read.mark`、`teamChat.channel.create`、`teamChat.channel.join`、
-  `teamChat.dm.open` 均为 `app` scope 命令；`teamChat.pushed` 与 `teamChat.connectionChanged` 是 `app`
+  `teamChat.dm.open`、`teamChat.workCard.create`、`teamChat.workCard.act` 均为 `app` scope 命令；`teamChat.pushed` 与 `teamChat.connectionChanged` 是 `app`
   scope 事件。Schema 位于 `packages/protocol/src/team-chat-schemas.ts`；字符长度按字素校验，Host 再按
   服务端的码点上限精确校验。`message.send` 不是 replay-safe control mutation：幂等由 caller 的
   `clientKey` 与服务端唯一约束承担，Renderer 重试复用同一 key。
@@ -2652,6 +2652,11 @@ ADR 0003 是权威合同。Team Chat 不经过 Pi Runtime、Task Scheduler 或 S
 - Renderer：`team-chat/team-chat-controller.ts` 订阅 Port 事件，在每个新 generation、sequence gap 或
   重连后重新读取目录并对已打开会话做 `after=<tail>` 补齐；跳号 push 从推送前的 tail 补齐。所有状态是
   可丢弃的内存缓存，登出时清空并忽略迟到响应。日志与诊断不记录消息正文、ticket 或 token。
+- 时间线用 Virtuoso 虚拟化（`team-chat/TeamChatTimeline.tsx`）：线程就绪后才挂载以定位到最新消息，
+  日期标签挂在当天首条消息上，使加载更早消息成为纯前插（`firstItemIndex` 递减）。
+- Work Card：卡片是带 `workCard` 的消息；`work_card.changed` 推送按 revision 替换已加载线程中的卡片，
+  revision 冲突会重载该线程。Chat→Work 只经 `team-chat/team-chat-work-bridge.ts` 打开带 `teamScope`
+  的草稿（`beginRendererSessionIntentInWorkspace` + 草稿 `setText`），从不自动发送，也不创建私人范围 Session。
 
 ## Source layout
 

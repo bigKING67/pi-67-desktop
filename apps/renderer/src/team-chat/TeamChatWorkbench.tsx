@@ -1,19 +1,18 @@
-import { ArrowUp, Hash, Lock, MessagesSquare, RotateCw } from "lucide-react";
+import { ArrowUp, Hash, Lock, MessagesSquare } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "react-aria-components";
 import { TEAM_CHAT_MESSAGE_MAX_CHARS, type TeamChatConversation, type TeamChatDirectory } from "@pi67/domain";
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
-import { canSendTo, conversationTitle, memberById } from "./team-chat-model.js";
+import { canSendTo, conversationTitle } from "./team-chat-model.js";
 import { teamChatErrorMessage } from "./team-chat-controller.js";
 import { teamChat, useTeamChat } from "./team-chat-instance.js";
-import { formatTeamChatTime, teamChatRemainingCharacters, teamChatTimeline } from "./team-chat-presentation.js";
+import { teamChatRemainingCharacters, teamChatTimeline } from "./team-chat-presentation.js";
 import { TeamChatAvatar } from "./TeamChatParts.js";
+import { TeamChatTimeline } from "./TeamChatTimeline.js";
 import styles from "./TeamChat.module.css";
 
 const EMPTY: readonly never[] = [];
-/** Distance from the bottom within which new messages keep the view pinned. */
-const PIN_THRESHOLD_PX = 96;
 
 export function TeamChatWorkbench() {
   const copy = messages.teamChat;
@@ -73,9 +72,7 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
   const conversationPending = useMemo(() => pending.filter((item) => item.conversationId === conversation.id), [pending, conversation.id]);
   const timeline = useMemo(() => teamChatTimeline(thread?.messages ?? EMPTY, conversationPending, directory.selfUserId, Date.now()),
     [thread?.messages, conversationPending, directory.selfUserId]);
-  const scroller = useRef<HTMLDivElement>(null);
-  const pinned = useRef(true);
-  const previousHeight = useRef(0);
+  const [scrollRequest, setScrollRequest] = useState(0);
 
   // Mark read while this conversation is visible and focused.
   useEffect(() => {
@@ -85,83 +82,49 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
     return () => window.removeEventListener("focus", read);
   }, [conversation.id, conversation.lastSeq]);
 
-  // Keep the newest message in view unless the reader scrolled up; preserve position when older pages load.
-  useLayoutEffect(() => {
-    const element = scroller.current;
-    if (!element) return;
-    if (pinned.current) element.scrollTop = element.scrollHeight;
-    else if (element.scrollHeight > previousHeight.current && element.scrollTop < 40) {
-      element.scrollTop += element.scrollHeight - previousHeight.current;
-    }
-    previousHeight.current = element.scrollHeight;
-  }, [timeline]);
-
   const Icon = conversation.visibility === "private" ? Lock : Hash;
+  const header = (
+    <>
+      <header className={styles.conversationIntro}>
+        {conversation.kind === "channel"
+          ? <><Icon aria-hidden="true" size={16} /><strong>{title}</strong>
+            <span>{`${conversation.visibility === "private" ? copy.privateChannel : copy.publicChannel} · ${conversation.memberCount} 位成员`}</span></>
+          : <><TeamChatAvatar name={title} /><strong>{title}</strong><span>{copy.directMessages}</span></>}
+      </header>
+      {!thread || thread.status === "loading" ? <p className={styles.timelineStatus} role="status">{copy.loadingMessages}</p> : null}
+      {thread?.status === "error" ? (
+        <div className={styles.timelineStatus} role="alert">
+          <span>{copy.messagesFailed}</span>
+          <Button className="secondary-button" onPress={() => void teamChat.reloadThread(conversation.id)}>{copy.retry}</Button>
+        </div>
+      ) : null}
+      {thread?.status === "ready" && thread.hasMore ? (
+        <Button className={styles.loadOlder!} isDisabled={thread.loadingOlder} onPress={() => void teamChat.loadOlder(conversation.id)}>
+          {copy.loadOlder}
+        </Button>
+      ) : null}
+      {thread?.status === "ready" && timeline.length === 0 ? <p className={styles.timelineStatus}>{copy.emptyConversation}</p> : null}
+    </>
+  );
   return (
     <>
-      <div
-        aria-label={target}
-        className={styles.timeline}
-        onScroll={(event) => {
-          const element = event.currentTarget;
-          pinned.current = element.scrollHeight - element.scrollTop - element.clientHeight < PIN_THRESHOLD_PX;
-        }}
-        ref={scroller}
-        role="log"
-      >
-        <div className={styles.timelineColumn}>
-          <header className={styles.conversationIntro}>
-            {conversation.kind === "channel"
-              ? <><Icon aria-hidden="true" size={16} /><strong>{title}</strong>
-                <span>{`${conversation.visibility === "private" ? copy.privateChannel : copy.publicChannel} · ${conversation.memberCount} 位成员`}</span></>
-              : <><TeamChatAvatar name={title} /><strong>{title}</strong><span>{copy.directMessages}</span></>}
-          </header>
-          {!thread || thread.status === "loading" ? <p className={styles.timelineStatus} role="status">{copy.loadingMessages}</p> : null}
-          {thread?.status === "error" ? (
-            <div className={styles.timelineStatus} role="alert">
-              <span>{copy.messagesFailed}</span>
-              <Button className="secondary-button" onPress={() => void teamChat.reloadThread(conversation.id)}>{copy.retry}</Button>
-            </div>
-          ) : null}
-          {thread?.status === "ready" && thread.hasMore ? (
-            <Button className={styles.loadOlder!} isDisabled={thread.loadingOlder}
-              onPress={() => { pinned.current = false; void teamChat.loadOlder(conversation.id); }}>
-              {copy.loadOlder}
-            </Button>
-          ) : null}
-          {thread?.status === "ready" && timeline.length === 0 ? <p className={styles.timelineStatus}>{copy.emptyConversation}</p> : null}
-          {timeline.map((entry) => entry.kind === "day" ? (
-            <div className={styles.daySeparator} key={entry.key}><span>{entry.label}</span></div>
-          ) : (
-            <article
-              className={`${styles.message} ${entry.showHeader ? styles.messageGroupStart : ""} ${entry.pending ? styles.messagePending : ""}`}
-              key={entry.key}
-            >
-              {entry.showHeader ? (
-                <header>
-                  <strong>{entry.senderUserId === directory.selfUserId
-                    ? copy.you
-                    : memberById(directory, entry.senderUserId)?.displayName ?? copy.unknownTeammate}</strong>
-                  <time dateTime={new Date(entry.createdAt).toISOString()}>{formatTeamChatTime(entry.createdAt)}</time>
-                </header>
-              ) : null}
-              <p>{entry.body}</p>
-              {entry.pending?.status === "sending" ? <small role="status">{copy.sending}</small> : null}
-              {entry.pending?.status === "failed" ? (
-                <div className={styles.pendingFailure} role="alert">
-                  <span>{`${copy.sendFailed}：${entry.pending.error ?? copy.genericError}`}</span>
-                  <Button className={styles.textAction!} onPress={() => { pinned.current = true; void teamChat.retrySend(entry.pending!.clientKey); }}>
-                    <RotateCw aria-hidden="true" size={13} />{copy.retrySend}
-                  </Button>
-                  <Button className={styles.textAction!} onPress={() => teamChat.discardPending(entry.pending!.clientKey)}>{copy.discard}</Button>
-                </div>
-              ) : null}
-            </article>
-          ))}
-        </div>
-      </div>
+      {/* Mount Virtuoso only with data so it opens at the newest message. */}
+      {thread?.status === "ready" ? (
+        <TeamChatTimeline
+          conversationId={conversation.id}
+          directory={directory}
+          entries={timeline}
+          hasMore={thread.hasMore}
+          header={header}
+          loadingOlder={thread.loadingOlder}
+          scrollRequest={scrollRequest}
+          target={target}
+        />
+      ) : (
+        <div className={styles.timelinePending}><div className={styles.timelineColumn}>{header}</div></div>
+      )}
       {conversation.joined
-        ? <Composer conversation={conversation} directory={directory} onSent={() => { pinned.current = true; }} target={target} />
+        ? <Composer conversation={conversation} directory={directory} onSent={() => setScrollRequest((value) => value + 1)} target={target} />
         : <JoinCard conversation={conversation} title={title} />}
     </>
   );

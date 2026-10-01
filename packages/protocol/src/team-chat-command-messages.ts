@@ -5,7 +5,10 @@ import type {
   TeamChatMessage,
   TeamChatMessagePage,
   TeamChatPushEvent,
-  TeamChatVisibility
+  TeamChatVisibility,
+  TeamChatWorkCard,
+  TeamChatWorkCardAction,
+  TeamChatWorkCardRef
 } from "@pi67/domain";
 
 export interface TeamChatCommandPayloads {
@@ -17,6 +20,17 @@ export interface TeamChatCommandPayloads {
   "teamChat.channel.create": { name: string; visibility: TeamChatVisibility; memberUserIds: string[] };
   "teamChat.channel.join": { conversationId: string };
   "teamChat.dm.open": { userId: string };
+  "teamChat.workCard.create": {
+    conversationId: string;
+    clientKey: string;
+    title: string;
+    goal: string;
+    acceptance: string;
+    summary: string;
+    refs: TeamChatWorkCardRef[];
+    assigneeUserId?: string;
+  };
+  "teamChat.workCard.act": { cardId: string; action: TeamChatWorkCardAction; expectedRevision: number };
 }
 
 export interface TeamChatCommandResults {
@@ -28,6 +42,8 @@ export interface TeamChatCommandResults {
   "teamChat.channel.create": TeamChatConversation;
   "teamChat.channel.join": TeamChatConversation;
   "teamChat.dm.open": TeamChatConversation;
+  "teamChat.workCard.create": TeamChatMessage;
+  "teamChat.workCard.act": TeamChatWorkCard;
 }
 
 export interface TeamChatEventPayloads {

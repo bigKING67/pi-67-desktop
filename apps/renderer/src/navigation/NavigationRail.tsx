@@ -28,6 +28,7 @@ import { newMoneyAccountLabel } from "../context-memory/new-money-account-store.
 import { TeamChatNavigation } from "../team-chat/TeamChatNavigation.js";
 import chatStyles from "../team-chat/TeamChat.module.css";
 import { WorkspaceModeSwitch } from "./WorkspaceModeSwitch.js";
+import { useTeamChatDialogStore } from "../team-chat/team-chat-dialog-store.js";
 
 const WorkspaceRemovalDialog = lazy(async () => {
   const module = await import("./WorkspaceRemovalDialog.js");
@@ -41,6 +42,12 @@ const ConversationDraftDiscardDialog = lazy(() => import("./ConversationDraftDis
 })));
 const NewChannelDialog = lazy(() => import("../team-chat/NewChannelDialog.js").then((module) => ({
   default: module.NewChannelDialog
+})));
+const TeamChatHandoffDialog = lazy(() => import("../team-chat/TeamChatHandoffDialog.js").then((module) => ({
+  default: module.TeamChatHandoffDialog
+})));
+const TeamChatStartWorkDialog = lazy(() => import("../team-chat/TeamChatStartWorkDialog.js").then((module) => ({
+  default: module.TeamChatStartWorkDialog
 })));
 const ArchivedConversationsDialog = lazy(() => import("./ArchivedConversationsDialog.js").then((module) => ({
   default: module.ArchivedConversationsDialog
@@ -79,6 +86,8 @@ export function NavigationRail({
   const archivedWorkspace = archivedWorkspaceId ? workspaces[archivedWorkspaceId] : undefined;
   const chatMode = useShellStore((state) => state.workspaceMode === "chat");
   const [channelDialogOpen, setChannelDialogOpen] = useState(false);
+  const handoffSource = useTeamChatDialogStore((state) => state.handoff);
+  const startWorkSource = useTeamChatDialogStore((state) => state.startWork);
 
   return (
     <aside
@@ -178,6 +187,12 @@ export function NavigationRail({
       {draftDiscardTarget ? (
         <Suspense fallback={<span className="sr-only" role="status">正在打开丢弃草稿确认</span>}>
           <ConversationDraftDiscardDialog />
+        </Suspense>
+      ) : null}
+      {handoffSource || startWorkSource ? (
+        <Suspense fallback={null}>
+          {handoffSource ? <TeamChatHandoffDialog source={handoffSource} /> : null}
+          {startWorkSource ? <TeamChatStartWorkDialog source={startWorkSource} /> : null}
         </Suspense>
       ) : null}
       {channelDialogOpen ? (

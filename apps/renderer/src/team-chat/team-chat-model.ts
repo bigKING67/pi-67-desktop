@@ -7,7 +7,8 @@ import {
   type TeamChatDirectory,
   type TeamChatMember,
   type TeamChatMessage,
-  type TeamChatPushEvent
+  type TeamChatPushEvent,
+  type TeamChatWorkCard
 } from "@pi67/domain";
 
 export interface TeamChatThread {
@@ -135,6 +136,19 @@ export function applyReadCursor(state: TeamChatState, conversationId: string, la
   });
 }
 
+/** Replaces a carried Work Card when the update is not older than what is shown. */
+export function applyWorkCard(state: TeamChatState, card: TeamChatWorkCard): TeamChatState {
+  const thread = state.threads[card.conversationId];
+  if (!thread) return state;
+  let changed = false;
+  const messages = thread.messages.map((message) => {
+    if (message.workCard?.id !== card.id || message.workCard.revision > card.revision) return message;
+    changed = true;
+    return { ...message, workCard: card };
+  });
+  return changed ? { ...state, threads: { ...state.threads, [card.conversationId]: { ...thread, messages } } } : state;
+}
+
 /** Reduces a push. Returns whether the directory must be re-read (unknown or changed conversation). */
 export function applyPush(state: TeamChatState, event: TeamChatPushEvent): { state: TeamChatState; refreshDirectory: boolean } {
   switch (event.type) {
@@ -146,6 +160,8 @@ export function applyPush(state: TeamChatState, event: TeamChatPushEvent): { sta
       return { state: applyReadCursor(state, event.conversationId, event.lastReadSeq), refreshDirectory: false };
     case "conversation.changed":
       return { state, refreshDirectory: true };
+    case "work_card.changed":
+      return { state: applyWorkCard(state, event.card), refreshDirectory: false };
   }
 }
 

@@ -12,6 +12,7 @@ import {
   Pin,
   PinOff,
   RotateCcw,
+  Send,
   Sparkles,
   Square,
   Trash2
@@ -39,6 +40,8 @@ import {
 } from "./conversation-organization-controller.js";
 import { useConversationDialogStore } from "./conversation-dialog-store.js";
 import { requestProvisionalDraftDiscard } from "./provisional-draft-discard-controller.js";
+import { useTeamChatDialogStore } from "../team-chat/team-chat-dialog-store.js";
+import { messages } from "../localization/message-catalog.js";
 import { statusLabel, type ConversationRowModel } from "./workspace-conversation-model.js";
 
 const PINNED_CONVERSATION_DRAG_TYPE = "application/x-pi67-pinned-conversation";
@@ -194,6 +197,12 @@ export function ConversationRow({
                   ><ArrowDown aria-hidden="true" size={13} />下移置顶对话</MenuItem>
                 </>
               ) : null}
+              <MenuItem className={styles.menuItem!} onAction={() => useTeamChatDialogStore.getState().openHandoff({
+                workspaceId: sessionConversation.workspaceId,
+                title: row.title
+              })} textValue={messages.teamChat.handoffMenu}>
+                <Send aria-hidden="true" size={13} />{messages.teamChat.handoffMenu}
+              </MenuItem>
               <MenuItem className={styles.menuItem!} onAction={() => useConversationDialogStore.getState().openRename({
                 workspaceId: sessionConversation.workspaceId,
                 fileIdentity: sessionConversation.sessionFileIdentity,

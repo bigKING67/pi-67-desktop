@@ -20,6 +20,23 @@ interface MockConversation {
   createdAt: number;
 }
 
+interface MockWorkCard {
+  id: string;
+  conversationId: string;
+  createdBy: string;
+  assigneeUserId?: string;
+  claimedBy?: string;
+  title: string;
+  goal: string;
+  acceptance: string;
+  summary: string;
+  refs: Array<{ kind: string; label: string; url?: string }>;
+  status: string;
+  revision: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 interface MockMessage {
   id: string;
   conversationId: string;
@@ -28,6 +45,7 @@ interface MockMessage {
   body: string;
   clientKey: string;
   createdAt: number;
+  workCard?: MockWorkCard;
 }
 
 export interface MockTeamChatState {
@@ -55,6 +73,12 @@ export function installMockTeamChatCommandHandler(): void {
     { id: "msg-3", conversationId: "conv-research", seq: 3, senderUserId: self, body: "可以，我先在工作里跑一遍敏感性分析。", clientKey: "seed-key-0003", createdAt: start + 600_000 },
     { id: "msg-4", conversationId: "conv-research", seq: 4, senderUserId: "user-li", body: "顺便把港股那几家的口径对齐一下。", clientKey: "seed-key-0004", createdAt: start + 3_600_000 }
   ];
+  const liCard: MockWorkCard = {
+    id: "card-li-1", conversationId: "dm-li", createdBy: "user-li", assigneeUserId: self, title: "港股口径对齐",
+    goal: "统一三家港股公司的营收口径", acceptance: "口径表通过复核", summary: "原始数据在共享盘 Q3 文件夹",
+    refs: [{ kind: "branch", label: "data/hk-alignment" }], status: "todo", revision: 1,
+    createdAt: start + 7_200_000, updatedAt: start + 7_200_000
+  };
   const state: MockTeamChatState = {
     connection: { status: "signed-out" },
     directory: {
@@ -70,10 +94,17 @@ export function installMockTeamChatCommandHandler(): void {
           memberUserIds: [], lastSeq: 4, lastReadSeq: 3, unreadCount: 1, lastMessageAt: start + 3_600_000,
           lastSenderUserId: "user-li", lastPreview: "顺便把港股那几家的口径对齐一下。", createdAt: start - 86_400_000 },
         { id: "conv-ops", kind: "channel", visibility: "public", name: "交易复盘", joined: false, memberCount: 2,
-          memberUserIds: [], lastSeq: 0, lastReadSeq: 0, unreadCount: 0, createdAt: start - 3_600_000 }
+          memberUserIds: [], lastSeq: 0, lastReadSeq: 0, unreadCount: 0, createdAt: start - 3_600_000 },
+        { id: "dm-li", kind: "dm", visibility: "private", joined: true, memberCount: 2, memberUserIds: [self, "user-li"].sort(),
+          lastSeq: 1, lastReadSeq: 1, unreadCount: 0, lastMessageAt: start + 7_200_000, lastSenderUserId: "user-li",
+          lastPreview: "港股口径对齐", createdAt: start }
       ]
     },
-    messages: { "conv-research": history }
+    messages: {
+      "conv-research": history,
+      "dm-li": [{ id: "msg-card-1", conversationId: "dm-li", seq: 1, senderUserId: "user-li", body: "港股口径对齐",
+        clientKey: "seed-card-0001", createdAt: start + 7_200_000, workCard: liCard }]
+    }
   };
   let nextId = 100;
 
@@ -126,6 +157,33 @@ export function installMockTeamChatCommandHandler(): void {
         const target = conversation(payload.conversationId)!;
         Object.assign(target, { joined: true, memberCount: target.memberCount + 1 });
         return target;
+      }
+      case "teamChat.workCard.create": {
+        const conversationId = String(payload.conversationId);
+        const existing = (state.messages[conversationId] ?? []).find((message) => message.clientKey === payload.clientKey);
+        if (existing) return existing;
+        const message = append(conversationId, self, String(payload.title), String(payload.clientKey));
+        message.workCard = {
+          id: `card-${nextId++}`, conversationId, createdBy: self,
+          ...(typeof payload.assigneeUserId === "string" ? { assigneeUserId: payload.assigneeUserId } : {}),
+          title: String(payload.title), goal: String(payload.goal), acceptance: String(payload.acceptance),
+          summary: String(payload.summary), refs: payload.refs as MockWorkCard["refs"], status: "todo", revision: 1,
+          createdAt: message.createdAt, updatedAt: message.createdAt
+        };
+        return message;
+      }
+      case "teamChat.workCard.act": {
+        const card = Object.values(state.messages).flat().map((message) => message.workCard)
+          .find((candidate) => candidate?.id === payload.cardId);
+        if (!card || card.revision !== payload.expectedRevision) throw new Error("work_card_revision_conflict");
+        const next: Record<string, string> = { claim: "in_progress", submit_for_review: "in_review", accept: "done",
+          request_changes: "in_progress", close: "closed", reopen: "todo" };
+        card.status = next[String(payload.action)]!;
+        if (payload.action === "claim") card.claimedBy = self;
+        if (payload.action === "reopen") delete card.claimedBy;
+        card.revision += 1;
+        card.updatedAt = Date.now();
+        return card;
       }
       case "teamChat.dm.open": {
         const existing = state.directory.conversations.find((item) => item.kind === "dm" && item.memberUserIds.includes(String(payload.userId)));

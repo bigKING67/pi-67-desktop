@@ -17,12 +17,12 @@ describe("team chat presentation", () => {
       message("m4", "u2", at(2, 9, 30)),
       message("m5", "me", at(3, 11, 0))
     ], [{ clientKey: "p1-000000", conversationId: "c1", body: "hi", createdAt: at(3, 11, 1), status: "failed", error: "x" }], "me", now);
-    expect(entries.map((entry) => entry.kind === "day" ? entry.label : `${entry.key}:${entry.showHeader}`)).toEqual([
-      "10月1日", "m1:true", "昨天", "m2:true", "m3:false", "m4:true", "今天", "m5:true", "pending-p1-000000:false"
+    expect(entries.map((entry) => `${entry.dayLabel ? `${entry.dayLabel}|` : ""}${entry.key}:${entry.showHeader}`)).toEqual([
+      "10月1日|m1:true", "昨天|m2:true", "m3:false", "m4:true", "今天|m5:true", "pending-p1-000000:false"
     ]);
     expect(entries.at(-1)).toMatchObject({ senderUserId: "me", pending: { status: "failed", error: "x" } });
     expect(teamChatTimeline([message("m1", "u2", new Date(2025, 0, 2).getTime())], [], "me", now)[0])
-      .toMatchObject({ label: "2025年1月2日" });
+      .toMatchObject({ dayLabel: "2025年1月2日" });
   });
 
   it("formats times and reveals the remaining budget only near the limit", () => {

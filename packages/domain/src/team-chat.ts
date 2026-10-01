@@ -36,6 +36,35 @@ export interface TeamChatConversation {
   createdAt: number;
 }
 
+export type TeamChatWorkCardStatus = "todo" | "in_progress" | "in_review" | "done" | "closed";
+export type TeamChatWorkCardAction = "claim" | "submit_for_review" | "accept" | "request_changes" | "close" | "reopen";
+export const TEAM_CHAT_WORK_CARD_LIMITS = { title: 160, section: 4_000, summary: 8_000, refs: 10, refLabel: 200 } as const;
+
+export interface TeamChatWorkCardRef {
+  kind: "repository" | "branch" | "pull_request" | "link";
+  label: string;
+  /** HTTPS only. */
+  url?: string;
+}
+
+/** A hand-off card (ADR 0003): reviewed text and references, never Session transcripts. */
+export interface TeamChatWorkCard {
+  id: string;
+  conversationId: string;
+  createdBy: string;
+  assigneeUserId?: string;
+  claimedBy?: string;
+  title: string;
+  goal: string;
+  acceptance: string;
+  summary: string;
+  refs: TeamChatWorkCardRef[];
+  status: TeamChatWorkCardStatus;
+  revision: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface TeamChatMessage {
   id: string;
   conversationId: string;
@@ -44,6 +73,7 @@ export interface TeamChatMessage {
   body: string;
   clientKey: string;
   createdAt: number;
+  workCard?: TeamChatWorkCard;
 }
 
 export interface TeamChatMessagePage {
@@ -61,6 +91,7 @@ export interface TeamChatDirectory {
 export type TeamChatPushEvent =
   | { type: "message.created"; message: TeamChatMessage }
   | { type: "conversation.changed"; conversationId: string }
+  | { type: "work_card.changed"; card: TeamChatWorkCard }
   | { type: "read.changed"; conversationId: string; lastReadSeq: number };
 
 /**
@@ -127,4 +158,42 @@ export function teamChatHasControlCharacter(text: string): boolean {
     if (code < 0x20 || code === 0x7f) return true;
   }
   return false;
+}
+
+/**
+ * Actions the service will accept from this member (mirrors the server policy):
+ * the assignee, or anyone when unassigned, claims; the claimer submits; the
+ * creator accepts, requests changes, closes or reopens.
+ */
+export function teamChatWorkCardActions(card: TeamChatWorkCard, selfUserId: string): TeamChatWorkCardAction[] {
+  const creator = card.createdBy === selfUserId;
+  switch (card.status) {
+    case "todo":
+      return [
+        ...(card.assigneeUserId === undefined || card.assigneeUserId === selfUserId ? ["claim" as const] : []),
+        ...(creator ? ["close" as const] : [])
+      ];
+    case "in_progress":
+      return [
+        ...(card.claimedBy === selfUserId ? ["submit_for_review" as const] : []),
+        ...(creator ? ["close" as const] : [])
+      ];
+    case "in_review":
+      return creator ? ["accept", "request_changes", "close"] : [];
+    case "done":
+    case "closed":
+      return creator ? ["reopen"] : [];
+  }
+}
+
+/** Starting Composer text for Work: the card's reviewed fields only. */
+export function teamChatWorkCardBrief(card: Pick<TeamChatWorkCard, "title" | "goal" | "acceptance" | "summary" | "refs">): string {
+  const sections = [`任务：${card.title}`];
+  if (card.goal.trim()) sections.push(`目标：\n${card.goal.trim()}`);
+  if (card.acceptance.trim()) sections.push(`验收条件：\n${card.acceptance.trim()}`);
+  if (card.summary.trim()) sections.push(`交接摘要：\n${card.summary.trim()}`);
+  if (card.refs.length > 0) {
+    sections.push(`参考：\n${card.refs.map((ref) => `- ${ref.label}${ref.url ? ` ${ref.url}` : ""}`).join("\n")}`);
+  }
+  return sections.join("\n\n");
 }

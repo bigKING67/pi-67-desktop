@@ -155,9 +155,26 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   re-reads the directory and catches up open conversations, so push loss never
   hides messages. Chat bodies are hosted team content: they are never logged,
   persisted locally, or captured into private memory.
-- Not in P1: Work Cards and handoff, Agents as members, threads, edits/deletes,
-  reactions, attachments, search, notifications, team invitations (use the New
-  Money web console).
+- Work Cards (P2) connect Chat and Work in both directions:
+  - `交给同事…` on a Work conversation opens a hand-off form: target teammate or
+    joined channel, title (prefilled from the conversation), goal, acceptance
+    criteria, a sender-written summary, optional Workspace/branch references and one
+    HTTPS link. Only these reviewed fields are sent; the Pi Session transcript,
+    prompts, source and private memory are never uploaded. A direct-message card is
+    assigned to that teammate.
+  - A card shows status (`待接手`, `进行中`, `待验收`, `已完成`, `已关闭`), owner and its
+    sections. Actions follow the service policy: the assignee (or any member when
+    unassigned) `接手`; the claimer `提交验收`; the creator `验收通过`, `退回修改`,
+    `关闭` and `重新打开`. A stale revision reloads the conversation and explains why.
+  - `接手` and `在工作中开始` (claimer) or `在工作中处理` (any plain message) open a
+    review step: choose a Workspace and an active team project, edit the starting
+    text, then `创建草稿`. Desktop switches to Work and opens a team-scoped draft with
+    that text; nothing is sent until the user sends it. Team-scoped Sessions never
+    write private memory and re-check team authorization on every model call.
+  - Card status does not yet follow the Work Session automatically; status receipts
+    are explicit card actions.
+- Not yet: Agents as members, threads, edits/deletes, reactions, attachments,
+  search, notifications, team invitations (use the New Money web console).
 
 ## Success criteria
 

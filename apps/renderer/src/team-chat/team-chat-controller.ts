@@ -1,4 +1,10 @@
-import type { TeamChatConnectionState, TeamChatVisibility } from "@pi67/domain";
+import type {
+  TeamChatConnectionState,
+  TeamChatVisibility,
+  TeamChatWorkCard,
+  TeamChatWorkCardAction,
+  TeamChatWorkCardRef
+} from "@pi67/domain";
 import type { CommandPayloads, CommandResults, TeamChatCommandPayloads } from "@pi67/protocol";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import type { ConnectionSubscriber } from "../connection/agent-connection-controller-contract.js";
@@ -9,6 +15,7 @@ import {
   applyMessagePage,
   applyPush,
   applyReadCursor,
+  applyWorkCard,
   directMessageWith,
   failPending,
   INITIAL_TEAM_CHAT_STATE,
@@ -160,6 +167,15 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
     }
   }
 
+  /** Returns the direct message with a teammate without changing the selection. */
+  async function ensureDirectMessage(userId: string): Promise<string> {
+    const existing = directMessageWith(store.getState().directory, userId);
+    if (existing) return existing.id;
+    const conversation = await port.request("teamChat.dm.open", { userId });
+    guarded((state) => upsertConversation(state, conversation))();
+    return conversation.id;
+  }
+
   async function selectConversation(conversationId: string | undefined): Promise<void> {
     update((state) => ({ ...state, selectedConversationId: conversationId }));
     if (conversationId === undefined) return;
@@ -219,15 +235,29 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
     },
     discardPending: (clientKey: string) => update((state) => removePending(state, clientKey)),
     async openDirectMessage(userId: string): Promise<void> {
-      const existing = directMessageWith(store.getState().directory, userId);
-      const conversation = existing ?? await port.request("teamChat.dm.open", { userId });
-      if (!existing) guarded((state) => upsertConversation(state, conversation))();
-      await selectConversation(conversation.id);
+      await selectConversation(await ensureDirectMessage(userId));
     },
     async createChannel(input: { name: string; visibility: TeamChatVisibility; memberUserIds: string[] }): Promise<void> {
       const conversation = await port.request("teamChat.channel.create", input);
       guarded((state) => upsertConversation(state, conversation))();
       await selectConversation(conversation.id);
+    },
+    ensureDirectMessage,
+    async createWorkCard(conversationId: string, input: {
+      title: string; goal: string; acceptance: string; summary: string; refs: TeamChatWorkCardRef[]; assigneeUserId?: string;
+    }): Promise<void> {
+      const message = await port.request("teamChat.workCard.create", { conversationId, clientKey: port.newClientKey(), ...input });
+      guarded((state) => applyMessage(state, message))();
+    },
+    /** Applies a lifecycle action; a stale revision reloads the thread before rethrowing. */
+    async actOnWorkCard(card: TeamChatWorkCard, action: TeamChatWorkCardAction): Promise<void> {
+      try {
+        const next = await port.request("teamChat.workCard.act", { cardId: card.id, action, expectedRevision: card.revision });
+        guarded((state) => applyWorkCard(state, next))();
+      } catch (error) {
+        if (serviceErrorCode(error) === "work_card_revision_conflict") await loadLatest(card.conversationId);
+        throw error;
+      }
     },
     async joinChannel(conversationId: string): Promise<void> {
       const conversation = await port.request("teamChat.channel.join", { conversationId });
@@ -237,10 +267,15 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
   };
 }
 
-/** Specific copy for known New Money rejections; never echoes raw service text. */
-export function teamChatErrorMessage(error: unknown): string {
+function serviceErrorCode(error: unknown): string | undefined {
   const code = typeof error === "object" && error !== null && "details" in error
     ? (error as { details?: Record<string, unknown> }).details?.serviceError
     : undefined;
-  return (typeof code === "string" ? messages.teamChat.errors[code] : undefined) ?? messages.teamChat.genericError;
+  return typeof code === "string" ? code : undefined;
+}
+
+/** Specific copy for known New Money rejections; never echoes raw service text. */
+export function teamChatErrorMessage(error: unknown): string {
+  const code = serviceErrorCode(error);
+  return (code === undefined ? undefined : messages.teamChat.errors[code]) ?? messages.teamChat.genericError;
 }

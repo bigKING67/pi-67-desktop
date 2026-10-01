@@ -245,7 +245,10 @@ both themes. Native application assets remain unchanged.
 
 Team Chat shares DESIGN.md hierarchy in dark mode: solid accent unread counts,
 neutral row selection, dark border hairlines for day separators, the dark raised
-Composer surface, and danger-role send failures. No dark-only Chat color exists.
+Composer surface, and danger-role send failures. Work Cards use the dark surface
+and border roles with the same info/warning/success status roles and icons; the
+hand-off and start-work dialogs reuse the dark field and notice surfaces. No
+dark-only Chat color exists.
 
 Workbench polish follows DESIGN.md in both themes: matching pane/reading widths,
 quieter navigation weights, transparent model/parameter utilities, labelled file

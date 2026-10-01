@@ -2025,8 +2025,12 @@ loading error where the operation can produce those states
   name and a trailing solid accent unread count; joinable channels use tertiary
   text and `可加入`. Selection matches Work conversations: neutral active surface
   and medium title, no leading stripe.
-- The center surface uses the conversation track width. Short timelines sit
-  above the composer. A channel intro (name, visibility, member count) precedes
+- The center surface uses the conversation track width and a Virtuoso-virtualized
+  timeline that opens at the newest message, follows new messages only while the
+  reader is at the bottom, loads older pages when the top is reached, and keeps
+  short timelines above the composer. Group and day spacing uses padding so item
+  measurement stays exact; `在工作中处理` floats at the row's top-right and takes no
+  layout space. A channel intro (name, visibility, member count) precedes
   day separators (`今天`, `昨天`, dates) and sender groups that repeat the name and
   time only after a sender change or five minutes. Message text is primary,
   pre-wrapped and selectable; pending text is secondary and failures use the
@@ -2038,6 +2042,19 @@ loading error where the operation can produce those states
   above the timeline; signed-out and no-selection states use the centered empty
   state with one next action. The TitleBar shows `# channel`, the teammate name or
   `聊天`, and omits Inspector and Repository controls in Chat.
+
+- Work Cards render inside the message group on the surface token with a 1px
+  border and panel radius, at most 560px wide. The header pairs a caption `任务卡`
+  with an icon+text status (info for in progress, warning for review, success for
+  done, tertiary for closed; closed titles are struck through). The title is the
+  body-size semibold line, the owner line is a tertiary caption, and goal,
+  acceptance and summary are captioned sections. References are single-line
+  links opened through the desktop bridge. Actions are compact buttons; the
+  primary action is `接手` or `在工作中开始`.
+- Plain messages expose `在工作中处理` as a tertiary text action revealed on hover
+  or keyboard focus. The hand-off and start-work dialogs open with a muted privacy
+  notice, use labelled native selects, textareas and checkboxes, scroll within a
+  600px dialog, and keep validation inline (an invalid link disables sending).
 
 ### Session navigation
 
