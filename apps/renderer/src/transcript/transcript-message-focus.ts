@@ -30,6 +30,9 @@ export function useTranscriptMessageFocus({
     virtuosoRef.current?.scrollToIndex({ index, align: "center", behavior: "auto" });
 
     let focusedTarget: HTMLElement | undefined;
+    // The element that requested the jump (usually the index button). Until the
+    // message takes focus, any other focus move is the user's and ends retries.
+    const invoker = document.activeElement;
     const focusTarget = () => {
       const selector = row.kind === "process-group"
         ? `[data-transcript-row-key="${CSS.escape(row.key)}"]`
@@ -40,6 +43,8 @@ export function useTranscriptMessageFocus({
       if (!target || target.getClientRects().length === 0 || !focusMessage) return;
       const activeElement = document.activeElement;
       if (focusedTarget?.isConnected && activeElement !== focusedTarget) return;
+      if (!focusedTarget && activeElement !== invoker && activeElement !== document.body
+        && activeElement !== target) return;
       if (activeElement !== target) target.focus({ preventScroll: true });
       if (document.activeElement === target) focusedTarget = target;
     };
@@ -53,11 +58,16 @@ export function useTranscriptMessageFocus({
       });
     }
     let focusFrame: number | undefined;
-    let remainingFocusFrames = 4;
+    // Locating a message can remount the virtualized list; its rows may take
+    // many frames to return on a busy machine, and the observer above may be
+    // watching the replaced region, so retry by time rather than a frame count.
+    const focusDeadline = performance.now() + FOCUS_RETRY_MS;
+    let stableFrames = 0;
     const stabilizeFocus = () => {
       focusTarget();
-      remainingFocusFrames -= 1;
-      if (remainingFocusFrames > 0) focusFrame = window.requestAnimationFrame(stabilizeFocus);
+      // Keep a few frames after success so a re-render that drops focus is restored.
+      if (focusedTarget && document.activeElement === focusedTarget) stableFrames += 1;
+      if (stableFrames < 4 && performance.now() < focusDeadline) focusFrame = window.requestAnimationFrame(stabilizeFocus);
     };
     if (focusMessage) focusFrame = window.requestAnimationFrame(stabilizeFocus);
     const timeout = window.setTimeout(() => setHighlightedMessageId((current) => (
@@ -70,3 +80,5 @@ export function useTranscriptMessageFocus({
     };
   }, [focusMessage, highlightedMessageId, regionRef, rows, setHighlightedMessageId, virtuosoRef]);
 }
+
+const FOCUS_RETRY_MS = 2_000;

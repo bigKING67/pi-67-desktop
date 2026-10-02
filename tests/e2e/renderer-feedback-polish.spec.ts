@@ -21,8 +21,13 @@ for (const theme of ["light", "dark"] as const) {
     const header = await inspector.locator(".inspector-messages-header").boundingBox();
     const row = await inspector.getByRole("listitem").boundingBox();
     expect(row!.y - header!.y - header!.height).toBeLessThan(60);
-    await inspector.getByRole("listitem").getByRole("button").click();
-    await expect(page.locator('[data-message-id="compact-message"]')).toBeFocused();
+    // The index list can re-render just after it appears; a press whose down and
+    // up land on different element instances is cancelled, so retry the click
+    // while still requiring the located message to take focus.
+    await expect(async () => {
+      await inspector.getByRole("listitem").getByRole("button").click();
+      await expect(page.locator('[data-message-id="compact-message"]')).toBeFocused({ timeout: 2_500 });
+    }).toPass({ timeout: 10_000 });
     await page.screenshot({ path: `artifacts/visual-review/feedback-polish/${theme}.png`, animations: "disabled" });
   });
 }
