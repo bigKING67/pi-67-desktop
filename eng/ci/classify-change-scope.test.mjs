@@ -34,6 +34,12 @@ describe("CI change scope classifier", () => {
     }
   });
 
+  it("runs full validation for the shared packaged launch harness", () => {
+    for (const path of ["eng/packaging/packaged-electron-fixture.mjs", "eng/packaging/packaged-electron-smoke-scenarios.mjs"]) {
+      expect(classifyChangedPaths([path])).toMatchObject({ runQuality: true, runWindows: true, runMacos: true, fullValidation: true });
+    }
+  });
+
   it("does not infer a light lane from the test suffix or a mixed change", () => {
     for (const path of [
       "packages/pi-runtime/src/new-boundary.test.ts",

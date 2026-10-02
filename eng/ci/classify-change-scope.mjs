@@ -27,6 +27,16 @@ const GATE_CONSUMED_DOCUMENTS = new Set([
   "docs/testing/performance.md"
 ]);
 
+/**
+ * Installer-verifier reuse may accept these test-harness files, but every
+ * packaged probe (including the macOS smoke) launches through them, so a
+ * change to them alone must not take the verifier-only lane.
+ */
+const SHARED_PACKAGED_HARNESS = new Set([
+  "eng/packaging/packaged-electron-fixture.mjs",
+  "eng/packaging/packaged-electron-smoke-scenarios.mjs"
+]);
+
 export function classifyChangedPaths(paths) {
   const changedPaths = [...new Set(paths.map(normalizeRepoPath).filter(Boolean))]
     .sort((left, right) => left.localeCompare(right));
@@ -43,7 +53,7 @@ export function classifyChangedPaths(paths) {
   if (productPaths.every(isQualityOnlyPath)) {
     return scopeResult("quality-only", changedPaths, true, false, false, false, "none");
   }
-  if (productPaths.every(isWindowsInstallerVerifierProductPath)) {
+  if (productPaths.every((path) => isWindowsInstallerVerifierProductPath(path) && !SHARED_PACKAGED_HARNESS.has(path))) {
     return scopeResult("windows-installer-verifier-only", changedPaths, false, false, false, false, "full", true);
   }
   if (productPaths.every(isWindowsOnlyPath)) {
