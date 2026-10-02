@@ -26,6 +26,7 @@ import {
 import { requestNewMoney } from "../context/new-money-http.js";
 import { parseActivity } from "./team-chat-activity-parse.js";
 import { parseSearchPage } from "./team-chat-search-parse.js";
+import { parseWorkCard } from "./team-chat-work-card-parse.js";
 
 export interface TeamChatAccess {
   endpoint: string;
@@ -37,6 +38,10 @@ export interface TeamChatAccess {
 /** Service error codes the renderer turns into specific copy. */
 const TEAM_CHAT_SERVICE_ERRORS: ReadonlySet<string> = new Set([
   "entitlement_inactive",
+  "chat_message_not_found",
+  "chat_message_not_own",
+  "chat_message_recalled",
+  "chat_message_not_editable",
   "team_not_found",
   "device_team_scope",
   "chat_conversation_not_found",
@@ -196,6 +201,25 @@ export class TeamChatGateway {
     await this.request(`${path}${suffix}`, init, signal);
   }
 
+  /** The sender's edit (ADR 0008); earlier text is not kept by the service. */
+  async editMessage(
+    conversationId: string,
+    messageId: string,
+    input: { body: string; mentionUserIds?: string[] },
+    signal?: AbortSignal
+  ): Promise<TeamChatMessage> {
+    return parseMessage(await this.request(`${conversationPath(conversationId)}/messages/${encodeURIComponent(messageId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }, signal));
+  }
+
+  async recallMessage(conversationId: string, messageId: string, signal?: AbortSignal): Promise<TeamChatMessage> {
+    return parseMessage(await this.request(`${conversationPath(conversationId)}/messages/${encodeURIComponent(messageId)}`, {
+      method: "DELETE"
+    }, signal));
+  }
+
   async markRead(conversationId: string, lastReadSeq: number, signal?: AbortSignal): Promise<number> {
     const value = asRecord(await this.request(`${conversationPath(conversationId)}/read`, {
       method: "PUT",
@@ -341,6 +365,13 @@ export function parseMessage(value: unknown): TeamChatMessage {
     if (!Array.isArray(item) || item.length > TEAM_CHAT_MENTION_MAX) throw invalidResponse("message.mentionUserIds");
     return item.map((userId, index) => boundedString(userId, `message.mentionUserIds.${index}`, 128));
   });
+  const editedAt = nullable(record.editedAt, (item) => parseTimestamp(item, "message.editedAt"));
+  const recalledAt = nullable(record.recalledAt, (item) => parseTimestamp(item, "message.recalledAt"));
+  const recalledBy = nullable(record.recalledBy, (item) => boundedString(item, "message.recalledBy", 128));
+  // Only a recalled message has an empty body.
+  if (recalledAt !== undefined ? record.body !== "" : typeof record.body !== "string" || record.body.length === 0) {
+    throw invalidResponse("message.body");
+  }
   const invocations = nullable(record.agentInvocations, (item) => {
     if (!Array.isArray(item) || item.length > TEAM_CHAT_MENTION_MAX) throw invalidResponse("message.agentInvocations");
     return item.map(parseInvocationSummary);
@@ -353,7 +384,10 @@ export function parseMessage(value: unknown): TeamChatMessage {
     conversationId: boundedString(record.conversationId, "message.conversationId", 128),
     seq: boundedInteger(record.seq, "message.seq", 1),
     senderUserId: boundedString(record.senderUserId, "message.senderUserId", 128),
-    body: boundedString(record.body, "message.body", 8_000),
+    body: recalledAt === undefined ? boundedString(record.body, "message.body", 8_000) : "",
+    ...(editedAt === undefined ? {} : { editedAt }),
+    ...(recalledAt === undefined ? {} : { recalledAt }),
+    ...(recalledBy === undefined ? {} : { recalledBy }),
     clientKey: boundedString(record.clientKey, "message.clientKey", 64),
     createdAt: parseTimestamp(record.createdAt, "message.createdAt")
   };
@@ -375,51 +409,6 @@ export function parseInvocationSummary(value: unknown): TeamChatAgentInvocationS
     agentUserId: boundedString(record.agentUserId, "invocation.agentUserId", 128),
     status: record.status as TeamChatAgentInvocationSummary["status"],
     ...(reason === undefined ? {} : { reason })
-  };
-}
-
-const WORK_CARD_STATUSES = new Set(["todo", "in_progress", "in_review", "done", "closed"]);
-const WORK_CARD_REF_KINDS = new Set(["repository", "branch", "pull_request", "link"]);
-
-export function parseWorkCard(value: unknown): TeamChatWorkCard {
-  const record = asRecord(value);
-  if (typeof record.status !== "string" || !WORK_CARD_STATUSES.has(record.status)) throw invalidResponse("workCard.status");
-  if (!Array.isArray(record.refs) || record.refs.length > 10) throw invalidResponse("workCard.refs");
-  const text = (field: string, maximum: number) => {
-    const item = record[field];
-    if (typeof item !== "string" || item.length > maximum * 2) throw invalidResponse(`workCard.${field}`);
-    return item;
-  };
-  const assigneeUserId = nullable(record.assigneeUserId, (item) => boundedString(item, "workCard.assigneeUserId", 128));
-  const claimedBy = nullable(record.claimedBy, (item) => boundedString(item, "workCard.claimedBy", 128));
-  return {
-    id: boundedString(record.id, "workCard.id", 128),
-    conversationId: boundedString(record.conversationId, "workCard.conversationId", 128),
-    createdBy: boundedString(record.createdBy, "workCard.createdBy", 128),
-    ...(assigneeUserId === undefined ? {} : { assigneeUserId }),
-    ...(claimedBy === undefined ? {} : { claimedBy }),
-    title: boundedString(record.title, "workCard.title", 320),
-    goal: text("goal", 4_000),
-    acceptance: text("acceptance", 4_000),
-    summary: text("summary", 8_000),
-    refs: record.refs.map((item, index) => {
-      const ref = asRecord(item);
-      if (typeof ref.kind !== "string" || !WORK_CARD_REF_KINDS.has(ref.kind)) throw invalidResponse(`workCard.refs.${index}.kind`);
-      const url = nullable(ref.url, (candidate) => {
-        const checked = boundedString(candidate, `workCard.refs.${index}.url`);
-        if (!checked.startsWith("https://")) throw invalidResponse(`workCard.refs.${index}.url`);
-        return checked;
-      });
-      return {
-        kind: ref.kind as TeamChatWorkCardRef["kind"],
-        label: boundedString(ref.label, `workCard.refs.${index}.label`, 400),
-        ...(url === undefined ? {} : { url })
-      };
-    }),
-    status: record.status as TeamChatWorkCard["status"],
-    revision: boundedInteger(record.revision, "workCard.revision", 1),
-    createdAt: parseTimestamp(record.createdAt, "workCard.createdAt"),
-    updatedAt: parseTimestamp(record.updatedAt, "workCard.updatedAt")
   };
 }
 

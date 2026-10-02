@@ -1,4 +1,4 @@
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Check } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "react-aria-components";
 import {
@@ -9,8 +9,10 @@ import {
   type TeamChatDirectory
 } from "@pi67/domain";
 import { messages } from "../localization/message-catalog.js";
+import { publishNotification } from "../notifications/notification-store.js";
+import { teamChatErrorMessage } from "./team-chat-controller.js";
 import { canSendTo, memberById } from "./team-chat-model.js";
-import { teamChat } from "./team-chat-instance.js";
+import { teamChat, useTeamChat } from "./team-chat-instance.js";
 import {
   teamChatMentionCandidates,
   teamChatMentionQuery,
@@ -84,6 +86,32 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
   const remaining = teamChatRemainingCharacters(draft, TEAM_CHAT_MESSAGE_MAX_CHARS);
   const sendable = writable && draft.trim().length > 0 && (remaining === undefined || remaining >= 0);
   const pickerOpen = query !== undefined && writable;
+  const editing = useTeamChat((state) => state.editing?.conversationId === conversation.id ? state.editing : undefined);
+  const thread = useTeamChat((state) => state.threads[conversation.id]);
+  const edited = editing ? thread?.messages.find((item) => item.id === editing.messageId) : undefined;
+  const [saving, setSaving] = useState(false);
+  /** The unsent draft set aside while a message is edited, restored afterwards. */
+  const stash = useRef<{ draft: string; picks: TeamChatMentionCandidate[] } | undefined>(undefined);
+
+  useEffect(() => {
+    if (!editing) {
+      if (!stash.current) return;
+      setDraft(stash.current.draft);
+      setPicks(stash.current.picks);
+      stash.current = undefined;
+      return;
+    }
+    if (!edited) return;
+    stash.current ??= { draft, picks };
+    setDraft(edited.body);
+    setPicks((edited.mentionUserIds ?? []).flatMap((userId) => {
+      const member = memberById(directory, userId);
+      return member ? [{ userId, displayName: member.displayName, ...(member.agent ? { agent: true } : {}) }] : [];
+    }));
+    setQuery(undefined);
+    pendingCaret.current = edited.body.length;
+    // Only a new edit target or its end resets the field; typing must not.
+  }, [editing?.messageId, edited !== undefined]);
 
   useLayoutEffect(() => {
     const element = input.current;
@@ -112,8 +140,34 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
     pendingCaret.current = before.length + inserted.length;
   };
 
+  const save = () => {
+    if (!editing || !edited || saving) return;
+    const mentions = teamChatRetainedMentions(draft, picks, directory.selfUserId);
+    if (draft === edited.body && mentions.join() === (edited.mentionUserIds ?? []).join()) {
+      teamChat.stopEditing();
+      return;
+    }
+    setSaving(true);
+    void teamChat.editMessage(conversation.id, editing.messageId, draft, mentions)
+      .catch((error: unknown) => publishNotification({ level: "warning", title: copy.editFailed, message: teamChatErrorMessage(error) }))
+      .finally(() => setSaving(false));
+  };
+
+  /** ↑ in an empty composer edits the reader's newest editable message here. */
+  const editLast = () => {
+    const last = [...thread?.messages ?? []].reverse().find((item) => item.senderUserId === directory.selfUserId
+      && item.workCard === undefined && item.recalledAt === undefined);
+    if (!last) return false;
+    teamChat.startEditing(conversation.id, last.id);
+    return true;
+  };
+
   const send = () => {
     if (!sendable) return;
+    if (editing) {
+      save();
+      return;
+    }
     const body = draft;
     const mentions = teamChatRetainedMentions(body, picks, directory.selfUserId);
     setDraft("");
@@ -143,6 +197,15 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
       setQuery(undefined);
       return;
     }
+    if (editing && event.key === "Escape") {
+      event.preventDefault();
+      teamChat.stopEditing();
+      return;
+    }
+    if (!editing && event.key === "ArrowUp" && draft === "" && editLast()) {
+      event.preventDefault();
+      return;
+    }
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       send();
@@ -150,10 +213,17 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
   };
 
   const notice = !policyAllows ? copy.viewerReadOnly : !writable ? copy.peerLeft : undefined;
-  const askedAgents = picks.filter((pick) => pick.agent && draft.includes(`@${pick.displayName}`));
+  // Edits never ask Agents again (ADR 0008), so the disclosure is for new messages only.
+  const askedAgents = editing ? [] : picks.filter((pick) => pick.agent && draft.includes(`@${pick.displayName}`));
   return (
     <form className={styles.composer} onSubmit={(event) => { event.preventDefault(); send(); }}>
       {notice ? <p className={styles.composerNotice} id={noticeId} role="status">{notice}</p> : null}
+      {editing ? (
+        <div className={styles.composerEditing} data-testid="team-chat-editing" role="status">
+          <span>{copy.editingMessage}</span>
+          <Button className={styles.textAction!} onPress={() => teamChat.stopEditing()}>{copy.cancelEdit}</Button>
+        </div>
+      ) : null}
       {askedAgents.length > 0 ? (
         <p className={styles.composerNotice} data-testid="team-chat-agent-disclosure">
           {copy.agentMentionDisclosure(askedAgents.map((pick) => `@${pick.displayName}`).join("、"))}
@@ -200,8 +270,9 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
           rows={1}
           value={draft}
         />
-        <Button aria-label={copy.send} className={styles.sendButton!} isDisabled={!sendable} type="submit">
-          <ArrowUp aria-hidden="true" size={16} />
+        <Button aria-label={editing ? copy.saveEdit : copy.send} className={styles.sendButton!}
+          isDisabled={!sendable || saving || (editing !== undefined && edited === undefined)} type="submit">
+          {editing ? <Check aria-hidden="true" size={16} /> : <ArrowUp aria-hidden="true" size={16} />}
         </Button>
       </div>
       {remaining !== undefined ? (

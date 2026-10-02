@@ -134,4 +134,15 @@ describe("Team Chat protocol schemas", () => {
     expect(Value.Check(page, { results: [{ ...hit, field: "body" }] })).toBe(false);
     expect(Value.Check(page, { results: [{ ...hit, snippet: "x".repeat(241) }] })).toBe(false);
   });
+
+  it("carries edits and recalls", () => {
+    expect(COMMAND_CONTEXT_SCOPE_REQUIREMENTS["teamChat.message.recall"]).toBe("app");
+    const edit = CommandPayloadSchemas["teamChat.message.edit"];
+    expect(Value.Check(edit, { conversationId: "c1", messageId: "m1", body: "改后", mentionUserIds: ["u2"] })).toBe(true);
+    expect(Value.Check(edit, { conversationId: "c1", messageId: "m1", body: "" })).toBe(false);
+    const recalled = { ...message, body: "", recalledAt: 2, recalledBy: "u1" };
+    expect(Value.Check(CommandResultSchemas["teamChat.message.recall"], recalled)).toBe(true);
+    expect(Value.Check(EventPayloadSchemas["teamChat.pushed"], { type: "message.updated", message: { ...message, editedAt: 3 } })).toBe(true);
+  });
 });
+

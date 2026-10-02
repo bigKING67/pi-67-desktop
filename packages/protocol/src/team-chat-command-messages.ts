@@ -57,6 +57,8 @@ export interface TeamChatCommandPayloads {
   "teamChat.activity.markAllRead": Record<string, never>;
   "teamChat.conversation.mute": { conversationId: string; muted: boolean };
   "teamChat.search": { query: string; conversationId?: string; senderUserId?: string; cursor?: string };
+  "teamChat.message.edit": { conversationId: string; messageId: string; body: string; mentionUserIds?: string[] };
+  "teamChat.message.recall": { conversationId: string; messageId: string };
 }
 
 /** The secret delivery URL appears only in this result, once; it is never stored by Desktop. */
@@ -100,6 +102,8 @@ export interface TeamChatCommandResults {
   "teamChat.activity.markAllRead": Record<string, never>;
   "teamChat.conversation.mute": { muted: boolean };
   "teamChat.search": TeamChatSearchPage;
+  "teamChat.message.edit": TeamChatMessage;
+  "teamChat.message.recall": TeamChatMessage;
 }
 
 export interface TeamChatEventPayloads {

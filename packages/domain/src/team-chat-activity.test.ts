@@ -21,6 +21,7 @@ describe("team chat activity", () => {
     expect(teamChatActivityIsUnread(item({}), conversation(4))).toBe(true);
     expect(teamChatActivityIsUnread(item({}), conversation(5))).toBe(false);
     expect(teamChatActivityIsUnread(item({ kind: "dm" }), undefined)).toBe(true);
+    expect(teamChatActivityIsUnread(item({ addedByEdit: true }), conversation(9))).toBe(true);
   });
 
   it("keeps card and failure items unread until handled or marked read", () => {

@@ -7,6 +7,7 @@ import {
   teamChatDirectPeer,
   teamChatHasTailGap,
   teamChatUnreadTotal,
+  teamChatMessagePermissions,
   teamChatWorkCardActions,
   teamChatWorkCardBrief,
   type TeamChatConversation,
@@ -104,4 +105,19 @@ describe("team chat policy", () => {
       .toBe("任务：修复登录\n\n目标：\n回跳\n\n交接摘要：\n已定位\n\n参考：\n- fix/login\n- #4 https://example.test/4");
     expect(teamChatWorkCardBrief({ title: "t", goal: "", acceptance: "", summary: "", refs: [] })).toBe("任务：t");
   });
+
+  it("lets senders edit and recall their messages and channel managers remove others'", () => {
+    const channel = { kind: "channel" as const, joined: true, ownerUserId: "owner" };
+    const message = { senderUserId: "me" };
+    const self = (userId: string, role?: "owner" | "admin" | "member" | "viewer", canPost = true) => ({ userId, role, canPost });
+    expect(teamChatMessagePermissions(message, channel, self("me", "member"))).toEqual({ edit: true, recall: true, remove: false });
+    expect(teamChatMessagePermissions(message, channel, self("me", "viewer", false))).toEqual({ edit: false, recall: true, remove: false });
+    expect(teamChatMessagePermissions(message, channel, self("owner", "member"))).toEqual({ edit: false, recall: false, remove: true });
+    expect(teamChatMessagePermissions(message, channel, self("u3", "admin"))).toEqual({ edit: false, recall: false, remove: true });
+    expect(teamChatMessagePermissions(message, { ...channel, kind: "dm" }, self("u3", "admin")).remove).toBe(false);
+    expect(teamChatMessagePermissions({ ...message, recalledAt: 1 }, channel, self("me", "member")).recall).toBe(false);
+    expect(teamChatMessagePermissions({ ...message, workCard: {} as never }, channel, self("me", "member")).edit).toBe(false);
+    expect(teamChatMessagePermissions(message, { ...channel, joined: false }, self("me", "member")).recall).toBe(false);
+  });
 });
+

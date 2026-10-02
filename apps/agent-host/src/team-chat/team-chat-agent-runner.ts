@@ -29,6 +29,8 @@ export interface TeamChatAgentRunnerDependencies {
 export class TeamChatAgentRunner {
   readonly #queue: Array<{ invocationId: string; agentUserId: string }> = [];
   readonly #known = new Set<string>();
+  /** Turns in flight, so a request the service ended (for example a recall) stops early. */
+  readonly #running = new Map<string, AbortController>();
   #activity: TeamChatAgentActivity[] = [];
   #draining = false;
   #stopped = new AbortController();
@@ -52,6 +54,16 @@ export class TeamChatAgentRunner {
     this.#known.add(invocationId);
     this.#queue.push({ invocationId, agentUserId });
     void this.#drain();
+  }
+
+  /**
+   * The service ended a request (recalled message, expiry): drop it if queued, and
+   * abort its turn if running so no model time is spent on text that was taken back.
+   */
+  cancel(invocationId: string): void {
+    const queued = this.#queue.findIndex((item) => item.invocationId === invocationId);
+    if (queued >= 0) this.#queue.splice(queued, 1);
+    this.#running.get(invocationId)?.abort();
   }
 
   /** After each (re)connect: pick up requests that arrived while this Desktop was away. */
@@ -108,6 +120,7 @@ export class TeamChatAgentRunner {
     timer.unref?.();
     const stop = () => controller.abort();
     this.#stopped.signal.addEventListener("abort", stop, { once: true });
+    this.#running.set(invocationId, controller);
     try {
       const [members, agents, bots] = await Promise.all([gateway.listMembers(), gateway.listAgents(), gateway.listBots().catch(() => [])]);
       const agent = agents.find((item) => item.userId === agentUserId);
@@ -152,6 +165,7 @@ export class TeamChatAgentRunner {
     } finally {
       clearTimeout(timer);
       this.#stopped.signal.removeEventListener("abort", stop);
+      this.#running.delete(invocationId);
     }
   }
 

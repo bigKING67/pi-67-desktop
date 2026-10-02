@@ -17,6 +17,7 @@ import {
   applyActivityDone,
   applyActivityRead,
   applyMessage,
+  applyMessageUpdate,
   applyPush,
   applyReadCursor,
   applyWorkCard,
@@ -73,7 +74,7 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
     const started = epoch;
     return (reduce: (state: TeamChatState) => TeamChatState) => { if (started === epoch) update(reduce); };
   };
-  const { loadLatest, catchUp, loadOlder, loadNewer, reveal } = createTeamChatHistory({ port, store, update, since });
+  const { loadLatest, catchUp, loadOlder, loadNewer, reveal, refreshLoaded } = createTeamChatHistory({ port, store, update, since });
 
   function reset(connection: TeamChatConnectionState | undefined): void {
     epoch += 1;
@@ -132,7 +133,10 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
     void loadActivity();
     await loadDirectory();
     const { threads, selectedConversationId } = store.getState();
-    await Promise.all(Object.keys(threads).map((id) => catchUp(id)));
+    await Promise.all(Object.keys(threads).map(async (id) => {
+      await refreshLoaded(id);
+      await catchUp(id);
+    }));
     if (selectedConversationId) await markRead(selectedConversationId);
   }
 
@@ -171,7 +175,8 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
 
   async function selectConversation(conversationId: string | undefined): Promise<void> {
     // A focus request belongs to one opening; openMessage sets it again afterwards.
-    update((state) => ({ ...state, selectedConversationId: conversationId, panel: undefined, focus: undefined }));
+    update((state) => ({ ...state, selectedConversationId: conversationId, panel: undefined, focus: undefined,
+      editing: state.editing?.conversationId === conversationId ? state.editing : undefined }));
     if (conversationId === undefined) return;
     const thread = store.getState().threads[conversationId];
     if (!thread || thread.status === "error") await loadLatest(conversationId);
@@ -258,6 +263,22 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
         const { muted: _previous, ...rest } = conversation;
         return upsertConversation(state, result.muted ? { ...rest, muted: true } : rest);
       });
+    },
+    /** Opens one of the reader's own messages in the composer (ADR 0008). */
+    startEditing: (conversationId: string, messageId: string) => update((state) => ({ ...state, editing: { conversationId, messageId } })),
+    stopEditing: () => update((state) => state.editing ? { ...state, editing: undefined } : state),
+    async editMessage(conversationId: string, messageId: string, body: string, mentionUserIds: readonly string[]): Promise<void> {
+      const settle = since();
+      const message = await port.request("teamChat.message.edit", {
+        conversationId, messageId, body, ...(mentionUserIds.length === 0 ? {} : { mentionUserIds: [...mentionUserIds] })
+      });
+      settle((state) => ({ ...applyMessageUpdate(state, message), editing: undefined }));
+    },
+    /** Recalls the reader's own message, or removes another's as a channel manager. */
+    async recallMessage(conversationId: string, messageId: string): Promise<void> {
+      const settle = since();
+      const message = await port.request("teamChat.message.recall", { conversationId, messageId });
+      settle((state) => applyMessageUpdate(state, message));
     },
     loadOlder,
     loadNewer,

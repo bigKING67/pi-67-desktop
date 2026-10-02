@@ -56,6 +56,8 @@ export interface TeamChatState {
   search: TeamChatSearchState | undefined;
   /** A message to bring into view once its conversation shows (from activity or a notification). */
   focus: { conversationId: string; seq: number; revision: number } | undefined;
+  /** The reader's own message open in the composer for editing (ADR 0008). */
+  editing: { conversationId: string; messageId: string } | undefined;
 }
 
 export interface TeamChatSearchFilters {
@@ -83,6 +85,7 @@ export const INITIAL_TEAM_CHAT_STATE: TeamChatState = {
   activityStatus: "idle",
   panel: undefined,
   search: undefined,
+  editing: undefined,
   focus: undefined
 };
 
@@ -112,9 +115,14 @@ export function applyMessagePage(
   state: TeamChatState,
   conversationId: string,
   page: { messages: readonly TeamChatMessage[]; hasMore?: boolean },
-  position: "latest" | "older" | "newer" | "window"
+  position: "latest" | "older" | "newer" | "window" | "refresh"
 ): TeamChatState {
   const current = state.threads[conversationId];
+  // Re-reading loaded history replaces edited and recalled copies and keeps the view's flags.
+  if (position === "refresh") {
+    if (!current) return state;
+    return { ...state, threads: { ...state.threads, [conversationId]: { ...current, messages: mergeTeamChatMessages(current.messages, page.messages) } } };
+  }
   const replace = position === "latest" || position === "window";
   const messages = mergeTeamChatMessages(replace ? [] : current?.messages ?? [], page.messages);
   const hasMore = position === "newer" ? current?.hasMore ?? false : page.hasMore ?? false;
@@ -187,6 +195,29 @@ export function applyReadCursor(state: TeamChatState, conversationId: string, la
   });
 }
 
+/**
+ * An edited or recalled message (ADR 0008): replaces the loaded copy and, for the
+ * newest message, the conversation preview. Unread counts do not change. A recalled
+ * message leaves search results and ends its edit.
+ */
+export function applyMessageUpdate(state: TeamChatState, message: TeamChatMessage): TeamChatState {
+  const thread = state.threads[message.conversationId];
+  let next: TeamChatState = thread?.messages.some((item) => item.id === message.id)
+    ? { ...state, threads: { ...state.threads, [message.conversationId]: { ...thread, messages: mergeTeamChatMessages(thread.messages, [message]) } } }
+    : state;
+  const conversation = state.directory?.conversations.find((item) => item.id === message.conversationId);
+  if (conversation && conversation.lastSeq === message.seq) {
+    next = upsertConversation(next, { ...conversation, lastPreview: teamChatCodePointPrefix(message.body, PREVIEW_CHARS) });
+  }
+  if (message.recalledAt !== undefined) {
+    if (next.search?.results.some((hit) => hit.messageId === message.id)) {
+      next = { ...next, search: { ...next.search, results: next.search.results.filter((hit) => hit.messageId !== message.id) } };
+    }
+    if (next.editing?.messageId === message.id) next = { ...next, editing: undefined };
+  }
+  return next;
+}
+
 /** Replaces a carried Work Card when the update is not older than what is shown. */
 export function applyWorkCard(state: TeamChatState, card: TeamChatWorkCard): TeamChatState {
   const thread = state.threads[card.conversationId];
@@ -208,6 +239,8 @@ export function applyPush(
   switch (event.type) {
     case "activity.changed":
       return { state, refreshDirectory: false, refreshActivity: true };
+    case "message.updated":
+      return { state: applyMessageUpdate(state, event.message), refreshDirectory: false };
     case "message.created": {
       const known = state.directory?.conversations.some((item) => item.id === event.message.conversationId) ?? false;
       return { state: applyMessage(state, event.message), refreshDirectory: !known };

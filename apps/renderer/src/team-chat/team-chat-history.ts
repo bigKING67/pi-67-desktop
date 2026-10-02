@@ -104,5 +104,32 @@ export function createTeamChatHistory({ port, store, update, since }: {
     }
   }
 
-  return { loadLatest, catchUp, loadOlder, loadNewer, reveal };
+  /**
+   * After a reconnect: re-reads the history already loaded so edits and recalls made
+   * while away replace their text (ADR 0008); a long range reloads the latest page.
+   */
+  async function refreshLoaded(conversationId: string): Promise<void> {
+    const settle = since();
+    const thread = store.getState().threads[conversationId];
+    const first = thread?.messages[0]?.seq;
+    const last = thread?.messages.at(-1)?.seq;
+    if (!thread || thread.status !== "ready" || first === undefined || last === undefined) return;
+    if (last - first >= TEAM_CHAT_PAGE_MAX * MAX_CATCH_UP_PAGES) {
+      await loadLatest(conversationId);
+      return;
+    }
+    for (let after = first - 1; after < last;) {
+      try {
+        const page = await port.request("teamChat.messages.list", { conversationId, after, limit: TEAM_CHAT_PAGE_MAX });
+        settle((state) => applyMessagePage(state, conversationId, { messages: page.messages.filter((item) => item.seq <= last) }, "refresh"));
+        const tail = page.messages.at(-1)?.seq;
+        if (!page.hasMore || tail === undefined) return;
+        after = tail;
+      } catch {
+        return;
+      }
+    }
+  }
+
+  return { loadLatest, catchUp, loadOlder, loadNewer, reveal, refreshLoaded };
 }

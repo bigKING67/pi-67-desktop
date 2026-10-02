@@ -138,7 +138,7 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
       {/* Mount Virtuoso only with data so it opens at the newest message. */}
       {thread?.status === "ready" ? (
         <TeamChatTimeline
-          conversationId={conversation.id}
+          conversation={conversation}
           directory={directory}
           entries={timeline}
           focus={focus}

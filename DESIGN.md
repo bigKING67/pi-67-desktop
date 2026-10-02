@@ -2121,6 +2121,16 @@ loading error where the operation can produce those states
   time then place. `加载更多结果` is a centred secondary button. A result far back in
   history opens a window centred on it; `跳到最新消息` then floats at the bottom centre
   of the timeline (raised surface, floating shadow) until the newest page returns.
+- Edit and recall (ADR 0008): the hover group floats 12px above a message's
+  top-right edge (canvas surface, 1px border, small shadow) so it never covers text,
+  and holds caption text actions `编辑`, `撤回` or `移除`, and `在工作中处理`; it also
+  shows while focused or armed, and Esc disarms. The first press on `撤回`/`移除`
+  arms it (danger outline and tint, `确认撤回`/`确认移除`); leaving or blurring
+  disarms. Editing shows one support-size secondary line above the composer field,
+  `正在编辑消息 · Enter 保存，Esc 取消`, with a `取消编辑` text action, and the send
+  button becomes a check labelled `保存修改`. `（已编辑）` follows the text as a
+  tertiary caption; a recalled message is a single tertiary support line
+  (`你撤回了一条消息`, `X 撤回了一条消息`, `这条消息已被管理员移除`) with no actions.
 - Mute: a small `静音通知`/`取消静音` button with a bell-off/bell glyph ends the
   conversation intro (before `频道设置` in channels). Muted rows add an 11px
   tertiary bell-off mark after the name, and their unread count switches from the

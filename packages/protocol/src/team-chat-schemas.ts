@@ -167,9 +167,13 @@ export const TeamChatMessageSchema = strictObject({
   conversationId: IdSchema,
   seq: Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
   senderUserId: IdSchema,
-  body: BodySchema,
+  // Empty only once recalled.
+  body: Type.String({ maxLength: TEAM_CHAT_MESSAGE_MAX_CHARS }),
   clientKey: ClientKeySchema,
   createdAt: TimestampSchema,
+  editedAt: Type.Optional(TimestampSchema),
+  recalledAt: Type.Optional(TimestampSchema),
+  recalledBy: Type.Optional(IdSchema),
   workCard: Type.Optional(TeamChatWorkCardSchema),
   mentionUserIds: Type.Optional(MentionsSchema),
   agentInvocations: Type.Optional(Type.Array(InvocationSummarySchema, { maxItems: TEAM_CHAT_MENTION_MAX }))
@@ -188,6 +192,7 @@ const ActivityItemSchema = strictObject({
   cardTitle: Type.Optional(WorkCardTitleSchema),
   reason: Type.Optional(Type.String({ minLength: 1, maxLength: 40, pattern: "^[a-z_]+$" })),
   createdAt: TimestampSchema,
+  addedByEdit: Type.Optional(Type.Boolean()),
   unread: Type.Boolean(),
   doneAt: Type.Optional(TimestampSchema)
 });
@@ -288,7 +293,14 @@ export const TeamChatCommandPayloadSchemas: Record<keyof TeamChatCommandPayloads
     conversationId: Type.Optional(IdSchema),
     senderUserId: Type.Optional(IdSchema),
     cursor: Type.Optional(SearchCursorSchema)
-  })
+  }),
+  "teamChat.message.edit": strictObject({
+    conversationId: IdSchema,
+    messageId: IdSchema,
+    body: BodySchema,
+    mentionUserIds: Type.Optional(MentionsSchema)
+  }),
+  "teamChat.message.recall": strictObject({ conversationId: IdSchema, messageId: IdSchema })
 };
 
 export const TeamChatCommandResultSchemas: Record<keyof TeamChatCommandResults, TSchema> = {
@@ -344,12 +356,15 @@ export const TeamChatCommandResultSchemas: Record<keyof TeamChatCommandResults, 
   "teamChat.search": strictObject({
     results: Type.Array(SearchHitSchema, { maxItems: TEAM_CHAT_SEARCH_PAGE }),
     nextCursor: Type.Optional(SearchCursorSchema)
-  })
+  }),
+  "teamChat.message.edit": TeamChatMessageSchema,
+  "teamChat.message.recall": TeamChatMessageSchema
 };
 
 export const TeamChatEventPayloadSchemas: Record<keyof TeamChatEventPayloads, TSchema> = {
   "teamChat.pushed": Type.Union([
     strictObject({ type: Type.Literal("message.created"), message: TeamChatMessageSchema }),
+    strictObject({ type: Type.Literal("message.updated"), message: TeamChatMessageSchema }),
     strictObject({ type: Type.Literal("conversation.changed"), conversationId: IdSchema }),
     strictObject({ type: Type.Literal("work_card.changed"), card: TeamChatWorkCardSchema }),
     strictObject({ type: Type.Literal("read.changed"), conversationId: IdSchema, lastReadSeq: SeqSchema }),

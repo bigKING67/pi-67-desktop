@@ -239,7 +239,13 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   place, time and a one-line excerpt with the match marked; they filter by
   conversation and sender, load 50 at a time, and open the message centred and
   highlighted. In Chat, ⌘⇧F focuses search and ⌘F searches the conversation in view.
-- Not yet: threads, edits/deletes, reactions, attachments,
+- Edit and recall (contract `docs/adr/0008-team-chat-message-edit-recall.md`): hover a
+  message for `编辑` / `撤回` on your own, or `移除` on others' in channels you own or
+  as a team owner/admin. Editing happens in the composer (Enter saves, Esc cancels,
+  ↑ edits your newest message) and shows `（已编辑）`; earlier text is not kept. Recall
+  and removal need a second press, erase the text and leave a placeholder; mentions
+  added by an edit notify. Work Cards change through their card.
+- Not yet: threads, reactions, attachments,
   team invitations (use the New Money web console).
 
 ## Success criteria

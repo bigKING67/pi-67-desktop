@@ -48,7 +48,9 @@ const TEAM_CHAT_COMMANDS: ReadonlySet<string> = new Set<TeamChatCommandType>([
   "teamChat.activity.setDone",
   "teamChat.activity.markAllRead",
   "teamChat.conversation.mute",
-  "teamChat.search"
+  "teamChat.search",
+  "teamChat.message.edit",
+  "teamChat.message.recall"
 ]);
 
 export function isTeamChatCommand(type: AgentCommandType): type is TeamChatCommandType {
@@ -99,8 +101,15 @@ export class TeamChatCommandRouter {
         }
       },
       onPush: (payload) => {
-        if (payload.type === "agent.invoked") this.#agents.runner.enqueue(payload.invocationId, payload.agentUserId);
-        else events.sendFor({ type: "teamChat.pushed", payload }, appContextAuthority());
+        if (payload.type === "agent.invoked") {
+          this.#agents.runner.enqueue(payload.invocationId, payload.agentUserId);
+          return;
+        }
+        // A request the service ended stops here too (ADR 0008: a recall cancels it).
+        if (payload.type === "agent_invocation.changed" && (payload.invocation.status === "failed" || payload.invocation.status === "expired")) {
+          this.#agents.runner.cancel(payload.invocation.id);
+        }
+        events.sendFor({ type: "teamChat.pushed", payload }, appContextAuthority());
       }
     });
     // A Desktop hosting Agents connects at startup, not only when Chat is opened.
@@ -160,6 +169,20 @@ export class TeamChatCommandRouter {
           body,
           ...(mentionUserIds === undefined || mentionUserIds.length === 0 ? {} : { mentionUserIds })
         }, signal);
+      }
+      case "teamChat.message.edit": {
+        const { conversationId, messageId, body, mentionUserIds } = command.payload as TeamChatCommandPayloads["teamChat.message.edit"];
+        if (!body.trim() || teamChatCodePointLength(body) > TEAM_CHAT_MESSAGE_MAX_CHARS || body.includes("\0")) {
+          throw invalid("Messages need 1 to 4000 characters.");
+        }
+        return gateway.editMessage(conversationId, messageId, {
+          body,
+          ...(mentionUserIds === undefined || mentionUserIds.length === 0 ? {} : { mentionUserIds })
+        }, signal);
+      }
+      case "teamChat.message.recall": {
+        const { conversationId, messageId } = command.payload as TeamChatCommandPayloads["teamChat.message.recall"];
+        return gateway.recallMessage(conversationId, messageId, signal);
       }
       case "teamChat.read.mark": {
         const { conversationId, lastReadSeq } = command.payload as TeamChatCommandPayloads["teamChat.read.mark"];

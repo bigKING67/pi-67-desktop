@@ -21,6 +21,9 @@ export interface TeamChatTimelineEntry {
   workCard?: TeamChatWorkCard;
   mentionUserIds?: string[];
   agentInvocations?: TeamChatAgentInvocationSummary[];
+  editedAt?: number;
+  recalledAt?: number;
+  recalledBy?: string;
 }
 
 /** Orders confirmed then pending messages into day-labelled sender groups. */
@@ -50,7 +53,10 @@ export function teamChatTimeline(
     push({ key: message.id, seq: message.seq, senderUserId: message.senderUserId, body: message.body, createdAt: message.createdAt,
       ...(message.workCard === undefined ? {} : { workCard: message.workCard }),
       ...(message.mentionUserIds === undefined ? {} : { mentionUserIds: message.mentionUserIds }),
-      ...(message.agentInvocations === undefined ? {} : { agentInvocations: message.agentInvocations }) });
+      ...(message.agentInvocations === undefined ? {} : { agentInvocations: message.agentInvocations }),
+      ...(message.editedAt === undefined ? {} : { editedAt: message.editedAt }),
+      ...(message.recalledAt === undefined ? {} : { recalledAt: message.recalledAt }),
+      ...(message.recalledBy === undefined ? {} : { recalledBy: message.recalledBy }) });
   }
   for (const item of pending) {
     push({

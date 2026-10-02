@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HostEventChannel } from "../host-event-channel.js";
 import { isTeamChatCommand, TeamChatCommandRouter, type TeamChatCommandType } from "./team-chat-command-router.js";
-import { parseConversation } from "./team-chat-gateway.js";
+import { parseConversation, parseMessage } from "./team-chat-gateway.js";
 
 const endpoint = "https://newmoney.example.test";
 const teamBase = `${endpoint}/v1/agent/teams/team-1`;
@@ -357,6 +357,22 @@ describe("TeamChatCommandRouter", () => {
     await expect(run("teamChat.search", { query: "redirect" })).rejects.toBeDefined();
     await expect(run("teamChat.search", { query: "   " })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
     expect(calls).toHaveLength(2);
+    router.shutdown();
+  });
+
+  it("edits and recalls messages and parses placeholders", async () => {
+    const { router, run, calls } = setup({
+      "PATCH /chat/conversations/c1/messages/m1": () => json({ ...message, body: "改后", editedAt: "2026-10-02T00:00:02Z" }),
+      "DELETE /chat/conversations/c1/messages/m1": () => json({ ...message, body: "", recalledAt: "2026-10-02T00:00:03Z", recalledBy: "me" })
+    });
+    await expect(run("teamChat.message.edit", { conversationId: "c1", messageId: "m1", body: "改后", mentionUserIds: [] }))
+      .resolves.toMatchObject({ body: "改后", editedAt: Date.parse("2026-10-02T00:00:02Z") });
+    await expect(run("teamChat.message.recall", { conversationId: "c1", messageId: "m1" }))
+      .resolves.toMatchObject({ body: "", recalledAt: Date.parse("2026-10-02T00:00:03Z"), recalledBy: "me" });
+    await expect(run("teamChat.message.edit", { conversationId: "c1", messageId: "m1", body: "  " })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    expect(JSON.parse(calls[0]!.init.body as string)).toEqual({ body: "改后" });
+    expect(() => parseMessage({ ...message, body: "" })).toThrow();
+    expect(() => parseMessage({ ...message, body: "x", recalledAt: "2026-10-02T00:00:03Z" })).toThrow();
     router.shutdown();
   });
 });

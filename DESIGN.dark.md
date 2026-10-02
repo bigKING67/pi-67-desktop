@@ -252,7 +252,7 @@ runs, the `@N` outline count and the reader's mention rail use the dark accent,
 accent-soft and accent-strong roles; the mention list uses the dark raised surface
 and floating shadow; the channel settings dialog reuses the dark dialog and danger
 roles. Agent tiles, presence dots, badges and the Agent dialog use the same dark
-accent, success, border and surface roles. The search field, scope chip, result marks and the activity inbox, its segmented
+accent, success, border and surface roles. Message hover actions, armed recall, edit line and placeholders, the search field, scope chip, result marks and the activity inbox, its segmented
 control, unread dots, the focus highlight (dark accent-soft) and muted counts (dark
 muted surface and border) use the same dark roles. No dark-only Chat color exists.
 

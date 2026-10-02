@@ -103,6 +103,21 @@ describe("TeamChatAgentRunner", () => {
     expect(gateway.pendingInvocations).toHaveBeenCalled();
   });
 
+  it("stops a running turn when the service cancels its request", async () => {
+    let started!: () => void;
+    const running = new Promise<void>((resolve) => { started = resolve; });
+    const { runner, gateway } = await harness({ turn: (input) => new Promise((_, reject) => {
+      started();
+      input.signal.addEventListener("abort", () => reject(new TeamChatAgentTurnError("cancelled", "recalled")));
+    }) });
+    runner.enqueue("inv-1", "agent");
+    await running;
+    runner.cancel("inv-1");
+    await vi.waitFor(() => expect(gateway.failInvocation).toHaveBeenCalledWith("inv-1", "cancelled", "lease-1"));
+    expect(gateway.completeInvocation).not.toHaveBeenCalled();
+    runner.cancel("unknown");
+  });
+
   it("leaves requests queued until the Workspace is registered, and retries transient claim failures", async () => {
     const waiting = await harness({ ready: false });
     waiting.runner.enqueue("inv-1", "agent");

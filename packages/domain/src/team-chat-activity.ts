@@ -26,6 +26,8 @@ export interface TeamChatActivityItem {
   /** Why an Agent request ended without a reply. */
   reason?: string;
   createdAt: number;
+  /** A mention an edit added after the reader had read past the message (ADR 0008). */
+  addedByEdit?: boolean;
   unread: boolean;
   doneAt?: number;
 }
@@ -42,7 +44,8 @@ const MESSAGE_KINDS = new Set<TeamChatActivityKind>(["mention", "dm", "agent_rep
  */
 export function teamChatActivityIsUnread(item: TeamChatActivityItem, conversation: TeamChatConversation | undefined): boolean {
   if (!item.unread || item.doneAt !== undefined) return false;
-  if (!MESSAGE_KINDS.has(item.kind) || item.messageSeq === undefined || !conversation) return true;
+  // A late mention stays unread until handled or marked read; the cursor already passed it.
+  if (item.addedByEdit || !MESSAGE_KINDS.has(item.kind) || item.messageSeq === undefined || !conversation) return true;
   return item.messageSeq > conversation.lastReadSeq;
 }
 

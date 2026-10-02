@@ -51,6 +51,9 @@ interface MockMessage {
   workCard?: MockWorkCard;
   mentionUserIds?: string[];
   agentInvocations?: Array<{ id: string; agentUserId: string; status: string; reason?: string }>;
+  editedAt?: number;
+  recalledAt?: number;
+  recalledBy?: string;
 }
 
 interface MockAgent {
@@ -297,6 +300,22 @@ export function installMockTeamChatCommandHandler(): void {
         state.webhooks = state.webhooks.filter((item) => item.botUserId !== payload.botUserId);
         state.directory.bots = state.directory.bots.filter((item) => item.userId !== payload.botUserId);
         return {};
+      case "teamChat.message.edit":
+      case "teamChat.message.recall": {
+        const target = (state.messages[String(payload.conversationId)] ?? []).find((item) => item.id === payload.messageId)!;
+        if (type === "teamChat.message.edit") {
+          target.body = String(payload.body);
+          if (Array.isArray(payload.mentionUserIds) && payload.mentionUserIds.length > 0) target.mentionUserIds = payload.mentionUserIds as string[];
+          else delete target.mentionUserIds;
+          target.editedAt = Date.now();
+        } else {
+          target.body = "";
+          delete target.mentionUserIds;
+          target.recalledAt = Date.now();
+          target.recalledBy = self;
+        }
+        return target;
+      }
       case "teamChat.search": {
         const query = String(payload.query).toLowerCase();
         const readable = state.directory.conversations.filter((item) => item.joined || (item.kind === "channel" && item.visibility === "public"));

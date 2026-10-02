@@ -5,6 +5,7 @@ import {
   applyActivityDone,
   applyActivityRead,
   applyMessage,
+  applyMessageUpdate,
   applyMessagePage,
   applyPush,
   applyReadCursor,
@@ -203,6 +204,25 @@ describe("team chat model", () => {
     const caughtUp = applyMessagePage(live, "c1", { messages: [message(102)], hasMore: false }, "newer");
     expect(caughtUp.threads.c1?.hasNewer).toBeUndefined();
     expect(applyMessagePage(caughtUp, "c1", { messages: [message(99)], hasMore: true }, "older").threads.c1?.hasNewer).toBeUndefined();
+  });
+
+  it("replaces edited and recalled messages and the newest preview without touching unread", () => {
+    const state = replaceDirectory(INITIAL_TEAM_CHAT_STATE, {
+      teamId: "t", selfUserId: "me", members: [], policy: { channelCreation: "members", viewersCanPost: true, agentCreation: "members", revision: 0 },
+      agents: [], bots: [], conversations: [channel({ lastSeq: 2, unreadCount: 1 })]
+    });
+    const message = (seq: number, body: string): TeamChatMessage => ({ id: `m${seq}`, conversationId: "c1", seq, senderUserId: "u2", body, clientKey: `k-${seq}`, createdAt: seq });
+    const loaded = applyMessagePage(state, "c1", { messages: [message(1, "a"), message(2, "b")], hasMore: false }, "latest");
+    const edited = applyMessageUpdate(loaded, { ...message(2, "b2"), editedAt: 5 });
+    expect(edited.threads.c1?.messages[1]).toMatchObject({ body: "b2", editedAt: 5 });
+    expect(edited.directory?.conversations[0]).toMatchObject({ lastPreview: "b2", unreadCount: 1 });
+    const withSearch = { ...edited, editing: { conversationId: "c1", messageId: "m1" },
+      search: { query: "a", status: "ready" as const, results: [{ messageId: "m1", conversationId: "c1", seq: 1, senderUserId: "u2", createdAt: 1, field: "message" as const, snippet: "a" }], loadingMore: false } };
+    const recalled = applyMessageUpdate(withSearch, { ...message(1, ""), recalledAt: 6, recalledBy: "u2" });
+    expect(recalled.threads.c1?.messages[0]).toMatchObject({ body: "", recalledAt: 6 });
+    expect(recalled.search?.results).toEqual([]);
+    expect(recalled.editing).toBeUndefined();
+    expect(recalled.directory?.conversations[0]?.lastPreview).toBe("b2");
   });
 });
 

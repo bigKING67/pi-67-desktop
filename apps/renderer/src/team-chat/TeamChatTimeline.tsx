@@ -2,8 +2,10 @@ import { RotateCw } from "lucide-react";
 import { forwardRef, useEffect, useRef, useState, type HTMLAttributes, type ReactNode } from "react";
 import { Button } from "react-aria-components";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
-import type { TeamChatDirectory } from "@pi67/domain";
+import { teamChatCanPost, teamChatMessagePermissions, type TeamChatConversation, type TeamChatDirectory } from "@pi67/domain";
 import { messages } from "../localization/message-catalog.js";
+import { publishNotification } from "../notifications/notification-store.js";
+import { teamChatErrorMessage } from "./team-chat-controller.js";
 import { memberById } from "./team-chat-model.js";
 import { teamChat } from "./team-chat-instance.js";
 import { useTeamChatDialogStore } from "./team-chat-dialog-store.js";
@@ -22,8 +24,8 @@ const FIRST_ITEM_BASE = 1_000_000_000;
  * Virtualized conversation timeline. Each entry is one message (day labels ride on
  * the first message of a day), so loading older history is a pure prepend.
  */
-export function TeamChatTimeline({ conversationId, directory, entries, target, header, hasMore, hasNewer, windowStart, loadingOlder, scrollRequest, focus }: {
-  conversationId: string;
+export function TeamChatTimeline({ conversation, directory, entries, target, header, hasMore, hasNewer, windowStart, loadingOlder, scrollRequest, focus }: {
+  conversation: TeamChatConversation;
   directory: TeamChatDirectory;
   entries: TeamChatTimelineEntry[];
   target: string;
@@ -39,6 +41,7 @@ export function TeamChatTimeline({ conversationId, directory, entries, target, h
   /** A message opened from activity or a notification: centered and briefly highlighted. */
   focus?: { seq: number; revision: number } | undefined;
 }) {
+  const conversationId = conversation.id;
   const virtuoso = useRef<VirtuosoHandle>(null);
   const firstKey = useRef<string | undefined>(undefined);
   const firstItemIndex = useRef(FIRST_ITEM_BASE);
@@ -88,7 +91,7 @@ export function TeamChatTimeline({ conversationId, directory, entries, target, h
         : Math.max(0, entries.length - 1)}
       itemContent={(_, entry) => (
         <div className={styles.timelineColumn}>
-          <TimelineMessage directory={directory} entry={entry} focused={entry.seq !== undefined && entry.seq === highlighted} target={target} />
+          <TimelineMessage conversation={conversation} directory={directory} entry={entry} focused={entry.seq !== undefined && entry.seq === highlighted} target={target} />
         </div>
       )}
       key={`${conversationId}:${windowStart ?? "latest"}`}
@@ -113,7 +116,8 @@ const TIMELINE_COMPONENTS = {
   Scroller: TimelineScroller
 };
 
-function TimelineMessage({ directory, entry, focused, target }: {
+function TimelineMessage({ conversation, directory, entry, focused, target }: {
+  conversation: TeamChatConversation;
   directory: TeamChatDirectory;
   entry: TeamChatTimelineEntry;
   focused: boolean;
@@ -121,8 +125,10 @@ function TimelineMessage({ directory, entry, focused, target }: {
 }) {
   const copy = messages.teamChat;
   const participant = memberById(directory, entry.senderUserId);
-  const sender = entry.senderUserId === directory.selfUserId ? copy.you : participant?.displayName ?? copy.unknownTeammate;
-  const mentionsSelf = entry.senderUserId !== directory.selfUserId && (entry.mentionUserIds?.includes(directory.selfUserId) ?? false);
+  const own = entry.senderUserId === directory.selfUserId;
+  const sender = own ? copy.you : participant?.displayName ?? copy.unknownTeammate;
+  const mentionsSelf = !own && (entry.mentionUserIds?.includes(directory.selfUserId) ?? false);
+  const recalled = entry.recalledAt !== undefined;
   return (
     <>
       {entry.dayLabel ? <div className={styles.daySeparator}><span>{entry.dayLabel}</span></div> : null}
@@ -135,15 +141,17 @@ function TimelineMessage({ directory, entry, focused, target }: {
             <time dateTime={new Date(entry.createdAt).toISOString()}>{formatTeamChatTime(entry.createdAt)}</time>
           </header>
         ) : null}
-        {entry.workCard ? <TeamChatWorkCard card={entry.workCard} directory={directory} /> : <MessageBody directory={directory} entry={entry} />}
-        <InvocationStates directory={directory} entry={entry} />
-        {!entry.pending && !entry.workCard ? (
-          <Button
-            className={styles.messageAction!}
-            onPress={() => useTeamChatDialogStore.getState().openStartWork({
-              text: chatMessageWorkBrief({ conversationLabel: target, senderName: sender, body: entry.body })
-            })}
-          >{copy.handleInWork}</Button>
+        {recalled ? (
+          <p className={styles.messageRecalled}>
+            {entry.recalledBy !== undefined && entry.recalledBy !== entry.senderUserId ? copy.removedByManager
+              : own ? copy.recalledOwn : copy.recalledBy(sender)}
+          </p>
+        ) : entry.workCard ? <TeamChatWorkCard card={entry.workCard} directory={directory} /> : (
+          <MessageBody directory={directory} entry={entry} />
+        )}
+        {recalled ? null : <InvocationStates directory={directory} entry={entry} />}
+        {!entry.pending && !recalled ? (
+          <MessageActions conversation={conversation} directory={directory} entry={entry} sender={sender} target={target} />
         ) : null}
         {entry.pending?.status === "sending" ? <small role="status">{copy.sending}</small> : null}
         {entry.pending?.status === "failed" ? (
@@ -160,13 +168,65 @@ function TimelineMessage({ directory, entry, focused, target }: {
   );
 }
 
+/** Hover actions: edit and recall own messages, remove others' as a channel manager, hand off to Work. */
+function MessageActions({ conversation, directory, entry, sender, target }: {
+  conversation: TeamChatConversation;
+  directory: TeamChatDirectory;
+  entry: TeamChatTimelineEntry;
+  sender: string;
+  target: string;
+}) {
+  const copy = messages.teamChat;
+  const [armed, setArmed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const role = directory.members.find((member) => member.userId === directory.selfUserId)?.role;
+  const allowed = teamChatMessagePermissions(entry, conversation, {
+    userId: directory.selfUserId, role, canPost: teamChatCanPost(directory)
+  });
+  const removing = allowed.remove;
+  const recall = () => {
+    if (!armed) {
+      setArmed(true);
+      return;
+    }
+    setBusy(true);
+    void teamChat.recallMessage(conversation.id, entry.key)
+      .catch((error: unknown) => publishNotification({ level: "warning", title: copy.recallFailed, message: teamChatErrorMessage(error) }))
+      .finally(() => { setBusy(false); setArmed(false); });
+  };
+  return (
+    <div className={`${styles.messageActions} ${armed ? styles.messageActionsArmed : ""}`}
+      onKeyDown={(event) => { if (event.key === "Escape" && armed) { event.stopPropagation(); setArmed(false); } }}
+      onMouseLeave={() => setArmed(false)}>
+      {allowed.edit ? (
+        <Button className={styles.messageAction!} onPress={() => teamChat.startEditing(conversation.id, entry.key)}>{copy.editMessage}</Button>
+      ) : null}
+      {allowed.recall || removing ? (
+        <Button className={`${styles.messageAction} ${armed ? styles.messageActionArmed : ""}`} isDisabled={busy}
+          onBlur={() => setArmed(false)} onPress={recall}>
+          {armed ? removing ? copy.confirmRemove : copy.confirmRecall : removing ? copy.removeMessage : copy.recallMessage}
+        </Button>
+      ) : null}
+      {entry.workCard ? null : (
+        <Button
+          className={styles.messageAction!}
+          onPress={() => useTeamChatDialogStore.getState().openStartWork({
+            text: chatMessageWorkBrief({ conversationLabel: target, senderName: sender, body: entry.body })
+          })}
+        >{copy.handleInWork}</Button>
+      )}
+    </div>
+  );
+}
+
 /** Message text with `@name` runs styled for mentioned members; the reader's own mention stands out. */
 function MessageBody({ directory, entry }: { directory: TeamChatDirectory; entry: TeamChatTimelineEntry }) {
   const mentioned = (entry.mentionUserIds ?? []).flatMap((userId) => {
     const member = memberById(directory, userId);
     return member ? [{ userId, displayName: member.displayName }] : [];
   });
-  if (mentioned.length === 0) return <p>{entry.body}</p>;
+  const edited = entry.editedAt === undefined ? null : <span className={styles.messageEdited}>{messages.teamChat.edited}</span>;
+  if (mentioned.length === 0) return <p>{entry.body}{edited}</p>;
   return (
     <p>
       {teamChatMentionSegments(entry.body, mentioned).map((segment, index) => segment.userId === undefined ? segment.text : (
@@ -174,6 +234,7 @@ function MessageBody({ directory, entry }: { directory: TeamChatDirectory; entry
           {segment.text}
         </span>
       ))}
+      {edited}
     </p>
   );
 }

@@ -4,7 +4,8 @@
 import type { TeamChatConnectionState, TeamChatPushEvent } from "@pi67/domain";
 import { asRecord, boundedInteger, boundedString } from "../context/enterprise-context-gateway-validation.js";
 import { HostCommandError } from "../protocol-error.js";
-import { parseInvocationSummary, parseMessage, parseWorkCard } from "./team-chat-gateway.js";
+import { parseInvocationSummary, parseMessage } from "./team-chat-gateway.js";
+import { parseWorkCard } from "./team-chat-work-card-parse.js";
 
 const MAX_FRAME_CHARS = 64 * 1024;
 const MAX_BACKOFF_MS = 30_000;
@@ -225,6 +226,8 @@ export function parseFrame(
         return record.type;
       case "message.created":
         return { type: "message.created", message: parseMessage(record.message) };
+      case "message.updated":
+        return { type: "message.updated", message: parseMessage(record.message) };
       case "work_card.changed":
         return { type: "work_card.changed", card: parseWorkCard(record.card) };
       case "policy.changed":

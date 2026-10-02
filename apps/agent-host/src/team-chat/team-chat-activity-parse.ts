@@ -52,6 +52,7 @@ function parseActivityItem(value: unknown, field: string): TeamChatActivityItem 
       return item;
     }),
     createdAt: parseTimestamp(record.createdAt, `${field}.createdAt`),
+    ...(record.addedByEdit === true ? { addedByEdit: true } : {}),
     unread: record.unread,
     ...optional("doneAt", (item) => parseTimestamp(item, `${field}.doneAt`))
   };

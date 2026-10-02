@@ -86,6 +86,11 @@ export interface TeamChatMessage {
   mentionUserIds?: string[];
   /** Agents this message addressed and the state of each request. */
   agentInvocations?: TeamChatAgentInvocationSummary[];
+  /** The sender changed the text; earlier text is not kept (ADR 0008). */
+  editedAt?: number;
+  /** Recalled by its sender or removed by a channel manager; `body` is then empty. */
+  recalledAt?: number;
+  recalledBy?: string;
 }
 
 export interface TeamChatMessagePage {
@@ -107,6 +112,7 @@ export interface TeamChatDirectory {
 
 export type TeamChatPushEvent =
   | { type: "message.created"; message: TeamChatMessage }
+  | { type: "message.updated"; message: TeamChatMessage }
   | { type: "conversation.changed"; conversationId: string }
   | { type: "work_card.changed"; card: TeamChatWorkCard }
   | { type: "read.changed"; conversationId: string; lastReadSeq: number }
@@ -221,3 +227,19 @@ export function teamChatWorkCardBrief(card: Pick<TeamChatWorkCard, "title" | "go
   }
   return sections.join("\n\n");
 }
+
+/** Who may change a message in a conversation (mirrors the service, ADR 0008). */
+export function teamChatMessagePermissions(
+  message: Pick<TeamChatMessage, "senderUserId" | "workCard" | "recalledAt">,
+  conversation: Pick<TeamChatConversation, "kind" | "joined" | "ownerUserId">,
+  self: { userId: string; role: TeamChatMember["role"] | undefined; canPost: boolean }
+): { edit: boolean; recall: boolean; remove: boolean } {
+  if (!conversation.joined || message.workCard !== undefined || message.recalledAt !== undefined) {
+    return { edit: false, recall: false, remove: false };
+  }
+  const own = message.senderUserId === self.userId;
+  const manager = conversation.kind === "channel"
+    && (conversation.ownerUserId === self.userId || self.role === "owner" || self.role === "admin");
+  return { edit: own && self.canPost, recall: own, remove: !own && manager };
+}
+

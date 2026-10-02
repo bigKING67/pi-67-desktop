@@ -462,6 +462,17 @@
 
 .composer > small.overLimit { color: var(--danger); }
 
+/* Editing a sent message: one quiet line above the field. */
+.composerEditing {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0 2px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-support);
+}
+
 .composerNotice {
   margin: var(--space-2) 0 0;
   color: var(--text-secondary);
@@ -817,22 +828,57 @@
 }
 
 /* Revealed on hover or keyboard focus at the row's top-right; takes no layout space. */
-.messageAction {
+/* Hover actions float just above the row's top-right, so they never cover its text. */
+.messageActions {
   position: absolute;
-  top: 0;
+  z-index: 1;
+  top: -12px;
   right: 0;
+  display: flex;
+  gap: 2px;
+  padding: 1px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-primary) 8%, transparent);
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--motion-ease-out);
+}
+
+.message:hover .messageActions,
+.messageActions:focus-within,
+.messageActionsArmed { opacity: 1; }
+
+.messageAction {
   padding: 1px 4px;
   border: 0;
   border-radius: 5px;
   background: var(--canvas);
   color: var(--text-tertiary);
   font-size: var(--font-size-caption);
-  opacity: 0;
-  transition: opacity var(--motion-fast) var(--motion-ease-out);
 }
 
-.message:hover .messageAction,
-.messageAction[data-focus-visible] { opacity: 1; }
+/* Second press removes: danger outline and tint, like other destructive steps. */
+.messageActionArmed,
+.messageActionArmed[data-hovered] {
+  box-shadow: inset 0 0 0 1px var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, var(--canvas));
+  color: var(--danger);
+}
+
+.messageEdited {
+  margin-left: 4px;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+}
+
+/* Beats `.message p`, so the placeholder stays tertiary support text. */
+.message p.messageRecalled {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-support);
+}
+
 .messageAction[data-hovered] { background: var(--surface-hover); color: var(--text-primary); }
 .messageAction[data-focus-visible] { box-shadow: var(--shadow-focus); outline: none; }
 
