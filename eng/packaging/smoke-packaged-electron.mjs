@@ -38,6 +38,7 @@ import { closeElectronApplicationWithinTimeout } from "./electron-shutdown-measu
 import { assertPackagedSkillSuites } from "./smoke-packaged-skill-suites.mjs";
 import { assertNoWorkspaceChangesAuthorityWarning, verifyPackagedChangesInspector } from "./packaged-changes-inspector-smoke.mjs";
 import { verifyPackagedWorkbenchJourney } from "./packaged-workbench-journey-smoke.mjs";
+import { createPackagedSmokeGuard } from "./packaged-smoke-failure-evidence.mjs";
 const artifact = resolvePackagedArtifact();
 await assertPackagedRuntimeAssets(artifact);
 const packagedScreenshotDirectory = process.env.PI67_PACKAGED_SCREENSHOT_DIR?.trim() || undefined;
@@ -67,6 +68,7 @@ let application;
 let childPid;
 const shutdownState = { childPid: undefined };
 let packagedProcessOutput = () => "";
+const guard = createPackagedSmokeGuard({ application: () => application, processOutput: () => packagedProcessOutput() });
 const smokeEnvironment = packagedSmokeEnvironment(userDataDirectory);
 try {
   application = await launchPackagedApplication({
@@ -99,7 +101,7 @@ try {
   }
   let sessionCreation;
   try {
-    sessionCreation = await verifyPackagedSessionCreation({ agentDir, window });
+    sessionCreation = await guard.stage("session-creation", () => verifyPackagedSessionCreation({ agentDir, window }));
     const teamEvidence = JSON.parse(await readFile(teamKnowledgeEvidencePath, "utf8"));
     const expectsTeamRoute = process.platform === "darwin" && process.arch === "arm64";
     assertPackagedTeamToolSelection(teamEvidence, expectsTeamRoute);
@@ -115,7 +117,7 @@ try {
       { cause: error }
     );
   }
-  await verifyPackagedChangesInspector(window, capturePackagedScreenshot);
+  await guard.stage("changes-inspector", () => verifyPackagedChangesInspector(window, capturePackagedScreenshot));
   const workspaceSettings = await verifyReadySessionCatalog(window);
   await assertNoWorkspaceChangesAuthorityWarning(window);
   await verifyPackagedProviderSettings({
@@ -320,7 +322,7 @@ try {
     const returnedSurface = await inspectRendererSurface(window);
     throw new Error(`Packaged Settings did not return to the conversation: ${JSON.stringify(returnedSurface)}`, { cause: error });
   }
-  await verifyPackagedWorkbenchJourney({ window, captureScreenshot: capturePackagedScreenshot });
+  await guard.stage("workbench-journey", () => verifyPackagedWorkbenchJourney({ window, captureScreenshot: capturePackagedScreenshot }));
   const heicAttachment = await verifyPackagedHeicAttachment({ artifact, userDataDirectory, window });
   console.info(`Packaged HEIC attachment: ${JSON.stringify(heicAttachment)}`);
   const projectedImage = await preparePackagedProjectedImage(window);
@@ -401,7 +403,8 @@ try {
   childPid = shutdownState.childPid;
   await runPackagedLocalMemorySettingsSmoke(artifact);
   console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, packaged-direct Agent Host startup (${startupDiagnostics.totalDurationMs}ms), private toolchain + first-party capabilities, Desktop browser67 packaged-direct dependency resolution, packaged GUI Extension/Skill update checks with bounded worker cleanup, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, Lark user-first Tabs + persisted Main layout, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), projected image assets after submission plus warm/cold Restore Task, cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt product shutdown (${shutdown.productExitDurationMs}ms; Playwright driver close ${shutdown.driverCloseDurationMs}ms).`);
-} finally {
+} catch (error) { await guard.fail(error); throw error; } finally {
+  guard.stop();
   try {
     if (application) {
       const cleanupApplication = application;
