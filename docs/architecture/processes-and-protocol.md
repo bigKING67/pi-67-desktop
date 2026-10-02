@@ -1805,12 +1805,18 @@ retain Pi's supported loading path. Desktop's Session-only settings exclude both
 and `.js` shared projections of these owned entries, preserving one canonical owner
 without modifying user settings or resources.
 
-Capability staging copies files in batches of at most eight, with a 2 MiB budget
-based on their inspected sizes; an individually larger file is copied alone.
-Directory traversal remains sequential, and every started write settles before a
-batch failure reaches staging cleanup. File modes, filtering, containment and
-symlink checks remain enforced. This is not an integrity cache: the existing full
-source and staged-tree verification still gates activation.
+Capability staging first walks the whole source tree, enforcing filtering,
+containment, symlink and entry-type checks and creating directories, before it
+copies any file. Files are then copied across directory boundaries with at most
+32 in flight and an 8 MiB in-flight budget based on their inspected sizes; an
+individually larger file is copied alone. Most capability directories hold one to
+three files, so per-directory batches serialized the copy, which dominated
+first-run `desktop-capabilities` time on Windows (8.8 s of 10.1 s on CI). After a
+failure no further file starts, and every started write settles before the
+failure reaches staging cleanup. File modes remain enforced. This is not an
+integrity cache: the existing full source and staged-tree verification still
+gates activation. Packaged smoke prints the stage's `source-verify`,
+`profile-inspect`, `profile-copy` and `profile-verify` sub-phase timings.
 
 ## Startup and recovery
 

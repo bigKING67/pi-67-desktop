@@ -6,14 +6,54 @@ import { isContainedRelativePath } from "./desktop-capability-catalog.js";
 const MAX_METADATA_BYTES = 1_000_000;
 const HASH_READ_CONCURRENCY = 8;
 const HASH_READ_BATCH_BYTES = 2 * 1024 * 1024;
-const COPY_BATCH_FILES = 8;
-const COPY_BATCH_BYTES = 2 * 1024 * 1024;
+const COPY_CONCURRENCY = 32;
+const COPY_IN_FLIGHT_BYTES = 8 * 1024 * 1024;
 
+interface CapabilityFileCopy { input: string; output: string; mode: number; size: number }
+
+/**
+ * Validates and plans the whole tree before copying any file, then copies across
+ * directory boundaries with bounded file and byte concurrency. Small directories
+ * no longer serialize the copy, which dominates first-run startup on Windows.
+ */
 export async function copyCapabilityDirectory(
   source: string,
   destination: string,
   sourceRoot: string,
   includeNodeModules: boolean
+): Promise<void> {
+  const files: CapabilityFileCopy[] = [];
+  await planCapabilityCopy(source, destination, sourceRoot, includeNodeModules, files);
+  const inFlight = new Set<Promise<void>>();
+  let inFlightBytes = 0;
+  let failure: { reason: unknown } | undefined;
+  for (const file of files) {
+    while (!failure && inFlight.size > 0
+      && (inFlight.size >= COPY_CONCURRENCY || inFlightBytes + file.size > COPY_IN_FLIGHT_BYTES)) {
+      await Promise.race(inFlight);
+    }
+    if (failure) break;
+    const copy: Promise<void> = readFile(file.input)
+      .then((content) => writeFile(file.output, content, { mode: file.mode }))
+      .catch((reason: unknown) => { failure ??= { reason }; })
+      .finally(() => {
+        inFlightBytes -= file.size;
+        inFlight.delete(copy);
+      });
+    inFlightBytes += file.size;
+    inFlight.add(copy);
+  }
+  // Settle every started write before reporting so staging cleanup cannot race one.
+  await Promise.all(inFlight);
+  if (failure) throw failure.reason;
+}
+
+async function planCapabilityCopy(
+  source: string,
+  destination: string,
+  sourceRoot: string,
+  includeNodeModules: boolean,
+  files: CapabilityFileCopy[]
 ): Promise<void> {
   const metadata = await lstat(source);
   if (metadata.isSymbolicLink()) throw new Error(`Desktop capabilities cannot contain symlinks: ${source}`);
@@ -22,20 +62,6 @@ export async function copyCapabilityDirectory(
   const entries = (await readdir(source, { withFileTypes: true }))
     .filter((entry) => entry.name !== ".DS_Store" && (includeNodeModules || entry.name !== "node_modules"))
     .sort((left, right) => left.name.localeCompare(right.name));
-  const pending: { input: string; output: string; mode: number }[] = [];
-  let pendingBytes = 0;
-  const flush = async (): Promise<void> => {
-    // Settle every write before returning an error so staging cleanup cannot race
-    // another file in this batch. Directories are still traversed sequentially.
-    const results = await Promise.allSettled(pending.map(async (file) => (
-      writeFile(file.output, await readFile(file.input), { mode: file.mode })
-    )));
-    pending.length = 0;
-    pendingBytes = 0;
-    for (const result of results) {
-      if (result.status === "rejected") throw result.reason;
-    }
-  };
   for (const entry of entries) {
     const input = resolve(source, entry.name);
     const output = resolve(destination, entry.name);
@@ -43,21 +69,13 @@ export async function copyCapabilityDirectory(
     const child = await lstat(input);
     if (child.isSymbolicLink()) throw new Error(`Desktop capabilities cannot contain symlinks: ${input}`);
     if (child.isDirectory()) {
-      await flush();
-      await copyCapabilityDirectory(input, output, sourceRoot, includeNodeModules);
+      await planCapabilityCopy(input, output, sourceRoot, includeNodeModules, files);
     } else if (child.isFile()) {
-      if (pending.length > 0 && (pending.length >= COPY_BATCH_FILES || pendingBytes + child.size > COPY_BATCH_BYTES)) {
-        await flush();
-      }
-      pending.push({ input, output, mode: child.mode & 0o111 ? 0o755 : 0o600 });
-      pendingBytes += child.size;
-      // An individually oversized file is copied alone, as in the serial path.
-      if (pendingBytes >= COPY_BATCH_BYTES) await flush();
+      files.push({ input, output, mode: child.mode & 0o111 ? 0o755 : 0o600, size: child.size });
     } else {
       throw new Error(`Unsupported Desktop capability entry: ${input}`);
     }
   }
-  await flush();
 }
 
 export async function capabilityTreeSha256(root: string, includeNodeModules = false): Promise<string> {

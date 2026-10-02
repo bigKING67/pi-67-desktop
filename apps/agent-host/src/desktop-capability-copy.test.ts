@@ -52,9 +52,10 @@ describe("capability directory copy", () => {
     expect(await capabilityTreeSha256(withModules, true)).toBe(await capabilityTreeSha256(source, true));
   });
 
-  it("waits for every started write before rejecting and does not start another batch", async () => {
+  it("waits for every started write before rejecting and starts no further file", async () => {
     const { source, destination } = await fixture();
-    for (let index = 0; index < 10; index += 1) await writeFile(join(source, `f${index}`), "content");
+    const names = Array.from({ length: 40 }, (_, index) => `f${String(index).padStart(2, "0")}`);
+    for (const name of names) await writeFile(join(source, name), "content");
     const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
     let release!: () => void;
     const held = new Promise<void>((resolve) => { release = resolve; });
@@ -63,8 +64,9 @@ describe("capability directory copy", () => {
       if (typeof path !== "string") throw new Error("Expected a capability file path.");
       const name = basename(path);
       started.push(name);
-      if (name === "f0") throw new Error("synthetic copy failure");
-      if (name === "f7") await held;
+      if (name === "f00") throw new Error("synthetic copy failure");
+      // Hold every other write so only the failure frees a slot.
+      await held;
       return actual.writeFile(path, data, options);
     });
     let settled = false;
@@ -72,17 +74,43 @@ describe("capability directory copy", () => {
       .then(() => undefined, (error: unknown) => error)
       .finally(() => { settled = true; });
     try {
-      await vi.waitFor(() => expect(started).toHaveLength(8));
+      await vi.waitFor(() => expect(started).toHaveLength(32));
       expect(settled).toBe(false);
     } finally {
       release();
     }
     expect(await outcome).toEqual(new Error("synthetic copy failure"));
-    expect(started.sort()).toEqual(Array.from({ length: 8 }, (_, index) => `f${index}`));
-    expect(await readFile(join(destination, "f7"), "utf8")).toBe("content");
+    expect(started.sort()).toEqual(names.slice(0, 32));
+    expect(await readFile(join(destination, "f07"), "utf8")).toBe("content");
   });
 
-  it.each([1_100_000, 2 * 1024 * 1024 + 1])("copies %i-byte files alone within the size budget", async (size) => {
+  it("copies small directories concurrently instead of one directory at a time", async () => {
+    const { source, destination } = await fixture();
+    for (const directory of ["a", "b", "c"]) {
+      await mkdir(join(source, directory));
+      await writeFile(join(source, directory, `${directory}.txt`), directory);
+    }
+    const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const started: string[] = [];
+    vi.mocked(writeFile).mockImplementation(async (path, data, options) => {
+      if (typeof path !== "string") throw new Error("Expected a capability file path.");
+      started.push(basename(path));
+      if (basename(path) === "a.txt") await held;
+      return actual.writeFile(path, data, options);
+    });
+    const copied = copyCapabilityDirectory(source, destination, source, false);
+    try {
+      await vi.waitFor(() => expect([...started].sort()).toEqual(["a.txt", "b.txt", "c.txt"]));
+    } finally {
+      release();
+      await copied;
+    }
+    expect(await capabilityTreeSha256(destination)).toBe(await capabilityTreeSha256(source));
+  });
+
+  it.each([4_500_000, 8 * 1024 * 1024 + 1])("copies %i-byte files alone within the in-flight byte budget", async (size) => {
     const { source, destination } = await fixture();
     for (let index = 0; index < 3; index += 1) await writeFile(join(source, `f${index}`), Buffer.alloc(size, index));
     const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
