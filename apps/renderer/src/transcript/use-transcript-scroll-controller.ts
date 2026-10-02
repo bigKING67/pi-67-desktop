@@ -137,12 +137,18 @@ export function useTranscriptScrollController({
 
   const handleAtBottomStateChange = useCallback((nextAtBottom: boolean) => {
     if (historical) return;
-    if (!nextAtBottom && followLatestRef.current) return;
+    if (!nextAtBottom && followLatestRef.current) {
+      // Virtuoso re-estimates unmeasured rows and Footer growth without always
+      // reporting a total height change. Follow again on the next frame; a user
+      // scroll up has cleared followLatestRef by then and keeps its position.
+      handleTotalListHeightChanged();
+      return;
+    }
     if (nextAtBottom) followLatestRef.current = true;
     setAtBottom(nextAtBottom);
     if (nextAtBottom) setUnseenRowCount(0);
     if (readKey) useConversationReadPositionStore.getState().setAtBottom(readKey, nextAtBottom);
-  }, [historical, readKey]);
+  }, [handleTotalListHeightChanged, historical, readKey]);
 
   const handleRangeChanged = useCallback((range: ListRange) => {
     if (!readKey || historical) return;

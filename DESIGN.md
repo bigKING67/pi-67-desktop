@@ -1717,7 +1717,9 @@ loading error where the operation can produce those states
 - Transcript follow intent is distinct from its measured bottom position. While
   the user is following the latest Turn, live Assistant text, thinking, activity,
   Markdown, and other Footer height growth keep the newest content in view without
-  exposing `回到最新`. An explicit user scroll away preserves that reading anchor
+  exposing `回到最新`; this also holds when the virtualized list re-estimates
+  rows it has not measured, which can grow the content without a list height
+  change. An explicit user scroll away preserves that reading anchor
   and exposes the recovery action; activating it returns to the current end and
   resumes following subsequent streamed growth. The anchor is the first row with
   more than 8px visible in the viewport, never a row from the overscan rendered
