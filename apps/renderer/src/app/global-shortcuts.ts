@@ -3,6 +3,7 @@ import { useShellStore } from "../shell/shell-store.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { useAppStore } from "./app-store.js";
 import { requestConversationFind } from "../search/conversation-find-events.js";
+import { requestTeamChatSearch } from "../team-chat/team-chat-search-events.js";
 import {
   matchDesktopAction,
   type DesktopActionDescriptor,
@@ -56,6 +57,19 @@ export function handleGlobalShortcut(event: KeyboardEvent) {
   if (action.id === "keyboard-shortcuts") {
     event.preventDefault();
     openKeyboardShortcutsDialog(event.target);
+    return;
+  }
+
+  // In Chat, the find shortcuts search Team Chat: all conversations, or the one in view.
+  if (
+    (action.id === "find-current-conversation" || action.id === "find-workspace-conversations")
+    && useShellStore.getState().workspaceMode === "chat"
+    && rendererWorkbenchStore.getState().selectedSurface?.kind !== "settings"
+  ) {
+    event.preventDefault();
+    // The field lives in the rail; a collapsed rail opens first so focus can land.
+    useShellStore.getState().setNavigationVisible(true);
+    requestTeamChatSearch(action.id === "find-current-conversation" ? "current" : "all");
     return;
   }
 

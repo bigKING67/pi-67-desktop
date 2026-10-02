@@ -189,4 +189,20 @@ describe("team chat model", () => {
     expect(applyActivityRead(state).activity?.[0]?.unread).toBe(false);
     expect(applyActivityRead(INITIAL_TEAM_CHAT_STATE)).toBe(INITIAL_TEAM_CHAT_STATE);
   });
+
+  it("opens a window at older history that skips live messages until it catches up", () => {
+    const base = replaceDirectory(INITIAL_TEAM_CHAT_STATE, {
+      teamId: "t", selfUserId: "me", members: [], policy: { channelCreation: "members", viewersCanPost: true, agentCreation: "members", revision: 0 },
+      agents: [], bots: [], conversations: [channel({ lastSeq: 900 })]
+    });
+    const message = (seq: number): TeamChatMessage => ({ id: `m${seq}`, conversationId: "c1", seq, senderUserId: "u2", body: "x", clientKey: `k-${seq}`, createdAt: seq });
+    const windowed = applyMessagePage(base, "c1", { messages: [message(100), message(101)], hasMore: true }, "window");
+    expect(windowed.threads.c1).toMatchObject({ hasMore: true, hasNewer: true });
+    const live = applyMessage(windowed, message(901));
+    expect(live.threads.c1?.messages.map((item) => item.seq)).toEqual([100, 101]);
+    const caughtUp = applyMessagePage(live, "c1", { messages: [message(102)], hasMore: false }, "newer");
+    expect(caughtUp.threads.c1?.hasNewer).toBeUndefined();
+    expect(applyMessagePage(caughtUp, "c1", { messages: [message(99)], hasMore: true }, "older").threads.c1?.hasNewer).toBeUndefined();
+  });
 });
+

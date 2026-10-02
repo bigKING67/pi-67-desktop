@@ -98,8 +98,8 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
   {
     id: "find-current-conversation",
     label: "查找当前对话正文",
-    detail: "只查找当前 Pi 会话的可见正文",
-    keywords: "find search current message 查找 当前 对话",
+    detail: "只查找当前 Pi 会话的可见正文；在聊天中搜索当前对话的消息",
+    keywords: "find search current message 查找 当前 对话 聊天 搜索",
     requiresWorkspace: true,
     contexts: ["workspaceOpen", "composerFocus", "taskRunning", "taskIdle"],
     bindings: [{ key: "f" }]
@@ -107,8 +107,8 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
   {
     id: "find-workspace-conversations",
     label: "查找工作区对话正文",
-    detail: "跨当前工作区的 Pi JSONL 会话查找正文",
-    keywords: "find search workspace messages 查找 工作区 对话",
+    detail: "跨当前工作区的 Pi JSONL 会话查找正文；在聊天中搜索全部消息",
+    keywords: "find search workspace messages 查找 工作区 对话 聊天 搜索 消息",
     requiresWorkspace: true,
     contexts: ["workspaceOpen", "composerFocus", "taskRunning", "taskIdle"],
     bindings: [{ key: "f", shift: true }]

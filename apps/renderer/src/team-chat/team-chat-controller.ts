@@ -17,7 +17,6 @@ import {
   applyActivityDone,
   applyActivityRead,
   applyMessage,
-  applyMessagePage,
   applyPush,
   applyReadCursor,
   applyWorkCard,
@@ -26,10 +25,11 @@ import {
   INITIAL_TEAM_CHAT_STATE,
   removePending,
   replaceDirectory,
-  setThreadStatus,
   upsertConversation,
   type TeamChatState
 } from "./team-chat-model.js";
+import { createTeamChatHistory } from "./team-chat-history.js";
+import { createTeamChatSearch } from "./team-chat-search-controller.js";
 
 type TeamChatCommandType = keyof TeamChatCommandPayloads;
 
@@ -38,11 +38,6 @@ export interface TeamChatPort {
   subscribe(subscriber: ConnectionSubscriber): () => void;
   newClientKey(): string;
 }
-
-/** Newer pages fetched while reconciling one thread before reloading its latest page instead. */
-const MAX_CATCH_UP_PAGES = 5;
-/** Older pages fetched to reach a message opened from activity before showing the conversation as is. */
-const MAX_REVEAL_PAGES = 10;
 
 /** Runs `load` one pass at a time; calls during a pass schedule exactly one more. */
 function coalesced(load: () => Promise<void>): () => Promise<void> {
@@ -70,11 +65,15 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
   let focusRevision = 0;
 
   const update = (reduce: (state: TeamChatState) => TeamChatState) => store.setState(reduce(store.getState()), true);
-  /** Applies a late result only if no sign-out or reset happened since the request began. */
-  const guarded = (reduce: (state: TeamChatState) => TeamChatState) => {
+  /**
+   * Call before a request: the returned function applies a late result only if no
+   * sign-out or reset happened since then.
+   */
+  const since = () => {
     const started = epoch;
-    return () => { if (started === epoch) update(reduce); };
+    return (reduce: (state: TeamChatState) => TeamChatState) => { if (started === epoch) update(reduce); };
   };
+  const { loadLatest, catchUp, loadOlder, loadNewer, reveal } = createTeamChatHistory({ port, store, update, since });
 
   function reset(connection: TeamChatConnectionState | undefined): void {
     epoch += 1;
@@ -129,61 +128,12 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
   });
 
   /** Loads older pages until `seq` is in the thread, within a bound. */
-  async function reveal(conversationId: string, seq: number): Promise<void> {
-    for (let page = 0; page < MAX_REVEAL_PAGES; page += 1) {
-      const thread = store.getState().threads[conversationId];
-      const first = thread?.messages[0]?.seq;
-      if (!thread || thread.status !== "ready" || !thread.hasMore || first === undefined || first <= seq) return;
-      await loadOlder(conversationId);
-    }
-  }
-
   async function reconcile(): Promise<void> {
     void loadActivity();
     await loadDirectory();
     const { threads, selectedConversationId } = store.getState();
     await Promise.all(Object.keys(threads).map((id) => catchUp(id)));
     if (selectedConversationId) await markRead(selectedConversationId);
-  }
-
-  async function loadLatest(conversationId: string): Promise<void> {
-    update((state) => setThreadStatus(state, conversationId, { status: "loading" }));
-    try {
-      const page = await port.request("teamChat.messages.list", { conversationId });
-      guarded((state) => applyMessagePage(state, conversationId, page, "latest"))();
-    } catch {
-      guarded((state) => setThreadStatus(state, conversationId, { status: "error" }))();
-    }
-  }
-
-  /** Fetches newer messages; `from` overrides the first cursor when a push skipped ahead of the loaded tail. */
-  async function catchUp(conversationId: string, from?: number): Promise<void> {
-    for (let page = 0; page < MAX_CATCH_UP_PAGES; page += 1) {
-      const thread = store.getState().threads[conversationId];
-      if (!thread || thread.status !== "ready") return;
-      const tail = page === 0 && from !== undefined ? from : thread.messages.at(-1)?.seq ?? 0;
-      try {
-        const result = await port.request("teamChat.messages.list", { conversationId, after: tail, limit: 100 });
-        guarded((state) => applyMessagePage(state, conversationId, result, "newer"))();
-        if (!result.hasMore) return;
-      } catch {
-        return;
-      }
-    }
-    await loadLatest(conversationId);
-  }
-
-  async function loadOlder(conversationId: string): Promise<void> {
-    const thread = store.getState().threads[conversationId];
-    const first = thread?.messages[0]?.seq;
-    if (!thread || thread.loadingOlder || !thread.hasMore || first === undefined) return;
-    update((state) => setThreadStatus(state, conversationId, { loadingOlder: true }));
-    try {
-      const page = await port.request("teamChat.messages.list", { conversationId, before: first });
-      guarded((state) => applyMessagePage(state, conversationId, page, "older"))();
-    } catch {
-      guarded((state) => setThreadStatus(state, conversationId, { loadingOlder: false }))();
-    }
   }
 
   async function markRead(conversationId: string): Promise<void> {
@@ -198,28 +148,30 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
   }
 
   async function deliver(conversationId: string, clientKey: string, body: string, mentionUserIds: readonly string[] = []): Promise<void> {
+    const settle = since();
     try {
       const message = await port.request("teamChat.message.send", {
         conversationId, clientKey, body, ...(mentionUserIds.length === 0 ? {} : { mentionUserIds: [...mentionUserIds] })
       });
-      guarded((state) => applyMessage(state, message))();
+      settle((state) => applyMessage(state, message));
     } catch (error) {
-      guarded((state) => failPending(state, clientKey, teamChatErrorMessage(error)))();
+      settle((state) => failPending(state, clientKey, teamChatErrorMessage(error)));
     }
   }
 
   /** Returns the direct message with a teammate without changing the selection. */
   async function ensureDirectMessage(userId: string): Promise<string> {
+    const settle = since();
     const existing = directMessageWith(store.getState().directory, userId);
     if (existing) return existing.id;
     const conversation = await port.request("teamChat.dm.open", { userId });
-    guarded((state) => upsertConversation(state, conversation))();
+    settle((state) => upsertConversation(state, conversation));
     return conversation.id;
   }
 
   async function selectConversation(conversationId: string | undefined): Promise<void> {
     // A focus request belongs to one opening; openMessage sets it again afterwards.
-    update((state) => ({ ...state, selectedConversationId: conversationId, activityOpen: false, focus: undefined }));
+    update((state) => ({ ...state, selectedConversationId: conversationId, panel: undefined, focus: undefined }));
     if (conversationId === undefined) return;
     const thread = store.getState().threads[conversationId];
     if (!thread || thread.status === "error") await loadLatest(conversationId);
@@ -267,14 +219,16 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
     },
     retryDirectory: () => loadDirectory(),
     retryActivity: () => loadActivity(),
-    openActivity: () => update((state) => ({ ...state, activityOpen: true })),
+    openActivity: () => update((state) => ({ ...state, panel: "activity" })),
+    ...createTeamChatSearch({ request: (payload) => port.request("teamChat.search", payload), store, update, since }),
     /** Opens a conversation at one message, as activity items and notifications do. */
     async openMessage(conversationId: string, seq?: number): Promise<void> {
       await selectConversation(conversationId);
       if (seq === undefined) return;
-      await reveal(conversationId, seq);
+      // Set first, so a window opened by reveal mounts already centred on the message.
       focusRevision += 1;
       update((state) => ({ ...state, focus: { conversationId, seq, revision: focusRevision } }));
+      await reveal(conversationId, seq);
     },
     /** Optimistic; a failed request re-reads the activity before rethrowing. */
     async setActivityDone(keys: readonly string[], done: boolean): Promise<void> {
@@ -296,15 +250,17 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
       }
     },
     async muteConversation(conversationId: string, muted: boolean): Promise<void> {
+      const settle = since();
       const result = await port.request("teamChat.conversation.mute", { conversationId, muted });
-      guarded((state) => {
+      settle((state) => {
         const conversation = state.directory?.conversations.find((item) => item.id === conversationId);
         if (!conversation) return state;
         const { muted: _previous, ...rest } = conversation;
         return upsertConversation(state, result.muted ? { ...rest, muted: true } : rest);
-      })();
+      });
     },
     loadOlder,
+    loadNewer,
     markRead,
     selectConversation,
     reloadThread: loadLatest,
@@ -327,22 +283,25 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
       await selectConversation(await ensureDirectMessage(userId));
     },
     async createChannel(input: { name: string; visibility: TeamChatVisibility; memberUserIds: string[] }): Promise<void> {
+      const settle = since();
       const conversation = await port.request("teamChat.channel.create", input);
-      guarded((state) => upsertConversation(state, conversation))();
+      settle((state) => upsertConversation(state, conversation));
       await selectConversation(conversation.id);
     },
     ensureDirectMessage,
     async createWorkCard(conversationId: string, input: {
       title: string; goal: string; acceptance: string; summary: string; refs: TeamChatWorkCardRef[]; assigneeUserId?: string;
     }): Promise<void> {
+      const settle = since();
       const message = await port.request("teamChat.workCard.create", { conversationId, clientKey: port.newClientKey(), ...input });
-      guarded((state) => applyMessage(state, message))();
+      settle((state) => applyMessage(state, message));
     },
     /** Applies a lifecycle action; a stale revision reloads the thread before rethrowing. */
     async actOnWorkCard(card: TeamChatWorkCard, action: TeamChatWorkCardAction): Promise<void> {
+      const settle = since();
       try {
         const next = await port.request("teamChat.workCard.act", { cardId: card.id, action, expectedRevision: card.revision });
-        guarded((state) => applyWorkCard(state, next))();
+        settle((state) => applyWorkCard(state, next));
       } catch (error) {
         if (serviceErrorCode(error) === "work_card_revision_conflict") await loadLatest(card.conversationId);
         throw error;
@@ -373,16 +332,19 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
       await loadDirectory();
     },
     async loadAgentHost(): Promise<void> {
+      const settle = since();
       const host = await port.request("teamChat.agent.host.get", {});
-      guarded((state) => ({ ...state, agentHost: host }))();
+      settle((state) => ({ ...state, agentHost: host }));
     },
     async hostAgent(binding: TeamChatAgentBinding): Promise<void> {
+      const settle = since();
       const host = await port.request("teamChat.agent.host.bind", { binding });
-      guarded((state) => ({ ...state, agentHost: host }))();
+      settle((state) => ({ ...state, agentHost: host }));
     },
     async stopHostingAgent(agentUserId: string): Promise<void> {
+      const settle = since();
       const host = await port.request("teamChat.agent.host.unbind", { agentUserId });
-      guarded((state) => ({ ...state, agentHost: host }))();
+      settle((state) => ({ ...state, agentHost: host }));
     },
     /** Webhook bots (ADR 0005). The secret URL is returned to the caller and never kept in the store. */
     listWebhooks: async (conversationId: string) => (await port.request("teamChat.webhook.list", { conversationId })).webhooks,
@@ -397,8 +359,9 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
       await loadDirectory();
     },
     async joinChannel(conversationId: string): Promise<void> {
+      const settle = since();
       const conversation = await port.request("teamChat.channel.join", { conversationId });
-      guarded((state) => upsertConversation(state, conversation))();
+      settle((state) => upsertConversation(state, conversation));
       await loadLatest(conversationId);
     }
   };

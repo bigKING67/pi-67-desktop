@@ -13,7 +13,7 @@ function isViewing(conversationId: string): boolean {
   if (useShellStore.getState().workspaceMode !== "chat") return false;
   if (rendererWorkbenchStore.getState().selectedSurface?.kind === "settings") return false;
   const state = teamChat.store.getState();
-  return !state.activityOpen && state.selectedConversationId === conversationId;
+  return state.panel === undefined && state.selectedConversationId === conversationId;
 }
 
 /**

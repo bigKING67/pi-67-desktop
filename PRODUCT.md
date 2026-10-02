@@ -233,8 +233,14 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
     switch counts only their mentions.
   - Notifications arrive while Pi's background service runs (any open Workspace or
     Chat); the Welcome screen alone does not start it.
+- Message search (contract `docs/adr/0007-team-chat-message-search.md`): the search
+  field at the top of the Chat rail finds text in joined conversations and public
+  channels, including Work Card goal, acceptance and summary. Results show sender,
+  place, time and a one-line excerpt with the match marked; they filter by
+  conversation and sender, load 50 at a time, and open the message centred and
+  highlighted. In Chat, ⌘⇧F focuses search and ⌘F searches the conversation in view.
 - Not yet: threads, edits/deletes, reactions, attachments,
-  search, team invitations (use the New Money web console).
+  team invitations (use the New Money web console).
 
 ## Success criteria
 

@@ -113,6 +113,82 @@
   outline: none;
 }
 
+/* Search (ADR 0007): a quiet field at the top of the Chat rail. */
+.railSearch {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding: 0 2px;
+}
+
+.railSearch input {
+  width: 100%;
+  min-height: 30px;
+  /* Text starts on the rail rows' label edge. */
+  padding: 0 8px 0 33px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  outline: 0;
+  background: var(--surface-muted);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--font-size-interface);
+}
+
+.railSearch input::placeholder { color: var(--text-tertiary); }
+
+.railSearch input::-webkit-search-cancel-button { appearance: none; }
+
+.railSearch input:focus {
+  border-color: var(--focus);
+  background: var(--surface);
+  box-shadow: var(--shadow-focus);
+}
+
+.railSearchIcon {
+  position: absolute;
+  top: 8px;
+  left: 15px;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+.railSearchScope {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-self: start;
+  gap: 2px;
+  max-width: 100%;
+  padding: 1px 2px 1px 8px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.railSearchScope > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.railSearchClear {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
+.railSearchClear[data-hovered] { background: var(--surface-hover); color: var(--text-primary); }
+.railSearchClear[data-focus-visible] { box-shadow: var(--shadow-focus); outline: none; }
+
 .railEmpty,
 .railStatus {
   margin: 0;
@@ -174,6 +250,9 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
   background: var(--canvas);
 }
+
+/* One column: overlays such as the jump button share a cell instead of adding a column. */
+.workbench > * { grid-column: 1; }
 
 .banner {
   margin: 0;
@@ -276,6 +355,16 @@
 }
 
 .loadOlder[data-hovered] { background: var(--surface-hover); color: var(--text-primary); }
+
+/* Shown while a window at older history is open: floats at the bottom of the timeline cell. */
+.jumpLatest {
+  z-index: 2;
+  grid-row: 2;
+  align-self: end;
+  margin-bottom: var(--space-3);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+}
 
 .daySeparator {
   display: grid;

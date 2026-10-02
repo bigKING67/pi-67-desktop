@@ -22,13 +22,17 @@ const FIRST_ITEM_BASE = 1_000_000_000;
  * Virtualized conversation timeline. Each entry is one message (day labels ride on
  * the first message of a day), so loading older history is a pure prepend.
  */
-export function TeamChatTimeline({ conversationId, directory, entries, target, header, hasMore, loadingOlder, scrollRequest, focus }: {
+export function TeamChatTimeline({ conversationId, directory, entries, target, header, hasMore, hasNewer, windowStart, loadingOlder, scrollRequest, focus }: {
   conversationId: string;
   directory: TeamChatDirectory;
   entries: TeamChatTimelineEntry[];
   target: string;
   header: ReactNode;
   hasMore: boolean;
+  /** A window at older history: reaching the bottom loads newer messages. */
+  hasNewer: boolean;
+  /** Changes when a window replaces the history; the list remounts centred on the focus. */
+  windowStart: number | undefined;
   loadingOlder: boolean;
   /** Increments when the reader sends, forcing the view to the newest message. */
   scrollRequest: number;
@@ -77,16 +81,19 @@ export function TeamChatTimeline({ conversationId, directory, entries, target, h
       computeItemKey={(_, entry) => entry.key}
       data={entries}
       firstItemIndex={firstItemIndex.current}
-      followOutput={(atBottom) => atBottom ? "auto" : false}
+      followOutput={(atBottom) => atBottom && !hasNewer ? "auto" : false}
       increaseViewportBy={{ top: 400, bottom: 200 }}
-      initialTopMostItemIndex={Math.max(0, entries.length - 1)}
+      initialTopMostItemIndex={focusIndex >= 0 && windowStart !== undefined
+        ? { index: focusIndex, align: "center" }
+        : Math.max(0, entries.length - 1)}
       itemContent={(_, entry) => (
         <div className={styles.timelineColumn}>
           <TimelineMessage directory={directory} entry={entry} focused={entry.seq !== undefined && entry.seq === highlighted} target={target} />
         </div>
       )}
-      key={conversationId}
+      key={`${conversationId}:${windowStart ?? "latest"}`}
       ref={virtuoso}
+      endReached={() => { if (hasNewer) void teamChat.loadNewer(conversationId); }}
       startReached={() => { if (hasMore && !loadingOlder) void teamChat.loadOlder(conversationId); }}
     />
   );

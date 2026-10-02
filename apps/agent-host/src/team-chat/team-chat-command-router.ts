@@ -1,6 +1,7 @@
 import {
   TEAM_CHAT_CHANNEL_NAME_MAX_CHARS,
   TEAM_CHAT_MESSAGE_MAX_CHARS,
+  TEAM_CHAT_SEARCH_QUERY_MAX,
   TEAM_CHAT_WEBHOOK_NAME_MAX,
   TEAM_CHAT_WORK_CARD_LIMITS,
   teamChatCodePointLength,
@@ -46,7 +47,8 @@ const TEAM_CHAT_COMMANDS: ReadonlySet<string> = new Set<TeamChatCommandType>([
   "teamChat.activity.list",
   "teamChat.activity.setDone",
   "teamChat.activity.markAllRead",
-  "teamChat.conversation.mute"
+  "teamChat.conversation.mute",
+  "teamChat.search"
 ]);
 
 export function isTeamChatCommand(type: AgentCommandType): type is TeamChatCommandType {
@@ -229,6 +231,14 @@ export class TeamChatCommandRouter {
       case "teamChat.conversation.mute": {
         const { conversationId, muted } = command.payload as TeamChatCommandPayloads["teamChat.conversation.mute"];
         return { muted: await gateway.muteConversation(conversationId, muted, signal) };
+      }
+      case "teamChat.search": {
+        const { query, ...filters } = command.payload as TeamChatCommandPayloads["teamChat.search"];
+        const text = query.trim();
+        if (!text || teamChatCodePointLength(text) > TEAM_CHAT_SEARCH_QUERY_MAX || teamChatHasControlCharacter(text)) {
+          throw invalid("Search for 1 to 100 printable characters.");
+        }
+        return gateway.searchMessages({ query: text, ...filters }, signal);
       }
       case "teamChat.dm.open": {
         const { userId } = command.payload as TeamChatCommandPayloads["teamChat.dm.open"];

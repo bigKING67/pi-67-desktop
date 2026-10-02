@@ -2105,6 +2105,22 @@ loading error where the operation can produce those states
   segmented control) when its row leaves the list.
   Opening an item centres its message and gives it an accent-soft highlight for
   about two seconds.
+- Search (ADR 0007): a 30px search field with a 14px search glyph sits at the top of
+  the Chat rail above `动态`, on the muted surface with the default border; its text
+  starts on the rail rows' label edge, focus uses the focus-role border and ring, and
+  the native clear control is hidden. A conversation scope from ⌘F shows under it
+  as an accent-soft caption chip `在 #频道 中` with a 24px clear button. Results reuse
+  the activity panel column: search glyph + `「q」的搜索结果` heading with a 28px close
+  button that overhangs the line so the heading does not shift from `动态`, the hint
+  line, then labelled compact 30px `对话` and `发送人` selects (180–280px, wrap). An
+  empty filtered search says so and offers `清除筛选`.
+  Rows reuse the activity row anatomy: a 20px sender initial tile (a card glyph tile
+  for Work Card hits), the sender as title, for cards a tertiary `任务卡 · 目标 · 标题`
+  line, then the excerpt in support-size secondary text with every match in an
+  accent-soft mark with a 2px accent underline and semibold primary text; meta shows
+  time then place. `加载更多结果` is a centred secondary button. A result far back in
+  history opens a window centred on it; `跳到最新消息` then floats at the bottom centre
+  of the timeline (raised surface, floating shadow) until the newest page returns.
 - Mute: a small `静音通知`/`取消静音` button with a bell-off/bell glyph ends the
   conversation intro (before `频道设置` in channels). Muted rows add an 11px
   tertiary bell-off mark after the name, and their unread count switches from the

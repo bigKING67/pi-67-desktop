@@ -10,6 +10,7 @@ import {
   type TeamChatDirectory,
   type TeamChatMessage,
   type TeamChatPushEvent,
+  type TeamChatSearchHit,
   type TeamChatWorkCard
 } from "@pi67/domain";
 import type { TeamChatAgentHostState } from "@pi67/protocol";
@@ -18,6 +19,10 @@ export interface TeamChatThread {
   messages: TeamChatMessage[];
   /** Older history exists before the first loaded message. */
   hasMore: boolean;
+  /** A window opened at an older message (search, activity); newer history loads on scroll. */
+  hasNewer?: boolean;
+  /** Identifies a window until the latest page replaces it; the view remounts per window. */
+  windowStart?: number;
   status: "loading" | "ready" | "error";
   loadingOlder: boolean;
 }
@@ -45,10 +50,25 @@ export interface TeamChatState {
   /** The reader's activity (ADR 0006), newest first; undefined until read. */
   activity: readonly TeamChatActivityItem[] | undefined;
   activityStatus: "idle" | "loading" | "ready" | "error";
-  /** The activity inbox replaces the conversation view while open. */
-  activityOpen: boolean;
+  /** The activity inbox or search results replace the conversation view while open. */
+  panel: "activity" | "search" | undefined;
+  /** The last search (ADR 0007); kept while a result is open so the list can return. */
+  search: TeamChatSearchState | undefined;
   /** A message to bring into view once its conversation shows (from activity or a notification). */
   focus: { conversationId: string; seq: number; revision: number } | undefined;
+}
+
+export interface TeamChatSearchFilters {
+  query: string;
+  conversationId?: string;
+  senderUserId?: string;
+}
+
+export interface TeamChatSearchState extends TeamChatSearchFilters {
+  status: "loading" | "ready" | "error";
+  results: readonly TeamChatSearchHit[];
+  nextCursor?: string;
+  loadingMore: boolean;
 }
 
 export const INITIAL_TEAM_CHAT_STATE: TeamChatState = {
@@ -61,7 +81,8 @@ export const INITIAL_TEAM_CHAT_STATE: TeamChatState = {
   agentHost: undefined,
   activity: undefined,
   activityStatus: "idle",
-  activityOpen: false,
+  panel: undefined,
+  search: undefined,
   focus: undefined
 };
 
@@ -91,17 +112,25 @@ export function applyMessagePage(
   state: TeamChatState,
   conversationId: string,
   page: { messages: readonly TeamChatMessage[]; hasMore?: boolean },
-  position: "latest" | "older" | "newer"
+  position: "latest" | "older" | "newer" | "window"
 ): TeamChatState {
   const current = state.threads[conversationId];
-  const messages = mergeTeamChatMessages(position === "latest" ? [] : current?.messages ?? [], page.messages);
+  const replace = position === "latest" || position === "window";
+  const messages = mergeTeamChatMessages(replace ? [] : current?.messages ?? [], page.messages);
   const hasMore = position === "newer" ? current?.hasMore ?? false : page.hasMore ?? false;
+  const lastSeq = state.directory?.conversations.find((item) => item.id === conversationId)?.lastSeq ?? 0;
+  const hasNewer = position === "window" ? (messages.at(-1)?.seq ?? 0) < lastSeq
+    : position === "older" ? current?.hasNewer === true
+      : position === "newer" ? current?.hasNewer === true && page.hasMore === true
+        : false;
+  const windowStart = position === "window" ? page.messages[0]?.seq ?? 0 : position === "latest" ? undefined : current?.windowStart;
   const settled = state.pending.filter((item) => !page.messages.some((message) => message.clientKey === item.clientKey
     && message.conversationId === item.conversationId));
   return {
     ...state,
     pending: settled.length === state.pending.length ? state.pending : settled,
-    threads: { ...state.threads, [conversationId]: { messages, hasMore, status: "ready", loadingOlder: false } }
+    threads: { ...state.threads, [conversationId]: { messages, hasMore, status: "ready", loadingOlder: false,
+      ...(hasNewer ? { hasNewer } : {}), ...(windowStart === undefined ? {} : { windowStart }) } }
   };
 }
 
@@ -123,7 +152,8 @@ export function applyMessage(state: TeamChatState, message: TeamChatMessage): Te
   let next: TeamChatState = {
     ...state,
     pending: pending.length === state.pending.length ? state.pending : pending,
-    threads: thread && thread.status === "ready"
+    // A window at older history skips live messages; scrolling down loads them in order.
+    threads: thread && thread.status === "ready" && thread.hasNewer !== true
       ? { ...state.threads, [message.conversationId]: { ...thread, messages: mergeTeamChatMessages(thread.messages, [message]) } }
       : state.threads
   };

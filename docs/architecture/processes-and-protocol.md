@@ -2637,7 +2637,7 @@ ADR 0003 是权威合同。Team Chat 不经过 Pi Runtime、Task Scheduler 或 S
   `teamChat.message.send`、`teamChat.read.mark`、`teamChat.channel.create`、`teamChat.channel.join`、
   `teamChat.channel.members`、`teamChat.channel.manage`、`teamChat.dm.open`、`teamChat.workCard.create`、
   `teamChat.workCard.act`、`teamChat.agent.create|update|setDisabled|remove`、`teamChat.agent.host.get|bind|unbind`、`teamChat.webhook.list|create|rotate|remove`、
-  `teamChat.activity.list|setDone|markAllRead`、`teamChat.conversation.mute`
+  `teamChat.activity.list|setDone|markAllRead`、`teamChat.conversation.mute`、`teamChat.search`
   均为 `app` scope 命令（`teamChat.agentHostChanged` 为 `app` scope 事件）；`teamChat.pushed` 与 `teamChat.connectionChanged` 是 `app`
   scope 事件。Schema 位于 `packages/protocol/src/team-chat-schemas.ts`；字符长度按字素校验，Host 再按
   服务端的码点上限精确校验。`message.send` 不是 replay-safe control mutation：幂等由 caller 的
@@ -2683,6 +2683,9 @@ ADR 0003 是权威合同。Team Chat 不经过 Pi Runtime、Task Scheduler 或 S
   动态由服务端按需推导（30 天、≤200 条），Desktop 不落盘。系统通知由 renderer 依据新动态组成文案（默认只含谁/在哪，
   预览需用户开启），经 `showNativeNotification` 的 `kind: "chat"` 形态（title ≤120、body ≤240，Main 原样展示、不记日志）发出；
   点击回到对应会话与消息。通知不会自行启动 Agent Host：Host 每次连接时 renderer 已会请求 Team Chat 连接状态，通知复用该连接。
+- 消息搜索（`docs/adr/0007-team-chat-message-search.md`）：`teamChat.search` 由 Host 校验查询（1–100 个可见字符）后转发
+  `GET /chat/search`；服务端按子串匹配读者可读的对话（含任务卡目标/验收/摘要），只返回命中处的一行摘录与游标。
+  查询词不进日志、Desktop 不保存。聊天模式下 ⌘⇧F/⌘F 改为聊天搜索（全部/当前对话）。
 - Desktop Main：`app-protocol`、`main-window`、`agent-host-supervisor`、`system-bridge` 分别拥有
   scheme/window/process/system 能力，`main.ts` 只做组合。
 - Agent Host：`host-server`、`command-scheduler`、`operation-registry`、`operation-submission-ledger`、

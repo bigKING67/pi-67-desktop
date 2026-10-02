@@ -1,42 +1,7 @@
-import { TEAM_CHAT_DEFAULT_POLICY, type TeamChatConversation, type TeamChatDirectory, type TeamChatMessage } from "@pi67/domain";
-import type { AgentEvent, EventEnvelope } from "@pi67/protocol";
-import { describe, expect, it, vi } from "vitest";
-import type { ConnectionSubscriber } from "../connection/agent-connection-controller-contract.js";
-import { createTeamChatController, teamChatErrorMessage, type TeamChatPort } from "./team-chat-controller.js";
-
-const conversation: TeamChatConversation = {
-  id: "c1", kind: "channel", visibility: "public", name: "研究", joined: true, memberCount: 2, memberUserIds: [],
-  lastSeq: 2, lastReadSeq: 1, unreadCount: 1, mentionCount: 0, createdAt: 1
-};
-const directory: TeamChatDirectory = {
-  teamId: "t", selfUserId: "me", members: [{ userId: "me", displayName: "Me", role: "owner" }], conversations: [conversation],
-  policy: TEAM_CHAT_DEFAULT_POLICY,
-  agents: [],
-  bots: []
-};
-const message = (seq: number, patch: Partial<TeamChatMessage> = {}): TeamChatMessage => ({
-  id: `m${seq}`, conversationId: "c1", seq, senderUserId: "u2", body: `m${seq}`, clientKey: `client-${seq}`, createdAt: seq, ...patch
-});
-const appEnvelope = { context: { scope: "app" } } as EventEnvelope;
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
-
-function harness(handlers: Partial<Record<string, (payload: never) => unknown>>) {
-  let subscriber: ConnectionSubscriber = {};
-  const calls: Array<{ type: string; payload: unknown }> = [];
-  const port: TeamChatPort = {
-    request: vi.fn(async (type: string, payload: unknown) => {
-      calls.push({ type, payload });
-      const handler = handlers[type];
-      if (!handler) throw new Error(`unexpected ${type}`);
-      return await handler(payload as never);
-    }) as unknown as TeamChatPort["request"],
-    subscribe: (next) => { subscriber = next; return () => { subscriber = {}; }; },
-    newClientKey: () => "client-key-new"
-  };
-  const controller = createTeamChatController(port);
-  const emit = (event: AgentEvent) => subscriber.onEvent?.(event, appEnvelope);
-  return { controller, calls, emit, connect: () => subscriber.onConnected?.({} as never), subscriber: () => subscriber };
-}
+import type { TeamChatConversation, TeamChatDirectory } from "@pi67/domain";
+import { describe, expect, it } from "vitest";
+import { teamChatErrorMessage } from "./team-chat-controller.js";
+import { conversation, directory, flush, harness, message } from "./team-chat-controller-test-support.js";
 
 describe("team chat controller", () => {
   it("loads the directory on connect and reconciles once per live generation", async () => {
@@ -366,31 +331,4 @@ describe("team chat controller", () => {
       .toEqual([{ conversationId: "c1", muted: true }, { conversationId: "c1", muted: false }]);
   });
 
-  it("opens the inbox and opens a message by paging back to it", async () => {
-    const pages: Record<string, { messages: TeamChatMessage[]; hasMore: boolean }> = {
-      latest: { messages: [message(5), message(6)], hasMore: true },
-      5: { messages: [message(3), message(4)], hasMore: true },
-      3: { messages: [message(1), message(2)], hasMore: false }
-    };
-    const { controller, connect } = harness({
-      "teamChat.connection.get": () => ({ status: "connecting" }),
-      "teamChat.directory.get": () => directory,
-      "teamChat.activity.list": () => ({ items: [] }),
-      "teamChat.messages.list": (payload: { before?: number }) => pages[payload.before === undefined ? "latest" : String(payload.before)],
-      "teamChat.read.mark": () => ({ lastReadSeq: 6 })
-    });
-    controller.start();
-    connect();
-    await flush();
-    controller.openActivity();
-    expect(controller.store.getState().activityOpen).toBe(true);
-    await controller.openMessage("c1", 2);
-    const state = controller.store.getState();
-    expect(state.activityOpen).toBe(false);
-    expect(state.selectedConversationId).toBe("c1");
-    expect(state.threads.c1?.messages.map((item) => item.seq)).toEqual([1, 2, 3, 4, 5, 6]);
-    expect(state.focus).toMatchObject({ conversationId: "c1", seq: 2 });
-    await controller.selectConversation("c1");
-    expect(controller.store.getState().focus).toBeUndefined();
-  });
 });

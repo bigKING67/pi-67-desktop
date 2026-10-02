@@ -9,7 +9,7 @@ import { activityDetail, activityTitle, activityWhere } from "./team-chat-activi
 import { teamChatErrorMessage } from "./team-chat-controller.js";
 import { teamChat, useTeamChat } from "./team-chat-instance.js";
 import { formatTeamChatMoment } from "./team-chat-presentation.js";
-import styles from "./TeamChatActivity.module.css";
+import styles from "./TeamChatPanel.module.css";
 
 const ICONS = {
   mention: AtSign,

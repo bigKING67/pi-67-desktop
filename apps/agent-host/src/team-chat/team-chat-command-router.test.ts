@@ -341,5 +341,23 @@ describe("TeamChatCommandRouter", () => {
     await expect(run("teamChat.activity.list", {})).rejects.toBeDefined();
     router.shutdown();
   });
+
+  it("searches messages with filters and a cursor, and validates the query", async () => {
+    const cursor = "1759380000123456_0b5c2f4e-8a1d-4c3e-9f6a-2d7e1b0c9a8f";
+    const hit = { messageId: "m1", conversationId: "c1", seq: 3, senderUserId: "u2", createdAt: "2026-10-02T00:00:00Z",
+      field: "summary", snippet: "…已定位到 redirect 参数丢失", cardTitle: "修复登录跳转" };
+    const { router, run, calls } = setup({
+      [`GET /chat/search?q=%E5%8F%A3%E5%BE%84&conversationId=c1&senderUserId=u2&cursor=${cursor}`]:
+        () => json({ results: [hit], nextCursor: cursor }),
+      "GET /chat/search?q=redirect": () => json({ results: [{ ...hit, field: "body" }] })
+    });
+    await expect(run("teamChat.search", { query: " 口径 ", conversationId: "c1", senderUserId: "u2", cursor })).resolves.toEqual({
+      results: [{ ...hit, createdAt: Date.parse(hit.createdAt) }], nextCursor: cursor
+    });
+    await expect(run("teamChat.search", { query: "redirect" })).rejects.toBeDefined();
+    await expect(run("teamChat.search", { query: "   " })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    expect(calls).toHaveLength(2);
+    router.shutdown();
+  });
 });
 

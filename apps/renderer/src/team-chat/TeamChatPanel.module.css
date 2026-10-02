@@ -1,4 +1,4 @@
-/* Team Chat activity inbox (ADR 0006): one reading column like a conversation. */
+/* Team Chat center panels (activity inbox, search results): one reading column like a conversation. */
 
 .panel {
   grid-row: 2 / -1;
@@ -225,4 +225,56 @@
 .rowAction[data-hovered] {
   background: var(--surface-hover);
   color: var(--text-primary);
+}
+
+/* Search results reuse the row anatomy; these add the close action, filters and marks. */
+.headingClose {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  /* Overhangs the 24px heading line so switching from 动态 does not shift the heading. */
+  margin: -2px 0 -2px auto;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
+.headingClose[data-hovered] { background: var(--surface-hover); color: var(--text-primary); }
+.headingClose[data-focus-visible] { box-shadow: var(--shadow-focus); outline: none; }
+
+.filter {
+  min-width: 180px;
+  flex: 1 1 180px;
+  max-width: 280px;
+}
+
+/* Compact like the toolbar around it. */
+.filter select {
+  min-height: 30px;
+  padding: 3px 8px;
+  font-size: var(--font-size-support);
+}
+
+.snippet {
+  color: var(--text-secondary);
+  font-size: var(--font-size-support);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* The fill alone is too faint on white; the underline carries the match. */
+.snippet mark {
+  border-radius: 3px 3px 0 0;
+  background: var(--accent-soft);
+  box-shadow: inset 0 -2px 0 var(--accent);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.more {
+  justify-self: center;
+  margin-top: var(--space-4);
 }

@@ -19,6 +19,7 @@ import { conversationTitle, directMessageWith } from "./team-chat-model.js";
 import { teamChat, useTeamChat } from "./team-chat-instance.js";
 import { agentPresenceLabel, RowCounts, TeamChatAgentAvatar, TeamChatAvatar } from "./TeamChatParts.js";
 import { TeamChatAgentsDialog } from "./TeamChatAgentsDialog.js";
+import { TeamChatSearchField } from "./TeamChatSearchField.js";
 import agentStyles from "./TeamChatAgents.module.css";
 import styles from "./TeamChat.module.css";
 
@@ -27,7 +28,7 @@ export function TeamChatNavigation({ onCreateChannel }: { onCreateChannel: () =>
   const connection = useTeamChat((state) => state.connection);
   const directory = useTeamChat((state) => state.directory);
   const directoryStatus = useTeamChat((state) => state.directoryStatus);
-  const selectedId = useTeamChat((state) => state.activityOpen ? undefined : state.selectedConversationId);
+  const selectedId = useTeamChat((state) => state.panel ? undefined : state.selectedConversationId);
   const [agentsOpen, setAgentsOpen] = useState(false);
 
   if (connection?.status === "signed-out") {
@@ -64,6 +65,7 @@ export function TeamChatNavigation({ onCreateChannel }: { onCreateChannel: () =>
 
   return (
     <nav aria-label={copy.region} className={styles.railLists} data-testid="team-chat-navigation">
+      <TeamChatSearchField directory={directory} />
       <ActivityRow directory={directory} />
       <section aria-labelledby="team-chat-channels" className={styles.railSection}>
         <header>
@@ -140,7 +142,7 @@ export function TeamChatNavigation({ onCreateChannel }: { onCreateChannel: () =>
 
 function ActivityRow({ directory }: { directory: TeamChatDirectory }) {
   const copy = messages.teamChat;
-  const open = useTeamChat((state) => state.activityOpen);
+  const open = useTeamChat((state) => state.panel === "activity");
   const unread = useTeamChat((state) => teamChatActivityUnreadCount(state.activity ?? [], directory.conversations));
   return (
     <Button

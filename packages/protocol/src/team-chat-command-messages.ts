@@ -12,6 +12,7 @@ import type {
   TeamChatMessage,
   TeamChatMessagePage,
   TeamChatPushEvent,
+  TeamChatSearchPage,
   TeamChatVisibility,
   TeamChatWorkCard,
   TeamChatWorkCardAction,
@@ -55,6 +56,7 @@ export interface TeamChatCommandPayloads {
   "teamChat.activity.setDone": { keys: string[]; done: boolean };
   "teamChat.activity.markAllRead": Record<string, never>;
   "teamChat.conversation.mute": { conversationId: string; muted: boolean };
+  "teamChat.search": { query: string; conversationId?: string; senderUserId?: string; cursor?: string };
 }
 
 /** The secret delivery URL appears only in this result, once; it is never stored by Desktop. */
@@ -97,6 +99,7 @@ export interface TeamChatCommandResults {
   "teamChat.activity.setDone": Record<string, never>;
   "teamChat.activity.markAllRead": Record<string, never>;
   "teamChat.conversation.mute": { muted: boolean };
+  "teamChat.search": TeamChatSearchPage;
 }
 
 export interface TeamChatEventPayloads {

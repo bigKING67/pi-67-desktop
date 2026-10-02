@@ -297,6 +297,25 @@ export function installMockTeamChatCommandHandler(): void {
         state.webhooks = state.webhooks.filter((item) => item.botUserId !== payload.botUserId);
         state.directory.bots = state.directory.bots.filter((item) => item.userId !== payload.botUserId);
         return {};
+      case "teamChat.search": {
+        const query = String(payload.query).toLowerCase();
+        const readable = state.directory.conversations.filter((item) => item.joined || (item.kind === "channel" && item.visibility === "public"));
+        const hits = readable.flatMap((item) => (state.messages[item.id] ?? []).map((message) => ({ message, conversationId: item.id })))
+          .filter(({ message, conversationId }) => (payload.conversationId === undefined || payload.conversationId === conversationId)
+            && (payload.senderUserId === undefined || payload.senderUserId === message.senderUserId))
+          .flatMap(({ message, conversationId }) => {
+            const fields: Array<[string, string]> = message.workCard
+              ? [["title", message.workCard.title], ["goal", message.workCard.goal], ["acceptance", message.workCard.acceptance],
+                ["summary", message.workCard.summary]]
+              : [["message", message.body]];
+            const found = fields.find(([, text]) => text.toLowerCase().includes(query));
+            return found ? [{ messageId: message.id, conversationId, seq: message.seq, senderUserId: message.senderUserId,
+              createdAt: message.createdAt, field: found[0], snippet: found[1].slice(0, 120),
+              ...(message.workCard ? { cardTitle: message.workCard.title } : {}) }] : [];
+          })
+          .sort((left, right) => right.createdAt - left.createdAt);
+        return { results: hits };
+      }
       case "teamChat.activity.list": return { items: state.activity };
       case "teamChat.activity.setDone": {
         const keys = new Set(payload.keys as string[]);

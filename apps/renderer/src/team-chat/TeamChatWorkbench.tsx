@@ -9,6 +9,7 @@ import { teamChatErrorMessage } from "./team-chat-controller.js";
 import { teamChat, useTeamChat } from "./team-chat-instance.js";
 import { teamChatTimeline } from "./team-chat-presentation.js";
 import { TeamChatActivity } from "./TeamChatActivity.js";
+import { TeamChatSearch } from "./TeamChatSearch.js";
 import { agentPresenceLabel, TeamChatAgentAvatar, TeamChatAgentBadge, TeamChatAvatar } from "./TeamChatParts.js";
 import agentStyles from "./TeamChatAgents.module.css";
 import { TeamChatChannelSettings } from "./TeamChatChannelSettings.js";
@@ -25,13 +26,15 @@ export function TeamChatWorkbench() {
   const directory = useTeamChat((state) => state.directory);
   const conversation = useTeamChat((state) => state.directory?.conversations
     .find((item) => item.id === state.selectedConversationId));
-  const activityOpen = useTeamChat((state) => state.activityOpen);
+  const panel = useTeamChat((state) => state.panel);
 
   let body;
   if (connection?.status === "signed-out") {
     body = <ChatState icon={<MessagesSquare size={22} />} title={copy.signedOutTitle} detail={copy.signedOutBody} />;
-  } else if (directory && activityOpen) {
+  } else if (directory && panel === "activity") {
     body = <TeamChatActivity directory={directory} />;
+  } else if (directory && panel === "search") {
+    body = <TeamChatSearch directory={directory} />;
   } else if (!directory || !conversation) {
     body = <ChatState icon={<MessagesSquare size={22} />} title={copy.selectConversation} detail={copy.selectConversationBody} />;
   } else {
@@ -140,6 +143,8 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
           entries={timeline}
           focus={focus}
           hasMore={thread.hasMore}
+          hasNewer={thread.hasNewer === true}
+          windowStart={thread.windowStart}
           header={header}
           loadingOlder={thread.loadingOlder}
           scrollRequest={scrollRequest}
@@ -148,6 +153,11 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
       ) : (
         <div className={styles.timelinePending}><div className={styles.timelineColumn}>{header}</div></div>
       )}
+      {thread?.hasNewer ? (
+        <Button className={`${styles.loadOlder} ${styles.jumpLatest}`} onPress={() => {
+          void teamChat.reloadThread(conversation.id).then(() => setScrollRequest((value) => value + 1));
+        }}>{copy.jumpToLatest}</Button>
+      ) : null}
       {conversation.joined
         ? <TeamChatComposer conversation={conversation} directory={directory} onSent={() => setScrollRequest((value) => value + 1)} target={target} />
         : <JoinCard conversation={conversation} title={title} />}

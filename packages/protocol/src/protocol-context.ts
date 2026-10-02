@@ -149,6 +149,7 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "teamChat.activity.setDone": "app",
   "teamChat.activity.markAllRead": "app",
   "teamChat.conversation.mute": "app",
+  "teamChat.search": "app",
   "context.session.get": "workspace",
   "context.session.commit": "workspace",
   "context.recall.list": "workspace",

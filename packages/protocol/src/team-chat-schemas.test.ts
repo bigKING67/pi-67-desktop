@@ -118,4 +118,20 @@ describe("Team Chat protocol schemas", () => {
     expect(Value.Check(CommandResultSchemas["teamChat.dm.open"], { ...conversation, muted: true })).toBe(true);
     expect(Value.Check(EventPayloadSchemas["teamChat.pushed"], { type: "activity.changed" })).toBe(true);
   });
+
+  it("bounds search queries, cursors and hits", () => {
+    expect(COMMAND_CONTEXT_SCOPE_REQUIREMENTS["teamChat.search"]).toBe("app");
+    const search = CommandPayloadSchemas["teamChat.search"];
+    const cursor = "1759380000123456_0b5c2f4e-8a1d-4c3e-9f6a-2d7e1b0c9a8f";
+    expect(Value.Check(search, { query: "口径", conversationId: "c1", senderUserId: "u2", cursor })).toBe(true);
+    expect(Value.Check(search, { query: "" })).toBe(false);
+    expect(Value.Check(search, { query: "字".repeat(101) })).toBe(false);
+    expect(Value.Check(search, { query: "x", cursor: "junk" })).toBe(false);
+    const hit = { messageId: "m1", conversationId: "c1", seq: 3, senderUserId: "u2", createdAt: 1, field: "summary",
+      snippet: "…已定位到 redirect 参数丢失", cardTitle: "修复登录跳转" };
+    const page = CommandResultSchemas["teamChat.search"];
+    expect(Value.Check(page, { results: [hit], nextCursor: cursor })).toBe(true);
+    expect(Value.Check(page, { results: [{ ...hit, field: "body" }] })).toBe(false);
+    expect(Value.Check(page, { results: [{ ...hit, snippet: "x".repeat(241) }] })).toBe(false);
+  });
 });

@@ -8,6 +8,9 @@ import {
   TEAM_CHAT_MENTION_MAX,
   TEAM_CHAT_MESSAGE_MAX_CHARS,
   TEAM_CHAT_PAGE_MAX,
+  TEAM_CHAT_SEARCH_CURSOR_PATTERN,
+  TEAM_CHAT_SEARCH_PAGE,
+  TEAM_CHAT_SEARCH_QUERY_MAX,
   TEAM_CHAT_WEBHOOK_NAME_MAX,
   TEAM_CHAT_WORK_CARD_LIMITS
 } from "@pi67/domain";
@@ -189,6 +192,18 @@ const ActivityItemSchema = strictObject({
   doneAt: Type.Optional(TimestampSchema)
 });
 
+const SearchHitSchema = strictObject({
+  messageId: IdSchema,
+  conversationId: IdSchema,
+  seq: Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
+  senderUserId: IdSchema,
+  createdAt: TimestampSchema,
+  field: Type.Union(["message", "title", "goal", "acceptance", "summary"].map((field) => Type.Literal(field))),
+  snippet: Type.String({ maxLength: 240 }),
+  cardTitle: Type.Optional(WorkCardTitleSchema)
+});
+const SearchCursorSchema = Type.String({ minLength: 38, maxLength: 64, pattern: TEAM_CHAT_SEARCH_CURSOR_PATTERN });
+
 const ConnectionStateSchema = Type.Union([
   strictObject({ status: Type.Literal("signed-out") }),
   strictObject({ status: Type.Literal("connecting") }),
@@ -267,7 +282,13 @@ export const TeamChatCommandPayloadSchemas: Record<keyof TeamChatCommandPayloads
     done: Type.Boolean()
   }),
   "teamChat.activity.markAllRead": EmptySchema,
-  "teamChat.conversation.mute": strictObject({ conversationId: IdSchema, muted: Type.Boolean() })
+  "teamChat.conversation.mute": strictObject({ conversationId: IdSchema, muted: Type.Boolean() }),
+  "teamChat.search": strictObject({
+    query: Type.String({ minLength: 1, maxLength: TEAM_CHAT_SEARCH_QUERY_MAX }),
+    conversationId: Type.Optional(IdSchema),
+    senderUserId: Type.Optional(IdSchema),
+    cursor: Type.Optional(SearchCursorSchema)
+  })
 };
 
 export const TeamChatCommandResultSchemas: Record<keyof TeamChatCommandResults, TSchema> = {
@@ -319,7 +340,11 @@ export const TeamChatCommandResultSchemas: Record<keyof TeamChatCommandResults, 
   "teamChat.activity.list": strictObject({ items: Type.Array(ActivityItemSchema, { maxItems: TEAM_CHAT_ACTIVITY_LIMIT }) }),
   "teamChat.activity.setDone": EmptySchema,
   "teamChat.activity.markAllRead": EmptySchema,
-  "teamChat.conversation.mute": strictObject({ muted: Type.Boolean() })
+  "teamChat.conversation.mute": strictObject({ muted: Type.Boolean() }),
+  "teamChat.search": strictObject({
+    results: Type.Array(SearchHitSchema, { maxItems: TEAM_CHAT_SEARCH_PAGE }),
+    nextCursor: Type.Optional(SearchCursorSchema)
+  })
 };
 
 export const TeamChatEventPayloadSchemas: Record<keyof TeamChatEventPayloads, TSchema> = {

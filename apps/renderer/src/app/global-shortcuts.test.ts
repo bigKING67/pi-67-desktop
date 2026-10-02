@@ -4,6 +4,7 @@ import { useShellStore } from "../shell/shell-store.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { useAppStore } from "./app-store.js";
 import { subscribeConversationFind } from "../search/conversation-find-events.js";
+import { subscribeTeamChatSearch } from "../team-chat/team-chat-search-events.js";
 import {
   desktopActionAllowedInContexts,
   handleGlobalShortcut,
@@ -147,6 +148,24 @@ describe("global shortcuts", () => {
     useShellStore.setState({ contextVisible: false });
     handleGlobalShortcut(shortcut("b", { shiftKey: true }).event);
     expect(useShellStore.getState().contextVisible).toBe(true);
+  });
+
+  it("routes the find shortcuts to Team Chat search while Chat is shown, even without a Workspace", () => {
+    const chat: string[] = [];
+    const work: string[] = [];
+    const unsubscribeChat = subscribeTeamChatSearch((scope) => chat.push(scope));
+    const unsubscribeWork = subscribeConversationFind((scope) => work.push(scope));
+    useShellStore.setState({ workspaceMode: "chat", navigationVisible: false });
+    handleGlobalShortcut(shortcut("f").event);
+    expect(useShellStore.getState().navigationVisible).toBe(true);
+    handleGlobalShortcut(shortcut("f", { shiftKey: true }).event);
+    expect(chat).toEqual(["current", "all"]);
+    rendererWorkbenchStore.getState().openSettings();
+    handleGlobalShortcut(shortcut("f", { shiftKey: true }).event);
+    expect(chat).toHaveLength(2);
+    expect(work).toEqual([]);
+    unsubscribeChat();
+    unsubscribeWork();
   });
 
   it("routes current and Workspace text search without introducing a search toggle", () => {

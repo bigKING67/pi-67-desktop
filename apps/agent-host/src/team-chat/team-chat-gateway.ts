@@ -1,6 +1,7 @@
 import {
   TEAM_CHAT_DEFAULT_POLICY,
   type TeamChatActivityItem,
+  type TeamChatSearchPage,
   TEAM_CHAT_MENTION_MAX,
   type TeamChatChannelAction,
   type TeamChatChannelRoster,
@@ -24,6 +25,7 @@ import {
 } from "../context/enterprise-context-gateway-validation.js";
 import { requestNewMoney } from "../context/new-money-http.js";
 import { parseActivity } from "./team-chat-activity-parse.js";
+import { parseSearchPage } from "./team-chat-search-parse.js";
 
 export interface TeamChatAccess {
   endpoint: string;
@@ -241,6 +243,17 @@ export class TeamChatGateway {
 
   async listActivity(signal?: AbortSignal): Promise<TeamChatActivityItem[]> {
     return parseActivity(await this.request("/chat/activity", { method: "GET" }, signal));
+  }
+
+  async searchMessages(
+    input: { query: string; conversationId?: string; senderUserId?: string; cursor?: string },
+    signal?: AbortSignal
+  ): Promise<TeamChatSearchPage> {
+    const params = new URLSearchParams({ q: input.query });
+    if (input.conversationId !== undefined) params.set("conversationId", input.conversationId);
+    if (input.senderUserId !== undefined) params.set("senderUserId", input.senderUserId);
+    if (input.cursor !== undefined) params.set("cursor", input.cursor);
+    return parseSearchPage(await this.request(`/chat/search?${params.toString()}`, { method: "GET" }, signal));
   }
 
   async setActivityDone(keys: readonly string[], done: boolean, signal?: AbortSignal): Promise<void> {
