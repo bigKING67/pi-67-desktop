@@ -66,6 +66,10 @@ describe("team chat policy", () => {
       conversation({ id: "c2", unreadCount: 99, joined: false }),
       conversation({ id: "c3", unreadCount: 2 })
     ])).toBe(5);
+    expect(teamChatUnreadTotal([
+      conversation({ unreadCount: 3 }),
+      conversation({ id: "c2", unreadCount: 9, mentionCount: 1, muted: true })
+    ])).toBe(4);
   });
 
   it("counts and truncates by code point without splitting pairs", () => {

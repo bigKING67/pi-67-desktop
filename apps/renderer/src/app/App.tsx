@@ -1,6 +1,7 @@
 import { isDesktopAgentHostFailureState, isDesktopAgentHostStartupState } from "@pi67/protocol";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { teamChat } from "../team-chat/team-chat-instance.js";
+import { initializeTeamChatNotifications } from "../team-chat/team-chat-notification-installation.js";
 import { useApprovalStore } from "../approval/approval-store.js";
 import { DEFAULT_APPLICATION_TITLE } from "../extension-ui/extension-ui-state.js";
 import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
@@ -74,7 +75,10 @@ export function App() {
   const blockingOverlayOpen = approvalDialogOpen || extensionDialogOpen;
   const selectedSurface = useWorkbenchStore((state) => state.selectedSurface);
   const chatMode = workspaceMode === "chat" && selectedSurface?.kind !== "settings";
-  useEffect(() => { teamChat.start(); }, []);
+  useEffect(() => {
+    teamChat.start();
+    return initializeTeamChatNotifications();
+  }, []);
   useEffect(() => { if (chatMode) teamChat.activate(); }, [chatMode]);
   const workbenchWorkspaceCount = useWorkbenchStore((state) => state.workspaceOrder.length);
   const [navigationIsDrawer, setNavigationIsDrawer] = useState(() => window.matchMedia("(max-width: 760px)").matches);

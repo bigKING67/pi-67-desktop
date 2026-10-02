@@ -307,5 +307,39 @@ describe("TeamChatCommandRouter", () => {
     expect(bodies).toEqual([{ name: "CI" }]);
     router.shutdown();
   });
+
+  it("reads activity, records handled and read state, and mutes conversations", async () => {
+    const key = "m:0b5c2f4e-8a1d-4c3e-9f6a-2d7e1b0c9a8f";
+    const item = { key, kind: "mention", conversationId: "c1", actorUserId: "u2", messageSeq: 3, preview: "看一下",
+      cardId: null, createdAt: "2026-10-02T00:00:00Z", unread: true };
+    const { router, run, calls } = setup({
+      "GET /chat/activity": () => json({ items: [item] }),
+      "POST /chat/activity/done": () => new Response(null, { status: 204 }),
+      "POST /chat/activity/read": () => json({ readAt: "2026-10-02T00:00:01Z" }),
+      "PUT /chat/conversations/c1/mute": (init) => json(JSON.parse(init.body as string))
+    });
+    await expect(run("teamChat.activity.list", {})).resolves.toEqual({ items: [{
+      key, kind: "mention", conversationId: "c1", actorUserId: "u2", messageSeq: 3, preview: "看一下",
+      createdAt: Date.parse("2026-10-02T00:00:00Z"), unread: true
+    }] });
+    await expect(run("teamChat.activity.setDone", { keys: [key], done: true })).resolves.toEqual({});
+    await expect(run("teamChat.activity.markAllRead", {})).resolves.toEqual({});
+    await expect(run("teamChat.conversation.mute", { conversationId: "c1", muted: true })).resolves.toEqual({ muted: true });
+    const bodies = calls.filter((call) => call.init.body !== undefined).map((call) => JSON.parse(call.init.body as string));
+    expect(bodies).toEqual([{ keys: [key], done: true }, { muted: true }]);
+    expect(parseConversation({ ...conversation, muted: true }).muted).toBe(true);
+    expect(parseConversation({ ...conversation, muted: false }).muted).toBeUndefined();
+    expect(() => parseConversation({ ...conversation, muted: "yes" })).toThrow();
+    router.shutdown();
+  });
+
+  it("rejects malformed activity", async () => {
+    const { router, run } = setup({
+      "GET /chat/activity": () => json({ items: [{ key: "m:1", kind: "mention", conversationId: "c1", actorUserId: "u2",
+        createdAt: "2026-10-02T00:00:00Z", unread: true }] })
+    });
+    await expect(run("teamChat.activity.list", {})).rejects.toBeDefined();
+    router.shutdown();
+  });
 });
 

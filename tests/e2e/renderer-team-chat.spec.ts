@@ -325,3 +325,77 @@ test("creates a channel webhook, shows its URL once and labels bot messages", as
   await expect(page.getByTestId("team-chat-webhook-secret")).toHaveCount(0);
 });
 
+
+test("collects activity, marks it handled, opens the message and notifies without content", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.getByRole("group", { name: "工作模式" }).getByRole("button", { name: "聊天" }).click();
+  await signIn(page);
+  const navigation = page.getByTestId("team-chat-navigation");
+  await navigation.getByRole("button", { name: "动态，2 条未读" }).click();
+  const inbox = page.getByTestId("team-chat-activity");
+  await expect(inbox.getByText("李若溪 给你指派了任务卡")).toBeVisible();
+  await expect(inbox.getByText("李若溪 在 #宏观研究 提到了你")).toBeVisible();
+
+  await inbox.getByRole("button", { name: "标记已处理：李若溪 给你指派了任务卡" }).click();
+  await expect(navigation.getByRole("button", { name: "动态，1 条未读" })).toBeVisible();
+  await expect(inbox.getByText("李若溪 给你指派了任务卡")).toHaveCount(0);
+  await inbox.getByRole("button", { name: "已处理", exact: true }).click();
+  await expect(inbox.getByText("李若溪 给你指派了任务卡")).toBeVisible();
+  await inbox.getByRole("button", { name: "移回待处理：李若溪 给你指派了任务卡" }).click();
+  await inbox.getByRole("button", { name: "待处理", exact: true }).click();
+  await inbox.getByRole("button", { name: "全部已读" }).click();
+  await expect(navigation.getByRole("button", { name: "动态", exact: true })).toBeVisible();
+
+  await inbox.getByText("李若溪 在 #宏观研究 提到了你").click();
+  const log = page.getByRole("log", { name: "#宏观研究" });
+  await expect(log.locator("[data-focused]")).toContainText("顺便把港股那几家的口径对齐一下。");
+
+  // Mute keeps the channel's unread count but labels the row.
+  await page.getByTestId("team-chat-mute").click();
+  await expect(page.getByTestId("team-chat-mute")).toHaveText("取消静音");
+  await expect(navigation.getByRole("button", { name: "宏观研究，已静音" })).toBeVisible();
+
+  // A new direct message while the window is in the background raises a content-free notification.
+  await page.evaluate(() => {
+    Object.defineProperty(document, "hasFocus", { configurable: true, value: () => false });
+    const state = (window as unknown as { __pi67MockTeamChat: MockTeamChatState }).__pi67MockTeamChat;
+    state.activity = [{ key: "m:00000000-0000-4000-8000-0000000000d1", kind: "dm", conversationId: "dm-li", actorUserId: "user-li",
+      messageSeq: 1, preview: "这段私信正文不能出现在通知里", createdAt: Date.now(), unread: true }, ...state.activity];
+  });
+  await emitMockAgentEvent(page, { type: "teamChat.pushed", payload: { type: "activity.changed" } }, { context: "app" });
+  const notifications = () => page.evaluate(() => (
+    (window as unknown as { __pi67NativeNotificationTest: { requests: Array<Record<string, unknown>> } })
+      .__pi67NativeNotificationTest.requests.filter((request) => request.kind === "chat")
+  ));
+  await expect.poll(notifications).toEqual([expect.objectContaining({
+    kind: "chat", title: "李若溪 给你发了私信", body: "", conversationId: "dm-li", messageSeq: 1
+  })]);
+  expect(JSON.stringify(await notifications())).not.toContain("这段私信正文");
+
+  await page.evaluate(() => {
+    const test = (window as unknown as {
+      __pi67NativeNotificationTest: { requests: Array<Record<string, unknown>>; activate(activation: Record<string, unknown>): void };
+    }).__pi67NativeNotificationTest;
+    test.activate(test.requests.find((request) => request.kind === "chat")!);
+  });
+  await expect(page.getByTestId("title-context-current")).toHaveText("李若溪");
+});
+
+test("turns Team Chat notifications and previews on and off in General settings", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.evaluate(() => { localStorage.removeItem("pi67.team-chat-notifications.v1"); });
+  await page.getByTestId("settings-entry").click();
+  const section = page.locator("section").filter({ hasText: "团队聊天通知" });
+  await expect(section.getByRole("checkbox", { name: "启用系统通知" })).toBeChecked();
+  await expect(section.getByRole("checkbox", { name: "显示消息预览" })).not.toBeChecked();
+  await section.getByText("私信", { exact: true }).click();
+  await section.getByText("显示消息预览", { exact: true }).click();
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("pi67.team-chat-notifications.v1") ?? "{}") as unknown);
+  expect(stored).toMatchObject({ enabled: true, preview: true, topics: { dm: false, mention: true } });
+  await section.getByText("启用系统通知", { exact: true }).click();
+  await expect(section.getByRole("checkbox", { name: "显示消息预览" })).toBeDisabled();
+});

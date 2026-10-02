@@ -1,5 +1,6 @@
 import {
   TEAM_CHAT_DEFAULT_POLICY,
+  type TeamChatActivityItem,
   TEAM_CHAT_MENTION_MAX,
   type TeamChatChannelAction,
   type TeamChatChannelRoster,
@@ -22,6 +23,7 @@ import {
   parseTimestamp
 } from "../context/enterprise-context-gateway-validation.js";
 import { requestNewMoney } from "../context/new-money-http.js";
+import { parseActivity } from "./team-chat-activity-parse.js";
 
 export interface TeamChatAccess {
   endpoint: string;
@@ -237,6 +239,27 @@ export class TeamChatGateway {
     }, signal));
   }
 
+  async listActivity(signal?: AbortSignal): Promise<TeamChatActivityItem[]> {
+    return parseActivity(await this.request("/chat/activity", { method: "GET" }, signal));
+  }
+
+  async setActivityDone(keys: readonly string[], done: boolean, signal?: AbortSignal): Promise<void> {
+    await this.request("/chat/activity/done", { method: "POST", body: JSON.stringify({ keys, done }) }, signal);
+  }
+
+  async markActivityRead(signal?: AbortSignal): Promise<void> {
+    await this.request("/chat/activity/read", { method: "POST" }, signal);
+  }
+
+  async muteConversation(conversationId: string, muted: boolean, signal?: AbortSignal): Promise<boolean> {
+    const value = asRecord(await this.request(`${conversationPath(conversationId)}/mute`, {
+      method: "PUT",
+      body: JSON.stringify({ muted })
+    }, signal));
+    if (typeof value.muted !== "boolean") throw invalidResponse("muted");
+    return value.muted;
+  }
+
   /** `hostAgentIds` are this Desktop's enabled Agents; while connected they show as online. */
   async issueRealtimeTicket(signal?: AbortSignal, hostAgentIds: readonly string[] = []): Promise<string> {
     const value = asRecord(await this.request("/chat/realtime-tickets", hostAgentIds.length === 0
@@ -272,6 +295,7 @@ export function parseConversation(value: unknown): TeamChatConversation {
   const lastMessageAt = nullable(record.lastMessageAt, (item) => parseTimestamp(item, "conversation.lastMessageAt"));
   const lastSenderUserId = nullable(record.lastSenderUserId, (item) => boundedString(item, "conversation.lastSenderUserId", 128));
   const ownerUserId = nullable(record.ownerUserId, (item) => boundedString(item, "conversation.ownerUserId", 128));
+  if (record.muted !== undefined && typeof record.muted !== "boolean") throw invalidResponse("conversation.muted");
   const lastPreview = nullable(record.lastPreview, (item) => {
     if (typeof item !== "string" || item.length > 280) throw invalidResponse("conversation.lastPreview");
     return item;
@@ -289,6 +313,7 @@ export function parseConversation(value: unknown): TeamChatConversation {
     unreadCount: boundedInteger(record.unreadCount, "conversation.unreadCount", 0, 100),
     mentionCount: record.mentionCount === undefined ? 0 : boundedInteger(record.mentionCount, "conversation.mentionCount", 0, 100),
     ...(ownerUserId === undefined ? {} : { ownerUserId }),
+    ...(record.muted === true ? { muted: true } : {}),
     ...(lastMessageAt === undefined ? {} : { lastMessageAt }),
     ...(lastSenderUserId === undefined ? {} : { lastSenderUserId }),
     ...(lastPreview === undefined ? {} : { lastPreview }),

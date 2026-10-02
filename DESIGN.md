@@ -2083,6 +2083,32 @@ loading error where the operation can produce those states
   floats above the composer on the raised surface with the floating shadow, at most
   280px wide and eight 32px rows (avatar tile and name); the active row uses
   accent-soft. Loading and no-match states are one tertiary line.
+- Activity (ADR 0006): a `动态` row with a bell glyph sits above `频道`, styled like
+  any rail row, with the solid unread count. Selecting it replaces the center with
+  the inbox in the conversation track: a bell + section-size heading, one tertiary
+  intro line, then a toolbar with a `待处理 | 已处理` segmented control (the General
+  settings theme-switch anatomy plus a 1px strong-border ring on the selected segment
+  so it reads in dark), `全部已读` (secondary, disabled at zero) and a
+  quiet `通知设置` text button. Items are hairline-separated rows: a 24px muted tile
+  with the kind glyph (@, message, bot, card), an interface-size title line saying
+  who did what, a one-line tertiary detail (preview, card title, or the Agent
+  failure reason in the warning role), and right-aligned caption meta at most 200px
+  wide (time first: `HH:MM`, `昨天 HH:MM` or a date; then where, ellipsized). Unread
+  rows use primary medium titles and an 8px accent dot ringed in canvas on the kind
+  tile's top-right corner, so all titles share one left edge; read rows use
+  secondary regular. The row's accessible name reads `未读`, title, detail, place and
+  time. A trailing 32px icon button marks handled (check) or returns to open (undo),
+  names the item in its label, and passes focus to the next row's button (or the
+  segmented control) when its row leaves the list.
+  Opening an item centres its message and gives it an accent-soft highlight for
+  about two seconds.
+- Mute: a small `静音通知`/`取消静音` button with a bell-off/bell glyph ends the
+  conversation intro (before `频道设置` in channels). Muted rows add an 11px
+  tertiary bell-off mark after the name, and their unread count switches from the
+  solid accent to the neutral muted tile with a border ring; `@N` keeps its accent
+  outline. General settings carries a `团队聊天通知` section above shortcuts:
+  `系统通知` (enable checkbox), `提醒这些动态` (four checkboxes in a wrapping row) and
+  `消息预览` with its exposure hint; dependent checkboxes disable while off.
 - `频道设置` is a small button at the end of the channel intro. Its dialog reuses the
   new-channel dialog layout: rename field with an inline save, a roster of 38px rows
   (avatar, name, outlined `负责人` chip, trailing small buttons), an add-member

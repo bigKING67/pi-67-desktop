@@ -260,5 +260,56 @@ export const zhCNTeamChatMessages = {
     chat_webhook_quota_reached: "每个频道最多 10 个 Webhook，团队最多 100 个。",
     chat_webhook_not_found: "这个 Webhook 已不存在。"
   } as Record<string, string>,
-  genericError: "操作没有完成，请稍后重试。"
+  genericError: "操作没有完成，请稍后重试。",
+  activity: "动态",
+  activityUnread: (count: number) => `动态，${count > 99 ? "99+" : count} 条未读`,
+  activityIntro: "最近 30 天里 @你、私信你、Agent 回复你，以及等你处理的任务卡。",
+  activityOpen: "待处理",
+  activityDone: "已处理",
+  activityMarkAllRead: "全部已读",
+  activityMarkDone: "标记已处理",
+  activityMarkOpen: "移回待处理",
+  activityUnreadLabel: "未读",
+  activityLoading: "正在读取动态…",
+  activityFailed: "无法读取动态。",
+  activityEmptyOpen: "没有待处理的动态。",
+  activityEmptyDone: "还没有已处理的动态。",
+  activityNotificationSettings: "通知设置",
+  activityTitles: {
+    mention: (actor: string, where: string) => `${actor} 在 ${where} 提到了你`,
+    dm: (actor: string) => `${actor} 给你发了私信`,
+    agent_reply: (agent: string) => `${agent} 回复了你`,
+    agent_failed: (agent: string) => `${agent} 没能回复你`,
+    card_assigned: (actor: string) => `${actor} 给你指派了任务卡`,
+    card_review: (actor: string) => `${actor} 提交了任务卡，等你验收`,
+    card_changes_requested: (actor: string) => `${actor} 退回了任务卡，需要修改`
+  },
+  activityAgentName: (name: string) => `Agent ${name}`,
+  activityExpired: "请求已过期",
+  activityDirectWith: (name: string) => `与 ${name} 的私信`,
+  unknownConversation: "已不可见的对话",
+  activityMerged: (count: number, where: string) => `${count} 条新动态 · ${where}`,
+  activitySummary: (count: number) => `你有 ${count} 条新动态`,
+  activitySummaryBody: "打开 New Money 查看动态。",
+  mute: "静音通知",
+  unmute: "取消静音",
+  muted: "已静音",
+  muteFailed: "无法更改静音设置。",
+  notificationSettings: {
+    title: "团队聊天通知",
+    description: "只在这台电脑生效。要静音某个对话，在聊天里打开它，点开头介绍栏的「静音通知」；静音的对话不发通知，但仍计未读。",
+    system: "系统通知",
+    systemDescription: "你不在那个对话时，告诉你谁在哪里找你。",
+    enabled: "启用系统通知",
+    topicsTitle: "提醒这些动态",
+    previewTitle: "消息预览",
+    topics: {
+      mention: "@我",
+      dm: "私信",
+      agent: "Agent 回复我的请求",
+      card: "任务卡指派给我、等我验收或退回给我"
+    },
+    preview: "显示消息预览",
+    previewDescription: "开启后，通知会显示消息开头或任务卡标题；锁屏和共享屏幕时也可能被他人看到。"
+  }
 } as const;

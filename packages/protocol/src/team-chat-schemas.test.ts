@@ -100,4 +100,22 @@ describe("Team Chat protocol schemas", () => {
       bindings: [binding], activity: [{ agentUserId: "a1", invocationId: "i1", state: "failed", reason: "model_unavailable", at: 1 }]
     })).toBe(true);
   });
+
+  it("bounds activity items, handled keys and mute", () => {
+    expect(COMMAND_CONTEXT_SCOPE_REQUIREMENTS["teamChat.activity.setDone"]).toBe("app");
+    const key = "m:0b5c2f4e-8a1d-4c3e-9f6a-2d7e1b0c9a8f";
+    const setDone = CommandPayloadSchemas["teamChat.activity.setDone"];
+    expect(Value.Check(setDone, { keys: [key], done: true })).toBe(true);
+    for (const keys of [[], ["x:1"], [key.toUpperCase()], Array.from({ length: 201 }, () => key)]) {
+      expect(Value.Check(setDone, { keys, done: true })).toBe(false);
+    }
+    const item = { key, kind: "mention", conversationId: "c1", actorUserId: "u2", messageSeq: 3, preview: "看一下", createdAt: 1, unread: true };
+    const list = CommandResultSchemas["teamChat.activity.list"];
+    expect(Value.Check(list, { items: [item, { ...item, key: key.replace("m:", "e:"), kind: "card_review", cardId: "k1", cardTitle: "补测试" }] })).toBe(true);
+    expect(Value.Check(list, { items: [{ ...item, kind: "reaction" }] })).toBe(false);
+    expect(Value.Check(list, { items: [{ ...item, preview: "x".repeat(141) }] })).toBe(false);
+    expect(Value.Check(CommandPayloadSchemas["teamChat.conversation.mute"], { conversationId: "c1", muted: true })).toBe(true);
+    expect(Value.Check(CommandResultSchemas["teamChat.dm.open"], { ...conversation, muted: true })).toBe(true);
+    expect(Value.Check(EventPayloadSchemas["teamChat.pushed"], { type: "activity.changed" })).toBe(true);
+  });
 });

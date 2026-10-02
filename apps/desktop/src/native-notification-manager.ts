@@ -33,7 +33,7 @@ export class NativeNotificationManager {
     if (!this.#options.isSupported() || this.#dedupeIds.has(request.notificationId)) return false;
     let notification: NativeNotificationHandle | undefined;
     try {
-      notification = this.#options.create(nativeNotificationPresentation(request.kind));
+      notification = this.#options.create(nativeNotificationPresentation(request));
       let settled = false;
       const release = () => {
         if (settled) return false;
@@ -105,10 +105,16 @@ export class NativeNotificationManager {
   }
 }
 
-function nativeNotificationPresentation(kind: NativeNotificationKind): {
+function nativeNotificationPresentation(request: NativeNotificationRequest): {
   title: string;
   body: string;
 } {
+  // Team Chat wording comes from the renderer, already bounded by the bridge schema (ADR 0006).
+  if (request.kind === "chat") return { title: request.title, body: request.body };
+  return taskPresentation(request.kind);
+}
+
+function taskPresentation(kind: NativeNotificationKind): { title: string; body: string } {
   switch (kind) {
     case "completed":
       return {

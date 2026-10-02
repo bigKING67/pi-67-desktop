@@ -36,6 +36,8 @@ export interface TeamChatConversation {
   mentionCount: number;
   /** Channel owner; absent for direct messages. */
   ownerUserId?: string;
+  /** The reader muted system notifications here; unread counts still apply. */
+  muted?: boolean;
   lastMessageAt?: number;
   lastSenderUserId?: string;
   lastPreview?: string;
@@ -110,7 +112,8 @@ export type TeamChatPushEvent =
   | { type: "read.changed"; conversationId: string; lastReadSeq: number }
   | { type: "policy.changed" }
   | { type: "agents.changed" }
-  | { type: "agent_invocation.changed"; conversationId: string; messageId: string; invocation: TeamChatAgentInvocationSummary };
+  | { type: "agent_invocation.changed"; conversationId: string; messageId: string; invocation: TeamChatAgentInvocationSummary }
+  | { type: "activity.changed" };
 
 /**
  * `live` carries a generation that increases on every successful connect, so the
@@ -150,8 +153,10 @@ export function teamChatDirectPeer(
   return conversation.memberUserIds.find((userId) => userId !== selfUserId);
 }
 
+/** Unread for the mode badge; a muted conversation counts only its mentions. */
 export function teamChatUnreadTotal(conversations: readonly TeamChatConversation[]): number {
-  return conversations.reduce((total, conversation) => total + (conversation.joined ? conversation.unreadCount : 0), 0);
+  return conversations.reduce((total, conversation) => total + (!conversation.joined ? 0
+    : conversation.muted ? conversation.mentionCount : conversation.unreadCount), 0);
 }
 
 const SURROGATE_PAIR = /[\uD800-\uDBFF][\uDC00-\uDFFF]/g;

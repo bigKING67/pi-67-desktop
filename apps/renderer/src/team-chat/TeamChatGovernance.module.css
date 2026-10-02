@@ -69,6 +69,12 @@
   border-left: 2px solid var(--accent);
 }
 
+/* A message opened from activity or a notification, briefly. */
+.messageFocused {
+  background: var(--accent-soft);
+  border-radius: 6px;
+}
+
 /* Mentions read as "@N" in the accent outline; unread counts stay solid accent. */
 .mentionBadge {
   min-width: 18px;

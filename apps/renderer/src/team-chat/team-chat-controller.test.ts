@@ -40,7 +40,7 @@ function harness(handlers: Partial<Record<string, (payload: never) => unknown>>)
 
 describe("team chat controller", () => {
   it("loads the directory on connect and reconciles once per live generation", async () => {
-    const { controller, calls, emit, connect } = harness({
+    const { controller, calls, emit, connect, subscriber } = harness({
       "teamChat.connection.get": () => ({ status: "live", generation: 1 }),
       "teamChat.directory.get": () => directory
     });
@@ -56,6 +56,11 @@ describe("team chat controller", () => {
     emit({ type: "teamChat.connectionChanged", payload: { status: "live", generation: 2 } });
     await flush();
     expect(calls.filter((call) => call.type === "teamChat.directory.get")).toHaveLength(2);
+    // A restarted Agent Host starts its generations again at 1; that still reconciles.
+    subscriber().onTeardown?.(new Error("host restarted"));
+    emit({ type: "teamChat.connectionChanged", payload: { status: "live", generation: 1 } });
+    await flush();
+    expect(calls.filter((call) => call.type === "teamChat.directory.get")).toHaveLength(3);
     controller.stop();
   });
 
@@ -322,5 +327,70 @@ describe("team chat controller", () => {
       "teamChat.webhook.list", "teamChat.webhook.create", "teamChat.webhook.rotate", "teamChat.webhook.remove"
     ]);
   });
-});
 
+  it("reads activity on connect and on push, records handled and read state, and mutes", async () => {
+    const key = "m:00000000-0000-4000-8000-000000000001";
+    const entry = { key, kind: "mention" as const, conversationId: "c1", actorUserId: "u2", messageSeq: 2, createdAt: 1, unread: true };
+    let reads = 0;
+    let failDone = false;
+    const { controller, calls, connect, emit } = harness({
+      "teamChat.connection.get": () => ({ status: "connecting" }),
+      "teamChat.directory.get": () => directory,
+      "teamChat.activity.list": () => { reads += 1; return { items: [entry] }; },
+      "teamChat.activity.setDone": () => { if (failDone) throw new Error("offline"); return {}; },
+      "teamChat.activity.markAllRead": () => ({}),
+      "teamChat.conversation.mute": (payload: { muted: boolean }) => ({ muted: payload.muted })
+    });
+    controller.start();
+    connect();
+    await flush();
+    expect(controller.store.getState()).toMatchObject({ activityStatus: "ready", activity: [entry] });
+    emit({ type: "teamChat.pushed", payload: { type: "activity.changed" } });
+    await flush();
+    expect(reads).toBe(2);
+
+    await controller.setActivityDone([key], true);
+    expect(controller.store.getState().activity?.[0]).toMatchObject({ unread: false, doneAt: expect.any(Number) });
+    failDone = true;
+    await expect(controller.setActivityDone([key], false)).rejects.toThrow("offline");
+    await flush();
+    expect(reads).toBe(3);
+    await controller.markAllActivityRead();
+    expect(controller.store.getState().activity?.every((item) => !item.unread)).toBe(true);
+
+    await controller.muteConversation("c1", true);
+    expect(controller.store.getState().directory?.conversations[0]?.muted).toBe(true);
+    await controller.muteConversation("c1", false);
+    expect(controller.store.getState().directory?.conversations[0]).not.toHaveProperty("muted");
+    expect(calls.filter((call) => call.type === "teamChat.conversation.mute").map((call) => call.payload))
+      .toEqual([{ conversationId: "c1", muted: true }, { conversationId: "c1", muted: false }]);
+  });
+
+  it("opens the inbox and opens a message by paging back to it", async () => {
+    const pages: Record<string, { messages: TeamChatMessage[]; hasMore: boolean }> = {
+      latest: { messages: [message(5), message(6)], hasMore: true },
+      5: { messages: [message(3), message(4)], hasMore: true },
+      3: { messages: [message(1), message(2)], hasMore: false }
+    };
+    const { controller, connect } = harness({
+      "teamChat.connection.get": () => ({ status: "connecting" }),
+      "teamChat.directory.get": () => directory,
+      "teamChat.activity.list": () => ({ items: [] }),
+      "teamChat.messages.list": (payload: { before?: number }) => pages[payload.before === undefined ? "latest" : String(payload.before)],
+      "teamChat.read.mark": () => ({ lastReadSeq: 6 })
+    });
+    controller.start();
+    connect();
+    await flush();
+    controller.openActivity();
+    expect(controller.store.getState().activityOpen).toBe(true);
+    await controller.openMessage("c1", 2);
+    const state = controller.store.getState();
+    expect(state.activityOpen).toBe(false);
+    expect(state.selectedConversationId).toBe("c1");
+    expect(state.threads.c1?.messages.map((item) => item.seq)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(state.focus).toMatchObject({ conversationId: "c1", seq: 2 });
+    await controller.selectConversation("c1");
+    expect(controller.store.getState().focus).toBeUndefined();
+  });
+});

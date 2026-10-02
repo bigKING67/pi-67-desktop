@@ -1,4 +1,5 @@
 import type {
+  TeamChatActivityItem,
   TeamChatAgent,
   TeamChatAgentActivity,
   TeamChatAgentBinding,
@@ -50,6 +51,10 @@ export interface TeamChatCommandPayloads {
   "teamChat.webhook.create": { conversationId: string; name: string };
   "teamChat.webhook.rotate": { conversationId: string; botUserId: string };
   "teamChat.webhook.remove": { conversationId: string; botUserId: string };
+  "teamChat.activity.list": Record<string, never>;
+  "teamChat.activity.setDone": { keys: string[]; done: boolean };
+  "teamChat.activity.markAllRead": Record<string, never>;
+  "teamChat.conversation.mute": { conversationId: string; muted: boolean };
 }
 
 /** The secret delivery URL appears only in this result, once; it is never stored by Desktop. */
@@ -88,6 +93,10 @@ export interface TeamChatCommandResults {
   "teamChat.webhook.create": TeamChatWebhookSecret;
   "teamChat.webhook.rotate": TeamChatWebhookSecret;
   "teamChat.webhook.remove": Record<string, never>;
+  "teamChat.activity.list": { items: TeamChatActivityItem[] };
+  "teamChat.activity.setDone": Record<string, never>;
+  "teamChat.activity.markAllRead": Record<string, never>;
+  "teamChat.conversation.mute": { muted: boolean };
 }
 
 export interface TeamChatEventPayloads {

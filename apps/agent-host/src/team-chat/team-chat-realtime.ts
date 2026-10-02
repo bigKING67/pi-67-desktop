@@ -231,6 +231,8 @@ export function parseFrame(
         return { type: "policy.changed" };
       case "agents.changed":
         return { type: "agents.changed" };
+      case "activity.changed":
+        return { type: "activity.changed" };
       case "agent_invocation.changed":
         return {
           type: "agent_invocation.changed",

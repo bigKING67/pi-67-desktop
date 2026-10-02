@@ -1,4 +1,4 @@
-import { Hash, Lock, MessagesSquare, Settings2 } from "lucide-react";
+import { Bell, BellOff, Hash, Lock, MessagesSquare, Settings2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Button } from "react-aria-components";
 import { teamChatDirectPeer, type TeamChatConversation, type TeamChatDirectory } from "@pi67/domain";
@@ -8,6 +8,7 @@ import { conversationTitle, memberById } from "./team-chat-model.js";
 import { teamChatErrorMessage } from "./team-chat-controller.js";
 import { teamChat, useTeamChat } from "./team-chat-instance.js";
 import { teamChatTimeline } from "./team-chat-presentation.js";
+import { TeamChatActivity } from "./TeamChatActivity.js";
 import { agentPresenceLabel, TeamChatAgentAvatar, TeamChatAgentBadge, TeamChatAvatar } from "./TeamChatParts.js";
 import agentStyles from "./TeamChatAgents.module.css";
 import { TeamChatChannelSettings } from "./TeamChatChannelSettings.js";
@@ -24,10 +25,13 @@ export function TeamChatWorkbench() {
   const directory = useTeamChat((state) => state.directory);
   const conversation = useTeamChat((state) => state.directory?.conversations
     .find((item) => item.id === state.selectedConversationId));
+  const activityOpen = useTeamChat((state) => state.activityOpen);
 
   let body;
   if (connection?.status === "signed-out") {
     body = <ChatState icon={<MessagesSquare size={22} />} title={copy.signedOutTitle} detail={copy.signedOutBody} />;
+  } else if (directory && activityOpen) {
+    body = <TeamChatActivity directory={directory} />;
   } else if (!directory || !conversation) {
     body = <ChatState icon={<MessagesSquare size={22} />} title={copy.selectConversation} detail={copy.selectConversationBody} />;
   } else {
@@ -79,6 +83,7 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
     [thread?.messages, conversationPending, directory.selfUserId]);
   const [scrollRequest, setScrollRequest] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const focus = useTeamChat((state) => state.focus?.conversationId === conversation.id ? state.focus : undefined);
 
   // Mark read while this conversation is visible and focused.
   useEffect(() => {
@@ -98,14 +103,16 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
         {conversation.kind === "channel"
           ? <><Icon aria-hidden="true" size={16} /><strong>{title}</strong>
             <span>{`${conversation.visibility === "private" ? copy.privateChannel : copy.publicChannel} · ${conversation.memberCount} 位成员`}</span>
+            {conversation.joined ? <MuteButton conversation={conversation} /> : null}
             {conversation.joined ? (
-              <Button aria-label={copy.channelSettings} className={`small-button ${governance.headerAction}`}
+              <Button aria-label={copy.channelSettings} className="small-button"
                 onPress={() => setSettingsOpen(true)}>
                 <Settings2 aria-hidden="true" size={14} />{copy.channelSettings}
               </Button>
             ) : null}</>
           : <>{peerAgent ? <TeamChatAgentAvatar agent={peerAgent} /> : <TeamChatAvatar name={title} />}
-            <strong>{title}</strong><span>{copy.directMessages}</span></>}
+            <strong>{title}</strong><span>{copy.directMessages}</span>
+            <MuteButton conversation={conversation} /></>}
       </header>
       <AgentIntro conversation={conversation} directory={directory} />
       {!thread || thread.status === "loading" ? <p className={styles.timelineStatus} role="status">{copy.loadingMessages}</p> : null}
@@ -131,6 +138,7 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
           conversationId={conversation.id}
           directory={directory}
           entries={timeline}
+          focus={focus}
           hasMore={thread.hasMore}
           header={header}
           loadingOlder={thread.loadingOlder}
@@ -145,6 +153,25 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
         : <JoinCard conversation={conversation} title={title} />}
       {settingsOpen ? <TeamChatChannelSettings conversation={conversation} directory={directory} onClose={() => setSettingsOpen(false)} /> : null}
     </>
+  );
+}
+
+/** Mutes system notifications for this conversation; unread counts still apply. */
+function MuteButton({ conversation }: { conversation: TeamChatConversation }) {
+  const copy = messages.teamChat;
+  const [busy, setBusy] = useState(false);
+  const muted = conversation.muted === true;
+  return (
+    <Button className={`small-button ${governance.headerAction}`} data-testid="team-chat-mute" isDisabled={busy}
+      onPress={() => {
+        setBusy(true);
+        void teamChat.muteConversation(conversation.id, !muted)
+          .catch((error: unknown) => publishNotification({ level: "warning", title: copy.muteFailed, message: teamChatErrorMessage(error) }))
+          .finally(() => setBusy(false));
+      }}>
+      {muted ? <Bell aria-hidden="true" size={14} /> : <BellOff aria-hidden="true" size={14} />}
+      {muted ? copy.unmute : copy.mute}
+    </Button>
   );
 }
 

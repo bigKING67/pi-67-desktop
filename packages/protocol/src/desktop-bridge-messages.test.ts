@@ -21,6 +21,12 @@ describe("desktop system-bridge message shapes", () => {
     expect(isNativeNotificationRequest({ ...request, kind: "info" })).toBe(false);
     expect(isNativeNotificationRequest({ ...request, notificationId: "bad id" })).toBe(false);
     expect(isNativeNotificationRequest({ ...request, extra: true })).toBe(false);
+    const chat = { notificationId: "chat-c1-1", kind: "chat", title: "李雷 在 #设计 提到了你", body: "", conversationId: "c-1", messageSeq: 4 };
+    expect(isNativeNotificationRequest(chat)).toBe(true);
+    expect(isNativeNotificationRequest({ ...chat, title: "" })).toBe(false);
+    expect(isNativeNotificationRequest({ ...chat, body: "x".repeat(241) })).toBe(false);
+    expect(isNativeNotificationRequest({ ...chat, workspaceId: "w-1" })).toBe(false);
+    expect(isNativeNotificationRequest({ ...request, kind: "chat" })).toBe(false);
   });
 
   it("owns the workspace entry and shutdown checkpoint shapes", () => {

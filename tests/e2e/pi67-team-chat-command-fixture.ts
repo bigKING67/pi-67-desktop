@@ -16,6 +16,7 @@ interface MockConversation {
   unreadCount: number;
   mentionCount: number;
   ownerUserId?: string;
+  muted?: boolean;
   lastMessageAt?: number;
   lastSenderUserId?: string;
   lastPreview?: string;
@@ -72,6 +73,10 @@ export interface MockTeamChatState {
   agentHost: { bindings: unknown[]; activity: unknown[] };
   messages: Record<string, MockMessage[]>;
   rosters: Record<string, string[]>;
+  activity: Array<{
+    key: string; kind: string; conversationId: string; actorUserId: string; messageSeq?: number; preview?: string;
+    cardId?: string; cardTitle?: string; reason?: string; createdAt: number; unread: boolean; doneAt?: number;
+  }>;
 }
 
 /** Stateful New Money Team Chat stand-in. Signed out by default so Work-only specs are unaffected. */
@@ -124,6 +129,12 @@ export function installMockTeamChatCommandHandler(): void {
     webhooks: [],
     agentHost: { bindings: [], activity: [] },
     rosters: { "conv-research": [self, "user-wang", "user-li", "agent-macro"], "conv-ops": ["user-wang", "user-li"] },
+    activity: [
+      { key: "e:00000000-0000-4000-8000-0000000000c1", kind: "card_assigned", conversationId: "dm-li", actorUserId: "user-li",
+        messageSeq: 1, cardId: "card-li-1", cardTitle: "港股口径对齐", createdAt: start + 7_200_000, unread: true },
+      { key: "m:00000000-0000-4000-8000-000000000004", kind: "mention", conversationId: "conv-research", actorUserId: "user-li",
+        messageSeq: 4, preview: "@高乾 顺便把港股那几家的口径对齐一下。", createdAt: start + 3_600_000, unread: true }
+    ],
     messages: {
       "conv-research": history,
       "dm-li": [{ id: "msg-card-1", conversationId: "dm-li", seq: 1, senderUserId: "user-li", body: "港股口径对齐",
@@ -286,6 +297,25 @@ export function installMockTeamChatCommandHandler(): void {
         state.webhooks = state.webhooks.filter((item) => item.botUserId !== payload.botUserId);
         state.directory.bots = state.directory.bots.filter((item) => item.userId !== payload.botUserId);
         return {};
+      case "teamChat.activity.list": return { items: state.activity };
+      case "teamChat.activity.setDone": {
+        const keys = new Set(payload.keys as string[]);
+        state.activity = state.activity.map((item) => {
+          if (!keys.has(item.key)) return item;
+          const { doneAt: _doneAt, ...open } = item;
+          return payload.done === true ? { ...item, unread: false, doneAt: Date.now() } : open;
+        });
+        return {};
+      }
+      case "teamChat.activity.markAllRead":
+        state.activity = state.activity.map((item) => ({ ...item, unread: false }));
+        return {};
+      case "teamChat.conversation.mute": {
+        const target = conversation(payload.conversationId)!;
+        if (payload.muted === true) target.muted = true;
+        else delete target.muted;
+        return { muted: payload.muted === true };
+      }
       case "teamChat.dm.open": {
         const existing = state.directory.conversations.find((item) => item.kind === "dm" && item.memberUserIds.includes(String(payload.userId)));
         if (existing) return existing;

@@ -1,4 +1,6 @@
 import {
+  TEAM_CHAT_ACTIVITY_KEY_PATTERN,
+  TEAM_CHAT_ACTIVITY_LIMIT,
   TEAM_CHAT_AGENT_LIMITS,
   TEAM_CHAT_CHANNEL_NAME_MAX_CHARS,
   TEAM_CHAT_CLIENT_KEY_PATTERN,
@@ -119,6 +121,7 @@ export const TeamChatConversationSchema = strictObject({
   unreadCount: Type.Integer({ minimum: 0, maximum: 100 }),
   mentionCount: Type.Integer({ minimum: 0, maximum: 100 }),
   ownerUserId: Type.Optional(IdSchema),
+  muted: Type.Optional(Type.Boolean()),
   lastMessageAt: Type.Optional(TimestampSchema),
   lastSenderUserId: Type.Optional(IdSchema),
   lastPreview: Type.Optional(Type.String({ maxLength: 140 })),
@@ -167,6 +170,23 @@ export const TeamChatMessageSchema = strictObject({
   workCard: Type.Optional(TeamChatWorkCardSchema),
   mentionUserIds: Type.Optional(MentionsSchema),
   agentInvocations: Type.Optional(Type.Array(InvocationSummarySchema, { maxItems: TEAM_CHAT_MENTION_MAX }))
+});
+
+const ActivityKeySchema = Type.String({ minLength: 38, maxLength: 38, pattern: TEAM_CHAT_ACTIVITY_KEY_PATTERN });
+const ActivityItemSchema = strictObject({
+  key: ActivityKeySchema,
+  kind: Type.Union(["mention", "dm", "agent_reply", "agent_failed", "card_assigned", "card_review", "card_changes_requested"]
+    .map((kind) => Type.Literal(kind))),
+  conversationId: IdSchema,
+  actorUserId: IdSchema,
+  messageSeq: Type.Optional(Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER })),
+  preview: Type.Optional(Type.String({ maxLength: 140 })),
+  cardId: Type.Optional(IdSchema),
+  cardTitle: Type.Optional(WorkCardTitleSchema),
+  reason: Type.Optional(Type.String({ minLength: 1, maxLength: 40, pattern: "^[a-z_]+$" })),
+  createdAt: TimestampSchema,
+  unread: Type.Boolean(),
+  doneAt: Type.Optional(TimestampSchema)
 });
 
 const ConnectionStateSchema = Type.Union([
@@ -240,7 +260,14 @@ export const TeamChatCommandPayloadSchemas: Record<keyof TeamChatCommandPayloads
     name: Type.String({ minLength: 1, maxLength: TEAM_CHAT_WEBHOOK_NAME_MAX })
   }),
   "teamChat.webhook.rotate": strictObject({ conversationId: IdSchema, botUserId: IdSchema }),
-  "teamChat.webhook.remove": strictObject({ conversationId: IdSchema, botUserId: IdSchema })
+  "teamChat.webhook.remove": strictObject({ conversationId: IdSchema, botUserId: IdSchema }),
+  "teamChat.activity.list": EmptySchema,
+  "teamChat.activity.setDone": strictObject({
+    keys: Type.Array(ActivityKeySchema, { minItems: 1, maxItems: TEAM_CHAT_ACTIVITY_LIMIT }),
+    done: Type.Boolean()
+  }),
+  "teamChat.activity.markAllRead": EmptySchema,
+  "teamChat.conversation.mute": strictObject({ conversationId: IdSchema, muted: Type.Boolean() })
 };
 
 export const TeamChatCommandResultSchemas: Record<keyof TeamChatCommandResults, TSchema> = {
@@ -288,7 +315,11 @@ export const TeamChatCommandResultSchemas: Record<keyof TeamChatCommandResults, 
   "teamChat.webhook.list": strictObject({ webhooks: Type.Array(WebhookSchema, { maxItems: 10 }) }),
   "teamChat.webhook.create": WebhookSecretSchema,
   "teamChat.webhook.rotate": WebhookSecretSchema,
-  "teamChat.webhook.remove": EmptySchema
+  "teamChat.webhook.remove": EmptySchema,
+  "teamChat.activity.list": strictObject({ items: Type.Array(ActivityItemSchema, { maxItems: TEAM_CHAT_ACTIVITY_LIMIT }) }),
+  "teamChat.activity.setDone": EmptySchema,
+  "teamChat.activity.markAllRead": EmptySchema,
+  "teamChat.conversation.mute": strictObject({ muted: Type.Boolean() })
 };
 
 export const TeamChatEventPayloadSchemas: Record<keyof TeamChatEventPayloads, TSchema> = {
@@ -304,7 +335,8 @@ export const TeamChatEventPayloadSchemas: Record<keyof TeamChatEventPayloads, TS
       conversationId: IdSchema,
       messageId: IdSchema,
       invocation: InvocationSummarySchema
-    })
+    }),
+    strictObject({ type: Type.Literal("activity.changed") })
   ]),
   "teamChat.connectionChanged": ConnectionStateSchema,
   "teamChat.agentHostChanged": AgentHostStateSchema

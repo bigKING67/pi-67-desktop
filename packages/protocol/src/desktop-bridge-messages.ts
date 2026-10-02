@@ -1,4 +1,4 @@
-import type { NativeNotificationRequest, WorkspaceEntryRequest } from "@pi67/domain";
+import { NATIVE_NOTIFICATION_TEXT_LIMITS, type NativeNotificationRequest, type WorkspaceEntryRequest } from "@pi67/domain";
 import { AgentHostStartupFailedMessageSchema, AgentHostStartupStateSchema } from "./supervisor-messages.js";
 import { strictObject, Type, Value, type Static } from "./typebox-schema.js";
 
@@ -10,12 +10,23 @@ const IDENTIFIER_PATTERN = "^[A-Za-z0-9._:-]+$";
 export const WorkspaceIdSchema = Type.String({ minLength: 1, maxLength: 200, pattern: IDENTIFIER_PATTERN });
 export const NativeNotificationIdSchema = Type.String({ minLength: 1, maxLength: 200, pattern: IDENTIFIER_PATTERN });
 
-export const NativeNotificationRequestSchema = strictObject({
-  notificationId: NativeNotificationIdSchema,
-  kind: Type.Union([Type.Literal("completed"), Type.Literal("failed"), Type.Literal("attention")]),
-  workspaceId: WorkspaceIdSchema,
-  sessionFileIdentity: Type.String({ minLength: 1, maxLength: 2_048 })
-});
+export const NativeNotificationRequestSchema = Type.Union([
+  strictObject({
+    notificationId: NativeNotificationIdSchema,
+    kind: Type.Union([Type.Literal("completed"), Type.Literal("failed"), Type.Literal("attention")]),
+    workspaceId: WorkspaceIdSchema,
+    sessionFileIdentity: Type.String({ minLength: 1, maxLength: 2_048 })
+  }),
+  // Team Chat (ADR 0006): the renderer's wording, bounded; Main shows it as given.
+  strictObject({
+    notificationId: NativeNotificationIdSchema,
+    kind: Type.Literal("chat"),
+    title: Type.String({ minLength: 1, maxLength: NATIVE_NOTIFICATION_TEXT_LIMITS.title }),
+    body: Type.String({ maxLength: NATIVE_NOTIFICATION_TEXT_LIMITS.body }),
+    conversationId: Type.Optional(Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9-]+$" })),
+    messageSeq: Type.Optional(Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }))
+  })
+]);
 
 export const WorkspaceEntryRequestSchema = strictObject({
   workspaceId: WorkspaceIdSchema,

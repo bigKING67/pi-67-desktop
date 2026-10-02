@@ -42,7 +42,11 @@ const TEAM_CHAT_COMMANDS: ReadonlySet<string> = new Set<TeamChatCommandType>([
   "teamChat.webhook.list",
   "teamChat.webhook.create",
   "teamChat.webhook.rotate",
-  "teamChat.webhook.remove"
+  "teamChat.webhook.remove",
+  "teamChat.activity.list",
+  "teamChat.activity.setDone",
+  "teamChat.activity.markAllRead",
+  "teamChat.conversation.mute"
 ]);
 
 export function isTeamChatCommand(type: AgentCommandType): type is TeamChatCommandType {
@@ -211,6 +215,20 @@ export class TeamChatCommandRouter {
       case "teamChat.workCard.act": {
         const { cardId, action, expectedRevision } = command.payload as TeamChatCommandPayloads["teamChat.workCard.act"];
         return gateway.actOnWorkCard(cardId, action, expectedRevision, signal);
+      }
+      case "teamChat.activity.list":
+        return { items: await gateway.listActivity(signal) };
+      case "teamChat.activity.setDone": {
+        const { keys, done } = command.payload as TeamChatCommandPayloads["teamChat.activity.setDone"];
+        await gateway.setActivityDone(keys, done, signal);
+        return {};
+      }
+      case "teamChat.activity.markAllRead":
+        await gateway.markActivityRead(signal);
+        return {};
+      case "teamChat.conversation.mute": {
+        const { conversationId, muted } = command.payload as TeamChatCommandPayloads["teamChat.conversation.mute"];
+        return { muted: await gateway.muteConversation(conversationId, muted, signal) };
       }
       case "teamChat.dm.open": {
         const { userId } = command.payload as TeamChatCommandPayloads["teamChat.dm.open"];

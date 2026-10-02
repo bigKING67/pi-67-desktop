@@ -1,12 +1,14 @@
-import { Hash, Lock, Plus, Settings2 } from "lucide-react";
+import { Bell, BellOff, Hash, Lock, Plus, Settings2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "react-aria-components";
 import {
+  teamChatActivityUnreadCount,
   teamChatCanCreateAgent,
   teamChatCanCreateChannel,
   teamChatDirectPeer,
   type TeamChatAgent,
   type TeamChatConversation,
+  type TeamChatDirectory,
   type TeamChatMember
 } from "@pi67/domain";
 import { messages } from "../localization/message-catalog.js";
@@ -25,7 +27,7 @@ export function TeamChatNavigation({ onCreateChannel }: { onCreateChannel: () =>
   const connection = useTeamChat((state) => state.connection);
   const directory = useTeamChat((state) => state.directory);
   const directoryStatus = useTeamChat((state) => state.directoryStatus);
-  const selectedId = useTeamChat((state) => state.selectedConversationId);
+  const selectedId = useTeamChat((state) => state.activityOpen ? undefined : state.selectedConversationId);
   const [agentsOpen, setAgentsOpen] = useState(false);
 
   if (connection?.status === "signed-out") {
@@ -62,6 +64,7 @@ export function TeamChatNavigation({ onCreateChannel }: { onCreateChannel: () =>
 
   return (
     <nav aria-label={copy.region} className={styles.railLists} data-testid="team-chat-navigation">
+      <ActivityRow directory={directory} />
       <section aria-labelledby="team-chat-channels" className={styles.railSection}>
         <header>
           <h2 id="team-chat-channels">{copy.channels}</h2>
@@ -135,6 +138,25 @@ export function TeamChatNavigation({ onCreateChannel }: { onCreateChannel: () =>
   );
 }
 
+function ActivityRow({ directory }: { directory: TeamChatDirectory }) {
+  const copy = messages.teamChat;
+  const open = useTeamChat((state) => state.activityOpen);
+  const unread = useTeamChat((state) => teamChatActivityUnreadCount(state.activity ?? [], directory.conversations));
+  return (
+    <Button
+      aria-current={open ? "page" : false}
+      aria-label={unread > 0 ? copy.activityUnread(unread) : copy.activity}
+      className={`${styles.railRow} ${open ? styles.railRowSelected : ""}`}
+      data-testid="team-chat-activity-entry"
+      onPress={() => teamChat.openActivity()}
+    >
+      <Bell aria-hidden="true" className={styles.railRowIcon} size={15} />
+      <span className={styles.railRowTitle}>{copy.activity}</span>
+      <RowCounts mentions={0} unread={unread} />
+    </Button>
+  );
+}
+
 function AgentRow({ agent, conversation, mine, selected }: {
   agent: TeamChatAgent;
   conversation: TeamChatConversation | undefined;
@@ -174,16 +196,17 @@ function ConversationRow({ conversation, selected, title }: {
       aria-label={[title, conversation.visibility === "private" ? copy.privateChannel : undefined,
         conversation.joined ? undefined : copy.joinableChannel,
         conversation.unreadCount > 0 ? copy.unread(conversation.unreadCount) : undefined,
-        conversation.mentionCount > 0 ? copy.mentions(conversation.mentionCount) : undefined].filter(Boolean).join("，")}
+        conversation.mentionCount > 0 ? copy.mentions(conversation.mentionCount) : undefined,
+        conversation.muted ? copy.muted : undefined].filter(Boolean).join("，")}
       className={`${styles.railRow} ${selected ? styles.railRowSelected : ""} ${conversation.joined ? "" : styles.railRowMuted}`}
       onPress={() => void teamChat.selectConversation(conversation.id)}
     >
       {conversation.kind === "channel"
         ? <Icon aria-hidden="true" className={styles.railRowIcon} size={15} />
         : <TeamChatAvatar name={title} />}
-      <span className={styles.railRowTitle}>{title}</span>
+      <span className={styles.railRowTitle}>{title}{conversation.muted ? <MutedMark /> : null}</span>
       {conversation.joined
-        ? <RowCounts mentions={conversation.mentionCount} unread={conversation.unreadCount} />
+        ? <RowCounts mentions={conversation.mentionCount} muted={conversation.muted} unread={conversation.unreadCount} />
         : <small>{copy.joinableChannel}</small>}
     </Button>
   );
@@ -201,7 +224,7 @@ function TeammateRow({ conversation, member, selected }: {
     <Button
       aria-current={selected ? "page" : false}
       aria-label={[member.displayName, unread > 0 ? copy.unread(unread) : undefined,
-        mentioned > 0 ? copy.mentions(mentioned) : undefined].filter(Boolean).join("，")}
+        mentioned > 0 ? copy.mentions(mentioned) : undefined, conversation?.muted ? copy.muted : undefined].filter(Boolean).join("，")}
       className={`${styles.railRow} ${selected ? styles.railRowSelected : ""}`}
       data-testid="team-chat-teammate"
       onPress={() => void teamChat.openDirectMessage(member.userId).catch((error: unknown) => publishNotification({
@@ -209,8 +232,12 @@ function TeammateRow({ conversation, member, selected }: {
       }))}
     >
       <TeamChatAvatar name={member.displayName} />
-      <span className={styles.railRowTitle}>{member.displayName}</span>
-      <RowCounts mentions={mentioned} unread={unread} />
+      <span className={styles.railRowTitle}>{member.displayName}{conversation?.muted ? <MutedMark /> : null}</span>
+      <RowCounts mentions={mentioned} muted={conversation?.muted} unread={unread} />
     </Button>
   );
+}
+
+function MutedMark() {
+  return <BellOff aria-hidden="true" className={styles.railMutedMark} size={11} />;
 }

@@ -38,6 +38,7 @@ import { SettingsCategoryNavigation } from "./SettingsCategoryNavigation.js";
 import { SettingsDraftGuardContext, SettingsNavigationContext } from "./SettingsDraftGuard.js";
 import { useSettingsNavigationGuard } from "./use-settings-navigation-guard.js";
 import { AboutSettings, RuntimeSettings } from "./SettingsSystemPanels.js";
+import { TeamChatNotificationSettings } from "./TeamChatNotificationSettings.js";
 import { KeyboardShortcutSettings } from "./KeyboardShortcutSettings.js";
 import { LarkOfficeSettings } from "./LarkOfficeSettings.js";
 import { UsageSettings } from "./UsageSettings.js";
@@ -249,6 +250,7 @@ function GeneralSettings() {
       </SettingsRows>
       {theme.persistence === "memory" ? <SettingsNotice tone="warning">主题存储不可用，选择仅在本次运行有效。</SettingsNotice> : null}
     </SettingsSectionBlock>
+    <TeamChatNotificationSettings />
     <KeyboardShortcutSettings />
   </>);
 }

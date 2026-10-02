@@ -2,6 +2,8 @@ import { TEAM_CHAT_DEFAULT_POLICY, teamChatCodePointLength, type TeamChatConvers
 import { describe, expect, it } from "vitest";
 import {
   addPending,
+  applyActivityDone,
+  applyActivityRead,
   applyMessage,
   applyMessagePage,
   applyPush,
@@ -175,5 +177,16 @@ describe("team chat model", () => {
     expect(applyInvocation(state, "c1", "missing", queued)).toBe(state);
     const pushed = applyPush(state, { type: "agent_invocation.changed", conversationId: "c1", messageId: "m1", invocation: queued });
     expect(pushed.state.threads.c1?.messages[0]?.agentInvocations).toEqual([queued]);
+  });
+
+  it("re-reads activity on push and applies handled and read state locally", () => {
+    expect(applyPush(INITIAL_TEAM_CHAT_STATE, { type: "activity.changed" })).toMatchObject({ refreshDirectory: false, refreshActivity: true });
+    const entry = { key: "m:00000000-0000-4000-8000-000000000001", kind: "dm" as const, conversationId: "c1", actorUserId: "u2", createdAt: 1, unread: true };
+    const state: TeamChatState = { ...INITIAL_TEAM_CHAT_STATE, activity: [entry] };
+    const done = applyActivityDone(state, [entry.key], true, 7);
+    expect(done.activity?.[0]).toMatchObject({ unread: false, doneAt: 7 });
+    expect(applyActivityDone(done, [entry.key], false, 8).activity?.[0]).not.toHaveProperty("doneAt");
+    expect(applyActivityRead(state).activity?.[0]?.unread).toBe(false);
+    expect(applyActivityRead(INITIAL_TEAM_CHAT_STATE)).toBe(INITIAL_TEAM_CHAT_STATE);
   });
 });

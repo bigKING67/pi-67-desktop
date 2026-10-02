@@ -58,6 +58,21 @@ describe("native notification manager", () => {
     expect(manager.dismiss(request().notificationId)).toBe(false);
   });
 
+  it("shows Team Chat wording as composed and activates the conversation", async () => {
+    const notifications: FakeNotification[] = [];
+    const activate = vi.fn();
+    const manager = managerWith(notifications, activate);
+    const chat: NativeNotificationRequest = {
+      notificationId: "chat-c1-1", kind: "chat", title: "李雷 在 #设计 提到了你", body: "", conversationId: "c1", messageSeq: 4
+    };
+
+    expect(manager.show(chat)).toBe(true);
+    expect(notifications[0]?.presentation).toEqual({ title: "李雷 在 #设计 提到了你", body: "" });
+    notifications[0]!.emit("click");
+    await Promise.resolve();
+    expect(activate).toHaveBeenCalledWith(chat);
+  });
+
   it("does not construct notifications when the platform does not support them", () => {
     const create = vi.fn();
     const manager = new NativeNotificationManager({

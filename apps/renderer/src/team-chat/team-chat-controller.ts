@@ -14,6 +14,8 @@ import type { ConnectionSubscriber } from "../connection/agent-connection-contro
 import { messages } from "../localization/message-catalog.js";
 import {
   addPending,
+  applyActivityDone,
+  applyActivityRead,
   applyMessage,
   applyMessagePage,
   applyPush,
@@ -39,13 +41,33 @@ export interface TeamChatPort {
 
 /** Newer pages fetched while reconciling one thread before reloading its latest page instead. */
 const MAX_CATCH_UP_PAGES = 5;
+/** Older pages fetched to reach a message opened from activity before showing the conversation as is. */
+const MAX_REVEAL_PAGES = 10;
+
+/** Runs `load` one pass at a time; calls during a pass schedule exactly one more. */
+function coalesced(load: () => Promise<void>): () => Promise<void> {
+  let running: Promise<void> | undefined;
+  let again = false;
+  return () => {
+    if (running) {
+      again = true;
+      return running;
+    }
+    running = (async () => {
+      do {
+        again = false;
+        await load();
+      } while (again);
+    })().finally(() => { running = undefined; });
+    return running;
+  };
+}
 
 export function createTeamChatController(port: TeamChatPort, store: StoreApi<TeamChatState> = createStore(() => INITIAL_TEAM_CHAT_STATE)) {
   let unsubscribe: (() => void) | undefined;
   let epoch = 0;
-  let directoryRequest: Promise<void> | undefined;
-  let directoryAgain = false;
   let lastLiveGeneration = 0;
+  let focusRevision = 0;
 
   const update = (reduce: (state: TeamChatState) => TeamChatState) => store.setState(reduce(store.getState()), true);
   /** Applies a late result only if no sign-out or reset happened since the request began. */
@@ -71,6 +93,7 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
       void reconcile();
     } else if (connection.status !== "unavailable" && store.getState().directoryStatus === "idle") {
       void loadDirectory();
+      void loadActivity();
     }
   }
 
@@ -82,28 +105,41 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
     }
   }
 
-  function loadDirectory(): Promise<void> {
-    if (directoryRequest) {
-      directoryAgain = true;
-      return directoryRequest;
-    }
+  const loadDirectory = coalesced(async () => {
+    const started = epoch;
     if (!store.getState().directory) update((state) => ({ ...state, directoryStatus: "loading" }));
-    directoryRequest = (async () => {
-      do {
-        directoryAgain = false;
-        const started = epoch;
-        try {
-          const directory = await port.request("teamChat.directory.get", {});
-          if (started === epoch) update((state) => replaceDirectory(state, directory));
-        } catch {
-          if (started === epoch) update((state) => ({ ...state, directoryStatus: state.directory ? "ready" : "error" }));
-        }
-      } while (directoryAgain);
-    })().finally(() => { directoryRequest = undefined; });
-    return directoryRequest;
+    try {
+      const directory = await port.request("teamChat.directory.get", {});
+      if (started === epoch) update((state) => replaceDirectory(state, directory));
+    } catch {
+      if (started === epoch) update((state) => ({ ...state, directoryStatus: state.directory ? "ready" : "error" }));
+    }
+  });
+
+  /** The reader's activity (ADR 0006); re-read on every activity.changed push and reconnect. */
+  const loadActivity = coalesced(async () => {
+    const started = epoch;
+    if (!store.getState().activity) update((state) => ({ ...state, activityStatus: "loading" }));
+    try {
+      const { items } = await port.request("teamChat.activity.list", {});
+      if (started === epoch) update((state) => ({ ...state, activity: items, activityStatus: "ready" }));
+    } catch {
+      if (started === epoch) update((state) => ({ ...state, activityStatus: state.activity ? "ready" : "error" }));
+    }
+  });
+
+  /** Loads older pages until `seq` is in the thread, within a bound. */
+  async function reveal(conversationId: string, seq: number): Promise<void> {
+    for (let page = 0; page < MAX_REVEAL_PAGES; page += 1) {
+      const thread = store.getState().threads[conversationId];
+      const first = thread?.messages[0]?.seq;
+      if (!thread || thread.status !== "ready" || !thread.hasMore || first === undefined || first <= seq) return;
+      await loadOlder(conversationId);
+    }
   }
 
   async function reconcile(): Promise<void> {
+    void loadActivity();
     await loadDirectory();
     const { threads, selectedConversationId } = store.getState();
     await Promise.all(Object.keys(threads).map((id) => catchUp(id)));
@@ -182,7 +218,8 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
   }
 
   async function selectConversation(conversationId: string | undefined): Promise<void> {
-    update((state) => ({ ...state, selectedConversationId: conversationId }));
+    // A focus request belongs to one opening; openMessage sets it again afterwards.
+    update((state) => ({ ...state, selectedConversationId: conversationId, activityOpen: false, focus: undefined }));
     if (conversationId === undefined) return;
     const thread = store.getState().threads[conversationId];
     if (!thread || thread.status === "error") await loadLatest(conversationId);
@@ -195,7 +232,11 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
       if (unsubscribe) return;
       unsubscribe = port.subscribe({
         onConnected: () => { void refreshConnection(); },
-        onTeardown: () => update((state) => ({ ...state, connection: undefined })),
+        onTeardown: () => {
+          // A restarted Host counts realtime generations from 1 again; its first live state must reconcile.
+          lastLiveGeneration = 0;
+          update((state) => ({ ...state, connection: undefined }));
+        },
         onSequenceGap: () => { void refreshConnection().then(() => reconcile()); },
         onEvent: (event, envelope) => {
           if (envelope.context.scope !== "app") return;
@@ -208,6 +249,7 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
           const result = applyPush(store.getState(), event.payload);
           store.setState(result.state, true);
           if (result.refreshDirectory) void loadDirectory();
+          if (result.refreshActivity) void loadActivity();
           if (event.payload.type === "message.created" && before !== undefined && event.payload.message.seq > before + 1) {
             void catchUp(event.payload.message.conversationId, before);
           }
@@ -224,6 +266,44 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
       reset(undefined);
     },
     retryDirectory: () => loadDirectory(),
+    retryActivity: () => loadActivity(),
+    openActivity: () => update((state) => ({ ...state, activityOpen: true })),
+    /** Opens a conversation at one message, as activity items and notifications do. */
+    async openMessage(conversationId: string, seq?: number): Promise<void> {
+      await selectConversation(conversationId);
+      if (seq === undefined) return;
+      await reveal(conversationId, seq);
+      focusRevision += 1;
+      update((state) => ({ ...state, focus: { conversationId, seq, revision: focusRevision } }));
+    },
+    /** Optimistic; a failed request re-reads the activity before rethrowing. */
+    async setActivityDone(keys: readonly string[], done: boolean): Promise<void> {
+      update((state) => applyActivityDone(state, keys, done, Date.now()));
+      try {
+        await port.request("teamChat.activity.setDone", { keys: [...keys], done });
+      } catch (error) {
+        void loadActivity();
+        throw error;
+      }
+    },
+    async markAllActivityRead(): Promise<void> {
+      update(applyActivityRead);
+      try {
+        await port.request("teamChat.activity.markAllRead", {});
+      } catch (error) {
+        void loadActivity();
+        throw error;
+      }
+    },
+    async muteConversation(conversationId: string, muted: boolean): Promise<void> {
+      const result = await port.request("teamChat.conversation.mute", { conversationId, muted });
+      guarded((state) => {
+        const conversation = state.directory?.conversations.find((item) => item.id === conversationId);
+        if (!conversation) return state;
+        const { muted: _previous, ...rest } = conversation;
+        return upsertConversation(state, result.muted ? { ...rest, muted: true } : rest);
+      })();
+    },
     loadOlder,
     markRead,
     selectConversation,

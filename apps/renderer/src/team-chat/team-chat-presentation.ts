@@ -8,6 +8,8 @@ const GROUP_WINDOW_MS = 5 * 60 * 1_000;
 /** One message per entry; the first message of each day carries its day label. */
 export interface TeamChatTimelineEntry {
   key: string;
+  /** Confirmed messages only. */
+  seq?: number;
   senderUserId: string;
   body: string;
   createdAt: number;
@@ -45,7 +47,7 @@ export function teamChatTimeline(
     lastAt = item.createdAt;
   };
   for (const message of messages) {
-    push({ key: message.id, senderUserId: message.senderUserId, body: message.body, createdAt: message.createdAt,
+    push({ key: message.id, seq: message.seq, senderUserId: message.senderUserId, body: message.body, createdAt: message.createdAt,
       ...(message.workCard === undefined ? {} : { workCard: message.workCard }),
       ...(message.mentionUserIds === undefined ? {} : { mentionUserIds: message.mentionUserIds }),
       ...(message.agentInvocations === undefined ? {} : { agentInvocations: message.agentInvocations }) });
@@ -66,6 +68,13 @@ export function teamChatTimeline(
 export function formatTeamChatTime(timestamp: number): string {
   const date = new Date(timestamp);
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+/** Time today, "昨天 HH:MM", or the date, for activity rows. */
+export function formatTeamChatMoment(timestamp: number, now: number): string {
+  const day = dayLabel(timestamp, now);
+  if (day === "今天") return formatTeamChatTime(timestamp);
+  return day === "昨天" ? `${day} ${formatTeamChatTime(timestamp)}` : day;
 }
 
 function dayKey(timestamp: number): string {

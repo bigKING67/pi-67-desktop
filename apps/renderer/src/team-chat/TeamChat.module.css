@@ -93,6 +93,12 @@
   white-space: nowrap;
 }
 
+.railMutedMark {
+  margin-left: 5px;
+  color: var(--text-tertiary);
+  vertical-align: -1px;
+}
+
 .railRow small {
   color: var(--text-tertiary);
   font-size: var(--font-size-caption);
@@ -152,6 +158,13 @@
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-semibold);
   text-align: center;
+}
+
+/* Muted conversations keep their count, without the accent. */
+.unreadMuted {
+  background: var(--surface-muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--text-secondary);
 }
 
 .workbench {

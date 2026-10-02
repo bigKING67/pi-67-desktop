@@ -30,6 +30,7 @@ export * from "./skill-pack-management.js";
 export * from "./team-chat.js";
 export * from "./team-chat-governance.js";
 export * from "./team-chat-agents.js";
+export * from "./team-chat-activity.js";
 export * from "./tool-execution.js";
 export * from "./workspace-change.js";
 export * from "./workbench.js";

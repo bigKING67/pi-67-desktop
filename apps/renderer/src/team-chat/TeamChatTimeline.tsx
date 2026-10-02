@@ -1,5 +1,5 @@
 import { RotateCw } from "lucide-react";
-import { forwardRef, useEffect, useRef, type HTMLAttributes, type ReactNode } from "react";
+import { forwardRef, useEffect, useRef, useState, type HTMLAttributes, type ReactNode } from "react";
 import { Button } from "react-aria-components";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import type { TeamChatDirectory } from "@pi67/domain";
@@ -22,7 +22,7 @@ const FIRST_ITEM_BASE = 1_000_000_000;
  * Virtualized conversation timeline. Each entry is one message (day labels ride on
  * the first message of a day), so loading older history is a pure prepend.
  */
-export function TeamChatTimeline({ conversationId, directory, entries, target, header, hasMore, loadingOlder, scrollRequest }: {
+export function TeamChatTimeline({ conversationId, directory, entries, target, header, hasMore, loadingOlder, scrollRequest, focus }: {
   conversationId: string;
   directory: TeamChatDirectory;
   entries: TeamChatTimelineEntry[];
@@ -32,6 +32,8 @@ export function TeamChatTimeline({ conversationId, directory, entries, target, h
   loadingOlder: boolean;
   /** Increments when the reader sends, forcing the view to the newest message. */
   scrollRequest: number;
+  /** A message opened from activity or a notification: centered and briefly highlighted. */
+  focus?: { seq: number; revision: number } | undefined;
 }) {
   const virtuoso = useRef<VirtuosoHandle>(null);
   const firstKey = useRef<string | undefined>(undefined);
@@ -49,6 +51,22 @@ export function TeamChatTimeline({ conversationId, directory, entries, target, h
     if (scrollRequest > 0) virtuoso.current?.scrollToIndex({ index: "LAST", behavior: "auto" });
   }, [scrollRequest]);
 
+  const [highlighted, setHighlighted] = useState<number>();
+  const handledFocus = useRef<number | undefined>(undefined);
+  const focusIndex = focus === undefined ? -1 : entries.findIndex((entry) => entry.seq === focus.seq);
+  // Once per focus request: later entries must not re-center the view.
+  useEffect(() => {
+    if (focus === undefined || focusIndex < 0 || handledFocus.current === focus.revision) return;
+    handledFocus.current = focus.revision;
+    virtuoso.current?.scrollToIndex({ index: focusIndex, align: "center", behavior: "auto" });
+    setHighlighted(focus.seq);
+  }, [focus, focusIndex]);
+  useEffect(() => {
+    if (highlighted === undefined) return;
+    const timer = window.setTimeout(() => setHighlighted(undefined), 2_400);
+    return () => window.clearTimeout(timer);
+  }, [highlighted]);
+
   return (
     <Virtuoso<TeamChatTimelineEntry, TimelineContext>
       alignToBottom
@@ -64,7 +82,7 @@ export function TeamChatTimeline({ conversationId, directory, entries, target, h
       initialTopMostItemIndex={Math.max(0, entries.length - 1)}
       itemContent={(_, entry) => (
         <div className={styles.timelineColumn}>
-          <TimelineMessage directory={directory} entry={entry} target={target} />
+          <TimelineMessage directory={directory} entry={entry} focused={entry.seq !== undefined && entry.seq === highlighted} target={target} />
         </div>
       )}
       key={conversationId}
@@ -88,7 +106,12 @@ const TIMELINE_COMPONENTS = {
   Scroller: TimelineScroller
 };
 
-function TimelineMessage({ directory, entry, target }: { directory: TeamChatDirectory; entry: TeamChatTimelineEntry; target: string }) {
+function TimelineMessage({ directory, entry, focused, target }: {
+  directory: TeamChatDirectory;
+  entry: TeamChatTimelineEntry;
+  focused: boolean;
+  target: string;
+}) {
   const copy = messages.teamChat;
   const participant = memberById(directory, entry.senderUserId);
   const sender = entry.senderUserId === directory.selfUserId ? copy.you : participant?.displayName ?? copy.unknownTeammate;
@@ -96,7 +119,8 @@ function TimelineMessage({ directory, entry, target }: { directory: TeamChatDire
   return (
     <>
       {entry.dayLabel ? <div className={styles.daySeparator}><span>{entry.dayLabel}</span></div> : null}
-      <article className={`${styles.message} ${entry.showHeader ? styles.messageGroupStart : ""} ${entry.pending ? styles.messagePending : ""} ${mentionsSelf ? governance.messageMentionsSelf : ""}`}>
+      <article className={`${styles.message} ${entry.showHeader ? styles.messageGroupStart : ""} ${entry.pending ? styles.messagePending : ""} ${mentionsSelf ? governance.messageMentionsSelf : ""} ${focused ? governance.messageFocused : ""}`}
+        data-focused={focused || undefined}>
         {entry.showHeader ? (
           <header>
             <strong>{sender}</strong>

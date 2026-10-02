@@ -12,19 +12,19 @@ export function TeamChatAvatar({ name }: { name: string }) {
   return <span aria-hidden="true" className={styles.avatar}>{first.toUpperCase()}</span>;
 }
 
-function UnreadCount({ count }: { count: number }) {
+function UnreadCount({ count, muted }: { count: number; muted?: boolean | undefined }) {
   if (count <= 0) return null;
   return (
-    <span className={styles.unread} title={messages.teamChat.unread(count)}>
+    <span className={`${styles.unread} ${muted ? styles.unreadMuted : ""}`} title={messages.teamChat.unread(count)}>
       {count > 99 ? "99+" : count}
     </span>
   );
 }
 
-/** Mention and unread counts in one trailing cell of a rail row. */
-export function RowCounts({ mentions, unread }: { mentions: number; unread: number }) {
+/** Mention and unread counts in one trailing cell of a rail row; a muted conversation's unread recedes. */
+export function RowCounts({ mentions, unread, muted }: { mentions: number; unread: number; muted?: boolean | undefined }) {
   if (mentions <= 0 && unread <= 0) return null;
-  return <span className={governance.rowCounts}><MentionCount count={mentions} /><UnreadCount count={unread} /></span>;
+  return <span className={governance.rowCounts}><MentionCount count={mentions} /><UnreadCount count={unread} muted={muted} /></span>;
 }
 
 function MentionCount({ count }: { count: number }) {

@@ -2,6 +2,7 @@ import {
   mergeTeamChatMessages,
   teamChatCodePointPrefix,
   teamChatDirectPeer,
+  type TeamChatActivityItem,
   type TeamChatAgent,
   type TeamChatAgentInvocationSummary,
   type TeamChatConnectionState,
@@ -41,6 +42,13 @@ export interface TeamChatState {
   pending: readonly TeamChatPendingMessage[];
   /** This Desktop's Agent hosting (bindings and recent runs); undefined until read. */
   agentHost: TeamChatAgentHostState | undefined;
+  /** The reader's activity (ADR 0006), newest first; undefined until read. */
+  activity: readonly TeamChatActivityItem[] | undefined;
+  activityStatus: "idle" | "loading" | "ready" | "error";
+  /** The activity inbox replaces the conversation view while open. */
+  activityOpen: boolean;
+  /** A message to bring into view once its conversation shows (from activity or a notification). */
+  focus: { conversationId: string; seq: number; revision: number } | undefined;
 }
 
 export const INITIAL_TEAM_CHAT_STATE: TeamChatState = {
@@ -50,7 +58,11 @@ export const INITIAL_TEAM_CHAT_STATE: TeamChatState = {
   selectedConversationId: undefined,
   threads: {},
   pending: [],
-  agentHost: undefined
+  agentHost: undefined,
+  activity: undefined,
+  activityStatus: "idle",
+  activityOpen: false,
+  focus: undefined
 };
 
 const PREVIEW_CHARS = 140;
@@ -158,9 +170,14 @@ export function applyWorkCard(state: TeamChatState, card: TeamChatWorkCard): Tea
   return changed ? { ...state, threads: { ...state.threads, [card.conversationId]: { ...thread, messages } } } : state;
 }
 
-/** Reduces a push. Returns whether the directory must be re-read (unknown or changed conversation). */
-export function applyPush(state: TeamChatState, event: TeamChatPushEvent): { state: TeamChatState; refreshDirectory: boolean } {
+/** Reduces a push. Returns whether the directory or the activity must be re-read. */
+export function applyPush(
+  state: TeamChatState,
+  event: TeamChatPushEvent
+): { state: TeamChatState; refreshDirectory: boolean; refreshActivity?: boolean } {
   switch (event.type) {
+    case "activity.changed":
+      return { state, refreshDirectory: false, refreshActivity: true };
     case "message.created": {
       const known = state.directory?.conversations.some((item) => item.id === event.message.conversationId) ?? false;
       return { state: applyMessage(state, event.message), refreshDirectory: !known };
@@ -192,6 +209,24 @@ export function applyInvocation(
     agentInvocations: [...(message.agentInvocations ?? []).filter((item) => item.id !== invocation.id), invocation]
   });
   return { ...state, threads: { ...state.threads, [conversationId]: { ...thread, messages } } };
+}
+
+/** Handled (or returned) items leave the unread count at once; the service confirms by push. */
+export function applyActivityDone(state: TeamChatState, keys: readonly string[], done: boolean, now: number): TeamChatState {
+  if (!state.activity) return state;
+  const selected = new Set(keys);
+  const activity = state.activity.map((item) => {
+    if (!selected.has(item.key)) return item;
+    if (done) return { ...item, unread: false, doneAt: item.doneAt ?? now };
+    const { doneAt: _doneAt, ...open } = item;
+    return open;
+  });
+  return { ...state, activity };
+}
+
+export function applyActivityRead(state: TeamChatState): TeamChatState {
+  if (!state.activity?.some((item) => item.unread)) return state;
+  return { ...state, activity: state.activity.map((item) => item.unread ? { ...item, unread: false } : item) };
 }
 
 export function addPending(state: TeamChatState, pending: TeamChatPendingMessage): TeamChatState {

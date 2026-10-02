@@ -215,8 +215,26 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   channel owners and team owners/admins create a webhook bot for the channel and see
   its delivery URL once (copy, rotate, delete). CI, monitoring or scripts post plain
   text to it; messages carry a `Bot` badge. Bots cannot read messages.
+- Activity and notifications (contract `docs/adr/0006-team-chat-activity-notifications.md`):
+  - `动态` at the top of the Chat rail lists the last 30 days of what asks for you:
+    channel mentions, the newest direct message per conversation, Agent replies to
+    your requests and requests that ended without one, and Work Cards assigned to
+    you, submitted for your review or returned to you. It shows an unread count;
+    reading a conversation clears its items. Each item opens its message (centred
+    and briefly highlighted) and can be marked handled (`已处理` tab, `移回待处理`);
+    `全部已读` clears the count.
+  - System notifications cover the same four topics while you are not looking at
+    that conversation. They say who and where only; `显示消息预览` in General
+    settings adds the message start or card title. Settings also turn notifications
+    or each topic off on this device. Bursts in one conversation merge; many
+    conversations at once become one summary. Clicking opens the message.
+  - `静音通知` in a conversation's header silences its notifications on every device
+    while keeping unread counts; the rail marks muted conversations and the Chat
+    switch counts only their mentions.
+  - Notifications arrive while Pi's background service runs (any open Workspace or
+    Chat); the Welcome screen alone does not start it.
 - Not yet: threads, edits/deletes, reactions, attachments,
-  search, notifications, team invitations (use the New Money web console).
+  search, team invitations (use the New Money web console).
 
 ## Success criteria
 
@@ -2030,8 +2048,8 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   It stores only bounded presentation text and terminal identity/timing metadata; it
   does not persist Prompt, source, command text, paths, credential values, Protocol
   error details, or raw payload objects in localStorage, SQLite, JSONL, or diagnostics.
-- Native operating-system notifications are emitted only for a background or hidden Session
-  completion, failure, or interactive-attention state. Renderer sends Main only a bounded
+- Native operating-system notifications for Pi tasks are emitted only for a background or hidden Session
+  completion, failure, or interactive-attention state (Team Chat notifications follow ADR 0006). Renderer sends Main only a bounded
   notification ID plus opaque Workspace/physical Session identity and a fixed kind; Main owns
   all displayed title/body copy, so Prompt, source, Tool output, error detail, Session title,
   and absolute paths cannot enter the native notification. Clicking one focuses or recreates

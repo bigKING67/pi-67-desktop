@@ -29,7 +29,7 @@ export const zhCNMessages = {
       },
       general: {
         label: "外观",
-        summary: "设置应用主题，查看键盘快捷键。"
+        summary: "设置应用主题、团队聊天通知，查看键盘快捷键。"
       },
       contextMemory: {
         label: "上下文与记忆",

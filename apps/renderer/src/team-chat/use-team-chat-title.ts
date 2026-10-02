@@ -7,6 +7,7 @@ import { useTeamChat } from "./team-chat-instance.js";
 export function useTeamChatTitle(): string | undefined {
   const chatMode = useShellStore((state) => state.workspaceMode === "chat");
   const title = useTeamChat((state) => {
+    if (state.activityOpen) return messages.teamChat.activity;
     const conversation = state.directory?.conversations.find((item) => item.id === state.selectedConversationId);
     if (!conversation) return undefined;
     const name = conversationTitle(state.directory, conversation, messages.teamChat.unknownTeammate);

@@ -1,7 +1,7 @@
 import type {
   NativeNotificationActivation,
   NativeNotificationKind,
-  NativeNotificationRequest
+  TaskNativeNotificationRequest
 } from "@pi67/domain";
 import type { AgentEvent, EventEnvelope } from "@pi67/protocol";
 import { eventSessionAuthority } from "../connection/event-authority.js";
@@ -18,10 +18,11 @@ import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-con
 import type { WorkbenchEventRoute } from "../workbench/workbench-event-router.js";
 import { publishNotification } from "./notification-store.js";
 import { runAfterLeavingSettings } from "../settings/settings-leave-guard.js";
+import { activateTeamChatNotification } from "../team-chat/team-chat-notification-installation.js";
 
 const MAX_TRACKED_NATIVE_NOTIFICATIONS = 512;
 
-const trackedNotifications = new Map<string, NativeNotificationRequest>();
+const trackedNotifications = new Map<string, TaskNativeNotificationRequest>();
 const trackedNotificationOrder: string[] = [];
 let controllerDisposer: (() => void) | undefined;
 
@@ -94,7 +95,7 @@ export function handleNativeNotificationAgentEvent(
     || task.sessionId !== authority.sessionId
     || task.sessionGeneration !== authority.sessionGeneration
   ) return;
-  const request: NativeNotificationRequest = {
+  const request: TaskNativeNotificationRequest = {
     notificationId: `native:${envelope.hostEpoch}:${authority.operationId}:${kind}`,
     kind,
     workspaceId: authority.workspaceId,
@@ -114,10 +115,11 @@ export async function activateRendererNativeNotification(
 ): Promise<boolean> {
   forgetTrackedNotification(activation.notificationId);
   void window.pi67.system.dismissNativeNotification(activation.notificationId).catch(() => false);
+  if (activation.kind === "chat") return activateTeamChatNotification(activation);
   return (await runAfterLeavingSettings(() => activateNotificationTarget(activation))) ?? false;
 }
 
-async function activateNotificationTarget(activation: NativeNotificationActivation): Promise<boolean> {
+async function activateNotificationTarget(activation: TaskNativeNotificationRequest): Promise<boolean> {
   const workbench = rendererWorkbenchStore.getState();
   const task = Object.values(workbench.tasks).find((candidate) => (
     candidate.workspaceId === activation.workspaceId
@@ -179,7 +181,7 @@ function isRendererForeground(): boolean {
   return document.visibilityState === "visible" && document.hasFocus();
 }
 
-function rememberTrackedNotification(request: NativeNotificationRequest): void {
+function rememberTrackedNotification(request: TaskNativeNotificationRequest): void {
   trackedNotifications.set(request.notificationId, request);
   trackedNotificationOrder.push(request.notificationId);
   while (trackedNotificationOrder.length > MAX_TRACKED_NATIVE_NOTIFICATIONS) {
