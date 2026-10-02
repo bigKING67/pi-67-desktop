@@ -179,7 +179,7 @@ export function TitleBar({
         type="button"
       >
         <Command aria-hidden="true" size={16} />
-        <ControlTooltip id="command-palette-tooltip">{`${messages.shell.commandPalette} · ${formatDesktopShortcut(paletteShortcut)}`}</ControlTooltip>
+        <ControlTooltip align="end" id="command-palette-tooltip">{`${messages.shell.commandPalette} · ${formatDesktopShortcut(paletteShortcut)}`}</ControlTooltip>
       </button>
       {selectedWorkspace && !settingsSelected && workMode ? (
         <button
@@ -194,7 +194,7 @@ export function TitleBar({
           type="button"
         >
           {contextVisible ? <PanelRightClose aria-hidden="true" size={16} /> : <PanelRightOpen aria-hidden="true" size={16} />}
-          <ControlTooltip id="context-toggle-tooltip">{`${contextVisible
+          <ControlTooltip align="end" id="context-toggle-tooltip">{`${contextVisible
             ? messages.shell.hideContextPanel
             : messages.shell.showContextPanel} · ${formatDesktopShortcut(contextShortcut)}`}</ControlTooltip>
         </button>
@@ -288,8 +288,8 @@ function selectedConversationTitle({
     || (sessionId ? messages.shell.sessionFallback(sessionId.slice(0, 8)) : undefined);
 }
 
-function ControlTooltip({ id, children }: { id: string; children: ReactNode }) {
-  return <span className={styles.tooltip} id={id} role="tooltip">{children}</span>;
+function ControlTooltip({ id, children, align = "center" }: { id: string; children: ReactNode; align?: "center" | "end" }) {
+  return <span className={`${styles.tooltip} ${align === "end" ? styles.tooltipEnd : ""}`} id={id} role="tooltip">{children}</span>;
 }
 
 type StatusIconKind = "idle" | "ready" | "active" | "tool" | "warning" | "error" | "recovering";

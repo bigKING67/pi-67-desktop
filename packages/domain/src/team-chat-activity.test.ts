@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { teamChatActivityIsUnread, teamChatActivityUnreadCount, type TeamChatActivityItem } from "./team-chat-activity.js";
+import {
+  teamChatActivityInView,
+  teamChatActivityIsUnread,
+  teamChatActivityUnreadCount,
+  type TeamChatActivityItem
+} from "./team-chat-activity.js";
 import type { TeamChatConversation } from "./team-chat.js";
 
 const conversation = (lastReadSeq: number): TeamChatConversation => ({
@@ -29,5 +34,12 @@ describe("team chat activity", () => {
     const items = [item({}), item({ key: "e:00000000-0000-4000-8000-000000000002", kind: "card_assigned" })];
     expect(teamChatActivityUnreadCount(items, [conversation(5)])).toBe(1);
     expect(teamChatActivityUnreadCount(items, [conversation(0)])).toBe(2);
+  });
+
+  it("hides items from conversations the reader left, lost or never joined", () => {
+    const items = [item({}), item({ key: "m:00000000-0000-4000-8000-000000000003", conversationId: "gone" })];
+    expect(teamChatActivityInView(items, [conversation(0)]).map((entry) => entry.conversationId)).toEqual(["c1"]);
+    expect(teamChatActivityInView(items, [{ ...conversation(0), joined: false }])).toEqual([]);
+    expect(teamChatActivityUnreadCount(items, [{ ...conversation(0), joined: false }])).toBe(0);
   });
 });

@@ -37,6 +37,8 @@ shows content-free notifications for background Pi tasks.
    is unread until the conversation read cursor passes it; every item is read after
    "mark all read" or once handled. Mute only silences notifications: unread counts
    remain, and the Chat switch badge counts a muted conversation's mentions only.
+   Desktop also hides items whose conversation it no longer lists as joined (left,
+   removed, archived) as soon as the directory says so.
 3. **Push.** Every change that creates an item, and every handled/read change, pushes
    `activity.changed` to the affected member only; clients re-read the list. Mute
    pushes `conversation.changed` to the member.

@@ -125,7 +125,10 @@ completing a real session without learning terminal UI conventions first.
   Inspector-owned actions remain in the Inspector zone while it is docked.
   Quiet semantic surfaces and a single-pixel divider establish pane ownership;
   the header does not imitate a terminal card, add a second toolbar frame, or
-  place an opaque layer over conversation content.
+  place an opaque layer over conversation content. Tooltips of the right-edge
+  controls (command palette, Inspector toggle) align to their button's end so they
+  never extend past the window; the app root clips rather than scrolls, so focus or
+  scrolling into view can never shift the whole layout sideways.
 - The global TitleBar baseline and the navigation/Inspector pane dividers are
   the resting shell boundaries. Navigation brand and Inspector tab groups use
   spacing and quiet semantic surfaces rather than a second local underline;
@@ -891,7 +894,7 @@ loading error where the operation can produce those states
   summary; global-only sections do not repeat a redundant `全局设置` label, while
   project-aware sections retain the explicit scope switch in the same header row.
 - Settings keeps 16 stable category identities in five task-oriented groups:
-  `通用`: `外观`, `账户与数据`; `模型与记忆`: `模型`, `视觉辅助`, `上下文与记忆`;
+  `通用`: `外观与通知`, `账户与数据`; `模型与记忆`: `模型`, `视觉辅助`, `上下文与记忆`;
   `能力与指令`: `扩展`, `技能`, `提示词模板`, `工作规则`;
   `连接与集成`: `飞书`, `浏览器集成`; `系统与支持`: `运行服务`,
   `用量分析`, `下载源与网络`, `更新与诊断`, `关于`.
@@ -2903,6 +2906,8 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
   customized, detail and contexts in an on-demand info tip.
 - Choices use `SettingsSelect` and `SettingsCheckbox`; native select and checkbox controls
   are not used. A select's accessible name is its current value followed by its label.
+  A disabled checkbox recedes: tertiary label, disabled-surface box with the default
+  border, and a checked one fills with the strong-border grey instead of the accent.
 - A page-level save unit shows `SettingsSaveBar` only while its draft differs from saved
   state (放弃 / 保存更改, sticky at the bottom of the scroll region). Independent units such
   as the local memory model keep their own save and undo actions, shown only while dirty.

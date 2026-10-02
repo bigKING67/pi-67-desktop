@@ -92,7 +92,7 @@ test("opens Account and Settings directly from the lower-left footer", async ({ 
 
   await settingsButton.click();
   await expect(page.getByLabel("New Money 设置")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "外观", exact: true, level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "外观与通知", exact: true, level: 1 })).toBeVisible();
 
   await page.getByRole("button", { name: "返回工作台" }).click();
   await expect(settingsButton).toBeVisible();

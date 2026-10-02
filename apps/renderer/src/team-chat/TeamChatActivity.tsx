@@ -1,7 +1,7 @@
 import { AtSign, Bell, Bot, Check, ClipboardCheck, MessageCircle, Undo2 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { Button } from "react-aria-components";
-import { teamChatActivityIsUnread, type TeamChatActivityItem, type TeamChatDirectory } from "@pi67/domain";
+import { teamChatActivityInView, teamChatActivityIsUnread, type TeamChatActivityItem, type TeamChatDirectory } from "@pi67/domain";
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
@@ -30,8 +30,9 @@ export function TeamChatActivity({ directory }: { directory: TeamChatDirectory }
   const list = useRef<HTMLUListElement>(null);
   const tabs = useRef<HTMLDivElement>(null);
   const byId = useMemo(() => new Map(directory.conversations.map((item) => [item.id, item])), [directory.conversations]);
-  const items = (activity ?? []).filter((item) => (view === "done") === (item.doneAt !== undefined));
-  const unread = (activity ?? []).filter((item) => teamChatActivityIsUnread(item, byId.get(item.conversationId))).length;
+  const inView = useMemo(() => teamChatActivityInView(activity ?? [], directory.conversations), [activity, directory.conversations]);
+  const items = inView.filter((item) => (view === "done") === (item.doneAt !== undefined));
+  const unread = inView.filter((item) => teamChatActivityIsUnread(item, byId.get(item.conversationId))).length;
 
   const act = (action: () => Promise<void>) => {
     void action().catch((error: unknown) => publishNotification({

@@ -3,7 +3,7 @@ import { DEFAULT_CONTEXT_MEMORY_CONFIGURATION } from "../../packages/domain/src/
 import { DEFAULT_MOCK_WORKSPACE } from "./pi67-renderer-desktop-bridge.js";
 import { attachMockAgent, installMockDesktopBridge } from "./pi67-renderer-fixture.js";
 
-const categories = ["外观", "账户与数据", "模型", "上下文与记忆", "视觉辅助", "扩展", "技能", "提示词模板", "工作规则", "飞书", "浏览器集成", "运行服务", "用量分析", "下载源与网络", "更新与诊断", "关于"];
+const categories = ["外观与通知", "账户与数据", "模型", "上下文与记忆", "视觉辅助", "扩展", "技能", "提示词模板", "工作规则", "飞书", "浏览器集成", "运行服务", "用量分析", "下载源与网络", "更新与诊断", "关于"];
 const wide = new Set(["模型", "扩展", "技能", "提示词模板", "工作规则", "用量分析"]);
 
 for (const theme of ["light", "dark"] as const) {

@@ -16,7 +16,7 @@ describe("settings navigation", () => {
       {
         label: "通用",
         items: [
-          { id: "general", label: "外观" },
+          { id: "general", label: "外观与通知" },
           { id: "account", label: "账户与数据" }
         ]
       },

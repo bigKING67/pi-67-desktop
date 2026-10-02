@@ -86,7 +86,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByTestId("settings-entry").click();
     const settings = page.getByTestId("settings-workbench");
     await expect(settings).toBeVisible();
-    await settings.getByRole("button", { name: "外观", exact: true }).click();
+    await settings.getByRole("button", { name: "外观与通知", exact: true }).click();
     await page.screenshot({ path: testInfo.outputPath(`neutral-${theme}-settings.png`), animations: "disabled" });
     const opposite = theme === "dark" ? "light" : "dark";
     await page.emulateMedia({ colorScheme: opposite });

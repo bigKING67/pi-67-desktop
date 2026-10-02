@@ -17,7 +17,7 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
 
   const settings = page.getByLabel("New Money 设置");
   const navigation = page.getByRole("navigation", { name: "设置分类" });
-  const contentHeader = page.getByRole("heading", { name: "外观", exact: true, level: 1 }).locator("..");
+  const contentHeader = page.getByRole("heading", { name: "外观与通知", exact: true, level: 1 }).locator("..");
   const layout = await settings.evaluate((element) => {
     const navigationElement = [...element.querySelectorAll<HTMLElement>('[aria-label="设置分类"]')]
       .find((candidate) => getComputedStyle(candidate).display !== "none");

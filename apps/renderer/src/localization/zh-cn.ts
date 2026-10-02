@@ -28,8 +28,8 @@ export const zhCNMessages = {
         summary: "管理 New Money 登录、团队入口与本地数据边界。"
       },
       general: {
-        label: "外观",
-        summary: "设置应用主题、团队聊天通知，查看键盘快捷键。"
+        label: "外观与通知",
+        summary: "设置应用主题和团队聊天通知，查看键盘快捷键。"
       },
       contextMemory: {
         label: "上下文与记忆",

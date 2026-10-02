@@ -11,6 +11,11 @@ body,
   overflow: hidden;
 }
 
+/* Not a scroll container at all: focus or scrollIntoView can never shift the app sideways. */
+#root {
+  overflow: clip;
+}
+
 body {
   background: var(--canvas);
   color: var(--text-primary);

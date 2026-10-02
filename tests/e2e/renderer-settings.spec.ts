@@ -384,7 +384,7 @@ test("uses compact grouped navigation and real Settings search", async ({ page }
   await page.keyboard.press(process.platform === "darwin" ? "Meta+f" : "Control+f");
   await expect(search).toBeFocused();
   await search.fill("主题");
-  await expect(navigation.getByRole("button", { name: "外观", exact: true })).toBeVisible();
+  await expect(navigation.getByRole("button", { name: "外观与通知", exact: true })).toBeVisible();
   await expect(navigation.getByRole("button", { name: "账户与数据", exact: true })).toHaveCount(0);
   await expect(navigation.getByRole("button", { name: "扩展", exact: true })).toHaveCount(0);
 
@@ -397,5 +397,5 @@ test("uses compact grouped navigation and real Settings search", async ({ page }
   await search.fill("不存在的设置");
   await expect(navigation.getByText("没有匹配的设置", { exact: true })).toBeVisible();
   await navigation.getByRole("button", { name: "清除搜索", exact: true }).click();
-  await expect(navigation.getByRole("button", { name: "外观", exact: true })).toBeVisible();
+  await expect(navigation.getByRole("button", { name: "外观与通知", exact: true })).toBeVisible();
 });

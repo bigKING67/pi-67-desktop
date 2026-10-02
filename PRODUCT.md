@@ -1198,7 +1198,7 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
 - Settings opens or focuses one application-level selected surface. Global and project
   scope are explicit only where meaningful, and changing the current workspace
   retargets project scope instead of creating another Settings instance.
-- Settings navigation groups `外观` and `账户与数据` under General; models, vision
+- Settings navigation groups `外观与通知` (theme, Team Chat notifications, shortcuts) and `账户与数据` under General; models, vision
   and context/memory under Models & Memory; extensions, skills, prompts and rules
   under Capabilities & Instructions; Lark and browser work under Connections &
   Integrations; and runtime, usage, network, updates and About under System &

@@ -46,10 +46,23 @@ export function teamChatActivityIsUnread(item: TeamChatActivityItem, conversatio
   return item.messageSeq > conversation.lastReadSeq;
 }
 
+/**
+ * Items whose conversation the reader still belongs to. Leaving, removal or archiving
+ * hides their items at once, before the service's next derived list drops them.
+ */
+export function teamChatActivityInView(
+  items: readonly TeamChatActivityItem[],
+  conversations: readonly TeamChatConversation[]
+): TeamChatActivityItem[] {
+  const joined = new Set(conversations.filter((conversation) => conversation.joined).map((conversation) => conversation.id));
+  return items.filter((item) => joined.has(item.conversationId));
+}
+
 export function teamChatActivityUnreadCount(
   items: readonly TeamChatActivityItem[],
   conversations: readonly TeamChatConversation[]
 ): number {
   const byId = new Map(conversations.map((conversation) => [conversation.id, conversation]));
-  return items.filter((item) => teamChatActivityIsUnread(item, byId.get(item.conversationId))).length;
+  return teamChatActivityInView(items, conversations)
+    .filter((item) => teamChatActivityIsUnread(item, byId.get(item.conversationId))).length;
 }

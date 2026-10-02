@@ -95,7 +95,7 @@ test("memory settings preserve one draft across tabs, use keyboard radios, and g
   await expect(settings.getByRole("button", { name: "立即归档" })).toHaveCount(0);
   await settings.getByRole("tab", { name: "记忆与隐私" }).click();
   await expect(settings.getByRole("radio", { name: /完整学习/ })).toBeChecked();
-  await page.getByRole("button", { name: "外观", exact: true }).click();
+  await page.getByRole("button", { name: "外观与通知", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByRole("button", { name: "继续编辑", exact: true }).click();
   const saved = { ...configuration, revision: "fixture-2", defaultPrivacyMode: "full-learning" };

@@ -225,6 +225,24 @@
   visibility: hidden;
 }
 
+/* Controls at the window's right edge open their tooltip toward the window. */
+.tooltipEnd {
+  right: 0;
+  left: auto;
+  transform: translate(0, -2px);
+}
+
+.iconButton:hover .tooltipEnd,
+.iconButton:focus-visible .tooltipEnd {
+  transform: translate(0, 0);
+}
+
+.iconButton[aria-expanded="true"] .tooltipEnd,
+.iconButton:active .tooltipEnd,
+.iconButton[data-pressed] .tooltipEnd {
+  transform: translate(0, -2px);
+}
+
 .spinning {
   animation: title-status-spin 1s linear infinite;
 }

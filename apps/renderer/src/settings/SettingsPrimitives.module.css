@@ -637,6 +637,18 @@
 }
 
 .checkbox[data-disabled] { color: var(--text-tertiary); }
+
+/* Disabled boxes recede: a checked one must not read as an active choice. */
+.checkbox[data-disabled] .checkboxBox {
+  border-color: var(--border);
+  background: var(--surface-disabled);
+}
+
+.checkbox[data-disabled][data-selected] .checkboxBox {
+  border-color: var(--border-strong);
+  background: var(--border-strong);
+  color: var(--surface-disabled);
+}
 .checkbox[data-focus-visible] .checkboxBox { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 .saveBar {

@@ -121,7 +121,7 @@ test("team deep link protects an unsaved service address and clears its target",
   await link.click();
   await dialog.getByRole("button", { name: "放弃修改并离开", exact: true }).click();
   await expect(page.getByRole("tab", { name: "团队经验", exact: true })).toHaveAttribute("aria-selected", "true");
-  await page.getByRole("button", { name: "外观", exact: true }).click();
+  await page.getByRole("button", { name: "外观与通知", exact: true }).click();
   await page.getByRole("button", { name: "上下文与记忆", exact: true }).click();
   await expect(page.getByRole("tab", { name: "记忆与隐私", exact: true })).toHaveAttribute("aria-selected", "true");
   expect((await recordedCommandDetails(page)).some(command => command.type === "context.config.update")).toBe(false);

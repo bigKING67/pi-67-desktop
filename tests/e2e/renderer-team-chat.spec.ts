@@ -381,6 +381,17 @@ test("collects activity, marks it handled, opens the message and notifies withou
     test.activate(test.requests.find((request) => request.kind === "chat")!);
   });
   await expect(page.getByTestId("title-context-current")).toHaveText("李若溪");
+
+  // Leaving a channel hides its activity at once.
+  await page.evaluate(() => {
+    const state = (window as unknown as { __pi67MockTeamChat: MockTeamChatState }).__pi67MockTeamChat;
+    state.directory.conversations.find((item) => item.id === "conv-research")!.joined = false;
+  });
+  await emitMockAgentEvent(page, { type: "teamChat.pushed", payload: { type: "conversation.changed", conversationId: "conv-research" } },
+    { context: "app" });
+  await navigation.getByRole("button", { name: /^动态/u }).click();
+  await expect(page.getByTestId("team-chat-activity").getByText("李若溪 给你发了私信")).toBeVisible();
+  await expect(page.getByTestId("team-chat-activity").getByText("李若溪 在 #宏观研究 提到了你")).toHaveCount(0);
 });
 
 test("turns Team Chat notifications and previews on and off in General settings", async ({ page }) => {
@@ -398,4 +409,10 @@ test("turns Team Chat notifications and previews on and off in General settings"
   expect(stored).toMatchObject({ enabled: true, preview: true, topics: { dm: false, mention: true } });
   await section.getByText("启用系统通知", { exact: true }).click();
   await expect(section.getByRole("checkbox", { name: "显示消息预览" })).toBeDisabled();
+  // The app root never scrolls sideways, even when asked to.
+  expect(await page.evaluate(() => {
+    const root = document.getElementById("root")!;
+    root.scrollLeft = 40;
+    return root.scrollLeft;
+  })).toBe(0);
 });

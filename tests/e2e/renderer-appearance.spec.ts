@@ -35,7 +35,7 @@ test("lets users persist System, Light, and Dark appearance choices", async ({ p
 
   await expect(page.getByTestId("settings-entry")).toBeVisible();
   const settings = await openAppearanceSettings(page);
-  await expect(settings.getByRole("heading", { name: "外观", exact: true, level: 1 })).toBeVisible();
+  await expect(settings.getByRole("heading", { name: "外观与通知", exact: true, level: 1 })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("appearance-settings-dark.png"), animations: "disabled" });
 
   await settings.getByRole("button", { name: /^浅色/u }).click();
