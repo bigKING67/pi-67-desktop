@@ -8,7 +8,7 @@ import { memberById } from "./team-chat-model.js";
 import { teamChat } from "./team-chat-instance.js";
 import { useTeamChatDialogStore } from "./team-chat-dialog-store.js";
 import { formatTeamChatTime, teamChatInvocationText, teamChatMentionSegments, type TeamChatTimelineEntry } from "./team-chat-presentation.js";
-import { TeamChatAgentBadge } from "./TeamChatParts.js";
+import { TeamChatAgentBadge, TeamChatBotBadge } from "./TeamChatParts.js";
 import agentStyles from "./TeamChatAgents.module.css";
 import { chatMessageWorkBrief } from "./team-chat-work-bridge.js";
 import { TeamChatWorkCard } from "./TeamChatWorkCard.js";
@@ -100,7 +100,7 @@ function TimelineMessage({ directory, entry, target }: { directory: TeamChatDire
         {entry.showHeader ? (
           <header>
             <strong>{sender}</strong>
-            {participant?.agent ? <TeamChatAgentBadge /> : null}
+            {participant?.agent ? <TeamChatAgentBadge /> : participant?.bot ? <TeamChatBotBadge /> : null}
             <time dateTime={new Date(entry.createdAt).toISOString()}>{formatTeamChatTime(entry.createdAt)}</time>
           </header>
         ) : null}

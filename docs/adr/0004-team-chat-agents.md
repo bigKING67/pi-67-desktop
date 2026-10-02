@@ -91,7 +91,7 @@ scope and model (`purpose: agent`) on every model call.
 - P3a (this ADR): identity, policy, invocation routing, presence, conversation-only
   turns, owner management on Desktop, admin governance on the web console.
 - P3b: optional read-only Workspace tools, with owner review before a reply posts.
-- P3c: webhook bots that do not depend on a member's Desktop.
+- P3c: webhook bots that do not depend on a member's Desktop (`docs/adr/0005-team-chat-webhooks.md`).
 
 ## Rejected alternatives
 

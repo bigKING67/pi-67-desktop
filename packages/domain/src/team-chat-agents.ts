@@ -65,3 +65,24 @@ export function teamChatAgentById(directory: TeamChatDirectory | undefined, user
   if (!directory || userId === undefined) return undefined;
   return directory.agents.find((agent) => agent.userId === userId);
 }
+
+/** An incoming webhook bot (ADR 0005): posts into one channel, never reads. */
+export interface TeamChatBot {
+  userId: string;
+  name: string;
+  conversationId: string;
+}
+
+/** Webhook metadata for channel managers; the secret URL is never part of it. */
+export interface TeamChatWebhook {
+  botUserId: string;
+  conversationId: string;
+  channelName: string;
+  name: string;
+  createdBy: string;
+  createdAt: number;
+  rotatedAt?: number;
+  lastUsedAt?: number;
+}
+
+export const TEAM_CHAT_WEBHOOK_NAME_MAX = 40;

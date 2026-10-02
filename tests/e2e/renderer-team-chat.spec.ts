@@ -294,3 +294,34 @@ test("asks an Agent member, follows its request state and manages own Agents", a
   await expect(navigation.getByRole("button", { name: "写作助手，Agent，已停用，我的" })).toBeVisible();
 });
 
+test("creates a channel webhook, shows its URL once and labels bot messages", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.getByRole("group", { name: "工作模式" }).getByRole("button", { name: "聊天" }).click();
+  await signIn(page);
+  const navigation = page.getByTestId("team-chat-navigation");
+  await navigation.getByRole("button", { name: "宏观研究，1 条未读，1 条提及你" }).click();
+  await emitMockAgentEvent(page, { type: "teamChat.pushed", payload: { type: "message.created", message: {
+    id: "bot-msg-1", conversationId: "conv-research", seq: 5, senderUserId: "bot-ci", body: "构建 #42 成功",
+    clientKey: "build-0042-ok", createdAt: Date.now() } } }, { context: "app" });
+  const log = page.getByRole("log", { name: "#宏观研究" });
+  await expect(log.getByRole("article").filter({ hasText: "构建 #42 成功" }).getByText("Bot", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "频道设置" }).click();
+  const settings = page.getByRole("dialog", { name: "#宏观研究 设置" });
+  await expect(settings.getByText("这个频道还没有 Webhook。")).toBeVisible();
+  await settings.getByRole("textbox", { name: "机器人名称" }).fill("监控告警");
+  await settings.getByRole("button", { name: "创建 Webhook" }).click();
+  const secret = settings.getByTestId("team-chat-webhook-secret");
+  await expect(secret.getByRole("textbox", { name: "Webhook 地址" })).toHaveValue(/\/v1\/hooks\/chat\/bot-\d+\/secret-/u);
+  await expect(settings.getByText("监控告警")).toBeVisible();
+  await settings.getByRole("button", { name: "删除 监控告警" }).click();
+  await settings.getByRole("button", { name: "确认删除 监控告警" }).click();
+  await expect(settings.getByText("这个频道还没有 Webhook。")).toBeVisible();
+  await expect(secret).toHaveCount(0);
+  await settings.getByRole("button", { name: "关闭" }).click();
+  await page.getByRole("button", { name: "频道设置" }).click();
+  await expect(page.getByTestId("team-chat-webhook-secret")).toHaveCount(0);
+});
+

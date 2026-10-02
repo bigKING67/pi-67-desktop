@@ -1,4 +1,4 @@
-import type { TeamChatAgent, TeamChatMessage } from "@pi67/domain";
+import type { TeamChatAgent, TeamChatBot, TeamChatMessage, TeamChatWebhook } from "@pi67/domain";
 import {
   asRecord,
   boundedInteger,
@@ -63,6 +63,38 @@ export class TeamChatAgentGateway extends TeamChatGateway {
     await this.request(agentPath(agentUserId), { method: "DELETE" }, signal);
   }
 
+  /** Webhook bots (ADR 0005): names for labelling, management for channel managers. */
+  async listBots(signal?: AbortSignal): Promise<TeamChatBot[]> {
+    const value = asRecord(await this.request("/chat/bots", { method: "GET" }, signal));
+    if (!Array.isArray(value.bots) || value.bots.length > 100) throw invalidResponse("bots");
+    return value.bots.map((item, index) => {
+      const bot = asRecord(item);
+      return {
+        userId: boundedString(bot.userId, `bots.${index}.userId`, 128),
+        name: boundedString(bot.name, `bots.${index}.name`, 80),
+        conversationId: boundedString(bot.conversationId, `bots.${index}.conversationId`, 128)
+      };
+    });
+  }
+
+  async listWebhooks(conversationId: string, signal?: AbortSignal): Promise<TeamChatWebhook[]> {
+    const value = asRecord(await this.request(`${webhooksPath(conversationId)}`, { method: "GET" }, signal));
+    if (!Array.isArray(value.webhooks) || value.webhooks.length > 10) throw invalidResponse("webhooks");
+    return value.webhooks.map(parseWebhook);
+  }
+
+  async createWebhook(conversationId: string, name: string, signal?: AbortSignal): Promise<{ webhook: TeamChatWebhook; url: string }> {
+    return parseWebhookSecret(await this.request(webhooksPath(conversationId), { method: "POST", body: JSON.stringify({ name }) }, signal));
+  }
+
+  async rotateWebhook(conversationId: string, botUserId: string, signal?: AbortSignal): Promise<{ webhook: TeamChatWebhook; url: string }> {
+    return parseWebhookSecret(await this.request(`${webhooksPath(conversationId)}/${encodeURIComponent(botUserId)}/rotate`, { method: "POST" }, signal));
+  }
+
+  async removeWebhook(conversationId: string, botUserId: string, signal?: AbortSignal): Promise<void> {
+    await this.request(`${webhooksPath(conversationId)}/${encodeURIComponent(botUserId)}`, { method: "DELETE" }, signal);
+  }
+
   async pendingInvocations(signal?: AbortSignal): Promise<TeamChatAgentInvocation[]> {
     const value = asRecord(await this.request("/chat/agent-invocations", { method: "GET" }, signal));
     if (!Array.isArray(value.invocations) || value.invocations.length > MAX_PENDING) throw invalidResponse("invocations");
@@ -95,6 +127,33 @@ export class TeamChatAgentGateway extends TeamChatGateway {
   async failInvocation(invocationId: string, reason: TeamChatAgentFailure, leaseToken: string, signal?: AbortSignal): Promise<void> {
     await this.request(`${invocationPath(invocationId)}/fail`, { method: "POST", body: JSON.stringify({ reason, leaseToken }) }, signal);
   }
+}
+
+function webhooksPath(conversationId: string): string {
+  return `/chat/conversations/${encodeURIComponent(conversationId)}/webhooks`;
+}
+
+function parseWebhook(value: unknown): TeamChatWebhook {
+  const record = asRecord(value);
+  const rotatedAt = nullable(record.rotatedAt, (item) => parseTimestamp(item, "webhook.rotatedAt"));
+  const lastUsedAt = nullable(record.lastUsedAt, (item) => parseTimestamp(item, "webhook.lastUsedAt"));
+  return {
+    botUserId: boundedString(record.botUserId, "webhook.botUserId", 128),
+    conversationId: boundedString(record.conversationId, "webhook.conversationId", 128),
+    channelName: boundedString(record.channelName, "webhook.channelName", 160),
+    name: boundedString(record.name, "webhook.name", 80),
+    createdBy: boundedString(record.createdBy, "webhook.createdBy", 128),
+    createdAt: parseTimestamp(record.createdAt, "webhook.createdAt"),
+    ...(rotatedAt === undefined ? {} : { rotatedAt }),
+    ...(lastUsedAt === undefined ? {} : { lastUsedAt })
+  };
+}
+
+function parseWebhookSecret(value: unknown): { webhook: TeamChatWebhook; url: string } {
+  const record = asRecord(value);
+  const url = boundedString(record.url, "webhook.url", 512);
+  if (!/^https?:\/\/\S+\/v1\/hooks\/chat\//u.test(url)) throw invalidResponse("webhook.url");
+  return { webhook: parseWebhook(record.webhook), url };
 }
 
 function agentPath(agentUserId: string): string {

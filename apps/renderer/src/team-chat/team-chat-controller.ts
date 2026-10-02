@@ -304,6 +304,18 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
       const host = await port.request("teamChat.agent.host.unbind", { agentUserId });
       guarded((state) => ({ ...state, agentHost: host }))();
     },
+    /** Webhook bots (ADR 0005). The secret URL is returned to the caller and never kept in the store. */
+    listWebhooks: async (conversationId: string) => (await port.request("teamChat.webhook.list", { conversationId })).webhooks,
+    async createWebhook(conversationId: string, name: string) {
+      const created = await port.request("teamChat.webhook.create", { conversationId, name });
+      await loadDirectory();
+      return created;
+    },
+    rotateWebhook: (conversationId: string, botUserId: string) => port.request("teamChat.webhook.rotate", { conversationId, botUserId }),
+    async removeWebhook(conversationId: string, botUserId: string): Promise<void> {
+      await port.request("teamChat.webhook.remove", { conversationId, botUserId });
+      await loadDirectory();
+    },
     async joinChannel(conversationId: string): Promise<void> {
       const conversation = await port.request("teamChat.channel.join", { conversationId });
       guarded((state) => upsertConversation(state, conversation))();

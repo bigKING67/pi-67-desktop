@@ -66,7 +66,9 @@ export interface MockTeamChatState {
     conversations: MockConversation[];
     policy: { channelCreation: string; viewersCanPost: boolean; retentionDays?: number; agentCreation: string; revision: number };
     agents: MockAgent[];
+    bots: Array<{ userId: string; name: string; conversationId: string }>;
   };
+  webhooks: Array<{ botUserId: string; conversationId: string; channelName: string; name: string; createdBy: string; createdAt: number }>;
   agentHost: { bindings: unknown[]; activity: unknown[] };
   messages: Record<string, MockMessage[]>;
   rosters: Record<string, string[]>;
@@ -116,8 +118,10 @@ export function installMockTeamChatCommandHandler(): void {
       ],
       policy: { channelCreation: "members", viewersCanPost: true, agentCreation: "members", revision: 0 },
       agents: [{ userId: "agent-macro", name: "宏观助手", description: "回答宏观数据问题", ownerUserId: "user-li",
-        modelLabel: "anthropic · claude-sonnet", dailyLimit: 50, status: "active", disabledByAdmin: false, online: true, createdAt: start }]
+        modelLabel: "anthropic · claude-sonnet", dailyLimit: 50, status: "active", disabledByAdmin: false, online: true, createdAt: start }],
+      bots: [{ userId: "bot-ci", name: "CI 通知", conversationId: "conv-research" }]
     },
+    webhooks: [],
     agentHost: { bindings: [], activity: [] },
     rosters: { "conv-research": [self, "user-wang", "user-li", "agent-macro"], "conv-ops": ["user-wang", "user-li"] },
     messages: {
@@ -265,6 +269,23 @@ export function installMockTeamChatCommandHandler(): void {
       case "teamChat.agent.host.unbind":
         state.agentHost = { ...state.agentHost, bindings: state.agentHost.bindings.filter((item) => (item as { agentUserId: string }).agentUserId !== payload.agentUserId) };
         return state.agentHost;
+      case "teamChat.webhook.list":
+        return { webhooks: state.webhooks.filter((item) => item.conversationId === payload.conversationId) };
+      case "teamChat.webhook.create":
+      case "teamChat.webhook.rotate": {
+        let webhook = state.webhooks.find((item) => item.botUserId === payload.botUserId);
+        if (!webhook) {
+          webhook = { botUserId: `bot-${nextId++}`, conversationId: String(payload.conversationId), channelName: "宏观研究",
+            name: String(payload.name), createdBy: self, createdAt: Date.now() };
+          state.webhooks.push(webhook);
+          state.directory.bots.push({ userId: webhook.botUserId, name: webhook.name, conversationId: webhook.conversationId });
+        }
+        return { webhook, url: `https://newmoney.example.test/v1/hooks/chat/${webhook.botUserId}/secret-${nextId++}` };
+      }
+      case "teamChat.webhook.remove":
+        state.webhooks = state.webhooks.filter((item) => item.botUserId !== payload.botUserId);
+        state.directory.bots = state.directory.bots.filter((item) => item.userId !== payload.botUserId);
+        return {};
       case "teamChat.dm.open": {
         const existing = state.directory.conversations.find((item) => item.kind === "dm" && item.memberUserIds.includes(String(payload.userId)));
         if (existing) return existing;

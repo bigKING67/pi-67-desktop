@@ -1,5 +1,5 @@
 import type { EnterpriseTeamSummary } from "./context-memory.js";
-import type { TeamChatAgent, TeamChatAgentInvocationSummary } from "./team-chat-agents.js";
+import type { TeamChatAgent, TeamChatAgentInvocationSummary, TeamChatBot } from "./team-chat-agents.js";
 import type { TeamChatPolicy } from "./team-chat-governance.js";
 
 /** Team Chat (ADR 0003). New Money owns the truth; Desktop state is disposable. */
@@ -99,6 +99,8 @@ export interface TeamChatDirectory {
   policy: TeamChatPolicy;
   /** The team's Agent members (never part of `members`). */
   agents: TeamChatAgent[];
+  /** Incoming webhook bots, for labelling their messages. */
+  bots: TeamChatBot[];
 }
 
 export type TeamChatPushEvent =

@@ -2,6 +2,7 @@ import type {
   TeamChatAgent,
   TeamChatAgentActivity,
   TeamChatAgentBinding,
+  TeamChatWebhook,
   TeamChatChannelAction,
   TeamChatChannelRoster,
   TeamChatConnectionState,
@@ -45,6 +46,16 @@ export interface TeamChatCommandPayloads {
   "teamChat.agent.host.get": Record<string, never>;
   "teamChat.agent.host.bind": { binding: TeamChatAgentBinding };
   "teamChat.agent.host.unbind": { agentUserId: string };
+  "teamChat.webhook.list": { conversationId: string };
+  "teamChat.webhook.create": { conversationId: string; name: string };
+  "teamChat.webhook.rotate": { conversationId: string; botUserId: string };
+  "teamChat.webhook.remove": { conversationId: string; botUserId: string };
+}
+
+/** The secret delivery URL appears only in this result, once; it is never stored by Desktop. */
+export interface TeamChatWebhookSecret {
+  webhook: TeamChatWebhook;
+  url: string;
 }
 
 /** This Desktop's hosting state for the current team's Agents. */
@@ -73,6 +84,10 @@ export interface TeamChatCommandResults {
   "teamChat.agent.host.get": TeamChatAgentHostState;
   "teamChat.agent.host.bind": TeamChatAgentHostState;
   "teamChat.agent.host.unbind": TeamChatAgentHostState;
+  "teamChat.webhook.list": { webhooks: TeamChatWebhook[] };
+  "teamChat.webhook.create": TeamChatWebhookSecret;
+  "teamChat.webhook.rotate": TeamChatWebhookSecret;
+  "teamChat.webhook.remove": Record<string, never>;
 }
 
 export interface TeamChatEventPayloads {

@@ -211,6 +211,10 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
     them, and chooses how this Desktop runs each one: Workspace (its Sessions are
     saved there for review), team project, a configured model, and an on/off switch.
     Agents only converse: no tools, files, commands or network.
+- Webhook bots (P3c, contract `docs/adr/0005-team-chat-webhooks.md`): in `频道设置`,
+  channel owners and team owners/admins create a webhook bot for the channel and see
+  its delivery URL once (copy, rotate, delete). CI, monitoring or scripts post plain
+  text to it; messages carry a `Bot` badge. Bots cannot read messages.
 - Not yet: threads, edits/deletes, reactions, attachments,
   search, notifications, team invitations (use the New Money web console).
 

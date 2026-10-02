@@ -14,7 +14,8 @@ import { publishNotification } from "../notifications/notification-store.js";
 import { teamChatErrorMessage } from "./team-chat-controller.js";
 import { memberById } from "./team-chat-model.js";
 import { teamChat } from "./team-chat-instance.js";
-import { TeamChatAvatar } from "./TeamChatParts.js";
+import { TeamChatAgentBadge, TeamChatAvatar, TeamChatBotBadge } from "./TeamChatParts.js";
+import { TeamChatWebhooks } from "./TeamChatWebhooks.js";
 import styles from "./TeamChat.module.css";
 import governance from "./TeamChatGovernance.module.css";
 
@@ -107,7 +108,9 @@ export function TeamChatChannelSettings({ conversation, directory, onClose }: {
                     <TeamChatAvatar name={label} />
                     <span className={governance.rosterName}>{label}</span>
                     {owner ? <span className={governance.ownerChip}>{copy.channelOwner}</span> : null}
-                    {manager && !owner && !self ? (
+                    {memberById(directory, member.userId)?.agent ? <TeamChatAgentBadge />
+                      : memberById(directory, member.userId)?.bot ? <TeamChatBotBadge /> : null}
+                    {manager && !owner && !self && !memberById(directory, member.userId)?.bot ? (
                       <span className={governance.rosterActions}>
                         <Button aria-label={armedHere === "owner" ? copy.channelConfirmOwner(label) : `${copy.channelMakeOwner} ${label}`}
                           className={`small-button ${armedHere === "owner" ? governance.armed : ""}`} isDisabled={busy}
@@ -147,6 +150,7 @@ export function TeamChatChannelSettings({ conversation, directory, onClose }: {
             )
           ) : null}
 
+          {manager ? <TeamChatWebhooks conversationId={conversation.id} /> : null}
           {manager ? <p className={governance.hint}>{copy.channelArchiveHint}</p> : null}
           {selfIsOwner ? <p className={governance.hint}>{copy.channelOwnerMustTransfer}</p> : null}
           {error ? <p className={styles.formError} role="alert">{error}</p> : null}

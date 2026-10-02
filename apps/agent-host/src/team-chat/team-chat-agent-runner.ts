@@ -109,10 +109,12 @@ export class TeamChatAgentRunner {
     const stop = () => controller.abort();
     this.#stopped.signal.addEventListener("abort", stop, { once: true });
     try {
-      const [members, agents] = await Promise.all([gateway.listMembers(), gateway.listAgents()]);
+      const [members, agents, bots] = await Promise.all([gateway.listMembers(), gateway.listAgents(), gateway.listBots().catch(() => [])]);
       const agent = agents.find((item) => item.userId === agentUserId);
       if (!agent || agent.ownerUserId !== access.userId) throw new TeamChatAgentTurnError("not_configured", "Agent unavailable.");
-      const people = [...members, ...agents.map((item) => ({ userId: item.userId, displayName: item.name }))];
+      // Webhook text comes from outside the team; the model sees it labelled as such.
+      const people = [...members, ...agents.map((item) => ({ userId: item.userId, displayName: item.name })),
+        ...bots.map((item) => ({ userId: item.userId, displayName: `${item.name}（Bot，外部集成）` }))];
       const name = (userId: string) => people.find((person) => person.userId === userId)?.displayName ?? "同事";
       const conversationLabel = claim.conversationKind === "channel"
         ? `#${claim.conversationName ?? ""}`

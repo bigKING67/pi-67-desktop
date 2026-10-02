@@ -220,6 +220,8 @@ export interface TeamChatParticipant {
   userId: string;
   displayName: string;
   agent?: TeamChatAgent;
+  /** An incoming webhook bot. */
+  bot?: true;
 }
 
 export function memberById(directory: TeamChatDirectory | undefined, userId: string | undefined): TeamChatParticipant | undefined {
@@ -227,7 +229,9 @@ export function memberById(directory: TeamChatDirectory | undefined, userId: str
   const member = directory.members.find((item) => item.userId === userId);
   if (member) return member;
   const agent = directory.agents.find((item) => item.userId === userId);
-  return agent ? { userId, displayName: agent.name, agent } : undefined;
+  if (agent) return { userId, displayName: agent.name, agent };
+  const bot = directory.bots.find((item) => item.userId === userId);
+  return bot ? { userId, displayName: bot.name, bot: true } : undefined;
 }
 
 /** Channel name, or the peer's display name for a direct message. */

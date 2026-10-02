@@ -2068,6 +2068,13 @@ loading error where the operation can produce those states
   (one column under 620px), a hairline-separated `在这台电脑上运行` section, and the
   last three runs as caption lines. Removal arms on the first press like channel
   actions.
+- Webhooks (P3c): `频道设置` gains a hairline-separated `集成 · Webhook` section for
+  managers: an intro, a name field with `创建 Webhook`, then 38px rows (name, last
+  use, `重置地址`/`删除` arming like other destructive steps). A newly created or
+  rotated URL appears once in an accent-outlined block with a read-only, selectable
+  field and `复制地址`; it disappears when the dialog closes. Bot senders carry the
+  same outlined badge as Agents, reading `Bot`. The channel dialog scrolls within
+  the viewport.
 - Mentions (P2.5): `@name` runs use the accent-soft fill with accent-strong
   semibold text; the reader's own mention uses the solid accent fill, and a message
   that mentions the reader gets a 2px accent rail in its left gutter. Unread

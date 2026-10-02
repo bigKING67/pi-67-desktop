@@ -220,3 +220,48 @@
   background: color-mix(in srgb, var(--danger) 10%, var(--surface));
   color: var(--danger);
 }
+
+.secret {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-control);
+  background: var(--accent-soft);
+}
+
+.secretValue {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--font-size-caption);
+}
+
+/* Closes a settings section before the content that follows it. */
+.closedSection {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.webhookList {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.webhookList li {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 6px;
+  /* Same inset as roster rows, so action columns line up. */
+  padding: 3px 6px 3px 0;
+}

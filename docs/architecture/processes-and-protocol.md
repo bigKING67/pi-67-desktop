@@ -2636,7 +2636,7 @@ ADR 0003 是权威合同。Team Chat 不经过 Pi Runtime、Task Scheduler 或 S
 - Protocol：`teamChat.connection.get`、`teamChat.directory.get`、`teamChat.messages.list`、
   `teamChat.message.send`、`teamChat.read.mark`、`teamChat.channel.create`、`teamChat.channel.join`、
   `teamChat.channel.members`、`teamChat.channel.manage`、`teamChat.dm.open`、`teamChat.workCard.create`、
-  `teamChat.workCard.act`、`teamChat.agent.create|update|setDisabled|remove`、`teamChat.agent.host.get|bind|unbind`
+  `teamChat.workCard.act`、`teamChat.agent.create|update|setDisabled|remove`、`teamChat.agent.host.get|bind|unbind`、`teamChat.webhook.list|create|rotate|remove`
   均为 `app` scope 命令（`teamChat.agentHostChanged` 为 `app` scope 事件）；`teamChat.pushed` 与 `teamChat.connectionChanged` 是 `app`
   scope 事件。Schema 位于 `packages/protocol/src/team-chat-schemas.ts`；字符长度按字素校验，Host 再按
   服务端的码点上限精确校验。`message.send` 不是 replay-safe control mutation：幂等由 caller 的
@@ -2671,6 +2671,9 @@ ADR 0003 是权威合同。Team Chat 不经过 Pi Runtime、Task Scheduler 或 S
   `team-chat-agent-turns.ts`：以 `chat-agent-<invocationId>` 的 Host 内部 Task 在绑定 Workspace 创建团队范围 Session，
   先经 `AgentRuntime.agentTurn.disableAllTools()` 去掉全部工具并让安全策略拦截任何工具调用，再选模型、运行一轮，
   150 秒超时中止，结束后释放 Task。日志与错误回报只含原因码，不含正文。
+- Webhook 机器人（P3c，`docs/adr/0005-team-chat-webhooks.md`）：`teamChat.webhook.list|create|rotate|remove` 为 `app` scope 命令；
+  create/rotate 的结果含一次性的投递地址，只交给发起命令的对话框显示，Host 与 Renderer 都不存储、不记录它。
+  目录读取 `/chat/bots` 以标注机器人消息（旧服务缺该路由时退回空列表）。
 
 ## Source layout
 

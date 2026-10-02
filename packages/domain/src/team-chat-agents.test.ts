@@ -9,7 +9,7 @@ const agent: TeamChatAgent = {
 };
 const directory = (role: TeamChatMember["role"], agentCreation: "members" | "admins" = "members"): TeamChatDirectory => ({
   teamId: "t", selfUserId: "me", members: [{ userId: "me", displayName: "我", role }], conversations: [],
-  policy: { ...TEAM_CHAT_DEFAULT_POLICY, agentCreation }, agents: [agent]
+  policy: { ...TEAM_CHAT_DEFAULT_POLICY, agentCreation }, agents: [agent], bots: []
 });
 
 describe("team chat agents", () => {

@@ -14,7 +14,8 @@ const directory = (role: TeamChatMember["role"], policy = TEAM_CHAT_DEFAULT_POLI
   members: [{ userId: "me", displayName: "我", role }, { userId: "u2", displayName: "李雷", role: "member" }],
   conversations: [],
   policy,
-  agents: []
+  agents: [],
+  bots: []
 });
 
 describe("team chat governance", () => {

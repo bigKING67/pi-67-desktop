@@ -84,7 +84,8 @@ describe("TeamChatCommandRouter", () => {
       members: [{ userId: "me", displayName: "Me", role: "owner" }],
       conversations: [parseConversation(conversation)],
       policy: { channelCreation: "admins", viewersCanPost: false, agentCreation: "members", revision: 2 },
-      agents: []
+      agents: [],
+      bots: []
     });
     expect(new Headers(calls[0]!.init.headers).get("Authorization")).toBe("Bearer access");
     router.shutdown();
@@ -278,6 +279,32 @@ describe("TeamChatCommandRouter", () => {
     const ticket = calls.find((call) => call.url.endsWith("/chat/realtime-tickets") && call.init.body !== undefined);
     expect(JSON.parse(ticket!.init.body as string)).toEqual({ hostAgentIds: ["agent-1"] });
     expect(events.sendFor.mock.calls.some(([event]) => (event as { type: string }).type === "teamChat.pushed")).toBe(false);
+    router.shutdown();
+  });
+
+  it("manages a channel's webhooks and returns the secret URL only from create and rotate", async () => {
+    const webhook = { botUserId: "bot-1", conversationId: "c1", channelName: "构建通知", name: "CI", createdBy: "me",
+      createdAt: "2026-10-02T00:00:00Z", rotatedAt: null, lastUsedAt: null };
+    const secret = { webhook, url: "https://newmoney.example.test/v1/hooks/chat/bot-1/s3cret" };
+    const { router, run, calls } = setup({
+      "GET /chat/conversations/c1/webhooks": () => json({ webhooks: [webhook] }),
+      "POST /chat/conversations/c1/webhooks": () => json(secret, 201),
+      "POST /chat/conversations/c1/webhooks/bot-1/rotate": () => json(secret),
+      "DELETE /chat/conversations/c1/webhooks/bot-1": () => new Response(null, { status: 204 }),
+      "GET /chat/bots": () => json({ bots: [{ userId: "bot-1", name: "CI", conversationId: "c1" }] }),
+      "GET /members": () => json({ members: [] }),
+      "GET /chat/conversations": () => json({ conversations: [] }),
+      "GET /chat/policy": () => json({ channelCreation: "members", viewersCanPost: true, retentionDays: null, revision: 0 }),
+      "GET /chat/agents": () => json({ agents: [] })
+    });
+    await expect(run("teamChat.webhook.list", { conversationId: "c1" })).resolves.toMatchObject({ webhooks: [{ name: "CI" }] });
+    await expect(run("teamChat.webhook.create", { conversationId: "c1", name: " CI " })).resolves.toMatchObject({ url: secret.url });
+    await expect(run("teamChat.webhook.create", { conversationId: "c1", name: " " })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    await expect(run("teamChat.webhook.rotate", { conversationId: "c1", botUserId: "bot-1" })).resolves.toMatchObject({ url: secret.url });
+    await expect(run("teamChat.webhook.remove", { conversationId: "c1", botUserId: "bot-1" })).resolves.toEqual({});
+    expect((await run("teamChat.directory.get", {})).bots).toEqual([{ userId: "bot-1", name: "CI", conversationId: "c1" }]);
+    const bodies = calls.filter((call) => call.init.body !== undefined).map((call) => JSON.parse(call.init.body as string));
+    expect(bodies).toEqual([{ name: "CI" }]);
     router.shutdown();
   });
 });

@@ -11,7 +11,8 @@ const conversation: TeamChatConversation = {
 const directory: TeamChatDirectory = {
   teamId: "t", selfUserId: "me", members: [{ userId: "me", displayName: "Me", role: "owner" }], conversations: [conversation],
   policy: TEAM_CHAT_DEFAULT_POLICY,
-  agents: []
+  agents: [],
+  bots: []
 };
 const message = (seq: number, patch: Partial<TeamChatMessage> = {}): TeamChatMessage => ({
   id: `m${seq}`, conversationId: "c1", seq, senderUserId: "u2", body: `m${seq}`, clientKey: `client-${seq}`, createdAt: seq, ...patch
@@ -298,4 +299,28 @@ describe("team chat controller", () => {
     expect(controller.store.getState().agentHost?.bindings).toEqual([]);
     await controller.stopHostingAgent("a1");
   });
+
+  it("manages webhooks without keeping their secret URL in the store", async () => {
+    const webhook = { botUserId: "b1", conversationId: "c1", channelName: "研究", name: "CI", createdBy: "me", createdAt: 1 };
+    const { controller, calls, connect } = harness({
+      "teamChat.connection.get": () => ({ status: "connecting" }),
+      "teamChat.directory.get": () => directory,
+      "teamChat.webhook.list": () => ({ webhooks: [webhook] }),
+      "teamChat.webhook.create": () => ({ webhook, url: "https://nm.example/v1/hooks/chat/b1/secret" }),
+      "teamChat.webhook.rotate": () => ({ webhook, url: "https://nm.example/v1/hooks/chat/b1/rotated" }),
+      "teamChat.webhook.remove": () => ({})
+    });
+    controller.start();
+    connect();
+    await flush();
+    await expect(controller.listWebhooks("c1")).resolves.toEqual([webhook]);
+    await expect(controller.createWebhook("c1", "CI")).resolves.toMatchObject({ url: expect.stringContaining("/secret") });
+    await expect(controller.rotateWebhook("c1", "b1")).resolves.toMatchObject({ url: expect.stringContaining("/rotated") });
+    await controller.removeWebhook("c1", "b1");
+    expect(JSON.stringify(controller.store.getState())).not.toContain("/v1/hooks/");
+    expect(calls.map((call) => call.type).filter((type) => type.startsWith("teamChat.webhook"))).toEqual([
+      "teamChat.webhook.list", "teamChat.webhook.create", "teamChat.webhook.rotate", "teamChat.webhook.remove"
+    ]);
+  });
 });
+

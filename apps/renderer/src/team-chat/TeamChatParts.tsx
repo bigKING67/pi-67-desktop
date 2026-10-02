@@ -56,3 +56,7 @@ export function agentPresenceLabel(agent: Pick<TeamChatAgent, "online" | "status
 export function TeamChatAgentBadge() {
   return <span className={agentStyles.badge}>{messages.teamChat.agentBadge}</span>;
 }
+
+export function TeamChatBotBadge() {
+  return <span className={agentStyles.badge}>{messages.teamChat.botBadge}</span>;
+}

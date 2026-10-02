@@ -442,8 +442,10 @@
 
 .channelDialog {
   display: grid;
+  max-height: calc(100vh - 80px);
   gap: 14px;
   padding: 20px;
+  overflow-y: auto;
 }
 
 .channelDialog h2 { margin: 0; }

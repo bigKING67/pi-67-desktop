@@ -1,6 +1,7 @@
 import {
   TEAM_CHAT_CHANNEL_NAME_MAX_CHARS,
   TEAM_CHAT_MESSAGE_MAX_CHARS,
+  TEAM_CHAT_WEBHOOK_NAME_MAX,
   TEAM_CHAT_WORK_CARD_LIMITS,
   teamChatCodePointLength,
   teamChatHasControlCharacter
@@ -37,7 +38,11 @@ const TEAM_CHAT_COMMANDS: ReadonlySet<string> = new Set<TeamChatCommandType>([
   "teamChat.dm.open",
   "teamChat.workCard.create",
   "teamChat.workCard.act",
-  ...TEAM_CHAT_AGENT_COMMANDS
+  ...TEAM_CHAT_AGENT_COMMANDS,
+  "teamChat.webhook.list",
+  "teamChat.webhook.create",
+  "teamChat.webhook.rotate",
+  "teamChat.webhook.remove"
 ]);
 
 export function isTeamChatCommand(type: AgentCommandType): type is TeamChatCommandType {
@@ -120,14 +125,15 @@ export class TeamChatCommandRouter {
     if (isAgentCommand(command)) return this.#agents.dispatch(command.type, command.payload, signal);
     switch (command.type) {
       case "teamChat.directory.get": {
-        const [members, conversations, policy, agents] = await Promise.all([
+        const [members, conversations, policy, agents, bots] = await Promise.all([
           gateway.listMembers(signal),
           gateway.listConversations(signal),
           gateway.getPolicyOrDefault(signal),
-          // Services before Agent members lack the route; Chat works without Agents.
-          gateway.listAgents(signal).catch(() => [])
+          // Services before Agent members or webhooks lack these routes; Chat works without them.
+          gateway.listAgents(signal).catch(() => []),
+          gateway.listBots(signal).catch(() => [])
         ]);
-        return { teamId: access.teamId, selfUserId: access.userId, members, conversations, policy, agents };
+        return { teamId: access.teamId, selfUserId: access.userId, members, conversations, policy, agents, bots };
       }
       case "teamChat.messages.list": {
         const { conversationId, before, after, limit } = command.payload as TeamChatCommandPayloads["teamChat.messages.list"];
@@ -182,6 +188,25 @@ export class TeamChatCommandRouter {
           throw invalid("Work Card fields exceed their limits.");
         }
         return gateway.createWorkCard(conversationId, { ...input, title }, signal);
+      }
+      case "teamChat.webhook.list":
+        return { webhooks: await gateway.listWebhooks((command.payload as TeamChatCommandPayloads["teamChat.webhook.list"]).conversationId, signal) };
+      case "teamChat.webhook.create": {
+        const { conversationId, name } = command.payload as TeamChatCommandPayloads["teamChat.webhook.create"];
+        const trimmed = name.trim();
+        if (!trimmed || teamChatCodePointLength(trimmed) > TEAM_CHAT_WEBHOOK_NAME_MAX || teamChatHasControlCharacter(trimmed)) {
+          throw invalid("Webhook names need 1 to 40 printable characters.");
+        }
+        return gateway.createWebhook(conversationId, trimmed, signal);
+      }
+      case "teamChat.webhook.rotate": {
+        const { conversationId, botUserId } = command.payload as TeamChatCommandPayloads["teamChat.webhook.rotate"];
+        return gateway.rotateWebhook(conversationId, botUserId, signal);
+      }
+      case "teamChat.webhook.remove": {
+        const { conversationId, botUserId } = command.payload as TeamChatCommandPayloads["teamChat.webhook.remove"];
+        await gateway.removeWebhook(conversationId, botUserId, signal);
+        return {};
       }
       case "teamChat.workCard.act": {
         const { cardId, action, expectedRevision } = command.payload as TeamChatCommandPayloads["teamChat.workCard.act"];

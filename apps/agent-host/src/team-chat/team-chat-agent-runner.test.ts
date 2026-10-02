@@ -16,7 +16,10 @@ const claim = {
   invocation: { id: "inv-1", agentUserId: "agent", conversationId: "c1", messageId: "m1", messageSeq: 3, invokerUserId: "u2", expiresAt: 9e12 },
   conversationKind: "channel" as const,
   conversationName: "宏观研究",
-  messages: [{ id: "m1", conversationId: "c1", seq: 3, senderUserId: "u2", body: "@研究助手 总结", clientKey: "k-000001", createdAt: 1 }]
+  messages: [
+    { id: "m0", conversationId: "c1", seq: 2, senderUserId: "bot-ci", body: "构建失败", clientKey: "k-000000", createdAt: 1 },
+    { id: "m1", conversationId: "c1", seq: 3, senderUserId: "u2", body: "@研究助手 总结", clientKey: "k-000001", createdAt: 1 }
+  ]
 };
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -36,6 +39,7 @@ async function harness(options: {
     }),
     listMembers: vi.fn(async () => [{ userId: "owner", displayName: "高乾", role: "owner" }, { userId: "u2", displayName: "王一凡", role: "member" }]),
     listAgents: vi.fn(async () => [agent]),
+    listBots: vi.fn(async () => [{ userId: "bot-ci", name: "CI", conversationId: "c1" }]),
     completeInvocation: vi.fn(async () => ({})),
     failInvocation: vi.fn(async () => undefined),
     pendingInvocations: vi.fn(async () => [claim.invocation])
@@ -61,6 +65,7 @@ describe("TeamChatAgentRunner", () => {
     expect(input).toMatchObject({ workspaceId: "w1", teamScope: { teamId: "t1", projectId: "p1" }, model: { provider: "anthropic", id: "claude" },
       sessionName: "Agent · 研究助手 · #宏观研究" });
     expect(input.prompt).toContain("王一凡：@研究助手 总结");
+    expect(input.prompt).toContain("CI（Bot，外部集成）：构建失败");
     expect(gateway.completeInvocation).toHaveBeenCalledWith("inv-1", { clientKey: "agent-inv-1", body: "本周要点：利率下行。", leaseToken: "lease-1" });
     expect(activity.at(-1)?.[0]).toMatchObject({ invocationId: "inv-1", state: "replied" });
   });

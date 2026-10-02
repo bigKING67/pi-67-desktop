@@ -6,6 +6,7 @@ import {
   TEAM_CHAT_MENTION_MAX,
   TEAM_CHAT_MESSAGE_MAX_CHARS,
   TEAM_CHAT_PAGE_MAX,
+  TEAM_CHAT_WEBHOOK_NAME_MAX,
   TEAM_CHAT_WORK_CARD_LIMITS
 } from "@pi67/domain";
 import { strictObject, Type, type TSchema } from "./typebox-schema.js";
@@ -82,6 +83,20 @@ const AgentHostStateSchema = strictObject({
     reason: Type.Optional(InvocationReasonSchema),
     at: TimestampSchema
   }), { maxItems: 20 })
+});
+const WebhookSchema = strictObject({
+  botUserId: IdSchema,
+  conversationId: IdSchema,
+  channelName: ChannelNameSchema,
+  name: Type.String({ minLength: 1, maxLength: TEAM_CHAT_WEBHOOK_NAME_MAX }),
+  createdBy: IdSchema,
+  createdAt: TimestampSchema,
+  rotatedAt: Type.Optional(TimestampSchema),
+  lastUsedAt: Type.Optional(TimestampSchema)
+});
+const WebhookSecretSchema = strictObject({
+  webhook: WebhookSchema,
+  url: Type.String({ minLength: 20, maxLength: 512, pattern: "^https?://[^\\s]+/v1/hooks/chat/" })
 });
 const VisibilitySchema = Type.Union([Type.Literal("public"), Type.Literal("private")]);
 const RoleSchema = Type.Union([
@@ -218,7 +233,14 @@ export const TeamChatCommandPayloadSchemas: Record<keyof TeamChatCommandPayloads
   "teamChat.agent.remove": strictObject({ agentUserId: IdSchema }),
   "teamChat.agent.host.get": EmptySchema,
   "teamChat.agent.host.bind": strictObject({ binding: AgentBindingSchema }),
-  "teamChat.agent.host.unbind": strictObject({ agentUserId: IdSchema })
+  "teamChat.agent.host.unbind": strictObject({ agentUserId: IdSchema }),
+  "teamChat.webhook.list": strictObject({ conversationId: IdSchema }),
+  "teamChat.webhook.create": strictObject({
+    conversationId: IdSchema,
+    name: Type.String({ minLength: 1, maxLength: TEAM_CHAT_WEBHOOK_NAME_MAX })
+  }),
+  "teamChat.webhook.rotate": strictObject({ conversationId: IdSchema, botUserId: IdSchema }),
+  "teamChat.webhook.remove": strictObject({ conversationId: IdSchema, botUserId: IdSchema })
 };
 
 export const TeamChatCommandResultSchemas: Record<keyof TeamChatCommandResults, TSchema> = {
@@ -233,7 +255,12 @@ export const TeamChatCommandResultSchemas: Record<keyof TeamChatCommandResults, 
     }), { maxItems: 100_000 }),
     conversations: Type.Array(TeamChatConversationSchema, { maxItems: 500 }),
     policy: PolicySchema,
-    agents: Type.Array(AgentSchema, { maxItems: 50 })
+    agents: Type.Array(AgentSchema, { maxItems: 50 }),
+    bots: Type.Array(strictObject({
+      userId: IdSchema,
+      name: Type.String({ minLength: 1, maxLength: TEAM_CHAT_WEBHOOK_NAME_MAX }),
+      conversationId: IdSchema
+    }), { maxItems: 100 })
   }),
   "teamChat.messages.list": strictObject({
     messages: Type.Array(TeamChatMessageSchema, { maxItems: TEAM_CHAT_PAGE_MAX }),
@@ -257,7 +284,11 @@ export const TeamChatCommandResultSchemas: Record<keyof TeamChatCommandResults, 
   "teamChat.agent.remove": EmptySchema,
   "teamChat.agent.host.get": AgentHostStateSchema,
   "teamChat.agent.host.bind": AgentHostStateSchema,
-  "teamChat.agent.host.unbind": AgentHostStateSchema
+  "teamChat.agent.host.unbind": AgentHostStateSchema,
+  "teamChat.webhook.list": strictObject({ webhooks: Type.Array(WebhookSchema, { maxItems: 10 }) }),
+  "teamChat.webhook.create": WebhookSecretSchema,
+  "teamChat.webhook.rotate": WebhookSecretSchema,
+  "teamChat.webhook.remove": EmptySchema
 };
 
 export const TeamChatEventPayloadSchemas: Record<keyof TeamChatEventPayloads, TSchema> = {

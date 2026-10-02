@@ -33,7 +33,8 @@ const directory: TeamChatDirectory = {
   members: [{ userId: "me", displayName: "我自己", role: "owner" }, { userId: "u2", displayName: "小王", role: "member" }],
   conversations: [channel(), dm],
   policy: TEAM_CHAT_DEFAULT_POLICY,
-  agents: []
+  agents: [],
+  bots: []
 };
 const message = (seq: number, patch: Partial<TeamChatMessage> = {}): TeamChatMessage => ({
   id: `m${seq}`, conversationId: "c1", seq, senderUserId: "u2", body: `m${seq}`, clientKey: `key-000${seq}`, createdAt: 100 + seq, ...patch
@@ -164,6 +165,8 @@ describe("team chat model", () => {
     state = applyMessagePage(state, "c1", { messages: [message(1), message(2)], hasMore: false }, "latest");
     expect(memberById(state.directory, "a1")).toMatchObject({ displayName: "研究助手", agent });
     expect(memberById(state.directory, "u2")).toMatchObject({ displayName: "小王" });
+    const withBot = replaceDirectory(state, { ...directory, agents: [agent], bots: [{ userId: "b1", name: "CI", conversationId: "c1" }] });
+    expect(memberById(withBot.directory, "b1")).toEqual({ userId: "b1", displayName: "CI", bot: true });
     expect(applyPush(state, { type: "agents.changed" }).refreshDirectory).toBe(true);
     const queued = { id: "i1", agentUserId: "a1", status: "queued" as const };
     state = applyInvocation(state, "c1", "m2", queued);
