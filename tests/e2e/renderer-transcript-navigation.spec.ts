@@ -33,6 +33,8 @@ test("restores an away-from-bottom reading anchor across a Settings round trip",
   await expect.poll(() => scroller.evaluate((element) => (
     element.scrollHeight - element.clientHeight - element.scrollTop
   ))).toBeGreaterThan(400);
+  // The wheel scroll animates; the reader's position is where it comes to rest.
+  await waitForScrollToSettle(scroller);
   await expect.poll(() => firstVisibleTranscriptMessageId(scroller)).not.toBeNull();
   const anchorId = await firstVisibleTranscriptMessageId(scroller);
   if (!anchorId) throw new Error("Expected an away-from-bottom transcript anchor.");
@@ -69,5 +71,16 @@ async function firstVisibleTranscriptMessageId(scroller: Locator): Promise<strin
     const candidates = Array.from(element.querySelectorAll<HTMLElement>("[data-message-id]"));
     return candidates.find((candidate) => candidate.getBoundingClientRect().bottom > scrollerTop + 8)
       ?.dataset.messageId ?? null;
+  });
+}
+
+async function waitForScrollToSettle(scroller: Locator): Promise<void> {
+  await scroller.evaluate(async (element) => {
+    let previous = element.scrollTop;
+    for (let stableChecks = 0, checks = 0; stableChecks < 3 && checks < 100; checks += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      stableChecks = element.scrollTop === previous ? stableChecks + 1 : 0;
+      previous = element.scrollTop;
+    }
   });
 }
