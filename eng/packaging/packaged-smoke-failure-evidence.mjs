@@ -46,10 +46,19 @@ export function createPackagedSmokeGuard({
     // table separate a blocking Main operation from a starved runner.
     const mainPid = app?.process?.().pid;
     if (process.platform === "darwin" && mainPid) {
-      await writeFile(join(directory, "main-sample.txt"), (await run("sample", [String(mainPid), "3", "-mayDie"], 20_000)).slice(0, 400_000));
+      // Symbolication on hosted runners can take well over 20 s.
+      await writeFile(join(directory, "main-sample.txt"), (await run("sample", [String(mainPid), "3", "-mayDie"], 90_000)).slice(0, 400_000));
+      // A near-idle Main that does not answer suggests a blocking wait; a locked
+      // login keychain makes safeStorage wait for a prompt nobody can answer.
+      await writeFile(join(directory, "keychain.txt"), [
+        await run("security", ["list-keychains"], 5_000),
+        await run("security", ["show-keychain-info", "login.keychain"], 5_000)
+      ].join("\n"));
     }
-    await writeFile(join(directory, "processes.txt"), (await run("ps", ["-axo", "pid,ppid,%cpu,%mem,etime,comm", "-r"], 5_000))
-      .split("\n").slice(0, 40).join("\n"));
+    const table = await run("ps", ["-axo", "pid,ppid,stat,wchan,%cpu,%mem,etime,comm", "-r"], 5_000);
+    const lines = table.split("\n");
+    const family = mainPid ? lines.filter((line) => new RegExp(`^\\s*\\d+\\s+${mainPid}\\s|^\\s*${mainPid}\\s`).test(line)) : [];
+    await writeFile(join(directory, "processes.txt"), [lines[0], ...family, "--- top CPU ---", ...lines.slice(1, 40)].join("\n"));
     if (window) await window.screenshot({ path: join(directory, `${current}.png`), timeout: 10_000 }).catch(() => undefined);
     console.error(`Packaged smoke failure evidence (stage ${current}): ${directory}`);
   };
