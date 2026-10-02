@@ -32,8 +32,11 @@ import {
 } from "./desktop-compatibility-extension.js";
 import {
   activateSharedProfile,
+  timedCapabilityPhase,
+  type CapabilityPhaseObserver,
   type DesktopSharedProfileProjection,
-  type SharedProfilePackage
+  type SharedProfilePackage,
+  type SharedProfilePhase
 } from "./desktop-shared-profile.js";
 import { managedSkillPackPackagePaths } from "./managed-skill-pack-state.js";
 
@@ -48,7 +51,11 @@ export interface DesktopCapabilityBootstrapOptions {
   environment?: NodeJS.ProcessEnv;
   profileOwnership?: "desktop" | "shared";
   createToken?: () => string;
+  onPhase?: CapabilityPhaseObserver<DesktopCapabilityPhase>;
 }
+
+/** Sub-phases of the `desktop-capabilities` startup stage, for cost diagnostics. */
+type DesktopCapabilityPhase = "source-verify" | SharedProfilePhase;
 
 export interface DesktopCapabilityBootstrapResult {
   enabled: boolean;
@@ -104,32 +111,35 @@ export async function bootstrapDesktopCapabilities(
   await mkdir(agentDir, { recursive: true, mode: 0o700 });
   await mkdir(managedRoot, { recursive: true, mode: 0o700 });
   const sharedPackages: SharedProfilePackage[] = [];
-  for (const entry of catalog.entries) {
-    const integrity = manifestById.get(entry.id)!;
-    const source = containedCapabilityPath(capabilitiesRoot, entry.packagePath, "Capability package path");
-    if (environment.PI67_PACKAGED === "1") {
-      await validatePackagedCapabilityPackage(capabilitiesRoot, source, entry.id);
+  await timedCapabilityPhase(options.onPhase, "source-verify", async () => {
+    for (const entry of catalog.entries) {
+      const integrity = manifestById.get(entry.id)!;
+      const source = containedCapabilityPath(capabilitiesRoot, entry.packagePath, "Capability package path");
+      if (environment.PI67_PACKAGED === "1") {
+        await validatePackagedCapabilityPackage(capabilitiesRoot, source, entry.id);
+      }
+      const sourceHash = await capabilityTreeSha256(source, integrity.includeNodeModules);
+      if (sourceHash !== integrity.treeSha256) {
+        throw new Error(`Desktop capability ${entry.id} failed bundled integrity verification.`);
+      }
+      sharedPackages.push({
+        id: entry.id,
+        displayName: entry.displayName,
+        source,
+        packagePath: `packages/${entry.id}`,
+        treeSha256: integrity.treeSha256,
+        includeNodeModules: integrity.includeNodeModules === true
+      });
     }
-    const sourceHash = await capabilityTreeSha256(source, integrity.includeNodeModules);
-    if (sourceHash !== integrity.treeSha256) {
-      throw new Error(`Desktop capability ${entry.id} failed bundled integrity verification.`);
-    }
-    sharedPackages.push({
-      id: entry.id,
-      displayName: entry.displayName,
-      source,
-      packagePath: `packages/${entry.id}`,
-      treeSha256: integrity.treeSha256,
-      includeNodeModules: integrity.includeNodeModules === true
-    });
-  }
+  });
 
   const sharedProfile = await activateSharedProfile({
     agentDir,
     managedRoot,
     catalogVersion: catalog.catalogVersion,
     packages: sharedPackages,
-    createToken
+    createToken,
+    ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase })
   });
   const bundledPackagePaths = sharedPackages.map((entry) => (
     join(sharedProfile.root, entry.packagePath)

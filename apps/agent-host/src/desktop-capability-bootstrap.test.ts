@@ -124,13 +124,33 @@ describe("Desktop first-party capability bootstrap", () => {
     };
 
     const firstHash = await writeRelease("test.shared.1", "first\n");
+    const firstPhases: string[] = [];
     const first = await bootstrapDesktopCapabilities({
       capabilitiesRoot,
       agentDir,
       environment: { PI67_DESKTOP: "1" },
-      createToken: () => "first"
+      createToken: () => "first",
+      onPhase: (phase, durationMs, outcome) => {
+        expect(durationMs).toBeGreaterThanOrEqual(0);
+        firstPhases.push(`${phase}:${outcome}`);
+      }
     });
     expect(first.sharedProfile?.status).toBe("installed");
+    expect(firstPhases).toEqual([
+      "source-verify:completed",
+      "profile-inspect:completed",
+      "profile-copy:completed",
+      "profile-verify:completed"
+    ]);
+    const relaunchPhases: string[] = [];
+    const relaunched = await bootstrapDesktopCapabilities({
+      capabilitiesRoot,
+      agentDir,
+      environment: { PI67_DESKTOP: "1" },
+      onPhase: (phase, _durationMs, outcome) => relaunchPhases.push(`${phase}:${outcome}`)
+    });
+    expect(relaunched.sharedProfile?.status).toBe("current");
+    expect(relaunchPhases).toEqual(["source-verify:completed", "profile-inspect:completed"]);
 
     const secondHash = await writeRelease("test.shared.2", "second\n");
     const second = await bootstrapDesktopCapabilities({
@@ -285,11 +305,14 @@ describe("Desktop first-party capability bootstrap", () => {
       }],
       recommendedExternal: []
     }), "utf8");
+    const phases: string[] = [];
     await expect(bootstrapDesktopCapabilities({
       capabilitiesRoot,
       agentDir: join(root, "agent"),
-      environment: { PI67_DESKTOP: "1" }
+      environment: { PI67_DESKTOP: "1" },
+      onPhase: (phase, _durationMs, outcome) => phases.push(`${phase}:${outcome}`)
     })).rejects.toThrow("integrity verification");
+    expect(phases).toEqual(["source-verify:failed"]);
   });
 
   it("copies packaged capabilities into the stable shared Pi profile", async () => {

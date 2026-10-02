@@ -93,7 +93,7 @@ try {
     verifyMainOnlyDiagnostics: verifyPackagedMainOnlyDiagnostics
   });
   await captureWelcomeAndConnectAgentHost(window, capturePackagedScreenshot, packagedProcessOutput);
-  const startupDiagnostics = await verifyPackagedReadyDiagnostics({ agentDir, application, packagedCredential, userDataDirectory, window, workspace });
+  const startupDiagnostics = await verifyPackagedReadyDiagnostics({ agentDir, application, packagedCredential, processOutput: packagedProcessOutput, userDataDirectory, window, workspace });
   await openPackagedSmokeWorkspace({ application, window, workspace });
   await verifyPackagedPrivateGitWorktreeContract(window);
   if (await window.getByText("无法打开工作区", { exact: true }).count()) {
@@ -438,7 +438,7 @@ function packagedSmokeEnvironment(profileRoot) {
     USERPROFILE: profileRoot,
     APPDATA: join(profileRoot, "app-data", "roaming"),
     LOCALAPPDATA: join(profileRoot, "app-data", "local"),
-    PI67_MEMORY_PRIVACY_MODE: "off",
+    PI67_MEMORY_PRIVACY_MODE: "off", PI67_TEST_CAPTURE_AGENT_INIT: "1", // names a startup budget miss's phase
     PATH: process.platform === "win32"
       ? [join(windowsRoot, "System32"), windowsRoot].join(delimiter)
       : "/usr/bin:/bin:/usr/sbin:/sbin"

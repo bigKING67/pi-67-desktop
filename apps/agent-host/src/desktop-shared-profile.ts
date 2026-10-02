@@ -28,6 +28,31 @@ export interface SharedProfilePackage {
   includeNodeModules: boolean;
 }
 
+export type SharedProfilePhase = "profile-inspect" | "profile-copy" | "profile-verify";
+
+/** Startup-cost observation only; it never changes activation. */
+export type CapabilityPhaseObserver<Phase extends string> = (
+  phase: Phase,
+  durationMs: number,
+  outcome: "completed" | "failed"
+) => void;
+
+export async function timedCapabilityPhase<Phase extends string, T>(
+  observe: CapabilityPhaseObserver<Phase> | undefined,
+  phase: Phase,
+  operation: () => Promise<T>
+): Promise<T> {
+  const startedAt = performance.now();
+  let outcome: "completed" | "failed" = "failed";
+  try {
+    const result = await operation();
+    outcome = "completed";
+    return result;
+  } finally {
+    observe?.(phase, performance.now() - startedAt, outcome);
+  }
+}
+
 export interface DesktopSharedProfileProjection {
   status: "current" | "installed" | "updated";
   root: string;
@@ -40,13 +65,14 @@ export async function activateSharedProfile(options: {
   catalogVersion: string;
   packages: SharedProfilePackage[];
   createToken: () => string;
+  onPhase?: CapabilityPhaseObserver<SharedProfilePhase>;
 }): Promise<DesktopSharedProfileProjection> {
   const root = join(options.managedRoot, "shared-profile");
   const active = join(root, "active");
   const previous = join(root, "previous");
   const stagingRoot = join(root, "staging");
   const receiptPath = join(active, "receipt.json");
-  const inspection = await inspectSharedProfile(active);
+  const inspection = await timedCapabilityPhase(options.onPhase, "profile-inspect", () => inspectSharedProfile(active));
   if (inspection.status === "invalid") {
     throw new Error(`Desktop shared profile is invalid: ${inspection.detail}`);
   }
@@ -75,14 +101,16 @@ export async function activateSharedProfile(options: {
   try {
     await mkdir(join(staging, "packages"), { recursive: true, mode: 0o700 });
     staged = true;
-    for (const entry of options.packages) {
-      const destination = containedCapabilityPath(staging, entry.packagePath, "Shared profile Package path");
-      await copyCapabilityDirectory(entry.source, destination, entry.source, entry.includeNodeModules);
-    }
+    await timedCapabilityPhase(options.onPhase, "profile-copy", async () => {
+      for (const entry of options.packages) {
+        const destination = containedCapabilityPath(staging, entry.packagePath, "Shared profile Package path");
+        await copyCapabilityDirectory(entry.source, destination, entry.source, entry.includeNodeModules);
+      }
+    });
     await writeFile(join(staging, "receipt.json"), `${JSON.stringify(expected, null, 2)}\n`, { mode: 0o600 });
     // Receipt inspection hashes every staged Package before activation. Keep that
     // as the single staging integrity pass, including for newly copied content.
-    const stagedInspection = await inspectSharedProfile(staging);
+    const stagedInspection = await timedCapabilityPhase(options.onPhase, "profile-verify", () => inspectSharedProfile(staging));
     if (
       stagedInspection.status !== "valid"
       || !sharedProfileReceiptMatches(stagedInspection.receipt, expected)

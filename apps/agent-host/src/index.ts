@@ -70,6 +70,9 @@ async function startAgentHost(): Promise<void> {
     const agentDir = resolveAgentDirectory(undefined);
     started = await coordinateAgentHostStartup({
       agentDir,
+      onCapabilityPhase: (phase, durationMs, outcome) => {
+        process.stderr.write(`[agent-host:init] ${JSON.stringify({ stage: `capability-${phase}`, outcome, durationMs })}\n`);
+      },
       constructServer: () => {
         const promptAttachments = createPromptAttachmentAccessOwner(
           process.env.PI67_PROMPT_ATTACHMENT_ROOT

@@ -104,12 +104,22 @@ export async function verifyPackagedReadyDiagnostics(options) {
       || (stage.outcome !== "completed" && stage.outcome !== "skipped")
     ))
   ) {
-    throw new Error(`Packaged ready diagnostics violated the startup contract: ${JSON.stringify(diagnostics)}`);
+    throw new Error(`Packaged ready diagnostics violated the startup contract: ${JSON.stringify(diagnostics)}${capabilityPhaseSummary(options.processOutput?.())}`);
   }
   for (const sensitiveValue of [options.packagedCredential, options.agentDir, options.workspace]) {
     if (text.includes(sensitiveValue)) {
       throw new Error("Packaged ready diagnostics exposed a credential or absolute path.");
     }
   }
+  // Passing runs record the budget margin too, not only the runs that miss it.
+  console.log(`Packaged startup ${startup.totalDurationMs} ms: ${stageTimings.map((stage) => `${stage.stage}=${stage.durationMs}`).join(" ")}${capabilityPhaseSummary(options.processOutput?.())}`);
   return { totalDurationMs: startup.totalDurationMs };
+}
+
+/** The `desktop-capabilities` sub-phase records Agent Host forwards in test runs. */
+function capabilityPhaseSummary(output) {
+  const phases = (output ?? "").split(/\r?\n/u)
+    .filter((line) => line.startsWith("[agent-host:init] {\"stage\":\"capability-"))
+    .map((line) => line.slice("[agent-host:init] ".length));
+  return phases.length > 0 ? `\nCapability phases: ${phases.join(" ")}` : "";
 }

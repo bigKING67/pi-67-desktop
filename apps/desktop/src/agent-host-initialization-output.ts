@@ -10,7 +10,12 @@ const INITIALIZATION_STAGES = new Set([
   "load-session-resources",
   "activate-session",
   "reload-configuration",
-  "project-snapshot"
+  "project-snapshot",
+  // Sub-phases of the startup `desktop-capabilities` stage.
+  "capability-source-verify",
+  "capability-profile-inspect",
+  "capability-profile-copy",
+  "capability-profile-verify"
 ]);
 
 const INITIALIZATION_OUTCOMES = new Set(["started", "completed", "failed"]);

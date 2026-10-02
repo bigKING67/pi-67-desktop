@@ -18,7 +18,11 @@ describe("AgentHostInitializationOutputForwarder", () => {
   it.each([
     "validate-packages",
     "load-session-resources",
-    "activate-session"
+    "activate-session",
+    "capability-source-verify",
+    "capability-profile-inspect",
+    "capability-profile-copy",
+    "capability-profile-verify"
   ])("forwards the truthful restore stage %s", (stage) => {
     const emit = vi.fn<(line: string) => void>();
     const forwarder = new AgentHostInitializationOutputForwarder(emit);

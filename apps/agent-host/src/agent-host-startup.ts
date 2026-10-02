@@ -8,10 +8,7 @@ import type {
 } from "@pi67/protocol";
 import { lstat, readFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import {
-  bootstrapDesktopCapabilities,
-  type DesktopCapabilityBootstrapResult
-} from "./desktop-capability-bootstrap.js";
+import { bootstrapDesktopCapabilities, type DesktopCapabilityBootstrapOptions, type DesktopCapabilityBootstrapResult } from "./desktop-capability-bootstrap.js";
 import {
   activateDesktopManagedPackages,
   type ManagedPackageBundleResult
@@ -39,7 +36,9 @@ interface AgentHostStartupOptions<T> {
     agentDir: string;
     environment: NodeJS.ProcessEnv;
     profileOwnership: "desktop" | "shared";
+    onPhase?: DesktopCapabilityBootstrapOptions["onPhase"];
   }) => Promise<DesktopCapabilityBootstrapResult>;
+  onCapabilityPhase?: DesktopCapabilityBootstrapOptions["onPhase"];
   activateManagedPackages?: (options: {
     agentDir: string;
     environment: NodeJS.ProcessEnv;
@@ -100,7 +99,8 @@ export async function coordinateAgentHostStartup<T>(
   )({
       agentDir,
       environment,
-      profileOwnership: profileMode === "existing-shared" ? "shared" : "desktop"
+      profileOwnership: profileMode === "existing-shared" ? "shared" : "desktop",
+      ...(options.onCapabilityPhase === undefined ? {} : { onPhase: options.onCapabilityPhase })
     }));
   if (capabilityStage.ok) {
     capabilities = capabilityStage.value;

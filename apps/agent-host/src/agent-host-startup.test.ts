@@ -110,11 +110,13 @@ describe("Agent Host startup", () => {
     const before = await readFixtureFiles(agentDir, files);
     const cleanupRetiredMcp = vi.fn(async () => retiredCleanup("missing", agentDir));
     const bootstrapCapabilities = vi.fn(async () => enabledCapabilities());
+    const onCapabilityPhase = vi.fn();
 
     const result = await coordinateAgentHostStartup({
       agentDir,
       environment: packagedEnvironment(),
       bootstrapCapabilities,
+      onCapabilityPhase,
       activateManagedPackages: async () => enabledManagedPackages(),
       cleanupRetiredMcp,
       provisionBrowser67Mcp: async () => browser67Result(
@@ -136,7 +138,8 @@ describe("Agent Host startup", () => {
     });
     expect(cleanupRetiredMcp).not.toHaveBeenCalled();
     expect(bootstrapCapabilities).toHaveBeenCalledWith(expect.objectContaining({
-      profileOwnership: "shared"
+      profileOwnership: "shared",
+      onPhase: onCapabilityPhase
     }));
     expect(await readFixtureFiles(agentDir, files)).toEqual(before);
   });
