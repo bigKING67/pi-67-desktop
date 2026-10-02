@@ -10,7 +10,8 @@ async function guardFixture(window) {
   const directory = await mkdtemp(join(tmpdir(), "pi67-smoke-evidence-"));
   directories.push(directory);
   const guard = createPackagedSmokeGuard({
-    application: () => ({ windows: () => window ? [window] : [] }),
+    application: () => ({ windows: () => window ? [window] : [],
+      evaluate: async () => [{ destroyed: false, visible: false, crashed: false, loading: false, unresponsive: true }] }),
     processOutput: () => `synthetic output ${"x".repeat(9_000)}`,
     deadlineMs: 60_000, directory
   });
@@ -34,7 +35,8 @@ describe("packaged smoke failure evidence", () => {
     await guard.fail(new Error("second failure is ignored"));
     guard.stop();
     const failure = JSON.parse(await readFile(join(directory, "failure.json"), "utf8"));
-    expect(failure).toMatchObject({ stage: "changes-inspector" });
+    expect(failure).toMatchObject({ stage: "changes-inspector", playwrightWindows: 1,
+      mainWindows: [{ crashed: false, unresponsive: true }], surface: { title: "synthetic" } });
     expect(failure.error).toContain("locator missing");
     expect((await readFile(join(directory, "process-output.txt"), "utf8")).length).toBe(8_192);
     expect(screenshot).toHaveBeenCalledOnce();

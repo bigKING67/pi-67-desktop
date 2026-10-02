@@ -25,11 +25,20 @@ export function createPackagedSmokeGuard({
     if (recorded) return;
     recorded = true;
     await mkdir(directory, { recursive: true });
-    const window = application()?.windows()[0];
-    const surface = window ? await withTimeout(inspectRendererSurface(window), 10_000).catch(() => null) : null;
+    const app = application();
+    const window = app?.windows()[0];
+    // Main answers even when a renderer is busy, so this separates a crashed or
+    // missing window from a hung one when the renderer probes below time out.
+    const mainWindows = app ? await withTimeout(app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((item) => ({
+      destroyed: item.isDestroyed(), visible: !item.isDestroyed() && item.isVisible(),
+      crashed: !item.isDestroyed() && item.webContents.isCrashed(), loading: !item.isDestroyed() && item.webContents.isLoading(),
+      unresponsive: !item.isDestroyed() && item.webContents.isWaitingForResponse?.()
+    }))), 10_000).catch((reason) => ({ error: String(reason?.message ?? reason).slice(0, 200) })) : null;
+    const surface = window ? await withTimeout(inspectRendererSurface(window), 10_000)
+      .catch((reason) => ({ error: String(reason?.message ?? reason).slice(0, 200) })) : null;
     await writeFile(join(directory, "failure.json"), `${JSON.stringify({
-      stage: current, at: new Date().toISOString(),
-      error: String(error?.stack ?? error).slice(0, 4_000), surface
+      stage: current, at: new Date().toISOString(), playwrightWindows: app?.windows().length ?? 0,
+      error: String(error?.stack ?? error).slice(0, 4_000), mainWindows, surface
     }, null, 2)}\n`);
     await writeFile(join(directory, "process-output.txt"), processOutput().slice(0, 8_192));
     if (window) await window.screenshot({ path: join(directory, `${current}.png`), timeout: 10_000 }).catch(() => undefined);
