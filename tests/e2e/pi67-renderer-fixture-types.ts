@@ -165,6 +165,14 @@ export interface FixtureAgentState {
   responseFailures: Record<string, FixtureFailure>;
   responseResults: Record<string, unknown>;
   commands: FixtureCommand[];
+  /** Ordered account request/response log (types and states only) for failure diagnostics. */
+  accountExchanges: {
+    at: number;
+    phase: "request" | "response";
+    type: string;
+    requestId: string | undefined;
+    state?: string | undefined;
+  }[];
   taskStates: Record<string, FixtureTaskState>;
   resyncOperations: FixtureResyncOperations;
   terminalDelayMs?: number;

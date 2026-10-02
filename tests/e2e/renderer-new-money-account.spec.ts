@@ -3,6 +3,17 @@ import { DEFAULT_CONTEXT_MEMORY_CONFIGURATION } from "../../packages/domain/src/
 import { attachMockAgent, installMockDesktopBridge, recordedCommandDetails, setMockAgentResponseFailure, setMockAgentResponseResult } from "./pi67-renderer-fixture.js";
 
 const signedIn = { state: "signed-in", userId: "synthetic-user", displayName: "New Money 测试账户" };
+// A rare CI failure shows sign-out reverting to signed-in; keep the account
+// request/response order (types and states only) when any account test fails.
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus) return;
+  const exchanges = await page.evaluate(() => (
+    window as unknown as { __pi67TestAgent?: { accountExchanges?: unknown[] } }
+  ).__pi67TestAgent?.accountExchanges ?? []).catch(() => []);
+  const log = JSON.stringify(exchanges);
+  console.log(`Account exchanges for "${testInfo.title}": ${log}`);
+  await testInfo.attach("account-exchanges", { body: log, contentType: "application/json" });
+});
 async function setup(page: Page, identity: object = signedIn) {
   const configuration = { ...DEFAULT_CONTEXT_MEMORY_CONFIGURATION, revision: "account-fixture", enterpriseGatewayEndpoint: "https://newmoney.example.test" };
   await installMockDesktopBridge(page);

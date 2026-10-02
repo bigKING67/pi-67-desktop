@@ -74,6 +74,7 @@ export async function attachMockAgent(
       responseFailures: {},
       responseResults: fixtureOptions.responseResults ?? {},
       commands: [],
+      accountExchanges: [],
       taskStates: {},
       resyncOperations: {},
       ...(fixtureOptions.terminalDelayMs === undefined ? {} : { terminalDelayMs: fixtureOptions.terminalDelayMs }),
@@ -131,6 +132,7 @@ export async function attachMockAgent(
           ) {
             state.workspaceId = envelope.context.workspaceId;
           }
+          if (envelope.type.startsWith("enterprise.")) state.accountExchanges.push({ at: Math.round(performance.now()), phase: "request", type: envelope.type, requestId: envelope.requestId });
           state.commands.push({
             type: envelope.type,
             payload: await sanitizeMockPayload(envelope.type, envelope.payload),
@@ -265,6 +267,7 @@ export async function attachMockAgent(
               });
               result = projectionMutationAcknowledgement(state, hostEpoch);
             }
+            if (envelope.type?.startsWith("enterprise.")) state.accountExchanges.push({ at: Math.round(performance.now()), phase: "response", type: envelope.type, requestId: envelope.requestId, state: (result as { state?: string } | undefined)?.state });
             hostPort.postMessage({
               protocolVersion: fixtureProtocolVersion,
               kind: "response",
