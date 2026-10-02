@@ -4,7 +4,8 @@ import {
   clearRecordedCommands,
   currentMockSessionAuthority,
   emitMockAgentEvent,
-  installMockDesktopBridge
+  installMockDesktopBridge,
+  waitForMockWorkspaceReady
 } from "./pi67-renderer-fixture.js";
 import { scenarioCommands, scenarioCommandTypes } from "./pi67-renderer-scenario-commands.js";
 import type { FixtureMessage } from "./pi67-renderer-fixture.js";
@@ -135,6 +136,8 @@ async function openPlanScenario(page: Page, planImplementationStartDelayMs = 0):
     planImplementationStartDelayMs
   });
   await page.getByRole("button", { name: "选择工作区" }).click();
+  // plan.proposed is Session-scoped; emitted before the workspace Session is ready it is stale.
+  await waitForMockWorkspaceReady(page);
   await clearRecordedCommands(page);
   await emitMockAgentEvent(page, {
     type: "plan.proposed",
