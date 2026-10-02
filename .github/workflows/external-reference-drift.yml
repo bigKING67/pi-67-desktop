@@ -36,6 +36,9 @@ jobs:
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.18.0
+          # The audit uses only Node built-ins; setup-node v5 otherwise tries to
+          # cache the packageManager (pnpm) that this job never installs.
+          package-manager-cache: false
       - name: Audit S0 specification references
         run: node eng/quality/audit-external-reference-drift.mjs --tier S0 --json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -57,6 +60,9 @@ jobs:
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.18.0
+          # The audit uses only Node built-ins; setup-node v5 otherwise tries to
+          # cache the packageManager (pnpm) that this job never installs.
+          package-manager-cache: false
       - name: Audit S1 comprehensive references
         run: node eng/quality/audit-external-reference-drift.mjs --tier S1 --json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -76,6 +82,9 @@ jobs:
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.18.0
+          # The audit uses only Node built-ins; setup-node v5 otherwise tries to
+          # cache the packageManager (pnpm) that this job never installs.
+          package-manager-cache: false
       - name: Audit every registered reference
         run: node eng/quality/audit-external-reference-drift.mjs --all --json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -95,6 +104,9 @@ jobs:
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.18.0
+          # The audit uses only Node built-ins; setup-node v5 otherwise tries to
+          # cache the packageManager (pnpm) that this job never installs.
+          package-manager-cache: false
       - name: Audit selected reference
         env:
           PI67_REFERENCE_ID: ${{ inputs.repository_id }}
