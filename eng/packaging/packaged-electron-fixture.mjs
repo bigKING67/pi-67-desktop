@@ -225,7 +225,11 @@ export async function launchPackagedApplication({
 }) {
   const application = await electron.launch({
     executablePath: artifact.executablePath,
-    args: [...applicationArguments, `--user-data-dir=${userDataDirectory}`],
+    // Isolated profiles must not write a "Safe Storage" item into the host login
+    // keychain: on hosted runners that SecItemAdd blocks Main on an authorization
+    // prompt nobody can answer. Chromium's mock keychain keeps safeStorage real.
+    args: [...(process.platform === "darwin" ? ["--use-mock-keychain"] : []), ...applicationArguments,
+      `--user-data-dir=${userDataDirectory}`],
     env: packagedApplicationEnvironment({
       agentDir,
       environment,
