@@ -92,6 +92,18 @@ describe("team chat model", () => {
     expect(applyMessage(INITIAL_TEAM_CHAT_STATE, message(1))).toEqual(INITIAL_TEAM_CHAT_STATE);
   });
 
+  it("keeps a message pushed while the latest page loads instead of losing it to that page", () => {
+    const loading = setThreadStatus(replaceDirectory(INITIAL_TEAM_CHAT_STATE, directory), "c1", { status: "loading" });
+    const pushed = applyMessage(loading, message(3));
+    expect(pushed.threads.c1?.messages.map((item) => item.seq)).toEqual([3]);
+    const loaded = applyMessagePage(pushed, "c1", { messages: [message(1), message(2)], hasMore: false }, "latest");
+    expect(loaded.threads.c1).toMatchObject({ status: "ready" });
+    expect(loaded.threads.c1?.messages.map((item) => item.seq)).toEqual([1, 2, 3]);
+    // A page that already contains the push neither duplicates it nor keeps older stale copies.
+    const covered = applyMessagePage(pushed, "c1", { messages: [message(2), message(3, { body: "edited" })] }, "latest");
+    expect(covered.threads.c1?.messages.map((item) => [item.seq, item.body])).toEqual([[2, "m2"], [3, "edited"]]);
+  });
+
   it("advances read cursors monotonically", () => {
     let state = applyMessage(ready(), message(3));
     state = applyMessage(state, message(4));

@@ -289,6 +289,22 @@ test("asks an Agent member, follows its request state and manages own Agents", a
   await expect(navigation.getByRole("button", { name: "写作助手，Agent，已停用，我的" })).toBeVisible();
 });
 
+test("keeps a message pushed while the channel history is still loading", async ({ page }) => {
+  await page.goto("/");
+  // The history reply is computed when it is sent, so it never contains the pushed message.
+  await attachMockAgent(page, [], { "teamChat.messages.list": 800 });
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.getByRole("group", { name: "工作模式" }).getByRole("button", { name: "聊天" }).click();
+  await signIn(page);
+  await page.getByTestId("team-chat-navigation").getByRole("button", { name: "宏观研究，1 条未读，1 条提及你" }).click();
+  await emitMockAgentEvent(page, { type: "teamChat.pushed", payload: { type: "message.created", message: {
+    id: "live-msg-1", conversationId: "conv-research", seq: 5, senderUserId: "user-wang", body: "刚刚推送的消息",
+    clientKey: "live-0005-msg", createdAt: Date.now() } } }, { context: "app" });
+  const log = page.getByRole("log", { name: "#宏观研究" });
+  await expect(log.getByText("重点是第三节的折现率假设。")).toBeVisible();
+  await expect(log.getByText("刚刚推送的消息")).toBeVisible();
+});
+
 test("creates a channel webhook, shows its URL once and labels bot messages", async ({ page }) => {
   await page.goto("/");
   await attachMockAgent(page);

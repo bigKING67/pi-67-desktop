@@ -32,6 +32,8 @@ Real-time team messaging needs a push channel from the hosted service.
    single-use, short-lived ticket obtained over REST, closes no later than the access
    token expiry, and reconnects with backoff. After every (re)connect the client
    reconciles per-conversation `lastSeq` over REST, so push loss never loses messages.
+   A push that lands while a conversation's latest history page is loading is kept
+   and merged after that page, so opening a conversation never drops it.
 4. **Red line narrowed, not removed.** Still forbidden: any local listener, internal
    HTTP server, renderer network access (CSP `connect-src 'self'` stays), and any
    WebSocket between local processes. Allowed: exactly this Host-owned outbound WSS

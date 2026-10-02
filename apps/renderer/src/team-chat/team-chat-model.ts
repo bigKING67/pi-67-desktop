@@ -124,7 +124,10 @@ export function applyMessagePage(
     return { ...state, threads: { ...state.threads, [conversationId]: { ...current, messages: mergeTeamChatMessages(current.messages, page.messages) } } };
   }
   const replace = position === "latest" || position === "window";
-  const messages = mergeTeamChatMessages(replace ? [] : current?.messages ?? [], page.messages);
+  // Pushes that arrived while the latest page was in flight are newer than it; keep them.
+  const pageTail = page.messages.at(-1)?.seq ?? 0;
+  const carried = position === "latest" ? (current?.messages ?? []).filter((message) => message.seq > pageTail) : [];
+  const messages = mergeTeamChatMessages(replace ? carried : current?.messages ?? [], page.messages);
   const hasMore = position === "newer" ? current?.hasMore ?? false : page.hasMore ?? false;
   const lastSeq = state.directory?.conversations.find((item) => item.id === conversationId)?.lastSeq ?? 0;
   const hasNewer = position === "window" ? (messages.at(-1)?.seq ?? 0) < lastSeq
@@ -161,7 +164,8 @@ export function applyMessage(state: TeamChatState, message: TeamChatMessage): Te
     ...state,
     pending: pending.length === state.pending.length ? state.pending : pending,
     // A window at older history skips live messages; scrolling down loads them in order.
-    threads: thread && thread.status === "ready" && thread.hasNewer !== true
+    // A thread still loading keeps the push for its latest page to carry.
+    threads: thread && (thread.status === "ready" || thread.status === "loading") && thread.hasNewer !== true
       ? { ...state.threads, [message.conversationId]: { ...thread, messages: mergeTeamChatMessages(thread.messages, [message]) } }
       : state.threads
   };
