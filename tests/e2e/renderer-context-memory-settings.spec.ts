@@ -101,7 +101,8 @@ test("memory settings preserve one draft across tabs, use keyboard radios, and g
   const saved = { ...configuration, revision: "fixture-2", defaultPrivacyMode: "full-learning" };
   await setMockAgentResponseResult(page, "context.config.update", saved);
   await settings.getByRole("button", { name: "保存更改" }).click();
-  await expect(settings.getByRole("button", { name: "保存更改" })).toBeHidden();
+  // The button relabels to "保存中…" at once; the bar leaves only after the write settles.
+  await expect(settings.getByRole("region", { name: "未保存的更改" })).toBeHidden();
   const writes = (await recordedCommandDetails(page)).filter((command) => command.type === "context.config.update");
   expect(writes).toHaveLength(1);
   expect(writes[0]?.payload).toMatchObject({ defaultPrivacyMode: "full-learning", enterpriseGatewayEndpoint: configuration.enterpriseGatewayEndpoint, expectedRevision: "fixture-1" });
