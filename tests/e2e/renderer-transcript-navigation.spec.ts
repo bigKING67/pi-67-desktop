@@ -43,6 +43,9 @@ test("restores an away-from-bottom reading anchor across a Settings round trip",
 
   await expect(transcript).toHaveAttribute("data-message-count", "72");
   await expect(transcript.locator(`[data-message-id="${anchorId}"]`)).toBeVisible();
+  // The restored reading position starts at the same row, not at a row from
+  // the overscan rendered above the viewport.
+  await expect.poll(() => firstVisibleTranscriptMessageId(scroller)).toBe(anchorId);
   await expect(latestButton).toBeVisible();
   await expect.poll(() => scroller.evaluate((element) => (
     element.scrollHeight - element.clientHeight - element.scrollTop

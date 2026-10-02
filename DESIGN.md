@@ -1719,7 +1719,10 @@ loading error where the operation can produce those states
   Markdown, and other Footer height growth keep the newest content in view without
   exposing `回到最新`. An explicit user scroll away preserves that reading anchor
   and exposes the recovery action; activating it returns to the current end and
-  resumes following subsequent streamed growth.
+  resumes following subsequent streamed growth. The anchor is the first row with
+  more than 8px visible in the viewport, never a row from the overscan rendered
+  above it; returning from another surface such as Settings restores that row to
+  the top, and a hidden transcript never overwrites the saved anchor.
 - While a Prompt Operation is streaming, the compact delivery selector replaces
   the idle `执行 | 计划` control instead of being appended beside it. Its resting
   trigger shows the current `立即纠偏` or `完成后执行` behavior and opens an upward

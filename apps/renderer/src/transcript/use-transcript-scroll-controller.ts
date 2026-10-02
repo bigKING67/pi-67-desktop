@@ -23,6 +23,10 @@ export function useTranscriptScrollController({
   const followLatestRef = useRef(true);
   const followScrollFrameRef = useRef(0);
   const scrollerCleanupRef = useRef<(() => void) | undefined>(undefined);
+  // Current values for listeners bound once to the scroller element.
+  const anchorInputsRef = useRef({ historical, readKey, rows });
+  anchorInputsRef.current = { historical, readKey, rows };
+  const anchorFrameRef = useRef(0);
   const previousRowsRef = useRef<{
     readKey: string | undefined;
     count: number;
@@ -49,7 +53,15 @@ export function useTranscriptScrollController({
     const armUserScrollIntent = () => {
       userScrollIntentUntil = performance.now() + USER_SCROLL_INTENT_WINDOW_MS;
     };
+    const observeAnchorAfterScroll = () => {
+      if (anchorFrameRef.current) return;
+      anchorFrameRef.current = requestAnimationFrame(() => {
+        anchorFrameRef.current = 0;
+        observeVisibleAnchor(scroller, anchorInputsRef.current);
+      });
+    };
     const observeScrollDirection = () => {
+      observeAnchorAfterScroll();
       const nextScrollTop = scroller.scrollTop;
       // Reflow and Virtuoso measurement can lower scrollTop without user input.
       if (
@@ -134,6 +146,10 @@ export function useTranscriptScrollController({
 
   const handleRangeChanged = useCallback((range: ListRange) => {
     if (!readKey || historical) return;
+    // The reported range includes overscan rendered above the viewport, so it
+    // would restore a row or two above where the reader actually was.
+    const scroller = scrollerRef.current;
+    if (scroller && (scroller.clientHeight === 0 || observeVisibleAnchor(scroller, { historical, readKey, rows }))) return;
     const row = rows[range.startIndex - firstItemIndex];
     if (row) useConversationReadPositionStore.getState().observeAnchor(readKey, row.key);
   }, [firstItemIndex, historical, readKey, rows]);
@@ -173,6 +189,7 @@ export function useTranscriptScrollController({
   useEffect(() => () => {
     scrollerCleanupRef.current?.();
     cancelAnimationFrame(followScrollFrameRef.current);
+    cancelAnimationFrame(anchorFrameRef.current);
   }, []);
 
   return {
@@ -190,6 +207,29 @@ export function useTranscriptScrollController({
 }
 
 const USER_SCROLL_INTENT_WINDOW_MS = 750;
+/** A row counts as the reading anchor once more than this much of it is visible. */
+const VISIBLE_ANCHOR_MIN_PX = 8;
+
+/**
+ * Persist the first row actually visible in the scroller (Virtuoso's
+ * `data-index` is the row position). Hidden scrollers (for example behind
+ * Settings) report no geometry and must not overwrite the saved anchor.
+ */
+function observeVisibleAnchor(
+  scroller: HTMLElement,
+  { historical, readKey, rows }: { historical: boolean; readKey: string | undefined; rows: readonly TranscriptRow[] }
+): boolean {
+  if (historical || !readKey || scroller.clientHeight === 0) return false;
+  const top = scroller.getBoundingClientRect().top;
+  for (const node of scroller.querySelectorAll<HTMLElement>("[data-index]")) {
+    if (node.getBoundingClientRect().bottom <= top + VISIBLE_ANCHOR_MIN_PX) continue;
+    const row = rows[Number(node.dataset.index)];
+    if (!row) return false;
+    useConversationReadPositionStore.getState().observeAnchor(readKey, row.key);
+    return true;
+  }
+  return false;
+}
 
 function keyboardRequestsOlderContent(event: KeyboardEvent): boolean {
   if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return false;
