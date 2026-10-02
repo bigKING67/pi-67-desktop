@@ -1,6 +1,6 @@
 # Dedicated OpenViking query planner for Recall expansion
 
-Status: active
+Status: completed locally
 Owner: Claude Code
 Started: 2026-10-01
 Last updated: 2026-10-01
@@ -81,7 +81,7 @@ expansion wait when no suitable planner is configured.
 - [x] 3. Host resolution + thinking-off derivation (explicit `compat.thinkingFormat` only) with tests.
 - [x] 4. Native process `ov.conf`/env; `retrieval.enable_intent` false without a planner; tests.
 - [x] 5. Settings UI Provider/model field pair (design-craft L1-F), PRODUCT/DESIGN updates, packaged smoke extended.
-- [ ] 6. Aggregate gate, baseline re-run, packaged macOS smoke and visual verification.
+- [x] 6. Aggregate gate, packaged macOS smoke (memory settings incl. planner fields), real-app save and live ov.conf verification.
 
 ## Validation matrix
 
@@ -121,4 +121,14 @@ changes together.
   (913 files / 5,920 tests) PASS; knip fails only on another session's
   uncommitted `eng/release` files. Packaged smoke and settings screenshot are
   pending until that session's preview/release script changes settle.
+- 2026-10-02: Concurrent sessions committed; main packaged (smoke PASS incl.
+  isolated memory-settings save/readback and cold-process readback). Ark added
+  as a custom Pi provider `volcengine-ark` (openai-completions, models
+  doubao-seed-2-0-mini-260428 and deepseek-v4-1-flash-260910,
+  `compat.thinkingFormat: "deepseek"`; key only in Pi auth.json); the Desktop
+  resolver derives `{"thinking":{"type":"disabled"}}`. The user saved the planner
+  in the real app (screenshot provided); after restart the live ov.conf has
+  `retrieval.enable_intent: true` and `query_planner` for the Ark model with an
+  environment-only key and the thinking-off body. Live follow-up latency/hit
+  observation in real conversations is left to normal use.
 
