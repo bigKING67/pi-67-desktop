@@ -41,6 +41,7 @@ describe("packaged smoke failure evidence", () => {
     expect((await readFile(join(directory, "process-output.txt"), "utf8")).length).toBe(8_192);
     expect(screenshot).toHaveBeenCalledOnce();
     expect(screenshot.mock.calls[0][0].path).toBe(join(directory, "changes-inspector.png"));
-    expect((await readdir(directory)).sort()).toEqual(["failure.json", "process-output.txt"]);
+    expect((await readdir(directory)).sort()).toEqual(["failure.json", "process-output.txt", "processes.txt"]);
+    expect(await readFile(join(directory, "processes.txt"), "utf8")).toMatch(/PID/u);
   });
 });

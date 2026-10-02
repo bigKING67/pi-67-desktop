@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -41,6 +42,14 @@ export function createPackagedSmokeGuard({
       error: String(error?.stack ?? error).slice(0, 4_000), mainWindows, surface
     }, null, 2)}\n`);
     await writeFile(join(directory, "process-output.txt"), processOutput().slice(0, 8_192));
+    // When Main itself stops answering, a native stack sample and the host's CPU
+    // table separate a blocking Main operation from a starved runner.
+    const mainPid = app?.process?.().pid;
+    if (process.platform === "darwin" && mainPid) {
+      await writeFile(join(directory, "main-sample.txt"), (await run("sample", [String(mainPid), "3", "-mayDie"], 20_000)).slice(0, 400_000));
+    }
+    await writeFile(join(directory, "processes.txt"), (await run("ps", ["-axo", "pid,ppid,%cpu,%mem,etime,comm", "-r"], 5_000))
+      .split("\n").slice(0, 40).join("\n"));
     if (window) await window.screenshot({ path: join(directory, `${current}.png`), timeout: 10_000 }).catch(() => undefined);
     console.error(`Packaged smoke failure evidence (stage ${current}): ${directory}`);
   };
@@ -69,4 +78,12 @@ function withTimeout(promise, timeoutMs, message = `Timed out after ${timeoutMs}
   let timer;
   return Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), timeoutMs); })])
     .finally(() => clearTimeout(timer));
+}
+
+function run(command, args, timeout) {
+  return new Promise((resolve) => {
+    execFile(command, args, { timeout, maxBuffer: 2 * 1024 * 1024 }, (error, stdout, stderr) => {
+      resolve(`${stdout}${stderr}${error ? `\n[${command} ${error.code ?? error.signal ?? "failed"}]` : ""}`);
+    });
+  });
 }
