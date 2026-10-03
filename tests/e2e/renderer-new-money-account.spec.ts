@@ -57,12 +57,14 @@ for (const theme of ["light", "dark"] as const) {
     await expect(memory.getByRole("button",{name:"连接 New Money",exact:true})).toHaveCount(0);
     await memory.getByRole("button",{name:"账户与登录设置"}).click();
     await expect(account).toBeVisible();
-    await setMockAgentResponseResult(page,"enterprise.identity.get",{state:"signed-out"});
     await account.getByRole("button",{name:"退出登录",exact:true}).click();
     await expect(account.getByRole("button",{name:"登录 New Money",exact:true})).toBeEnabled();
     await page.getByRole("button",{name:"返回工作台"}).click();
     await expect(footer).toContainText("登录 New Money");
-    expect((await recordedCommandDetails(page)).some(x=>x.type==="enterprise.knowledge.index")).toBe(false);
+    const commands = await recordedCommandDetails(page);
+    expect(commands.filter(command => command.type === "enterprise.auth.disconnect")).toHaveLength(1);
+    expect(commands.some(command => command.type === "enterprise.auth.begin")).toBe(false);
+    expect(commands.some(command => command.type === "enterprise.knowledge.index")).toBe(false);
   });
 }
 test("device login publishes its result to the footer without a separate memory login", async ({page}) => {

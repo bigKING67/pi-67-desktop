@@ -1,4 +1,4 @@
-import { access, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -34,13 +34,16 @@ describe("controlled shutdown fixture", () => {
   });
 
   it("records the real native tool result even when a later provider request has only the prompt prefix", async () => {
-    const root = await mkdtemp(join(tmpdir(), "pi67-native-receipt-"));
+    // Resolve Pi from its actual dependency owner; the external temporary
+    // node_modules junction failed dependency resolution on the Windows runner.
+    const root = await mkdtemp(fileURLToPath(new URL(
+      "../../packages/pi-runtime/node_modules/.pi67-native-receipt-", import.meta.url
+    )));
     roots.push(root);
     const extensionPath = join(root, "fixture.mjs");
     const evidencePath = join(root, "evidence.json");
     await writeControlledShutdownExtension({ extensionPath, nativeMcpEvidencePath: evidencePath,
       childPidPath: join(root, "child.pid"), lifecyclePath: join(root, "lifecycle.txt") });
-    await symlink(fileURLToPath(new URL("../../packages/pi-runtime/node_modules", import.meta.url)), join(root, "node_modules"), "junction");
     const { default: factory } = await import(pathToFileURL(extensionPath).href);
     const handlers = new Map();
     let provider;
