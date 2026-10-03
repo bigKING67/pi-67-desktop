@@ -1720,7 +1720,8 @@ loading error where the operation can produce those states
   resumes following subsequent streamed growth. The anchor is the first row with
   more than 8px visible in the viewport, never a row from the overscan rendered
   above it; returning from another surface such as Settings restores that row to
-  the top, and a hidden transcript never overwrites the saved anchor.
+  the top. Hidden, detached or not-yet-attached scrollers retain the last measured
+  anchor; a virtualizer range notification alone never overwrites it.
 - While a Prompt Operation is streaming, the compact delivery selector replaces
   the idle `执行 | 计划` control instead of being appended beside it. Its resting
   trigger shows the current `立即纠偏` or `完成后执行` behavior and opens an upward

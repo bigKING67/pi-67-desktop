@@ -158,7 +158,6 @@ export function Transcript() {
     unseenRowCount,
     virtuosoRef: transcriptRef
   } = useTranscriptScrollController({
-    firstItemIndex: transcriptFirstItemIndex,
     historical: Boolean(historicalWindow),
     readKey,
     rows: transcriptRows

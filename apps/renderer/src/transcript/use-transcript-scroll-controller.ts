@@ -4,14 +4,12 @@ import { useConversationReadPositionStore } from "./conversation-read-position-s
 import type { TranscriptRow } from "./transcript-rows.js";
 
 interface TranscriptScrollControllerOptions {
-  firstItemIndex: number;
   historical: boolean;
   readKey: string | undefined;
   rows: readonly TranscriptRow[];
 }
 
 export function useTranscriptScrollController({
-  firstItemIndex,
   historical,
   readKey,
   rows
@@ -150,15 +148,12 @@ export function useTranscriptScrollController({
     if (readKey) useConversationReadPositionStore.getState().setAtBottom(readKey, nextAtBottom);
   }, [handleTotalListHeightChanged, historical, readKey]);
 
-  const handleRangeChanged = useCallback((range: ListRange) => {
-    if (!readKey || historical) return;
-    // The reported range includes overscan rendered above the viewport, so it
-    // would restore a row or two above where the reader actually was.
+  const handleRangeChanged = useCallback((_range: ListRange) => {
+    // Range notifications can outlive the scroller or precede its attachment.
+    // Their overscan boundary is never evidence of the reader's position.
     const scroller = scrollerRef.current;
-    if (scroller && (scroller.clientHeight === 0 || observeVisibleAnchor(scroller, { historical, readKey, rows }))) return;
-    const row = rows[range.startIndex - firstItemIndex];
-    if (row) useConversationReadPositionStore.getState().observeAnchor(readKey, row.key);
-  }, [firstItemIndex, historical, readKey, rows]);
+    if (scroller) observeVisibleAnchor(scroller, { historical, readKey, rows });
+  }, [historical, readKey, rows]);
 
   useEffect(() => {
     const saved = readKey
