@@ -192,11 +192,6 @@ export async function attachMockAgent(
             let result = hasConfiguredResult
               ? state.responseResults[envelope.type!]
               : preparedPage ?? resolveMockCommand(envelope.type!, envelope.payload ?? {}, state, hostEpoch);
-            if (envelope.type === "enterprise.auth.disconnect") {
-              // Identity changes when the Host accepts logout, not before the
-              // user clicks while a Settings identity refresh may still finish.
-              state.responseResults["enterprise.identity.get"] = result;
-            }
             if (envelope.type === "runtime.initialize" || envelope.type === "workspace.open") {
               if (
                 envelope.type === "runtime.initialize"

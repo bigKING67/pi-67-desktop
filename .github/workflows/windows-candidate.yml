@@ -95,6 +95,8 @@ jobs:
       - name: Verify locked capability sources are remotely fetchable
         run: node eng/capabilities/verify-capability-source-lock.mjs
       - name: Verify first-party capability freshness
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: node eng/capabilities/check-capability-freshness.mjs --json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()

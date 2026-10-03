@@ -50,6 +50,12 @@ export function installMockCommandResponseHandler({
       ?? current.sessionCatalogPage;
     if (type === "runtime.getStatus") return { initialized: true, loaded: true };
     if (type === "enterprise.identity.get") return { state: "signed-out" };
+    if (type === "enterprise.auth.disconnect") {
+      // Commit the Host identity change with logout, after any earlier reads.
+      const identity = { state: "signed-out" };
+      current.responseResults["enterprise.identity.get"] = identity;
+      return identity;
+    }
     const larkResult = resolveMockLarkCommand(type, payload);
     if (larkResult !== undefined) return larkResult;
     const teamChatResult = resolveMockTeamChatCommand(type, payload);

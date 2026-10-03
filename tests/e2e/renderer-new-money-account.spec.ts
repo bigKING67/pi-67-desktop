@@ -26,7 +26,6 @@ async function setup(page: Page, identity: object = signedIn) {
       endpoint: configuration.endpoint, configured: true, conflictExtensions: [], lastCheckedAt: 1
     } },
     "enterprise.team.list": {items: [], total: 0},
-    "enterprise.auth.disconnect": {state:"signed-out"},
     "enterprise.auth.begin": {authorizationId:"synthetic-auth",verificationUri:"https://newmoney.example.test/device",userCode:"TEST-CODE",expiresAt:Date.now()+60000,intervalSeconds:1},
     "enterprise.auth.poll": signedIn
   } });

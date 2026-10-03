@@ -42,8 +42,12 @@ export async function resolveAiBerkshireInputEquivalence(pack, latestCommit, que
 }
 
 async function queryGitHub(endpoint) {
+  const token = process.env.GH_TOKEN;
   const response = await fetch(`https://api.github.com/repos/xbtlin/ai-berkshire/${endpoint}`, {
-    headers: { Accept: "application/vnd.github+json" },
+    headers: {
+      Accept: "application/vnd.github+json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
     signal: AbortSignal.timeout(30_000),
     redirect: "error"
   });

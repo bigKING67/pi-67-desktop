@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { resolveAiBerkshireInputEquivalence } from "./ai-berkshire-input-equivalence.mjs";
 
 const locked = "1".repeat(40);
@@ -22,6 +22,27 @@ function queryFixture(change = () => {}) {
   };
 }
 describe("AI Berkshire input equivalence", () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+  it.each([undefined, "synthetic-github-token"])("uses optional workflow authentication without changing the proof (%s)", async (token) => {
+    vi.stubEnv("GH_TOKEN", token);
+    const query = queryFixture();
+    const fetch = vi.fn(async (url) => new Response(JSON.stringify(
+      await query(new URL(url).pathname.replace("/repos/xbtlin/ai-berkshire/", ""))
+    )));
+    vi.stubGlobal("fetch", fetch);
+    await expect(resolveAiBerkshireInputEquivalence(pack, latest)).resolves.toMatchObject({ equivalent: true });
+    expect(fetch).toHaveBeenCalledTimes(4);
+    for (const [url, options] of fetch.mock.calls) {
+      expect(url).toMatch(/^https:\/\/api.github.com\/repos\/xbtlin\/ai-berkshire\/git\/(commits|trees)\/[a-f0-9]{40}$/u);
+      expect(options.redirect).toBe("error");
+      expect(options.headers.Authorization).toBe(token ? `Bearer ${token}` : undefined);
+    }
+  });
+  it("fails closed on an authenticated denial without copying response details", async () => {
+    vi.stubEnv("GH_TOKEN", "synthetic-github-token");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("synthetic-private-response", { status: 403 })));
+    await expect(resolveAiBerkshireInputEquivalence(pack, latest)).rejects.toThrow("Input proof request failed: HTTP 403");
+  });
   it("proves complete input roots while allowing unrelated reports to change", async () => {
     const proof = await resolveAiBerkshireInputEquivalence(pack, latest, queryFixture());
     expect(proof).toMatchObject({ equivalent: true, lockedCommit: locked, latestCommit: latest });
