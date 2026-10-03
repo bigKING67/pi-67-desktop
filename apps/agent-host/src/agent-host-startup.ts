@@ -10,10 +10,6 @@ import { lstat, readFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { bootstrapDesktopCapabilities, type DesktopCapabilityBootstrapOptions, type DesktopCapabilityBootstrapResult } from "./desktop-capability-bootstrap.js";
 import {
-  activateDesktopManagedPackages,
-  type ManagedPackageBundleResult
-} from "./managed-package-bundle.js";
-import {
   provisionManagedBrowser67Mcp,
   type ManagedBrowser67McpResult
 } from "./managed-browser67-mcp-provision.js";
@@ -39,10 +35,6 @@ interface AgentHostStartupOptions<T> {
     onPhase?: DesktopCapabilityBootstrapOptions["onPhase"];
   }) => Promise<DesktopCapabilityBootstrapResult>;
   onCapabilityPhase?: DesktopCapabilityBootstrapOptions["onPhase"];
-  activateManagedPackages?: (options: {
-    agentDir: string;
-    environment: NodeJS.ProcessEnv;
-  }) => Promise<ManagedPackageBundleResult>;
   cleanupRetiredMcp?: (options: {
     agentDir: string;
     environment: NodeJS.ProcessEnv;
@@ -125,38 +117,6 @@ export async function coordinateAgentHostStartup<T>(
     );
   }
 
-  let managedPackages: ManagedPackageBundleResult | undefined;
-  if (capabilities?.enabled) {
-    const managedPackageStage = await captureStage("managed-packages", async () => {
-      const result = await (
-        options.activateManagedPackages ?? activateDesktopManagedPackages
-      )({ agentDir, environment });
-      if (!result.enabled && profileMode === "fresh" && environment.PI67_PACKAGED === "1") {
-        throw new AgentHostStartupError(
-          { stage: "managed-packages", code: "missing-resource" },
-          profileMode
-        );
-      }
-      return result;
-    });
-    if (managedPackageStage.ok) {
-      managedPackages = managedPackageStage.value;
-      stageTimings.push(stageTiming(managedPackageStage, "failed"));
-    } else {
-      stageTimings.push(stageTiming(
-        managedPackageStage,
-        profileMode === "fresh" ? "failed" : "degraded"
-      ));
-      resetManagedPackageProjection(environment, capabilities);
-      if (profileMode === "fresh") {
-        throw startupError("managed-packages", managedPackageStage.error, profileMode);
-      }
-      addIssue(issues, startupIssue("managed-packages", managedPackageStage.error));
-    }
-  } else {
-    stageTimings.push(skippedStageTiming("managed-packages"));
-  }
-
   if (profileMode !== "existing-shared") {
     const cleanupStage = await captureStage("retired-mcp-cleanup", () => (
       options.cleanupRetiredMcp ?? removeRetiredTeamMcpConfig
@@ -203,7 +163,7 @@ export async function coordinateAgentHostStartup<T>(
   stageTimings.push(stageTiming(serverStage, "failed"));
   if (!serverStage.ok) throw startupError("server-construction", serverStage.error, profileMode);
   const server = serverStage.value;
-  scheduleLegacyCapabilityCleanup(agentDir, capabilities, managedPackages);
+  scheduleLegacyCapabilityCleanup(agentDir, capabilities);
   return {
     server,
     startup: {
@@ -297,11 +257,6 @@ function managedBrowser67Issues(result: ManagedBrowser67McpResult): AgentHostSta
   } else if (result.status === "invalid-json") {
     addIssue(issues, { stage: "browser67-mcp", code: "invalid-state" });
   }
-  if (result.cacheStatus === "revision-conflict") {
-    addIssue(issues, { stage: "browser67-mcp", code: "conflict" });
-  } else if (result.cacheStatus === "invalid-json") {
-    addIssue(issues, { stage: "browser67-mcp", code: "invalid-state" });
-  }
   return issues;
 }
 
@@ -345,18 +300,8 @@ function clearCapabilityProjection(environment: NodeJS.ProcessEnv): void {
   delete environment.PI67_SHARED_PROFILE_ROOT;
   delete environment.PI67_CAPABILITY_PACKAGE_PATHS;
   delete environment.PI67_KNOWN_PACKAGE_BASELINES;
-  delete environment.PI67_MANAGED_NPM_ROOT;
   delete environment.PI67_MANAGED_EXTENSION_PATHS;
   delete environment.PI67_OPENVIKING_SHARED_PROJECTION;
-}
-
-function resetManagedPackageProjection(
-  environment: NodeJS.ProcessEnv,
-  capabilities: DesktopCapabilityBootstrapResult
-): void {
-  delete environment.PI67_MANAGED_NPM_ROOT;
-  delete environment.PI67_MANAGED_EXTENSION_PATHS;
-  environment.PI67_CAPABILITY_PACKAGE_PATHS = JSON.stringify(capabilities.packagePaths);
 }
 
 function nodeErrorCode(error: unknown): string | undefined {
@@ -439,19 +384,10 @@ function boundedDuration(value: number): number {
 
 function scheduleLegacyCapabilityCleanup(
   agentDir: string,
-  capabilities: DesktopCapabilityBootstrapResult | undefined,
-  managedPackages: ManagedPackageBundleResult | undefined
+  capabilities: DesktopCapabilityBootstrapResult | undefined
 ): void {
   if (capabilities?.projectionMode !== "packaged-direct") return;
   const paths = [join(agentDir, "desktop-capabilities", "packages")];
-  if (managedPackages?.projectionMode === "packaged-direct") {
-    const managedRoot = join(agentDir, "desktop-capabilities", "managed-packages");
-    paths.push(
-      join(managedRoot, "active"),
-      join(managedRoot, "previous"),
-      join(managedRoot, "staging")
-    );
-  }
   const timer = setTimeout(() => {
     void Promise.all(paths.map((path) => rm(path, { recursive: true, force: true }).catch(() => undefined)));
   }, LEGACY_CAPABILITY_CLEANUP_DELAY_MS);

@@ -20,7 +20,6 @@ import {
   assertCapabilitySourceLock,
   treeSha256
 } from "./prepared-capabilities-validation.mjs";
-import { prepareManagedNpmBundles } from "./managed-npm-bundles.mjs";
 import { preparePi67SkillPackOverlay } from "./pi67-skill-pack-overlay.mjs";
 import {
   assertRelativePath,
@@ -36,8 +35,6 @@ const lockPath = resolve(repositoryRoot, "eng/capabilities/capability-sources.lo
 const skillSuitesPath = resolve(repositoryRoot, "eng/capabilities/bundled-skill-suites.json");
 const outputRoot = resolve(repositoryRoot, "artifacts/capabilities/current");
 const sourceCacheRoot = resolve(repositoryRoot, "artifacts/capabilities/sources");
-const managedNpmCacheRoot = resolve(repositoryRoot, "artifacts/capabilities/npm-cache");
-const managedNpmProjectRoot = resolve(repositoryRoot, "eng/capabilities/managed-npm");
 const generatedSkillPackRoot = resolve(repositoryRoot, "artifacts/capabilities/generated/skill-packs");
 const toolchainManifestPath = resolve(repositoryRoot, "artifacts/toolchain/current/manifest.json");
 const execFileAsync = promisify(execFile);
@@ -127,21 +124,12 @@ export async function prepareDesktopCapabilities() {
     ...skillPackOverlays.map(({ sourceRoot: _sourceRoot, skills: _skills, ...pack }) => pack)
   ].sort((left, right) => left.name.localeCompare(right.name));
   const bundledSkillSuites = compileBundledSkillSuites(skillSuiteDefinition, entries, { skillPacks });
-  const managedNpmBundle = await prepareManagedNpmBundles({
-    lock,
-    outputRoot,
-    projectRoot: managedNpmProjectRoot,
-    cacheRoot: managedNpmCacheRoot,
-    npmCommand
-  });
-
   const catalog = {
     schema: "pi67.capability-catalog.v1",
     catalogVersion: lock.catalogVersion,
     generatedFrom: entries.map(({ packagePath: _packagePath, resourceTypes: _resourceTypes, ...entry }) => entry),
     entries,
     bundledSkillSuites,
-    managedNpmBundles: managedNpmBundle.packages,
     recommendedExternal: lock.recommendedExternal
   };
   const manifest = {
@@ -151,12 +139,7 @@ export async function prepareDesktopCapabilities() {
       id: entry.id,
       treeSha256: await treeSha256(join(outputRoot, entry.packagePath)),
       ...(entry.id === "browser67" ? { includeNodeModules: true } : {})
-    }))),
-    managedNpmBundle: {
-      treeSha256: managedNpmBundle.treeSha256,
-      platform: managedNpmBundle.platform,
-      architecture: managedNpmBundle.architecture
-    }
+    })))
   };
   assertCapabilitiesMetadata(lock, catalog, manifest);
   await writeFile(join(outputRoot, "catalog.json"), `${JSON.stringify(catalog, null, 2)}\n`, "utf8");

@@ -13,7 +13,6 @@ export type AgentHostProfileMode = Static<typeof AgentHostProfileModeSchema>;
 export const AgentHostStartupStageSchema = Type.Union([
   Type.Literal("classify-profile"),
   Type.Literal("desktop-capabilities"),
-  Type.Literal("managed-packages"),
   Type.Literal("retired-mcp-cleanup"),
   Type.Literal("browser67-mcp"),
   Type.Literal("server-construction")
@@ -24,7 +23,6 @@ export type AgentHostStartupStage = Static<typeof AgentHostStartupStageSchema>;
 export const AgentHostStartupTimingStageSchema = Type.Union([
   Type.Literal("profile-classification"),
   Type.Literal("desktop-capabilities"),
-  Type.Literal("managed-packages"),
   Type.Literal("retired-mcp-cleanup"),
   Type.Literal("browser67-mcp"),
   Type.Literal("server-construction")
@@ -77,7 +75,7 @@ export const AgentHostStartupStateSchema = strictObject({
   status: Type.Union([Type.Literal("ready"), Type.Literal("degraded")]),
   issues: Type.Array(AgentHostStartupIssueSchema, { maxItems: 8 }),
   totalDurationMs: Type.Optional(Type.Integer({ minimum: 0, maximum: 10 * 60_000 })),
-  stageTimings: Type.Optional(Type.Array(AgentHostStartupStageTimingSchema, { maxItems: 6 })),
+  stageTimings: Type.Optional(Type.Array(AgentHostStartupStageTimingSchema, { maxItems: 5 })),
   capabilityProjectionMode: Type.Optional(CapabilityProjectionModeSchema)
 });
 

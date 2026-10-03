@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionToolContext } from "@earendil-works/pi-coding-agent";
 
-function context(): ExtensionContext {
-  return { model: { baseUrl: "https://model.fixture/v1", id: "fixture-model" }, sessionManager: { getSessionId: () => "session_67" } } as ExtensionContext;
+function context(): ExtensionToolContext {
+  return { model: { baseUrl: "https://model.fixture/v1", id: "fixture-model" }, sessionManager: { getSessionId: () => "session_67" } } as ExtensionToolContext;
 }
 import type { SharedSopAccess } from "./shared-sop-tools.js";
 import { createSharedSopTools } from "./shared-sop-tools.js";

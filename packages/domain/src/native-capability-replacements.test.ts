@@ -5,11 +5,12 @@ import {
 } from "./native-capability-replacements.js";
 
 describe("native capability replacements", () => {
-  it("recognizes retired Plan and Search packages across pinned semver forms", () => {
+  it("recognizes retired Plan, Search, MCP, and subagent packages across pinned semver forms", () => {
     expect(nativeCapabilityReplacement("npm:@narumitw/pi-plan-mode@^1.2.3")).toBe("native-plan");
     expect(nativeCapabilityReplacement("npm:pi-web-access@~0.17.0")).toBe("native-web");
     expect(nativeCapabilityReplacement(" npm:pi-smart-fetch@2.0.0 ")).toBe("native-web");
     expect(nativeCapabilityReplacement("npm:pi-subagents@0.46.0")).toBe("native-subagents");
+    expect(nativeCapabilityReplacement("npm:pi-mcp-adapter@2.11.0")).toBe("native-mcp");
     expect(nativeCapabilityReplacement("npm:another-package@1.0.0")).toBeUndefined();
   });
 
@@ -17,6 +18,7 @@ describe("native capability replacements", () => {
     expect(nativeCapabilityReplacement(`npm:@narumitw/pi-plan-mode@${tag}`)).toBe("native-plan");
     expect(nativeCapabilityReplacement(`npm:pi-web-access@${tag}`)).toBe("native-web");
     expect(nativeCapabilityReplacement(`npm:pi-smart-fetch@${tag}`)).toBe("native-web");
+    expect(nativeCapabilityReplacement(`npm:pi-mcp-adapter@${tag}`)).toBe("native-mcp");
     expect(nativeCapabilityReplacement(`npm:pi-web-access-other@${tag}`)).toBeUndefined();
     expect(nativeCapabilityReplacement(`npm:@other/pi-plan-mode@${tag}`)).toBeUndefined();
   });
@@ -25,5 +27,6 @@ describe("native capability replacements", () => {
     expect(nativeCapabilityReplacementLabel("native-plan")).toBe("由 Pi-67 原生 Plan Mode 替代");
     expect(nativeCapabilityReplacementLabel("native-web")).toBe("由 Pi-67 原生搜索替代");
     expect(nativeCapabilityReplacementLabel("native-subagents")).toBe("由 Pi-67 原生子代理替代");
+    expect(nativeCapabilityReplacementLabel("native-mcp")).toBe("由 Pi-67 原生 MCP 替代");
   });
 });

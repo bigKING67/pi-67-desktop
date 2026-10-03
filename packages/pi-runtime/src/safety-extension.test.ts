@@ -412,6 +412,15 @@ describe("createDesktopSafetyExtension", () => {
     }), expect.any(Object));
   });
 
+  it("does not treat an obsolete builtin source path as a current trusted identity", async () => {
+    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
+    const legacyTool = builtinTool("read");
+    legacyTool.sourceInfo.path = "<builtin:read>";
+    const handler = safetyHandler(trustedPolicy(), requestApproval, () => [legacyTool]);
+    await expect(handler({ toolCallId: "legacy-builtin", toolName: "read", input: { path: "/workspace/README.md" } },
+      { hasUI: true })).resolves.toMatchObject({ block: true });
+  });
+
   it("refuses commands and working directories that cannot be displayed in full", async () => {
     const requestApproval = vi.fn<DesktopApprovalRequester>();
     const commandHandler = safetyHandler(trustedPolicy(), requestApproval);

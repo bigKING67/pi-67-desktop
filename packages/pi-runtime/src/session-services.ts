@@ -38,6 +38,7 @@ import { createLocalMemoryEventBus, type LocalMemoryAccess } from "./local-memor
 import { bindPrivateMemoryCommitBus } from "./private-memory-commit.js";
 import { createSharedHistoryTransitionExtension } from "./shared-history-transition-extension.js";
 import { createAgentTurnSystemPromptExtension } from "./agent-turn-profile.js";
+import { createDesktopNativeMcpExtensions } from "./native-mcp-extension.js";
 
 interface DesktopSessionServicesOptions {
   localMemory?: LocalMemoryAccess;
@@ -75,7 +76,9 @@ export async function createDesktopSessionServices(
   const admittedSettingsManager = createDesktopPackageSettingsView(
     baseSettingsManager,
     process.env,
-    options.packageTrustRegistry
+    options.packageTrustRegistry,
+    undefined,
+    { agentDir: options.agentDir, cwd: options.cwd }
   );
   const configuredManagedExtensions = options.noThirdPartyExtensions
     ? managedDesktopExtensionPaths()
@@ -93,7 +96,8 @@ export async function createDesktopSessionServices(
         baseSettingsManager,
         process.env,
         options.packageTrustRegistry,
-        memoryOwnerPreflight
+        memoryOwnerPreflight,
+        { agentDir: options.agentDir, cwd: options.cwd }
       )
     : admittedSettingsManager;
   // Pi reads this cost-bearing setting directly from globalSettings, bypassing
@@ -131,6 +135,10 @@ export async function createDesktopSessionServices(
         : {}),
       extensionFactories: [
         createSharedHistoryTransitionExtension(),
+        ...(agentTurn ? [] : createDesktopNativeMcpExtensions({
+          cwd: options.cwd, agentDir: options.agentDir,
+          catalog: configuredCapabilities.nativeMcp, getSafety: options.getSafety
+        })),
         createDesktopToolRoutingExtension(),
         ...(options.promptAttachmentAccess === undefined
           ? []

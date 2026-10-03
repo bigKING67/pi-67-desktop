@@ -398,7 +398,7 @@ function isExpectedCanonicalSource(name: CanonicalToolName, tool: ToolInfo): boo
       && tool.sourceInfo.origin === "top-level";
   }
   return tool.sourceInfo.source === "builtin"
-    && tool.sourceInfo.path === `<builtin:${name}>`
+    && tool.sourceInfo.path === `builtin:${name}`
     && tool.sourceInfo.scope === "temporary"
     && tool.sourceInfo.origin === "top-level";
 }

@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   createAgentSessionServices,
   SettingsManager
@@ -52,6 +53,25 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
         "/app/agent/desktop-capabilities/packages/design-craft"
       ]
     });
+  });
+
+  it("explicitly clears an adapter-only runtime override so it cannot reappear from raw settings", () => {
+    const rawPackages = ["npm:pi-mcp-adapter@2.11.0"];
+    const applyOverrides = vi.fn();
+    const settingsManager = { applyOverrides, getPackages: () => rawPackages };
+
+    applyDesktopPackageToolchain(settingsManager, {
+      ...environment,
+      PI67_CAPABILITY_PACKAGE_PATHS: JSON.stringify([])
+    });
+    applyDesktopPackageToolchain(settingsManager, {
+      ...environment,
+      PI67_CAPABILITY_PACKAGE_PATHS: JSON.stringify([])
+    });
+
+    expect(applyOverrides).toHaveBeenNthCalledWith(1, expect.objectContaining({ packages: [] }));
+    expect(applyOverrides).toHaveBeenNthCalledWith(2, expect.objectContaining({ packages: [] }));
+    expect(rawPackages).toEqual(["npm:pi-mcp-adapter@2.11.0"]);
   });
 
   it("reapplies the runtime-only override after SettingsManager reload", async () => {
@@ -168,29 +188,151 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
     expect(settingsManager.getGlobalSettings().packages).toEqual(configured);
   });
 
-  it("uses the verified managed MCP adapter without rewriting user npm sources", () => {
-    const managedRoot = "/app/agent/desktop-capabilities/managed-packages/active";
-    const adapter = `${managedRoot}/packages/pi-mcp-adapter`;
+  it("keeps the retired MCP adapter out of every Desktop runtime package view", () => {
+    const adapter = "/app/agent/desktop-capabilities/managed-packages/active/packages/pi-mcp-adapter";
     const configured = [
       "npm:pi-mcp-adapter@2.11.0",
+      "npm:pi-mcp-adapter@next",
+      adapter,
+      `${adapter}/package.json`,
       "npm:user-package"
     ];
-    const settingsManager = SettingsManager.inMemory({ packages: structuredClone(configured) });
-    const sessionView = createDesktopPackageSettingsView(settingsManager, {
-      ...environment,
-      PI67_MANAGED_NPM_ROOT: managedRoot,
-      PI67_CAPABILITY_PACKAGE_PATHS: JSON.stringify([
-        "/app/agent/desktop-capabilities/packages/pi-workspace-resources",
-        adapter
-      ])
-    });
+    const settingsManager = SettingsManager.inMemory({ packages: configured });
+    const sessionView = createDesktopPackageSettingsView(settingsManager, environment);
 
     expect(sessionView.getGlobalSettings().packages).toEqual([
       "npm:user-package",
       "/app/agent/desktop-capabilities/packages/pi-workspace-resources",
-      adapter
+      "/app/agent/desktop-capabilities/packages/design-craft"
     ]);
     expect(settingsManager.getGlobalSettings().packages).toEqual(configured);
+  });
+
+  it("filters only proven local adapter packages and their configured extension entrypoints", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-retired-mcp-adapter-"));
+    temporaryDirectories.push(root);
+    const adapterRoot = join(root, "adapter-with-unrelated-path");
+    const unrelatedRoot = join(root, "pi-mcp-adapter-looking-name");
+    const adapterExtension = join(adapterRoot, "extensions", "adapter.ts");
+    const unrelatedExtension = join(unrelatedRoot, "extensions", "keep.ts");
+    await Promise.all([
+      mkdir(join(adapterRoot, "extensions"), { recursive: true }),
+      mkdir(join(unrelatedRoot, "extensions"), { recursive: true })
+    ]);
+    await Promise.all([
+      writeFile(join(adapterRoot, "package.json"), JSON.stringify({ name: "pi-mcp-adapter" })),
+      writeFile(join(unrelatedRoot, "package.json"), JSON.stringify({ name: "user-package" })),
+      writeFile(adapterExtension, "export default {}\n"),
+      writeFile(unrelatedExtension, "export default {}\n")
+    ]);
+    const configured = [adapterRoot, pathToFileURL(adapterRoot).href, unrelatedRoot, "github:user/pi-mcp-adapter"];
+    const settingsManager = SettingsManager.inMemory({
+      packages: configured,
+      extensions: [adapterExtension, pathToFileURL(adapterExtension).href, unrelatedExtension]
+    }, { projectTrusted: true });
+    settingsManager.setProjectPackages(configured);
+    settingsManager.setProjectExtensionPaths([
+      adapterExtension,
+      pathToFileURL(adapterExtension).href,
+      unrelatedExtension
+    ]);
+    const sessionView = createDesktopPackageSettingsView(settingsManager, environment);
+
+    expect(sessionView.getGlobalSettings().packages).toEqual([
+      unrelatedRoot,
+      "github:user/pi-mcp-adapter",
+      "/app/agent/desktop-capabilities/packages/pi-workspace-resources",
+      "/app/agent/desktop-capabilities/packages/design-craft"
+    ]);
+    expect(sessionView.getGlobalSettings().extensions).toEqual([
+      unrelatedExtension,
+      "-extensions/pi-rules-loader/index.ts",
+      "-extensions/pi-rules-loader/index.js"
+    ]);
+    expect(sessionView.getProjectSettings().packages).toEqual([
+      unrelatedRoot,
+      "github:user/pi-mcp-adapter"
+    ]);
+    expect(sessionView.getProjectSettings().extensions).toEqual([unrelatedExtension]);
+    expect(settingsManager.getGlobalSettings().packages).toEqual(configured);
+    expect(settingsManager.getGlobalSettings().extensions).toEqual([
+      adapterExtension,
+      pathToFileURL(adapterExtension).href,
+      unrelatedExtension
+    ]);
+  });
+
+  it("filters only exact adapter manifests from global, project, and home-relative configured paths", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-retired-mcp-adapter-relative-"));
+    temporaryDirectories.push(root);
+    const agentDir = join(root, "agent");
+    const workspace = join(root, "workspace");
+    const projectConfig = join(workspace, ".pi");
+    const homeAdapter = join(root, "home-adapter");
+    const globalAdapter = join(agentDir, "global-adapter");
+    const globalKeep = join(agentDir, "global-keep");
+    const projectAdapter = join(projectConfig, "project-adapter");
+    const projectKeep = join(projectConfig, "project-keep");
+    const packageRoots = [homeAdapter, globalAdapter, globalKeep, projectAdapter, projectKeep];
+    await Promise.all([
+      ...packageRoots.map((path) => mkdir(join(path, "extensions"), { recursive: true })),
+      mkdir(projectConfig, { recursive: true })
+    ]);
+    await Promise.all([
+      ...[homeAdapter, globalAdapter, projectAdapter].map((path) => (
+        writeFile(join(path, "package.json"), JSON.stringify({ name: "pi-mcp-adapter" }))
+      )),
+      ...[globalKeep, projectKeep].map((path) => (
+        writeFile(join(path, "package.json"), JSON.stringify({ name: "user-package" }))
+      )),
+      writeFile(join(agentDir, "settings.json"), JSON.stringify({
+        packages: ["./global-adapter", "./global-keep", "~/home-adapter"],
+        extensions: [
+          "./global-adapter/extensions/adapter.ts",
+          "./global-keep/extensions/keep.ts",
+          "~/home-adapter/extensions/adapter.ts"
+        ]
+      })),
+      writeFile(join(projectConfig, "settings.json"), JSON.stringify({
+        packages: ["./project-adapter", "./project-keep"],
+        extensions: ["./project-adapter/extensions/adapter.ts", "./project-keep/extensions/keep.ts"]
+      }))
+    ]);
+    const originalHome = process.env.HOME;
+    process.env.HOME = root;
+    try {
+      const settingsManager = SettingsManager.create(workspace, agentDir, { projectTrusted: true });
+      const sessionView = createDesktopPackageSettingsView(
+        settingsManager,
+        environment,
+        undefined,
+        undefined,
+        { agentDir, cwd: workspace }
+      );
+
+      expect(sessionView.getGlobalSettings().packages).toEqual([
+        "./global-keep",
+        "/app/agent/desktop-capabilities/packages/pi-workspace-resources",
+        "/app/agent/desktop-capabilities/packages/design-craft"
+      ]);
+      expect(sessionView.getGlobalSettings().extensions).toEqual([
+        "./global-keep/extensions/keep.ts",
+        "-extensions/pi-rules-loader/index.ts",
+        "-extensions/pi-rules-loader/index.js"
+      ]);
+      expect(sessionView.getProjectSettings().packages).toEqual(["./project-keep"]);
+      expect(sessionView.getProjectSettings().extensions).toEqual(["./project-keep/extensions/keep.ts"]);
+      expect(sessionView.getPackages()).not.toEqual(expect.arrayContaining([
+        "./global-adapter", "./project-adapter", "~/home-adapter"
+      ]));
+      expect(settingsManager.getGlobalSettings().packages).toEqual([
+        "./global-adapter", "./global-keep", "~/home-adapter"
+      ]);
+      expect(settingsManager.getProjectSettings().packages).toEqual(["./project-adapter", "./project-keep"]);
+    } finally {
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+    }
   });
 
   it("keeps user extensions when the managed Workspace Resources Package is absent", () => {

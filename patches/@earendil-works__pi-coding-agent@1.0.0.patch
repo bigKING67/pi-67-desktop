@@ -1,0 +1,500 @@
+diff --git a/dist/extensions/mcp/index.d.ts b/dist/extensions/mcp/index.d.ts
+index 5c39af8..a929c53 100644
+--- a/dist/extensions/mcp/index.d.ts
++++ b/dist/extensions/mcp/index.d.ts
+@@ -26,11 +26,29 @@
+  * current session for registered servers.
+  */
+ import type { ExtensionContext, ExtensionFactory } from "../../core/extensions/types.ts";
+-import { type LoadedMcpConfig, type McpServerConfigPatch, type McpServerEntry } from "./config.ts";
++import type { TSchema } from "typebox";
++import { type LoadedMcpConfig, type McpServerConfigPatch, type McpServerEntry, type McpExposure } from "./config.ts";
+ import type { McpOAuthCredentialStore } from "./oauth.ts";
+ import type { McpTransportFactory } from "./runtime.ts";
++import type { McpOutputSaver } from "./tools.ts";
+ export type { McpTransportFactory } from "./runtime.ts";
++/** A tool as registered with pi for one current MCP server tool list. */
++export interface McpToolBinding {
++    /** Exact pi registration name. */
++    name: string;
++    /** Exact name offered by the remote MCP server. */
++    toolName: string;
++    /** Input schema normalized for pi's tool registration. */
++    parameters: TSchema;
++    exposure: string;
++}
+ export interface McpExtensionOptions {
++    /** Profile for default config, credentials, refresh locks and logs. Defaults to getAgentDir(). */
++    agentDir?: string;
++    /** Include extension-registered servers next to file configuration. Default: true. */
++    includeRegisteredServers?: boolean;
++    /** Host exposure override applied to the exact remote tool name before registration. */
++    getToolExposure?: (entry: McpServerEntry, toolName: string, exposure: McpExposure) => McpExposure;
+     /** Defaults to reading `mcp.json` from the agent directory and the trusted project. */
+     loadConfig?: (ctx: ExtensionContext) => LoadedMcpConfig;
+     /** Defaults to stdio and streamable HTTP transports built from the server config. */
+@@ -39,6 +57,14 @@ export interface McpExtensionOptions {
+     credentials?: McpOAuthCredentialStore;
+     /** File server log messages are appended to. Defaults to `mcp.log` in the agent directory. */
+     logPath?: string;
++    /** Set to false to disable raw MCP server message logging. Default: true. */
++    logging?: boolean;
++    /** Saves truncated text and binary resources. Set to false to keep all output in memory. */
++    saveOutput?: false | McpOutputSaver;
++    /** Receives the current registered tools, and an empty list when a server is hidden or removed. */
++    onToolsChanged?: (entry: McpServerEntry, bindings: readonly McpToolBinding[]) => void;
++    /** Set to false to refuse `/mcp login` without starting an OAuth callback listener. Default: true. */
++    allowOAuthLogin?: boolean;
+     /** Opens the OAuth authorization URL. Defaults to the platform browser. */
+     openUrl?: (url: string) => void;
+     /** Saves `/mcp` changes to the server's config file. Defaults to editing its `mcp.json`. */
+diff --git a/dist/extensions/mcp/index.js b/dist/extensions/mcp/index.js
+index fbbb30c..93015b3 100644
+--- a/dist/extensions/mcp/index.js
++++ b/dist/extensions/mcp/index.js
+@@ -28,6 +28,7 @@
+ import { join, resolve } from "node:path";
+ import { hyperlink } from "@earendil-works/pi-tui";
+ import { getAgentDir } from "../../config.js";
++import { FileAuthStorageBackend } from "../../core/auth-storage.js";
+ import { mcpNamespace } from "../../core/mcp-servers.js";
+ import { openBrowser } from "../../utils/open-browser.js";
+ import { CODEMODE_TOOL_NAME, isCodemodeTool } from "../codemode/tool.js";
+@@ -190,6 +191,7 @@ function describeTransport(entry) {
+ const MCP_USAGE = "Usage: /mcp, /mcp login [server], /mcp logout [server], /mcp reconnect [server]";
+ export function createMcpExtension(options = {}) {
+     return (pi) => {
++        const getProfileDir = () => options.agentDir ?? getAgentDir();
+         let servers = [];
+         /** Servers from `mcp.json`, which take precedence over registered servers of the same name. */
+         let configuredEntries = [];
+@@ -230,6 +232,8 @@ export function createMcpExtension(options = {}) {
+         const findServer = (name) => servers.find((server) => server.entry.name === name);
+         /** Servers extensions registered, except names `mcp.json` defines, which take precedence. */
+         const registeredServers = () => {
++            if (options.includeRegisteredServers === false)
++                return { servers: [], overridden: [] };
+             const registered = [];
+             const overriddenNames = [];
+             for (const { name, config, extensionPath } of pi.getMcpServers()) {
+@@ -246,11 +250,15 @@ export function createMcpExtension(options = {}) {
+             return { servers: registered, overridden: overriddenNames };
+         };
+         const getCredentials = (runtime) => {
+-            credentials ??= new runtime.McpOAuthCredentialStore();
++            credentials ??= options.agentDir === undefined
++                ? new runtime.McpOAuthCredentialStore()
++                : new runtime.McpOAuthCredentialStore(new FileAuthStorageBackend(join(getProfileDir(), "mcp-auth.json")), getProfileDir());
+             return credentials;
+         };
+         const getServerLog = (runtime) => {
+-            serverLog ??= new runtime.McpServerLog(options.logPath ?? join(getAgentDir(), "mcp.log"));
++            if (options.logging === false)
++                return undefined;
++            serverLog ??= new runtime.McpServerLog(options.logPath ?? join(getProfileDir(), "mcp.log"));
+             return serverLog;
+         };
+         /** pi tool name to the `<server>\0<tool>` it was assigned to, so names stay unique and stable. */
+@@ -270,6 +278,7 @@ export function createMcpExtension(options = {}) {
+             };
+             const previous = serverTools.get(server) ?? new Set();
+             const current = new Set();
++            const bindings = [];
+             // Like Codex, all tools whose names sanitize to the same name get the hash suffix, so which
+             // one would keep the plain name does not depend on the order of the list.
+             const plain = [...new Set(connection.tools.map((tool) => tool.name))].map((tool) => createMcpToolName(server, tool));
+@@ -289,14 +298,22 @@ export function createMcpExtension(options = {}) {
+                     server,
+                     tool,
+                     name: assignName(tool.name, `${server}\0${tool.name}`),
+-                    exposure: getMcpToolExposure(entry.config, tool.name),
++                    exposure: options.getToolExposure?.(entry, tool.name, getMcpToolExposure(entry.config, tool.name))
++                        ?? getMcpToolExposure(entry.config, tool.name),
+                     namespace,
+                     timeoutMs: connection.timeoutMs,
+                     getClient: async () => connection,
+                     readableResources: () => resourceServers().includes(connection),
++                    saveOutput: options.saveOutput,
+                 });
+                 definitions.set(definition.name, definition);
+                 pi.registerTool(definition);
++                bindings.push({
++                    name: definition.name,
++                    toolName: tool.name,
++                    parameters: definition.parameters,
++                    exposure: definition.exposure,
++                });
+             }
+             serverTools.set(server, current);
+             // Tools cannot be unregistered, so tools the server dropped are re-registered as hidden. When
+@@ -306,16 +323,19 @@ export function createMcpExtension(options = {}) {
+                 if (!current.has(name) && definition)
+                     pi.registerTool({ ...definition, exposure: "hidden" });
+             }
++            options.onToolsChanged?.(entry, bindings);
+             syncResourceTools();
+         };
+         /** Make a disabled server's tools unreachable. */
+-        const hideTools = (server) => {
++        const hideTools = (server, entry = findServer(server)?.entry) => {
+             for (const name of serverTools.get(server) ?? []) {
+                 const definition = definitions.get(name);
+                 if (definition)
+                     pi.registerTool({ ...definition, exposure: "hidden" });
+             }
+             serverTools.set(server, new Set());
++            if (entry)
++                options.onToolsChanged?.(entry, []);
+             syncResourceTools();
+         };
+         /** Enabled servers with resources whose exposure is not `hidden`, which the resource tools reach. */
+@@ -335,7 +355,11 @@ export function createMcpExtension(options = {}) {
+                 return;
+             const wasDirect = resourceToolsExposure === "direct";
+             resourceToolsExposure = next;
+-            const resourceDefinitions = createMcpResourceToolDefinitions({ exposure: next, servers: resourceServers });
++            const resourceDefinitions = createMcpResourceToolDefinitions({
++                exposure: next,
++                servers: resourceServers,
++                saveOutput: options.saveOutput,
++            });
+             for (const definition of resourceDefinitions)
+                 pi.registerTool(definition);
+             if (wasDirect) {
+@@ -441,9 +465,15 @@ export function createMcpExtension(options = {}) {
+                 if (!isCurrent())
+                     return;
+                 const connection = await createConnection(server);
+-                if (!isCurrent())
++                if (!isCurrent()) {
++                    await connection.close();
+                     return;
++                }
+                 await connection.getClient().catch(() => undefined);
++                if (!isCurrent()) {
++                    hideTools(connection.entry.name, connection.entry);
++                    await connection.close();
++                }
+             })();
+             server.ready = ready.catch(() => undefined);
+             return ready;
+@@ -496,6 +526,8 @@ export function createMcpExtension(options = {}) {
+             return undefined;
+         };
+         const signIn = async (server, prompt) => {
++            if (options.allowOAuthLogin === false)
++                return "MCP OAuth login is disabled by the host.";
+             const connection = server.connection;
+             const url = connection?.oauthUrl;
+             if (!connection || !url)
+@@ -554,7 +586,7 @@ export function createMcpExtension(options = {}) {
+             if (!enabled) {
+                 const connection = server.connection;
+                 server.connection = undefined;
+-                hideTools(server.entry.name);
++                hideTools(server.entry.name, server.entry);
+                 emitChange();
+                 await connection?.close();
+                 return undefined;
+@@ -596,7 +628,7 @@ export function createMcpExtension(options = {}) {
+                 label: server.entry.name,
+                 description: `${describeState(server)} · ${exposureOf(server.entry)} · ${server.entry.scope ?? server.entry.source}`,
+             })),
+-            empty: `No MCP servers configured. Add them to ${resolve(getAgentDir(), "mcp.json")} or .pi/mcp.json.`,
++            empty: `No MCP servers configured. Add them to ${resolve(getProfileDir(), "mcp.json")} or .pi/mcp.json.`,
+             confirmLabel: "manage",
+             cancelLabel: "close",
+         });
+@@ -759,7 +791,7 @@ export function createMcpExtension(options = {}) {
+         // ---------------------------------------------------------------------------------------
+         const formatStatus = () => {
+             if (servers.length === 0 && configErrors.length === 0 && overridden.length === 0) {
+-                return `No MCP servers configured. Add them to ${resolve(getAgentDir(), "mcp.json")} or .pi/mcp.json.`;
++                return `No MCP servers configured. Add them to ${resolve(getProfileDir(), "mcp.json")} or .pi/mcp.json.`;
+             }
+             const lines = servers.map((server) => {
+                 const { name } = server.entry;
+@@ -838,7 +870,7 @@ export function createMcpExtension(options = {}) {
+             ctx.ui.notify(`Signed in to MCP server "${name}" (${server.connection?.tools.length ?? 0} tools).`, "info");
+         };
+         pi.on("session_start", (_event, ctx) => {
+-            const loaded = (options.loadConfig ?? defaultLoadConfig)(ctx);
++            const loaded = options.loadConfig ? options.loadConfig(ctx) : defaultLoadConfig(ctx, getProfileDir());
+             configErrors = loaded.errors;
+             autoEnableCodemode = loaded.autoEnableCodemode ?? true;
+             warnedUnreachable = false;
+@@ -949,7 +981,7 @@ export function createMcpExtension(options = {}) {
+                 next.get(server.entry.name)?.registeredConfig !== server.registeredConfig);
+             servers = servers.filter((server) => !removed.includes(server));
+             for (const server of removed)
+-                hideTools(server.entry.name);
++                hideTools(server.entry.name, server.entry);
+             const added = registered.servers.filter((server) => !findServer(server.entry.name));
+             servers.push(...added);
+             emitChange();
+@@ -977,6 +1009,8 @@ export function createMcpExtension(options = {}) {
+             sessionActive = false;
+             generation++;
+             const closing = connections();
++            for (const server of servers)
++                hideTools(server.entry.name, server.entry);
+             servers = [];
+             emitChange();
+             await Promise.all(closing.map((connection) => connection.close()));
+@@ -1020,6 +1054,10 @@ export function createMcpExtension(options = {}) {
+                 }
+                 switch (action) {
+                     case "login": {
++                        if (options.allowOAuthLogin === false) {
++                            ctx.ui.notify("MCP OAuth login is disabled by the host.", "error");
++                            return;
++                        }
+                         const server = await pickServer(name, ctx, oauthPick);
+                         if (server)
+                             await loginCommand(server, ctx);
+@@ -1059,8 +1097,8 @@ export function createMcpExtension(options = {}) {
+         });
+     };
+ }
+-function defaultLoadConfig(ctx) {
+-    return loadMcpConfig({ agentDir: getAgentDir(), cwd: ctx.cwd, projectTrusted: ctx.isProjectTrusted() });
++function defaultLoadConfig(ctx, agentDir) {
++    return loadMcpConfig({ agentDir, cwd: ctx.cwd, projectTrusted: ctx.isProjectTrusted() });
+ }
+ export default createMcpExtension();
+ //# sourceMappingURL=index.js.map
+\ No newline at end of file
+diff --git a/dist/extensions/mcp/resources.d.ts b/dist/extensions/mcp/resources.d.ts
+index e0d8d9d..9ac0948 100644
+--- a/dist/extensions/mcp/resources.d.ts
++++ b/dist/extensions/mcp/resources.d.ts
+@@ -13,7 +13,7 @@ import type { ListResourcesResult, ListResourceTemplatesResult, McpRequestOption
+ import type { TSchema } from "typebox";
+ import type { ToolDefinition } from "../../core/extensions/types.ts";
+ import type { McpExposure } from "./config.ts";
+-import { type McpToolDetails, READ_MCP_RESOURCE_TOOL } from "./tools.ts";
++import { type McpOutputSaver, type McpToolDetails, READ_MCP_RESOURCE_TOOL } from "./tools.ts";
+ export declare const LIST_MCP_RESOURCES_TOOL = "list_mcp_resources";
+ export declare const LIST_MCP_RESOURCE_TEMPLATES_TOOL = "list_mcp_resource_templates";
+ export { READ_MCP_RESOURCE_TOOL };
+@@ -39,5 +39,7 @@ export declare function isMcpAppResource(item: {
+ export declare function createMcpResourceToolDefinitions(options: {
+     exposure: McpExposure;
+     servers: () => readonly McpResourceServer[];
++    /** Saves truncated text and binary resources. */
++    saveOutput?: false | McpOutputSaver;
+ }): ToolDefinition<TSchema, McpToolDetails>[];
+ //# sourceMappingURL=resources.d.ts.map
+\ No newline at end of file
+diff --git a/dist/extensions/mcp/resources.js b/dist/extensions/mcp/resources.js
+index a1afa87..4d59cd7 100644
+--- a/dist/extensions/mcp/resources.js
++++ b/dist/extensions/mcp/resources.js
+@@ -139,8 +139,8 @@ function stringArgument(params, key) {
+ function errorMessage(error) {
+     return error instanceof Error ? error.message : String(error);
+ }
+-async function jsonResult(tool, server, payload) {
+-    const { content, fullOutputPath } = await limitMcpContent([{ type: "text", text: JSON.stringify(payload) }]);
++async function jsonResult(tool, server, payload, saveOutput) {
++    const { content, fullOutputPath } = await limitMcpContent([{ type: "text", text: JSON.stringify(payload) }], saveOutput);
+     return {
+         content,
+         details: { server: server ?? "", tool, ...(fullOutputPath ? { fullOutputPath } : {}) },
+@@ -202,7 +202,7 @@ export function createMcpResourceToolDefinitions(options) {
+                 const result = await server.resourcesPage(cursor, requestOptions);
+                 return { items: result.resources, nextCursor: result.nextCursor };
+             }, (server, requestOptions) => server.allResources(requestOptions));
+-            return jsonResult(LIST_MCP_RESOURCES_TOOL, stringArgument(params, "server"), payload);
++            return jsonResult(LIST_MCP_RESOURCES_TOOL, stringArgument(params, "server"), payload, options.saveOutput);
+         },
+     };
+     const listTemplates = {
+@@ -218,7 +218,7 @@ export function createMcpResourceToolDefinitions(options) {
+                 const result = await server.resourceTemplatesPage(cursor, requestOptions);
+                 return { items: result.resourceTemplates, nextCursor: result.nextCursor };
+             }, (server, requestOptions) => server.allResourceTemplates(requestOptions));
+-            return jsonResult(LIST_MCP_RESOURCE_TEMPLATES_TOOL, stringArgument(params, "server"), payload);
++            return jsonResult(LIST_MCP_RESOURCE_TEMPLATES_TOOL, stringArgument(params, "server"), payload, options.saveOutput);
+         },
+     };
+     const readResource = {
+@@ -243,8 +243,8 @@ export function createMcpResourceToolDefinitions(options) {
+                 ...(result.contents.length > 1 ? [{ type: "text", text: `${contents.uri}:` }] : []),
+                 { type: "resource", resource: contents },
+             ]);
+-            const converted = await toModelContent(server.name, blocks);
+-            const { content, fullOutputPath } = await limitMcpContent(converted.length > 0 ? converted : [{ type: "text", text: `Resource ${uri} is empty.` }]);
++            const converted = await toModelContent(server.name, blocks, { saveOutput: options.saveOutput });
++            const { content, fullOutputPath } = await limitMcpContent(converted.length > 0 ? converted : [{ type: "text", text: `Resource ${uri} is empty.` }], options.saveOutput);
+             const contents = result.contents.map(({ _meta: _ignored, ...rest }) => rest);
+             return {
+                 content,
+diff --git a/dist/extensions/mcp/runtime.d.ts b/dist/extensions/mcp/runtime.d.ts
+index 3ac39f5..2ba6d48 100644
+--- a/dist/extensions/mcp/runtime.d.ts
++++ b/dist/extensions/mcp/runtime.d.ts
+@@ -38,6 +38,7 @@ export declare class McpServerConnection implements McpToolCaller, McpResourceSe
+     challenge: OAuthChallenge | undefined;
+     private client;
+     private opening;
++    private pendingClient;
+     private closed;
+     /** Stderr of the last stdio server that failed to connect. */
+     private stderrTail;
+diff --git a/dist/extensions/mcp/runtime.js b/dist/extensions/mcp/runtime.js
+index 2b76745..50a2a5d 100644
+--- a/dist/extensions/mcp/runtime.js
++++ b/dist/extensions/mcp/runtime.js
+@@ -116,6 +116,7 @@ export class McpServerConnection {
+     challenge;
+     client;
+     opening;
++    pendingClient;
+     closed = false;
+     /** Stderr of the last stdio server that failed to connect. */
+     stderrTail;
+@@ -293,6 +294,7 @@ export class McpServerConnection {
+             requestTimeoutMs: this.timeoutMs,
+             roots: [{ uri: pathToFileURL(this.cwd).href, name: basename(this.cwd) }],
+         });
++        this.pendingClient = client;
+         const log = this.log;
+         if (log)
+             client.onNotification("notifications/message", (params) => log.write(this.entry.name, params));
+@@ -319,6 +321,8 @@ export class McpServerConnection {
+             if (client.connectionState !== "connected")
+                 throw new Error("connection closed during setup");
+             this.client = client;
++            if (this.pendingClient === client)
++                this.pendingClient = undefined;
+             this.tools = tools;
+             this.hasResources = hasResources;
+             this.resources = resources.resources;
+@@ -331,6 +335,8 @@ export class McpServerConnection {
+             return client;
+         }
+         catch (error) {
++            if (this.pendingClient === client)
++                this.pendingClient = undefined;
+             await client.close().catch(() => undefined);
+             if (transport instanceof StdioTransport) {
+                 this.stderrTail = transport.stderr.trim().slice(-STDERR_TAIL_CHARS) || undefined;
+@@ -385,8 +391,14 @@ export class McpServerConnection {
+         this.state = "closed";
+         this.changed();
+         const client = this.client;
++        const pendingClient = this.pendingClient;
++        const opening = this.opening;
+         this.client = undefined;
+-        await client?.close().catch(() => undefined);
++        this.pendingClient = undefined;
++        await Promise.all([client, pendingClient]
++            .filter((candidate, index, clients) => candidate && clients.indexOf(candidate) === index)
++            .map((candidate) => candidate.close().catch(() => undefined)));
++        await opening?.catch(() => undefined);
+         // A refresh the server already answered may have rotated the refresh token; exiting before the
+         // new tokens are saved would lose the grant.
+         await this.authProvider?.settled();
+diff --git a/dist/extensions/mcp/tools.d.ts b/dist/extensions/mcp/tools.d.ts
+index aaab8f2..0cafe93 100644
+--- a/dist/extensions/mcp/tools.d.ts
++++ b/dist/extensions/mcp/tools.d.ts
+@@ -56,13 +56,13 @@ export declare function createMcpResultSchema(structuredContentSchema: Record<st
+  * Keep model-facing text within {@link MCP_OUTPUT_MAX_BYTES}. Longer text becomes one text block in
+  * Codex's truncation format, followed by the path of the file with the full text; images follow it.
+  */
+-export declare function limitMcpContent(content: (TextContent | ImageContent)[], saveOutput?: McpOutputSaver): Promise<{
++export declare function limitMcpContent(content: (TextContent | ImageContent)[], saveOutput?: false | McpOutputSaver): Promise<{
+     content: (TextContent | ImageContent)[];
+     fullOutputPath?: string;
+ }>;
+ export interface ConvertMcpResultOptions {
+     /** Saves truncated text and binary resources. Default: a temp file. */
+-    saveOutput?: McpOutputSaver;
++    saveOutput?: false | McpOutputSaver;
+     /** Whether the server's resources can be read with `read_mcp_resource`, which resource links then name. */
+     readableResources?: boolean;
+ }
+@@ -80,5 +80,7 @@ export declare function createMcpToolDefinition(options: {
+     getClient: () => Promise<McpToolCaller>;
+     /** Whether `read_mcp_resource` can read the server's resources. */
+     readableResources?: () => boolean;
++    /** Saves truncated text and binary resources. */
++    saveOutput?: false | McpOutputSaver;
+ }): ToolDefinition<TSchema, McpToolDetails>;
+ //# sourceMappingURL=tools.d.ts.map
+\ No newline at end of file
+diff --git a/dist/extensions/mcp/tools.js b/dist/extensions/mcp/tools.js
+index bbc1edd..f3ffa99 100644
+--- a/dist/extensions/mcp/tools.js
++++ b/dist/extensions/mcp/tools.js
+@@ -87,12 +87,17 @@ export async function limitMcpContent(content, saveOutput = saveToTempFile) {
+         return { content };
+     let fullOutputPath;
+     let where;
+-    try {
+-        fullOutputPath = await saveOutput(combined, ".txt");
+-        where = `[Full output: ${fullOutputPath} (read it with offset/limit)]`;
++    if (saveOutput === false) {
++        where = "[Full output was not saved because output persistence is disabled.]";
+     }
+-    catch (error) {
+-        where = `[Could not save the full output: ${error instanceof Error ? error.message : String(error)}]`;
++    else {
++        try {
++            fullOutputPath = await saveOutput(combined, ".txt");
++            where = `[Full output: ${fullOutputPath} (read it with offset/limit)]`;
++        }
++        catch (error) {
++            where = `[Could not save the full output: ${error instanceof Error ? error.message : String(error)}]`;
++        }
+     }
+     const tokens = Math.ceil(truncation.totalBytes / 4);
+     const text = `Warning: truncated output (original token count: ${tokens})\nTotal output lines: ${truncation.totalLines}\n\n${truncation.content}\n\n${where}`;
+@@ -132,6 +137,9 @@ async function blockToContent(server, block, options) {
+         if (isTextMimeType(mimeType))
+             return [{ type: "text", text: data.toString("utf8") }];
+         const kind = `${mimeType ?? "unknown type"}, ${formatSize(data.length)}`;
++        if (options.saveOutput === false) {
++            return [{ type: "text", text: `[Binary resource ${uri} (${kind}) was not saved because output persistence is disabled.]` }];
++        }
+         try {
+             const path = await (options.saveOutput ?? saveToTempFile)(data, extensionOf(uri));
+             return [{ type: "text", text: `[Binary resource ${uri} (${kind}) saved to ${path}]` }];
+@@ -244,7 +252,10 @@ export function createMcpToolDefinition(options) {
+                     onUpdate?.({ content: [{ type: "text", text }], details: { server, tool: tool.name } });
+                 },
+             });
+-            return convertMcpResult(server, tool.name, result, { readableResources: options.readableResources?.() });
++            return convertMcpResult(server, tool.name, result, {
++                readableResources: options.readableResources?.(),
++                saveOutput: options.saveOutput,
++            });
+         },
+     };
+ }
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index eda1c08..5067097 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -26,6 +26,7 @@ export { type EditDiffResult, generateDiffString, generateUnifiedPatch } from ".
+ export { type BashOperations, type BashSpawnContext, type BashSpawnHook, type BashToolDetails, type BashToolInput, type BashToolOptions, createBashToolDefinition, createEditToolDefinition, createFindToolDefinition, createGrepToolDefinition, createLocalBashOperations, createLocalPowerShellOperations, createLsToolDefinition, createPowerShellToolDefinition, createReadToolDefinition, createWriteToolDefinition, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, type EditOperations, type EditToolDetails, type EditToolInput, type EditToolOptions, type FindOperations, type FindToolDetails, type FindToolInput, type FindToolOptions, formatSize, type GrepOperations, type GrepToolDetails, type GrepToolInput, type GrepToolOptions, type LsOperations, type LsToolDetails, type LsToolInput, type LsToolOptions, type PowerShellOperations, type PowerShellSpawnContext, type PowerShellSpawnHook, type PowerShellToolDetails, type PowerShellToolInput, type PowerShellToolOptions, type ReadOperations, type ReadToolDetails, type ReadToolInput, type ReadToolOptions, type ToolsOptions, type TruncationOptions, type TruncationResult, truncateHead, truncateLine, truncateTail, type WriteOperations, type WriteToolInput, type WriteToolOptions, withFileMutationQueue, } from "./core/tools/index.ts";
+ export { hasTrustRequiringProjectResources, type ProjectTrustDecision, ProjectTrustStore, type ProjectTrustStoreEntry, type ProjectTrustUpdate, } from "./core/trust-manager.ts";
+ export { type ModelRoute, type ModelRouteReason, type ModelRouteRequest, VIRTUAL_MODEL_STATE_ENTRY, type VirtualModelDefinition, type VirtualModelStateData, } from "./core/virtual-models.ts";
++export { getMcpToolExposure, mcpNamespace, validateMcpServerConfig } from "./core/mcp-servers.ts";
+ export { type CodemodeExtensionOptions, createCodemodeExtension } from "./extensions/codemode/index.ts";
+ export type { CodemodeStoreEntryData, CodemodeToolDetails } from "./extensions/codemode/tool.ts";
+ export type { LoadedMcpConfig, McpExposure, McpServerConfig, McpServerEntry } from "./extensions/mcp/config.ts";
+diff --git a/dist/index.js b/dist/index.js
+index c48934f..b69e55a 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -30,6 +30,7 @@ export { generateDiffString, generateUnifiedPatch } from "./core/tools/edit-diff
+ export { createBashToolDefinition, createEditToolDefinition, createFindToolDefinition, createGrepToolDefinition, createLocalBashOperations, createLocalPowerShellOperations, createLsToolDefinition, createPowerShellToolDefinition, createReadToolDefinition, createWriteToolDefinition, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, truncateHead, truncateLine, truncateTail, withFileMutationQueue, } from "./core/tools/index.js";
+ export { hasTrustRequiringProjectResources, ProjectTrustStore, } from "./core/trust-manager.js";
+ export { VIRTUAL_MODEL_STATE_ENTRY, } from "./core/virtual-models.js";
++export { getMcpToolExposure, mcpNamespace, validateMcpServerConfig, } from "./core/mcp-servers.js";
+ // Built-in extensions. The CLI loads them; SDK sessions add them to their extension factories.
+ export { createCodemodeExtension } from "./extensions/codemode/index.js";
+ export { createMcpExtension } from "./extensions/mcp/index.js";

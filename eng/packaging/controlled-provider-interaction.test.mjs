@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  runNativeMcpPrompt,
   startControlledPrompt,
   submitControlledPromptInput
 } from "./controlled-provider-interaction.mjs";
 import {
   CONTROLLED_MODEL_LABEL,
-  CONTROLLED_PROMPT_TEXT
+  CONTROLLED_PROMPT_TEXT,
+  NATIVE_MCP_PROMPT_TEXT
 } from "./controlled-shutdown-fixture.ts";
 
 describe("controlled Provider interaction", () => {
@@ -74,5 +76,27 @@ describe("controlled Provider interaction", () => {
 
     expect(composer.fill).toHaveBeenCalledWith(CONTROLLED_PROMPT_TEXT);
     expect(sendButton.click).toHaveBeenCalledOnce();
+  });
+
+  it("waits for the controlled model and settled Runtime after the native MCP probe", async () => {
+    const actions = [];
+    const composer = { fill: vi.fn(async (text) => actions.push(`fill:${text}`)) };
+    const sendButton = { click: vi.fn(async () => actions.push("send")) };
+    const modelText = { waitFor: vi.fn(async () => actions.push("model")) };
+    const runtime = { waitFor: vi.fn(async () => actions.push("ready")) };
+    const page = {
+      getByLabel: vi.fn(() => composer),
+      getByRole: vi.fn((_role, options) => {
+        if (options.name === "发送") return sendButton;
+        if (options.name === "Pi 模型") return { getByText: () => modelText };
+        throw new Error(`Unexpected role: ${String(options.name)}`);
+      }),
+      locator: vi.fn(() => runtime)
+    };
+
+    await runNativeMcpPrompt(page, 1234);
+
+    expect(actions).toEqual([`fill:${NATIVE_MCP_PROMPT_TEXT}`, "send", "model", "ready"]);
+    expect(runtime.waitFor).toHaveBeenCalledWith({ state: "visible", timeout: 1234 });
   });
 });

@@ -233,6 +233,7 @@ function packageTool(
     name,
     description: name,
     parameters: { type: "object" },
+    exposure: "direct",
     sourceInfo: { path: source, source, scope: "user", origin: "package" }
   } as ReturnType<ExtensionAPI["getAllTools"]>[number];
 }
@@ -242,6 +243,7 @@ function extensionTool(name: string): ReturnType<ExtensionAPI["getAllTools"]>[nu
     name,
     description: name,
     parameters: { type: "object" },
+    exposure: "direct",
     sourceInfo: { path: `/extensions/${name}.ts`, source: "extension", scope: "user", origin: "top-level" }
   } as ReturnType<ExtensionAPI["getAllTools"]>[number];
 }

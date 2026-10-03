@@ -60,8 +60,8 @@ export class RuntimePromptAttachments {
       ...(signal === undefined
         ? {}
         : {
-            preflightResult: (success: boolean) => {
-              if (success && signal.aborted) {
+            preflightResult: (disposition) => {
+              if (disposition === "started" && signal.aborted) {
                 // Pi has completed preflight but has not returned control to the
                 // Host yet. Defer one microtask so Agent.activeRun exists before
                 // repeating the abort that may have arrived while Pi was idle.

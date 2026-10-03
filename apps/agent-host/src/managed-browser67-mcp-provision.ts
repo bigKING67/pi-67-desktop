@@ -8,8 +8,6 @@ import { isRetiredBrowser67ServerPair } from "./retired-browser67-mcp.js";
 const MANAGED_SCHEMA = "pi67.browser67-mcp.v1";
 const SERVER_NAMES = ["tmwd_browser", "js-reverse"] as const;
 const MAX_CONFIG_BYTES = 1_000_000;
-const MAX_CACHE_BYTES = 8_000_000;
-const MAX_CACHE_SERVERS = 128;
 
 type ManagedServerName = typeof SERVER_NAMES[number];
 
@@ -34,22 +32,11 @@ type ManagedBrowser67McpStatus =
   | "invalid-json"
   | "revision-conflict";
 
-type ManagedBrowser67McpCacheStatus =
-  | "skipped"
-  | "missing"
-  | "updated"
-  | "unchanged"
-  | "invalid-json"
-  | "revision-conflict";
-
 export interface ManagedBrowser67McpResult {
   status: ManagedBrowser67McpStatus;
   path: string;
   conflicts: ManagedServerName[];
   migratedLegacyServers: ManagedServerName[];
-  cacheStatus: ManagedBrowser67McpCacheStatus;
-  cachePath: string;
-  invalidatedCacheServers: ManagedServerName[];
 }
 
 export async function provisionManagedBrowser67Mcp(options: {
@@ -60,21 +47,15 @@ export async function provisionManagedBrowser67Mcp(options: {
 }): Promise<ManagedBrowser67McpResult> {
   const environment = options.environment ?? process.env;
   const path = join(options.agentDir, "mcp.json");
-  const cachePath = join(options.agentDir, "mcp-cache.json");
   let migratedLegacyServers: ManagedServerName[] = [];
   const result = (
     status: ManagedBrowser67McpStatus,
-    conflicts: ManagedServerName[] = [],
-    cacheStatus: ManagedBrowser67McpCacheStatus = "skipped",
-    invalidatedCacheServers: ManagedServerName[] = []
+    conflicts: ManagedServerName[] = []
   ): ManagedBrowser67McpResult => ({
     status,
     path,
     conflicts,
-    migratedLegacyServers,
-    cacheStatus,
-    cachePath,
-    invalidatedCacheServers
+    migratedLegacyServers
   });
   if (environment.PI67_DESKTOP !== "1") return result("skipped");
   const nodeExecutable = environment.PI67_NODE_EXECUTABLE;
@@ -91,11 +72,12 @@ export async function provisionManagedBrowser67Mcp(options: {
     tmwd_browser: {
       command: resolve(nodeExecutable),
       args: [join(browser67Root, "src", "mcp", "browser", "server.mjs")],
-      directTools: true
+      exposure: "direct"
     },
     "js-reverse": {
       command: resolve(nodeExecutable),
-      args: [join(browser67Root, "src", "mcp", "js-reverse", "server.mjs")]
+      args: [join(browser67Root, "src", "mcp", "js-reverse", "server.mjs")],
+      exposure: "deferred"
     }
   } satisfies Record<ManagedServerName, Record<string, unknown>>;
   await Promise.all(Object.values(expected).map(async (entry) => {
@@ -160,15 +142,8 @@ export async function provisionManagedBrowser67Mcp(options: {
   if (!serverDefinitionsUnchanged) {
     for (const name of SERVER_NAMES) servers[name] = expected[name];
     const provisionalReceipts = Object.fromEntries(SERVER_NAMES.map((name) => {
-      const existingReceipt = metadata?.servers[name];
       const nextReceipt = nextReceipts[name];
-      return [name, {
-        ...nextReceipt,
-        ...(sameManagedReceiptIdentity(existingReceipt, nextReceipt)
-          && existingReceipt?.cacheRevisionSha256 === cacheRevisionSha256(nextReceipt)
-          ? { cacheRevisionSha256: existingReceipt.cacheRevisionSha256 }
-          : {})
-      }];
+      return [name, nextReceipt];
     })) as Record<ManagedServerName, ManagedServerReceipt>;
     const nextConfig = {
       ...config,
@@ -191,45 +166,7 @@ export async function provisionManagedBrowser67Mcp(options: {
     configWritten = true;
   }
 
-  const pendingInvalidation = SERVER_NAMES.filter((name) => (
-    metadata?.servers[name]?.cacheRevisionSha256 !== cacheRevisionSha256(nextReceipts[name])
-  ));
-  if (pendingInvalidation.length === 0) {
-    return result(configWritten ? (initialKind === "missing" ? "created" : "updated") : "unchanged");
-  }
-
-  const cache = await invalidateManagedMcpCache(cachePath, pendingInvalidation, read);
-  const provisionStatus = configWritten
-    ? (initialKind === "missing" ? "created" : "updated")
-    : "unchanged";
-  if (cache.status === "invalid-json" || cache.status === "revision-conflict") {
-    return result(provisionStatus, [], cache.status, cache.invalidatedServers);
-  }
-
-  const acknowledgedReceipts = Object.fromEntries(SERVER_NAMES.map((name) => [name, {
-    ...nextReceipts[name],
-    cacheRevisionSha256: cacheRevisionSha256(nextReceipts[name])
-  }])) as Record<ManagedServerName, ManagedServerReceipt>;
-  const acknowledgedConfig = {
-    ...config,
-    pi67ManagedMcp: {
-      schema: MANAGED_SCHEMA,
-      servers: {
-        ...metadata?.servers,
-        ...acknowledgedReceipts
-      }
-    }
-  };
-  const acknowledged = serializeJson(acknowledgedConfig);
-  if (!await replaceRevision(path, acknowledged, revision, read, MAX_CONFIG_BYTES)) {
-    return result("revision-conflict", [], cache.status, cache.invalidatedServers);
-  }
-  return result(
-    initialKind === "missing" ? "created" : "updated",
-    [],
-    cache.status,
-    cache.invalidatedServers
-  );
+  return result(configWritten ? (initialKind === "missing" ? "created" : "updated") : "unchanged");
 }
 
 function resolveBrowser67CapabilityRoot(agentDir: string, environment: NodeJS.ProcessEnv): string {
@@ -288,13 +225,6 @@ function sameManagedReceiptIdentity(
     && left.specSha256 === right.specSha256;
 }
 
-function cacheRevisionSha256(receipt: ManagedServerReceipt): string {
-  return specSha256({
-    browser67Commit: receipt.browser67Commit,
-    specSha256: receipt.specSha256
-  });
-}
-
 function parseManagedMetadata(value: unknown): ManagedMetadata | undefined {
   if (!isRecord(value) || value.schema !== MANAGED_SCHEMA || !isRecord(value.servers)) return undefined;
   const servers: ManagedMetadata["servers"] = {};
@@ -318,42 +248,6 @@ function parseManagedMetadata(value: unknown): ManagedMetadata | undefined {
     };
   }
   return { schema: MANAGED_SCHEMA, servers };
-}
-
-async function invalidateManagedMcpCache(
-  path: string,
-  serverNames: ManagedServerName[],
-  read: (path: string) => Promise<Uint8Array>
-): Promise<{
-  status: Exclude<ManagedBrowser67McpCacheStatus, "skipped">;
-  invalidatedServers: ManagedServerName[];
-}> {
-  const revision = await readRevision(path, read, MAX_CACHE_BYTES);
-  if (revision.kind === "missing") return { status: "missing", invalidatedServers: [] };
-  let cache: Record<string, unknown>;
-  try {
-    const parsed = JSON.parse(revision.bytes.toString("utf8")) as unknown;
-    if (!isRecord(parsed)) return { status: "invalid-json", invalidatedServers: [] };
-    cache = parsed;
-  } catch {
-    return { status: "invalid-json", invalidatedServers: [] };
-  }
-  if (
-    cache.version !== 1
-    || !isRecord(cache.servers)
-    || Object.keys(cache.servers).length > MAX_CACHE_SERVERS
-  ) {
-    return { status: "invalid-json", invalidatedServers: [] };
-  }
-  const servers = { ...cache.servers };
-  const invalidatedServers = serverNames.filter((name) => Object.hasOwn(servers, name));
-  if (invalidatedServers.length === 0) return { status: "unchanged", invalidatedServers: [] };
-  for (const name of invalidatedServers) delete servers[name];
-  const next = serializeJson({ ...cache, servers });
-  if (!await replaceRevision(path, next, revision, read, MAX_CACHE_BYTES)) {
-    return { status: "revision-conflict", invalidatedServers: [] };
-  }
-  return { status: "updated", invalidatedServers };
 }
 
 async function readBoundedJson(path: string): Promise<unknown> {

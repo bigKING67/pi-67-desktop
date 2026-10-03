@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SettingsManager, type SourceInfo } from "@earendil-works/pi-coding-agent";
@@ -55,90 +55,13 @@ describe("ConfiguredCapabilityCatalog", () => {
     });
   });
 
-  it("indexes configured MCP servers, unique proxy tools, and direct Tool names", async () => {
-    const root = await temporaryDirectory();
-    await writeMcpFixture(root, {
-      mcpServers: {
-        browser: { command: "redacted", directTools: false },
-        memory: { command: "redacted", directTools: true },
-        web: { url: "https://redacted.invalid", directTools: ["search"] }
-      },
-      settings: { toolPrefix: "short" }
-    }, {
-      version: 1,
-      servers: {
-        browser: { tools: [tool("scan"), tool("shared")] },
-        memory: { tools: [tool("remember"), tool("shared")] },
-        web: { tools: [tool("search")] }
-      }
-    });
-    const catalog = new ConfiguredCapabilityCatalog({
-      agentDir: root,
-      settingsManager: SettingsManager.inMemory()
-    });
-    await catalog.refresh();
 
-    expect(catalog.resolveMcpServer("browser")).toMatchObject({
-      kind: "configured-mcp",
-      serverName: "browser",
-      transport: "stdio"
-    });
-    expect(catalog.resolveMcpTool("scan")).toMatchObject({
-      kind: "configured-mcp",
-      serverName: "browser",
-      toolName: "scan",
-      schemaDigest: expect.stringMatching(/^[a-f0-9]{64}$/u)
-    });
-    expect(catalog.resolveMcpTool("shared")).toEqual({
-      kind: "ambiguous",
-      sourceLabel: "多个已配置 MCP server"
-    });
-    expect(catalog.resolveMcpTool("shared", "memory")).toMatchObject({
-      kind: "configured-mcp",
-      serverName: "memory"
-    });
-    expect(catalog.resolveDirectMcpTool("memory_remember")).toMatchObject({
-      kind: "configured-mcp",
-      serverName: "memory",
-      toolName: "remember"
-    });
-    expect(catalog.resolveDirectMcpTool("web_search")).toMatchObject({
-      kind: "configured-mcp",
-      serverName: "web",
-      transport: "http"
-    });
-  });
-
-  it("does not trust malformed or oversized MCP metadata", async () => {
-    const root = await temporaryDirectory();
-    await writeFile(join(root, "mcp.json"), "{".repeat(32), "utf8");
-    await writeFile(join(root, "mcp-cache.json"), "x".repeat(8_000_001), "utf8");
-    const catalog = new ConfiguredCapabilityCatalog({
-      agentDir: root,
-      settingsManager: SettingsManager.inMemory()
-    });
-    await catalog.refresh();
-
-    expect(catalog.resolveMcpServer("browser").kind).toBe("unconfigured");
-    expect(catalog.resolveMcpTool("scan").kind).toBe("unconfigured");
-  });
 });
 
 async function temporaryDirectory(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "pi67-configured-capabilities-"));
   temporaryDirectories.push(root);
   return root;
-}
-
-async function writeMcpFixture(root: string, config: unknown, cache: unknown): Promise<void> {
-  await Promise.all([
-    writeFile(join(root, "mcp.json"), JSON.stringify(config), "utf8"),
-    writeFile(join(root, "mcp-cache.json"), JSON.stringify(cache), "utf8")
-  ]);
-}
-
-function tool(name: string) {
-  return { name, description: "must not enter the catalog", inputSchema: { type: "object" } };
 }
 
 function packageSource(source: string): SourceInfo {

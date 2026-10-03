@@ -74,8 +74,8 @@ describe("PiSdkRuntime prompt attachments", () => {
     const access = attachmentAccess({ readImages: vi.fn(async () => images) });
     const fixture = await initializedRuntime(access);
     const customMessage = vi.spyOn(fixture.session, "sendCustomMessage").mockResolvedValue();
-    const steer = vi.spyOn(fixture.session, "steer").mockResolvedValue();
-    const followUp = vi.spyOn(fixture.session, "followUp").mockResolvedValue();
+    const steer = vi.spyOn(fixture.session, "steer").mockResolvedValue("queued");
+    const followUp = vi.spyOn(fixture.session, "followUp").mockResolvedValue("queued");
 
     try {
       await fixture.runtime.steer("Correct course", attachmentSet());
@@ -140,19 +140,19 @@ describe("PiSdkRuntime prompt attachments", () => {
     }
   });
 
-  it("repeats Pi abort after preflight when cancellation arrived while Pi was idle", async () => {
+  it.each(["started", "queued", "handled"] as const)("only repeats late abort for a started run: %s", async (disposition) => {
     const fixture = await initializedRuntime(attachmentAccess());
     const controller = new AbortController();
     const abort = vi.spyOn(fixture.session, "abort").mockResolvedValue();
     vi.spyOn(fixture.session, "sendCustomMessage").mockResolvedValue();
     vi.spyOn(fixture.session, "prompt").mockImplementation(async (_text, options) => {
       controller.abort();
-      options?.preflightResult?.(true);
+      options?.preflightResult?.(disposition);
     });
 
     try {
       await fixture.runtime.submitPrompt("Inspect", attachmentSet(), controller.signal);
-      expect(abort).toHaveBeenCalledOnce();
+      expect(abort).toHaveBeenCalledTimes(disposition === "started" ? 1 : 0);
     } finally {
       await fixture.runtime.dispose();
     }

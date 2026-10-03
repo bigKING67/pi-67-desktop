@@ -1,6 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { ensurePackagedNewSessionIntent } from "./packaged-electron-smoke-scenarios.mjs";
+import { readPositiveProcessId } from "./controlled-shutdown-fixture.ts";
 
 const SESSION_CREATION_TIMEOUT_MS = 30_000;
 const SESSION_CREATION_PROMPT = "Create the packaged smoke Session.";
@@ -16,7 +17,7 @@ export function assertPackagedTeamToolSelection(evidence, expectsTeamRoute) {
   }
 }
 
-export async function verifyPackagedSessionCreation({ agentDir, window }) {
+export async function verifyPackagedSessionCreation({ agentDir, childPidPath, window }) {
   const startedAt = Date.now();
   const deadline = startedAt + SESSION_CREATION_TIMEOUT_MS;
   const conversationRows = window.locator('[data-testid="conversation-row"]');
@@ -43,6 +44,9 @@ export async function verifyPackagedSessionCreation({ agentDir, window }) {
     state: "visible",
     timeout: remainingTimeout(deadline, "start the controlled first turn")
   });
+  // Running includes Pi preflight. Observe the synthetic provider's own child
+  // before cancelling so the model-context receipt is real, not a timing guess.
+  await readPositiveProcessId(childPidPath, remainingTimeout(deadline, "enter the controlled provider"));
   await stop.click({ timeout: remainingTimeout(deadline, "stop the controlled first turn") });
   await stop.waitFor({
     state: "hidden",

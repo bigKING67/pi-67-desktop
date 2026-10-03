@@ -1,5 +1,5 @@
 import type { JsonValue } from "@earendil-works/pi-ai";
-import { SessionManager, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { SessionManager, type ExtensionToolContext } from "@earendil-works/pi-coding-agent";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -20,7 +20,7 @@ function fixture(privateSession = false) {
   const search = vi.fn<TeamKnowledgeAccess["search"]>().mockResolvedValue({ snapshot, hits: [{ assetId: id, contentRevision: revision, score: 1 }] });
   const read = vi.fn<TeamKnowledgeAccess["read"]>().mockImplementation(async input => ({ snapshot: input.snapshot === "current" ? { ...snapshot, cursor: "2" } : input.snapshot,
     assetId: id, contentRevision: revision, content }));
-  const access = { search, read }, context = { sessionManager: manager, model: { ...model } } as unknown as ExtensionContext;
+  const access = { search, read }, context = { sessionManager: manager, model: { ...model } } as unknown as ExtensionToolContext;
   const tools = createSessionSharedKnowledgeTools(undefined, undefined, () => manager, access);
   const call = (name: string, input: unknown, signal?: AbortSignal) => tools.find(tool => tool.name === name)!.execute("call", input, signal, undefined, context);
   const select = (scope = "project") => call("viking_team_search", { query: "synthetic", scope });

@@ -90,6 +90,7 @@ function packageTool(
     name,
     description: name,
     parameters: { type: "object" },
+    exposure: "direct",
     sourceInfo: { path: source, source, scope: "user", origin: "package" }
   } as ReturnType<ExtensionAPI["getAllTools"]>[number];
 }

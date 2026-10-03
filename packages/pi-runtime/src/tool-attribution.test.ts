@@ -247,7 +247,7 @@ function builtinTool(name: string): ToolAttributionSource {
   return {
     name,
     sourceInfo: {
-      path: `<builtin:${name}>`,
+      path: `builtin:${name}`,
       source: "builtin",
       scope: "temporary",
       origin: "top-level"

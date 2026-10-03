@@ -95,10 +95,7 @@ export function resolvePackagedRuntimeAssetContract(version) {
       : LEGACY_CLIPBOARD_NATIVE_MODULE_PATHS,
     requiredCapabilityPaths: unifiedCapabilities
       ? ["packages/pi-workspace-resources/package.json"]
-      : [
-        "packages/pi67-core/package.json",
-        "managed-packages/bundled/packages/pi-observational-memory/package.json"
-      ],
+      : ["packages/pi67-core/package.json"],
     heicNormalizationAssetsIncluded,
     packageWorkerIsolated,
     piTuiNativeAssetsIncluded,
@@ -159,8 +156,6 @@ export async function assertPackagedRuntimeAssets(artifact, {
     access(join(artifact.resourcesPath, "capabilities/packages/browser67/node_modules/ws/package.json")),
     access(join(artifact.resourcesPath, "capabilities/packages/design-craft/package.json")),
     access(join(artifact.resourcesPath, "capabilities/packages/commerce-growth-os/package.json")),
-    access(join(artifact.resourcesPath, "capabilities/managed-packages/bundled/manifest.json")),
-    access(join(artifact.resourcesPath, "capabilities/managed-packages/bundled/packages/pi-mcp-adapter/package.json")),
     ...(artifact.platform === "win32" && requireWindowsPackageWorkerJob
       ? [access(join(artifact.resourcesPath, "native/pi67-package-worker-job.exe"))]
       : []),

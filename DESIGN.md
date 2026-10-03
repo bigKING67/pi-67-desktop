@@ -1274,10 +1274,10 @@ loading error where the operation can produce those states
   Extension, global/project Skill, Prompt Template, and Context views consume the
   current Session resource projection and never repeat Package update or uninstall
   controls.
-- The Desktop-managed runtime bundle contains only the complete locked closure for
-  `pi-mcp-adapter@2.11.0`. Startup verifies the packaged bundle, atomically promotes
-  `staging` to `active`, retains one `previous` rollback, and exposes only `active` to
-  Pi ResourceLoader. OpenViking is the only supported third-party Context/Memory
+- Desktop uses Pi native MCP rather than presenting an installable adapter bundle.
+  The retired adapter has no enable/update entry or alternate runtime route.
+  Existing user files remain untouched by retirement. OpenViking is the only
+  supported third-party Context/Memory
   owner. Legacy observational-memory and Hy-Memory names are detection/migration
   identifiers only; their runtimes are never bundled or presented as alternatives.
   The zh-CN Settings surface names this category `上下文与记忆` and uses Chinese
@@ -1386,15 +1386,11 @@ loading error where the operation can produce those states
   and does not block Main because no token is injected.
 - Capability bootstrap provisions `tmwd_browser` and `js-reverse` into `mcp.json`
   with Desktop private Node and browser67 entrypoints under the active Pi Agent
-  Profile. The managed `tmwd_browser` specification includes `directTools=true`; a
-  previously receipted proxy-only specification is revision-migrated and its cached
-  Tool schema is invalidated. Same-name entries without an exact Desktop receipt are user-owned conflicts
-  and are never overwritten. Revision-checked atomic replacement prevents lost updates.
-  A changed browser67 commit or server spec invalidates only those two entries in a
-  structurally valid `mcp-cache.json`; unrelated server metadata is preserved. Cache
-  invalid JSON and cache compare-and-swap races remain distinct startup blockers, and
-  an unacknowledged invalidation is retried rather than silently accepting stale Tool
-  schemas.
+  Profile. Native exposure is respectively `direct` and `deferred`; the latter uses
+  Pi `tool_search`. Exact receipted old `directTools` entries migrate atomically.
+  User-owned conflicts are not overwritten and CAS conflicts remain explicit.
+  Native discovery replaces the old adapter cache; `mcp-cache.json` is preserved
+  byte-for-byte and does not block startup or grant Tool authority.
 - `用量分析` uses a grouped summary, restrained daily bars, and one responsive
   Provider/model table for `7 天`, `30 天`, or `90 天`. It rebuilds from the selected
   Workspace's Pi JSONL through `workspace.usage.report`; switching window, Workspace,
@@ -2401,7 +2397,7 @@ loading error where the operation can produce those states
   unclassifiable Shell with that corrective Tool Result instead of opening a modal
   whose approval cannot make the classification reliable.
   The effective capability catalog is rebuilt from Task-local Package settings
-  and bounded `mcp.json`/`mcp-cache.json` metadata at resource load/reload; Tool
+  and effective `mcp.json` plus exact live native Tool registration bindings; Tool
   Calls perform in-memory identity lookups and never expose command, env, URL,
   credential, args, results, or source paths. Skill directories authorize only canonical
   `read`/`grep`/`find`/`ls` targets within that directory; loaded Prompt, context,
@@ -2439,20 +2435,16 @@ loading error where the operation can produce those states
   files are not overwritten. `pi-vision-bridge` and `xtalpi-pi-tools` are absent
   from the managed catalog and are not exclusions. The visible result is one
   rule activation notification per entrypoint and no duplicate-owner conflict.
-- Verified `pi-mcp-adapter@2.10.0` and `2.11.0` `mcp` proxy calls distinguish
-  local capability discovery from execution. Empty status, cached server lists,
-  bounded search/describe, and current-Session UI-message reads use the
-  read-only capability category in `AUTO`. AUTO connects an already
-  configured server and runs a cached nested Tool under the resolved installed-
-  capability grant for every classified side effect, including that target's
-  OAuth/authentication and credential flow; recognized deletion retains exact
-  one-shot confirmation in AUTO and trusted YOLO. New server setup or catalog expansion remains
-  a separate configuration confirmation boundary. Missing or ambiguous servers/Tools,
-  malformed args, duplicate sources, and unsupported versions are corrective
-  errors rather than approvable actions. When a proxy call instead targets the currently verified
-  direct `pi-fff` capability, Desktop treats it as a routing error rather than a
-  user authorization decision: it opens no dialog, names the active direct Tool,
-  and lets the model retry through the ordinary Workspace path classifier.
+- Native MCP discovery and resource reads remain read-only capabilities. Exact
+  configured native tools retain installed-capability AUTO authorization; recognized
+  deletion still opens exact one-shot confirmation in AUTO and trusted YOLO.
+  PLAN remains read-only. Unknown, ambiguous, withdrawn or drifted native bindings
+  and the retired `mcp` proxy produce corrective errors rather than an approval.
+  Runtime-only legacy configuration conversion preserves user source files; invalid
+  or unsupported entries produce explicit diagnostics. No generic MCP Settings or
+  credential editor is added. Native OAuth login is unavailable in Desktop because
+  its loopback listener is outside the platform contract. Logs and implicit output
+  files are disabled; truncated/binary output states clearly when nothing was saved.
 - Configured Memory read/list/recall calls remain classified as reads, and
   add/remember/learn/propose/flush remain classified as persistent writes. When
   Memory, browser67, JS-Reverse, or another Package/MCP source is installed/admitted

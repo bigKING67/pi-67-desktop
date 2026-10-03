@@ -23,7 +23,6 @@ export type AgentHostProfileMode =
 export type AgentHostStartupStage =
   | "classify-profile"
   | "desktop-capabilities"
-  | "managed-packages"
   | "retired-mcp-cleanup"
   | "browser67-mcp"
   | "server-construction";

@@ -6,6 +6,7 @@ const CONTROLLED_MODEL_ID = "hold-open";
 export const CONTROLLED_MODEL_VALUE = `${CONTROLLED_PROVIDER_ID}/${CONTROLLED_MODEL_ID}`;
 export const CONTROLLED_MODEL_LABEL = "Controlled Runtime";
 export const CONTROLLED_PROMPT_TEXT = "Keep the controlled Pi runtime active.";
+export const NATIVE_MCP_PROMPT_TEXT = "Run the packaged native MCP smoke echo exactly once.";
 
 interface ControlledShutdownExtensionOptions {
   extensionPath: string;
@@ -13,6 +14,8 @@ interface ControlledShutdownExtensionOptions {
   lifecyclePath: string;
   /** Optional isolated packaged proof; records only mode flags and Tool names. */
   teamKnowledgeEvidencePath?: string;
+  /** Optional isolated native-MCP proof; never records prompts or raw Tool payloads. */
+  nativeMcpEvidencePath?: string;
 }
 
 interface ShutdownLifecycleExtensionOptions {
@@ -39,7 +42,8 @@ export async function writeControlledShutdownExtension({
   extensionPath,
   childPidPath,
   lifecyclePath,
-  teamKnowledgeEvidencePath
+  teamKnowledgeEvidencePath,
+  nativeMcpEvidencePath
 }: ControlledShutdownExtensionOptions): Promise<void> {
   await writeFile(extensionPath, `
     import { appendFileSync, writeFileSync } from "node:fs";
@@ -48,6 +52,33 @@ export async function writeControlledShutdownExtension({
 
     export default function controlledShutdownFixture(pi) {
       let child;
+      let nativeToolCallObserved = false;
+      let nativeModelSelected = false;
+      let nativeResult;
+      const nativeToolName = "mcp__packaged_native__echo";
+      const nativePrompt = ${JSON.stringify(NATIVE_MCP_PROMPT_TEXT)};
+      const nativeProbeRequested = (messages) => {
+        const latestUser = [...messages].reverse().find((message) => message.role === "user");
+        return JSON.stringify(latestUser?.content).includes(nativePrompt);
+      };
+      const writeNativeEvidence = () => {
+        ${nativeMcpEvidencePath ? `const tool = pi.getAllTools().find((candidate) => candidate.name === nativeToolName);
+        writeFileSync(${JSON.stringify(nativeMcpEvidencePath)}, JSON.stringify({
+          discoveredTool: tool?.name,
+          source: tool?.sourceInfo?.source,
+          sourcePath: tool?.sourceInfo?.path,
+          sourceScope: tool?.sourceInfo?.scope,
+          sourceOrigin: tool?.sourceInfo?.origin,
+          legacyMcpProxyPresent: pi.getAllTools().some((candidate) => candidate.name === "mcp"),
+          toolCallObserved: nativeToolCallObserved,
+          modelSelected: nativeModelSelected,
+          resultObserved: nativeResult !== undefined,
+          resultSucceeded: nativeResult?.isError === false && nativeResult.content.some((block) => (
+            block.type === "text" && block.text === "PACKAGED_NATIVE_MCP_OK"
+          )),
+          ...(nativeResult?.isError ? { syntheticToolError: JSON.stringify(nativeResult.content).slice(0, 512) } : {})
+        }), { mode: 0o600 });` : ""}
+      };
       const startChild = () => {
         if (child && child.exitCode === null && child.signalCode === null) return child;
         child = spawn(process.execPath, ["-e", "setInterval(() => undefined, 1000)"], {
@@ -109,6 +140,24 @@ export async function writeControlledShutdownExtension({
             stopReason: "stop",
             timestamp: Date.now()
           };
+          if (nativeProbeRequested(_context.messages)) {
+            const hasResult = _context.messages.some((message) => (
+              message.role === "toolResult" && message.toolName === nativeToolName
+            ));
+            nativeModelSelected = true;
+            writeNativeEvidence();
+            if (!hasResult) {
+              output.content = [{ type: "toolCall", id: "packaged-native-mcp-call", name: nativeToolName, arguments: {} }];
+              output.stopReason = "toolUse";
+            } else {
+              output.content = [{ type: "text", text: "Packaged native MCP smoke completed." }];
+            }
+            const stream = createAssistantMessageEventStream();
+            stream.push({ type: "start", partial: output });
+            stream.push({ type: "done", reason: output.stopReason, message: output });
+            stream.end();
+            return stream;
+          }
           const activeChild = startChild();
           let settled = false;
           const settle = (reason) => {
@@ -130,6 +179,14 @@ export async function writeControlledShutdownExtension({
           activeChild.once("exit", () => settle(options?.signal?.aborted ? "aborted" : "stop"));
           return stream;
         }
+      });
+      pi.on("tool_call", (event) => {
+        if (event.toolName === nativeToolName) nativeToolCallObserved = true;
+      });
+      pi.on("tool_result", (event) => {
+        if (event.toolName !== nativeToolName) return;
+        nativeResult = event;
+        writeNativeEvidence();
       });
       pi.on("before_agent_start", async (_event, ctx) => {
         const model = ctx.modelRegistry.find(

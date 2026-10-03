@@ -35,14 +35,20 @@ export function validatePiRuntimeContract(packageJson, workspaceSource) {
     failures.push("Pi core, AI, and coding-agent package versions must match");
   }
 
-  const overrides = readWorkspaceOverrides(workspaceSource);
-  for (const name of PI_RUNTIME_DEPENDENCIES) {
+  if (packageVersions.get("@earendil-works/pi-coding-agent") === "1.0.0"
+    && readWorkspaceEntries(workspaceSource, "patchedDependencies").get("@earendil-works/pi-coding-agent@1.0.0")
+      !== "patches/@earendil-works__pi-coding-agent@1.0.0.patch") {
+    failures.push("Pi 1.0.0 requires the locked native MCP host/lifecycle patch");
+  }
+
+  const overrides = readWorkspaceEntries(workspaceSource, "overrides");
+  for (const name of [...PI_RUNTIME_DEPENDENCIES, "@earendil-works/pi-tui"]) {
     const overrideVersion = overrides.get(name);
     if (!isExactVersion(overrideVersion)) {
       failures.push(`pnpm-workspace.yaml overrides.${name} must be an exact version, found ${String(overrideVersion)}`);
       continue;
     }
-    const packageVersion = packageVersions.get(name);
+    const packageVersion = packageVersions.get(name) ?? packageVersions.get("@earendil-works/pi-coding-agent");
     if (packageVersion && overrideVersion !== packageVersion) {
       failures.push(`pnpm-workspace.yaml overrides.${name} must match packages/pi-runtime/package.json (${packageVersion})`);
     }
@@ -63,9 +69,9 @@ function isExactVersion(value) {
   return typeof value === "string" && EXACT_VERSION.test(value);
 }
 
-function readWorkspaceOverrides(source) {
+function readWorkspaceEntries(source, section) {
   const lines = source.split(/\r?\n/u);
-  const start = lines.findIndex((line) => /^overrides:\s*(?:#.*)?$/u.test(line));
+  const start = lines.findIndex((line) => line.replace(/\s*(?:#.*)?$/u, "") === `${section}:`);
   if (start < 0) return new Map();
 
   const overrides = new Map();

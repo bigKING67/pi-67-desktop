@@ -66,8 +66,9 @@ function builtinReadTool(): ReturnType<ExtensionAPI["getAllTools"]>[number] {
     name: "read",
     description: "read",
     parameters: { type: "object" },
+    exposure: "direct",
     sourceInfo: {
-      path: "<builtin:read>",
+      path: "builtin:read",
       source: "builtin",
       scope: "temporary",
       origin: "top-level"

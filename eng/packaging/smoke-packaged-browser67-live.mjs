@@ -37,14 +37,7 @@ try {
         }
       }
     }, null, 2)}\n`, "utf8"),
-    writeFile(`${agentDir}/mcp-cache.json`, `${JSON.stringify({
-      version: 1,
-      servers: {
-        retained_fixture: { tools: [] },
-        tmwd_browser: { tools: [{ name: "stale-browser-tool" }] },
-        "js-reverse": { tools: [{ name: "stale-reverse-tool" }] }
-      }
-    })}\n`, "utf8")
+    writeFile(`${agentDir}/mcp-cache.json`, "{legacy adapter cache bytes}\n", "utf8")
   ]);
   application = await launchPackagedApplication({
     agentDir,
@@ -64,16 +57,11 @@ try {
   const mcpConfig = await readJson(`${agentDir}/mcp.json`);
   assert(mcpConfig.pi67ManagedMcp?.schema === "pi67.browser67-mcp.v1", "managed MCP receipt is missing");
   assert(mcpConfig.mcpServers?.retained_fixture?.command === "retained-fixture", "unrelated MCP config was not preserved");
-  assert(mcpConfig.mcpServers?.tmwd_browser?.directTools === true, "tmwd_browser direct Tools were not enabled");
-  const mcpCache = await readJson(`${agentDir}/mcp-cache.json`);
-  assert(mcpCache.servers?.retained_fixture !== undefined, "unrelated MCP cache was not preserved");
+  assert(mcpConfig.mcpServers?.tmwd_browser?.exposure === "direct", "tmwd_browser was not directly exposed");
+  assert(mcpConfig.mcpServers?.["js-reverse"]?.exposure === "deferred", "js-reverse was not deferred");
   assert(
-    !mcpCacheContainsTool(mcpCache, "tmwd_browser", "stale-browser-tool"),
-    "retired tmwd_browser cache content was not invalidated"
-  );
-  assert(
-    !mcpCacheContainsTool(mcpCache, "js-reverse", "stale-reverse-tool"),
-    "retired js-reverse cache content was not invalidated"
+    await readFile(`${agentDir}/mcp-cache.json`, "utf8") === "{legacy adapter cache bytes}\n",
+    "legacy adapter cache bytes were changed"
   );
   const browser67Root = join(artifact.resourcesPath, "capabilities", "packages", "browser67");
   const tmwdBrowserEntrypoint = mcpConfig.mcpServers?.tmwd_browser?.args?.[0];
@@ -85,13 +73,6 @@ try {
   const browser67Package = await readJson(`${browser67Root}/package.json`);
   assert(browser67Package.version === "0.11.4", "unexpected browser67 version");
   assert(/^[0-9a-f]{40}$/u.test(browser67Package.gitHead), "browser67 gitHead is missing");
-
-  const managedBundleRoot = join(artifact.resourcesPath, "capabilities", "managed-packages", "bundled");
-  const managedManifest = await readJson(join(managedBundleRoot, "manifest.json"));
-  const managedState = await readJson(`${agentDir}/desktop-capabilities/managed-packages/state.json`);
-  const managedPackages = Object.fromEntries(managedManifest.packages.map((entry) => [entry.id, entry]));
-  assertManagedPackage(managedPackages, managedState, "pi-mcp-adapter", "2.11.0");
-  assert(!("pi-observational-memory" in managedPackages), "retired observational-memory runtime is still packaged");
 
   const tmwdBrowser = await probePackagedMcpServer({
     name: "tmwd_browser",
@@ -138,9 +119,6 @@ try {
       extensionIdentity: doctor.doctor.checks.tmwd_ws_runtime.detail,
       identityMatch: doctor.doctor.checks.tmwd_ws_runtime.identity_match
     },
-    managedPackages: {
-      "pi-mcp-adapter": managedPackages["pi-mcp-adapter"].version
-    },
     mcp: {
       tmwd_browser: {
         server: tmwdBrowser.serverInfo,
@@ -185,18 +163,8 @@ async function runPackagedDoctor({ nodeExecutable, browser67Root }) {
   return JSON.parse(result.stdout.trim().split(/\r?\n/u).at(-1));
 }
 
-function assertManagedPackage(packages, state, id, version) {
-  assert(packages[id]?.version === version, `${id}@${version} is not active`);
-  assert(state.enabled[id] === true, `${id} is disabled`);
-}
-
 async function readJson(path) {
   return JSON.parse(await readFile(path, "utf8"));
-}
-
-function mcpCacheContainsTool(cache, serverName, toolName) {
-  const tools = cache?.servers?.[serverName]?.tools;
-  return Array.isArray(tools) && tools.some((tool) => tool?.name === toolName);
 }
 
 function assert(condition, message) {

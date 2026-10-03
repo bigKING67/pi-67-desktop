@@ -3,6 +3,7 @@ import { delimiter, join } from "node:path";
 import { CONTROLLED_PROMPT_TEXT, isProcessAlive } from "./controlled-shutdown-fixture.ts";
 import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
 import { preparePackagedSmokeProfile } from "./packaged-electron-smoke-profile.mjs";
+import { completePackagedNativeMcpShutdown, runPackagedNativeMcpScenario } from "./packaged-native-mcp-scenario.mjs";
 import {
   assertPackagedRuntimeAssets,
   cleanupPackagedTestDirectories,
@@ -43,27 +44,22 @@ const artifact = resolvePackagedArtifact();
 await assertPackagedRuntimeAssets(artifact);
 const packagedScreenshotDirectory = process.env.PI67_PACKAGED_SCREENSHOT_DIR?.trim() || undefined;
 if (packagedScreenshotDirectory) await mkdir(packagedScreenshotDirectory, { recursive: true });
-const {
-  capturePackagedScreenshot,
-  capturePackagedWorkbenchVisualEvidence
-} = createPackagedVisualEvidence(packagedScreenshotDirectory);
+const { capturePackagedScreenshot, capturePackagedWorkbenchVisualEvidence } =
+  createPackagedVisualEvidence(packagedScreenshotDirectory);
 const {
   agentDir,
   extensionsDirectory,
   userDataDirectory,
   workspace
 } = await createPackagedTestDirectories("pi67-packaged-smoke-");
-const {
-  childPidPath,
-  lifecyclePath,
-  packagedCredential,
-  teamKnowledgeEvidencePath
-} = await preparePackagedSmokeProfile({
-  agentDir,
-  extensionsDirectory,
-  userDataDirectory,
-  workspace
-});
+const { childPidPath, lifecyclePath, nativeMcp, packagedCredential, teamKnowledgeEvidencePath } =
+  await preparePackagedSmokeProfile({
+    agentDir,
+    artifact,
+    extensionsDirectory,
+    userDataDirectory,
+    workspace
+  });
 let application;
 let childPid;
 const shutdownState = { childPid: undefined };
@@ -101,7 +97,7 @@ try {
   }
   let sessionCreation;
   try {
-    sessionCreation = await guard.stage("session-creation", () => verifyPackagedSessionCreation({ agentDir, window }));
+    sessionCreation = await guard.stage("session-creation", () => verifyPackagedSessionCreation({ agentDir, childPidPath, window }));
     const teamEvidence = JSON.parse(await readFile(teamKnowledgeEvidencePath, "utf8"));
     const expectsTeamRoute = process.platform === "darwin" && process.arch === "arm64";
     assertPackagedTeamToolSelection(teamEvidence, expectsTeamRoute);
@@ -117,6 +113,7 @@ try {
       { cause: error }
     );
   }
+  await guard.stage("native-mcp", () => runPackagedNativeMcpScenario(window, nativeMcp));
   await guard.stage("changes-inspector", () => verifyPackagedChangesInspector(window, capturePackagedScreenshot));
   const workspaceSettings = await verifyReadySessionCatalog(window);
   await assertNoWorkspaceChangesAuthorityWarning(window);
@@ -374,6 +371,7 @@ try {
   const warmApplication = application;
   application = undefined;
   await assertBoundedApplicationClose(warmApplication, "warm-reload close");
+  await completePackagedNativeMcpShutdown(nativeMcp, true);
   console.info("Packaged smoke stage: warm-reload close completed; launching cold restart.");
   application = await launchPackagedApplication({
     agentDir,
@@ -401,8 +399,9 @@ try {
     window
   });
   childPid = shutdownState.childPid;
+  await completePackagedNativeMcpShutdown(nativeMcp);
   await runPackagedLocalMemorySettingsSmoke(artifact);
-  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, packaged-direct Agent Host startup (${startupDiagnostics.totalDurationMs}ms), private toolchain + first-party capabilities, Desktop browser67 packaged-direct dependency resolution, packaged GUI Extension/Skill update checks with bounded worker cleanup, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, Lark user-first Tabs + persisted Main layout, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), projected image assets after submission plus warm/cold Restore Task, cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt product shutdown (${shutdown.productExitDurationMs}ms; Playwright driver close ${shutdown.driverCloseDurationMs}ms).`);
+  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, packaged-direct Agent Host startup (${startupDiagnostics.totalDurationMs}ms), packaged private-Node native MCP discovery/source receipt plus one AUTO-pipeline synthetic echo and owned-process cleanup, private toolchain + first-party capabilities, Desktop browser67 packaged-direct dependency resolution, packaged GUI Extension/Skill update checks with bounded worker cleanup, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, Lark user-first Tabs + persisted Main layout, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), projected image assets after submission plus warm/cold Restore Task, cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt product shutdown (${shutdown.productExitDurationMs}ms; Playwright driver close ${shutdown.driverCloseDurationMs}ms).`);
 } catch (error) { await guard.fail(error); throw error; } finally {
   guard.stop();
   try {

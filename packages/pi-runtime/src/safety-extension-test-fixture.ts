@@ -61,7 +61,8 @@ export function builtinTool(name: string): ReturnType<ExtensionAPI["getAllTools"
     name,
     description: name,
     parameters: { type: "object" },
-    sourceInfo: { path: `<builtin:${name}>`, source: "builtin", scope: "temporary", origin: "top-level" }
+    exposure: "direct",
+    sourceInfo: { path: `builtin:${name}`, source: "builtin", scope: "temporary", origin: "top-level" }
   } as ReturnType<ExtensionAPI["getAllTools"]>[number];
 }
 

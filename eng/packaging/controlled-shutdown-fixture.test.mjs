@@ -1,12 +1,14 @@
-import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { PiSdkRuntime } from "../../packages/pi-runtime/src/pi-sdk-runtime.ts";
 import {
   assertSingleShutdownQuitLifecycle,
   CONTROLLED_PROMPT_TEXT,
+  NATIVE_MCP_PROMPT_TEXT,
   isProcessAlive,
   readPositiveProcessId,
   resetControlledShutdownLifecycle,
@@ -31,6 +33,36 @@ describe("controlled shutdown fixture", () => {
     })));
   });
 
+  it("records the real native tool result even when a later provider request has only the prompt prefix", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-native-receipt-"));
+    roots.push(root);
+    const extensionPath = join(root, "fixture.mjs");
+    const evidencePath = join(root, "evidence.json");
+    await writeControlledShutdownExtension({ extensionPath, nativeMcpEvidencePath: evidencePath,
+      childPidPath: join(root, "child.pid"), lifecyclePath: join(root, "lifecycle.txt") });
+    await symlink(fileURLToPath(new URL("../../packages/pi-runtime/node_modules", import.meta.url)), join(root, "node_modules"), "junction");
+    const { default: factory } = await import(pathToFileURL(extensionPath).href);
+    const handlers = new Map();
+    let provider;
+    const toolName = "mcp__packaged_native__echo";
+    factory({ on: (event, handler) => handlers.set(event, handler), registerCommand: () => {},
+      registerProvider: (_name, registered) => { provider = registered; },
+      getAllTools: () => [{ name: toolName, sourceInfo: { source: "inline", path: "<inline:pi67-native-mcp>",
+        scope: "temporary", origin: "top-level" } }] });
+    const context = { messages: [{ role: "user", content: NATIVE_MCP_PROMPT_TEXT }] };
+    const model = { api: "openai-responses", provider: "synthetic", id: "synthetic" };
+    provider.streamSimple(model, context, {});
+    handlers.get("tool_call")({ toolName });
+    handlers.get("tool_result")({ toolName, isError: false,
+      content: [{ type: "text", text: "PACKAGED_NATIVE_MCP_OK" }] });
+    provider.streamSimple(model, context, {});
+    expect(JSON.parse(await readFile(evidencePath, "utf8"))).toMatchObject({
+      modelSelected: true, toolCallObserved: true, resultObserved: true, resultSucceeded: true
+    });
+    handlers.get("tool_result")({ toolName, isError: true, content: [{ type: "text", text: "SYNTHETIC_ERROR" }] });
+    expect(JSON.parse(await readFile(evidencePath, "utf8"))).toMatchObject({ resultSucceeded: false });
+  });
+
   it("writes the reusable Extension and observes a controlled child lifecycle", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-controlled-shutdown-"));
     roots.push(root);
@@ -48,6 +80,8 @@ describe("controlled shutdown fixture", () => {
     expect(source).toContain('pi.on("session_shutdown"');
     expect(source).toContain('options?.signal?.addEventListener("abort"');
     expect(source).toContain("ELECTRON_RUN_AS_NODE");
+    expect(source).toContain('const nativeToolName = "mcp__packaged_native__echo"');
+    expect(source).toContain('pi.on("tool_call"');
 
     const child = spawn(process.execPath, ["-e", "setInterval(() => undefined, 1000)"], { stdio: "ignore" });
     children.push(child);

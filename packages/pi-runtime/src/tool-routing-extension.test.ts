@@ -356,7 +356,7 @@ function routingHandlers(
           ? { source: "sdk", path: "<sdk:WebFetch>", scope: "temporary", origin: "top-level" }
           : name === "web_fetch"
             ? { source: "sdk", path: "<sdk:web_fetch>", scope: "temporary", origin: "top-level" }
-          : { source: "builtin", path: `<builtin:${name}>`, scope: "temporary", origin: "top-level" }
+          : { source: "builtin", path: `builtin:${name}`, scope: "temporary", origin: "top-level" }
     })),
     on(event: string, candidate: unknown) {
       if (event === "before_agent_start") beforeAgentStart = candidate as BeforeAgentStartHandler;

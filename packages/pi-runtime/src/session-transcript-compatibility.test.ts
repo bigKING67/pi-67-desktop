@@ -22,10 +22,11 @@ it("persists and resumes Pi prompt/tool state without exposing control messages 
   const manager = SessionManager.create(root, join(root, "sessions"));
   const first = await createAgentSessionFromServices({ services, sessionManager: manager, model });
   let calls = 0;
-  const requests: { prompt: string; tools: string[] }[] = [];
+  const requests: { prompt: string; tools: string[]; userMessages: unknown[] }[] = [];
   const stream: typeof first.session.agent.streamFunction = (_model, context) => {
     calls++;
-    requests.push({ prompt: getCurrentSystemPrompt(context.messages), tools: getCurrentTools(context.messages).map(tool => tool.name) });
+    requests.push({ prompt: getCurrentSystemPrompt(context.messages), tools: getCurrentTools(context.messages).map(tool => tool.name),
+      userMessages: context.messages.filter(message => message.role === "user").map(message => message.content) });
     const message: AssistantMessage = { role: "assistant", api: model.api, provider: model.provider, model: model.id,
       content: [{ type: "text", text: `Synthetic response ${calls}` }], timestamp: Date.now(), stopReason: "stop",
       usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { ...model.cost, total: 0 } } };
@@ -45,6 +46,11 @@ it("persists and resumes Pi prompt/tool state without exposing control messages 
     const reopened = SessionManager.open(file!);
     expect(reopened.getEntries().some(entry => entry.type === "message" && entry.message.role === "system")).toBe(true);
     expect(projectMessagePage(reopened).messages.map(message => message.role)).toEqual(["user", "assistant"]);
+    const originalUser = reopened.getEntries().find(entry => entry.type === "message" && entry.message.role === "user");
+    expect(originalUser).toBeDefined();
+    reopened.appendContextEdit(originalUser!.id, null);
+    // A context omission changes the model's next request, not the user's raw history.
+    expect(projectMessagePage(reopened).messages.map(message => message.role)).toEqual(["user", "assistant"]);
     const resumed = await createAgentSessionFromServices({ services, sessionManager: reopened, model });
     try {
       resumed.session.agent.streamFunction = stream;
@@ -54,7 +60,10 @@ it("persists and resumes Pi prompt/tool state without exposing control messages 
       expect(calls).toBe(2);
       expect(requests[1]?.prompt).toBe(requests[0]?.prompt);
       expect(requests[1]?.tools).toEqual(requests[0]?.tools);
+      expect(JSON.stringify(requests[1]?.userMessages)).not.toContain("First synthetic turn");
+      expect(JSON.stringify(requests[1]?.userMessages)).toContain("Resumed synthetic turn");
       const restored = SessionManager.open(file!);
+      expect(restored.getEntries().some(entry => entry.type === "context_edit" && entry.targetId === originalUser!.id)).toBe(true);
       expect(projectMessagePage(restored).messages.map(message => message.role)).toEqual(["user", "assistant", "user", "assistant"]);
       // Branch at the completed turn: before_agent_start updates follow the user entry.
       const completedTurn = restored.getEntries().find(entry => entry.type === "message" && entry.message.role === "assistant");

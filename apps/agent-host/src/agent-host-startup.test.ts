@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DesktopCapabilityBootstrapResult } from "./desktop-capability-bootstrap.js";
-import type { ManagedPackageBundleResult } from "./managed-package-bundle.js";
 import type { ManagedBrowser67McpResult } from "./managed-browser67-mcp-provision.js";
 import type { RetiredTeamMcpCleanupResult } from "./retired-team-mcp-cleanup.js";
 import {
@@ -71,17 +70,13 @@ describe("Agent Host startup", () => {
         calls.push("desktop-capabilities");
         return enabledCapabilities();
       },
-      activateManagedPackages: async () => {
-        calls.push("managed-packages");
-        return enabledManagedPackages();
-      },
       cleanupRetiredMcp: async () => {
         calls.push("retired-mcp-cleanup");
         return retiredCleanup("missing", agentDir);
       },
       provisionBrowser67Mcp: async () => {
         calls.push("browser67-mcp");
-        return browser67Result("created", "missing", agentDir);
+        return browser67Result("created", agentDir);
       },
       constructServer: () => {
         calls.push("server-construction");
@@ -96,7 +91,6 @@ describe("Agent Host startup", () => {
     expect(environment.PI67_AGENT_PROFILE_FRESH).toBe("1");
     expect(calls).toEqual([
       "desktop-capabilities",
-      "managed-packages",
       "retired-mcp-cleanup",
       "browser67-mcp",
       "server-construction"
@@ -117,11 +111,9 @@ describe("Agent Host startup", () => {
       environment: packagedEnvironment(),
       bootstrapCapabilities,
       onCapabilityPhase,
-      activateManagedPackages: async () => enabledManagedPackages(),
       cleanupRetiredMcp,
       provisionBrowser67Mcp: async () => browser67Result(
         "user-owned-conflict",
-        "skipped",
         agentDir,
         ["tmwd_browser", "js-reverse"]
       ),
@@ -144,53 +136,15 @@ describe("Agent Host startup", () => {
     expect(await readFixtureFiles(agentDir, files)).toEqual(before);
   });
 
-  it("keeps core startup available when a Desktop-managed upgrade cannot activate packages", async () => {
-    const root = await fixtureRoot();
-    const agentDir = join(root, "managed");
-    await mkdir(join(agentDir, "desktop-capabilities"), { recursive: true });
-    await writeFile(
-      join(agentDir, "desktop-capabilities", "state.json"),
-      `${JSON.stringify(desktopCapabilityState())}\n`
-    );
-    await writeFile(join(agentDir, "settings.json"), "{\"theme\":\"user\"}\n");
-    const environment = packagedEnvironment();
-
-    const result = await coordinateAgentHostStartup({
-      agentDir,
-      environment,
-      bootstrapCapabilities: async ({ environment: target }) => {
-        target.PI67_CAPABILITY_PACKAGE_PATHS = JSON.stringify(["/managed/pi-workspace-resources"]);
-        return enabledCapabilities();
-      },
-      activateManagedPackages: async () => {
-        throw Object.assign(new Error("read only namespace"), { code: "EROFS" });
-      },
-      cleanupRetiredMcp: async () => retiredCleanup("missing", agentDir),
-      provisionBrowser67Mcp: async () => browser67Result("unchanged", "unchanged", agentDir),
-      constructServer: () => ({ kind: "server" })
-    });
-
-    expect(result.startup).toMatchObject({
-      profileMode: "desktop-managed-upgrade",
-      status: "degraded",
-      issues: [{ stage: "managed-packages", code: "access-denied" }]
-    });
-    expect(environment.PI67_CAPABILITY_PACKAGE_PATHS).toBe(JSON.stringify(["/managed/pi-workspace-resources"]));
-    expect(environment.PI67_MANAGED_NPM_ROOT).toBeUndefined();
-    expect(await readFile(join(agentDir, "settings.json"), "utf8")).toBe("{\"theme\":\"user\"}\n");
-  });
-
-  it("bounds MCP cleanup, config, and cache conflicts as degraded startup issues", async () => {
+  it("bounds MCP cleanup and config conflicts as degraded startup issues", async () => {
     const result = await coordinateAgentHostStartup({
       agentDir: "/managed-profile",
       environment: packagedEnvironment(),
       classifyProfile: async () => "desktop-managed-upgrade",
       bootstrapCapabilities: async () => enabledCapabilities(),
-      activateManagedPackages: async () => enabledManagedPackages(),
       cleanupRetiredMcp: async () => retiredCleanup("revision-conflict", "/managed-profile"),
       provisionBrowser67Mcp: async () => browser67Result(
         "invalid-json",
-        "revision-conflict",
         "/managed-profile"
       ),
       constructServer: () => ({ kind: "server" })
@@ -201,8 +155,7 @@ describe("Agent Host startup", () => {
       status: "degraded",
       issues: [
         { stage: "retired-mcp-cleanup", code: "conflict" },
-        { stage: "browser67-mcp", code: "invalid-state" },
-        { stage: "browser67-mcp", code: "conflict" }
+        { stage: "browser67-mcp", code: "invalid-state" }
       ],
       totalDurationMs: expect.any(Number),
       stageTimings: expect.arrayContaining([
@@ -217,13 +170,9 @@ describe("Agent Host startup", () => {
     const root = await fixtureRoot();
     const agentDir = join(root, "managed");
     const retired = [
-      join(agentDir, "desktop-capabilities", "packages"),
-      join(agentDir, "desktop-capabilities", "managed-packages", "active"),
-      join(agentDir, "desktop-capabilities", "managed-packages", "previous"),
-      join(agentDir, "desktop-capabilities", "managed-packages", "staging")
+      join(agentDir, "desktop-capabilities", "packages")
     ];
     const retained = [
-      join(agentDir, "desktop-capabilities", "managed-packages", "state.json"),
       join(agentDir, "desktop-capabilities", "skill-packs", "suite", "state.json"),
       join(agentDir, "settings.json"),
       join(agentDir, "sessions", "session.jsonl")
@@ -243,12 +192,8 @@ describe("Agent Host startup", () => {
         managedRoot: join(agentDir, "desktop-capabilities"),
         projectionMode: "packaged-direct"
       }),
-      activateManagedPackages: async () => ({
-        ...enabledManagedPackages(),
-        projectionMode: "packaged-direct"
-      }),
       cleanupRetiredMcp: async () => retiredCleanup("missing", agentDir),
-      provisionBrowser67Mcp: async () => browser67Result("unchanged", "unchanged", agentDir),
+      provisionBrowser67Mcp: async () => browser67Result("unchanged", agentDir),
       constructServer: () => ({ kind: "server" })
     });
 
@@ -318,16 +263,6 @@ function enabledCapabilities(): DesktopCapabilityBootstrapResult {
   };
 }
 
-function enabledManagedPackages(): ManagedPackageBundleResult {
-  return {
-    enabled: true,
-    activeRoot: "/managed/packages",
-    packagePaths: ["/managed/package"],
-    extensionPaths: ["/managed/extension.ts"],
-    activated: true
-  };
-}
-
 function retiredCleanup(
   status: RetiredTeamMcpCleanupResult["status"],
   agentDir: string
@@ -337,7 +272,6 @@ function retiredCleanup(
 
 function browser67Result(
   status: ManagedBrowser67McpResult["status"],
-  cacheStatus: ManagedBrowser67McpResult["cacheStatus"],
   agentDir: string,
   conflicts: ManagedBrowser67McpResult["conflicts"] = []
 ): ManagedBrowser67McpResult {
@@ -345,10 +279,7 @@ function browser67Result(
     status,
     path: join(agentDir, "mcp.json"),
     conflicts,
-    migratedLegacyServers: [],
-    cacheStatus,
-    cachePath: join(agentDir, "mcp-cache.json"),
-    invalidatedCacheServers: []
+    migratedLegacyServers: []
   };
 }
 

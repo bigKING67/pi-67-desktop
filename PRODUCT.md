@@ -338,12 +338,12 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   Existing user Package entries and filters are preserved, managed Rules remain
   namespaced, and an existing global `AGENTS.md` is never overwritten. Credentials,
   Pi JSONL Sessions and user-owned resources remain outside this transaction.
-- The default Pi Package set stays bounded. In addition to Desktop first-party
-  capability Packages, Desktop ships only the complete locked runtime closure for
-  `pi-mcp-adapter@2.11.0`; the client never runs npm to activate it. Build and packaging verify the complete bundle; packaged
-  startup loads it directly from the read-only `bundled` resource while retaining
-  only enablement state in the writable Overlay. Development and legacy recovery
-  may still use the verified `bundled -> staging -> active` projection. OpenViking is
+- The default Pi Package set stays bounded. Desktop uses Pi native MCP and native
+  tool discovery directly; `pi-mcp-adapter` is retired from distribution, startup
+  and the runtime Package view. Its old files and user settings are preserved,
+  but canonical npm entries and proven local adapter packages cannot load in
+  Desktop. There is no adapter fallback or second MCP connection owner.
+  OpenViking is
   the sole supported third-party Context/Memory owner. Legacy observational-memory
   and Hy-Memory identifiers remain only for pre-load blocking and migration; their
   runtimes are not bundled and existing private data is preserved.
@@ -763,18 +763,15 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   separately reviewed automation asset and never follows automatically from Memory
   extraction or SOP publication.
 - Desktop provisions `tmwd_browser` and `js-reverse` as managed browser67 MCP servers
-  in the Pi Agent Profile with the private packaged Node executable. `tmwd_browser`
-  is admitted with `directTools=true`, so its effective browser Tools enter Pi's
-  normal installed-capability identity and AUTO authorization path instead of being
-  trapped behind the generic MCP proxy Tool. Desktop updates only
-  entries carrying a matching Desktop receipt and never runs npm in the packaged
-  client. Same-name user-owned entries, invalid JSON, cache conflicts, and
-  compare-and-swap conflicts fail closed at the browser67 enhancement boundary:
-  Desktop preserves the user bytes, marks Agent Host startup `degraded`, and keeps
-  the core Pi runtime available. When the managed browser67 revision or server specification
-  changes, Desktop removes only those two entries from valid `mcp-cache.json`, keeps
-  unrelated cached servers, and records cache invalidation completion before startup
-  proceeds.
+  in the Pi Agent Profile with the private packaged Node executable. The browser
+  uses native `exposure: direct`; JS-Reverse uses `exposure: deferred` and Pi's
+  `tool_search`. Their registered native tools use the normal installed-capability
+  identity and AUTO authorization path. Desktop updates only entries carrying a
+  matching Desktop receipt and never runs npm in the packaged client. Exact
+  receipted `directTools` configurations are migrated; same-name user-owned entries,
+  invalid JSON and compare-and-swap conflicts preserve user bytes and degrade only
+  the browser67 enhancement. Native MCP discovers live tool schemas and never reads
+  or writes the retired adapter's `mcp-cache.json`; existing cache bytes are retained.
 - Settings presents Pi's automatically loaded Markdown instructions as `工作规则`
   in explicit `全局` and `项目` scopes. Global and project `AGENTS.md` rules remain
   primary; inherited rules are visible directly in the project scope. Pi-67 built-in
@@ -1063,14 +1060,15 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   Workspace, hard-stop request, or bounded grant limit), the request stays pending and
   the dialog stays open with the reason, so the user can still allow once or deny.
 - AUTO trusts an effective configured source, not an arbitrary registered Tool
-  name. At Session resource load, Desktop builds a bounded in-memory capability
-  catalog from the effective Task-local Package settings plus that Task's valid
-  `mcp.json` and `mcp-cache.json`. The catalog retains only Package/server/Tool
-  identity, MCP transport, direct-Tool mapping, and schema digest; it excludes
-  command, args, environment, URL, credential, Tool input, and Tool result data.
-  Resource reload atomically rebuilds the catalog, while the Tool Call hot path
-  performs only in-memory lookups. Duplicate Package, server, nested Tool, or
-  Direct Tool identities remain fail-closed.
+  name. Desktop combines admitted Task Package settings with the same effective
+  global/trusted-project `mcp.json` used by Pi native MCP. Native registration
+  callbacks bind the configured server, original Tool, final Pi Tool name, normalized
+  schema identity/digest and exposure. The in-memory permission catalog retains no
+  command, args, environment, URL, credentials, inputs or results. Reload, withdrawal,
+  shutdown, changed config, duplicate or mismatched identities invalidate grants;
+  the Tool Call path performs no filesystem discovery. Desktop does not connect
+  extension-registered servers; native resource enumeration and reads use the same
+  admitted file configurations as Tool execution.
 - Bounded Workspace reads and writes, conservatively classified local
   inspection/test/build commands, and exact read access to the Skills, Prompt
   files, context files, and visible Extension files already loaded by that
@@ -1140,27 +1138,23 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   and an absent verified Package produces no exclusion. `pi-vision-bridge` and
   `xtalpi-pi-tools` remain unmanaged and unbundled. Deduplication never grants
   Tool authority by itself.
-- Verified `pi-mcp-adapter@2.10.0` and `2.11.0` metadata operations remain a
-  read-only capability: status, cached server Tool lists, bounded
-  search/describe, and current-Session UI-message inspection run in `AUTO`.
-  Connecting a server already present in effective `mcp.json`
-  and invoking a nested Tool present in the effective cache use that resolved
-  installed-capability grant for every classified side effect in AUTO except
-  recognized destructive operations,
-  including the configured target's OAuth/authentication and credential flow;
-  recognized deletion retains exact one-shot confirmation in AUTO and trusted
-  YOLO. Adding an unconfigured
-  server or expanding the configured server catalog remains a separate configuration
-  confirmation boundary.
-  An unconfigured server, missing or ambiguous nested Tool, malformed proxy args,
-  unsupported Package identity, or duplicate `mcp` source is rejected without a
-  meaningless approval. A proxy call
-  that mistakenly addresses a current, explicitly user-installed and admitted direct
-  `pi-fff` Tool is not an
-  authorization decision: Desktop rejects it without opening Approval and tells
-  the model to use the active direct name (`find`/`grep` in override mode or
-  `fffind`/`ffgrep` in named mode). The corrected Workspace-local read then follows
-  the normal AUTO path policy.
+- Pi native MCP is the sole MCP execution path. Direct tools are immediately
+  available; deferred tools are discovered through native `tool_search`. Codemode is
+  not enabled. The retired `mcp` proxy is an invalid route in every safety mode.
+  MCP resources and discovery are read-only capabilities. Configured native tools
+  retain the installed-capability AUTO grant, but recognized deletion still requires
+  exact one-shot confirmation in AUTO and trusted YOLO; PLAN stays read-only.
+  Unknown, forged, withdrawn, ambiguous or schema-drifted native bindings fail closed.
+  Desktop translates supported legacy direct-tool, exclusion, timeout and bearer
+  fields in memory without rewriting user files. Unsupported imports, SSE, disabled
+  OAuth semantics and Codemode configurations produce explicit diagnostics. New
+  configuration and credential changes remain separate user actions.
+  Raw server logging and implicit text/binary result files are disabled through
+  the pinned Pi host patch. Large results clearly report truncation without claiming
+  a saved file. MCP uses the selected Pi Agent Profile for its credential store.
+  Desktop does not start the native OAuth loopback login flow; `/mcp login` reports
+  that limitation. Pending connections and their process trees close before the
+  Session shutdown completes. No new transport, loop or Session store is introduced.
 - Configured Memory reads and search/list/recall operations are read-only;
   remember/add/learn/propose/flush are non-destructive persistent writes and run
   in AUTO. When Memory, browser67, JS-Reverse, or another Package/MCP source is

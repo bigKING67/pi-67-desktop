@@ -2,7 +2,7 @@ import type { JsonValue } from "@earendil-works/pi-ai";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect } from "vitest";
-import { SessionManager, SettingsManager, createAgentSessionFromServices, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { SessionManager, SettingsManager, createAgentSessionFromServices, type ExtensionToolContext } from "@earendil-works/pi-coding-agent";
 import { createAssistantMessageEventStream, type AssistantMessage } from "@earendil-works/pi-ai";
 import type { TeamSessionIdentity } from "@pi67/domain";
 import type { TeamKnowledgeAccess } from "./team-knowledge-access.js";
@@ -26,7 +26,7 @@ export function createNativeKnowledgeSession(input: {
   const birth = manager.getLeafId()!;
   const tools = createSessionSharedKnowledgeTools(undefined, undefined, () => manager, input.access);
   const call = (name: string, args: unknown) => tools.find(tool => tool.name === name)!.execute(name, args, input.signal, undefined,
-    { sessionManager: manager, model: input.model } as unknown as ExtensionContext);
+    { sessionManager: manager, model: input.model } as unknown as ExtensionToolContext);
   return {
     call,
     async persistAndReopen(search: Awaited<ReturnType<typeof call>>, read: Awaited<ReturnType<typeof call>>) {

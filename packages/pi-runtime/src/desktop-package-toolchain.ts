@@ -1,4 +1,4 @@
-import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename } from "node:path";
 import {
   SettingsManager,
   type PackageSource
@@ -20,6 +20,14 @@ import {
   projectedCapabilityPackagePaths
 } from "./desktop-capability-paths.js";
 import type { PackageTrustRegistry } from "./package-trust-registry.js";
+import {
+  desktopPackageSettingsScopeDirectories,
+  desktopPackageSettingsScopeDirectory,
+  retiredMcpAdapterPackageRoots,
+  withoutRetiredMcpAdapterExtensions,
+  withoutRetiredMcpAdapterPackages,
+  type DesktopPackageSettingsLocations
+} from "./retired-mcp-adapter-filter.js";
 
 type ReloadableDesktopSettingsManager = Pick<
   SettingsManager,
@@ -42,10 +50,6 @@ const DESKTOP_WORKSPACE_LEGACY_EXTENSION_EXCLUSIONS = [
 const DESKTOP_OPENVIKING_PROJECTION_EXCLUSIONS = [
   "-extensions/pi67-openviking/index.ts", "-extensions/pi67-openviking/index.js"
 ] as const;
-
-const DESKTOP_MANAGED_NPM_SOURCES = new Set([
-  "npm:pi-mcp-adapter"
-]);
 
 export interface DesktopPackageToolchain {
   readonly desktop: boolean;
@@ -109,12 +113,12 @@ export function applyDesktopPackageToolchain(
       { recoverable: false, details: { packaged: toolchain.packaged } }
     );
   }
-  const packages = withoutManagedNpmPackageSources(withoutNativeReplacedPackages(
+  const packages = withoutRetiredMcpAdapterPackages(withoutNativeReplacedPackages(
     desktopCapabilityPackages(settingsManager.getPackages(), environment)
-  ), environment);
+  ));
   settingsManager.applyOverrides({
     npmCommand: [toolchain.nodeExecutable, toolchain.npmCli],
-    ...(packages.length === 0 ? {} : { packages })
+    packages
   });
   return toolchain;
 }
@@ -158,7 +162,8 @@ export function createDesktopPackageSettingsView(
   settingsManager: SettingsManager,
   environment: NodeJS.ProcessEnv = process.env,
   trustRegistry?: Pick<PackageTrustRegistry, "runtimePackageAllowed">,
-  memoryOwnerPreflight?: DesktopMemoryOwnerPreflight
+  memoryOwnerPreflight?: DesktopMemoryOwnerPreflight,
+  locations?: DesktopPackageSettingsLocations
 ): SettingsManager {
   const desktop = resolveDesktopPackageToolchain(environment).desktop;
   if (!desktop && memoryOwnerPreflight === undefined) return settingsManager;
@@ -167,8 +172,12 @@ export function createDesktopPackageSettingsView(
       if (property === "getGlobalSettings") {
         return () => {
           const settings = target.getGlobalSettings();
+          const localBase = desktopPackageSettingsScopeDirectory(locations, "global");
+          const retiredPackageRoots = desktop ? retiredMcpAdapterPackageRoots(settings.packages ?? [], localBase) : [];
           const runtimePackages = desktop
-            ? withoutNativeReplacedPackages(desktopCapabilityPackages(settings.packages ?? [], environment))
+            ? withoutRetiredMcpAdapterPackages(withoutNativeReplacedPackages(
+                desktopCapabilityPackages(settings.packages ?? [], environment, localBase)
+              ), localBase)
             : settings.packages ?? [];
           const packages = applyMemoryOwnerPackageGate(runtimeAdmittedPackages(
             runtimePackages,
@@ -176,7 +185,13 @@ export function createDesktopPackageSettingsView(
             trustRegistry
           ), memoryOwnerPreflight);
           const extensionOverrides = desktop
-            ? desktopExtensionOverrides(settings.extensions ?? [], packages, environment)
+            ? desktopExtensionOverrides(
+                settings.extensions ?? [],
+                packages,
+                environment,
+                retiredPackageRoots,
+                localBase
+              )
             : settings.extensions ?? [];
           return {
             ...settings,
@@ -192,10 +207,12 @@ export function createDesktopPackageSettingsView(
       if (property === "getProjectSettings") {
         return () => {
           const settings = target.getProjectSettings();
+          const localBase = desktopPackageSettingsScopeDirectory(locations, "project");
+          const retiredPackageRoots = desktop ? retiredMcpAdapterPackageRoots(settings.packages ?? [], localBase) : [];
           const runtimePackages = desktop
-            ? withoutManagedNpmPackageSources(
+            ? withoutRetiredMcpAdapterPackages(
                 withoutNativeReplacedPackages(settings.packages ?? []),
-                environment
+                localBase
               )
             : settings.packages ?? [];
           return {
@@ -206,7 +223,9 @@ export function createDesktopPackageSettingsView(
               trustRegistry
             ), memoryOwnerPreflight),
             extensions: applyMemoryOwnerExtensionGate(
-              settings.extensions ?? [],
+              desktop
+                ? withoutRetiredMcpAdapterExtensions(settings.extensions ?? [], retiredPackageRoots, localBase)
+                : settings.extensions ?? [],
               "project",
               memoryOwnerPreflight
             )
@@ -215,9 +234,9 @@ export function createDesktopPackageSettingsView(
       }
       if (property === "getPackages") {
         return () => applyMemoryOwnerPackageGate((desktop
-          ? withoutManagedNpmPackageSources(
+          ? withoutRetiredMcpAdapterPackages(
               withoutNativeReplacedPackages(target.getPackages()),
-              environment
+              desktopPackageSettingsScopeDirectories(locations)
             )
           : target.getPackages()).filter((entry) => {
           const source = typeof entry === "string" ? entry : entry.source;
@@ -250,7 +269,13 @@ export function inspectGlobalDesktopMemoryOwners(
     cwd: agentDir,
     agentDir,
     reservedOwner: "pi67-openviking",
-    settingsManager: createDesktopPackageSettingsView(settingsManager, environment)
+    settingsManager: createDesktopPackageSettingsView(
+      settingsManager,
+      environment,
+      undefined,
+      undefined,
+      { agentDir, cwd: agentDir }
+    )
   });
 }
 
@@ -258,19 +283,6 @@ function withoutNativeReplacedPackages(configured: PackageSource[]): PackageSour
   return configured.filter((entry) => {
     const source = typeof entry === "string" ? entry : entry.source;
     return nativeCapabilityReplacement(source) === undefined;
-  });
-}
-
-function withoutManagedNpmPackageSources(
-  configured: PackageSource[],
-  environment: NodeJS.ProcessEnv
-): PackageSource[] {
-  const active = activeManagedNpmPackageIds(environment);
-  if (active.size === 0) return configured;
-  return configured.filter((entry) => {
-    const source = typeof entry === "string" ? entry : entry.source;
-    const normalized = source.trim().replace(/@(?:\^|~)?\d[^/]*$/u, "");
-    return !DESKTOP_MANAGED_NPM_SOURCES.has(normalized) || !active.has(normalized.slice("npm:".length));
   });
 }
 
@@ -331,23 +343,26 @@ function runtimeAdmittedPackages(
 function desktopExtensionOverrides(
   configured: string[],
   packages: PackageSource[],
-  environment: NodeJS.ProcessEnv
+  environment: NodeJS.ProcessEnv,
+  retiredPackageRoots: string[],
+  localBase?: string
 ): string[] {
+  const permitted = withoutRetiredMcpAdapterExtensions(configured, retiredPackageRoots, localBase);
   const workspaceResourceRoots = projectedCapabilityPackagePaths(environment)
     .filter((root) => basename(root) === "pi-workspace-resources");
-  if (workspaceResourceRoots.length === 0) return configured;
+  if (workspaceResourceRoots.length === 0) return permitted;
   const hasManagedWorkspaceResources = packages.some((entry) => {
     const source = typeof entry === "string" ? entry : entry.source;
     return workspaceResourceRoots.some((root) => isSameAbsolutePath(source, root));
   });
-  if (!hasManagedWorkspaceResources) return configured;
+  if (!hasManagedWorkspaceResources) return permitted;
   const exclusions = [
     ...DESKTOP_WORKSPACE_LEGACY_EXTENSION_EXCLUSIONS,
     ...(environment.PI67_OPENVIKING_SHARED_PROJECTION === "managed"
       ? DESKTOP_OPENVIKING_PROJECTION_EXCLUSIONS
       : [])
   ];
-  return [...new Set([...configured, ...exclusions])];
+  return [...new Set([...permitted, ...exclusions])];
 }
 
 function releaseDesktopReloadHook(
@@ -364,14 +379,15 @@ function releaseDesktopReloadHook(
 
 function desktopCapabilityPackages(
   configured: PackageSource[],
-  environment: NodeJS.ProcessEnv
+  environment: NodeJS.ProcessEnv,
+  localBase?: string
 ): PackageSource[] {
   const capabilityRoots = desktopCapabilityRoots(environment);
   const serialized = nonEmpty(environment.PI67_CAPABILITY_PACKAGE_PATHS);
   if (capabilityRoots.length === 0) return configured;
-  const userConfigured = withoutManagedNpmPackageSources(
+  const userConfigured = withoutRetiredMcpAdapterPackages(
     withoutDesktopCapabilityPackages(configured, environment),
-    environment
+    localBase
   );
   if (!serialized) return userConfigured;
   let candidates: unknown;
@@ -404,25 +420,6 @@ function desktopCapabilityPackages(
     if (!configuredSources.has(path)) result.push(path);
   }
   return result;
-}
-
-function activeManagedNpmPackageIds(environment: NodeJS.ProcessEnv): Set<string> {
-  const root = nonEmpty(environment.PI67_MANAGED_NPM_ROOT);
-  const serialized = nonEmpty(environment.PI67_CAPABILITY_PACKAGE_PATHS);
-  if (!root || !serialized || !isAbsolute(root)) return new Set();
-  let candidates: unknown;
-  try {
-    candidates = JSON.parse(serialized) as unknown;
-  } catch {
-    return new Set();
-  }
-  if (!Array.isArray(candidates)) return new Set();
-  const packageRoot = join(root, "packages");
-  return new Set(candidates.flatMap((candidate) => {
-    if (typeof candidate !== "string" || !isContainedAbsolutePath(candidate, packageRoot)) return [];
-    const fromRoot = relative(resolve(packageRoot), resolve(candidate));
-    return fromRoot !== "" && !fromRoot.includes(sep) ? [fromRoot] : [];
-  }));
 }
 
 function withoutDesktopCapabilityPackages(

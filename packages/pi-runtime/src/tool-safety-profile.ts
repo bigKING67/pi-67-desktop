@@ -2,13 +2,14 @@ import { readFile, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { ExtensionAPI, SourceInfo } from "@earendil-works/pi-coding-agent";
 import type {
-  ConfiguredCapabilityCatalog,
-  ConfiguredMcpCapability
+  ConfiguredCapabilityCatalog
 } from "./configured-capability-catalog.js";
+
+import { isNativeMcpSource, isNativeToolSearchSource, type NativeMcpCapability } from "./native-mcp-catalog.js";
 
 const PI_WEB_ACCESS_VERSION = "0.17.0";
 const PI_FFF_VERSION = "0.10.1";
-const PI_MCP_ADAPTER_VERSIONS = ["2.10.0", "2.11.0"] as const;
+
 
 const BUILTIN_TOOLS = new Set(["bash", "read", "write", "edit", "grep", "find", "ls"]);
 const PI_WEB_ACCESS_TOOLS = new Set([
@@ -34,12 +35,7 @@ export type ToolSafetyProfile =
   | { kind: "pi67-plan"; toolName: string; sourceLabel: "Pi-67 原生计划" }
   | { kind: "pi67-context"; toolName: string; sourceLabel: "Pi-67 企业知识" }
   | { kind: "pi-web-access"; toolName: string; sourceLabel: "pi-web-access@0.17.0" }
-  | {
-      kind: "pi-mcp-adapter";
-      toolName: "mcp";
-      version: typeof PI_MCP_ADAPTER_VERSIONS[number];
-      sourceLabel: `pi-mcp-adapter@${typeof PI_MCP_ADAPTER_VERSIONS[number]}`;
-    }
+  | { kind: "native-mcp-read"; toolName: string; sourceLabel: string }
   | {
       kind: "pi-fff";
       toolName: string;
@@ -128,22 +124,21 @@ export function createToolSafetyProfileResolver(catalog?: ConfiguredCapabilityCa
     if (PI_WEB_ACCESS_TOOLS.has(toolName)) {
       return reservedIdentityMismatch(toolName, "pi-web-access");
     }
-    if (toolName === "mcp") {
-      const version = await resolveVerifiedPackageVersion(
-        source,
-        "pi-mcp-adapter",
-        PI_MCP_ADAPTER_VERSIONS,
-        manifestChecks
-      );
-      if (version) {
-        return {
-          kind: "pi-mcp-adapter",
-          toolName,
-          version,
-          sourceLabel: `pi-mcp-adapter@${version}`
-        };
-      }
-      return reservedIdentityMismatch(toolName, "pi-mcp-adapter");
+    if (toolName === "mcp") return reservedIdentityMismatch(toolName, "Pi 原生 MCP（旧代理已下线）");
+    if (toolName === "tool_search") {
+      return isNativeToolSearchSource(source)
+        ? { kind: "native-mcp-read", toolName, sourceLabel: "Pi 原生工具发现" }
+        : reservedIdentityMismatch(toolName, "Pi 原生工具发现");
+    }
+    if (["list_mcp_resources", "list_mcp_resource_templates", "read_mcp_resource"].includes(toolName)) {
+      return isNativeMcpSource(source)
+        ? { kind: "native-mcp-read", toolName, sourceLabel: "Pi 原生 MCP 资源" }
+        : reservedIdentityMismatch(toolName, "Pi 原生 MCP 资源");
+    }
+    if (toolName.startsWith("mcp__") || isNativeMcpSource(source)) {
+      const native = catalog?.nativeMcp.resolve(matches[0]!);
+      return native ? configuredMcpProfile(toolName, native)
+        : reservedIdentityMismatch(toolName, "当前 Session 的原生 MCP 绑定");
     }
     if (
       (PI_FFF_GREP_TOOLS.has(toolName) || PI_FFF_FIND_TOOLS.has(toolName))
@@ -165,32 +160,6 @@ export function createToolSafetyProfileResolver(catalog?: ConfiguredCapabilityCa
       return reservedIdentityMismatch(toolName, "@ff-labs/pi-fff");
     }
 
-    const directMcp = catalog?.resolveDirectMcpTool(toolName);
-    if (directMcp?.kind === "configured-mcp") {
-      const version = await resolveVerifiedPackageVersion(
-        source,
-        "pi-mcp-adapter",
-        PI_MCP_ADAPTER_VERSIONS,
-        manifestChecks
-      );
-      if (version) return configuredMcpProfile(toolName, directMcp);
-    } else if (directMcp?.kind === "ambiguous") {
-      const version = await resolveVerifiedPackageVersion(
-        source,
-        "pi-mcp-adapter",
-        PI_MCP_ADAPTER_VERSIONS,
-        manifestChecks
-      );
-      if (version) {
-        return {
-          kind: "unverified",
-          toolName,
-          sourceLabel: directMcp.sourceLabel,
-          nonApprovableReason: "当前 MCP Direct Tool 对应多个 server，授权无法消除歧义；请改用 mcp 并显式指定 server。"
-        };
-      }
-    }
-
     const configuredPackage = catalog?.resolvePackageSource(source);
     if (configuredPackage?.kind === "configured-package" || configuredPackage?.kind === "managed-package") {
       return { kind: configuredPackage.kind, toolName, sourceLabel: configuredPackage.sourceLabel };
@@ -209,7 +178,7 @@ export function createToolSafetyProfileResolver(catalog?: ConfiguredCapabilityCa
 
 function configuredMcpProfile(
   toolName: string,
-  capability: ConfiguredMcpCapability
+  capability: NativeMcpCapability
 ): Extract<ToolSafetyProfile, { kind: "configured-mcp" }> {
   return {
     kind: "configured-mcp",
@@ -230,22 +199,10 @@ function reservedIdentityMismatch(toolName: string, expectedPackage: string): To
   };
 }
 
-async function resolveVerifiedPackageVersion<TVersion extends string>(
-  source: SourceInfo,
-  packageName: string,
-  versions: readonly TVersion[],
-  manifestChecks: Map<string, Promise<boolean>>
-): Promise<TVersion | undefined> {
-  for (const version of versions) {
-    if (await isVerifiedPackageIdentity(source, packageName, version, manifestChecks)) return version;
-  }
-  return undefined;
-}
-
 function isBuiltinIdentity(toolName: string, source: SourceInfo): boolean {
   return BUILTIN_TOOLS.has(toolName)
     && source.source === "builtin"
-    && source.path === `<builtin:${toolName}>`
+    && source.path === `builtin:${toolName}`
     && source.scope === "temporary"
     && source.origin === "top-level";
 }

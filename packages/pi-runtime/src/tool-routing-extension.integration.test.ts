@@ -38,6 +38,9 @@ describe("Desktop tool routing Extension integration", () => {
 
     const { session, bridge, requestApproval } = await createSession(fixture);
     try {
+      expect(session.getAllTools().find((tool) => tool.name === "bash")?.sourceInfo).toEqual({
+        source: "builtin", path: "builtin:bash", scope: "temporary", origin: "top-level"
+      });
       expect(session.extensionRunner.getActiveTools()).toContain("web_search");
       expect(session.getActiveToolNames()).toContain("Bash");
       expect(session.getActiveToolNames()).not.toContain("WebSearch");
@@ -116,6 +119,30 @@ describe("Desktop tool routing Extension integration", () => {
     try {
       expect(session.getActiveToolNames()).not.toContain("powershell");
       expect(session.getAllTools().map((tool) => tool.name)).not.toContain("powershell");
+    } finally {
+      bridge.dispose();
+      session.dispose();
+    }
+  }, 15_000);
+
+  it("loads native discovery while keeping Codemode and disabled MCP servers off across reload", async () => {
+    const fixture = await createFixture("optional-sdk-extensions");
+    await writeFile(join(fixture.agentDir, "settings.json"), JSON.stringify({
+      defaultTools: ["+codemode", "+tool_search"]
+    }));
+    await writeFile(join(fixture.agentDir, "mcp.json"), JSON.stringify({
+      mcpServers: { disabledFixture: { command: "must-not-start-pi67-fixture", enabled: false } }
+    }));
+    const { session, bridge } = await createSession(fixture);
+    try {
+      for (const reload of [false, true]) {
+        if (reload) await session.reload();
+        const names = session.getAllTools().map((tool) => tool.name);
+        expect(names).not.toContain("codemode");
+        expect(names).toContain("tool_search");
+        expect(names.some((name) => name.startsWith("mcp__"))).toBe(false);
+        expect(session.getActiveToolNames()).toContain("read");
+      }
     } finally {
       bridge.dispose();
       session.dispose();

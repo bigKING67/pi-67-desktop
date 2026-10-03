@@ -88,7 +88,7 @@ describe("Windows installed real-user Pi profile", () => {
         rules: "installed"
       }));
       await writeFile(join(agentDir, "mcp.json"), JSON.stringify({
-        mcpServers: { tmwd_browser: { directTools: true } },
+        mcpServers: { tmwd_browser: { exposure: "direct" } },
         pi67ManagedMcp: {
           servers: { tmwd_browser: {}, "js-reverse": {} }
         }
@@ -266,7 +266,7 @@ async function writeCleanProvisioningState(agentDir) {
       rules: "installed"
     })),
     writeFile(join(agentDir, "mcp.json"), JSON.stringify({
-      mcpServers: { tmwd_browser: { directTools: true } },
+      mcpServers: { tmwd_browser: { exposure: "direct" } },
       pi67ManagedMcp: {
         servers: { tmwd_browser: {}, "js-reverse": {} }
       }

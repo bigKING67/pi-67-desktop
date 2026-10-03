@@ -1,6 +1,6 @@
 {
   "schema": "pi67.capability-sources-lock.v1",
-  "catalogVersion": "2026.09.26.1",
+  "catalogVersion": "2026.10.03.1",
   "sources": [
     {
       "id": "pi-workspace-resources",
@@ -163,19 +163,6 @@
           "sha256": "6e87430c49821fb2031a76e80dbd850f809affb70e10eebe2850fa241215b929"
         }
       ]
-    }
-  ],
-  "managedNpmBundles": [
-    {
-      "id": "pi-mcp-adapter",
-      "packageName": "pi-mcp-adapter",
-      "source": "npm:pi-mcp-adapter",
-      "version": "2.11.0",
-      "packageIntegrity": "sha512-4Y/eLbhbxnRih519dJUxMyQ5QASvPcdWyBlS8+dDXteAzaMuLnd4nMTWgoZw3JRIW+0r93KAQcz1Rbli4xCwEQ==",
-      "extensionPaths": [
-        "index.ts"
-      ],
-      "defaultEnabled": true
     }
   ],
   "recommendedExternal": [

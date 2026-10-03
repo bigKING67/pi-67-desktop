@@ -1,8 +1,9 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SettingsManager, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { SettingsManager, type ExtensionAPI, type McpServerEntry } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { NATIVE_MCP_EXTENSION_PATH } from "./native-mcp-catalog.js";
 import { ConfiguredCapabilityCatalog } from "./configured-capability-catalog.js";
 import {
   createDesktopSafetyExtension,
@@ -78,22 +79,22 @@ describe("createDesktopSafetyExtension configured capabilities", () => {
   it("auto-allows installed MCP writes but keeps persistent deletion behind hard confirmation", async () => {
     const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
     const tools = [
-      packageTool("agent_memory_remember", "npm:pi-mcp-adapter@2.11.0"),
-      packageTool("agent_memory_forget", "npm:pi-mcp-adapter@2.11.0")
+      nativeTool("mcp__agent_memory__remember"),
+      nativeTool("mcp__agent_memory__forget")
     ];
-    const handler = await safetyHandler(autoPolicy(), requestApproval, tools, ["pi-mcp-adapter"], {
+    const handler = await safetyHandler(autoPolicy(), requestApproval, tools, [], {
       mcpServers: { agent_memory: { command: "redacted", directTools: true } },
       cache: { agent_memory: ["remember", "forget"] }
     });
 
     await expect(handler({
       toolCallId: "memory-add",
-      toolName: "agent_memory_remember",
+      toolName: "mcp__agent_memory__remember",
       input: { text: "not projected" }
     }, { hasUI: true })).resolves.toBeUndefined();
     await expect(handler({
       toolCallId: "memory-delete",
-      toolName: "agent_memory_forget",
+      toolName: "mcp__agent_memory__forget",
       input: { id: "memory-1" }
     }, { hasUI: true })).resolves.toMatchObject({ block: true });
 
@@ -132,10 +133,10 @@ describe("createDesktopSafetyExtension configured capabilities", () => {
   it("auto-allows task-scoped JS-Reverse instrumentation and configured MCP reads", async () => {
     const requestApproval = vi.fn<DesktopApprovalRequester>();
     const tools = [
-      packageTool("js_reverse_remove_hook", "npm:pi-mcp-adapter@2.11.0"),
-      packageTool("docs_source_search", "npm:pi-mcp-adapter@2.11.0")
+      nativeTool("mcp__js_reverse__remove_hook"),
+      nativeTool("mcp__docs_source__search")
     ];
-    const handler = await safetyHandler(autoPolicy(), requestApproval, tools, ["pi-mcp-adapter"], {
+    const handler = await safetyHandler(autoPolicy(), requestApproval, tools, [], {
       mcpServers: {
         "js-reverse": { command: "redacted", directTools: true },
         "docs-source": { url: "https://redacted.invalid", directTools: ["search"] }
@@ -148,12 +149,12 @@ describe("createDesktopSafetyExtension configured capabilities", () => {
 
     await expect(handler({
       toolCallId: "js-reverse-remove-hook",
-      toolName: "js_reverse_remove_hook",
+      toolName: "mcp__js_reverse__remove_hook",
       input: { hook_id: "hook-1" }
     }, { hasUI: true })).resolves.toBeUndefined();
     await expect(handler({
       toolCallId: "docs-search",
-      toolName: "docs_source_search",
+      toolName: "mcp__docs_source__search",
       input: { query: "fixture" }
     }, { hasUI: true })).resolves.toBeUndefined();
     expect(requestApproval).not.toHaveBeenCalled();
@@ -161,7 +162,7 @@ describe("createDesktopSafetyExtension configured capabilities", () => {
 });
 
 interface McpFixture {
-  mcpServers: Record<string, Record<string, unknown>>;
+  mcpServers: Record<string, McpServerEntry["config"] & { directTools?: boolean | string[] }>;
   cache: Record<string, string[]>;
 }
 
@@ -175,24 +176,23 @@ async function safetyHandler(
 ): Promise<SafetyHandler> {
   const root = await mkdtemp(join(tmpdir(), "pi67-configured-safety-"));
   temporaryDirectories.push(root);
-  await Promise.all([
-    writeFile(join(root, "mcp.json"), JSON.stringify({
-      mcpServers: mcp?.mcpServers ?? {},
-      settings: { toolPrefix: "short" }
-    }), "utf8"),
-    writeFile(join(root, "mcp-cache.json"), JSON.stringify({
-      version: 1,
-      servers: Object.fromEntries(Object.entries(mcp?.cache ?? {}).map(([server, names]) => [
-        server,
-        { tools: names.map((name) => ({ name, inputSchema: { type: "object" } })) }
-      ]))
-    }), "utf8")
-  ]);
   const catalog = new ConfiguredCapabilityCatalog({
     agentDir: root,
     settingsManager: SettingsManager.inMemory({ packages })
   });
   await catalog.refresh();
+
+  const entries: McpServerEntry[] = Object.entries(mcp?.mcpServers ?? {}).map(([name, config]) => ({
+    name, config, source: join(root, "mcp.json"), scope: "global"
+  }));
+  catalog.nativeMcp.configure(entries);
+  for (const entry of entries) {
+    catalog.nativeMcp.replaceTools(entry, (mcp?.cache[entry.name] ?? []).map((raw) => {
+      const name = `mcp__${entry.name.replaceAll("-", "_")}__${raw}`;
+      const info = tools.find((tool) => tool.name === name)!;
+      return { name, toolName: raw, parameters: info.parameters, exposure: "direct" };
+    }));
+  }
 
   let handler: SafetyHandler | undefined;
   const api = {
@@ -225,6 +225,7 @@ function packageTool(name: string, source: string): ReturnType<ExtensionAPI["get
     name,
     description: name,
     parameters: { type: "object" },
+    exposure: "direct",
     sourceInfo: { path: source, source, scope: "user", origin: "package" }
   } as ReturnType<ExtensionAPI["getAllTools"]>[number];
 }
@@ -234,6 +235,7 @@ function extensionTool(name: string): ReturnType<ExtensionAPI["getAllTools"]>[nu
     name,
     description: name,
     parameters: { type: "object" },
+    exposure: "direct",
     sourceInfo: {
       path: `/extensions/${name}.ts`,
       source: "extensions",
@@ -241,4 +243,9 @@ function extensionTool(name: string): ReturnType<ExtensionAPI["getAllTools"]>[nu
       origin: "top-level"
     }
   } as ReturnType<ExtensionAPI["getAllTools"]>[number];
+}
+
+function nativeTool(name: string): ReturnType<ExtensionAPI["getAllTools"]>[number] {
+  return { ...packageTool(name, "inline"), sourceInfo: { source: "inline", path: NATIVE_MCP_EXTENSION_PATH,
+    origin: "top-level", scope: "temporary" } };
 }

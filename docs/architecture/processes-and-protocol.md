@@ -261,7 +261,7 @@ filesystem tests are not packaged/Windows or real power-loss evidence.
 - `apps/desktop`：窗口、Preload、`app://`、utility process、更新与原生对话框。
 - `apps/renderer`：产品 UI；不读取文件、凭据或 Pi SDK。
 
-Pi SDK 0.86.1 transcript adaptation: Runtime retains system/tool-control records
+Pi SDK transcript adaptation (0.86.1 onward): Runtime retains system/tool-control records
 in Pi JSONL for SDK replay, excludes them from conversation pages/counts, and
 projects only a fixed tree description. Standalone `usage` entries contribute to
 Session totals and Workspace usage buckets (`source: usage-entry`); raw notes and
@@ -1946,9 +1946,20 @@ Package 不会被 Pi ResourceLoader 隐式安装或加载。第三方 bounded co
 `node_modules`，限制 10,000 files、128 MiB、depth 32 和五秒；它不是 registry integrity、签名、provenance、
 完整依赖树证明或不可变文件系统 snapshot。
 
-当前 Pi SDK 0.86.1 没有 Extension executor、module-loader transport、Hook/Tool RPC 或 MCP supervisor
-injection point。`DefaultResourceLoader -> jiti.import -> factory(pi) -> ExtensionRunner` 仍在 Agent Host
-utility process 内运行。Package worker 也不拥有第三方 Extension 自行启动的 MCP child。真正的 runtime
+Pi 1.0 升级保留现有 Extension 执行方式：
+`DefaultResourceLoader -> jiti.import -> factory(pi) -> ExtensionRunner` 仍在 Agent Host
+utility process 内运行，没有接入独立 Extension executor、Hook/Tool RPC 或 MCP supervisor。
+Desktop 显式注册 Pi 原生 MCP 与 tool-search factory，移除 pi-mcp-adapter 的 bundle、
+启动阶段与代理调用路径；Codemode 保持关闭。原生 MCP 不是第三方 Extension 进程隔离。
+Pi 1.0.0 使用锁定 pnpm 补丁暴露配置校验、精确注册绑定、日志/输出持久化开关及
+Agent Profile 目录，并修复初始化/工具列举尚未完成时的退出。Desktop 仅消费公开 SDK
+入口，不私有导入、复制 transport 或实现第二个 MCP client/agent loop。
+原生连接器与权限目录消费同一有效文件配置；Desktop 不连接 extension-registered MCP，
+资源枚举与读取同样受该来源边界约束。权限核验精确 owner、原始/最终 Tool 名、
+schema 与 exposure。旧缓存不再授权，native Tool 不经旧 mcp 代理。资源撤回、reload、
+关闭和绑定漂移失效授权。原始 server log 与隐式结果落盘关闭；OAuth loopback 登录
+显式拒绝。所有持久凭据限定到当前 Pi Agent Profile，模型配置和 JSONL 真源保持 Pi 所有。
+Package worker 也不拥有第三方 Extension 自行启动的 MCP child。真正的 runtime
 isolation 需要上游 executor/proxy port、经审计的 loader/runner fork，或明确禁用 unsupported third-party
 execution；仓库不创建无真实调用方的 Extension Worker 空壳。
 
@@ -2337,7 +2348,7 @@ rebuilding 并调度 bounded discovery。Retry 重新打开 SQLite 后，在完�
 single-owner lock；文件替换、恶意重写 version cookie、多 utility-process 和 Windows lock timing 仍需独立证据。
 Catalog 当前继续使用 DELETE journal。WAL 的 main/`-wal`/`-shm` private-file 校验、checkpoint、整组隔离、
 外部 writer detection 和 Windows Defender/同步盘锁定尚未形成同等证据，因此不与 schema v3 同时切换。
-当前 Pi SDK `0.86.1` 的 cold discovery 内部仍会临时构造 `allMessagesText`，但该值在适配边界立即
+当前 Pi SDK `1.0.0` 的 cold discovery 内部仍会临时构造 `allMessagesText`，但该值在适配边界立即
 丢弃，不进入 SQLite、Protocol、Renderer、日志或 diagnostics。当前不实现 FTS 或明文 transcript index；
 活动 Session watcher 与 Catalog metadata discovery 保持独立，前者不会把 JSONL entry 写入 SQLite。
 
@@ -2518,9 +2529,12 @@ Notification history 已迁移到独立 `notificationStore`，App Store 不再�
   Approval 绑定 `hostEpoch + sessionId + sessionGeneration + operationId + requestId + toolCallId`；
   Port 不可投递、session/operation 过期、requester 异常、等待期间 abort 或 target/cwd 无法完整
   展示时立即拒绝，不能等待超时后继续执行。
-- Pi `0.86.1` 中用户 Extension 先运行，Desktop inline Safety Extension 后运行；Safety 因而检查
+- Pi `1.0.0` 中用户 Extension 先运行，Desktop inline Safety Extension 后运行；Safety 因而检查
   其他 Extension 修改后的最终 Tool 输入。真实 Pi ordering contract test 固定该属性，SDK
   升级若改变顺序必须失败。
+- Pi `1.0.0` 的 canonical built-in 来源为 `builtin:<name>`；Safety、alias routing
+  和 attribution 仍校验精确 path/source/scope/origin，不接受旧格式或同名第三方来源。
+  Desktop 显式注册 SDK 的 MCP/tool-search factories；旧 MCP adapter 退役，Codemode 保持未注册。
 - Project trust enables project resources and is distinct from Tool approval.
   An enabled, admitted Package/MCP capability with a unique effective Tool identity
   grants AUTO execution for its registered side effects, except recognized destructive

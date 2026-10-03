@@ -5,7 +5,6 @@ import { installSaveDialogResult } from "./packaged-electron-fixture.mjs";
 const EXPECTED_STARTUP_STAGES = [
   "profile-classification",
   "desktop-capabilities",
-  "managed-packages",
   "retired-mcp-cleanup",
   "browser67-mcp",
   "server-construction"

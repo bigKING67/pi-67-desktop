@@ -5,18 +5,42 @@
 当前源码锁定版本（本地升级候选；不代表 Windows/真实模型认证已完成）：
 
 ```text
-@earendil-works/pi-coding-agent 0.86.1
-@earendil-works/pi-agent-core   0.86.1
-@earendil-works/pi-ai           0.86.1
-@earendil-works/pi-tui          0.86.1 (transitive override)
+@earendil-works/pi-coding-agent 1.0.0
+@earendil-works/pi-agent-core   1.0.0
+@earendil-works/pi-ai           1.0.0
+@earendil-works/pi-tui          1.0.0 (transitive override)
 ```
 
 根依赖和 `pnpm-workspace.yaml#overrides` 双重固定，避免上游内部 caret dependency 在重新
 安装时漂移。不得使用 `^`、`~` 或 latest tag。
 
 `eng/release/pi-runtime-contract.mjs` 从 `packages/pi-runtime/package.json` 读取版本并验证三个
-Pi suite 直接依赖与 workspace overrides 完整一致。Release manifest、artifact verify 和
+Pi suite 直接依赖及传递 pi-tui 与 workspace overrides 完整一致。Release manifest、artifact verify 和
 unsigned preview 共用该 contract，不维护另一份运行时版本常量。
+
+## 1.0.0 adaptation and evidence boundary
+
+- 固定上游 `v1.0.0` / `a13d35a742c6ef8462812a28fbe1d8c8b7431c32`。
+  版本升级保留现有 Pi Coding Agent 与 JSONL Session，不引入 Pi Durable。
+- 内置 Tool 的来源路径从 `<builtin:name>` 改为 `builtin:name`。Safety、canonical
+  alias routing 和 Tool attribution 继续同时校验 source、scope、origin 与精确路径；
+  旧路径或同名第三方 Tool 不继承内置授权。
+- SDK prompt preflight 回执为 `started | queued | handled`。取消若发生于 idle
+  preflight，仅在 `started` 后重复 abort；排队或被 Extension 消费的输入不触发该补偿。
+- `context_edit` 由 Pi SessionManager 应用到模型上下文；Desktop 保留原始可见历史，
+  不把控制 entry 投影为聊天消息。OpenViking 继续使用 `context` 和 `turn_end` hooks，
+  不将 `context_edit` 误作新的 Extension event 或替代用户历史。
+- SDK 默认仍不注册 CLI factories；Desktop 显式启用原生 MCP 和 tool-search，彻底
+  退休 `pi-mcp-adapter` 的 bundle、加载和代理授权路径。Codemode 与 virtual model router
+  不启用。支持的旧 MCP 字段仅在内存转换，用户原文件和旧 cache 不删除。
+- `patches/@earendil-works__pi-coding-agent@1.0.0.patch` 由 pnpm 精确版本与内容 hash
+  锁定，为 host 增加注册身份、日志/输出、Profile/OAuth 控制并修复 pending connection
+  shutdown；上游替代版本必须重新通过同样的行为回归后才能移除补丁。
+- 原有 runtime-only cache warming suppression 保持不变，不改用户 TUI 设置。
+- 当前验证进展见 `docs/plans/2026-10-03-pi-1-upgrade.md`；仅完成的证据层可用于
+  验收。Windows、付费 Provider 和发布认证不得从本机离线测试推断。
+- 原生 MCP 与现有 adapter 的来源、配置、权限、隐私及生命周期差异见
+  [接入评估与迁移证据](pi-native-mcp-assessment.md)；各平台是否通过以实际收口记录为准。
 
 ## 0.86.1 adaptation and evidence boundary
 
@@ -47,7 +71,7 @@ unsigned preview 共用该 contract，不维护另一份运行时版本常量。
   ResourceLoader reload，不消费 SDK 可选的 pre-trust Extension import pass；
 - accepted prompt Operation、steer、follow-up、abort；
 - 最近 100 条 bootstrap、稳定 entry cursor 分页、有界 flat session tree 和增量 projection；
-- model list/select、thinking levels；SDK `0.86.1` 的 `AgentSession.setModel()` 默认只更新
+- model list/select、thinking levels；SDK `1.0.0` 的 `AgentSession.setModel()` 默认只更新
   当前 Session，Desktop 用户主动选模型时显式传入 `{ persist: true }` 保留默认模型设置，
   Extension 的临时模型切换则保持 Session-local，不能隐式改写全局默认值；
 - session tree navigation、新文件 branch、rollback、compact、name；
@@ -107,7 +131,7 @@ unsigned preview 共用该 contract，不维护另一份运行时版本常量。
   component 注入 renderer；
 - 不支持同一 JSONL session 的并发 Desktop/TUI writer；watcher 只检测并止损，不把外部 JSONL
   entry 合并进当前 `SessionManager`、Conversation projection 或 Renderer；
-- Pi SDK `0.86.1` 的 cold Session discovery 会临时构造 `firstMessage/allMessagesText`；Desktop
+- Pi SDK `1.0.0` 的 cold Session discovery 会临时构造 `firstMessage/allMessagesText`；Desktop
   立即丢弃这些字段，既不持久化也不跨进程传输。Catalog 不做 FTS、transcript index 或 Prompt
   派生名称，cold reconcile 的时间和 RSS 仍需按平台持续测量；
 - 不实现 system Pi/RPC session import adapter。当前 agent directory 内的已

@@ -79,7 +79,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins two Desktop-internal packages, three first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.09.26.1");
+    expect(lock.catalogVersion).toBe("2026.10.03.1");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi-workspace-resources",
       "openviking-pi-extension",
@@ -159,13 +159,7 @@ describe("Desktop first-party capability source lock", () => {
     ]);
     expect(lock.skillPacks[0].skills.every((skill) => /^[0-9a-f]{64}$/u.test(skill.sha256))).toBe(true);
     expect(() => assertPi67SkillPackSource(lock.skillPacks[0])).not.toThrow();
-    expect(lock.managedNpmBundles).toMatchObject([{
-      id: "pi-mcp-adapter",
-      version: "2.11.0",
-      extensionPaths: ["index.ts"],
-      defaultEnabled: true
-    }]);
-    expect(lock.managedNpmBundles.every((entry) => entry.packageIntegrity.startsWith("sha512-"))).toBe(true);
+    expect(lock).not.toHaveProperty("managedNpmBundles");
     expect(lock.recommendedExternal.map((entry) => entry.id)).toEqual(["pi-rewind"]);
     expect(lock.recommendedExternal.every((entry) => (
       entry.installPolicy === "prompt-once" || entry.installPolicy === "user-initiated"
@@ -249,27 +243,12 @@ describe("Desktop first-party capability source lock", () => {
       catalogVersion: lock.catalogVersion,
       generatedFrom,
       entries,
-      managedNpmBundles: lock.managedNpmBundles.map((entry) => ({
-        id: entry.id,
-        packageName: entry.packageName,
-        source: entry.source,
-        version: entry.version,
-        packageIntegrity: entry.packageIntegrity,
-        packagePath: `packages/${entry.id}`,
-        extensionPaths: entry.extensionPaths,
-        defaultEnabled: entry.defaultEnabled
-      })),
       recommendedExternal: lock.recommendedExternal
     };
     const manifest = {
       schema: "pi67.desktop-capabilities.v1",
       catalogVersion: lock.catalogVersion,
-      packages,
-      managedNpmBundle: {
-        treeSha256: "b".repeat(64),
-        platform: process.platform,
-        architecture: process.arch
-      }
+      packages
     };
 
     expect(() => assertCapabilitiesMetadata(lock, catalog, manifest)).not.toThrow();

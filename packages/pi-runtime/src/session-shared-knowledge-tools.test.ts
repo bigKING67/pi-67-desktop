@@ -1,4 +1,4 @@
-import { SessionManager, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { SessionManager, type ExtensionToolContext } from "@earendil-works/pi-coding-agent";
 import { expect, it, vi } from "vitest";
 import { createSessionSharedKnowledgeTools } from "./session-shared-knowledge-tools.js";
 import type { SharedExperienceAccess } from "./shared-experience-tools.js";
@@ -19,7 +19,7 @@ it("selects only local team tools when both local and legacy ports are supplied"
   const local = { search: vi.fn().mockRejectedValue(new Error("local index unavailable")), read: vi.fn() };
   const tools = createSessionSharedKnowledgeTools(legacy, legacy, () => manager, local);
   expect(tools.map(tool => tool.name)).toEqual(["viking_team_search", "viking_team_read"]);
-  const context = { sessionManager: manager, model: { baseUrl: "https://model.fixture", id: "model" } } as unknown as ExtensionContext;
+  const context = { sessionManager: manager, model: { baseUrl: "https://model.fixture", id: "model" } } as unknown as ExtensionToolContext;
   await expect(tools[0]!.execute("local", { query: "synthetic", scope: "project" }, undefined, undefined, context))
     .rejects.toThrow("local index unavailable");
   expect(local.search).toHaveBeenCalledOnce();
@@ -39,7 +39,7 @@ function fixture() {
   const manager = SessionManager.inMemory("/synthetic-workspace");
   markTeamSessionBirth(manager, scope);
   let current: SessionManager | undefined = manager;
-  const context = { sessionManager: manager, model: { baseUrl: "https://model.fixture", id: "model" } } as unknown as ExtensionContext;
+  const context = { sessionManager: manager, model: { baseUrl: "https://model.fixture", id: "model" } } as unknown as ExtensionToolContext;
   const search = vi.fn<SharedExperienceAccess["search"]>().mockResolvedValue(result);
   const read = vi.fn<SharedExperienceAccess["read"]>().mockResolvedValue(detail);
   const tools = createSessionSharedKnowledgeTools({ search, read }, undefined, () => current);

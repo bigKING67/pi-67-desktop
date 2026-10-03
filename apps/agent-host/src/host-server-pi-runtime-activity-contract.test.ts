@@ -61,7 +61,7 @@ describe("AgentHostServer Pi runtime activity contract", () => {
       await runtime.initialize({ cwd, agentDir, trust: "unknown" });
       const session = runtimeInternals(runtime).sessionBindings.requireSession();
       expect(session.getAllTools().find((tool) => tool.name === "bash")?.sourceInfo).toMatchObject({
-        path: "<builtin:bash>",
+        path: "builtin:bash",
         source: "builtin",
         scope: "temporary",
         origin: "top-level"

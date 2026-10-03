@@ -201,10 +201,7 @@ describe("packaged Electron launch environment", () => {
       "node_modules/heic-decode/index.js",
       "node_modules/libheif-js/libheif-wasm/libheif-bundle.js"
     ]));
-    const legacyCapabilityPaths = [
-      "packages/pi67-core/package.json",
-      "managed-packages/bundled/packages/pi-observational-memory/package.json"
-    ];
+    const legacyCapabilityPaths = ["packages/pi67-core/package.json"];
     expect(UNIFIED_CAPABILITIES_ASSET_VERSION).toBe("0.1.0-alpha.41");
     expect(resolvePackagedRuntimeAssetContract("0.1.0-alpha.39").requiredCapabilityPaths)
       .toEqual(legacyCapabilityPaths);

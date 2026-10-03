@@ -206,11 +206,11 @@ test("mentions channel members, manages the channel and follows the team chat po
   await composer.pressSequentially("帮忙看下");
   await composer.press("Enter");
   await expect(log.getByText("@王一凡", { exact: true })).toBeVisible();
-  const sent = await page.evaluate(() => {
+  // The optimistic bubble can render before the asynchronous send reaches the fixture.
+  await expect.poll(() => page.evaluate(() => {
     const state = (window as unknown as { __pi67MockTeamChat: MockTeamChatState }).__pi67MockTeamChat;
     return state.messages["conv-research"]!.at(-1);
-  });
-  expect(sent).toMatchObject({ body: "@王一凡 帮忙看下", mentionUserIds: ["user-wang"] });
+  })).toMatchObject({ body: "@王一凡 帮忙看下", mentionUserIds: ["user-wang"] });
 
   await page.getByRole("button", { name: "频道设置" }).click();
   const settings = page.getByRole("dialog", { name: "#宏观研究 设置" });

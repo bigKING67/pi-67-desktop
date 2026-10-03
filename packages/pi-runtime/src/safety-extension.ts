@@ -25,12 +25,10 @@ import {
 import { boundUtf8 } from "./utf8-boundary.js";
 import { isVerifiedDesktopAttachmentTool } from "./prompt-attachment-extension.js";
 import type { LoadedResourceReadAccess } from "./loaded-resource-read-access.js";
-import { classifyPiMcpAdapterIntent } from "./pi-mcp-adapter-safety.js";
 import type { ConfiguredCapabilityCatalog } from "./configured-capability-catalog.js";
 import { classifyConfiguredToolIntent } from "./configured-tool-safety.js";
 import {
-  createToolSafetyProfileResolver,
-  type ToolSafetyProfile
+  createToolSafetyProfileResolver
 } from "./tool-safety-profile.js";
 import {
   asToolInputRecord,
@@ -51,7 +49,6 @@ export interface SafetyPolicyState {
   /** Team Chat Agent turns run with no tools at all (ADR 0004). */
   toolsDisabled?: boolean;
 }
-
 export type DesktopApprovalDecision =
   | { status: "allowed" }
   | { status: "denied" }
@@ -351,39 +348,13 @@ async function classifyToolIntent(
     };
   }
 
-  if (profile.kind === "pi-mcp-adapter") {
-    const directToolCorrection = await classifyPiFffMcpMisroute(
-      pi,
-      profile,
-      record,
-      resolveToolProfile
-    );
-    if (directToolCorrection) return directToolCorrection;
-    if (!configuredCapabilities) {
-      return {
-        toolName,
-        category: "unverified-tool",
-        target: toolName,
-        targetKind: "tool",
-        sourceLabel: profile.sourceLabel,
-        nonApprovableReason: "当前 Task 的有效 MCP 能力目录不可用；请重新加载 Pi 资源后重试。"
-      };
+  if (profile.kind === "native-mcp-read") {
+    const server = stringField(record, "server");
+    if (server !== undefined && !configuredCapabilities?.nativeMcp.hasServer(server)) {
+      return { toolName, category: "unverified-tool", target: toolName, targetKind: "tool",
+        sourceLabel: profile.sourceLabel, nonApprovableReason: "MCP server 不在当前 Session 的有效配置中。" };
     }
-    let activeTools: ReadonlySet<string> = new Set();
-    try {
-      activeTools = new Set(pi.getActiveTools());
-    } catch {
-      // The configured MCP catalog still remains authoritative for proxy calls.
-    }
-    const intent = await classifyPiMcpAdapterIntent(profile, input, {
-      catalog: configuredCapabilities,
-      workspace,
-      ...(loadedResourceReadAccess === undefined ? {} : { loadedResourceReadAccess }),
-      isDirectTool: (candidate) => candidate !== "mcp" && activeTools.has(candidate)
-    });
-    return intent.nonApprovableReason === undefined && intent.sourceLabel !== profile.sourceLabel
-      ? { ...intent, autoAuthorizationReason: "installed-capability" }
-      : intent;
+    return { toolName, category: "capability-read", target: toolName, targetKind: "tool", sourceLabel: profile.sourceLabel };
   }
 
   if (
@@ -414,42 +385,4 @@ async function classifyToolIntent(
       ? {}
       : { nonApprovableReason: profile.nonApprovableReason })
   };
-}
-
-async function classifyPiFffMcpMisroute(
-  pi: ExtensionAPI,
-  profile: Extract<ToolSafetyProfile, { kind: "pi-mcp-adapter" }>,
-  record: Record<string, unknown>,
-  resolveToolProfile: ReturnType<typeof createToolSafetyProfileResolver>
-): Promise<ClassifiedToolIntent | undefined> {
-  const requestedTool = stringField(record, "tool");
-  if (requestedTool !== "fffind" && requestedTool !== "ffgrep") return undefined;
-  if (record.server !== undefined) return undefined;
-  if (!Object.keys(record).every((key) => key === "tool" || key === "args")) return undefined;
-
-  let activeTools: ReadonlySet<string>;
-  try {
-    activeTools = new Set(pi.getActiveTools());
-  } catch {
-    return undefined;
-  }
-
-  const canonicalTool = requestedTool === "fffind" ? "find" : "grep";
-  for (const directTool of [requestedTool, canonicalTool]) {
-    if (!activeTools.has(directTool)) continue;
-    const directProfile = await resolveToolProfile(pi, directTool);
-    if (
-      directProfile.kind !== "pi-fff"
-      || directProfile.canonicalToolName !== canonicalTool
-    ) continue;
-    return {
-      toolName: profile.toolName,
-      category: "unverified-tool",
-      target: requestedTool,
-      targetKind: "tool",
-      sourceLabel: profile.sourceLabel,
-      nonApprovableReason: `无需用户授权：@ff-labs/pi-fff 当前注册为直接 Tool \`${directTool}\`，不要通过 \`mcp\` 调用 \`${requestedTool}\`；请直接调用 \`${directTool}\`。`
-    };
-  }
-  return undefined;
 }

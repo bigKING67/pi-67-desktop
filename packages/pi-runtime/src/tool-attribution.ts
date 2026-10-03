@@ -193,7 +193,7 @@ function confirmedDesktopAliasTarget(toolName: string, sourceInfo: SourceInfo | 
 
 function isConfirmedBuiltinTool(toolName: string, sourceInfo: SourceInfo | undefined): boolean {
   return sourceInfo?.source === "builtin"
-    && sourceInfo.path === `<builtin:${toolName}>`
+    && sourceInfo.path === `builtin:${toolName}`
     && sourceInfo.scope === "temporary"
     && sourceInfo.origin === "top-level";
 }

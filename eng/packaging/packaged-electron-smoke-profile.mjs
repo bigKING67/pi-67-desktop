@@ -3,11 +3,13 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { writeControlledShutdownExtension } from "./controlled-shutdown-fixture.ts";
+import { preparePackagedNativeMcpFixture } from "./packaged-native-mcp-smoke.mjs";
 
 const execFileAsync = promisify(execFile);
 
 export async function preparePackagedSmokeProfile({
   agentDir,
+  artifact,
   extensionsDirectory,
   userDataDirectory,
   workspace
@@ -18,17 +20,19 @@ export async function preparePackagedSmokeProfile({
   const packagedCredential = "pi67-packaged-reveal-fixture";
   const packagedExtensionDirectory = join(agentDir, "npm/node_modules/pi67-smoke-extension");
   const nativeReplacedExtensionDirectory = join(agentDir, "npm/node_modules/pi-subagents");
+  const retiredMcpAdapterDirectory = join(agentDir, "npm/node_modules/pi-mcp-adapter");
   const packagedSkillDirectory = join(agentDir, "skills/packaged-skill");
   const packagedPromptDirectory = join(agentDir, "prompts");
   await Promise.all([
     mkdir(packagedExtensionDirectory, { recursive: true }),
     mkdir(nativeReplacedExtensionDirectory, { recursive: true }),
+    mkdir(retiredMcpAdapterDirectory, { recursive: true }),
     mkdir(packagedSkillDirectory, { recursive: true }),
     mkdir(packagedPromptDirectory, { recursive: true })
   ]);
   await Promise.all([
     writeFile(join(agentDir, "settings.json"), `${JSON.stringify({
-      packages: ["npm:pi67-smoke-extension", "npm:pi-subagents"]
+      packages: ["npm:pi67-smoke-extension", "npm:pi-subagents", "npm:pi-mcp-adapter"]
     }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 }),
     writeFile(join(packagedExtensionDirectory, "package.json"), `${JSON.stringify({
       name: "pi67-smoke-extension",
@@ -52,6 +56,17 @@ export async function preparePackagedSmokeProfile({
     writeFile(
       join(nativeReplacedExtensionDirectory, "index.js"),
       "throw new Error('pi-subagents must not load in a New Money Task');\n",
+      "utf8"
+    ),
+    writeFile(join(retiredMcpAdapterDirectory, "package.json"), `${JSON.stringify({
+      name: "pi-mcp-adapter",
+      version: "0.0.0-packaged-smoke",
+      type: "module",
+      pi: { extensions: ["index.js"] }
+    }, null, 2)}\n`, "utf8"),
+    writeFile(
+      join(retiredMcpAdapterDirectory, "index.js"),
+      "throw new Error('pi-mcp-adapter must never load in the packaged native MCP smoke');\n",
       "utf8"
     ),
     writeFile(join(packagedSkillDirectory, "SKILL.md"), [
@@ -84,12 +99,14 @@ export async function preparePackagedSmokeProfile({
     "-c", "user.email=pi67@example.invalid",
     "commit", "-m", "packaged smoke fixture"
   ], { cwd: workspace, encoding: "utf8" });
+  const nativeMcp = await preparePackagedNativeMcpFixture({ agentDir, artifact });
   await writeControlledShutdownExtension({
     extensionPath: join(extensionsDirectory, "shutdown-fixture.ts"),
     childPidPath,
     lifecyclePath,
-    teamKnowledgeEvidencePath
+    teamKnowledgeEvidencePath,
+    nativeMcpEvidencePath: nativeMcp.evidencePath
   });
 
-  return { childPidPath, lifecyclePath, packagedCredential, teamKnowledgeEvidencePath };
+  return { childPidPath, lifecyclePath, packagedCredential, teamKnowledgeEvidencePath, nativeMcp };
 }

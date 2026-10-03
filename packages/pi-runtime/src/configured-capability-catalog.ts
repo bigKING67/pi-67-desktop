@@ -5,18 +5,7 @@ import type {
   SettingsManager,
   SourceInfo
 } from "@earendil-works/pi-coding-agent";
-import {
-  collectMcpSnapshot,
-  configuredMcpTool,
-  emptyMcpSnapshot,
-  mcpSourceLabel,
-  normalizeToolName,
-  type ConfiguredMcpCapability,
-  type McpCatalogSnapshot,
-  type McpTransport
-} from "./configured-mcp-capability-catalog.js";
-
-export type { ConfiguredMcpCapability } from "./configured-mcp-capability-catalog.js";
+import { NativeMcpCatalog } from "./native-mcp-catalog.js";
 
 interface ConfiguredPackageCapability {
   kind: "configured-package" | "managed-package";
@@ -24,21 +13,6 @@ interface ConfiguredPackageCapability {
 }
 
 export type ConfiguredPackageResolution = ConfiguredPackageCapability | {
-  kind: "unconfigured" | "ambiguous";
-  sourceLabel: string;
-};
-
-export type ConfiguredMcpServerResolution = {
-  kind: "configured-mcp";
-  serverName: string;
-  transport: McpTransport;
-  sourceLabel: string;
-} | {
-  kind: "unconfigured";
-  sourceLabel: string;
-};
-
-export type ConfiguredMcpToolResolution = ConfiguredMcpCapability | {
   kind: "unconfigured" | "ambiguous";
   sourceLabel: string;
 };
@@ -56,8 +30,8 @@ interface ConfiguredCapabilityCatalogOptions {
 const catalogByLoader = new WeakMap<ResourceLoader, ConfiguredCapabilityCatalog>();
 
 export class ConfiguredCapabilityCatalog {
+  readonly nativeMcp = new NativeMcpCatalog();
   private packageIdentities = new Map<string, PackageIdentity[]>();
-  private mcp: McpCatalogSnapshot = emptyMcpSnapshot();
   private readonly environment: NodeJS.ProcessEnv;
 
   constructor(private readonly options: ConfiguredCapabilityCatalogOptions) {
@@ -73,9 +47,7 @@ export class ConfiguredCapabilityCatalog {
       safeGetPackages(this.options.settingsManager),
       this.environment
     );
-    const mcp = await collectMcpSnapshot(this.options.agentDir);
     this.packageIdentities = packageIdentities;
-    this.mcp = mcp;
   }
 
   resolvePackageSource(source: SourceInfo): ConfiguredPackageResolution {
@@ -98,43 +70,6 @@ export class ConfiguredCapabilityCatalog {
     return { kind: identity.kind, sourceLabel: identity.sourceLabel };
   }
 
-  resolveMcpServer(serverName: string): ConfiguredMcpServerResolution {
-    const server = this.mcp.servers.get(serverName);
-    if (!server) return { kind: "unconfigured", sourceLabel: "未配置的 MCP server" };
-    return {
-      kind: "configured-mcp",
-      serverName: server.name,
-      transport: server.transport,
-      sourceLabel: mcpSourceLabel(server.name)
-    };
-  }
-
-  resolveMcpTool(toolName: string, serverName?: string): ConfiguredMcpToolResolution {
-    const normalizedName = normalizeToolName(toolName);
-    if (serverName !== undefined) {
-      const server = this.mcp.servers.get(serverName);
-      if (!server) return { kind: "unconfigured", sourceLabel: "未配置的 MCP server" };
-      if (server.ambiguousTools.has(normalizedName)) {
-        return { kind: "ambiguous", sourceLabel: `MCP · ${server.name}` };
-      }
-      const tool = server.tools.get(normalizedName);
-      return tool === undefined
-        ? { kind: "unconfigured", sourceLabel: `MCP · ${server.name}` }
-        : configuredMcpTool(server, tool);
-    }
-
-    const matches = this.mcp.toolsByName.get(normalizedName) ?? [];
-    if (matches.length === 0) return { kind: "unconfigured", sourceLabel: "已配置 MCP 目录" };
-    if (matches.length !== 1) return { kind: "ambiguous", sourceLabel: "多个已配置 MCP server" };
-    return matches[0]!;
-  }
-
-  resolveDirectMcpTool(toolName: string): ConfiguredMcpToolResolution {
-    const matches = this.mcp.directToolsByName.get(toolName) ?? [];
-    if (matches.length === 0) return { kind: "unconfigured", sourceLabel: "已配置 MCP Direct Tool" };
-    if (matches.length !== 1) return { kind: "ambiguous", sourceLabel: "多个 MCP Direct Tool 来源" };
-    return matches[0]!;
-  }
 }
 
 export function bindConfiguredCapabilityCatalog(

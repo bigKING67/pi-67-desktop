@@ -1,6 +1,7 @@
 import {
   CONTROLLED_MODEL_LABEL,
-  CONTROLLED_PROMPT_TEXT
+  CONTROLLED_PROMPT_TEXT,
+  NATIVE_MCP_PROMPT_TEXT
 } from "./controlled-shutdown-fixture.ts";
 
 export async function startControlledPrompt(page) {
@@ -39,4 +40,11 @@ export async function waitForControlledModel(page, timeoutMs = 30_000) {
 export async function waitForControlledPromptRunning(page, timeoutMs = 10_000) {
   await page.getByTestId("composer-shell").getByRole("button", { name: "停止", exact: true })
     .waitFor({ state: "visible", timeout: timeoutMs });
+}
+
+export async function runNativeMcpPrompt(page, timeoutMs = 30_000) {
+  await page.getByLabel("给 Pi 发送消息").fill(NATIVE_MCP_PROMPT_TEXT);
+  await page.getByRole("button", { name: "发送" }).click();
+  await waitForControlledModel(page, timeoutMs);
+  await page.locator('[data-runtime-phase="ready"]').waitFor({ state: "visible", timeout: timeoutMs });
 }
