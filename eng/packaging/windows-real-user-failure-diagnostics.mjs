@@ -8,6 +8,31 @@ const ALLOWLISTED_ACKNOWLEDGEMENT_TIMEOUT_COMMANDS = new Set([
   "workspace.register"
 ]);
 
+const PROMPT_ACK_STAGES = new Set([
+  "received", "dispatch-started", "runtime-ready",
+  "receipt-reconcile-started", "receipt-reconcile-completed",
+  "receipt-write-started", "receipt-write-completed",
+  "response-ready", "response-error-ready", "response-posted", "response-failed"
+]);
+
+export function parsePromptAcknowledgementObservations(output) {
+  const prefix = "[agent-host:prompt-ack] ";
+  const records = [];
+  let droppedCount = 0;
+  for (const line of output.split(/\r?\n/u)) {
+    if (!line.startsWith(prefix) || line.length > 512) continue;
+    try {
+      const value = JSON.parse(line.slice(prefix.length));
+      if (!PROMPT_ACK_STAGES.has(value.stage) || !Number.isSafeInteger(value.attempt)
+        || value.attempt < 1 || value.attempt > 64
+        || !Number.isSafeInteger(value.elapsedMs) || value.elapsedMs < 0) continue;
+      records.push({ attempt: value.attempt, stage: value.stage, elapsedMs: value.elapsedMs });
+      if (records.length > 64) { records.shift(); droppedCount += 1; }
+    } catch { /* Ignore malformed test diagnostics without retaining their bytes. */ }
+  }
+  return { records, droppedCount };
+}
+
 export async function inspectRealUserRuntimeSurface(window, privateRoot) {
   const observation = await window.evaluate((allowlistedCommands) => {
     const bodyText = document.body.innerText;

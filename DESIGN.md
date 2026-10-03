@@ -1731,6 +1731,10 @@ loading error where the operation can produce those states
   above it; returning from another surface such as Settings restores that row to
   the top. Hidden, detached or not-yet-attached scrollers retain the last measured
   anchor; a virtualizer range notification alone never overwrites it.
+  Initial estimated row geometry cannot replace a saved anchor: after the list
+  attaches, align the saved row using measured geometry before recording its new
+  visible range. Explicit user scrolling or returning to latest supersedes this
+  pending restoration.
 - While a Prompt Operation is streaming, the compact delivery selector replaces
   the idle `执行 | 计划` control instead of being appended beside it. Its resting
   trigger shows the current `立即纠偏` or `完成后执行` behavior and opens an upward

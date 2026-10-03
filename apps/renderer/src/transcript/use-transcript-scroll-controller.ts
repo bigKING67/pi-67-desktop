@@ -25,6 +25,7 @@ export function useTranscriptScrollController({
   const anchorInputsRef = useRef({ historical, readKey, rows });
   anchorInputsRef.current = { historical, readKey, rows };
   const anchorFrameRef = useRef(0);
+  const restoreFrameRef = useRef(0);
   const previousRowsRef = useRef<{
     readKey: string | undefined;
     count: number;
@@ -33,9 +34,41 @@ export function useTranscriptScrollController({
   const savedReadPosition = readKey
     ? useConversationReadPositionStore.getState().positions[readKey]
     : undefined;
-  const restoredAnchorRowIndex = !historical && savedReadPosition && !savedReadPosition.atBottom
-    ? rows.findIndex((row) => row.key === savedReadPosition.anchorKey)
-    : -1;
+  const restoreRef = useRef<{ readKey: string | undefined; historical: boolean; index: number; pending: boolean; inFlight: boolean } | undefined>(undefined);
+  if (!restoreRef.current || restoreRef.current.readKey !== readKey || restoreRef.current.historical !== historical) {
+    const index = !historical && savedReadPosition && !savedReadPosition.atBottom
+      ? rows.findIndex((row) => row.key === savedReadPosition.anchorKey) : -1;
+    restoreRef.current = { readKey, historical, index, pending: index >= 0, inFlight: false };
+    followLatestRef.current = savedReadPosition?.atBottom ?? true;
+  }
+  const restoredAnchorRowIndex = restoreRef.current.index;
+
+  const restoreMeasuredAnchor = useCallback(() => {
+    const restore = restoreRef.current;
+    const scroller = scrollerRef.current;
+    if (!restore?.pending || !scroller || scroller.clientHeight === 0) return false;
+    if (restore.inFlight) return true;
+    if (!restoreFrameRef.current) restoreFrameRef.current = requestAnimationFrame(() => {
+      restoreFrameRef.current = 0;
+      if (restore !== restoreRef.current || !restore.pending || !virtuosoRef.current || scrollerRef.current !== scroller) return;
+      restore.inFlight = true;
+      virtuosoRef.current.scrollIntoView({
+        index: restore.index,
+        align: "start",
+        behavior: "auto",
+        // A partly visible row still needs alignment with the reading viewport.
+        calculateViewLocation: ({ itemTop, viewportTop, locationParams }) => (
+          Math.abs(itemTop - viewportTop) <= 1 ? null : locationParams
+        ),
+        done: () => {
+          if (restore !== restoreRef.current || !restore.pending) return;
+          restore.pending = false;
+          observeVisibleAnchor(scroller, anchorInputsRef.current);
+        }
+      });
+    });
+    return true;
+  }, []);
 
   const bindScroller = useCallback((scroller: HTMLElement | Window | null) => {
     scrollerCleanupRef.current?.();
@@ -49,13 +82,14 @@ export function useTranscriptScrollController({
     let pointerScrollActive = false;
     const ownerDocument = scroller.ownerDocument;
     const armUserScrollIntent = () => {
+      if (restoreRef.current) restoreRef.current.pending = false;
       userScrollIntentUntil = performance.now() + USER_SCROLL_INTENT_WINDOW_MS;
     };
     const observeAnchorAfterScroll = () => {
       if (anchorFrameRef.current) return;
       anchorFrameRef.current = requestAnimationFrame(() => {
         anchorFrameRef.current = 0;
-        observeVisibleAnchor(scroller, anchorInputsRef.current);
+        if (!restoreRef.current?.pending) observeVisibleAnchor(scroller, anchorInputsRef.current);
       });
     };
     const observeScrollDirection = () => {
@@ -72,17 +106,19 @@ export function useTranscriptScrollController({
       previousScrollTop = nextScrollTop;
     };
     const observeWheel = (event: WheelEvent) => {
+      if (restoreRef.current) restoreRef.current.pending = false;
       if (event.deltaY < 0) armUserScrollIntent();
     };
     const observeKeyboard = (event: KeyboardEvent) => {
       if (
-        !keyboardRequestsOlderContent(event)
+        !keyboardRequestsTranscriptScroll(event)
         || editableKeyboardTarget(event.target)
         || (event.target instanceof HTMLElement
           && event.target !== ownerDocument.body
           && !scroller.contains(event.target))
       ) return;
-      armUserScrollIntent();
+      if (restoreRef.current) restoreRef.current.pending = false;
+      if (keyboardRequestsOlderContent(event)) armUserScrollIntent();
     };
     const observePointerDown = (event: PointerEvent) => {
       if (event.pointerType === "mouse" && event.target !== scroller) return;
@@ -110,12 +146,14 @@ export function useTranscriptScrollController({
   }, []);
 
   const stopFollowingLatest = useCallback(() => {
+    if (restoreRef.current) restoreRef.current.pending = false;
     followLatestRef.current = false;
     setAtBottom(false);
     if (readKey) useConversationReadPositionStore.getState().setAtBottom(readKey, false);
   }, [readKey]);
 
   const returnToLatest = useCallback(() => {
+    if (restoreRef.current) restoreRef.current.pending = false;
     followLatestRef.current = true;
     setAtBottom(true);
     setUnseenRowCount(0);
@@ -124,6 +162,7 @@ export function useTranscriptScrollController({
   }, [readKey]);
 
   const handleTotalListHeightChanged = useCallback(() => {
+    if (restoreMeasuredAnchor()) return;
     if (!followLatestRef.current || historical || followScrollFrameRef.current) return;
     followScrollFrameRef.current = requestAnimationFrame(() => {
       followScrollFrameRef.current = 0;
@@ -131,10 +170,10 @@ export function useTranscriptScrollController({
       if (!followLatestRef.current || historical || !scroller) return;
       scroller.scrollTo({ top: scroller.scrollHeight });
     });
-  }, [historical]);
+  }, [historical, restoreMeasuredAnchor]);
 
   const handleAtBottomStateChange = useCallback((nextAtBottom: boolean) => {
-    if (historical) return;
+    if (historical || restoreRef.current?.pending) return;
     if (!nextAtBottom && followLatestRef.current) {
       // Virtuoso re-estimates unmeasured rows and Footer growth without always
       // reporting a total height change. Follow again on the next frame; a user
@@ -152,8 +191,9 @@ export function useTranscriptScrollController({
     // Range notifications can outlive the scroller or precede its attachment.
     // Their overscan boundary is never evidence of the reader's position.
     const scroller = scrollerRef.current;
-    if (scroller) observeVisibleAnchor(scroller, { historical, readKey, rows });
-  }, [historical, readKey, rows]);
+    if (restoreMeasuredAnchor()) return;
+    if (scroller && !restoreRef.current?.pending) observeVisibleAnchor(scroller, { historical, readKey, rows });
+  }, [historical, readKey, rows, restoreMeasuredAnchor]);
 
   useEffect(() => {
     const saved = readKey
@@ -191,6 +231,7 @@ export function useTranscriptScrollController({
     scrollerCleanupRef.current?.();
     cancelAnimationFrame(followScrollFrameRef.current);
     cancelAnimationFrame(anchorFrameRef.current);
+    cancelAnimationFrame(restoreFrameRef.current);
   }, []);
 
   return {
@@ -238,6 +279,12 @@ function keyboardRequestsOlderContent(event: KeyboardEvent): boolean {
     || event.key === "PageUp"
     || event.key === "Home"
     || (event.key === " " && event.shiftKey);
+}
+
+function keyboardRequestsTranscriptScroll(event: KeyboardEvent): boolean {
+  if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return false;
+  return keyboardRequestsOlderContent(event)
+    || event.key === "ArrowDown" || event.key === "PageDown" || event.key === "End" || event.key === " ";
 }
 
 function editableKeyboardTarget(target: EventTarget | null): boolean {

@@ -1,11 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   inspectRealUserRuntimeSurface,
+  parsePromptAcknowledgementObservations,
   realUserLifecycleFailureKind,
   summarizeRealUserShutdown
 } from "./windows-real-user-failure-diagnostics.mjs";
 
 describe("Windows real-user failure diagnostics", () => {
+  it("retains a bounded causal tail without private fields or malformed records", () => {
+    const prefix = "[agent-host:prompt-ack] ";
+    const lines = Array.from({ length: 70 }, (_, elapsedMs) => `${prefix}${JSON.stringify({
+      attempt: 1, stage: "receipt-write-started", elapsedMs, prompt: "private"
+    })}`);
+    lines.push(`${prefix}not-json`, `${prefix}{"attempt":1,"stage":"private","elapsedMs":1}`);
+    const result = parsePromptAcknowledgementObservations(lines.join("\n"));
+    expect(result.droppedCount).toBe(6);
+    expect(result.records).toHaveLength(64);
+    expect(result.records[0]).toEqual({ attempt: 1, stage: "receipt-write-started", elapsedMs: 6 });
+    expect(JSON.stringify(result)).not.toContain("private");
+  });
   it("distinguishes an unavailable shutdown measurement", () => {
     expect(summarizeRealUserShutdown(undefined, 5_000)).toEqual({ available: false });
   });

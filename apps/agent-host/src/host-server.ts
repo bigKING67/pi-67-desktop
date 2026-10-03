@@ -8,6 +8,7 @@ import { dispatchHostAppCommand } from "./host-app-command-dispatcher.js";
 import { HostEventChannel } from "./host-event-channel.js";
 import { HostDiagnosticEvidence } from "./host-diagnostic-evidence.js";
 import { HostRequestRouter } from "./host-request-router.js";
+import { observePromptAcknowledgement } from "./prompt-acknowledgement-observation.js";
 import { collectHostRuntimeDiagnostics } from "./host-runtime-diagnostics.js";
 import { defaultRuntimeLoader, initialHostIdentity } from "./host-runtime-loader.js";
 import type { AgentHostServerOptions, AgentHostShutdownResult, AgentRuntimeLoader, AttachPortOptions } from "./host-server-contract.js";
@@ -215,7 +216,7 @@ export class AgentHostServer {
       port.close?.();
       return;
     }
-    const identity = this.resolveHostIdentity(options);
+    const identity = this.hostIdentity ??= initialHostIdentity(options);
     const connectionSequence = this.diagnosticEvidence.attach(identity.hostEpoch);
     const connection = new HostConnectionContext(
       port,
@@ -252,6 +253,7 @@ export class AgentHostServer {
   private async dispatch(
     command: AgentCommand, state: TaskHostState, submissionFingerprint?: string
   ): Promise<CommandResults[AgentCommandType]> {
+    if (command.type === "prompt.submit") observePromptAcknowledgement("dispatch-started");
     if (command.type === "task.close") return this.taskLifecycle.closeTask(state, command.payload.mode);
     if (command.type === "prompt.submit" && command.payload.workspaceFiles?.length) {
       await this.workspaceFiles.validatePromptReferences(
@@ -261,6 +263,7 @@ export class AgentHostServer {
     }
     const initializedBeforeCommand = state.record.initialized;
     const runtime = await this.taskLifecycle.loadRuntimeForCommand(state, command);
+    if (command.type === "prompt.submit") observePromptAcknowledgement("runtime-ready");
     const admissionLease = commandRequiresRunAdmission(command)
       ? this.tasks.reserveRun(state.record.taskKey)
       : undefined;
@@ -451,9 +454,5 @@ export class AgentHostServer {
   }
   private captureProjectionResync(runtime: AgentRuntime, state: TaskHostState): CommandResults["projection.resync"] {
     return captureProjectionResync(runtime, this.events.eventSequence, this.hostIdentity?.hostEpoch ?? 1, state.operations);
-  }
-  private resolveHostIdentity(options: AttachPortOptions): HostConnectionIdentity {
-    if (!this.hostIdentity) this.hostIdentity = initialHostIdentity(options);
-    return this.hostIdentity;
   }
 }

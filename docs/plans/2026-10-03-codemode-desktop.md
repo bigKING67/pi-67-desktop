@@ -1,6 +1,6 @@
 # Desktop native Codemode integration
 
-Status: completed (local implementation and macOS acceptance; no distribution)
+Status: active (post-push Windows acknowledgement and Renderer recovery remediation)
 Owner: Codex
 Started: 2026-10-03
 Last updated: 2026-10-03
@@ -11,7 +11,14 @@ The user accepted the recommendation to close the three observed Codemode gaps
 and complete local implementation, source validation and macOS packaged preview.
 Use Pi's public Codemode factory and execution pipeline as the only authority.
 After local acceptance, the user explicitly authorized a scoped local commit of
-this implementation, tests, patch and documentation. Push remains outside scope.
+this implementation, tests, patch and documentation, then push of the two completed
+commits and exact-SHA Windows candidate CI. Source `4694974e` is now on remote main.
+The user subsequently accepted remediation of the observed Windows first-Prompt
+acknowledgement timeout and Renderer reading-anchor failures. This follow-up owns
+local fixes, diagnostic evidence, regressions and applicable packaged validation.
+The user then authorized the reviewed 16-file scoped commit, push to main and
+ordinary CI plus exact-SHA Windows candidate validation. Distribution remains a
+separate delivery step.
 The user subsequently authorized isolated synthetic live-model acceptance using
 `deepseek/deepseek-flash`, then continued to the packaged acceptance gap. Each
 follow-up live run was capped at two requests, 1,024 output tokens per request,
@@ -22,11 +29,82 @@ with immediate stop on failure and redacted receipts only.
 - Implement exact root admission, host-controlled output persistence and bounded
   parent/child live and restored projections with existing tool-card UI.
 - Keep `models: false`, direct native tools available and Pi JSONL authoritative.
-- No automatic model routing, Pi Durable service, user profile mutation, push,
-  upload, remote CI dispatch or publication. Paid requests are limited to the
-  separately authorized synthetic acceptance above.
+- No automatic model routing, Pi Durable service, user profile mutation, upload
+  or publication. Scoped push and remote CI follow the authorization above. Paid
+  requests are limited to the separately authorized synthetic acceptance above.
 - Windows source compatibility is required; real Windows/package acceptance is
   unverified locally and must not be inferred from macOS or source tests.
+
+## Post-push remediation
+
+- Entry: clean canonical `main`, `4694974e0f26d021d8aa49a879434ebd302580b4`,
+  local/remote 0/0. Preserve the original CI artifacts under
+  `artifacts/validation/codemode-ci-37123331634/`.
+- Windows candidate `37123585574/1`: provenance, build, packaged smoke and UI
+  passed; full installer certification failed at clean-profile first Prompt.
+  Baseline install, alpha.42-to-alpha.43 upgrade, post-upgrade launch and profile
+  bootstrap passed. Runtime initialization completed; the exact ACK stall boundary
+  is not yet known. No testable candidate was produced or distributed.
+- Ordinary CI `37123331634`: both native lanes and source quality passed.
+  Renderer attempt 1 timed out awaiting the changed-files card; the failure
+  screenshot then showed it. Attempt 2 passed that test but restored row 63
+  instead of row 65 after Settings. Neither attempt passed the complete gate.
+- Root owns implementation/integration. `reading_anchor_diagnosis` is a bounded
+  read-only analysis of the transcript failure; it does not mutate shared files.
+- Acceptance: reproduce the failing invariant, fix its owning boundary, retain
+  durable-before-ACK semantics and exact Session authority, and preserve the
+  current timeout/installer/lifecycle gates. Diagnostics may contain only bounded
+  stages, outcomes and timing, never prompts, credentials, paths or raw payloads.
+- [x] Locate first-Prompt ACK boundary; add focused regression and fix or explicitly
+  distinguish instrumentation from a verified Windows repair.
+- [x] Repair semantic reading-anchor recovery with deterministic layout regression.
+- [x] Run targeted and aggregate source gates, affected Renderer E2E and macOS
+  packaged preview; keep Windows exact-SHA certification pending until actually run.
+- ACK evidence is instrumentation, not a Windows repair: opt-in test capture follows
+  request receipt, dispatch, runtime, receipt reconcile/write and response delivery.
+  No payload, identity, path or raw error is captured; limits are 64 attempts and
+  16 records per attempt. Main projects fixed fields; installer failure retains a
+  64-record tail in a separate bounded report. The 5-second admission deadline and
+  durable-before-ACK ordering are unchanged. A `response-posted` record proves the
+  Host send returned, not that Renderer received it.
+- Renderer root cause: remount initial positioning used estimated 120px row heights,
+  leaving row 63 first-visible instead of saved row 65. Protect the saved anchor
+  through measurement and explicitly align it. Both scroll directions cancel a
+  queued restoration; editable targets and modified keys retain normal behavior.
+- Independent bounded review (`ack_anchor_review`): accepted and fixed downward-key
+  cancellation; dismissed the empty-row recovery candidate after confirming the
+  existing authority/recovery mount gate. A possible Virtuoso-internal resize retry
+  after user input remains source-level risk, not a reproduced browser failure;
+  avoid an unproven private-API cancellation or premature DOM-alignment replacement.
+- First aggregate pass: 929 test files passed / 9 skipped, 6,095 tests passed /
+  24 skipped, branch coverage 78.63%. Full Renderer: 287 passed / 1 skipped,
+  two workers and zero retries. Reading-position round trip also passed ten
+  consecutive Chromium runs. Final keyboard regression is included in the follow-up
+  gate recorded below.
+- Final keyboard regression: seven scroll keys cancel the queued frame. Final
+  source gate: 929 files / 6,102 tests passed, 9 files / 24 tests skipped, branch
+  coverage 78.67%. Ten affected Renderer projection/navigation cases passed; no
+  timeout, assertion or retry allowance was relaxed.
+- Real Chrome (`browser67`, synthetic bridge / built renderer): 72 rows, saved
+  message 65 -> restored message 65, 900px away from bottom; return-to-latest
+  distance 0. Receipt: `artifacts/validation/ack-anchor-20261003/browser/receipt.json`.
+  One managed tab was closed and verified, none left unkept; owned fixture server
+  stopped. This is browser evidence, not Electron or provider evidence.
+- macOS arm64 `preview:mac:unsigned` passed packaging, packaged smoke and launch
+  (PID 22104). This includes native MCP discovery and one AUTO synthetic echo,
+  warm/cold restore and bounded active-Prompt shutdown (610.4ms). No paid provider
+  request was used. `app.asar`: 194,925,527 bytes,
+  SHA-256 `eda03665bd06fc5a883426a40d112a5942a7e6ab224bbf249060bb62485444ad`.
+  Identity records baseline `4694974e` with `clean:false`; do not promote this to
+  an exact-SHA candidate claim. Full receipt:
+  `artifacts/validation/ack-anchor-20261003/receipt.json`.
+- Local follow-up implementation/validation is complete. The user authorized the
+  reviewed 16-file scoped commit, push and Windows exact-SHA CI on 2026-10-03.
+  Windows ACK cause and repair remain unverified until the new run supplies
+  evidence. Distribution is outside this authorization.
+- Rollback: restore only this follow-up's scoped diff; retain pre-existing failure
+  receipts and current preview. Do not alter user profiles, dependency versions,
+  timeouts, installer certification requirements or release state.
 
 ## Entry evidence and ownership
 

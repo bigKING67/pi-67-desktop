@@ -2,6 +2,20 @@ import { describe, expect, it, vi } from "vitest";
 import { AgentHostInitializationOutputForwarder } from "./agent-host-initialization-output.js";
 
 describe("AgentHostInitializationOutputForwarder", () => {
+  it("projects bounded Prompt ACK stages and drops payloads, unknown stages and invalid counters", () => {
+    const emit = vi.fn<(line: string) => void>();
+    const forwarder = new AgentHostInitializationOutputForwarder(emit);
+    const prefix = "[agent-host:prompt-ack] ";
+    const valid = { attempt: 1, stage: "receipt-write-started", elapsedMs: 17 };
+    forwarder.write(`${prefix}${JSON.stringify({ ...valid, prompt: "private", path: "private" })}\n`);
+    for (const invalid of [{ stage: "private" }, { attempt: 65 }, { elapsedMs: -1 }, { elapsedMs: 1.5 }]) {
+      forwarder.write(`${prefix}${JSON.stringify({ ...valid, ...invalid })}\n`);
+    }
+    forwarder.write(`${prefix}${JSON.stringify({ ...valid, private: "x".repeat(8_192) })}\n`);
+    expect(emit.mock.calls).toEqual([[`${prefix}${JSON.stringify(valid)}`]]);
+    for (let index = 0; index < 1_025; index += 1) forwarder.write(`${prefix}${JSON.stringify(valid)}\n`);
+    expect(emit).toHaveBeenCalledTimes(1_024);
+  });
   it("forwards split initialization records with only the bounded public fields", () => {
     const emit = vi.fn<(line: string) => void>();
     const forwarder = new AgentHostInitializationOutputForwarder(emit);

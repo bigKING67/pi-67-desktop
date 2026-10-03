@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
@@ -31,7 +31,10 @@ class PromptPort implements ProtocolPort {
 }
 
 describe("AgentHostServer prompt routing", () => {
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
   it("returns prompt acceptance without waiting for operation completion", async () => {
+    vi.stubEnv("PI67_TEST_CAPTURE_AGENT_INIT", "1");
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     let complete!: () => void;
     const submitPrompt = vi.fn(() => new Promise<void>((resolve) => { complete = resolve; }));
     const flushStream = vi.fn();
@@ -92,6 +95,16 @@ describe("AgentHostServer prompt routing", () => {
     const startedIndex = port.sent.findIndex((value) => isEventEnvelope(value) && value.type === "operation.started");
     expect(responseIndex).toBeGreaterThanOrEqual(0);
     expect(startedIndex).toBeGreaterThan(responseIndex);
+    const observations = stderr.mock.calls.map(([line]) => String(line))
+      .filter((line) => line.startsWith("[agent-host:prompt-ack] "))
+      .map((line) => JSON.parse(line.slice("[agent-host:prompt-ack] ".length)));
+    expect(observations.map((record) => record.stage)).toEqual([
+      "received", "dispatch-started", "runtime-ready", "receipt-reconcile-started",
+      "receipt-reconcile-completed", "receipt-write-started", "receipt-write-completed",
+      "response-ready", "response-posted"
+    ]);
+    expect(new Set(observations.map((record) => record.attempt)).size).toBe(1);
+    expect(JSON.stringify(observations)).not.toMatch(/run a long task|session-1|submission-1/u);
     expect(submitPrompt).toHaveBeenCalledWith(
       "run a long task",
       undefined,

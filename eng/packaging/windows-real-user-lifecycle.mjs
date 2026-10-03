@@ -23,7 +23,7 @@ import {
 } from "./windows-real-user-catalog-state.mjs";
 import { inspectRealUserSessionCatalogDiscovery } from "./windows-real-user-catalog-discovery.mjs";
 import {
-  inspectRealUserRuntimeSurface,
+  inspectRealUserRuntimeSurface, parsePromptAcknowledgementObservations,
   realUserLifecycleFailureKind,
   summarizeRealUserShutdown
 } from "./windows-real-user-failure-diagnostics.mjs";
@@ -35,6 +35,7 @@ import {
   assertModelRuntimeInitialization,
   parseInitializationObservations
 } from "./windows-real-user-initialization.mjs";
+import { outputDirectory, writeReport } from "./windows-installer-lifecycle-report.mjs";
 
 export { REAL_USER_PROVIDER_TIMEOUT_MS } from "./windows-real-user-provider-configuration.mjs";
 export { inspectRealUserRuntimeSurface } from "./windows-real-user-failure-diagnostics.mjs";
@@ -328,6 +329,7 @@ async function runRealUserLaunch({
       stage: failureStage,
       lane,
       launchIndex,
+      promptAcknowledgement: parsePromptAcknowledgementObservations(processOutput()),
       shutdown: summarizeRealUserShutdown(shutdownMeasurement, INSTALLED_SHUTDOWN_BUDGET_MS),
       initialization: parseInitializationObservations(processOutput()),
       surface: failureWindow
@@ -335,6 +337,7 @@ async function runRealUserLaunch({
           .catch(() => ({ available: false }))
         : { available: false }
     };
+    await writeReport(diagnostic, systemPath.join(outputDirectory, "real-user-launch-failure.json"));
     throw new Error(`Windows real-user launch failed. Diagnostics: ${JSON.stringify(diagnostic)}`);
   } finally {
     if (application) await application.close();

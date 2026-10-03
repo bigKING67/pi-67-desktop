@@ -27,6 +27,7 @@ import {
   hostIncident,
   type HostDiagnosticIncidentInput
 } from "./host-diagnostic-evidence.js";
+import { observePromptAcknowledgement, observePromptAcknowledgementRequest } from "./prompt-acknowledgement-observation.js";
 
 const INVALID_HOST_RESPONSE_ERROR: ProtocolError = {
   code: "INTERNAL",
@@ -117,6 +118,7 @@ export class HostConnectionContext {
   }
 
   sendSuccess<T extends AgentCommandType>(requestId: string, type: T, result: CommandResults[T]): void {
+    if (type === "prompt.submit") observePromptAcknowledgement("response-ready");
     const authority = this.pendingAuthority(requestId, type);
     if (!authority) return;
     const response = { ok: true, type, result } as CommandResponse<T>;
@@ -133,6 +135,7 @@ export class HostConnectionContext {
   }
 
   sendError<T extends AgentCommandType>(requestId: string, type: T, error: ProtocolError): void {
+    if (type === "prompt.submit") observePromptAcknowledgement("response-error-ready");
     const authority = this.pendingAuthority(requestId, type);
     if (!authority) return;
     const response = { ok: false, type, error } as CommandResponse<T>;
@@ -283,7 +286,7 @@ export class HostConnectionContext {
       return;
     }
     this.beginResponse(data);
-    this.onRequest(this, data);
+    observePromptAcknowledgementRequest(data.type, () => this.onRequest(this, data));
   }
 
   private async completeHandshake(appInstanceId: string, peerMaxEnvelopeBytes: number): Promise<void> {
@@ -350,12 +353,15 @@ export class HostConnectionContext {
     trackedRequestId?: string
   ): void {
     if (this.closed) {
+      if (diagnosticEnvelopeType(envelope) === "prompt.submit") observePromptAcknowledgement("response-failed");
       if (trackedRequestId !== undefined) this.completeResponse(trackedRequestId);
       return;
     }
     try {
       this.port.postMessage(envelope);
+      if (diagnosticEnvelopeType(envelope) === "prompt.submit") observePromptAcknowledgement("response-posted");
     } catch (error) {
+      if (diagnosticEnvelopeType(envelope) === "prompt.submit") observePromptAcknowledgement("response-failed");
       this.recordIncident(hostIncident("response-post", "failed", {
         command: diagnosticEnvelopeType(envelope),
         errorClass: classifyDiagnosticError(error),

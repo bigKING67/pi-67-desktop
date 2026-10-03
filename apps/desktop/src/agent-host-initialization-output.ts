@@ -1,4 +1,5 @@
 const INITIALIZATION_PREFIX = "[agent-host:init] ";
+const PROMPT_ACK_PREFIX = "[agent-host:prompt-ack] ";
 const MAX_PENDING_LINE_LENGTH = 8_192;
 
 const INITIALIZATION_STAGES = new Set([
@@ -19,10 +20,17 @@ const INITIALIZATION_STAGES = new Set([
 ]);
 
 const INITIALIZATION_OUTCOMES = new Set(["started", "completed", "failed"]);
+const PROMPT_ACK_STAGES = new Set([
+  "received", "dispatch-started", "runtime-ready",
+  "receipt-reconcile-started", "receipt-reconcile-completed",
+  "receipt-write-started", "receipt-write-completed",
+  "response-ready", "response-error-ready", "response-posted", "response-failed"
+]);
 
 export class AgentHostInitializationOutputForwarder {
   readonly #emit: (line: string) => void;
   #pending = "";
+  #promptRecords = 0;
 
   constructor(emit: (line: string) => void) {
     this.#emit = emit;
@@ -36,6 +44,11 @@ export class AgentHostInitializationOutputForwarder {
   }
 
   #forward(line: string): void {
+    if (line.length > MAX_PENDING_LINE_LENGTH) return;
+    if (line.startsWith(PROMPT_ACK_PREFIX)) {
+      this.#forwardPromptAcknowledgement(line);
+      return;
+    }
     if (!line.startsWith(INITIALIZATION_PREFIX)) return;
     try {
       const value = JSON.parse(line.slice(INITIALIZATION_PREFIX.length)) as Record<string, unknown>;
@@ -54,6 +67,24 @@ export class AgentHostInitializationOutputForwarder {
       })}`);
     } catch {
       // Utility stderr is untrusted diagnostics; malformed records are ignored.
+    }
+  }
+
+  #forwardPromptAcknowledgement(line: string): void {
+    if (this.#promptRecords >= 1_024) return;
+    try {
+      const value = JSON.parse(line.slice(PROMPT_ACK_PREFIX.length)) as Record<string, unknown>;
+      if (typeof value.stage !== "string" || !PROMPT_ACK_STAGES.has(value.stage)
+        || typeof value.attempt !== "number" || !Number.isSafeInteger(value.attempt)
+        || value.attempt < 1 || value.attempt > 64
+        || typeof value.elapsedMs !== "number" || !Number.isSafeInteger(value.elapsedMs)
+        || value.elapsedMs < 0) return;
+      this.#promptRecords += 1;
+      this.#emit(`${PROMPT_ACK_PREFIX}${JSON.stringify({
+        attempt: value.attempt, stage: value.stage, elapsedMs: value.elapsedMs
+      })}`);
+    } catch {
+      // Project fixed fields only; stderr is not a trusted diagnostic document.
     }
   }
 }

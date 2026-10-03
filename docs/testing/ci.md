@@ -97,6 +97,16 @@ Bind a failure to source SHA, workflow run/attempt, selected lane and failing st
 and its retained report before rerunning. Keep first-failure and retry evidence distinct. A source fix requires a
 new SHA; a passed local test or a retry does not prove the original cause is resolved on the target runner.
 
+The explicit test capture mode (`NODE_ENV=test`, `PI67_TEST_CAPTURE_AGENT_INIT=1`) also captures
+bounded `prompt.submit` acknowledgement stages from validated Host receipt through runtime admission,
+accepted-ledger reconciliation/write and response posting. At most 64 requests and 16 fixed stage records
+per request are emitted, with launch-local sequence and elapsed milliseconds only. Main projects an
+allowlist; it does not forward payloads, paths, errors or credentials. The installer failure report retains
+the latest 64 records with a dropped count in `real-user-launch-failure.json`, separate from the truncated
+summary error. No stage changes the existing 5-second Prompt ACK deadline or durable-before-ACK contract.
+`response-posted` proves the Host port write returned; it does not prove Renderer receipt. Instrumentation
+alone is not evidence that a Windows timeout is repaired.
+
 Keep source checks, browser E2E, native Electron, packaged smoke, installer certification and manual acceptance
 as separate evidence. Report missing evidence explicitly. Report settings, cache keys, concurrency and thresholds
 must be changed with their consumers and boundary tests; preserve unknown-input fallback and release authorization.

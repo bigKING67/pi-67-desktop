@@ -1,15 +1,10 @@
 import type {
-  OperationActivity,
-  OperationKind,
-  OperationView,
-  RuntimeIdentity,
-  RuntimeOperationActivity, ToolExecutionView
+  OperationActivity, OperationKind, OperationView, RuntimeIdentity, RuntimeOperationActivity, ToolExecutionView
 } from "@pi67/domain";
 import {
   type AgentHostRuntimePoisonedMessage,
   type AgentEvent,
-  type OperationAccepted,
-  type OperationSettled,
+  type OperationAccepted, type OperationSettled,
   type OperationSubmissionResult,
   type ProtocolError
 } from "@pi67/protocol";
@@ -30,6 +25,7 @@ import { type ActiveOperation, OperationTerminalCoordinator } from "./operation-
 import { OperationToolExecutionController } from "./operation-tool-execution-controller.js";
 import { authorityFromIdentity } from "./operation-submission-ledger.js";
 import { HostCommandError } from "./protocol-error.js";
+import { observePromptAcknowledgement } from "./prompt-acknowledgement-observation.js";
 
 export type OperationShutdownResult = "none" | "cancelled" | "lost";
 
@@ -175,7 +171,9 @@ export class OperationRegistry {
     if (this.accepting) throw new HostCommandError("BUSY", "Another operation is being accepted.");
     this.accepting = true;
     try {
+      observePromptAcknowledgement("receipt-reconcile-started");
       await this.reconcile();
+      observePromptAcknowledgement("receipt-reconcile-completed");
       const existing = this.submissionFor(options.submissionId, options.fingerprint);
       if (existing) return await existing;
       if (this.active) throw new HostCommandError("BUSY", "Another operation is already active.");
@@ -183,6 +181,7 @@ export class OperationRegistry {
       const startedAt = this.now();
       const view = createOperationView(identity, options.kind, options.abort !== undefined, startedAt);
       const authority = authorityFromIdentity(identity);
+      observePromptAcknowledgement("receipt-write-started");
       const remembered = await this.withDurability(() => this.results.rememberAccepted({
         submissionId: options.submissionId,
         fingerprint: options.fingerprint,
@@ -191,6 +190,7 @@ export class OperationRegistry {
         accepted: acceptedOperation(view, this.hostEpoch),
         authority
       }));
+      observePromptAcknowledgement("receipt-write-completed");
       if (!remembered.created) return remembered.result;
       this.activity.reset();
       this.toolExecutions.reset();
