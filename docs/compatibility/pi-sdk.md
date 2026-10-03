@@ -30,15 +30,20 @@ unsigned preview 共用该 contract，不维护另一份运行时版本常量。
 - `context_edit` 由 Pi SessionManager 应用到模型上下文；Desktop 保留原始可见历史，
   不把控制 entry 投影为聊天消息。OpenViking 继续使用 `context` 和 `turn_end` hooks，
   不将 `context_edit` 误作新的 Extension event 或替代用户历史。
-- SDK 默认仍不注册 CLI factories；Desktop 显式启用原生 MCP 和 tool-search，彻底
-  退休 `pi-mcp-adapter` 的 bundle、加载和代理授权路径。Codemode 与 virtual model router
-  不启用。支持的旧 MCP 字段仅在内存转换，用户原文件和旧 cache 不删除。
+- SDK 默认仍不注册 CLI factories；Desktop 显式启用原生 MCP、tool-search 和 Codemode，
+  彻底退休 `pi-mcp-adapter` 的 bundle、加载和代理授权路径。Codemode 保留用户显式
+  Tool 列表，并逐次执行子工具 Safety 策略；virtual model router 不启用。支持的旧 MCP
+  字段仅在内存转换，用户原文件和旧 cache 不删除。
 - `patches/@earendil-works__pi-coding-agent@1.0.0.patch` 由 pnpm 精确版本与内容 hash
   锁定，为 host 增加注册身份、日志/输出、Profile/OAuth 控制并修复 pending connection
-  shutdown；上游替代版本必须重新通过同样的行为回归后才能移除补丁。
+  shutdown。它还为 public `createCodemodeExtension()` 增加 `saveOutput?: boolean`：默认
+  保持上游将截断的文本写入临时文件；Desktop 传入 `false` 时不写完整文本、不返回路径，
+  并在截断结果中明确说明该输出未按 host 隐私策略保存。上游替代版本必须重新通过同样的
+  行为回归后才能移除补丁。
 - 原有 runtime-only cache warming suppression 保持不变，不改用户 TUI 设置。
 - 当前验证进展见 `docs/plans/2026-10-03-pi-1-upgrade.md`；仅完成的证据层可用于
   验收。Windows、付费 Provider 和发布认证不得从本机离线测试推断。
+- Codemode 接入与本地验收见 `docs/plans/2026-10-03-codemode-desktop.md`。
 - 原生 MCP 与现有 adapter 的来源、配置、权限、隐私及生命周期差异见
   [接入评估与迁移证据](pi-native-mcp-assessment.md)；各平台是否通过以实际收口记录为准。
 

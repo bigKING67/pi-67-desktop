@@ -50,7 +50,7 @@ export function TranscriptProcessGroup({
   const stepCount = row.stepCount + supplementalTimeline.length + (supplementalThinking ? 1 : 0);
   const toolCount = row.toolCount + supplementalTools.length;
   const unsuccessfulToolCount = row.unsuccessfulToolCount
-    + supplementalTools.filter((item) => isUnsuccessfulToolStatus(item.tool.status)).length;
+    + supplementalTools.filter((item) => isUnsuccessfulToolStatus(item.tool.status) || item.tool.execution?.nestedRecord?.complete === false).length;
   const outcome = resolveProcessGroupOutcome(row, operation, running, unsuccessfulToolCount);
   const autoExpanded = processOutcomeAutoExpanded(outcome);
   const [open, setOpen] = useState(autoExpanded);
@@ -94,7 +94,7 @@ export function TranscriptProcessGroup({
 
   const visibleItems = onlyUnsuccessful ? row.items.filter(processItemUnsuccessful) : row.items;
   const visibleTimeline = onlyUnsuccessful
-    ? supplementalTimeline.filter((item) => item.kind === "tool" && isUnsuccessfulToolStatus(item.tool.status))
+    ? supplementalTimeline.filter((item) => item.kind === "tool" && (isUnsuccessfulToolStatus(item.tool.status) || item.tool.execution?.nestedRecord?.complete === false))
     : supplementalTimeline;
 
   return (

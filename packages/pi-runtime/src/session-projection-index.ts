@@ -18,6 +18,7 @@ import {
 } from "./session-message-projection.js";
 import { projectSessionCompatibility } from "./session-compatibility-projection.js";
 import { DurableToolExecutionIndex } from "./durable-tool-execution-index.js";
+import type { NestedToolProjection } from "./nested-tool-projection.js";
 
 export interface SessionProjectionMetadata {
   sessionId: string;
@@ -163,6 +164,10 @@ export class SessionProjectionIndex {
 
   getToolExecution(toolCallId: string): ToolExecutionView | undefined {
     return this.synchronizeState().toolExecutions.get(toolCallId);
+  }
+
+  getNestedTools(rootToolCallId: string): NestedToolProjection | undefined {
+    return this.synchronizeState().toolExecutions.getNestedTools(rootToolCallId);
   }
 
   private requireState(manager: SessionManager): ProjectionState {

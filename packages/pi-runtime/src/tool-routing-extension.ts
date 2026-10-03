@@ -153,6 +153,16 @@ export function createDesktopToolRoutingExtension(): InlineExtension {
         return undefined;
       });
 
+      // Nested calls do not emit an independent message_end. Apply the same
+      // selected-provider failure boundary before returning to the sandbox.
+      pi.on("tool_result", (event) => {
+        if (!event.parentToolCallId || !webSearchCalls.delete(event.toolCallId)) return undefined;
+        const content = normalizeWebSearchFailure(event.content);
+        if (!content) return undefined;
+        nativeSearchFailed = true;
+        return { content, isError: true };
+      });
+
       pi.on("message_end", (event) => {
         const message = event.message;
         if (message.role === "toolResult") {

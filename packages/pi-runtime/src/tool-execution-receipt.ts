@@ -11,6 +11,7 @@ export type ToolExecutionReceiptStatus = "completed" | "failed" | "interrupted" 
 export interface ToolExecutionReceiptItem {
   toolCallId: string;
   toolName: string;
+  parentToolCallId?: string;
   startedAt?: number;
   completedAt: number;
   status: ToolExecutionReceiptStatus;
@@ -47,15 +48,17 @@ export function parseToolExecutionReceipt(value: unknown): ToolExecutionReceiptD
 
 function parseReceiptItem(value: unknown): ToolExecutionReceiptItem | undefined {
   const record = asRecord(value);
-  if (!hasOnlyKeys(record, ["toolCallId", "toolName", "startedAt", "completedAt", "status"])) return undefined;
+  if (!hasOnlyKeys(record, ["toolCallId", "toolName", "parentToolCallId", "startedAt", "completedAt", "status"])) return undefined;
   const toolCallId = boundedString(record.toolCallId, MAX_TOOL_CALL_ID_CHARS);
   const toolName = boundedString(record.toolName, MAX_TOOL_NAME_CHARS);
+  const parentToolCallId = boundedString(record.parentToolCallId, MAX_TOOL_CALL_ID_CHARS);
   const startedAt = nonNegativeInteger(record.startedAt);
   const completedAt = nonNegativeInteger(record.completedAt);
   const status = receiptStatus(record.status);
   if (
     toolCallId === undefined
     || toolName === undefined
+    || (record.parentToolCallId !== undefined && parentToolCallId === undefined)
     || completedAt === undefined
     || status === undefined
     || (record.startedAt !== undefined && startedAt === undefined)
@@ -64,6 +67,7 @@ function parseReceiptItem(value: unknown): ToolExecutionReceiptItem | undefined 
   return {
     toolCallId,
     toolName,
+    ...(parentToolCallId === undefined ? {} : { parentToolCallId }),
     ...(startedAt === undefined ? {} : { startedAt }),
     completedAt,
     status

@@ -40,6 +40,7 @@ import {
   stringField
 } from "./tool-input-contracts.js";
 import { classifyPi67ContextToolIntent } from "./pi67-context-tool-safety.js";
+import { isVerifiedDesktopCodemode } from "./codemode-extension.js";
 
 export interface SafetyPolicyState {
   cwd: string;
@@ -93,6 +94,19 @@ export function createDesktopSafetyExtension(
       pi.on("tool_call", async (event, ctx) => {
         const state = getState();
         if (state.toolsDisabled) return { block: true, reason: "AGENT_TURN_NO_TOOLS: Team Chat Agent turns have no tools." };
+        if (event.toolName === "codemode") {
+          try {
+            if (!isVerifiedDesktopCodemode(pi, event.input) || event.parentToolCallId) {
+              return { block: true, reason: "CODEMODE_IDENTITY_INVALID: Codemode requires the unique Desktop sandbox root; nested Codemode is not allowed." };
+            }
+          } catch {
+            return { block: true, reason: "CODEMODE_IDENTITY_INVALID: Codemode tool identity is unavailable." };
+          }
+          if (state.trust !== "trusted") return { block: true, reason: "CODEMODE_WORKSPACE_UNTRUSTED: Trust this Workspace before using Codemode." };
+          // The sandbox has no model/network/filesystem globals. This admits only
+          // the container, including in PLAN; every leaf still runs this hook.
+          return undefined;
+        }
         if (isVerifiedDesktopAttachmentTool(pi, event.toolName, event.input)) return undefined;
         let intent: ClassifiedToolIntent;
         try {

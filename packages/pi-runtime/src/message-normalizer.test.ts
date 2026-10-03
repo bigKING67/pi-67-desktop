@@ -266,6 +266,7 @@ describe("normalizeMessages tool outcome correlation", () => {
       execution
     });
   });
+
 });
 
 describe("normalizeMessages Desktop prompt attachments", () => {

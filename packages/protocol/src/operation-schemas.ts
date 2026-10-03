@@ -58,6 +58,8 @@ function boundedToolText(maxLength: number) {
 
 export const ToolExecutionSchema = strictObject({
   toolCallId: Type.String({ minLength: 1, maxLength: MAX_TOOL_CALL_ID_CHARS }),
+  parentToolCallId: Type.Optional(Type.String({ minLength: 1, maxLength: MAX_TOOL_CALL_ID_CHARS })),
+  nestedRecord: Type.Optional(strictObject({ complete: Type.Boolean() })),
   toolName: Type.String({ minLength: 1, maxLength: MAX_TOOL_NAME_CHARS }),
   toolKind: ToolPresentationKindSchema,
   status: ToolExecutionStatusSchema,
@@ -81,7 +83,7 @@ export const ToolExecutionSchema = strictObject({
   startedAt: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
   completedAt: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
   durationMs: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
-  timingSource: Type.Optional(Type.Union([Type.Literal("runtime"), Type.Literal("receipt")])),
+  timingSource: Type.Optional(Type.Union([Type.Literal("runtime"), Type.Literal("receipt"), Type.Literal("pi-result")])),
   aliasTarget: Type.Optional(Type.String({ minLength: 1, maxLength: MAX_TOOL_NAME_CHARS })),
   authorization: Type.Optional(ToolAuthorizationProjectionSchema)
 });

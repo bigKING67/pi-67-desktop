@@ -1,5 +1,5 @@
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
-import type { ToolExecutionView, ToolPresentationKind } from "@pi67/domain";
+import type { ToolExecutionView } from "@pi67/domain";
 import { desktopToolAliasTarget } from "./tool-routing-extension.js";
 import {
   deriveToolDuration,
@@ -8,6 +8,11 @@ import {
   safeToolCallId,
   safeToolName
 } from "./tool-execution-projection.js";
+import {
+  projectNestedToolCalls,
+  toolKindForName,
+  type NestedToolProjection
+} from "./nested-tool-projection.js";
 import {
   parseToolExecutionReceipt,
   TOOL_EXECUTION_RECEIPT_TYPE,
@@ -24,6 +29,9 @@ export class DurableToolExecutionIndex {
   private readonly calls = new Map<string, ToolExecutionView>();
   private readonly results = new Map<string, DurableToolResult>();
   private readonly receipts = new Map<string, ToolExecutionReceiptItem>();
+  private readonly nativeNestedCallIds = new Set<string>();
+  private readonly nativeNestedParents = new Map<string, string>();
+  private readonly nestedTools = new Map<string, NestedToolProjection>();
 
   constructor(private cwd = "") {}
 
@@ -32,6 +40,9 @@ export class DurableToolExecutionIndex {
     this.calls.clear();
     this.results.clear();
     this.receipts.clear();
+    this.nativeNestedCallIds.clear();
+    this.nativeNestedParents.clear();
+    this.nestedTools.clear();
     for (const entry of entries) this.observe(entry);
   }
 
@@ -60,6 +71,7 @@ export class DurableToolExecutionIndex {
       result: message,
       isError: message.isError === true
     });
+    this.observeNestedCalls(toolCallId, message.nestedCalls);
     this.reconcile(toolCallId);
   }
 
@@ -71,6 +83,22 @@ export class DurableToolExecutionIndex {
     return { ...call, status: "unreconciled", resultState: "unreconciled" };
   }
 
+  /**
+   * Returns the bounded native Pi summary for one root call. This is a
+   * disposable lookup index, never a second transcript or execution record.
+   */
+  getNestedTools(rootToolCallId: string): NestedToolProjection | undefined {
+    const nested = this.nestedTools.get(safeToolCallId(rootToolCallId));
+    if (!nested) return undefined;
+    return {
+      complete: nested.complete,
+      calls: nested.calls.map((call) => ({
+        ...call,
+        ...(call.nestedRecord === undefined ? {} : { nestedRecord: { ...call.nestedRecord } })
+      }))
+    };
+  }
+
   private observeAssistantPart(value: unknown): void {
     const part = asRecord(value);
     const type = stringValue(part.type);
@@ -78,6 +106,11 @@ export class DurableToolExecutionIndex {
     const rawId = stringValue(part.id);
     if (!rawId) return;
     const toolCallId = safeToolCallId(rawId);
+    const nestedParent = this.nativeNestedParents.get(toolCallId);
+    if (nestedParent !== undefined) {
+      this.markNestedRecordIncomplete(nestedParent);
+      return;
+    }
     const toolName = safeToolName(stringValue(part.name) ?? "tool");
     const aliasTarget = desktopToolAliasTarget(toolName);
     this.calls.set(toolCallId, {
@@ -93,9 +126,39 @@ export class DurableToolExecutionIndex {
     this.reconcile(toolCallId);
   }
 
+  private observeNestedCalls(parentToolCallId: string, value: unknown): void {
+    if (value === undefined || !this.calls.has(parentToolCallId)) return;
+    const nested = projectNestedToolCalls(parentToolCallId, value, this.cwd);
+    if (!nested || nested.calls.some((child) => this.calls.has(child.toolCallId))) {
+      this.markNestedRecordIncomplete(parentToolCallId);
+      return;
+    }
+    this.setNestedRecord(parentToolCallId, nested.complete);
+    this.nestedTools.set(parentToolCallId, nested);
+    for (const child of nested.calls) {
+      this.calls.set(child.toolCallId, child);
+      this.nativeNestedCallIds.add(child.toolCallId);
+      this.nativeNestedParents.set(child.toolCallId, parentToolCallId);
+    }
+  }
+
+  private markNestedRecordIncomplete(parentToolCallId: string): void {
+    this.setNestedRecord(parentToolCallId, false);
+    this.nestedTools.set(parentToolCallId, { calls: [], complete: false });
+  }
+
+  private setNestedRecord(parentToolCallId: string, complete: boolean): void {
+    const parent = this.calls.get(parentToolCallId);
+    if (parent) this.calls.set(parentToolCallId, { ...parent, nestedRecord: { complete } });
+  }
+
   private reconcile(toolCallId: string): void {
     const call = this.calls.get(toolCallId);
     if (!call) return;
+    // Pi persists the nested outcome as `toolResult.nestedCalls`, not as a
+    // standalone child Tool Result. A Desktop receipt may add live timing, but
+    // cannot replace that native outcome with an invented durable result.
+    if (this.nativeNestedCallIds.has(toolCallId)) return;
     const result = this.results.get(toolCallId);
     const receipt = this.receipts.get(toolCallId);
     const validReceipt = receipt?.toolName === call.toolName ? receipt : undefined;
@@ -132,16 +195,6 @@ export class DurableToolExecutionIndex {
       timingSource: "receipt"
     });
   }
-}
-
-function toolKindForName(toolName: string): ToolPresentationKind {
-  const normalized = toolName.trim().toLocaleLowerCase("en-US").replaceAll("_", "-");
-  if (["bash", "shell", "exec", "exec-command", "run-command"].includes(normalized)) return "shell";
-  if (["read", "read-file", "view-image"].includes(normalized)) return normalized === "view-image" ? "image" : "read";
-  if (["grep", "search", "find", "glob", "rg"].includes(normalized)) return "search";
-  if (["edit", "write", "apply-patch"].includes(normalized)) return "edit";
-  if (["subagent", "spawn-agent", "delegate"].includes(normalized)) return "subagent";
-  return "generic";
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

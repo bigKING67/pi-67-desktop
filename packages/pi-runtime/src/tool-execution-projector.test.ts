@@ -100,6 +100,49 @@ describe("ToolExecutionProjector", () => {
     ] });
   });
 
+  it("keeps Pi's nested parent identity in the live view and bounded receipt", () => {
+    const emitted: ToolExecutionView[] = [];
+    const receipts = vi.fn();
+    const projector = new ToolExecutionProjector({
+      emit: (execution) => emitted.push(execution),
+      getCwd: () => undefined,
+      persistReceipt: receipts,
+      reportReceiptFailure: vi.fn(),
+      now: () => 10
+    });
+
+    projector.handle(event({
+      type: "tool_execution_start",
+      toolCallId: "codemode-1/1",
+      toolName: "read",
+      args: { path: "README.md" },
+      parentToolCallId: "codemode-1"
+    }), "read");
+    projector.handle(event({
+      type: "tool_execution_end",
+      toolCallId: "codemode-1/1",
+      toolName: "read",
+      result: { content: [{ type: "text", text: "ok" }] },
+      isError: false,
+      parentToolCallId: "codemode-1"
+    }));
+    projector.handle(event({ type: "agent_settled" }));
+
+    expect(emitted.at(-1)).toMatchObject({
+      toolCallId: "codemode-1/1",
+      parentToolCallId: "codemode-1",
+      status: "completed"
+    });
+    expect(receipts).toHaveBeenCalledWith({ items: [{
+      toolCallId: "codemode-1/1",
+      toolName: "read",
+      parentToolCallId: "codemode-1",
+      startedAt: 10,
+      completedAt: 10,
+      status: "completed"
+    }] });
+  });
+
   it("records cancellation and exposes receipt persistence failure without raw errors", () => {
     let now = 10;
     const reportReceiptFailure = vi.fn();

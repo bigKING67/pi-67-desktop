@@ -7,6 +7,16 @@ import {
 } from "./envelope.js";
 
 describe("tool execution protocol", () => {
+  it("carries bounded nested identity and native timing without raw child payloads", () => {
+    const value = eventEnvelope("operation.toolExecutionChanged", {
+      operationId: "operation-1",
+      execution: { ...execution(), parentToolCallId: "root", nestedRecord: { complete: false }, timingSource: "pi-result" }
+    }, eventContext());
+    expect(isEventEnvelope(value)).toBe(true);
+    for (const patch of [{ parentToolCallId: "x".repeat(513) }, { nestedRecord: { complete: false, rawCalls: [] } }]) {
+      expect(isEventEnvelope({ ...value, payload: { ...value.payload, execution: { ...value.payload.execution, ...patch } } })).toBe(false);
+    }
+  });
   it("accepts the bounded lifecycle event and rejects raw Tool payloads", () => {
     const value = eventEnvelope("operation.toolExecutionChanged", {
       operationId: "operation-1",

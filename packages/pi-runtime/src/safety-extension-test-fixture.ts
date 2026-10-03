@@ -6,7 +6,7 @@ import {
 } from "./safety-extension.js";
 
 type SafetyHandler = (
-  event: { toolCallId: string; toolName: string; input: Record<string, unknown> },
+  event: { toolCallId: string; toolName: string; parentToolCallId?: string; input: Record<string, unknown> },
   context: { hasUI: boolean; signal?: AbortSignal }
 ) => Promise<{ block?: boolean; reason?: string } | undefined>;
 

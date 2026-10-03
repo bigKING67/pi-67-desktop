@@ -1139,15 +1139,24 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   `xtalpi-pi-tools` remain unmanaged and unbundled. Deduplication never grants
   Tool authority by itself.
 - Pi native MCP is the sole MCP execution path. Direct tools are immediately
-  available; deferred tools are discovered through native `tool_search`. Codemode is
-  not enabled. The retired `mcp` proxy is an invalid route in every safety mode.
+  available; deferred tools are discovered through native `tool_search` or Pi
+  Codemode discovery. Desktop registers Pi's Codemode sandbox as a default tool;
+  explicit user tool lists remain authoritative. Its exact Desktop-owned root is
+  admitted only in trusted Workspaces, including PLAN. Every child independently
+  crosses normal tool validation, safety and one-shot approval; the script never
+  grants blanket permission. Recursive Codemode and forged/ambiguous roots fail
+  closed. Team Chat Agent turns still have no tools. `mode: on` preserves direct
+  tools, `models: false` disables model globals, and `saveOutput: false` disables
+  implicit full-output files. This does not implement automatic model routing or
+  Pi Durable. The retired `mcp` proxy is an invalid route in every safety mode.
   MCP resources and discovery are read-only capabilities. Configured native tools
   retain the installed-capability AUTO grant, but recognized deletion still requires
   exact one-shot confirmation in AUTO and trusted YOLO; PLAN stays read-only.
   Unknown, forged, withdrawn, ambiguous or schema-drifted native bindings fail closed.
   Desktop translates supported legacy direct-tool, exclusion, timeout and bearer
   fields in memory without rewriting user files. Unsupported imports, SSE, disabled
-  OAuth semantics and Codemode configurations produce explicit diagnostics. New
+  OAuth semantics and MCP configurations requesting Codemode-only exposure produce
+  explicit diagnostics. New
   configuration and credential changes remain separate user actions.
   Raw server logging and implicit text/binary result files are disabled through
   the pinned Pi host patch. Large results clearly report truncation without claiming
@@ -1155,6 +1164,12 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   Desktop does not start the native OAuth loopback login flow; `/mcp login` reports
   that limitation. Pending connections and their process trees close before the
   Session shutdown completes. No new transport, loop or Session store is introduced.
+- Codemode child execution identity, status and duration remain visible independently
+  of the root script outcome. On reopen, Desktop projects Pi's bounded native
+  `toolResult.nestedCalls` summaries from JSONL; it does not persist a second copy of
+  raw child output. Missing/unfinished or incomplete records remain explicit. A
+  successful script that catches child failures cannot make those children appear
+  successful. Script `store` values use Pi's own branch-local Session entries.
 - Configured Memory reads and search/list/recall operations are read-only;
   remember/add/learn/propose/flush are non-destructive persistent writes and run
   in AUTO. When Memory, browser67, JS-Reverse, or another Package/MCP source is

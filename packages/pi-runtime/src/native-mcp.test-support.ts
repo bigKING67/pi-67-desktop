@@ -3,16 +3,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   createAgentSessionFromServices, createAgentSessionServices, createMcpExtension,
-  SessionManager, SettingsManager, type AgentSession
+  SessionManager, SettingsManager, type AgentSession, type InlineExtension
 } from "@earendil-works/pi-coding-agent";
 import { createAssistantMessageEventStream, type AssistantMessage, type ToolCall } from "@earendil-works/pi-ai";
-import type { SessionInteractionMode, TaskToolMode } from "@pi67/domain";
+import type { SessionInteractionMode, TaskToolMode, WorkspaceTrust } from "@pi67/domain";
 import type { AgentEvent } from "@pi67/protocol";
 import { expect, vi } from "vitest";
 import { DesktopExtensionUiBridge } from "./extension-ui-bridge.js";
 import { createDesktopNativeMcpExtensions } from "./native-mcp-extension.js";
 import { ConfiguredCapabilityCatalog } from "./configured-capability-catalog.js";
-import { createDesktopSafetyExtension } from "./safety-extension.js";
+import { createDesktopSafetyExtension, type DesktopApprovalRequester } from "./safety-extension.js";
 
 // Synthetic payloads only. This child deliberately waits for transport termination
 // after stdin closes; its descendant exercises the real stdio process-tree cleanup.
@@ -76,12 +76,15 @@ export function isProcessAlive(pid: number): boolean {
 }
 
 export async function createNativeMcpFixture(options: {
-  safety?: { taskToolMode: TaskToolMode; interactionMode?: SessionInteractionMode };
+  safety?: { taskToolMode: TaskToolMode; interactionMode?: SessionInteractionMode; trust?: WorkspaceTrust };
   pendingInitialize?: boolean;
   upstreamDefaults?: boolean;
   exposure?: "direct" | "deferred";
   excludeTools?: string[];
   registeredServer?: boolean;
+  additionalExtensions?: InlineExtension[];
+  defaultTools?: string[];
+  persistSession?: boolean;
 } = {}) {
   const root = await mkdtemp(join(tmpdir(), "pi67-native-mcp-"));
   const agentDir = join(root, "agent");
@@ -98,11 +101,12 @@ export async function createNativeMcpFixture(options: {
       ...(options.excludeTools === undefined ? {} : { excludeTools: options.excludeTools }) }
   } }));
   const settingsManager = SettingsManager.inMemory({
-    compaction: { enabled: false }, retry: { enabled: false }, cacheWarming: "off"
+    compaction: { enabled: false }, retry: { enabled: false }, cacheWarming: "off",
+    ...(options.defaultTools === undefined ? {} : { defaultTools: options.defaultTools })
   });
   const catalog = new ConfiguredCapabilityCatalog({ agentDir, settingsManager });
-  const getSafety = () => ({ cwd: root, trust: "trusted" as const, taskToolMode: options.safety?.taskToolMode ?? "auto" as const });
-  const requestApproval = vi.fn(async () => ({ status: "denied" as const }));
+  const getSafety = () => ({ cwd: root, trust: options.safety?.trust ?? "trusted" as const, taskToolMode: options.safety?.taskToolMode ?? "auto" as const });
+  const requestApproval = vi.fn<DesktopApprovalRequester>(async () => ({ status: "denied" }));
   const uiEvents = vi.fn<(event: AgentEvent) => void>();
   const bridge = new DesktopExtensionUiBridge(uiEvents);
   let session: AgentSession | undefined;
@@ -151,12 +155,17 @@ export async function createNativeMcpFixture(options: {
     if (cleanupErrors.length) throw new AggregateError(cleanupErrors, "Native MCP fixture cleanup failed");
   };
   try {
+    const safetyExtension = createDesktopSafetyExtension(
+      getSafety, requestApproval, undefined, catalog, undefined,
+      () => options.safety?.interactionMode ?? "execute"
+    );
     const services = await createAgentSessionServices({
       cwd: root, agentDir,
       settingsManager,
       resourceLoaderOptions: {
         noExtensions: true, noSkills: true, noPromptTemplates: true, noContextFiles: true,
         extensionFactories: [
+          ...(options.additionalExtensions ?? []),
           ...(options.registeredServer ? [{ name: "synthetic-mcp-registrar", factory: (pi: import("@earendil-works/pi-coding-agent").ExtensionAPI) => {
             pi.registerMcpServer("unadmitted", { command: process.execPath, args: [script, receipt], exposure: "direct" });
           } }] : []),
@@ -166,16 +175,13 @@ export async function createNativeMcpFixture(options: {
               config: { command: process.execPath, args: [script, receipt], exposure: "direct" }
             }] })
           }) }] : createDesktopNativeMcpExtensions({ agentDir, cwd: root, catalog: catalog.nativeMcp, getSafety })),
-          ...(!options.upstreamDefaults ? [createDesktopSafetyExtension(
-            getSafety, requestApproval, undefined, catalog, undefined,
-            () => options.safety?.interactionMode ?? "execute"
-          )] : [])
+          ...(!options.upstreamDefaults ? [safetyExtension] : [])
         ]
       }
     });
     await services.modelRuntime.setRuntimeApiKey("openai", "synthetic-only");
     const created = await createAgentSessionFromServices({
-      services, sessionManager: SessionManager.inMemory(root), model: syntheticModel
+      services, sessionManager: options.persistSession ? SessionManager.create(root, join(root, "sessions")) : SessionManager.inMemory(root), model: syntheticModel
     });
     session = created.session;
     // Retain spill ownership even if a later assertion fails. No user data is used.

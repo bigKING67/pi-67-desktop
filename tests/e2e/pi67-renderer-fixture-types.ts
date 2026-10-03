@@ -1,5 +1,5 @@
 import type { PiProviderConfigurationSnapshot } from "@pi67/protocol";
-import type { ProviderSummary } from "../../packages/domain/src/index.js";
+import type { ProviderSummary, ToolExecutionView } from "../../packages/domain/src/index.js";
 import type {
   ContextFileCatalogResult,
   ExtensionCatalogResult
@@ -24,6 +24,7 @@ export interface FixtureMessage {
     name?: string;
     status?: string;
     summary?: string;
+    execution?: ToolExecutionView;
     plan?: {
       entryId: string;
       planId: string;

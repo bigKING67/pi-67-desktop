@@ -9,6 +9,19 @@ import {
   type ToolExecutionView
 } from "@pi67/domain";
 import { projectToolFailure } from "./tool-execution-projection.js";
+import {
+  collectNestedToolResults,
+  nestedToolResult,
+  rootNestedExecution,
+  type NestedToolProjection,
+  type NestedToolResult
+} from "./nested-tool-projection.js";
+import {
+  isPromptAttachmentMessage,
+  mergePromptAttachments,
+  normalizePromptAttachmentMessage,
+  type NormalizedPromptAttachment
+} from "./message-prompt-attachment-projection.js";
 
 export interface ImageAssetSource {
   stableKey: string;
@@ -27,9 +40,11 @@ export function normalizeMessagesWithAdapters(
   stableIds: readonly string[] = [],
   resolveToolAdapter?: (toolCallId: string) => ExtensionToolAdapterView | undefined,
   projectImageAsset?: ImageAssetProjector,
-  resolveToolExecution?: (toolCallId: string) => ToolExecutionView | undefined
+  resolveToolExecution?: (toolCallId: string) => ToolExecutionView | undefined,
+  resolveNestedTools?: (rootToolCallId: string) => NestedToolProjection | undefined
 ): SessionMessageView[] {
   const toolResultStatuses = collectToolResultStatuses(messages);
+  const nestedToolResults = collectNestedToolResults(messages);
   const normalized: SessionMessageView[] = [];
   let promptAttachments: NormalizedPromptAttachment[] = [];
   for (let index = 0; index < messages.length; index += 1) {
@@ -48,7 +63,8 @@ export function normalizeMessagesWithAdapters(
       resolveToolAdapter,
       projectImageAsset,
       resolveToolExecution,
-      (toolCallId) => toolResultStatuses.get(toolCallId)
+      (toolCallId) => toolResultStatuses.get(toolCallId),
+      (toolCallId) => nestedToolResults.get(toolCallId) ?? nestedToolResult(resolveNestedTools?.(toolCallId))
     );
     if (projected.role === "user" && promptAttachments.length > 0) {
       projected.parts = mergePromptAttachments(projected.parts, promptAttachments);
@@ -79,7 +95,8 @@ function normalizeMessage(
   resolveToolAdapter: ((toolCallId: string) => ExtensionToolAdapterView | undefined) | undefined,
   projectImageAsset: ImageAssetProjector | undefined,
   resolveToolExecution: ((toolCallId: string) => ToolExecutionView | undefined) | undefined,
-  resolveToolStatus: (toolCallId: string) => ToolCallStatus | undefined
+  resolveToolStatus: (toolCallId: string) => ToolCallStatus | undefined,
+  resolveNestedTools: (toolCallId: string) => NestedToolResult | undefined
 ): SessionMessageView {
   const message = asRecord(value);
   const role = normalizeRole(message.role);
@@ -91,7 +108,8 @@ function normalizeMessage(
     resolveToolAdapter,
     projectImageAsset,
     resolveToolExecution,
-    resolveToolStatus
+    resolveToolStatus,
+    resolveNestedTools
   );
   const createdAt = numberValue(message.timestamp) ?? numberValue(message.createdAt);
   const model = stringValue(message.model);
@@ -119,7 +137,8 @@ function normalizeContent(
   resolveToolAdapter: ((toolCallId: string) => ExtensionToolAdapterView | undefined) | undefined,
   projectImageAsset: ImageAssetProjector | undefined,
   resolveToolExecution: ((toolCallId: string) => ToolExecutionView | undefined) | undefined,
-  resolveToolStatus: (toolCallId: string) => ToolCallStatus | undefined
+  resolveToolStatus: (toolCallId: string) => ToolCallStatus | undefined,
+  resolveNestedTools: (toolCallId: string) => NestedToolResult | undefined
 ): MessagePart[] {
   if (typeof content === "string") return [{ type: "text", text: boundedText(content) }];
   if (!Array.isArray(content)) {
@@ -134,16 +153,28 @@ function normalizeContent(
       ...(adapter === undefined ? {} : { adapter })
     }] : [];
   }
-  return content.slice(0, MAX_PROJECTED_MESSAGE_PARTS)
-    .flatMap((part, partIndex) => normalizePart(
+  const inputLimit = Math.min(content.length, MAX_PROJECTED_MESSAGE_PARTS);
+  const parts: MessagePart[] = [];
+  for (let partIndex = 0; partIndex < inputLimit && parts.length < MAX_PROJECTED_MESSAGE_PARTS; partIndex += 1) {
+    const part = content[partIndex];
+    if (part === undefined) continue;
+    // Preserve room for every original part that the historical bounded scan
+    // would have considered. Nested cards must not hide later text or tools.
+    const reservedForFollowingParts = inputLimit - partIndex - 1;
+    const remainingParts = Math.max(1, MAX_PROJECTED_MESSAGE_PARTS - parts.length - reservedForFollowingParts);
+    parts.push(...normalizePart(
       part,
       messageId,
       partIndex,
       resolveToolAdapter,
       projectImageAsset,
       resolveToolExecution,
-      resolveToolStatus
+      resolveToolStatus,
+      resolveNestedTools,
+      remainingParts
     ));
+  }
+  return parts;
 }
 
 function normalizePart(
@@ -153,7 +184,9 @@ function normalizePart(
   resolveToolAdapter: ((toolCallId: string) => ExtensionToolAdapterView | undefined) | undefined,
   projectImageAsset: ImageAssetProjector | undefined,
   resolveToolExecution: ((toolCallId: string) => ToolExecutionView | undefined) | undefined,
-  resolveToolStatus: (toolCallId: string) => ToolCallStatus | undefined
+  resolveToolStatus: (toolCallId: string) => ToolCallStatus | undefined,
+  resolveNestedTools: (toolCallId: string) => NestedToolResult | undefined,
+  remainingParts: number
 ): MessagePart[] {
   const part = asRecord(value);
   const type = stringValue(part.type);
@@ -167,16 +200,51 @@ function normalizePart(
     const summary = part.arguments === undefined ? undefined : summarizeToolArguments(name, part.arguments);
     const toolCallId = stringValue(part.id) ?? `${messageId}:tool:${stableDigest(`${name}:${summary ?? ""}`)}`;
     const adapter = resolveToolAdapter?.(toolCallId);
-    const execution = resolveToolExecution?.(toolCallId);
-    return [{
+    const nested = resolveNestedTools(toolCallId);
+    const childCapacity = Math.max(0, remainingParts - 1);
+    const visibleChildren = nested?.projection?.calls.slice(0, childCapacity) ?? [];
+    const nestedComplete = nested === undefined
+      ? undefined
+      : nested.complete && visibleChildren.length === (nested.projection?.calls.length ?? 0);
+    const resolvedExecution = resolveToolExecution?.(toolCallId);
+    const status = resolvedExecution?.status ?? resolveToolStatus(toolCallId) ?? "unreconciled";
+    const execution = nestedComplete === undefined
+      ? resolvedExecution
+      : {
+          ...(resolvedExecution ?? rootNestedExecution(toolCallId, name, status)),
+          nestedRecord: { complete: nestedComplete }
+        };
+    const root: MessagePart = {
       type: "tool-call",
       id: toolCallId,
       name,
-      status: execution?.status ?? resolveToolStatus(toolCallId) ?? "unreconciled",
+      status,
       ...(summary === undefined ? {} : { summary }),
       ...(execution === undefined ? {} : { execution }),
       ...(adapter === undefined ? {} : { adapter })
-    }];
+    };
+    const children: MessagePart[] = visibleChildren.map((child) => {
+      const resolvedChild = resolveToolExecution?.(child.toolCallId);
+      const parentToolCallId = resolvedChild?.parentToolCallId ?? child.parentToolCallId;
+      const childExecution = resolvedChild === undefined
+        ? child
+        : {
+            ...child,
+            ...resolvedChild,
+            ...(parentToolCallId === undefined ? {} : { parentToolCallId })
+          };
+      const childAdapter = resolveToolAdapter?.(child.toolCallId);
+      return {
+        type: "tool-call",
+        id: child.toolCallId,
+        name: child.toolName,
+        status: childExecution.status,
+        ...(childExecution.inputSummary === undefined ? {} : { summary: childExecution.inputSummary.text }),
+        execution: childExecution,
+        ...(childAdapter === undefined ? {} : { adapter: childAdapter })
+      };
+    });
+    return [root, ...children];
   }
   if (type === "image") {
     const mimeType = stringValue(part.mimeType) ?? "image/png";
@@ -196,79 +264,6 @@ function normalizePart(
   }
   const text = stringValue(part.text);
   return text ? [{ type: "text", text: boundedText(text) }] : [];
-}
-
-interface NormalizedPromptAttachment {
-  id: string;
-  name: string;
-  mimeType: string;
-  byteLength: number;
-  kind: "image" | "document" | "archive" | "audio" | "video" | "file";
-}
-
-function isPromptAttachmentMessage(value: unknown): boolean {
-  const message = asRecord(value);
-  return message.role === "custom"
-    && message.customType === "pi67.desktop-attachments.v1"
-    && message.display === false;
-}
-
-function normalizePromptAttachmentMessage(value: unknown): NormalizedPromptAttachment[] | undefined {
-  const message = asRecord(value);
-  const details = asRecord(message.details);
-  const attachments = details.attachments;
-  if (!Array.isArray(attachments) || attachments.length === 0 || attachments.length > 20) return undefined;
-  const normalized = attachments.map((item) => {
-    const record = asRecord(item);
-    const kind = stringValue(record.kind);
-    const id = stringValue(record.id);
-    const name = stringValue(record.name);
-    const mimeType = stringValue(record.mimeType);
-    const byteLength = numberValue(record.byteLength);
-    if (!id || !/^[A-Za-z0-9_-]{1,128}$/u.test(id)
-      || !name || name.length > 512
-      || !mimeType || mimeType.length > 128
-      || byteLength === undefined || !Number.isSafeInteger(byteLength) || byteLength < 0
-      || !isPromptAttachmentKind(kind)) return undefined;
-    return { id, name, mimeType, byteLength, kind };
-  });
-  return normalized.every((item) => item !== undefined)
-    ? normalized as NormalizedPromptAttachment[]
-    : undefined;
-}
-
-function mergePromptAttachments(
-  parts: readonly MessagePart[],
-  attachments: readonly NormalizedPromptAttachment[]
-): MessagePart[] {
-  const merged = parts.map((part) => ({ ...part }));
-  let imageIndex = 0;
-  for (const attachment of attachments) {
-    if (attachment.kind === "image") {
-      for (; imageIndex < merged.length; imageIndex += 1) {
-        const part = merged[imageIndex];
-        if (part?.type !== "image") continue;
-        if (!part.name) part.name = attachment.name;
-        imageIndex += 1;
-        break;
-      }
-      continue;
-    }
-    merged.push({
-      type: "attachment",
-      id: attachment.id,
-      name: attachment.name,
-      mimeType: attachment.mimeType,
-      byteLength: attachment.byteLength,
-      kind: attachment.kind
-    });
-  }
-  return merged.slice(0, MAX_PROJECTED_MESSAGE_PARTS);
-}
-
-function isPromptAttachmentKind(value: string | undefined): value is NormalizedPromptAttachment["kind"] {
-  return value === "image" || value === "document" || value === "archive"
-    || value === "audio" || value === "video" || value === "file";
 }
 
 type ToolCallStatus = Extract<MessagePart, { type: "tool-call" }>["status"];

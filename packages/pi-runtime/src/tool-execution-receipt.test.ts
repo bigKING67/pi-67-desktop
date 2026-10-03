@@ -7,6 +7,7 @@ describe("tool execution receipt", () => {
       items: [{
         toolCallId: "tool-1",
         toolName: "bash",
+        parentToolCallId: "codemode-1",
         startedAt: 10,
         completedAt: 25,
         status: "failed"
@@ -16,6 +17,7 @@ describe("tool execution receipt", () => {
       items: [{
         toolCallId: "tool-1",
         toolName: "bash",
+        parentToolCallId: "codemode-1",
         startedAt: 10,
         completedAt: 25,
         status: "failed"
@@ -34,6 +36,7 @@ describe("tool execution receipt", () => {
       { toolCallId: "tool-1", toolName: "bash", completedAt: 11, status: "completed" }
     ] },
     { items: [{ toolCallId: "tool-1\n", toolName: "bash", completedAt: 10, status: "completed" }] },
+    { items: [{ toolCallId: "tool-1", toolName: "bash", parentToolCallId: "parent\n", completedAt: 10, status: "completed" }] },
     { items: [{ toolCallId: "tool-1", toolName: "bash", completedAt: 10, status: "completed" }], extra: true }
   ])("rejects malformed or ambiguous receipt data", (value) => {
     expect(parseToolExecutionReceipt(value)).toBeUndefined();

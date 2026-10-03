@@ -68,6 +68,8 @@ export function ToolCard({
 }) {
   const change = useCommittedWorkspaceChange(tool.id);
   const execution = tool.execution;
+  const parentToolCallId = execution?.parentToolCallId;
+  const incompleteChildren = execution?.nestedRecord?.complete === false;
   const projectedTool: ToolCallPart = execution?.inputSummary === undefined
     ? tool
     : { ...tool, summary: execution.inputSummary.text };
@@ -81,7 +83,7 @@ export function ToolCard({
   const toolName = getToolDisplayName(tool.name);
   const effectiveAuthorization = execution?.authorization ?? authorization;
   const { copyState, copyText } = useCopyFeedback({ failureTitle: "工具详情复制失败" });
-  const unsuccessful = effectiveStatus === "failed"
+  const unsuccessful = incompleteChildren || effectiveStatus === "failed"
     || effectiveStatus === "interrupted"
     || effectiveStatus === "cancelled"
     || effectiveStatus === "lost"
@@ -101,6 +103,8 @@ export function ToolCard({
   async function copyDetails() {
     const callText = createToolCopyText({ ...projectedTool, status: effectiveStatus }, presentation);
     const projectedDetails = [
+      parentToolCallId ? `上级调用\n${parentToolCallId}` : undefined,
+      incompleteChildren ? "子调用记录不完整，无法确认所有步骤的结果。" : undefined,
       execution?.progress ? `实时输出\n${execution.progress.text}` : undefined,
       failureMessage ? `失败详情\n${failureMessage}` : undefined
     ].filter((value): value is string => value !== undefined);
@@ -113,6 +117,8 @@ export function ToolCard({
       aria-label={`${presentation.title}，${statusLabel}${effectiveAuthorization ? `，${authorizationLabel(effectiveAuthorization)}` : ""}`}
       data-presenter={presentation.presenterId}
       data-tool-status={effectiveStatus}
+      data-parent-tool-call-id={parentToolCallId}
+      data-nested-incomplete={incompleteChildren || undefined}
       open={open}
       onToggle={(event) => {
         const nextOpen = event.currentTarget.open;
@@ -124,6 +130,7 @@ export function ToolCard({
         <span className={styles.kindIcon} aria-hidden="true"><KindIcon size={15} /></span>
         <div className={styles.identity}>
           <span className={styles.titleRow}>
+            {parentToolCallId ? <span className={styles.childLabel}>子调用</span> : null}
             <strong>{presentation.title}</strong>
           </span>
           <span className={styles.compact}>{presentation.compact}</span>
@@ -151,6 +158,7 @@ export function ToolCard({
               <dt>精确工具</dt>
               <dd><code>{toolName}</code></dd>
             </div>
+            {parentToolCallId ? <div><dt>上级调用</dt><dd><code>{parentToolCallId}</code></dd></div> : null}
             {presentation.details.map((detail, index) => (
               <div key={`${detail.label}:${index}`}>
                 <dt>{detail.label}</dt>
@@ -158,6 +166,8 @@ export function ToolCard({
               </div>
             ))}
           </dl>
+
+          {incompleteChildren ? <p className={styles.warningDetail}>子调用记录不完整，无法确认所有步骤的结果。</p> : null}
 
           {presentation.summary ? (
             <div className={styles.rawSummary}>
@@ -209,6 +219,8 @@ export function ToolCard({
             </div>
           ) : effectiveStatus === "running" || effectiveStatus === "pending" ? (
             <p className={styles.pendingResult}>等待工具返回结果。</p>
+          ) : parentToolCallId && execution?.resultState === "present" ? (
+            <p className={styles.emptyResult}>已记录子调用的执行结果摘要；独立工具输出未保留在会话中。</p>
           ) : (
             <p className={styles.emptyResult}>当前会话记录中尚未找到对应的工具结果。</p>
           )}

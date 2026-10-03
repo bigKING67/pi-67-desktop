@@ -1950,7 +1950,9 @@ Pi 1.0 升级保留现有 Extension 执行方式：
 `DefaultResourceLoader -> jiti.import -> factory(pi) -> ExtensionRunner` 仍在 Agent Host
 utility process 内运行，没有接入独立 Extension executor、Hook/Tool RPC 或 MCP supervisor。
 Desktop 显式注册 Pi 原生 MCP 与 tool-search factory，移除 pi-mcp-adapter 的 bundle、
-启动阶段与代理调用路径；Codemode 保持关闭。原生 MCP 不是第三方 Extension 进程隔离。
+启动阶段与代理调用路径。Desktop 同时注册公开 Codemode factory，固定 `mode: on`、
+`models: false`、`saveOutput: false`，通过公开 `registerTool` 默认工具选项纳入 Pi loadout，
+不覆盖用户显式 Tool 列表。原生 MCP 不是第三方 Extension 进程隔离。
 Pi 1.0.0 使用锁定 pnpm 补丁暴露配置校验、精确注册绑定、日志/输出持久化开关及
 Agent Profile 目录，并修复初始化/工具列举尚未完成时的退出。Desktop 仅消费公开 SDK
 入口，不私有导入、复制 transport 或实现第二个 MCP client/agent loop。
@@ -2534,7 +2536,20 @@ Notification history 已迁移到独立 `notificationStore`，App Store 不再�
   升级若改变顺序必须失败。
 - Pi `1.0.0` 的 canonical built-in 来源为 `builtin:<name>`；Safety、alias routing
   和 attribution 仍校验精确 path/source/scope/origin，不接受旧格式或同名第三方来源。
-  Desktop 显式注册 SDK 的 MCP/tool-search factories；旧 MCP adapter 退役，Codemode 保持未注册。
+  Desktop 显式注册 SDK 的 MCP/tool-search/Codemode factories；旧 MCP adapter 退役。
+  Codemode 仅允许唯一 `<inline:pi67-desktop-codemode>`、inline/temporary/top-level
+  来源的根调用，输入必须是唯一 string `code` 字段。未信任 Workspace、递归、重复或
+  替换身份均拒绝。可信 PLAN 可运行容器，但每个子工具继续经过原有叶子 Safety hook，
+  写入/删除仍被 PLAN 拒绝，AUTO/YOLO 删除仍逐次精确确认，不从容器继承权限。
+  Team Chat toolsDisabled 在容器准入之前拒绝，且不注册该 factory。
+- ToolExecutionView 的可选 `parentToolCallId` 随现有事件/快照传输；根的
+  `nestedRecord.complete` 表达有界记录完整性。live receipt 仅补 identity/status/timing，
+  不保存原始子输入/输出。冷恢复解析 Pi 原生 `toolResult.nestedCalls`，最多 256 calls，
+  经参数/错误脱敏生成子卡，`ok/error/unfinished` 映射为完成/失败/未核对；原生耗时标记
+  `timingSource: pi-result`。畸形、冲突、缺失及 message-part 投影截断不得伪造成功；
+  有记录但不完整时明确标记。Pi 未落入根 Tool Result 时，不从 receipt 推造子结果。
+  原生搜索在 nested `tool_result` 同样落实当前 Provider 的失败边界，不通过 Codemode
+  绕过禁止自动切 Provider/重试的合同。
 - Project trust enables project resources and is distinct from Tool approval.
   An enabled, admitted Package/MCP capability with a unique effective Tool identity
   grants AUTO execution for its registered side effects, except recognized destructive

@@ -125,7 +125,7 @@ describe("Desktop tool routing Extension integration", () => {
     }
   }, 15_000);
 
-  it("loads native discovery while keeping Codemode and disabled MCP servers off across reload", async () => {
+  it("keeps native discovery and requested Codemode active while disabled MCP servers stay off across reload", async () => {
     const fixture = await createFixture("optional-sdk-extensions");
     await writeFile(join(fixture.agentDir, "settings.json"), JSON.stringify({
       defaultTools: ["+codemode", "+tool_search"]
@@ -138,10 +138,12 @@ describe("Desktop tool routing Extension integration", () => {
       for (const reload of [false, true]) {
         if (reload) await session.reload();
         const names = session.getAllTools().map((tool) => tool.name);
-        expect(names).not.toContain("codemode");
+        expect(names).toContain("codemode");
         expect(names).toContain("tool_search");
         expect(names.some((name) => name.startsWith("mcp__"))).toBe(false);
         expect(session.getActiveToolNames()).toContain("read");
+        expect(session.getActiveToolNames()).toContain("codemode");
+        expect(session.getActiveToolNames()).toContain("tool_search");
       }
     } finally {
       bridge.dispose();

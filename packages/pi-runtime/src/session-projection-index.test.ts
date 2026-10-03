@@ -234,6 +234,56 @@ describe("SessionProjectionIndex", () => {
       }
     });
   });
+
+  it("restores bounded Pi nested tools when the root and native result are on adjacent pages", () => {
+    const manager = SessionManager.inMemory("/tmp", { id: "projection-nested-tool-pagination" });
+    const callEntryId = manager.appendMessage(toolCallAssistant("codemode-1", "codemode", 1));
+    const resultEntryId = manager.appendMessage({
+      role: "toolResult",
+      toolCallId: "codemode-1",
+      toolName: "codemode",
+      content: [{ type: "text", text: "done" }],
+      isError: false,
+      nestedCalls: {
+        complete: true,
+        calls: [{ id: "codemode-1/1", name: "read", arguments: { path: "README.md" }, status: "ok", durationMs: 7 }]
+      },
+      timestamp: 2
+    } as never);
+    const projection = new SessionProjectionIndex();
+    projection.bind(manager);
+
+    const page = projectMessagePage(
+      projection,
+      { direction: "older", cursor: resultEntryId, limit: 1 },
+      undefined,
+      undefined,
+      (toolCallId) => projection.getToolExecution(toolCallId),
+      (toolCallId) => projection.getNestedTools(toolCallId)
+    );
+
+    expect(page.messages).toHaveLength(1);
+    expect(page.messages[0]?.id).toBe(callEntryId);
+    expect(page.messages[0]?.parts).toMatchObject([
+      {
+        type: "tool-call",
+        id: "codemode-1",
+        status: "completed",
+        execution: { nestedRecord: { complete: true } }
+      },
+      {
+        type: "tool-call",
+        id: "codemode-1/1",
+        name: "read",
+        status: "completed",
+        execution: {
+          parentToolCallId: "codemode-1",
+          timingSource: "pi-result",
+          durationMs: 7
+        }
+      }
+    ]);
+  });
 });
 
 function appended(manager: SessionManager, id: string): AgentSessionEvent {

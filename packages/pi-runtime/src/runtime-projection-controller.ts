@@ -149,7 +149,8 @@ export class RuntimeProjectionController {
       options,
       (toolCallId) => this.resolveToolAdapter(toolCallId),
       (source) => this.projectImageAsset(source),
-      (toolCallId) => this.session.getToolExecution(toolCallId)
+      (toolCallId) => this.session.getToolExecution(toolCallId),
+      (toolCallId) => this.session.getNestedTools(toolCallId)
     );
   }
 
@@ -201,7 +202,8 @@ export class RuntimeProjectionController {
       { direction: "newer", ...(cursor === undefined ? {} : { cursor }), limit: 100 },
       (toolCallId) => this.resolveToolAdapter(toolCallId),
       (source) => this.projectImageAsset(source),
-      (toolCallId) => this.session.getToolExecution(toolCallId)
+      (toolCallId) => this.session.getToolExecution(toolCallId),
+      (toolCallId) => this.session.getNestedTools(toolCallId)
     );
     if (!page.messages.some((message) => message.id === id)) throw missingMessage();
     return { ...page, anchorId: id, revision: this.session.getRevision() };

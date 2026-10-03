@@ -31,6 +31,8 @@ describe("Desktop Session package trust admission", () => {
     });
     expect(settingsManager.getCacheWarmingMode()).toBe("idle");
     expect(services.settingsManager.getCacheWarmingMode()).toBe("off");
+    expect(services.resourceLoader.getExtensions().extensions.map((entry) => entry.resolvedPath))
+      .toContain("<inline:pi67-desktop-codemode>");
     await services.settingsManager.reload();
     await services.resourceLoader.reload();
     expect(services.settingsManager.getCacheWarmingMode()).toBe("off");

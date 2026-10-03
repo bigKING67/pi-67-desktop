@@ -194,7 +194,8 @@ function projectProcessItems(messages: readonly SessionMessageView[]): Transcrip
 }
 
 export function processItemUnsuccessful(item: TranscriptProcessItem): boolean {
-  if (item.kind === "tool") return isUnsuccessfulToolStatus(item.call.status) || Boolean(item.result?.error);
+  if (item.kind === "tool") return isUnsuccessfulToolStatus(item.call.status)
+    || item.call.execution?.nestedRecord?.complete === false || Boolean(item.result?.error);
   if (item.kind === "orphan-tool-result") return Boolean(item.result.error);
   return false;
 }

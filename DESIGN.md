@@ -467,6 +467,15 @@ loading error where the operation can produce those states
   reopen the durable Tool Result remains authoritative, the receipt only restores
   timing, and a missing result becomes `unreconciled` rather than a fabricated
   success or failure. Renderer time never substitutes for Runtime/receipt time.
+- Nested Tool rows retain the existing compact Tool-card grammar with a quiet
+  `子调用` label and one bounded left guide; expansion shows the exact `上级调用`.
+  Live and reopened rows use the same parent identity. Pi's native nested record
+  supplies result summaries and durations; reopened child rows explicitly say
+  that independent Tool output was not retained. They never fabricate an output
+  body or imply a missing record means success. `子调用记录不完整` opens the root
+  detail and contributes to the process warning/filter, without relabeling a
+  successfully completed root script as failed. Child failures remain independent
+  unsuccessful steps even when the script catches them and returns successfully.
 - A recognized Tool row leads with a human semantic action and one bounded target
   summary. Its exact Tool identifier, response identity, and bounded redacted
   argument projection belong inside the expanded detail rather than competing on

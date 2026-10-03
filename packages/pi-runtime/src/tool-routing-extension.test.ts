@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ToolResultEvent, ToolResultEventResult } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 import {
   createDesktopToolAliasBinding,
@@ -25,8 +25,23 @@ type ToolCallHandler = (event: {
   toolName: string;
   input: Record<string, unknown>;
 }) => { block: true; reason: string } | undefined;
+type ToolResultHandler = (event: ToolResultEvent) => ToolResultEventResult | undefined;
 
 describe("createDesktopToolRoutingExtension", () => {
+  it("retains the selected-provider failure boundary inside Codemode", () => {
+    const handlers = routingHandlers(["web_search", "fetch_content"]);
+    handlers.toolCall({ toolCallId: "script/1", toolName: "web_search", input: { query: "weather" } });
+    expect(handlers.toolResult({
+      type: "tool_result", toolCallId: "script/1", parentToolCallId: "script", toolName: "web_search",
+      input: { query: "weather" }, content: [{ type: "text", text: "Error: synthetic native search failure" }], details: {}, isError: false
+    })).toMatchObject({ isError: true, content: [{ type: "text", text: expect.stringContaining("不要切换 Provider") }] });
+    expect(handlers.toolCall({ toolCallId: "script/2", toolName: "web_search", input: { query: "weather", provider: "other" } }))
+      .toMatchObject({ block: true });
+    expect(handlers.toolCall({ toolCallId: "script/3", toolName: "fetch_content", input: { url: "https://example.test" } }))
+      .toBeUndefined();
+    expect(handlers.toolCall({ toolCallId: "script/4", toolName: "fetch_content", input: { url: "https://example.test/again" } }))
+      .toMatchObject({ block: true });
+  });
   it("adds compact guidance only for executable compatibility aliases", () => {
     const handlers = routingHandlers([
       "Bash",
@@ -331,10 +346,12 @@ function routingHandlers(
   beforeAgentStart: BeforeAgentStartHandler;
   messageEnd: MessageEndHandler;
   toolCall: ToolCallHandler;
+  toolResult: ToolResultHandler;
 } {
   let beforeAgentStart: BeforeAgentStartHandler | undefined;
   let messageEnd: MessageEndHandler | undefined;
   let toolCall: ToolCallHandler | undefined;
+  let toolResult: ToolResultHandler | undefined;
   const api = {
     getActiveTools: () => activeTools,
     getAllTools: () => activeTools.map((name) => ({
@@ -362,11 +379,12 @@ function routingHandlers(
       if (event === "before_agent_start") beforeAgentStart = candidate as BeforeAgentStartHandler;
       if (event === "message_end") messageEnd = candidate as MessageEndHandler;
       if (event === "tool_call") toolCall = candidate as ToolCallHandler;
+      if (event === "tool_result") toolResult = candidate as ToolResultHandler;
     }
   } as unknown as ExtensionAPI;
   const extension = createDesktopToolRoutingExtension();
   if (!("factory" in extension)) throw new Error("Expected the named Desktop tool-routing extension factory.");
   void extension.factory(api);
-  if (!beforeAgentStart || !messageEnd || !toolCall) throw new Error("Desktop tool-routing handlers were not registered.");
-  return { beforeAgentStart, messageEnd, toolCall };
+  if (!beforeAgentStart || !messageEnd || !toolCall || !toolResult) throw new Error("Desktop tool-routing handlers were not registered.");
+  return { beforeAgentStart, messageEnd, toolCall, toolResult };
 }

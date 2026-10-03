@@ -107,6 +107,7 @@ export class ToolExecutionProjector {
       startedAt: this.now(),
       timingSource: "runtime",
       ...projectToolInput(toolName, event.args, this.target.getCwd()),
+      ...(event.parentToolCallId === undefined ? {} : { parentToolCallId: safeToolCallId(event.parentToolCallId) }),
       ...(aliasTarget === undefined ? {} : { aliasTarget }),
       ...(authorization === undefined ? {} : { authorization })
     };
@@ -159,6 +160,9 @@ export class ToolExecutionProjector {
       ...(current?.command === undefined ? {} : { command: current.command }),
       ...(current?.cwd === undefined ? {} : { cwd: current.cwd }),
       ...(current?.progress === undefined ? {} : { progress: current.progress }),
+      ...(current?.parentToolCallId === undefined && event.parentToolCallId === undefined
+        ? {}
+        : { parentToolCallId: current?.parentToolCallId ?? safeToolCallId(event.parentToolCallId!) }),
       ...(event.isError ? { failure: projectToolFailure(event.result, "runtime-event") } : {}),
       ...(aliasTarget === undefined ? {} : { aliasTarget }),
       ...(resolvedAuthorization === undefined ? {} : { authorization: resolvedAuthorization })
@@ -231,6 +235,7 @@ function toReceiptItem(execution: ToolExecutionView & { completedAt: number }): 
   return {
     toolCallId: execution.toolCallId,
     toolName: execution.toolName,
+    ...(execution.parentToolCallId === undefined ? {} : { parentToolCallId: execution.parentToolCallId }),
     ...(execution.startedAt === undefined ? {} : { startedAt: execution.startedAt }),
     completedAt: execution.completedAt,
     status

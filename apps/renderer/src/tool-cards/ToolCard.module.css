@@ -9,6 +9,21 @@
   width: 100%;
 }
 
+.card[data-parent-tool-call-id] {
+  padding-inline-start: 10px;
+  border-inline-start: 1px solid var(--border);
+}
+
+.childLabel {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
+.card[data-nested-incomplete] .status {
+  color: var(--warning);
+}
+
 .header {
   display: grid;
   width: fit-content;

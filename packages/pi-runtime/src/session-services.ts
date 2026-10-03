@@ -39,6 +39,7 @@ import { bindPrivateMemoryCommitBus } from "./private-memory-commit.js";
 import { createSharedHistoryTransitionExtension } from "./shared-history-transition-extension.js";
 import { createAgentTurnSystemPromptExtension } from "./agent-turn-profile.js";
 import { createDesktopNativeMcpExtensions } from "./native-mcp-extension.js";
+import { createDesktopCodemodeExtension } from "./codemode-extension.js";
 
 interface DesktopSessionServicesOptions {
   localMemory?: LocalMemoryAccess;
@@ -139,6 +140,7 @@ export async function createDesktopSessionServices(
           cwd: options.cwd, agentDir: options.agentDir,
           catalog: configuredCapabilities.nativeMcp, getSafety: options.getSafety
         })),
+        ...(agentTurn ? [] : [createDesktopCodemodeExtension(() => settingsManager.getDefaultTools())]),
         createDesktopToolRoutingExtension(),
         ...(options.promptAttachmentAccess === undefined
           ? []

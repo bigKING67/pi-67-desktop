@@ -44,7 +44,14 @@ export function projectSessionSnapshot(
   projectImageAsset?: ImageAssetProjector
 ): SessionSnapshot {
   const stats = projection.getStats(session);
-  const messagePage = projectMessagePage(projection, {}, resolveToolAdapter, projectImageAsset);
+  const messagePage = projectMessagePage(
+    projection,
+    {},
+    resolveToolAdapter,
+    projectImageAsset,
+    (toolCallId) => projection.getToolExecution(toolCallId),
+    (toolCallId) => projection.getNestedTools(toolCallId)
+  );
   const controls = projectSessionControls(session);
   const modelCatalog = projectSessionModelCatalog(session);
   const resourceCatalog = projectSessionResourceCatalog(services, extensionsResult);

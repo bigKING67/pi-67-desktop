@@ -5,6 +5,27 @@ import { describe, expect, it } from "vitest";
 import { ToolCard } from "./ToolCard.js";
 
 describe("ToolCard", () => {
+  it("shows nested identity and the persisted-summary boundary", () => {
+    const html = renderToStaticMarkup(createElement(ToolCard, { tool: tool({ status: "failed", execution: {
+      toolCallId: "root/1", parentToolCallId: "root", toolName: "bash", toolKind: "shell",
+      status: "failed", projectionSource: "durable", resultState: "present"
+    } }) }));
+    expect(html).toContain('data-parent-tool-call-id="root"');
+    expect(html).toContain("子调用");
+    expect(html).toContain("上级调用");
+    expect(html).toContain("独立工具输出未保留在会话中");
+  });
+
+  it("opens incomplete nested records without claiming the script failed", () => {
+    const html = renderToStaticMarkup(createElement(ToolCard, { tool: tool({ name: "codemode", execution: {
+      toolCallId: "root", toolName: "codemode", toolKind: "generic", status: "completed",
+      projectionSource: "durable", resultState: "present", nestedRecord: { complete: false }
+    } }) }));
+    expect(html).toContain('data-nested-incomplete="true"');
+    expect(html).toContain('data-tool-status="completed"');
+    expect(html).toContain("子调用记录不完整");
+    expect(html).toContain('open=""');
+  });
   it("shows projected command lifecycle metadata and the real failure", () => {
     const html = renderToStaticMarkup(createElement(ToolCard, { tool: tool({
       status: "failed",

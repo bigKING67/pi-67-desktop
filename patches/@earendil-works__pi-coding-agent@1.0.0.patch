@@ -1,5 +1,81 @@
+diff --git a/dist/extensions/codemode/execute.js b/dist/extensions/codemode/execute.js
+index b75b6801fa46363a948d8bb61b4aac248b6bcec5..06a16faa25ca6c5bae2118f8d6b6d9fbfcd378ac 100644
+--- a/dist/extensions/codemode/execute.js
++++ b/dist/extensions/codemode/execute.js
+@@ -223,9 +223,9 @@ async function spillOutput(text) {
+ /**
+  * Apply the token budget: when the combined text exceeds it, the text items become one
+  * item that keeps the start and end of the text, and images follow it. The full text is written to
+- * a temp file.
++ * a temp file unless the host disabled output persistence.
+  */
+-async function truncateOutput(items, maxTokens) {
++async function truncateOutput(items, maxTokens, saveOutput = true) {
+     const texts = items.filter((item) => item.type === "text").map((item) => item.text);
+     const combined = texts.join("\n");
+     const budget = maxTokens * CHARS_PER_TOKEN;
+@@ -237,6 +237,12 @@ async function truncateOutput(items, maxTokens) {
+     const head = combined.slice(0, headChars);
+     const tail = tailChars > 0 ? combined.slice(-tailChars) : "";
+     let text = `Warning: truncated output (original token count: ${Math.ceil(combined.length / CHARS_PER_TOKEN)})\nTotal output lines: ${combined.split("\n").length}\n\n${head}…${Math.ceil(removed / CHARS_PER_TOKEN)} tokens truncated…${tail}`;
++    if (!saveOutput) {
++        text += "\n\n[Full output was not saved by host policy.]";
++        return {
++            items: [{ type: "text", text }, ...items.filter((item) => item.type === "image")],
++        };
++    }
+     const spilled = await spillOutput(combined);
+     text +=
+         "path" in spilled
+@@ -360,7 +366,7 @@ export async function executeCodemode(toolCallId, input, signal, onUpdate, ctx,
+             text: `Note: models.generateImages() returned ${generatedImages} image${generatedImages === 1 ? "" : "s"} that the script did not show. Show each image block of result.output with image(block).`,
+         });
+     }
+-    const truncated = await truncateOutput(items, sourceOptions.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS);
++    const truncated = await truncateOutput(items, sourceOptions.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS, options.saveOutput ?? true);
+     const wallTime = ((performance.now() - startedAt) / 1000).toFixed(1);
+     const header = `${result.ok ? "Script completed" : "Script failed"}\nWall time ${wallTime} seconds\nOutput:\n`;
+     const details = snapshot();
+diff --git a/dist/extensions/codemode/index.d.ts b/dist/extensions/codemode/index.d.ts
+index 7de9c24e9d7ac437265eeb911ca9c841b36dca9f..f0ae1b450359d5b7888290e48845904173fc65bc 100644
+--- a/dist/extensions/codemode/index.d.ts
++++ b/dist/extensions/codemode/index.d.ts
+@@ -14,6 +14,8 @@ export interface CodemodeExtensionOptions {
+     inlineBudget?: number;
+     /** Expose the model catalog and classifiers to scripts as `models`. Default: `true`. */
+     models?: boolean;
++    /** Save full text output to a temporary file when it is truncated. Default: `true`. */
++    saveOutput?: boolean;
+ }
+ export declare function createCodemodeExtension(options?: CodemodeExtensionOptions): ExtensionFactory;
+ declare const _default: ExtensionFactory;
+diff --git a/dist/extensions/codemode/index.js b/dist/extensions/codemode/index.js
+index a810a29c7ae7c7626e92edbfc8a2cac419c2befc..0c87d1149d430f61203665ec454150dc945fcfb4 100644
+--- a/dist/extensions/codemode/index.js
++++ b/dist/extensions/codemode/index.js
+@@ -22,6 +22,7 @@ export function createCodemodeExtension(options = {}) {
+                 getToolNamespace: (name) => pi.getAllTools().find((tool) => tool.name === name)?.namespace,
+                 getMode: () => options.mode ?? readMode(pi),
+                 getInlineBudget: () => options.inlineBudget ?? readInlineBudget(pi),
++                saveOutput: options.saveOutput,
+             }),
+             defaultActive: false,
+         });
+diff --git a/dist/extensions/codemode/tool.d.ts b/dist/extensions/codemode/tool.d.ts
+index 705ca75a77efef84a60e848bc33c293fedd54ceb..1cf216641e905cbf9ce25277c2fd327536d99ec1 100644
+--- a/dist/extensions/codemode/tool.d.ts
++++ b/dist/extensions/codemode/tool.d.ts
+@@ -52,6 +52,8 @@ export interface CodemodeToolOptions {
+     getMode?: () => CodemodeMode;
+     /** Token budget for tool declarations in the description. Default: {@link DEFAULT_CODEMODE_INLINE_BUDGET}. */
+     getInlineBudget?: () => number | undefined;
++    /** Save full text output to a temporary file when it is truncated. Default: `true`. */
++    saveOutput?: boolean;
+ }
+ export declare const codemodeSchema: Type.TObject<{
+     code: Type.TString;
 diff --git a/dist/extensions/mcp/index.d.ts b/dist/extensions/mcp/index.d.ts
-index 5c39af8..a929c53 100644
+index 5c39af847eee2489421b3ee12edeb52bee408e92..a929c53667f30ea99f5aa9d1012a5f36f5e4b2d9 100644
 --- a/dist/extensions/mcp/index.d.ts
 +++ b/dist/extensions/mcp/index.d.ts
 @@ -26,11 +26,29 @@
@@ -49,7 +125,7 @@ index 5c39af8..a929c53 100644
      openUrl?: (url: string) => void;
      /** Saves `/mcp` changes to the server's config file. Defaults to editing its `mcp.json`. */
 diff --git a/dist/extensions/mcp/index.js b/dist/extensions/mcp/index.js
-index fbbb30c..93015b3 100644
+index fbbb30c87e610b98ffbe47fa71f93dbc3bd0bc45..93015b316abbf2a910f34675c3aaef7afab602c0 100644
 --- a/dist/extensions/mcp/index.js
 +++ b/dist/extensions/mcp/index.js
 @@ -28,6 +28,7 @@
@@ -265,7 +341,7 @@ index fbbb30c..93015b3 100644
  //# sourceMappingURL=index.js.map
 \ No newline at end of file
 diff --git a/dist/extensions/mcp/resources.d.ts b/dist/extensions/mcp/resources.d.ts
-index e0d8d9d..9ac0948 100644
+index e0d8d9d265ff9266dd730cb6a16b36277e7cd215..9ac0948d5e5241df0472c84d38eff1d6980198e9 100644
 --- a/dist/extensions/mcp/resources.d.ts
 +++ b/dist/extensions/mcp/resources.d.ts
 @@ -13,7 +13,7 @@ import type { ListResourcesResult, ListResourceTemplatesResult, McpRequestOption
@@ -287,7 +363,7 @@ index e0d8d9d..9ac0948 100644
  //# sourceMappingURL=resources.d.ts.map
 \ No newline at end of file
 diff --git a/dist/extensions/mcp/resources.js b/dist/extensions/mcp/resources.js
-index a1afa87..4d59cd7 100644
+index a1afa8795f94d8f2d2241859c7c1f9e8538a39c9..4d59cd753322d49066e8049edae1eba64b669f08 100644
 --- a/dist/extensions/mcp/resources.js
 +++ b/dist/extensions/mcp/resources.js
 @@ -139,8 +139,8 @@ function stringArgument(params, key) {
@@ -331,7 +407,7 @@ index a1afa87..4d59cd7 100644
              return {
                  content,
 diff --git a/dist/extensions/mcp/runtime.d.ts b/dist/extensions/mcp/runtime.d.ts
-index 3ac39f5..2ba6d48 100644
+index 3ac39f55c66f2134d71d187537717dda2501a06c..2ba6d48947db99682518f66b1b527c0db1326daa 100644
 --- a/dist/extensions/mcp/runtime.d.ts
 +++ b/dist/extensions/mcp/runtime.d.ts
 @@ -38,6 +38,7 @@ export declare class McpServerConnection implements McpToolCaller, McpResourceSe
@@ -343,7 +419,7 @@ index 3ac39f5..2ba6d48 100644
      /** Stderr of the last stdio server that failed to connect. */
      private stderrTail;
 diff --git a/dist/extensions/mcp/runtime.js b/dist/extensions/mcp/runtime.js
-index 2b76745..50a2a5d 100644
+index 2b767459cdc79eb664e89595d0ea1a133486fab7..50a2a5d4c74486bce58a4f87cfedd68dc5e76080 100644
 --- a/dist/extensions/mcp/runtime.js
 +++ b/dist/extensions/mcp/runtime.js
 @@ -116,6 +116,7 @@ export class McpServerConnection {
@@ -397,7 +473,7 @@ index 2b76745..50a2a5d 100644
          // new tokens are saved would lose the grant.
          await this.authProvider?.settled();
 diff --git a/dist/extensions/mcp/tools.d.ts b/dist/extensions/mcp/tools.d.ts
-index aaab8f2..0cafe93 100644
+index aaab8f2f93f4982ac047565a802871e858f1f806..0cafe93210a47e0804a66cf06a22b9aeb97754b3 100644
 --- a/dist/extensions/mcp/tools.d.ts
 +++ b/dist/extensions/mcp/tools.d.ts
 @@ -56,13 +56,13 @@ export declare function createMcpResultSchema(structuredContentSchema: Record<st
@@ -426,7 +502,7 @@ index aaab8f2..0cafe93 100644
  //# sourceMappingURL=tools.d.ts.map
 \ No newline at end of file
 diff --git a/dist/extensions/mcp/tools.js b/dist/extensions/mcp/tools.js
-index bbc1edd..f3ffa99 100644
+index bbc1eddd9d96e35f213339f9e930c9928b1b08ce..f3ffa990053ad0526350aeaea0fc10a57efe915b 100644
 --- a/dist/extensions/mcp/tools.js
 +++ b/dist/extensions/mcp/tools.js
 @@ -87,12 +87,17 @@ export async function limitMcpContent(content, saveOutput = saveToTempFile) {
@@ -475,7 +551,7 @@ index bbc1edd..f3ffa99 100644
      };
  }
 diff --git a/dist/index.d.ts b/dist/index.d.ts
-index eda1c08..5067097 100644
+index eda1c0822e3dc7830fb5e3835690afe56b59017a..5067097a3cb8e890ebf5c8eae7d63709dc8d3bac 100644
 --- a/dist/index.d.ts
 +++ b/dist/index.d.ts
 @@ -26,6 +26,7 @@ export { type EditDiffResult, generateDiffString, generateUnifiedPatch } from ".
@@ -487,7 +563,7 @@ index eda1c08..5067097 100644
  export type { CodemodeStoreEntryData, CodemodeToolDetails } from "./extensions/codemode/tool.ts";
  export type { LoadedMcpConfig, McpExposure, McpServerConfig, McpServerEntry } from "./extensions/mcp/config.ts";
 diff --git a/dist/index.js b/dist/index.js
-index c48934f..b69e55a 100644
+index c48934f78d61fd5f5f8008bc9e09d8c4558d330a..b69e55a29133e89c5356f68b292428bc7c974cf5 100644
 --- a/dist/index.js
 +++ b/dist/index.js
 @@ -30,6 +30,7 @@ export { generateDiffString, generateUnifiedPatch } from "./core/tools/edit-diff

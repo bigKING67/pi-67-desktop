@@ -19,6 +19,7 @@ import {
   normalizeMessagesWithAdapters,
   type ImageAssetProjector
 } from "./message-normalizer.js";
+import type { NestedToolProjection } from "./nested-tool-projection.js";
 import {
   PLAN_DECISION_ENTRY_TYPE,
   PLAN_IMPLEMENTATION_ENTRY_TYPE,
@@ -48,7 +49,8 @@ export function projectMessagePage(
   options: MessagePageOptions = {},
   resolveToolAdapter?: (toolCallId: string) => ExtensionToolAdapterView | undefined,
   projectImageAsset?: ImageAssetProjector,
-  resolveToolExecution?: (toolCallId: string) => ToolExecutionView | undefined
+  resolveToolExecution?: (toolCallId: string) => ToolExecutionView | undefined,
+  resolveNestedTools?: (rootToolCallId: string) => NestedToolProjection | undefined
 ): ConversationPage {
   const entries = sessionManager.getBranch();
   const planStatuses = projectPlanProposalStatuses(entries);
@@ -98,7 +100,8 @@ export function projectMessagePage(
     contextRecords.map((record) => record.id),
     resolveToolAdapter,
     projectImageAsset,
-    resolveToolExecution
+    resolveToolExecution,
+    resolveNestedTools
   );
   let normalizedIndex = 0;
   const normalized = collectedPage.map((record) => (

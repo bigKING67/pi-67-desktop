@@ -36,6 +36,8 @@ export interface ToolExecutionFailureView {
 
 export interface ToolExecutionView {
   toolCallId: string;
+  parentToolCallId?: string;
+  nestedRecord?: { complete: boolean };
   toolName: string;
   toolKind: ToolPresentationKind;
   status: ToolExecutionStatus;
@@ -49,7 +51,7 @@ export interface ToolExecutionView {
   startedAt?: number;
   completedAt?: number;
   durationMs?: number;
-  timingSource?: "runtime" | "receipt";
+  timingSource?: "runtime" | "receipt" | "pi-result";
   aliasTarget?: string;
   authorization?: ToolAuthorizationProjection;
 }
