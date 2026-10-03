@@ -7,6 +7,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { createAssistantMessageEventStream, type AssistantMessage, type ToolCall } from "@earendil-works/pi-ai";
 import type { SessionInteractionMode, TaskToolMode } from "@pi67/domain";
+import type { AgentEvent } from "@pi67/protocol";
 import { expect, vi } from "vitest";
 import { DesktopExtensionUiBridge } from "./extension-ui-bridge.js";
 import { createDesktopNativeMcpExtensions } from "./native-mcp-extension.js";
@@ -102,7 +103,7 @@ export async function createNativeMcpFixture(options: {
   const catalog = new ConfiguredCapabilityCatalog({ agentDir, settingsManager });
   const getSafety = () => ({ cwd: root, trust: "trusted" as const, taskToolMode: options.safety?.taskToolMode ?? "auto" as const });
   const requestApproval = vi.fn(async () => ({ status: "denied" as const }));
-  const uiEvents = vi.fn();
+  const uiEvents = vi.fn<(event: AgentEvent) => void>();
   const bridge = new DesktopExtensionUiBridge(uiEvents);
   let session: AgentSession | undefined;
   const spilledFiles = new Set<string>();
