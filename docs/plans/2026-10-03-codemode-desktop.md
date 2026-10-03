@@ -12,14 +12,19 @@ and complete local implementation, source validation and macOS packaged preview.
 Use Pi's public Codemode factory and execution pipeline as the only authority.
 After local acceptance, the user explicitly authorized a scoped local commit of
 this implementation, tests, patch and documentation. Push remains outside scope.
+The user subsequently authorized isolated synthetic live-model acceptance using
+`deepseek/deepseek-flash`, then continued to the packaged acceptance gap. Each
+follow-up live run was capped at two requests, 1,024 output tokens per request,
+with immediate stop on failure and redacted receipts only.
 
 ## Delivery boundary and non-goals
 
 - Implement exact root admission, host-controlled output persistence and bounded
   parent/child live and restored projections with existing tool-card UI.
 - Keep `models: false`, direct native tools available and Pi JSONL authoritative.
-- No automatic model routing, Pi Durable service, paid model calls, user profile
-  mutation, push, upload, remote CI dispatch or publication.
+- No automatic model routing, Pi Durable service, user profile mutation, push,
+  upload, remote CI dispatch or publication. Paid requests are limited to the
+  separately authorized synthetic acceptance above.
 - Windows source compatibility is required; real Windows/package acceptance is
   unverified locally and must not be inferred from macOS or source tests.
 
@@ -114,5 +119,37 @@ retention and preview lifecycle follow the release operation contract.
   previously tested dirty preview retains its original artifact identity;
   committing source does not retroactively certify an exact-SHA candidate.
   No push, upload or publication is authorized by this local closeout.
-- Model-choice behavior, paid Providers and Windows remain unverified. Pi Durable
-  and automatic model routing are not implemented or enabled in this change.
+- Source SDK live-model acceptance PASS at
+  `7926a5ddab2de1d9fcf31b98a5a6f66acd194fd8`: DeepSeek generated its own script for
+  the explicitly requested Codemode task, completed two synthetic file reads and
+  one native MCP echo, then returned all expected markers. Two HTTP 200 requests,
+  384 output tokens total, all ten acceptance checks and owned cleanup passed.
+  Receipt: `artifacts/validation/codemode-live-20261003/receipt-v2.json`.
+- The first live attempt failed before any nested call. Its receipt is retained
+  as `receipt.json` in the same directory; insufficient error metadata prevents
+  a conclusive root cause. The probe's PLAN setup separately reproduced a native
+  MCP rejection. Corrected the probe to AUTO with only synthetic read/echo tools,
+  preserved the native SDK stream wrapper, and added redacted diagnostics and
+  six passing offline checks for decoding, error classes, privacy and budget.
+  These are probe changes; no product runtime change was required for the pass.
+- Packaged macOS live-model acceptance PASS on the same alpha.43 app.asar above:
+  isolated Electron UI submission, actual Agent Host / native Pi provider,
+  model-generated Codemode, two file reads, native MCP echo, three completed child
+  cards, complete native JSONL nested calls and cold UI recovery. Two HTTP 200
+  requests produced 338 output tokens; cold recovery made no extra requests.
+  Receipt and reviewed live/cold screenshots:
+  `artifacts/validation/codemode-live-20261003/packaged-live-f772544c-ba18-408a-b4d0-b9fe6b1f5ff4/`.
+  Owned application and native MCP descendants stopped, temporary profile and its
+  credential copy removed, original user preview PID 78378 remained running.
+- Packaged preflight initially failed before model execution. The probe now obtains
+  the native Provider from the session's public `modelRegistry.getProvider` seam,
+  with budget enforcement around its original stream. Offline UI/JSONL/cold
+  recovery then passed before the live run. Initial preflight receipts remain
+  under `packaged-offline-cea7d89f-ed9d-46c4-8a88-0b50914ff68d` and
+  `packaged-offline-a4ba6a4f-4c99-42f6-83b0-4c59d2516aa1`; passing preflight is
+  `packaged-offline-d8d9ec73-aec2-457e-98cc-d478dc3f465e`, all in that validation directory.
+- These passes verify one explicit synthetic task with a real model through both
+  source SDK and packaged macOS. They do not prove autonomous tool choice, broad
+  model reliability, or normal-profile real-provider behavior. The tested package
+  retains its original dirty-build identity. Windows remains unverified. Pi Durable
+  and automatic model routing are not implemented or enabled.
