@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Model } from "@earendil-works/pi-ai";
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { ExtensionToolContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { deepSeekNativeSearchEndpoint, grolandNativeSearchApi } from "@pi67/domain";
 import {
   type DeepSeekWebSearchState,
@@ -25,6 +25,17 @@ import {
 } from "./first-party-web-tool-contract.js";
 
 const MAX_CACHE_ENTRIES = 32;
+
+function dispatchedToolModel(context: ExtensionToolContext): Model<any> | undefined {
+  if (context.model?.api !== "pi-virtual") return context.model;
+  const response = context.sessionManager.getBranch().findLast((entry) => (
+    entry.type === "message" && entry.message.role === "assistant"
+      && entry.message.stopReason !== "error" && entry.message.stopReason !== "aborted"
+  ));
+  if (response?.type !== "message" || response.message.role !== "assistant") return undefined;
+  const model = context.modelRegistry.find(response.message.provider, response.message.model);
+  return model?.api === "pi-virtual" ? undefined : model;
+}
 
 export type { SearchToolDetails } from "./first-party-web-tool-contract.js";
 
@@ -102,7 +113,7 @@ export function createFirstPartyWebTools(
     executionMode: "parallel",
     async execute(_toolCallId, rawInput, signal, onUpdate, ctx) {
       const request = normalizeSearchRequest(rawInput);
-      const model = ctx.model;
+      const model = dispatchedToolModel(ctx);
       const route = model ? resolveNativeSearchRoute(model) : undefined;
       if (!model || !route) {
         throw new Error(

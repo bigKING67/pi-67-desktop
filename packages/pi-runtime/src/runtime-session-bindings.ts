@@ -1,13 +1,9 @@
 import {
-  AgentSessionRuntime,
-  createAgentSession,
-  createAgentSessionFromServices,
-  type AgentSession,
-  type AgentSessionServices,
+  AgentSessionRuntime, createAgentSession, createAgentSessionFromServices,
+  type AgentSession, type AgentSessionServices,
   type CreateAgentSessionRuntimeFactory,
   type LoadExtensionsResult,
-  type SessionManager,
-  type SettingsManager
+  type SessionManager, type SettingsManager
 } from "@earendil-works/pi-coding-agent";
 import { realpath, stat, writeFile } from "node:fs/promises";
 import {
@@ -48,6 +44,7 @@ import type { SharedSopAccess } from "./shared-sop-tools.js";
 import { createSessionSharedKnowledgeTools } from "./session-shared-knowledge-tools.js";
 import { initializePrivateMemoryProvenance, assertPrivateMemoryProvenance } from "./session-memory-provenance.js";
 import { bindSharedHistoryModelGuard } from "./shared-history-model-guard.js";
+import { bindDesktopAutoRouting } from "./auto-routing.js";
 import type { LocalMemoryAccess } from "./local-memory-extension-bridge.js";
 import { requestPrivateMemoryCommit, inspectPrivateMemorySession } from "./private-memory-commit.js";
 const DESKTOP_EXCLUDED_SDK_TOOLS = ["powershell"];
@@ -373,6 +370,8 @@ export class RuntimeSessionBindings {
   }
 
   private async bindSession(session: AgentSession): Promise<void> {
+    if (!this.options.getSafety().toolsDisabled) await bindDesktopAutoRouting(session,
+      (entry) => { if (this.session === session) this.options.projections.observe(session, { type: "entry_appended", entry }); });
     bindSharedHistoryModelGuard(session, this.options);
     initializePrivateMemoryProvenance(session.sessionManager);
     await this.materializeSession(session.sessionManager);

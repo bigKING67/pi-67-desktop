@@ -41,6 +41,7 @@ export function handleConnected(
 ): void {
   const state = get();
   const previousHostEpoch = state.hostEpoch;
+  if (previousHostEpoch !== identity.hostEpoch) rememberTaskHostOwnership(state);
   const shouldRecover = Boolean(
     state.workspace
     && previousHostEpoch !== undefined
@@ -155,6 +156,7 @@ function isCurrentConnection(state: AppState, identity: AgentConnectionIdentity)
 
 export function handleTeardown(get: StoreGet, set: StoreSet, error: Error): void {
   const current = get();
+  rememberTaskHostOwnership(current);
   const workspace = current.workspace;
   const revision = beginRendererConnectionLoss(current);
   rendererReadQueryClient.disconnect();
@@ -231,6 +233,7 @@ function matchesProjectionAuthority(
 
 export function handleHostFailure(get: StoreGet, set: StoreSet, state: HostFailure): void {
   const deterministicStartupFailure = observeAgentHostFailure(state);
+  rememberTaskHostOwnership(get());
   rendererReadQueryClient.disconnect();
   prepareRendererHostReplacement();
   useShellStore.getState().closeRuntimeBoundDialogs();
@@ -261,4 +264,20 @@ export function handleHostFailure(get: StoreGet, set: StoreSet, state: HostFailu
       ? messages.runtime.connection.hostStartupFailedDetail
       : messages.credentials.clearedAfterHostReplacement
   });
+}
+
+function rememberTaskHostOwnership(state: AppState): void {
+  if (state.hostEpoch === undefined) return;
+  const workbench = rendererWorkbenchStore.getState();
+  for (const task of Object.values(workbench.tasks)) {
+    if (task.sessionGeneration === undefined
+      || task.recoveryHostEpoch !== undefined
+      || task.recoveryHostInstanceId !== undefined) continue;
+    // Live Tasks normally use the current connection implicitly. Retain that
+    // ownership before losing it, so a new Host cannot inherit an old generation.
+    workbench.updateTask(task.id, {
+      recoveryHostInstanceId: state.connectionIdentity?.hostInstanceId,
+      recoveryHostEpoch: state.hostEpoch
+    });
+  }
 }

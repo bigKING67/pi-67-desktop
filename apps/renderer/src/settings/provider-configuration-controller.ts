@@ -195,6 +195,15 @@ export async function setDefaultModelConfiguration(
   }, "Pi 项目默认模型已更新");
 }
 
+export async function setGlobalAutoRoutingConfiguration(
+  expectedRevision: string,
+  selection?: import("@pi67/protocol").PiAutoRoutingSelection
+): Promise<boolean> {
+  if (useProviderConfigurationStore.getState().workspaceId !== GLOBAL_PROVIDER_CONFIGURATION_KEY) return false;
+  return mutateGlobal("model.routing.global.set", { expectedRevision, ...(selection ? { selection } : {}) },
+    selection ? "Auto 配置已保存，请在对话中选择 Auto" : "Auto 已关闭，请选择具体模型继续");
+}
+
 export async function setGlobalVisionAssistantConfiguration(
   selection: { provider: string; model: string } | undefined
 ): Promise<boolean> {
@@ -373,6 +382,7 @@ type GlobalConfigurationMutationType = Extract<AgentCommandType,
   | "provider.credential.store"
   | "provider.credential.remove"
   | "model.default.set"
+  | "model.routing.global.set"
   | "vision.assistant.global.set">;
 type ProjectConfigurationMutationType = Extract<AgentCommandType,
   | "model.projectDefault.set"

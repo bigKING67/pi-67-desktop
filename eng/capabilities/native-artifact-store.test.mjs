@@ -114,12 +114,15 @@ describe("native artifact bounded lifecycle", () => {
   });
 
   it("never follows a replaced payload symlink during retirement", async () => {
-    const { run } = await fixture();
-    const first = await run(1); await run(2);
+    const { parent, run } = await fixture();
+    await run(1); await run(2);
+    // Equal millisecond timestamps are ordered by path, not creation call order.
+    const [victim] = await inspectNativeArtifacts(parent);
+    expect(victim).toBeDefined();
     const outside = await mkdtemp(join(tmpdir(), "native-protected-")); roots.push(outside);
     await writeFile(join(outside, "keep"), "protected");
-    await rm(join(first.path, "runtime"), { recursive: true });
-    await symlink(outside, join(first.path, "runtime"));
+    await rm(join(victim.path, "runtime"), { recursive: true });
+    await symlink(outside, join(victim.path, "runtime"));
     await expect(run(3)).rejects.toThrow("Unsafe native artifact payload");
     expect(await readFile(join(outside, "keep"), "utf8")).toBe("protected");
   });

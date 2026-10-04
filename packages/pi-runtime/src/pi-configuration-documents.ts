@@ -1,3 +1,5 @@
+import { parseAutoRoutingSelection } from "./auto-routing-settings.js";
+export { parseAutoRoutingSelection } from "./auto-routing-settings.js";
 import {
   applyEdits,
   modify,
@@ -9,6 +11,7 @@ import {
 import type { ProviderSummary } from "@pi67/domain";
 import type {
   PiConfigurationHeaderMutation,
+  PiAutoRoutingSelection,
   PiDefaultModelSelection,
   PiModelConfigurationInput,
   PiModelConfigurationView,
@@ -28,6 +31,7 @@ export interface ParsedSettingsDocument {
   root: JsonObject;
   selection?: PiDefaultModelSelection;
   visionAssistant?: PiVisionAssistantOverride;
+  autoRouting?: PiAutoRoutingSelection;
 }
 
 export interface RuntimeModelConfigurationProjection {
@@ -73,10 +77,12 @@ export function parseSettingsDocument(content: string | undefined): ParsedSettin
   const model = optionalString(parsed.defaultModel);
   const pi67Desktop = isPlainObject(parsed.pi67Desktop) ? parsed.pi67Desktop : undefined;
   const visionAssistant = parseVisionAssistant(pi67Desktop?.visionAssistant);
+  const autoRouting = parseAutoRoutingSelection(pi67Desktop?.autoRouting);
   return {
     root: parsed,
     ...(provider && model ? { selection: { provider, model } } : {}),
-    ...(visionAssistant ? { visionAssistant } : {})
+    ...(visionAssistant ? { visionAssistant } : {}),
+    ...(autoRouting ? { autoRouting } : {})
   };
 }
 
@@ -170,6 +176,15 @@ export function setVisionAssistantDocument(
   const source = content ?? "{}\n";
   parseSettingsDocument(source);
   return editJsonc(source, ["pi67Desktop", "visionAssistant"], value);
+}
+
+export function setAutoRoutingDocument(
+  content: string | undefined,
+  selection: PiAutoRoutingSelection | undefined
+): string {
+  const source = content ?? "{}\n";
+  parseSettingsDocument(source);
+  return editJsonc(source, ["pi67Desktop", "autoRouting"], selection);
 }
 
 function projectProvider(
@@ -427,6 +442,7 @@ function parseVisionAssistant(value: unknown): PiVisionAssistantOverride | undef
   if (value.mode === "model" && provider && model) return { mode: "model", provider, model };
   throw new Error("settings.json pi67Desktop.visionAssistant must select a Provider/model or be disabled.");
 }
+
 
 function positiveNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;

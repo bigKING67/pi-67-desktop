@@ -15,6 +15,7 @@ import {
   completeInteractiveResponse
 } from "./host-interactive-response.js";
 import { HostCommandError } from "./protocol-error.js";
+import { dispatchSessionRecoveryCommand } from "./session-recovery-command.js";
 import type { TeamChatCommandType } from "./team-chat/team-chat-command-router.js";
 export { operationSubmissionIdentity } from "./operation-submission-identity.js";
 export type RuntimeLoadedCommand = Exclude<
@@ -49,6 +50,7 @@ export type RuntimeLoadedCommand = Exclude<
       | "provider.modelDiscovery.cancel"
       | "provider.projectConfiguration.get" | "provider.projectConfiguration.reload"
       | "model.projectDefault.set" | "vision.assistant.global.set" | "vision.assistant.project.set"
+      | "model.routing.global.set"
       | "context.file.list"
       | "context.file.read"
       | "context.file.save"
@@ -320,6 +322,9 @@ export async function dispatchHostCommand(
     case "session.interactionMode.set":
       await runtime.setInteractionMode(command.payload.mode);
       return context.captureProjectionMutationAcknowledgement(runtime);
+    case "session.recovery.inspect":
+    case "session.recovery.continue":
+      return dispatchSessionRecoveryCommand(runtime, command, () => context.operations(), submissionFingerprint);
     case "plan.implement": {
       const submission = textOperationSubmissionIdentity(
         command.payload.submissionId,

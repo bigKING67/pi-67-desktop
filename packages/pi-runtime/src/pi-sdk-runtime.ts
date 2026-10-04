@@ -352,6 +352,9 @@ export class PiSdkRuntime implements AgentRuntime {
     await this.promptActions.submit(text, attachments, signal);
   }
 
+  getInterruptedTask() { return this.promptActions.inspectInterrupted(); }
+  continueInterruptedTask(anchor: string, signal?: AbortSignal) { return this.promptActions.continueInterrupted(anchor, signal); }
+
   async steer(text: string, attachments?: PreparedPromptAttachmentSet, signal?: AbortSignal): Promise<void> {
     await this.promptActions.steer(text, attachments, signal);
   }

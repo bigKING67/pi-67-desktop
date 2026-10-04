@@ -135,6 +135,8 @@ export function applyWorkbenchAgentEvent(
         runtime: { phase: "ready", detail: messages.runtime.workbench.sessionReady, recoverable: true },
         ...(event.type === "runtime.ready" ? { toolMode: event.payload.taskToolMode } : {}),
         operationId: undefined,
+        recoveryHostInstanceId: undefined,
+        recoveryHostEpoch: undefined,
         creationId: undefined,
         creationStatus: undefined,
       });

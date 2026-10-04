@@ -1147,8 +1147,8 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   grants blanket permission. Recursive Codemode and forged/ambiguous roots fail
   closed. Team Chat Agent turns still have no tools. `mode: on` preserves direct
   tools, `models: false` disables model globals, and `saveOutput: false` disables
-  implicit full-output files. This does not implement automatic model routing or
-  Pi Durable. The retired `mcp` proxy is an invalid route in every safety mode.
+  implicit full-output files. Codemode itself does not enable Auto model selection
+  or Pi Durable. The retired `mcp` proxy is an invalid route in every safety mode.
   MCP resources and discovery are read-only capabilities. Configured native tools
   retain the installed-capability AUTO grant, but recognized deletion still requires
   exact one-shot confirmation in AUTO and trusted YOLO; PLAN stays read-only.
@@ -1346,6 +1346,47 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   default and visual-assistance overrides remain Workspace- and trust-bound; an
   unavailable, identity-changed, or untrusted Workspace cannot block the global
   settings view and cannot be used to read or mutate project configuration.
+- Auto is an opt-in Pi virtual model (`pi67-auto/auto`) implemented through native
+  `ModelRuntime.registerVirtualModel`. Global `pi67Desktop.autoRouting` in Pi
+  `settings.json` selects the judge, standard and complex physical models; saving
+  does not change the default model. Candidates are distinct, configured chat
+  models. No separate registry, transport, retry loop or Session store is created.
+  Each new task makes at most one judge request over up to 16,000 characters of
+  its latest user text, requesting at most 128 output tokens with a 10-second
+  deadline. The judge classifies the requested operation, not the subject matter
+  in supplied material: summarizing complex engineering notes remains a standard
+  task. Uncertain root-cause investigation, interacting-component or recovery
+  design, nontrivial algorithm/security reasoning, cross-cutting implementation,
+  and high-stakes judgments are complex operations even when the user requests
+  a short answer or no tools. A local edit is routine only when its intended
+  behavior and solution are explicit; function count is not a complexity proxy.
+  Mixed requests use the most demanding requested operation. The judge returns
+  a JSON object containing only `complexity: "standard" | "complex"`; prose,
+  bare labels, extra fields and invalid/truncated results are rejected. Native
+  Pi sampling options request strict JSON Schema for OpenAI Completions,
+  OpenAI Responses and Azure Responses judge APIs. Other Pi APIs receive the
+  same JSON instruction and local validation without a provider-side schema
+  guarantee. An endpoint rejecting the schema fails explicitly, with no format
+  downgrade or retry. Classification quality still requires live evaluation.
+  Errors,
+  invalid output and cancellation do not dispatch a candidate or silently fall
+  back. This bounds requests and requested tokens, not a currency-denominated
+  bill; recorded usage is authoritative when returned.
+- Auto pins the physical model across the task's tool continuations, steering
+  and retries. Before the first dispatch, image input can select the other
+  configured candidate if required by its declared image capability; no capable
+  candidate is an explicit error. Later image steering cannot silently switch a
+  pinned text-only model. Native search and inherited subagents use the actual
+  physical model. Direct title/compaction requests do not classify again.
+- Pi owns branch-local routing state, physical assistant identity and usage.
+  Judge usage uses native `usage` entries; bounded `pi67.auto-routing.v1` evidence
+  records decision, selected model, budget facts and failure reason, never judge
+  input/output text. Desktop displays the evidence separately from task completion.
+  Reopen does not classify; disabling Auto preserves its selected identity and
+  requires explicit reconfiguration or physical model selection to continue.
+  Auto requires a trusted Workspace and is blocked before judging team/shared
+  history. Team Chat Agent turns do not expose it. Synthetic dispatch correctness
+  does not establish live classification quality or savings.
 - Visual assistance is an optional Pi setting stored at
   `pi67Desktop.visionAssistant`. The global value selects one configured
   image-capable Pi Provider/model pair. A trusted project may inherit it, disable
@@ -2059,6 +2100,18 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   `EEXIST`, a changed revision, invalid data, or a path-boundary failure are never
   retried. Provider and Context validation failures retain their existing guarded
   rollback instead of reporting a partial success.
+- After an application/Agent interruption, reopening the original Session preserves
+  recorded conversation and results without automatically calling a model. When
+  the current Pi branch contains unfinished work and all recorded Tool calls have
+  results, the user can explicitly choose `继续当前任务`. This continues through
+  native Pi, with current authorization, safety mode and configuration; Auto uses
+  its persisted current-task selection without reclassification or model fallback.
+  Already completed answers offer no continuation. Missing Tool Results are
+  unknown outcomes and block one-click continuation until the user reviews the
+  actual outcome and gives a new instruction. This is conversation-based recovery,
+  not instruction-level checkpoints or an exactly-once guarantee for side effects.
+  Lost unpersisted output cannot be reconstructed. Pi Durable is not a production
+  dependency, and there is no automatic unattended recovery request.
 - Operation receipts are bounded private durable recovery metadata under application storage.
   They contain caller-stable IDs, SHA-256 fingerprints, lifecycle, timing, Host/Task/physical
   Session authority, and redacted structured terminal errors only; Prompt text, import paths,

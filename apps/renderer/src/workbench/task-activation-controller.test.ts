@@ -181,6 +181,25 @@ describe("task activation controller", () => {
     );
   });
 
+  it("reopens a background Task owned by a replaced Host instead of resyncing it", async () => {
+    markTaskActive();
+    rendererWorkbenchStore.getState().updateTask("task-a", {
+      recoveryHostInstanceId: "previous-host", recoveryHostEpoch: 8
+    });
+    openWorkspace.mockImplementation(async () => {
+      expect(useAppStore.getState().sessionTransitionPending).toBe(false);
+      return true;
+    });
+
+    await expect(activateRendererTask("task-a")).resolves.toBe(true);
+
+    expect(resynchronize).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+    expect(openWorkspace).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "workspace-a" }), "/sessions/a.jsonl", "session-file-a"
+    );
+  });
+
   it("settles the selected Task when activation recovery fails", async () => {
     markTaskActive();
     useConversationAttentionStore.getState().mark("workspace-a", "session-file-a");

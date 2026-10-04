@@ -1,4 +1,5 @@
 import { SessionSnapshotSchema } from "./session-snapshot-schema.js";
+import { SessionRecoveryViewSchema } from "./session-recovery-schemas.js";
 import { strictObject, Type, type TSchema } from "./typebox-schema.js";
 import {
   MAX_SLASH_COMMAND_DESCRIPTION_CHARS,
@@ -240,6 +241,8 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "session.title.regenerate": ProjectionMutationAcknowledgementSchema,
   "session.interactionMode.set": ProjectionMutationAcknowledgementSchema,
   "plan.implement": operationSubmissionResultSchema(Type.Literal("prompt")),
+  "session.recovery.inspect": SessionRecoveryViewSchema,
+  "session.recovery.continue": operationSubmissionResultSchema(Type.Literal("prompt")),
   "session.nameByPath": strictObject({ revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }) }),
   "conversation.pin": strictObject({ revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }) }),
   "conversation.archive": strictObject({ revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }) }),
@@ -273,6 +276,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "model.projectDefault.set": PiProviderConfigurationSnapshotSchema,
   "vision.assistant.global.set": PiProviderConfigurationSnapshotSchema,
   "vision.assistant.project.set": PiProviderConfigurationSnapshotSchema,
+  "model.routing.global.set": PiProviderConfigurationSnapshotSchema,
   "thinking.set": SessionControlResultSchema,
   "resource.list": ResourceCatalogProjectionSchema,
   "resource.reload": SessionResourceCatalogResultSchema,
@@ -343,6 +347,7 @@ export const EventPayloadSchemas: Record<AgentEventType, TSchema> = {
     reason: Type.Union([
       Type.Literal("user-appended"),
       Type.Literal("settled"),
+      Type.Literal("routing"),
       Type.Literal("compacted"),
       Type.Literal("rolled-back")
     ])

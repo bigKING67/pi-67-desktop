@@ -3,6 +3,7 @@ import { Composer } from "../composer/Composer.js";
 import { StreamingAnnouncer } from "../live-turn/StreamingAnnouncer.js";
 import { Transcript } from "../transcript/Transcript.js";
 import { SessionMemoryOrigin } from "../transcript/SessionMemoryOrigin.js";
+import { InterruptedTaskNotice } from "../session/InterruptedTaskNotice.js";
 
 const TrustBanner = lazy(() => import("../workspace/TrustBanner.js").then((module) => ({
   default: module.TrustBanner
@@ -16,6 +17,7 @@ export function LiveConversationSurface({ showTrustBanner }: { showTrustBanner: 
       ) : null}
       <StreamingAnnouncer />
       <SessionMemoryOrigin />
+      <InterruptedTaskNotice />
       <Transcript />
       <Composer />
     </section>

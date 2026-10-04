@@ -20,6 +20,7 @@ export * from "./extension-package-operation.js";
 export * from "./port-client.js";
 export * from "./protocol-error.js";
 export * from "./provider-configuration-schemas.js";
+export * from "./auto-routing-configuration-schema.js";
 export * from "./lark-auth-schemas.js";
 export * from "./team-chat-command-messages.js";
 export * from "./team-chat-schemas.js";

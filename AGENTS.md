@@ -79,6 +79,9 @@
   Do not silently switch or retry through another model, Provider, protocol,
   Extension, MCP service, search path, or runtime unless a narrower product
   contract explicitly requires and exposes that behavior.
+- Opt-in Auto uses Pi's native virtual-model seam under the narrower PRODUCT
+  contract: a bounded judge selects a configured physical model once per task,
+  and continuations/retries retain it. This is not a second runtime/router.
 
 ## Platform and runtime
 

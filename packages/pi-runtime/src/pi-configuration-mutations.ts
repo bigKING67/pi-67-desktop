@@ -3,6 +3,7 @@ import { RuntimeError } from "@pi67/domain";
 import type {
   PiConfigurationChangeSource,
   PiConfigurationFileKind,
+  PiAutoRoutingSelection,
   PiCredentialRevealResult,
   PiDefaultModelSelection,
   PiProviderConfigurationInput,
@@ -13,6 +14,7 @@ import { withConfigurationFileLock, writePrivateFileAtomically } from "./atomic-
 import {
   removeProviderDocument,
   saveProviderDocument,
+  setAutoRoutingDocument,
   setDefaultModelDocument,
   setVisionAssistantDocument
 } from "./pi-configuration-documents.js";
@@ -204,6 +206,28 @@ export class PiConfigurationMutations {
     });
   }
 
+  setGlobalAutoRouting(
+    expectedRevision: string,
+    selection?: PiAutoRoutingSelection
+  ): Promise<PiProviderConfigurationSnapshot> {
+    return this.host.serial(async () => {
+      await this.assertConfiguredAutoRouting(selection);
+      return this.mutateDocumentLocked(
+        this.host.globalState,
+        expectedRevision,
+        "global-settings",
+        (content) => setAutoRoutingDocument(content, selection),
+        async () => {
+          const validation = SettingsManager.create(this.host.agentDir, this.host.agentDir, {
+            projectTrusted: false
+          });
+          const error = validation.drainErrors().find((item) => item.scope === "global");
+          if (error) throw error.error;
+        }
+      );
+    });
+  }
+
   setProjectVisionAssistant(
     cwd: string,
     expectedRevision: string,
@@ -361,6 +385,40 @@ export class PiConfigurationMutations {
       recoverable: false,
       details: { provider: selection.provider, modelId: selection.model }
     });
+  }
+
+  private async assertConfiguredAutoRouting(selection: PiAutoRoutingSelection | undefined): Promise<void> {
+    if (!selection) return;
+    if (
+      selection.standard.provider === selection.complex.provider
+      && selection.standard.model === selection.complex.model
+    ) {
+      throw new RuntimeError(
+        "INVALID_PAYLOAD",
+        "Pi Auto standard and complex models must be distinct.",
+        { recoverable: false }
+      );
+    }
+    const runtime = await this.host.requireModelRuntime();
+    for (const [role, modelSelection] of Object.entries(selection) as Array<[
+      "judge" | "standard" | "complex",
+      PiDefaultModelSelection
+    ]>) {
+      const model = runtime.getPhysicalModel(modelSelection.provider, modelSelection.model);
+      if (
+        model
+        && model.input.includes("text")
+        && runtime.hasConfiguredAuth(modelSelection.provider)
+      ) continue;
+      throw new RuntimeError(
+        "MODEL_NOT_FOUND",
+        `The selected Pi Auto ${role} model is not a configured physical text model.`,
+        {
+          recoverable: false,
+          details: { role, provider: modelSelection.provider, modelId: modelSelection.model }
+        }
+      );
+    }
   }
 }
 

@@ -49,10 +49,11 @@ import type {
   SessionNameMutation
 } from "./conversation-organization-messages.js";
 import type { LarkCommandPayloads, LarkCommandResults } from "./lark-command-messages.js";
+import type { SessionRecoveryCommandPayloads, SessionRecoveryCommandResults } from "./session-recovery-messages.js";
 import type { TeamChatCommandPayloads, TeamChatCommandResults } from "./team-chat-command-messages.js";
 import type { ContextMemoryCommandPayloads, ContextMemoryCommandResults } from "./context-memory-messages.js";
 import type {
-  PiCredentialRevealResult, PiModelCatalogRefreshResult,
+  PiAutoRoutingSelection, PiCredentialRevealResult, PiModelCatalogRefreshResult,
   PiProviderConfigurationInput, PiProviderConfigurationSnapshot,
   PiProviderModelDiscoveryInput, PiProviderModelDiscoveryResult
 } from "./provider-configuration-schemas.js";
@@ -92,10 +93,7 @@ export {
   type SessionCreationResolution
 } from "./session-creation-resolution-contract.js";
 export interface PromptAttachmentRef { id: string; }
-export interface PromptWorkspaceFileRef {
-  id: string;
-  revision: string;
-}
+export interface PromptWorkspaceFileRef { id: string; revision: string; }
 
 export const ALLOWED_IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
 
@@ -196,7 +194,7 @@ export type SessionCatalogPageResult = Omit<SessionCatalogPage, "items"> & {
 
 export interface CommandPayloads extends WorkspaceFileCommandPayloads,
   ConversationOrganizationCommandPayloads, LarkCommandPayloads, ContextMemoryCommandPayloads,
-  TeamChatCommandPayloads {
+  TeamChatCommandPayloads, SessionRecoveryCommandPayloads {
   "runtime.initialize": {
     cwd: string;
     agentDir?: string;
@@ -283,6 +281,10 @@ export interface CommandPayloads extends WorkspaceFileCommandPayloads,
     provider?: string;
     model?: string;
   };
+  "model.routing.global.set": {
+    expectedRevision: string;
+    selection?: PiAutoRoutingSelection;
+  };
   "thinking.set": { level: string };
   "resource.list": Record<string, never>;
   "resource.reload": Record<string, never>;
@@ -334,7 +336,7 @@ export interface CommandPayloads extends WorkspaceFileCommandPayloads,
 
 export interface CommandResults extends WorkspaceFileCommandResults,
   ConversationOrganizationCommandResults, LarkCommandResults, ContextMemoryCommandResults,
-  TeamChatCommandResults {
+  TeamChatCommandResults, SessionRecoveryCommandResults {
   "runtime.initialize": ProjectionMutationAcknowledgement;
   "runtime.getStatus": RuntimeStatusResult;
   "projection.resync": ProjectionResyncResult;
@@ -396,6 +398,7 @@ export interface CommandResults extends WorkspaceFileCommandResults,
   "model.projectDefault.set": PiProviderConfigurationSnapshot;
   "vision.assistant.global.set": PiProviderConfigurationSnapshot;
   "vision.assistant.project.set": PiProviderConfigurationSnapshot;
+  "model.routing.global.set": PiProviderConfigurationSnapshot;
   "thinking.set": SessionControlResult;
   "resource.list": ResourceCatalogProjection;
   "resource.reload": SessionResourceCatalogResult;

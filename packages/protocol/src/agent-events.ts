@@ -48,7 +48,7 @@ export interface EventPayloads extends ContextMemoryEventPayloads, TeamChatEvent
   };
   "conversation.changed": {
     sessionId: string;
-    reason: "user-appended" | "settled" | "compacted" | "rolled-back";
+    reason: "user-appended" | "routing" | "settled" | "compacted" | "rolled-back";
   };
   "queue.changed": { steeringQueue: string[]; followUpQueue: string[] };
   "session.metaChanged": {

@@ -36,6 +36,26 @@ class FakePort implements ProtocolPort {
 }
 
 describe("AgentHostServer operation replay", () => {
+  it("deduplicates continuation and rejects changed anchors without re-entering Pi", async () => {
+    let finish!: () => void;
+    const continueInterruptedTask = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+    const { port, server } = await createHarness({
+      getInterruptedTask: () => ({ status: "available", anchor: "anchor-1" }), continueInterruptedTask
+    });
+    expect(await send(port, "session.recovery.inspect", {})).toMatchObject({ ok: true, result: { status: "available", anchor: "anchor-1" } });
+    const payload = { submissionId: "recovery-1", anchor: "anchor-1" };
+    const operationId = acceptedOperationId(await send(port, "session.recovery.continue", payload));
+    expect(await send(port, "session.recovery.continue", payload)).toMatchObject({ ok: true, result: { operationId } });
+    expect(await send(port, "session.recovery.continue", { ...payload, anchor: "anchor-2" })).toMatchObject({ ok: false, error: { code: "DUPLICATE_REQUEST" } });
+    expect(continueInterruptedTask).toHaveBeenCalledOnce();
+    expect(continueInterruptedTask).toHaveBeenCalledWith("anchor-1", expect.any(AbortSignal));
+    finish();
+    await vi.waitFor(() => expect(port.sent.some(value => isEventEnvelope(value) && value.type === "operation.completed")).toBe(true));
+    expect(await send(port, "session.recovery.continue", payload)).toMatchObject({ ok: true, result: { kind: "settled", lifecycle: "completed", operationId } });
+    expect(continueInterruptedTask).toHaveBeenCalledOnce();
+    await server.shutdown();
+  });
+
   it("accepts and replays a non-cancellable Session import before it changes Session authority", async () => {
     let finish!: () => void;
     let sessionId = "session-before-import";
@@ -271,7 +291,7 @@ async function createHarness(overrides: Partial<AgentRuntime>): Promise<{
   return { port, server };
 }
 
-async function send<T extends "command.invoke" | "session.compact" | "session.import">(
+async function send<T extends "command.invoke" | "session.compact" | "session.import" | "session.recovery.inspect" | "session.recovery.continue">(
   port: FakePort,
   type: T,
   payload: CommandPayloads[T]

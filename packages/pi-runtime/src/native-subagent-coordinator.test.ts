@@ -13,6 +13,19 @@ import {
 } from "./native-subagent-coordinator.js";
 
 describe("NativeSubagentCoordinator", () => {
+  it("inherits the dispatched physical model when the parent selected Auto", async () => {
+    const fixture = await coordinatorFixture("complete");
+    const physical = fixture.parent.model;
+    Object.defineProperties(fixture.parent, {
+      model: { value: { provider: "pi67-auto", id: "auto", api: "pi-virtual" } },
+      routedModel: { value: { model: physical } }
+    });
+    await fixture.coordinator.bindParent(fixture.parent);
+    const spawned = await fixture.coordinator.spawn({ task: "Inspect module", mode: "background" });
+    await fixture.coordinator.wait([spawned.runId], "all", 1_000);
+    expect(spawned.model).toEqual({ provider: physical?.provider, id: physical?.id });
+    expect(fixture.createdModels).toEqual([physical]);
+  });
   it("blocks team-derived spawn, resume and steer before acquiring or publishing a child", async () => {
     const fixture = await coordinatorFixture("complete");
     markTeamSessionBirth(fixture.parent.sessionManager, { userId: "user", teamId: "team", projectId: "project", endpoint: "https://fixture.invalid" });
@@ -186,18 +199,20 @@ async function coordinatorFixture(mode: "complete" | "pending") {
   const admission = new NativeSubagentAdmission();
   const emit = vi.fn();
   let sequence = 0;
+  const createdModels: unknown[] = [];
   const coordinator = new NativeSubagentCoordinator({
     admission,
     parentKey: "parent-task",
     getAgentDir: () => agentDir,
     createId: () => `identity-${++sequence}`,
     emit,
-    createSession: async ({ sessionManager }) => {
+    createSession: async ({ sessionManager, parentModel }) => {
+      createdModels.push(parentModel);
       const session = fakeChild(sessionManager, mode);
       return { session, dispose: async () => undefined };
     }
   });
-  return { coordinator, admission, emit, parent, agentDir };
+  return { coordinator, admission, emit, parent, agentDir, createdModels };
 }
 
 function fakeParent(sessionManager: SessionManager): AgentSession {

@@ -162,6 +162,20 @@ jobs:
         env:
           PI67_PACKAGED_SCREENSHOT_DIR: artifacts/validation/windows-packaged-smoke
         run: corepack pnpm run package:smoke
+      - name: Verify packaged task recovery (agent-before-response)
+        run: corepack pnpm run package:smoke:task-recovery -- agent-before-response
+      - name: Verify packaged task recovery (app-after-tool)
+        run: corepack pnpm run package:smoke:task-recovery -- app-after-tool
+      - name: Verify packaged task recovery (agent-unconfirmed-tool)
+        run: corepack pnpm run package:smoke:task-recovery -- agent-unconfirmed-tool
+      - name: Upload packaged task recovery evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: windows-task-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/validation/pi-durable-compat/packaged/
+          if-no-files-found: warn
+          retention-days: 3
       - name: Upload packaged Electron smoke evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

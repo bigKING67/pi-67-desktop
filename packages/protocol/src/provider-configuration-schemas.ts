@@ -1,4 +1,22 @@
 import { Type, type TProperties } from "./typebox-schema.js";
+import {
+  PiAutoRoutingSelectionSchema,
+  type PiAutoRoutingSelection
+} from "./auto-routing-configuration-schema.js";
+import {
+  PiConfigurationIdentifierSchema as IdentifierSchema,
+  PiDefaultModelSelectionSchema,
+  type PiDefaultModelSelection
+} from "./pi-model-selection-schema.js";
+
+export {
+  PiAutoRoutingSelectionSchema,
+  type PiAutoRoutingSelection
+} from "./auto-routing-configuration-schema.js";
+export {
+  PiDefaultModelSelectionSchema,
+  type PiDefaultModelSelection
+} from "./pi-model-selection-schema.js";
 
 export type PiConfigurationFileKind = "models" | "auth" | "global-settings" | "project-settings";
 export type PiConfigurationChangeSource = "desktop" | "external" | "manual" | "catalog";
@@ -71,11 +89,6 @@ export interface PiProviderConfigurationView {
   advancedJson: string;
 }
 
-export interface PiDefaultModelSelection {
-  provider: string;
-  model: string;
-}
-
 export interface PiDefaultModelConfiguration {
   global?: PiDefaultModelSelection;
   project?: PiDefaultModelSelection;
@@ -103,6 +116,8 @@ export interface PiProviderConfigurationSnapshot {
   credentials: PiCredentialSummary[];
   defaults: PiDefaultModelConfiguration;
   vision: PiVisionAssistantConfiguration;
+  /** Absent when Pi Auto routing is disabled. */
+  autoRouting?: PiAutoRoutingSelection;
   files: PiConfigurationFileStatus[];
   diagnostics: PiConfigurationDiagnostic[];
 }
@@ -192,7 +207,6 @@ export interface PiProviderModelDiscoveryResult {
   truncated: boolean;
 }
 
-const IdentifierSchema = Type.String({ minLength: 1, maxLength: 512 });
 const RevisionSchema = Type.String({ minLength: 64, maxLength: 64, pattern: "^[0-9a-f]{64}$" });
 const OptionalTextSchema = Type.Optional(Type.String({ minLength: 1, maxLength: 16_384 }));
 const AdvancedJsonSchema = Type.Optional(Type.String({ maxLength: 262_144 }));
@@ -338,11 +352,6 @@ const PiProviderConfigurationViewSchema = strictObject({
   advancedJson: Type.String({ maxLength: 262_144 })
 });
 
-const PiDefaultModelSelectionSchema = strictObject({
-  provider: IdentifierSchema,
-  model: IdentifierSchema
-});
-
 const PiDefaultModelConfigurationSchema = strictObject({
   global: Type.Optional(PiDefaultModelSelectionSchema),
   project: Type.Optional(PiDefaultModelSelectionSchema),
@@ -375,6 +384,7 @@ export const PiProviderConfigurationSnapshotSchema = strictObject({
   credentials: Type.Array(PiCredentialSummarySchema, { maxItems: 512 }),
   defaults: PiDefaultModelConfigurationSchema,
   vision: PiVisionAssistantConfigurationSchema,
+  autoRouting: Type.Optional(PiAutoRoutingSelectionSchema),
   files: Type.Array(PiConfigurationFileStatusSchema, { minItems: 4, maxItems: 4 }),
   diagnostics: Type.Array(PiConfigurationDiagnosticSchema, { maxItems: 64 })
 });
@@ -446,7 +456,4 @@ export const PiProviderModelDiscoveryResultSchema = strictObject({
 
 export const PiConfigurationExpectedRevisionSchema = RevisionSchema;
 export const PiConfigurationProviderIdSchema = IdentifierSchema;
-
-function strictObject<T extends TProperties>(properties: T) {
-  return Type.Object(properties, { additionalProperties: false });
-}
+function strictObject<T extends TProperties>(properties: T) { return Type.Object(properties, { additionalProperties: false }); }

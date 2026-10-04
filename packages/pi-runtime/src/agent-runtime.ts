@@ -118,6 +118,8 @@ export interface AgentRuntime {
     attachments?: PreparedPromptAttachmentSet,
     signal?: AbortSignal
   ): Promise<void>;
+  getInterruptedTask?(): import("@pi67/domain").SessionRecoveryView;
+  continueInterruptedTask?(anchor: string, signal?: AbortSignal): Promise<void>;
   steer(text: string, attachments?: PreparedPromptAttachmentSet, signal?: AbortSignal): Promise<void>;
   followUp(text: string, attachments?: PreparedPromptAttachmentSet, signal?: AbortSignal): Promise<void>;
   clearQueue(): RuntimeQueueClearResult;

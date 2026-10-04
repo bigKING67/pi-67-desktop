@@ -26,6 +26,7 @@ export function activateRendererTask(taskId: string): Promise<boolean> {
 }
 
 async function activateRendererTaskOnce(taskId: string): Promise<boolean> {
+  if (taskTransitionPending()) return false;
   const workbench = rendererWorkbenchStore.getState();
   const task = workbench.tasks[taskId];
   const workspace = task ? workbench.workspaces[task.workspaceId] : undefined;
@@ -54,11 +55,17 @@ async function activateRendererTaskOnce(taskId: string): Promise<boolean> {
     sessionTransitionPending: true,
     runtime: { phase: "recovering", detail: rendererTaskTransitionDetail(task, "recovering"), recoverable: true }
   });
+  const activationAuthority = useSessionProjectionStore.getState().authority;
   try {
     const registered = await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
     if (!registered) throw new Error("目标工作区当前不可用。");
     const identity = await ensureAgentConnection();
     if (!isSelectedRendererTask(task)) return false;
+    if (useSessionProjectionStore.getState().authority !== activationAuthority) return false;
+    if (!rendererTaskBelongsToAgentHost(task, identity)) {
+      useAppStore.setState({ sessionTransitionPending: false });
+      return await reopenRendererTask(task, workspace, false);
+    }
     const recovery = await resynchronizeRendererProjection(useAppStore.getState, useAppStore.setState, {
       hostEpoch: identity.hostEpoch,
       context: workbenchProtocolContextForTask(task),
@@ -104,6 +111,8 @@ export function resumeRendererTask(taskId: string): Promise<boolean> {
 }
 
 async function resumeRendererTaskOnce(taskId: string): Promise<boolean> {
+  if (taskTransitionPending()) return false;
+  const recoveryAuthority = useSessionProjectionStore.getState().authority;
   const workbench = rendererWorkbenchStore.getState();
   const task = workbench.tasks[taskId];
   const workspace = task ? workbench.workspaces[task.workspaceId] : undefined;
@@ -127,6 +136,10 @@ async function resumeRendererTaskOnce(taskId: string): Promise<boolean> {
     const registered = await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
     if (!registered) throw new Error("目标工作区当前不可用。");
     const identity = await ensureAgentConnection();
+    // Reconnection can start (or finish) automatic bootstrap while this click
+    // awaits registration. That owner must keep its Task until ready is installed.
+    if (taskTransitionPending() || !isSelectedRendererTask(task)
+      || useSessionProjectionStore.getState().authority !== recoveryAuthority) return false;
     const sameHost = rendererTaskBelongsToAgentHost(task, identity);
     if (sameHost) {
       const recovery = await resynchronizeRendererProjection(useAppStore.getState, useAppStore.setState, {
@@ -155,6 +168,11 @@ async function resumeRendererTaskOnce(taskId: string): Promise<boolean> {
     markTaskRecoveryFailed(task.id, error);
     return false;
   }
+}
+
+function taskTransitionPending(): boolean {
+  const state = useAppStore.getState();
+  return state.sessionTransitionPending || state.workspaceOpenPending;
 }
 
 function runTaskActivationFlight(

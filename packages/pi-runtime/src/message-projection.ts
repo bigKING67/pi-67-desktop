@@ -3,6 +3,7 @@ import {
   type SessionEntry,
   type SessionManager
 } from "@earendil-works/pi-coding-agent";
+import { AUTO_ROUTING_ENTRY, parseAutoRoutingEvidence } from "./auto-routing-evidence.js";
 import {
   MAX_CONVERSATION_PAGE_JSON_BYTES,
   parseActiveProposedPlan,
@@ -237,6 +238,13 @@ function projectEntryRecord(
   entryIndex: number,
   planStatuses: ReadonlyMap<number, PlanProposalStatus>
 ): MessageEntryRecord | undefined {
+  if (entry.type === "custom" && entry.customType === AUTO_ROUTING_ENTRY) {
+    const evidence = parseAutoRoutingEvidence(entry.data);
+    if (!evidence) return undefined;
+    const { version: _version, createdAt, ...part } = evidence;
+    return { kind: "projected", id: entry.id, entryIndex,
+      message: { id: entry.id, role: "system", createdAt, parts: [{ type: "auto-routing", ...part }] } };
+  }
   if (entry.type === "custom" && entry.customType === VISION_ASSISTANCE_ENTRY_TYPE) {
     const evidence = parseVisionAssistanceEvidence(entry.data);
     if (!evidence) return undefined;

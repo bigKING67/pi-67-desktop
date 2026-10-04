@@ -22,6 +22,7 @@ const PROVIDER_SNAPSHOT_COMMANDS = [
   "provider.credential.store",
   "provider.credential.remove",
   "model.default.set",
+  "model.routing.global.set",
   "vision.assistant.global.set"
 ] as const satisfies readonly AgentCommandType[];
 const PROJECT_PROVIDER_SNAPSHOT_COMMANDS = [

@@ -242,7 +242,7 @@ export class NativeSubagentCoordinator implements NativeSubagentOperations {
       }
       const sessionInput = prepareNativeSubagentResume({
         record,
-        parentModel: parent.session.model,
+        parentModel: parent.session.routedModel?.model ?? parent.session.model,
         parentThinkingLevel: parent.session.thinkingLevel,
         activationId,
         ...(mode === undefined ? {} : { mode }),

@@ -221,6 +221,20 @@ jobs:
         run: pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources --ci-fast
       - name: Smoke packaged Electron runtime
         run: pnpm run package:smoke
+      - name: Verify packaged task recovery (agent-before-response)
+        run: pnpm run package:smoke:task-recovery -- agent-before-response
+      - name: Verify packaged task recovery (app-after-tool)
+        run: pnpm run package:smoke:task-recovery -- app-after-tool
+      - name: Verify packaged task recovery (agent-unconfirmed-tool)
+        run: pnpm run package:smoke:task-recovery -- agent-unconfirmed-tool
+      - name: Upload packaged task recovery evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ runner.os }}-task-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/validation/pi-durable-compat/packaged/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Verify Windows packaged synthetic scale and IME contracts
         run: pnpm run package:smoke:windows-ui
       - name: Verify Windows NSIS installer lifecycle
@@ -332,6 +346,20 @@ jobs:
         run: pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources
       - name: Smoke packaged Electron runtime
         run: pnpm run package:smoke
+      - name: Verify packaged task recovery (agent-before-response)
+        run: pnpm run package:smoke:task-recovery -- agent-before-response
+      - name: Verify packaged task recovery (app-after-tool)
+        run: pnpm run package:smoke:task-recovery -- app-after-tool
+      - name: Verify packaged task recovery (agent-unconfirmed-tool)
+        run: pnpm run package:smoke:task-recovery -- agent-unconfirmed-tool
+      - name: Upload packaged task recovery evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ runner.os }}-task-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/validation/pi-durable-compat/packaged/
+          if-no-files-found: warn
+          retention-days: 14
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: failure() || cancelled()
         with:

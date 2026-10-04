@@ -13,6 +13,7 @@ import {
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button, Tooltip, TooltipTrigger } from "react-aria-components";
 import { AttachmentPreview } from "../attachments/AttachmentPreview.js";
+import { AutoRoutingEvidence } from "./AutoRoutingEvidence.js";
 import { useCopyFeedback } from "../clipboard/use-copy-feedback.js";
 import { isImeConfirmationKey } from "../input/ime-keyboard.js";
 import { formatMessageDateTime, formatMessageDateTimeTitle } from "../localization/date-time.js";
@@ -141,6 +142,7 @@ export function MessageCard({
               />
             );
           }
+          if (part.type === "auto-routing") return <AutoRoutingEvidence part={part} key={`${message.id}-route-${index}`} />;
           if (part.type === "vision-evidence") {
             return (
               <details className={styles.visionEvidence} key={`${message.id}-vision-${index}`}>

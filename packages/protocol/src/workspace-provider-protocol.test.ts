@@ -45,7 +45,8 @@ describe.each([
       "provider.credential.store",
       "provider.credential.remove",
       "model.default.set",
-      "vision.assistant.global.set"
+      "vision.assistant.global.set",
+      "model.routing.global.set"
     ] as const;
     const workspaceQueries = [
       "provider.list",
@@ -233,6 +234,26 @@ describe.each([
         scope: "global"
       }
     })).toBe(true);
+  });
+
+  it("requires a complete global-only Pi Auto routing selection", () => {
+    const revision = "a".repeat(64);
+    const payload = {
+      expectedRevision: revision,
+      selection: {
+        judge: { provider: "judge", model: "small" },
+        standard: { provider: "standard", model: "medium" },
+        complex: { provider: "complex", model: "large" }
+      }
+    };
+    const request = commandEnvelope("model.routing.global.set", payload, APP_PROTOCOL_CONTEXT, 4, "set-routing");
+    expect(isRequestEnvelope(request)).toBe(true);
+    expect(isRequestEnvelope({ ...request, context: WORKSPACE_CONTEXT })).toBe(false);
+    expect(isReplaySafeControlMutation(request.type)).toBe(true);
+    expect(isRequestEnvelope({
+      ...request,
+      payload: { ...payload, selection: { ...payload.selection, complex: { provider: "complex" } } }
+    })).toBe(false);
   });
 
   it("accepts secret-free snapshots and Workspace change events", () => {

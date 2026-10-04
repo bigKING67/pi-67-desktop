@@ -51,12 +51,12 @@ export function refreshConversation(
       target,
       page,
       {
-        preserveOlder: event.payload.reason === "settled" || event.payload.reason === "user-appended",
-        settleStreaming: event.payload.reason !== "user-appended",
+        preserveOlder: ["settled", "user-appended", "routing"].includes(event.payload.reason),
+        settleStreaming: event.payload.reason !== "user-appended" && event.payload.reason !== "routing",
         ...(operationId === undefined ? {} : { operationId })
       }
     );
-    if (applied && event.payload.reason !== "user-appended") {
+    if (applied && event.payload.reason !== "user-appended" && event.payload.reason !== "routing") {
       useLiveTurnStore.getState().settle(operationId);
     }
   }).catch((error: unknown) => {

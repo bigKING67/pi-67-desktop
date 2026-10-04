@@ -90,8 +90,9 @@ export async function createNativeSubagentRecord(input: {
     input.childId
   );
   const sessionPath = sessionManager.getSessionFile();
-  const inheritedModel = input.request.model ?? (input.parent.session.model
-    ? { provider: input.parent.session.model.provider, id: input.parent.session.model.id }
+  const parentModel = input.parent.session.routedModel?.model ?? input.parent.session.model;
+  const inheritedModel = input.request.model ?? (parentModel
+    ? { provider: parentModel.provider, id: parentModel.id }
     : undefined);
   const lineage: NativeSubagentLineage = {
     runId: input.runId,
@@ -118,7 +119,7 @@ export async function createNativeSubagentRecord(input: {
     sessionInput: {
       sessionManager,
       lineage,
-      parentModel: input.parent.session.model,
+      parentModel,
       ...(input.request.model === undefined ? {} : { requestedModel: input.request.model }),
       thinkingLevel: (input.request.reasoning ?? input.parent.session.thinkingLevel) as ThinkingLevel
     },

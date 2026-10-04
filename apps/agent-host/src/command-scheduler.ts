@@ -43,6 +43,7 @@ const QUERY_COMMANDS = new Set<AgentCommandType>([
   "session.catalog.contentSearch",
   "workspace.usage.report",
   "session.tree",
+  "session.recovery.inspect",
   "message.page",
   "message.index",
   "message.search",

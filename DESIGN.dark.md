@@ -224,6 +224,10 @@ spacing, component states, and motion as `DESIGN.md`.
   from `停止整个任务`; danger, pending, disabled, focus, and failure remain legible
   at constrained height. The retired Team MCP/Tavily Settings surface has no
   dark-theme-only replacement.
+- The interrupted-task notice keeps the light-theme placement, copy and actions,
+  using `surface-muted`, `border`, `text-primary` and `text-secondary`. Available,
+  review-required, pending and error states are conveyed by text and button state;
+  recovery does not introduce a glowing or danger-styled panel.
 - Doctor's `运行健康` group uses the same neutral compact rows as environment and
   recovery. Queue/latency/heartbeat counts remain secondary text; warning and fail
   states use semantic icon, border, and text without animated gauges or glow.

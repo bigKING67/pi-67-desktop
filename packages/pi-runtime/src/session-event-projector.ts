@@ -21,6 +21,7 @@ import {
 import { OperationActivityProjector } from "./operation-activity-projector.js";
 import { ToolExecutionProjector } from "./tool-execution-projector.js";
 import { TOOL_EXECUTION_RECEIPT_TYPE } from "./tool-execution-receipt.js";
+import { AUTO_ROUTING_ENTRY } from "./auto-routing-evidence.js";
 
 interface SessionEventProjectionTarget {
   getSession: () => AgentSession;
@@ -104,6 +105,10 @@ export class SessionEventProjector {
     }
     if (event.type === "entry_appended") {
       this.target.emit({ type: "tree.changed", payload: { reason: "session-entry" } });
+      if (event.entry.type === "custom" && event.entry.customType === AUTO_ROUTING_ENTRY) {
+        this.target.emit(conversationChangedEvent(this.target.getSession(), "routing"));
+        this.target.emit(usageChangedEvent(this.target.getStats()));
+      }
     }
     if (event.type === "message_end" && event.message.role === "user") {
       const generation = this.projectionGeneration;

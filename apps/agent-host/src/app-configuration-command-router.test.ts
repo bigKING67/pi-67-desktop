@@ -41,3 +41,25 @@ describe("AppConfigurationCommandRouter model discovery", () => {
     expect(isAppConfigurationCommand("provider.modelDiscovery.cancel")).toBe(true);
   });
 });
+
+describe("AppConfigurationCommandRouter Pi Auto routing", () => {
+  it("routes the replay-safe global routing mutation to Pi configuration", async () => {
+    const snapshot = { revision: "a".repeat(64) };
+    const setGlobalAutoRouting = vi.fn(async () => snapshot);
+    const router = new AppConfigurationCommandRouter({
+      setGlobalAutoRouting
+    } as unknown as PiConfigurationService);
+    const selection = {
+      judge: { provider: "judge", model: "small" },
+      standard: { provider: "standard", model: "medium" },
+      complex: { provider: "complex", model: "large" }
+    };
+
+    await expect(router.dispatch({
+      type: "model.routing.global.set",
+      payload: { expectedRevision: "b".repeat(64), selection }
+    }, "set-routing")).resolves.toEqual(snapshot);
+    expect(setGlobalAutoRouting).toHaveBeenCalledWith("b".repeat(64), selection);
+    expect(isAppConfigurationCommand("model.routing.global.set")).toBe(true);
+  });
+});

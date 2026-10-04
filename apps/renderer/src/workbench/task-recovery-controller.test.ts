@@ -16,7 +16,8 @@ vi.mock("../workspace/workspace-open-controller.js", () => ({
 }));
 
 vi.mock("../connection/projection-recovery-controller.js", () => ({
-  resynchronizeRendererProjection: vi.fn()
+  resynchronizeRendererProjection: vi.fn(),
+  prepareRendererHostReplacement: vi.fn()
 }));
 
 vi.mock("./workspace-host-registration-controller.js", () => ({
@@ -159,6 +160,49 @@ describe("task recovery controller", () => {
       "/sessions/a.jsonl",
       "session-file-a"
     );
+  });
+
+  it("preserves the old Host ownership of a live Task through a crash", async () => {
+    const oldIdentity = agentConnectionController.identity!;
+    useAppStore.setState({ connected: true, connectionIdentity: oldIdentity, hostEpoch: 9 });
+    rendererWorkbenchStore.getState().updateTask("task-a", {
+      sessionGeneration: 4, recoveryHostInstanceId: undefined, recoveryHostEpoch: undefined,
+      lifecycle: "lost"
+    });
+    useAppStore.getState().handleAgentHostFailed({ code: 86, recoverable: true });
+    vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue({
+      ...oldIdentity, hostInstanceId: "replacement-host", hostEpoch: 10
+    });
+    openWorkspace.mockResolvedValue(true);
+
+    await expect(resumeRendererTask("task-a")).resolves.toBe(true);
+
+    expect(resynchronize).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+    expect(openWorkspace).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "workspace-a" }), "/sessions/a.jsonl", "session-file-a"
+    );
+  });
+
+  it("leaves the Task in place when connection renewal starts automatic recovery", async () => {
+    const original = rendererWorkbenchStore.getState().tasks["task-a"]!;
+    vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue({
+      appInstanceId: "app", hostInstanceId: "replacement-host", hostEpoch: 10,
+      sdkVersion: "fixture", eventSequence: 0
+    });
+    registerWorkspace.mockImplementation(async () => {
+      useAppStore.setState({ sessionTransitionPending: true });
+      return true;
+    });
+    openWorkspace.mockResolvedValue(true);
+
+    await expect(resumeRendererTask("task-a")).resolves.toBe(false);
+
+    expect(rendererWorkbenchStore.getState().tasks["task-a"]?.conversation).toEqual(original.conversation);
+    expect(openWorkspace).not.toHaveBeenCalled();
+    expect(resynchronize).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+    expect(useAppStore.getState().sessionTransitionPending).toBe(true);
   });
 
   it("opens a known Session after Host replacement without consulting Catalog", async () => {

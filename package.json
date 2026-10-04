@@ -72,6 +72,7 @@
     "memory:runtime:cleanup-local": "node eng/capabilities/cleanup-openviking-native-artifacts.mjs",
     "package:smoke:compaction-fallback": "node eng/packaging/verify-packaged-compaction-fallback.mjs",
     "package:smoke:context-isolation": "node eng/packaging/verify-packaged-context-isolation.mjs",
+    "package:smoke:task-recovery": "node eng/packaging/verify-packaged-task-recovery.mjs",
     "package:smoke:browser67-live": "node eng/packaging/smoke-packaged-browser67-live.mjs",
     "package:smoke:windows-ui": "node eng/packaging/verify-windows-packaged-input-layout.mjs",
     "package:smoke:windows-installer": "node eng/packaging/verify-windows-installer-lifecycle.mjs",

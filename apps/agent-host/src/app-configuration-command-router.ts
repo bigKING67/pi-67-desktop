@@ -13,6 +13,7 @@ export type AppConfigurationCommandType =
   | "provider.credential.remove"
   | "model.default.set"
   | "vision.assistant.global.set"
+  | "model.routing.global.set"
   | "provider.configuration.reload"
   | "provider.modelCatalog.refresh"
   | "provider.modelDiscovery.inspect"
@@ -205,6 +206,11 @@ export class AppConfigurationCommandRouter {
           provider === undefined || model === undefined ? undefined : { provider, model }
         );
       }
+      case "model.routing.global.set":
+        return this.configuration.setGlobalAutoRouting(
+          command.payload.expectedRevision,
+          command.payload.selection
+        );
     }
   }
 
@@ -225,6 +231,7 @@ export function isAppConfigurationCommand(type: AgentCommandType): type is AppCo
     || type === "provider.credential.remove"
     || type === "model.default.set"
     || type === "vision.assistant.global.set"
+    || type === "model.routing.global.set"
     || type === "provider.configuration.reload"
     || type === "provider.modelCatalog.refresh"
     || type === "provider.modelDiscovery.inspect"

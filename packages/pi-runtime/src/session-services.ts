@@ -40,6 +40,7 @@ import { createSharedHistoryTransitionExtension } from "./shared-history-transit
 import { createAgentTurnSystemPromptExtension } from "./agent-turn-profile.js";
 import { createDesktopNativeMcpExtensions } from "./native-mcp-extension.js";
 import { createDesktopCodemodeExtension } from "./codemode-extension.js";
+import { registerDesktopAutoCatalog } from "./auto-routing.js";
 
 interface DesktopSessionServicesOptions {
   localMemory?: LocalMemoryAccess;
@@ -168,6 +169,7 @@ export async function createDesktopSessionServices(
       .filter((path): path is string => typeof path === "string")
   );
   await installFirstPartyModelProviders(services.modelRuntime);
+  if (!agentTurn) registerDesktopAutoCatalog(services.modelRuntime, settingsManager);
   configuredCapabilities.useSettingsManager(services.settingsManager);
   await Promise.all([
     loadedResourceReadAccess.refresh(services.resourceLoader),

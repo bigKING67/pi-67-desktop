@@ -292,6 +292,9 @@ describe("workbench event routing", () => {
 
   it("installs a new Session identity from runtime.ready", () => {
     openActiveProvisionalTask();
+    rendererWorkbenchStore.getState().updateTask("active", {
+      recoveryHostInstanceId: "old-host", recoveryHostEpoch: 8
+    });
     const readySnapshot = snapshot("session-ready", "/sessions/ready.jsonl", "Ready Session");
     const payload = {
       capabilities: runtimeCapabilities(),
@@ -314,6 +317,8 @@ describe("workbench event routing", () => {
     expect(rendererWorkbenchStore.getState().tasks.active).toMatchObject({
       sessionId: "session-ready",
       sessionGeneration: 3,
+      recoveryHostInstanceId: undefined,
+      recoveryHostEpoch: undefined,
       conversation: {
         kind: "session",
         workspaceId: "workspace-a",

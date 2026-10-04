@@ -2,6 +2,7 @@ import type { RuntimeCapabilities, SessionSnapshot, WorkspaceChangesProjection }
 import { eventEnvelope } from "@pi67/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../app/app-store.js";
+import { applyRendererAgentEvent } from "../app/renderer-agent-event-controller.js";
 import { useApprovalStore } from "../approval/approval-store.js";
 import { useWorkspaceChangesStore } from "../changes/workspace-changes-store.js";
 import { useConversationStore } from "../conversation/conversation-store.js";
@@ -70,22 +71,23 @@ describe("new Host Session recovery", () => {
     resetStores();
   });
 
-  it("keeps recovery semantics when runtime.ready wins the initialize response race", async () => {
+  it("reopens on the new Host without carrying its predecessor Session generation", async () => {
     const resync = vi.spyOn(agentConnectionController, "resyncProjection");
     const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
       if (type === "runtime.initialize") {
         const restoredSnapshot = snapshot();
         const payload = { capabilities: RUNTIME_CAPABILITIES, snapshot: restoredSnapshot, taskToolMode: "auto" as const };
-        useAppStore.getState().receiveAgentEvent(
+        applyRendererAgentEvent(
           { type: "runtime.ready", payload },
           eventEnvelope("runtime.ready", payload, taskEventFixture({
             hostEpoch: 10,
             sequence: 1,
             sessionId: restoredSnapshot.sessionId,
-            sessionGeneration: 3
+            sessionFileIdentity: "session-file-1",
+            sessionGeneration: 1
           }))
         );
-        return projectionAcknowledgement(10, restoredSnapshot.sessionId, 3, 1) as never;
+        return projectionAcknowledgement(10, restoredSnapshot.sessionId, 1, 1) as never;
       }
       if (type === "workspace.changes") return emptyChanges() as never;
       if (type === "session.catalog.query") return emptyCatalogPage() as never;
@@ -104,11 +106,9 @@ describe("new Host Session recovery", () => {
       scope: "task",
       workspaceId: "workspace-fixture",
       taskId: "task-fixture",
-      taskGeneration: 1,
-      sessionId: "session-1",
-      sessionFileIdentity: "session-file-1",
-      sessionGeneration: 3
+      taskGeneration: 1
     } });
+    expect(rendererWorkbenchStore.getState().tasks["task-fixture"]?.sessionGeneration).toBe(1);
     expect(useAppStore.getState()).toMatchObject({
       hostEpoch: 10,
       runtime: { phase: "ready", detail: "Pi 会话已恢复" }

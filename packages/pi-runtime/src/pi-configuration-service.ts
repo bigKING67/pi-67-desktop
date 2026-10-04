@@ -3,7 +3,7 @@ import { ModelRuntime, SettingsManager, type SettingsManager as PiSettingsManage
 import { RuntimeError } from "@pi67/domain";
 import type {
   PiConfigurationChangeSource, PiConfigurationReloadState,
-  PiCredentialRevealResult, PiDefaultModelSelection,
+  PiAutoRoutingSelection, PiCredentialRevealResult, PiDefaultModelSelection,
   PiModelCatalogRefreshResult, PiProviderConfigurationChanged,
   PiProviderConfigurationInput, PiProviderConfigurationSnapshot,
   PiProviderModelDiscoveryInput, PiVisionAssistantOverride
@@ -32,10 +32,7 @@ import { PiModelCatalogRefreshCoordinator } from "./pi-model-catalog-refresh.js"
 import { createConfiguredProviderModelDiscovery, PiProviderModelDiscovery } from "./pi-provider-model-discovery.js";
 
 export type { PiConfigurationServiceOptions } from "./pi-configuration-service-options.js";
-export interface PiConfigurationReloadTarget {
-  requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState>;
-  requestModelCatalogReload(): Promise<PiConfigurationReloadState>;
-}
+export interface PiConfigurationReloadTarget { requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState>; requestModelCatalogReload(): Promise<PiConfigurationReloadState>; }
 export interface RegisterPiConfigurationWorkspaceOptions {
   cwd: string;
   settingsManager: PiSettingsManager;
@@ -255,6 +252,8 @@ export class PiConfigurationService {
     return this.mutations.setGlobalDefaultModel(expectedRevision, selection); }
   setGlobalVisionAssistant(expectedRevision: string, selection?: PiDefaultModelSelection): Promise<PiProviderConfigurationSnapshot> {
     return this.mutations.setGlobalVisionAssistant(expectedRevision, selection); }
+  setGlobalAutoRouting(expectedRevision: string, selection?: PiAutoRoutingSelection): Promise<PiProviderConfigurationSnapshot> {
+    return this.mutations.setGlobalAutoRouting(expectedRevision, selection); }
   setProjectVisionAssistant(cwd: string, expectedRevision: string,
     override?: PiVisionAssistantOverride): Promise<PiProviderConfigurationSnapshot> {
     return this.mutations.setProjectVisionAssistant(cwd, expectedRevision, override); }

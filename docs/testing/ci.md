@@ -52,6 +52,24 @@ Renderer CI 使用预构建资源、2 workers、0 retries；Electron CI 使用 1
 超时、定向运行通过时，保留首次失败证据，再使用 `check:source` 核对完整门禁；
 不能仅凭定向通过宣称全量通过，也不能仅凭固定并发通过认定产品性能问题已修复。
 
+中断任务的 macOS arm64 / Windows x64 打包验收使用
+`corepack pnpm run package:smoke:task-recovery -- <scenario>`，每次只接受一个场景：
+`agent-before-response`、`app-after-tool` 或 `agent-unconfirmed-tool`。
+它只使用独占临时 Profile、进程内模拟模型及禁止联网的 Provider；检查同一 JSONL、
+一次 Auto 判断、已记录工具不重复执行，以及未记录工具结果阻止一键续接。
+场景会让测试 Agent 自行退出，或终止已核对身份的测试 Main；不得指向用户 Profile。
+每次保留绑定 ASAR SHA-256 的结果/失败回执，确认自有进程退出后才清理夹具，并检查
+用户标准 Session 目录没有变化。无自动重试；失败需定位后单独重跑。该入口不包含
+真实 Provider 或外部副作用的 exactly-once 认证。Windows 进程身份使用精确 PID 的
+CIM 创建时间与可执行文件路径；查询失败、身份变化或无法确认退出时保留夹具并失败，
+不按应用名结束进程。回执包含平台、架构、源码 HEAD/dirty 状态与 CI run/attempt。
+普通 CI 的两平台 native job 和 Windows candidate 的 build job 在常规 packaged smoke
+后各执行三个独立步骤，并始终上传隔离验收证据。新增入口和本机通过不代表 Windows
+已通过，必须读取该平台精确构建的实际回执。
+冷启动用崩溃前的精确侧栏 Session identity 打开原对话；不假定导航选中状态已在
+强制退出前落盘。该场景明确经过工作区首页，验证从侧栏续接；身份含分隔字符，
+必须按属性值完整比较，不能拼入 CSS selector。失败取证使用本次启动的新窗口。
+
 ## Configuration and command ownership
 
 | Configuration | Responsibility / consumers |

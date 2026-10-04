@@ -40,7 +40,14 @@ export async function recoverSession(
     cwd: input.workspace,
     ...(input.sessionPath === undefined ? {} : { sessionPath: input.sessionPath }),
     trust: input.trust
-  }, [], { context });
+  }, [], { context: {
+    // This path initializes a replacement Host. Only the Task survives;
+    // runtime.ready must establish the new Host's Session authority.
+    scope: "task",
+    workspaceId: context.workspaceId,
+    taskId: context.taskId,
+    taskGeneration: context.taskGeneration
+  } });
 }
 
 export async function resynchronizeProjection(

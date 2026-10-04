@@ -218,7 +218,7 @@ describe("first-party web tools", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("calls only the selected model's declared native route", async () => {
+  it.each([false, true])("calls only the dispatched model's native route (virtual selection: %s)", async (virtual) => {
     const controller = new AbortController();
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       const requestUrl = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
@@ -248,7 +248,8 @@ describe("first-party web tools", () => {
           api: "openai-responses",
           baseUrl: "https://api.sciencetoken.ai/proxy/openai/v1"
         },
-        auth: { ok: true, apiKey: "fixture-key" }
+        auth: { ok: true, apiKey: "fixture-key" },
+        virtual
       }
     );
 
@@ -369,6 +370,7 @@ async function executeTool(
   context?: {
     model: Record<string, unknown>;
     auth: { ok: boolean; apiKey?: string };
+    virtual?: boolean;
   }
 ) {
   const tool = createFirstPartyWebTools({ ...dependencies, openPublicResponse: async (url, _addresses, signal) => ({
@@ -377,8 +379,12 @@ async function executeTool(
   }) }).find((candidate) => candidate.name === name);
   if (!tool) throw new Error(`Missing ${name} Tool.`);
   return tool.execute("test-tool-call", input, signal, undefined, {
-    model: context?.model,
+    model: context?.virtual ? { provider: "pi67-auto", id: "auto", api: "pi-virtual" } : context?.model,
+    sessionManager: { getBranch: () => [{ type: "message", message: {
+      role: "assistant", provider: context?.model.provider, model: context?.model.id, stopReason: "toolUse"
+    } }] },
     modelRegistry: {
+      find: vi.fn((provider: string, id: string) => provider === context?.model.provider && id === context?.model.id ? context.model : undefined),
       getApiKeyAndHeaders: vi.fn(async () => context?.auth ?? { ok: false })
     }
   } as never);

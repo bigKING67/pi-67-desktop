@@ -1,8 +1,12 @@
 import { MAX_RUNNING_TASKS } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
-import { GlobalRunAdmission } from "./global-run-admission.js";
+import { commandRequiresRunAdmission, GlobalRunAdmission } from "./global-run-admission.js";
 
 describe("GlobalRunAdmission", () => {
+  it("counts explicit continuation against the shared task limit but permits read-only inspection", () => {
+    expect(commandRequiresRunAdmission({ type: "session.recovery.continue", payload: { submissionId: "recovery", anchor: "leaf" } })).toBe(true);
+    expect(commandRequiresRunAdmission({ type: "session.recovery.inspect", payload: {} })).toBe(false);
+  });
   it("atomically rejects a Task above the shared limit and releases terminal Tasks", () => {
     const admission = new GlobalRunAdmission();
     const leases = Array.from(

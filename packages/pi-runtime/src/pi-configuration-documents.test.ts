@@ -2,11 +2,13 @@ import type { ProviderSummary } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
 import {
   parseModelsDocument,
+  parseAutoRoutingSelection,
   parseSettingsDocument,
   projectProviderConfigurations,
   removeProviderDocument,
   saveProviderDocument,
   setDefaultModelDocument,
+  setAutoRoutingDocument,
   setVisionAssistantDocument
 } from "./pi-configuration-documents.js";
 import { setDesktopManagedPackagesDocument } from "./desktop-managed-package-document.js";
@@ -171,6 +173,27 @@ describe("Pi configuration documents", () => {
       .toEqual({ mode: "disabled" });
     expect(parseSettingsDocument(setVisionAssistantDocument(selected, undefined)).visionAssistant)
       .toBeUndefined();
+  });
+
+  it("round-trips only complete global Pi Auto routing settings and rejects malformed values", () => {
+    const source = "{\n  // preserve user fields\n  \"theme\": \"dark\"\n}\n";
+    const selection = {
+      judge: { provider: "judge", model: "small" },
+      standard: { provider: "standard", model: "medium" },
+      complex: { provider: "complex", model: "large" }
+    };
+    const saved = setAutoRoutingDocument(source, selection);
+    expect(saved).toContain("// preserve user fields");
+    expect(parseSettingsDocument(saved)).toMatchObject({
+      root: { theme: "dark" },
+      autoRouting: selection
+    });
+    expect(parseSettingsDocument(setAutoRoutingDocument(saved, undefined)).autoRouting).toBeUndefined();
+    expect(() => parseAutoRoutingSelection({
+      judge: { provider: "judge", model: "small" },
+      standard: { provider: "standard", model: "medium" },
+      complex: { provider: "complex" }
+    })).toThrow(/complex must select a Provider\/model/iu);
   });
 
   it("projects stable Desktop Packages while preserving user Packages and JSONC", () => {

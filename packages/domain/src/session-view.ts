@@ -61,7 +61,18 @@ export interface VisionEvidencePart {
   totalCost: number;
 }
 
-export type MessagePart = TextPart | ToolCallPart | ImagePart | AttachmentPart | VisionEvidencePart | PlanProposalPart;
+export interface AutoRoutingPart {
+  type: "auto-routing";
+  status: "selected" | "failed";
+  reason: "standard" | "complex" | "image-capability" | "judge-failed" | "invalid-decision" | "cancelled" | "timed-out";
+  judge: { provider: string; model: string };
+  selected?: { provider: string; model: string };
+  inputTruncated: boolean;
+  totalTokens?: number;
+  totalCost?: number;
+}
+
+export type MessagePart = TextPart | ToolCallPart | ImagePart | AttachmentPart | VisionEvidencePart | AutoRoutingPart | PlanProposalPart;
 
 export interface SessionMessageView {
   id: string;

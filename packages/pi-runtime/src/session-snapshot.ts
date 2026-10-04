@@ -33,6 +33,7 @@ import { runtimeDisplayLabel } from "./runtime-display-label.js";
 import type { SessionProjectionIndex } from "./session-projection-index.js";
 import { projectSessionTree } from "./session-tree-projection.js";
 import { projectSessionMemoryOrigin } from "./session-memory-origin.js";
+import { isDesktopAutoModel, readAutoRoutingSettings } from "./auto-routing.js";
 
 export function projectSessionSnapshot(
   session: AgentSession,
@@ -116,7 +117,17 @@ export function projectSessionModelCatalogResult(session: AgentSession): Session
 }
 
 export function projectSessionModels(session: AgentSession): ModelSummary[] {
-  return projectRuntimeModels(session.modelRuntime);
+  let configured = false;
+  try {
+    const selection = readAutoRoutingSettings(session.settingsManager);
+    configured = selection !== undefined && Object.values(selection).every((item) => {
+      const model = session.modelRuntime.getPhysicalModel(item.provider, item.model);
+      return model?.input.includes("text") && session.modelRuntime.hasConfiguredAuth(item.provider);
+    }) && (selection.standard.provider !== selection.complex.provider || selection.standard.model !== selection.complex.model);
+  } catch { /* invalid settings stay unavailable */ }
+  return projectRuntimeModels(session.modelRuntime)
+    .filter((model) => !isDesktopAutoModel(model) || configured || isDesktopAutoModel(session.model))
+    .map((model) => isDesktopAutoModel(model) ? { ...model, configured } : model);
 }
 
 function projectRuntimeModels(runtime: ModelRuntime): ModelSummary[] {

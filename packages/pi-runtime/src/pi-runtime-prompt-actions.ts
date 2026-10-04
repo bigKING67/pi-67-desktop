@@ -5,6 +5,7 @@ import type { RuntimeSessionBindings } from "./runtime-session-bindings.js";
 import type { createRuntimeSessionCatalog } from "./runtime-session-catalog.js";
 import { clearSessionQueue } from "./session-queue.js";
 import type { RuntimeResponseTimings } from "./runtime-response-timing.js";
+import { continueInterruptedTask, inspectInterruptedTask } from "./interrupted-task-recovery.js";
 
 interface PiRuntimePromptActionsOptions {
   responseTimings?: RuntimeResponseTimings;
@@ -67,6 +68,31 @@ export class PiRuntimePromptActions {
       attachments,
       signal
     );
+  }
+
+  inspectInterrupted() { return inspectInterruptedTask(this.options.sessionBindings.requireSession()); }
+
+  async continueInterrupted(anchor: string, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
+    await this.options.assertWritable();
+    signal?.throwIfAborted();
+    await this.options.configurationReload.assertReady();
+    signal?.throwIfAborted();
+    const session = this.options.sessionBindings.requireSession();
+    let aborting: Promise<void> | undefined;
+    const abort = () => {
+      aborting = session.abort();
+      void aborting.catch(() => undefined); // Observed below, including when the run also rejects.
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+    try {
+      await continueInterruptedTask(session, anchor);
+    } finally {
+      signal?.removeEventListener("abort", abort);
+      await aborting;
+      await this.options.sessionCatalog.upsertCurrent("session-updated");
+      await this.options.configurationReload.apply();
+    }
   }
 
   async followUp(text: string, attachments?: PreparedPromptAttachmentSet, signal?: AbortSignal): Promise<void> {

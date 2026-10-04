@@ -22,6 +22,7 @@ export function commandRequiresRunAdmission(command: AgentCommand): boolean {
   return command.type === "session.import"
     || command.type === "session.compact"
     || command.type === "command.invoke"
+    || command.type === "session.recovery.continue"
     || (command.type === "prompt.submit" && command.payload.delivery === "new-turn");
 }
 

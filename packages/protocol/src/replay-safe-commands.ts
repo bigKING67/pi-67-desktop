@@ -30,6 +30,7 @@ export const REPLAY_SAFE_CONTROL_MUTATION_TYPES = [
   "model.default.set",
   "model.projectDefault.set",
   "vision.assistant.global.set",
+  "model.routing.global.set",
   "vision.assistant.project.set",
   "thinking.set",
   "resource.reload",
@@ -72,6 +73,7 @@ export const REPLAY_SAFE_OPERATION_ACK_TYPES = [
   "session.import",
   "session.compact",
   "plan.implement",
+  "session.recovery.continue",
   "command.invoke"
 ] as const satisfies readonly AgentCommandType[];
 

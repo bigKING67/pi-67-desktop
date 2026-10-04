@@ -845,6 +845,16 @@ loading error where the operation can produce those states
   projection merely because its Session ID still matches. Until Pi reacquires
   runtime authority, the center surface shows an explicit `打开对话` or `恢复任务`
   action and does not mount the Transcript, Composer, or Inspector projection.
+- Once the Session is authoritative and idle, derive unfinished work from its
+  current Pi branch. A neutral notice above the Transcript offers `继续当前任务`
+  only when the recorded task can continue. It explains that continuation calls
+  the current model and Auto retains its prior choice. `重新检查` is read-only.
+  Reopening alone never sends a model request. Pending submission disables both
+  actions; stale Session responses cannot affect another conversation.
+- Missing Tool Results show `继续前需要核对任务` with the bounded unresolved count
+  and no continuation button. Missing current-task Auto selection or insufficient
+  history explains the limitation and points to explicit Composer input. Inspection
+  failure says the state is unavailable, without asserting unfinished work.
 - Opening a Workspace with no known formal conversation keeps the center in one bounded
   loading/recovery state while the first Catalog page is decided. Existing rows open before
   any new Task is created; a verified empty Catalog creates exactly one first Session.
@@ -1493,6 +1503,20 @@ loading error where the operation can produce those states
   Settings, toggle navigation, and toggle Inspector respectively.
 
 ### Provider and model configuration
+
+- The global model catalog includes an `自动模型选择` section using existing
+  Settings rows/selects. It configures the judge, standard and complex models
+  from configured Pi chat models, then explicitly saves or disables Auto.
+  Saving does not change the default selection. Unsaved changes participate in
+  Settings navigation protection; external revisions require explicit adoption.
+  Missing saved choices remain visible as unavailable and never silently change.
+- Draft and live conversation pickers expose the configured `Auto · 自动选择`
+  choice. Auto is distinct from the Tool safety mode AUTO. The explanation states
+  the additional judge request, character/token/deadline limits, privacy scope
+  and unsupported team/shared-history boundary. A decision disclosure in the
+  transcript shows the actual selection/reason and judge usage; its success does
+  not indicate task success. Routing updates must preserve the live task and
+  streaming text. Both themes use existing Settings and evidence-card tokens.
 
 - `模型` is the Settings entry for Pi's native Provider and model
   configuration, not a parallel Desktop registry. Its file-status region names

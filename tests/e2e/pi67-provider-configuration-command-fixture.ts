@@ -5,7 +5,7 @@ import type {
 } from "@pi67/protocol";
 
 export type MockProviderConfigurationCommandHandler = (
-  mutation: "save" | "remove" | "credential" | "default" | "vision-global" | "vision-project",
+  mutation: "save" | "remove" | "credential" | "default" | "vision-global" | "vision-project" | "auto-routing",
   value: PiProviderConfigurationSnapshot,
   payload: Record<string, unknown>,
   persistent?: boolean
@@ -162,6 +162,12 @@ export function installMockProviderConfigurationCommandHandler(): void {
   }
 
   testWindow.__pi67ResolveMockProviderConfigurationCommand = (mutation, value, payload, persistent) => {
+    if (mutation === "auto-routing") {
+      const snapshot = structuredClone(value);
+      if (payload.selection) snapshot.autoRouting = payload.selection as NonNullable<PiProviderConfigurationSnapshot["autoRouting"]>;
+      else delete snapshot.autoRouting;
+      return nextConfigurationRevision(snapshot);
+    }
     if (mutation === "save") return saveProviderConfiguration(value, payload);
     if (mutation === "remove") return removeProviderConfiguration(value, payload);
     if (mutation === "credential") return updateCredentialConfiguration(value, payload, persistent === true);

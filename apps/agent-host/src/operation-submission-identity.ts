@@ -16,6 +16,7 @@ export function operationSubmissionIdentity(command: AgentCommand): OperationSub
     case "session.import":
     case "session.compact":
     case "plan.implement":
+    case "session.recovery.continue":
     case "command.invoke":
       return textOperationSubmissionIdentity(
         command.payload.submissionId,
@@ -26,7 +27,9 @@ export function operationSubmissionIdentity(command: AgentCommand): OperationSub
             ? command.payload.instructions ?? ""
             : command.type === "plan.implement"
               ? command.payload.planId
-              : command.payload.command
+              : command.type === "session.recovery.continue"
+                ? command.payload.anchor
+                : command.payload.command
       );
     default:
       return undefined;
@@ -50,7 +53,7 @@ export function promptSubmissionFingerprint(
 
 export function textOperationSubmissionIdentity(
   submissionId: string,
-  type: "session.import" | "session.compact" | "plan.implement" | "command.invoke",
+  type: "session.import" | "session.compact" | "plan.implement" | "session.recovery.continue" | "command.invoke",
   value: string
 ): OperationSubmissionIdentity {
   const hash = createHash("sha256");

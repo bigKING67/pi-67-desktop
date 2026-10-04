@@ -232,6 +232,7 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
           disabledByProject: projectVision?.mode === "disabled",
           projectTrusted: state.projectTrusted
         },
+        ...(globalSettings.autoRouting ? { autoRouting: globalSettings.autoRouting } : {}),
         files,
         diagnostics: []
       };
@@ -248,6 +249,7 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
           disabledByProject: false,
           projectTrusted: state.projectTrusted
         },
+        ...(previous?.autoRouting ? { autoRouting: previous.autoRouting } : {}),
         files,
         diagnostics
       };

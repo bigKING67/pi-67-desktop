@@ -26,6 +26,7 @@ export * from "./plan-mode.js";
 export * from "./safety-policy.js";
 export * from "./session-catalog.js";
 export * from "./session-view.js";
+export * from "./session-recovery.js";
 export * from "./skill-pack-management.js";
 export * from "./team-chat.js";
 export * from "./team-chat-governance.js";

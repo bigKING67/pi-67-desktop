@@ -4,6 +4,7 @@ import { Button } from "react-aria-components";
 import { useShellStore } from "../shell/shell-store.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { ProviderDefaultModelEditor } from "./ProviderDefaultModelEditor.js";
+import { AutoRoutingSettings } from "./AutoRoutingSettings.js";
 import { ProjectProviderConfigurationPanel } from "./ProjectProviderConfigurationPanel.js";
 import {
   ProviderConfigurationEmpty as PanelEmpty,
@@ -239,6 +240,7 @@ function GlobalProviderConfigurationPanel() {
           query={providerQuery}
           view={providerCatalogView}
         />
+        <AutoRoutingSettings snapshot={snapshot} disabled={phase === "saving" || dirty || !!externalConflict} />
         </div>
       ) : (
         <main className={styles.editor} data-testid="provider-configuration-editor">

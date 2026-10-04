@@ -15,6 +15,7 @@ import {
 } from "./extension-package-schemas.js";
 import {
   PiConfigurationExpectedRevisionSchema,
+  PiAutoRoutingSelectionSchema,
   PiConfigurationProviderIdSchema,
   PiProviderModelDiscoveryInputSchema,
   PiProviderConfigurationInputSchema
@@ -35,6 +36,7 @@ import {
 import { WorkspaceRegisterPayloadSchema } from "./workspace-registration-schemas.js";
 import { WorkspaceUsageReportPayloadSchema } from "./usage-schemas.js";
 import { MAX_PROMPT_TEXT_CHARS } from "./prompt-text-limits.js";
+import { SessionRecoveryAnchorSchema } from "./session-recovery-schemas.js";
 import {
   WorkspaceFileContentSearchPayloadSchema,
   WorkspaceFileCreatePayloadSchema,
@@ -158,6 +160,8 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
     mode: Type.Union([Type.Literal("execute"), Type.Literal("plan")])
   }),
   "plan.implement": strictObject({ submissionId: SubmissionIdSchema, planId: PlanIdSchema }),
+  "session.recovery.inspect": EmptyPayloadSchema,
+  "session.recovery.continue": strictObject({ submissionId: SubmissionIdSchema, anchor: SessionRecoveryAnchorSchema }),
   "session.nameByPath": strictObject({ path: PathSchema, mutation: SessionNameMutationSchema }),
   "conversation.pin": strictObject({ path: PathSchema, pinned: Type.Boolean() }),
   "conversation.archive": strictObject({ path: PathSchema, archived: Type.Boolean() }),
@@ -259,6 +263,10 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
       model: PiConfigurationProviderIdSchema
     })
   ]),
+  "model.routing.global.set": strictObject({
+    expectedRevision: PiConfigurationExpectedRevisionSchema,
+    selection: Type.Optional(PiAutoRoutingSelectionSchema)
+  }),
   "thinking.set": strictObject({ level: Type.String({ minLength: 1, maxLength: 32 }) }),
   "resource.list": EmptyPayloadSchema,
   "resource.reload": EmptyPayloadSchema,

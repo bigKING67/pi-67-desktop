@@ -76,7 +76,8 @@ export function ComposerIntentRuntimeControls({
     return () => { current = false; };
   }, [credentialDialogOpen, revision, taskId, workspaceId]);
 
-  const models = useMemo(() => runtimeModels(snapshot), [snapshot]);
+  const providers = useMemo(() => runtimeProviders(snapshot), [snapshot]);
+  const models = useMemo(() => runtimeModels(providers), [providers]);
   const effectiveModel = draftModel ?? snapshot?.defaults.effective;
   const selected = effectiveModel
     ? models.find((candidate) => (
@@ -84,7 +85,8 @@ export function ComposerIntentRuntimeControls({
         && candidate.model.id === effectiveModel.model
       ))
     : undefined;
-  const modelGroups: ComposerRuntimeSelectOptionGroup[] = (snapshot?.providers ?? [])
+  const unavailableAuto = !selected && draftModel?.provider === "pi67-auto" && draftModel.model === "auto";
+  const modelGroups: ComposerRuntimeSelectOptionGroup[] = providers
     .filter((provider) => provider.configured && provider.models.length > 0)
     .map((provider) => ({
       id: provider.id,
@@ -123,11 +125,13 @@ export function ComposerIntentRuntimeControls({
 
   useEffect(() => {
     if (!snapshot || !draftModel) return;
-    const selectedModel = runtimeModels(snapshot).find((candidate) => (
+    const selectedModel = runtimeModels(runtimeProviders(snapshot)).find((candidate) => (
       candidate.provider.id === draftModel.provider
       && candidate.model.id === draftModel.model
     ));
     if (!selectedModel) {
+      // An explicit Auto choice must fail visibly if configuration disappears.
+      if (draftModel.provider === "pi67-auto" && draftModel.model === "auto") return;
       const drafts = useTaskDraftStore.getState();
       drafts.setStartupModel(taskId, undefined);
       drafts.setStartupThinkingLevel(taskId, undefined);
@@ -150,7 +154,7 @@ export function ComposerIntentRuntimeControls({
         <ComposerRuntimeSelect
           ariaLabel={messages.composer.modelLabel}
           disabled={submitting || loading}
-          footer={usingRecentPreference
+          footer={unavailableAuto ? "Auto 配置不可用。请更新配置或明确选择其他模型。" : usingRecentPreference
             ? "沿用当前工作区最近一次成功配置。"
             : draftModel
               ? "将在创建会话后、发送首条消息前应用。"
@@ -181,7 +185,7 @@ export function ComposerIntentRuntimeControls({
           optionGroups={modelGroups}
           options={modelOptions}
           selectedKey={selected?.key ?? null}
-          valueText={loading ? "正在读取模型…" : selected?.model.name ?? selected?.model.id ?? messages.composer.selectModel}
+          valueText={loading ? "正在读取模型…" : unavailableAuto ? "Auto · 配置不可用" : selected?.model.name ?? selected?.model.id ?? messages.composer.selectModel}
           variant="model"
         />
       </div>
@@ -212,12 +216,25 @@ export function ComposerIntentRuntimeControls({
   );
 }
 
-function runtimeModels(snapshot: PiProviderConfigurationSnapshot | undefined): RuntimeModelOption[] {
-  return (snapshot?.providers ?? []).filter((provider) => provider.configured).flatMap((provider) => (
+function runtimeModels(providers: PiProviderConfigurationView[]): RuntimeModelOption[] {
+  return providers.filter((provider) => provider.configured).flatMap((provider) => (
     provider.models.map((model) => ({
       provider,
       model,
       key: `${provider.id}/${model.id}`
     }))
   ));
+}
+
+function runtimeProviders(snapshot: PiProviderConfigurationSnapshot | undefined): PiProviderConfigurationView[] {
+  const providers = snapshot?.providers ?? [];
+  const config = snapshot?.autoRouting;
+  if (!config || snapshot.syncState !== "current" || !Object.values(config).every((selection) => (
+    providers.some((provider) => provider.id === selection.provider && provider.configured
+      && provider.models.some((model) => model.id === selection.model && model.api !== "pi-virtual" && model.input.includes("text")))
+  ))) return providers;
+  return [{ id: "pi67-auto", name: "Auto", origin: "builtin", configured: true,
+    modelsJsonApiKeyConfigured: false, headerNames: [], modelCount: 1, advancedJson: "{}",
+    models: [{ id: "auto", name: "Auto · 自动选择", api: "pi-virtual", input: ["text", "image"], reasoning: true,
+      thinkingLevels: ["off", "minimal", "low", "medium", "high", "xhigh"], headerNames: [], advancedJson: "{}" }] }, ...providers];
 }

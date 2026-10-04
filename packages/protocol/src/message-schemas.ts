@@ -86,12 +86,27 @@ const VisionEvidencePartSchema = messageObject({
   totalTokens: Type.Number({ minimum: 0, maximum: Number.MAX_VALUE }),
   totalCost: Type.Number({ minimum: 0, maximum: Number.MAX_VALUE })
 });
+const AutoRoutingSelectionSchema = messageObject({
+  provider: Type.String({ minLength: 1, maxLength: 512 }),
+  model: Type.String({ minLength: 1, maxLength: 512 })
+});
+const AutoRoutingPartSchema = messageObject({
+  type: Type.Literal("auto-routing"),
+  status: Type.Union([Type.Literal("selected"), Type.Literal("failed")]),
+  reason: Type.Union(["standard", "complex", "image-capability", "judge-failed", "invalid-decision", "cancelled", "timed-out"].map((reason) => Type.Literal(reason))),
+  judge: AutoRoutingSelectionSchema,
+  selected: Type.Optional(AutoRoutingSelectionSchema),
+  inputTruncated: Type.Boolean(),
+  totalTokens: Type.Optional(Type.Number({ minimum: 0, maximum: Number.MAX_VALUE })),
+  totalCost: Type.Optional(Type.Number({ minimum: 0, maximum: Number.MAX_VALUE }))
+});
 const MessagePartSchema = Type.Union([
   TextPartSchema,
   ToolCallPartSchema,
   ImagePartSchema,
   AttachmentPartSchema,
   VisionEvidencePartSchema,
+  AutoRoutingPartSchema,
   PlanProposalPartSchema
 ]);
 

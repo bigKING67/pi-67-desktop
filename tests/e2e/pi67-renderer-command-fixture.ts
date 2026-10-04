@@ -49,6 +49,7 @@ export function installMockCommandResponseHandler({
     const sessionCatalogPage = current.sessionCatalogPagesByWorkspace[current.workspaceId]
       ?? current.sessionCatalogPage;
     if (type === "runtime.getStatus") return { initialized: true, loaded: true };
+    if (type === "session.recovery.inspect") return { status: "none" };
     if (type === "enterprise.identity.get") return { state: "signed-out" };
     if (type === "enterprise.auth.disconnect") {
       // Commit the Host identity change with logout, after any earlier reads.
@@ -245,6 +246,10 @@ export function installMockCommandResponseHandler({
     if (type === "model.projectDefault.set") {
       current.providerConfiguration = resolveMockProviderConfigurationCommand(
         "default", current.providerConfiguration, { ...payload, scope: "project" });
+      return current.providerConfiguration;
+    }
+    if (type === "model.routing.global.set") {
+      current.providerConfiguration = resolveMockProviderConfigurationCommand("auto-routing", current.providerConfiguration, payload);
       return current.providerConfiguration;
     }
     if (type === "vision.assistant.global.set" || type === "vision.assistant.project.set") {

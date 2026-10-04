@@ -1820,6 +1820,38 @@ gates activation. Packaged smoke prints the stage's `source-verify`,
 
 ## Startup and recovery
 
+Auto model selection remains Agent Host-owned Pi execution. App-scoped
+`model.routing.global.set` validates exact config revision and physical candidate
+availability before writing only `pi67Desktop.autoRouting` in global Pi JSONC.
+The optional Provider snapshot field contains model references, never credentials.
+Task Sessions register `pi67-auto/auto` through Pi ModelRuntime; Pi owns dispatch
+and branch-local virtual state. Judge usage is appended through SessionManager's
+native usage API. Judge JSON is validated locally against the single complexity
+field. Pi's native samplingParams requests strict response_format/text.format
+JSON Schema on compatible OpenAI/Azure APIs; other APIs keep local validation
+without foreign payload fields. A schema rejection never retries or downgrades
+the format. This does not introduce a transport or a second provider adapter.
+A bounded `pi67.auto-routing.v1` custom entry projects as the
+`auto-routing` MessagePart without adding model context. `conversation.changed`
+reason `routing` refreshes that evidence while preserving streaming/live state.
+The latest physical response identifies search and inherited subagent models.
+Shared/team history is rejected before classification pending a separate model
+policy integration. Pi Durable is not part of the production runtime.
+
+Task-scoped `session.recovery.inspect` is a read-only, bounded current-branch
+assessment. `session.recovery.continue { submissionId, anchor }` uses the existing
+durable Prompt operation receipt, global run admission and exact Session authority.
+The anchor is the native leaf ID, not prompt content. Current authorization and
+configuration are checked before a fresh branch assessment; a stale anchor,
+missing Tool Result, missing current-task Auto state or incomplete history denies
+dispatch. The supported Pi `sendCustomMessage` seam appends one bounded hidden
+continuation instruction and triggers the native loop. It neither copies the
+original prompt nor fabricates Tool Results. During this explicit continuation
+only, the Auto virtual router restores native persisted state even if a crash
+left the last recorded message as a user message. A later new user task follows
+ordinary classification. Abort uses Pi cancellation; no alternate runtime,
+background resubmission, tool replay or recovery journal is introduced.
+
 1. Main 注册 secure `app` scheme 并创建窗口；Welcome 不启动 Agent Host。
 2. 用户选定 workspace 或运行依赖 Agent Host 的恢复与诊断后，renderer 通过窄 IPC 请求按需启动。
 3. Agent Host 启动协调器先按 Agent 目录和有效 Desktop capability receipt 分类
@@ -1863,7 +1895,14 @@ gates activation. Packaged smoke prints the stage's `source-verify`,
    同一恢复 incident 内重复 Port 中断保留首次在途 Operation 身份，直到恢复收敛或 Host replacement；
    已清空的瞬态 AppState 不得覆盖该身份。只有
    `hostEpoch` 变化才用当前 workspace、trust 与 session path 重新初始化；审批模式不在协议上传递，
-   由 Runtime 固定使用 Host 默认值。
+   由 Runtime 固定使用 Host 默认值。新 Host 的初始化 context 只携带 Workspace/Task 身份，
+   不复用旧 Host 的 Session id/file identity/generation；新的 Session authority 必须来自
+   当前 Host 的 `runtime.ready`。同 Host resync 与普通命令仍严格校验既有 Session authority。
+   Renderer 在连接丢失或 Host replacement 前保留各 live Task 的旧 Host 归属；显式恢复和
+   后台任务切换据此选择同 Host resync 或新 Task 重开，不能仅凭存在 Session generation
+   推断属于当前 Host。权威 bootstrap 成功后才解除旧 Host 的恢复标记。
+   显式恢复若在等待连接期间遇到自动 bootstrap，须保留自动恢复持有的 Task，不能轮换身份
+   或发起第二次初始化；异步等待前后的投影代次也必须一致，避免丢弃已到达的权威 ready。
 
 打包环境无条件忽略 `PI67_RENDERER_DEV_URL`，只加载 `app://pi67/index.html`；开发环境只接受
 精确的 `http://127.0.0.1:5173`。生产协议解析只接受 exact `app://pi67` authority，拒绝 credentials、
