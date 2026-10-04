@@ -58,7 +58,7 @@ the current contract records slower cache restore/save.
 - [x] Reproduce failure mechanisms and implement targeted regression fixes.
 - [x] Implement evidence-backed CI overhead reduction and update CI contracts.
 - [x] Pass focused gates and complete source check; independent diff review.
-- [ ] Commit/push scoped changes; verify exact-SHA CI and compare timings.
+- [x] Commit/push scoped changes; verify exact-SHA CI and compare timings.
 
 ## Rollback and risks
 
@@ -194,3 +194,39 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
   the affected 2 files / 28 tests passed again. Type-aware lint, structure, workflow Action
   pins, PowerShell discovery and diff whitespace checks passed. Independent readonly review
   found no blocker and independently confirmed the full-CI routing requirement.
+
+
+## Completed acceptance and timing limits
+
+- Code/verifier commit `1018f9d3dd1b7f0c2e4db45474ad0b9c0df44412`,
+  [CI run 37211024413](https://github.com/bigKING67/pi-67-desktop/actions/runs/37211024413),
+  attempt 1: aggregate CI Gate **PASS**, source **PASS** (946 files / 6,268 tests,
+  24 optional tests skipped), Renderer **PASS** (294 passed / 1 skipped), macOS
+  native **PASS** (284 s), Windows native **PASS** (942 s). No rerun of this SHA.
+- All six packaged recovery receipts bind to the clean source above, with process
+  cleanup and canonical isolation passed and zero real model requests. The installer
+  report is `full`, status `passed`, last stage `uninstall:completed`; both synthetic
+  Profile lanes completed four launches, Provider checks and shutdowns. User data
+  was preserved after uninstall. All eight Provider checks completed in 1.33–1.59 s.
+- Windows installer identity: `New-Money-0.1.0-alpha.43-win-x64.exe`,
+  883,771,805 bytes, SHA-256
+  `90bcdd4d35e63c8b7d03020141f40885dc5627439576e109f753345b5b7832b9`.
+  Windows ASAR SHA-256
+  `d7bae6a06fab2faaf09c342b597e42191282b6c1851034ca7b0292597dfe0f79`.
+- Timings: Windows packaging 60 s versus baseline 141 s; macOS packaging
+  48 s versus baseline 132 s. Provider configuration regression 5.58 s versus
+  the previous failed 81.39 s sample. Full NSIS 288 s versus baseline 244 s;
+  complete Windows job 942 s versus baseline 870 s. **Packaging/test overhead
+  improved; total Windows duration is not proven improved.** Install/reinstall
+  took 86.3/81.7 s, with hosted runner variability and actual installer I/O retained.
+- Evidence directory: `artifacts/validation/pi-durable-compat/ci-37211024413/`;
+  sibling job logs and `ci-37211024413-jobs.json` retain source, native, timing and
+  gate evidence. These are ignored validation artifacts, not distributed releases.
+- The prior blank DOMContentLoaded failure and historical Main Host Operation
+  shutdown stall did not recur here; their root causes remain unproven. One green
+  run is not a zero-flakiness guarantee. Windows evidence is hosted Windows Server
+  2025 x64 with isolated synthetic profiles, not manual target-user acceptance,
+  SmartScreen, a distinct-version upgrade or uncontrolled real profiles.
+- Scope closed with independent reviews and no open blocking finding. Preserve
+  concurrent native-image WIP; no publish, release, paid model calls, global
+  configuration changes or local preview replacement were performed in this task.
