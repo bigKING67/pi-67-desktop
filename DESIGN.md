@@ -1685,6 +1685,9 @@ loading error where the operation can produce those states
 
 ### Runtime controls
 
+- A Workspace startup placeholder shows `正在加载对话` with its current initialization
+  detail until bootstrap commits. It does not expose the New Session Intent Composer;
+  only an actual provisional `draft` uses that offline-capable surface.
 - A provisional New Session Intent shows the same compact model and thinking
   controls before any Pi Session or JSONL exists. Its model catalog comes from the
   read-only effective project configuration projection (or the app projection when

@@ -2105,6 +2105,9 @@ coordinator 管理。同一 `workspaceId + creationId` 共享一次 single-fligh
 异步执行，失败只触发 metadata refresh/rebuild，不能把已创建结果改写为 `REQUEST_OUTCOME_UNKNOWN`。
 Renderer 已 committed 的 bootstrap 同样不等待 Session Catalog refresh；查询继续由 Catalog Store
 持有 loading/error/retry 与 generation 校验，首条 Prompt 只等待精确 Session identity 和运行配置确认。
+Workspace 打开期间，Host handshake 必须保留 `workspaceOpenPending` 所属的 transition；启动占位的
+`initializing` lifecycle 不能被当成 New Session Intent。只有 `provisional + draft + 无 creationStatus`
+可进入 Intent Composer 和 materialize 入口，bootstrap 完成后仍按精确 Session identity 提交 Prompt。
 
 Workspace-scoped `workspace.usage.report` 同样不创建 Task 或加载 Pi Task Runtime。Agent Host 按
 `workspaceId + window` single-flight，同一 Workspace 最多运行一个冷扫描、全 Host 最多并行四个扫描，

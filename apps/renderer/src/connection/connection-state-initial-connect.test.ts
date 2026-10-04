@@ -50,6 +50,7 @@ describe("initial Agent Host connection state", () => {
       connected: false,
       hostEpoch: undefined,
       sessionTransitionPending: true,
+      workspaceOpenPending: true,
       runtime: {
         phase: "recovering",
         detail: "正在恢复 Pi 会话",
@@ -59,9 +60,10 @@ describe("initial Agent Host connection state", () => {
 
     useAppStore.getState().handleAgentConnected(CONNECTION);
 
-    expect(useAppStore.getState().runtime).toMatchObject({
-      phase: "recovering",
-      detail: "正在恢复 Pi 会话"
+    expect(useAppStore.getState()).toMatchObject({
+      sessionTransitionPending: true,
+      workspaceOpenPending: true,
+      runtime: { phase: "recovering", detail: "正在恢复 Pi 会话" }
     });
   });
 

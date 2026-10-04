@@ -58,7 +58,7 @@ export function handleConnected(
     hostEpoch: identity.hostEpoch,
     connected: true,
     trustUpdating: false,
-    sessionTransitionPending: shouldRecoverProjection,
+    sessionTransitionPending: state.workspaceOpenPending || shouldRecoverProjection,
     sessionBootstrapTransitionPending: false,
     ...(restoredRuntime === undefined ? {} : { runtime: restoredRuntime })
   });

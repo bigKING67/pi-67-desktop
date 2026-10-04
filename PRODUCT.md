@@ -1704,7 +1704,11 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   cannot duplicate Session creation or replay a control mutation into a newer Session
   generation.
 - `新建对话`, `Cmd/Ctrl+N`, `Cmd/Ctrl+T`, and `/new` first create only a
-  Renderer-owned New Session Intent. The intent is an offline-capable Composer surface,
+  Renderer-owned New Session Intent. Only a provisional Task in the `draft` lifecycle
+  is such an intent. A Workspace startup placeholder remains `initializing` until its
+  authoritative bootstrap commits; the initial Host handshake preserves the pending
+  Workspace transition and never exposes that placeholder as a sendable draft.
+  The intent is an offline-capable Composer surface,
   not a Pi Session: it does not connect a Runtime, call `session.create`, or create Pi
   JSONL until the first Prompt is submitted. The intent nevertheless exposes the
   effective project model and exact Pi-supported thinking choices. An explicit choice

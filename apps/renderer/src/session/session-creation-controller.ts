@@ -47,6 +47,7 @@ export function beginRendererSessionIntent(
   if (
     selected?.workspaceId === targetWorkspaceId
     && selected.conversation.kind === "provisional"
+    && selected.lifecycle === "draft"
     && selected.creationStatus === undefined
     && sameTeamScope(selected.teamScope, options.teamScope)
     && !selectedDraft?.text.trim()
@@ -103,6 +104,7 @@ export async function materializeRendererSessionIntent(
   if (
     !before
     || before.conversation.kind !== "provisional"
+    || before.lifecycle !== "draft"
     || before.creationStatus !== undefined
     || selectedWorkbenchTask(rendererWorkbenchStore.getState())?.id !== taskId
   ) {
@@ -122,6 +124,7 @@ export async function materializeRendererSessionIntent(
     !current
     || current.taskGeneration !== before.taskGeneration
     || current.conversation.kind !== "provisional"
+    || current.lifecycle !== "draft"
     || current.creationStatus !== undefined
     || !sameTeamScope(current.teamScope, teamScope)
     || selectedWorkbenchTask(workbench)?.id !== taskId

@@ -109,6 +109,7 @@ export function WorkspaceShell({
   ) : selectedWorkspace && selectedWorkspace.availability !== "available" ? (
     <WorkspaceRecoveryState workspace={selectedWorkspace} />
   ) : selectedTask?.conversation.kind === "provisional"
+    && selectedTask.lifecycle === "draft"
     && selectedTask.creationStatus === undefined
     && selectedWorkspace ? (
       <NewSessionIntentBoundary pending={sessionTransitionPending} task={selectedTask} workspace={selectedWorkspace} />
@@ -393,12 +394,13 @@ export function provisionalTaskStateCopy(task: RendererWorkbenchTask): {
       loading: false
     };
   }
+  const initializing = task.lifecycle === "initializing";
   return {
-    title: task.hasDraft ? "对话草稿尚未创建" : "对话尚未创建",
-    detail: task.hasDraft
+    title: initializing ? "正在加载对话" : task.hasDraft ? "对话草稿尚未创建" : "对话尚未创建",
+    detail: initializing ? task.runtime.detail : task.hasDraft
       ? "草稿仍保留在当前窗口中，重新新建对话后可以继续发送。"
       : "该条目没有可恢复的会话记录。",
-    loading: false
+    loading: initializing
   };
 }
 

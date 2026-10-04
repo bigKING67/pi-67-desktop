@@ -46,6 +46,7 @@ async function submitIntent(
     !selected
     || selected.id !== taskId
     || selected.conversation.kind !== "provisional"
+    || selected.lifecycle !== "draft"
     || selected.creationStatus !== undefined
   ) {
     return { accepted: false, error: "当前新对话草稿已失效，请重新选择后再发送。" };

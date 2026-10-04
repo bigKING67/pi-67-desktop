@@ -461,3 +461,41 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
 - The preceding diagnostic run finished with source/Renderer/macOS and the full
   Windows NSIS lifecycle passing. Hidden shutdown remained strict graceful (Main
   694.3 ms, Host 631.5 ms). Only the synthetic UI gate failed. Do not call that run green.
+
+## Followup: preserve Workspace startup ownership through the first handshake
+
+- Catalog fix run `37225378901` / attempt 1 at `78373016` still failed only the
+  Windows synthetic UI lane (scale 1.5). Source/Renderer/macOS, all recovery
+  scenarios, Windows hidden smoke and full NSIS passed. Windows native took 863 s,
+  macOS 226 s. Catalog independence is valid but was not the complete cause.
+- A local isolated current-source Electron probe with a synthetic extension factory
+  delayed by 2 s reproduced the same failure: an initializing Workspace placeholder
+  was rendered as `new-session-intent`, bootstrap became ready, but the first submit
+  never dispatched a Prompt or started its synthetic Provider/child. No real model
+  requests or user Profile access. Before/after evidence is under ignored
+  `artifacts/validation/pi-durable-compat/probe-ui-activation-slow-init*.log`.
+- The first Host handshake cleared `sessionTransitionPending` while the caller still
+  owned `workspaceOpenPending`. UI and submission checks mistook any provisional
+  without creation status for an offline draft. Submission waited for Workspace
+  authority; bootstrap then replaced that same placeholder, invalidating the intent.
+  Its old Composer unmounted, leaving the draft with no visible local error.
+- Preserve the Workspace-owned pending transition at handshake; require the `draft`
+  lifecycle for Intent rendering/submission/materialization, including revalidation.
+  The `initializing` placeholder shows truthful loading state. Preserve offline draft
+  behavior, physical Session identity guards and model/thinking confirmation. No
+  automatic resubmit, request retry, timeout increase or acceptance weakening.
+- Three regressions failed before the fix and passed after. 78 focused tests across
+  eight files, Renderer typecheck/build, type-aware lint and structure passed. The
+  identical delayed-initialization native probe then passed all three scales with
+  actual controlled Provider/child activation. This local mixed-WIP probe proves the
+  mechanism; exact-SHA CI remains required for Windows/macOS acceptance.
+- Explicit offline Intent activation also passed at all three scales after the fix.
+  Independent review found the empty-provisional reuse entry still admitted failed
+  startup placeholders; add the same draft requirement there. Its lost/initializing
+  cases failed before correction, then passed alongside the genuine empty-draft reuse
+  case. This keeps New Session usable after a Workspace-open failure.
+- Final review accepted the reuse correction. Total targeted coverage is 81 tests.
+  Concurrent unrelated local-memory retirement WIP appeared during final validation;
+  a repeated full local lint hit its `openviking-runtime-retirement.ts` unbound-method
+  warnings. Preserve that WIP and use scoped Renderer lint plus clean exact-SHA CI
+  for this delivery; the earlier full lint passed before those concurrent changes.

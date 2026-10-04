@@ -37,6 +37,14 @@ describe("WorkspaceShell live task selection", () => {
 });
 
 describe("WorkspaceShell provisional task state", () => {
+  it("keeps the Workspace startup placeholder loading until its bootstrap commits", () => {
+    expect(provisionalTaskStateCopy(task({
+      conversation: { kind: "provisional", workspaceId: "workspace-a", draftId: "draft-a" },
+      lifecycle: "initializing",
+      runtime: { phase: "starting", detail: "正在加载 Pi SDK", recoverable: true }
+    }))).toEqual({ title: "正在加载对话", detail: "正在加载 Pi SDK", loading: true });
+  });
+
   it("shows acknowledgement confirmation without offering runtime recovery", () => {
     expect(provisionalTaskStateCopy(task({
       conversation: { kind: "provisional", workspaceId: "workspace-a", draftId: "draft-a" },

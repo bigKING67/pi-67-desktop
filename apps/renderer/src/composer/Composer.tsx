@@ -100,7 +100,8 @@ export function Composer() {
     && activeTask.sessionFileIdentity === sessionFileIdentity
     && activeTask.sessionGeneration === sessionGeneration
   );
-  const newSessionIntent = activeTask?.conversation.kind === "provisional" && activeTask.creationStatus === undefined;
+  const newSessionIntent = activeTask?.conversation.kind === "provisional"
+    && activeTask.lifecycle === "draft" && activeTask.creationStatus === undefined;
   const interactionMode = activeSessionAuthority
     ? authoritativeInteractionMode
     : draft.interactionMode;
@@ -295,8 +296,7 @@ export function Composer() {
       submissionIdRef.current = submissionId;
       const result = await submitComposerDraft({
         taskId: activeTask.id,
-        provisional: activeTask.conversation.kind === "provisional"
-          && activeTask.creationStatus === undefined,
+        provisional: newSessionIntent,
         text: nextText,
         submissionId,
         attachments: nextAttachments,

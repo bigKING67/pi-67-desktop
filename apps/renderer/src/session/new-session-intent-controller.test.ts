@@ -62,6 +62,20 @@ describe("new Session intent controller", () => {
     rendererWorkbenchStore.getState().openTask(provisionalTask());
   });
 
+  it("rejects a Workspace startup placeholder without materializing or sending", async () => {
+    rendererWorkbenchStore.getState().openTask({
+      ...provisionalTask(),
+      lifecycle: "initializing",
+      runtime: { phase: "starting", detail: "正在加载 Pi SDK", recoverable: true }
+    });
+    materializeIntent.mockResolvedValue({ status: "failed", error: "Unexpected materialization" });
+
+    await expect(submitRendererNewSessionIntent("task-intent", "hello", "startup-submission"))
+      .resolves.toEqual({ accepted: false, error: "当前新对话草稿已失效，请重新选择后再发送。" });
+    expect(materializeIntent).not.toHaveBeenCalled();
+    expect(submitPrompt).not.toHaveBeenCalled();
+  });
+
   it("confirms provisional Plan Mode before submitting the first Prompt", async () => {
     useTaskDraftStore.getState().setInteractionMode("task-intent", "plan");
     materializeIntent.mockImplementation(async () => {
