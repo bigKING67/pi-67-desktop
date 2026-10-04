@@ -1,8 +1,30 @@
 import { EventEmitter } from "node:events";
+import { spawn } from "node:child_process";
 import { afterEach, expect, it, vi } from "vitest";
 import { watchAgentHostOwner } from "./agent-host-owner.js";
 
 afterEach(() => vi.useRealTimers());
+
+it("keeps the exit deadline runnable when abandoned cleanup has no active handles", async () => {
+  const entry = new URL("./agent-host-owner.ts", import.meta.url).href;
+  const child = spawn(process.execPath, ["--input-type=module", "--eval", `
+    import { EventEmitter } from "node:events";
+    import { watchAgentHostOwner } from ${JSON.stringify(entry)};
+    const parent = new EventEmitter();
+    const port = Object.assign(new EventEmitter(), { close() {}, start() {} });
+    watchAgentHostOwner(parent, () => {}, () => { process.stdout.write("forced-exit"); process.exit(70); });
+    parent.emit("message", { data: { type: "agent-host-owner" }, ports: [port] });
+    port.emit("close");
+  `], { stdio: ["ignore", "pipe", "pipe"], timeout: 10_000 });
+  let output = "", errors = "";
+  child.stdout.on("data", chunk => { output += String(chunk); });
+  child.stderr.on("data", chunk => { errors += String(chunk); });
+  const code = await new Promise<number | null>((resolve, reject) => {
+    child.once("error", reject); child.once("close", resolve);
+  });
+  expect(code, errors).toBe(70);
+  expect(output).toBe("forced-exit");
+}, 15_000);
 
 function fixture() {
   vi.useFakeTimers();

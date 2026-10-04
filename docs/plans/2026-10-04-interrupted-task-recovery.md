@@ -1,6 +1,6 @@
 # Recover interrupted tasks on native Pi
 
-Status: active; Windows Main-death lifecycle fix and exact-SHA CI acceptance pending
+Status: active; Windows fault-injection PID correction and exact-SHA CI acceptance pending
 Owner: Codex
 Started: 2026-10-04
 
@@ -74,10 +74,11 @@ browser runtime acceptance uses browser67 when needed.
   renderer (294 passed / 1 skipped), macOS native/recovery and Windows general
   packaged smoke. The prior missing Windows quit observation did not recur; its
   isolated cause remains unproven. Windows `agent-before-response` passed. Windows
-  `app-after-tool` persisted the Tool Result, then proved that the old Agent Host
-  survived forced Main death; the runner failed waiting for its exit. Cleanup and
+  `app-after-tool` persisted the Tool Result, then the runner failed waiting for
+  the old Agent Host to exit after killing the driver PID. Later diagnostics below
+  invalidate the assumption that this PID was Main on Windows. Cleanup and
   canonical-session preservation passed. The unknown-Tool case was not reached.
-- Fix the observed orphan at the existing Main/Host lifecycle boundary with a
+- Bound the existing Main/Host lifecycle with a
   dedicated owner MessagePort. Install its listener before async startup; reuse
   bounded shutdown after disconnect. Keep crash-runner assertions unchanged.
   Rollback is scoped removal of this lifetime contract and its protocol revision;
@@ -113,6 +114,32 @@ browser runtime acceptance uses browser67 when needed.
   `HasExited`/exit-code observations before cleanup to distinguish execution state
   from a still-enumerable WMI object. Do not add a heartbeat or another runtime on
   the basis of PID visibility alone. Current Windows acceptance remains partial.
+
+- Clean `636d80f4`, CI `37192444423` attempt 1 passed source, renderer, macOS
+  native/three recovery cases and Windows ordinary smoke. Its new launch assertion
+  failed before the synthetic task: Electron reported Main PID 8884, while the
+  driver returned PID 3680. Installed Playwright 1.61.1 launches Electron with
+  `shell: true` on Windows. Prior Windows Main-death samples killed the shell and
+  are invalid evidence of a product orphan defect. The runner now reads Main PID
+  inside Electron, verifies it belongs to the launched driver and the isolated
+  profile, tracks both identities, and verifies the Host's parent is this Main
+  before injecting the crash. Exit budgets/assertions stay unchanged. Unit cases
+  cover direct launch, wrapped launch, missing Main and foreign ownership.
+- Independently, a real child-process regression proved the orphan exit deadline
+  must stay referenced: with `unref()` the otherwise idle Node loop exited code 0
+  without running the force-exit callback; retaining the timer produced code 70
+  and the expected callback marker. This proves timer scheduling, not the earlier
+  Windows orphan hypothesis. Full local source gate passed 944 files / 6224 tests
+  with 9 files / 24 optional tests skipped. The subsequent runner-only PID change
+  passed 35 focused tests, lint and structure checks; clean-SHA CI remains required.
+  New macOS preview passed packaged smoke and reopened the repository artifact:
+  ASAR 195103050 bytes, SHA-256
+  `20c2406623648baff63448cf1eae41268937e3ac5b19ab52ae970d1ef8be2f69`.
+  All three isolated macOS recovery scenarios passed on these bytes with the
+  corrected runner: original Session preserved, one classifier call, exact Tool
+  effect counts, zero real model requests, canonical profile unchanged and cleanup
+  passed. Receipts are linked from `owner-deadline-<scenario>.log` in the existing
+  evidence directory. The full source gate precedes only runner/test/plan edits.
 
 - Next bounded acceptance uses `eng/packaging/verify-packaged-task-recovery.mjs`:
   separate temporary profile per scenario, in-process synthetic provider, Auto

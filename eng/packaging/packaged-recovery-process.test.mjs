@@ -1,12 +1,30 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { describe, expect, it, vi } from "vitest";
-import { readRecoveryProcess, readWindowsRecoveryExitState, signalRecoveryProcess } from "./packaged-recovery-process.mjs";
+import { readRecoveryMainProcess, readRecoveryProcess, readWindowsRecoveryExitState, signalRecoveryProcess } from "./packaged-recovery-process.mjs";
 
 const pid = 123456;
 const win = { pid, parentPid: 123455, startedAt: "639267123456789012", executablePath: "C:\\隔离 测试\\New Money.exe" };
 
 describe("packaged recovery process ownership", () => {
+  it.each(["darwin", "win32"])("uses the application Main PID instead of assuming the driver PID on %s", async platform => {
+    const driverPid = platform === "win32" ? pid - 1 : pid;
+    const application = { process: () => ({ pid: driverPid }), evaluate: async () => pid };
+    const read = vi.fn().mockResolvedValue({ parentPid: pid - 1, identity: "owned-main" });
+    expect(await readRecoveryMainProcess(application, { platform, read })).toEqual({
+      pid, driverPid, parentPid: pid - 1, identity: "owned-main"
+    });
+    expect(read).toHaveBeenCalledExactlyOnceWith(pid);
+  });
+
+  it("rejects missing or foreign Main processes before fault injection", async () => {
+    const application = { process: () => ({ pid: pid - 1 }), evaluate: async () => pid };
+    const read = vi.fn().mockResolvedValueOnce(undefined).mockResolvedValue({ parentPid: pid - 2, identity: "foreign" });
+    await expect(readRecoveryMainProcess(application, { platform: "win32", read })).rejects.toThrow("exited before identity capture");
+    await expect(readRecoveryMainProcess(application, { platform: "win32", read })).rejects.toThrow("not owned");
+    await expect(readRecoveryMainProcess(application, { platform: "darwin", read })).rejects.toThrow("not owned");
+  });
+
   it.each([{ missing: true }, { missing: false, hasExited: false, exitCode: null },
     { missing: false, hasExited: true, exitCode: 70 }])("keeps native exit diagnostics separate from PID ownership: %j", async value => {
     const execute = vi.fn().mockResolvedValue({ stdout: JSON.stringify(value) });

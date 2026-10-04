@@ -3,6 +3,18 @@ import { promisify } from "node:util";
 
 const executeFile = promisify(execFile);
 
+/** Playwright launches through a shell on Windows; its child PID is not Electron Main. */
+export async function readRecoveryMainProcess(application, { platform = process.platform, read = readRecoveryProcess } = {}) {
+  const driverPid = application.process().pid;
+  const pid = await application.evaluate(() => process.pid);
+  const main = await read(pid);
+  if (!main) throw new Error("Recovery Main exited before identity capture.");
+  if (pid !== driverPid && (platform !== "win32" || main.parentPid !== driverPid)) {
+    throw new Error("Recovery Main is not owned by the launched driver.");
+  }
+  return { pid, driverPid, ...main };
+}
+
 /** Diagnostic only: a visible WMI process object alone does not certify execution state. */
 export async function readWindowsRecoveryExitState(pid, { execute = executeFile } = {}) {
   if (!Number.isSafeInteger(pid) || pid <= 0 || pid === process.pid) throw new Error("Invalid recovery process PID.");

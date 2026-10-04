@@ -21,8 +21,8 @@ export function watchAgentHostOwner(
     if (stopped) return;
     dispose();
     // Main's watchdog is gone; keep disposal from leaving this utility orphaned.
-    const exitDeadline = setTimeout(forceExit, 1_250);
-    exitDeadline.unref();
+    // Must stay referenced: a utility can outlive an otherwise idle Node loop.
+    setTimeout(forceExit, 1_250);
     onLost();
   };
   // Covers Main dying between fork and transfer without imposing a startup deadline.

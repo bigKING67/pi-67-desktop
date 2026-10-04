@@ -5,7 +5,7 @@ import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { readRecoveryProcess, readWindowsRecoveryExitState, signalRecoveryProcess } from "./packaged-recovery-process.mjs";
+import { readRecoveryMainProcess, readRecoveryProcess, readWindowsRecoveryExitState, signalRecoveryProcess } from "./packaged-recovery-process.mjs";
 import { fileURLToPath } from "node:url";
 import { cleanupPackagedTestDirectories, createPackagedTestDirectories, installWorkspaceDialogResult,
   launchPackagedApplication, resolvePackagedArtifact } from "./packaged-electron-fixture.mjs";
@@ -34,6 +34,8 @@ const canonicalBefore = await snapshotDirectoryMetadata(canonicalRoot);
 const canonicalWatch = canonicalBefore.exists ? watchDirectoryMutationDigests(canonicalRoot) : undefined;
 const tracked = new Map();
 let application;
+let applicationMainPid;
+const launches = [];
 let window;
 let failure;
 let stage = "launch";
@@ -71,15 +73,15 @@ try {
     mark("terminate-owned-main-after-persisted-tool-result");
     assert(initialEntries.some(entry => entry.type === "message" && entry.message.role === "toolResult"));
     await track(hostPid);
-    const main = application.process();
-    assert.equal((await readRecoveryProcess(hostPid))?.parentPid, main.pid, "The fixture Host must be owned by this exact Main.");
+    const mainPid = applicationMainPid;
+    assert.equal((await readRecoveryProcess(hostPid))?.parentPid, mainPid, "The fixture Host must be owned by this exact Main.");
     const conversationId = await window.locator('[data-testid="conversation-row"][aria-current="page"][data-conversation-id^="session:"]').getAttribute("data-conversation-id");
     assert(conversationId);
     assert.equal(await realpath(await application.evaluate(({ app }) => app.getPath("userData"))), directories.userDataDirectory);
-    assert.equal(await processIdentity(main.pid), tracked.get(main.pid));
+    assert.equal(await processIdentity(mainPid), tracked.get(mainPid));
     await recordFixtureNavigation("before-crash");
-    assert(await signalRecoveryProcess(main.pid, tracked.get(main.pid), "SIGKILL"));
-    await waitUntil(async () => !await processIdentity(main.pid), 10_000, "owned Main exit");
+    assert(await signalRecoveryProcess(mainPid, tracked.get(mainPid), "SIGKILL"));
+    await waitUntil(async () => !await processIdentity(mainPid), 10_000, "owned Main exit");
     await waitUntil(async () => !await processIdentity(hostPid), 10_000, "owned utility exit with Main");
     application = undefined;
     mark("cold-reopen-same-profile");
@@ -173,7 +175,7 @@ try {
   else failure ??= new Error("Owned test processes remain; isolated profile retained.");
   await writeFile(join(evidence, "receipt.json"), JSON.stringify({ ...receipt,
     status: failure ? "FAIL" : "PASS", scenario, stage, ...provenance, artifactSha256, artifactSize: asar.length, canonicalUnchanged, cleanupPassed,
-    ownedPids: [...tracked.keys()], journal, ...(cleanupError ? { cleanupError } : {}), ...(failure ? { error: failure.message } : {}) }, null, 2) + "\n");
+    ownedPids: [...tracked.keys()], launches, journal, ...(cleanupError ? { cleanupError } : {}), ...(failure ? { error: failure.message } : {}) }, null, 2) + "\n");
 }
 console.log(`Recovery receipt: ${evidence}/receipt.json`);
 if (failure) throw failure;
@@ -183,9 +185,13 @@ async function launch() {
     environment: { HOME: directories.userDataDirectory, USERPROFILE: directories.userDataDirectory },
     hideNativeWindow: true, isolateNativeWindow: true, offline: true });
   application = app; // Retain the owned driver even if the first identity read fails.
+  applicationMainPid = undefined;
   await track(app.process().pid);
-  assert.equal(await app.evaluate(() => process.pid), app.process().pid, "The driver PID must be the actual Main.");
   assert.equal(await realpath(await app.evaluate(({ app: main }) => main.getPath("userData"))), directories.userDataDirectory);
+  const main = await readRecoveryMainProcess(app);
+  tracked.set(main.pid, main.identity);
+  applicationMainPid = main.pid;
+  launches.push({ driverPid: main.driverPid, mainPid: main.pid });
   return app;
 }
 async function openWorkspace(app, conversationId) {
@@ -251,6 +257,7 @@ async function recordFixtureNavigation(label) {
 }
 async function closeFixtureApplication(app) {
   return closeElectronApplicationWithinTimeout({ application: app, timeoutMs: 5000,
+    mainPid: applicationMainPid ?? app.process().pid,
     // The caller performs checked termination after this bounded close attempt.
     terminateProcess: () => { throw new Error("Recovery cleanup requires a fresh process identity check."); } });
 }
