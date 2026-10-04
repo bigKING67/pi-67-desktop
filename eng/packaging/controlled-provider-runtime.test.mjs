@@ -67,18 +67,20 @@ describe("controlled Provider runtime fixture", () => {
     }
   }, 15_000);
 
-  it("runs and aborts a provider-backed prompt without external credentials", async () => {
+  it.each([true, false])("runs and aborts without external credentials even if observations fail: writable=%s", async (writable) => {
     const root = await mkdtemp(join(tmpdir(), "pi67-controlled-provider-"));
     temporaryDirectories.push(root);
     const cwd = join(root, "workspace");
     const agentDir = join(root, "agent");
     const extensionsDirectory = join(agentDir, "extensions");
     const childPidPath = join(root, "child.pid");
+    const observationPath = join(root, "observations.jsonl");
     await Promise.all([mkdir(cwd), mkdir(extensionsDirectory, { recursive: true })]);
     await writeControlledShutdownExtension({
       extensionPath: join(extensionsDirectory, "controlled-provider.ts"),
       childPidPath,
-      lifecyclePath: join(root, "lifecycle.txt")
+      lifecyclePath: join(root, "lifecycle.txt"),
+      observationPath: writable ? observationPath : root
     });
 
     const runtime = new PiSdkRuntime();
@@ -98,6 +100,21 @@ describe("controlled Provider runtime fixture", () => {
       await runtime.abort();
       await expect(prompt).resolves.toBeUndefined();
       await expect(waitForProcessExit(childPid)).resolves.toBeUndefined();
+      const observations = writable
+        ? (await readFile(observationPath, "utf8")).trim().split("\n").map(JSON.parse)
+        : [];
+      if (writable) {
+        expect(observations).toEqual(expect.arrayContaining([
+          { stage: "extension-loaded" },
+          { stage: "provider-started", aborted: false },
+          { stage: "child-created", pid: childPid },
+          { stage: "child-spawned" },
+          { stage: "provider-aborted" },
+          { stage: "stream-settled", reason: "aborted" },
+          expect.objectContaining({ stage: "child-exited" })
+        ]));
+        expect(JSON.stringify(observations)).not.toContain(CONTROLLED_PROMPT_TEXT);
+      }
     } finally {
       await runtime.dispose();
       if (childPid !== undefined && isProcessAlive(childPid)) process.kill(childPid);

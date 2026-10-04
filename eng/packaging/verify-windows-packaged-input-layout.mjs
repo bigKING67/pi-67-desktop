@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { release, tmpdir, version } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -106,13 +106,16 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
   );
   const childPidPath = join(directories.userDataDirectory, "child.pid");
   const lifecyclePath = join(directories.userDataDirectory, "lifecycle.txt");
+  const observationPath = join(outputDirectory, `scale-${scaleLabel}-lifecycle.jsonl`);
   await writeControlledShutdownExtension({
     extensionPath: join(agentDirectory, "extensions", "windows-ui-fixture.ts"),
     childPidPath,
-    lifecyclePath
+    lifecyclePath,
+    observationPath
   });
 
   let application;
+  let window;
   let childPid;
   let processOutput = () => "";
   try {
@@ -124,7 +127,7 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
       userDataDirectory: directories.userDataDirectory
     });
     processOutput = captureProcessOutput(application.process());
-    const window = await application.firstWindow();
+    window = await application.firstWindow();
     await window.waitForLoadState("domcontentloaded");
     await window.getByRole("button", { name: "选择工作区" }).waitFor({ state: "visible", timeout: 15_000 });
     await installWorkspaceDialogResult(application, directories.workspace);
@@ -190,6 +193,21 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
         sha256: await hashFile(screenshotPath)
       }
     };
+  } catch (error) {
+    // Capture before close: its abort/exit must not be mistaken for the failure.
+    const pid = Number(await readFile(childPidPath, "utf8").catch(() => ""));
+    if (Number.isSafeInteger(pid) && pid > 0) childPid = pid;
+    const observations = await readFile(observationPath, "utf8").catch(() => "");
+    const screenshot = window
+      ? await window.screenshot({ path: join(outputDirectory, `scale-${scaleLabel}-failed.png`), timeout: 5_000 })
+        .then(() => "captured", () => "unavailable")
+      : "unavailable";
+    throw new Error(`${error instanceof Error ? error.message : String(error)}. Before cleanup: ${JSON.stringify({
+      childPresent: childPid !== undefined,
+      childAlive: childPid !== undefined && isProcessAlive(childPid),
+      observations: observations.split(/\r?\n/u).filter(Boolean).slice(0, 64),
+      screenshot
+    })}`, { cause: error });
   } finally {
     try {
       if (application) await application.close();

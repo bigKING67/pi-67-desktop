@@ -17,7 +17,7 @@ import {
 } from "./verify-windows-packaged-input-layout.mjs";
 
 vi.mock("./controlled-provider-interaction.mjs", () => ({ startControlledPrompt: vi.fn(async () => undefined) }));
-afterEach(() => vi.clearAllMocks());
+afterEach(() => { vi.clearAllMocks(); vi.useRealTimers(); });
 
 describe("Windows packaged synthetic-scale UI contract", () => {
   it("keeps the release scale matrix explicit", () => {
@@ -105,12 +105,38 @@ describe("Windows packaged synthetic-scale UI contract", () => {
     const failed = { isVisible: vi.fn(async () => false) };
     const window = {
       locator: vi.fn(selector => selector.includes("ready") ? combined : failed),
-      getByTestId: vi.fn(() => ({ isVisible: vi.fn(async () => true) }))
+      getByTestId: vi.fn(() => ({ isVisible: vi.fn(async () => true) })),
+      evaluate: vi.fn(async () => ({ runtimePhase: "ready", firstPromptNotSent: true }))
     };
     const failure = new Error("Controlled model did not hydrate");
     vi.mocked(startControlledPrompt).mockRejectedValueOnce(failure);
-    await expect(startWindowsSyntheticControlledOperation(window, () => "", 1.5)).rejects.toBe(failure);
+    await expect(startWindowsSyntheticControlledOperation(window, () => "", 1.5))
+      .rejects.toMatchObject({ cause: failure, message: expect.stringContaining('"stage":"controlled-prompt"') });
     expect(startControlledPrompt).toHaveBeenCalledExactlyOnceWith(window);
+    expect(window.evaluate).toHaveBeenCalledOnce();
+  });
+
+  it("preserves a prompt failure when the renderer is already unavailable", async () => {
+    const combined = { or: vi.fn(), first: () => ({ waitFor: vi.fn() }) };
+    combined.or.mockReturnValue(combined);
+    const window = {
+      locator: vi.fn(selector => selector.includes("ready") ? combined : { isVisible: async () => false }),
+      getByTestId: vi.fn(() => ({ isVisible: async () => true })),
+      evaluate: vi.fn(async () => { throw new Error("page closed"); })
+    };
+    const failure = new Error("Stop never appeared");
+    vi.mocked(startControlledPrompt).mockRejectedValueOnce(failure);
+    await expect(startWindowsSyntheticControlledOperation(window, () => "", 1.5))
+      .rejects.toMatchObject({ cause: failure, message: expect.stringContaining('"surface":{"unavailable":true}') });
+  });
+
+  it("bounds surface evidence when a stalled renderer never answers", async () => {
+    vi.useFakeTimers();
+    const window = { evaluate: vi.fn(() => new Promise(() => {})) };
+    const observation = inspectWindowsSyntheticRuntimeSurface(window);
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(observation).resolves.toEqual({ unavailable: true });
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("locates only the task inspector complementary region", () => {

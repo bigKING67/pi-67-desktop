@@ -97,6 +97,9 @@ New Session Intent surface，仍使用 60 秒上限；单独 stopped、starting 
 优先报错。合法 Intent 按产品合同等待首条消息才启动 Pi；夹具随后必须通过受控模型、
 运行中的 Operation、真实子进程以及原有缩放/输入法/5 秒退出断言，不能用 Intent 代替
 Runtime 成功。回执记录 `initialSessionSurface`，失败诊断记录 `newSessionIntentVisible`。
+受控 Prompt 失败也保留初始化/界面阶段；Provider 与子进程可选记录最多 64 条固定字段
+生命周期观察，不记录模型输入。Windows UI 失败时在关闭应用前保存观察快照、子进程
+存活状态与截图；关闭导致的 abort/exit 不能反推为失败原因。
 冷启动用崩溃前的精确侧栏 Session identity 打开原对话；不假定导航选中状态已在
 强制退出前落盘。该场景明确经过工作区首页，验证从侧栏续接；身份含分隔字符，
 必须按属性值完整比较，不能拼入 CSS selector。失败取证使用本次启动的新窗口。

@@ -12,6 +12,8 @@ interface ControlledShutdownExtensionOptions {
   extensionPath: string;
   childPidPath: string;
   lifecyclePath: string;
+  /** Optional bounded synthetic-process observations; never records model input. */
+  observationPath?: string;
   /** Optional isolated packaged proof; records only mode flags and Tool names. */
   teamKnowledgeEvidencePath?: string;
   /** Optional isolated native-MCP proof; never records prompts or raw Tool payloads. */
@@ -42,6 +44,7 @@ export async function writeControlledShutdownExtension({
   extensionPath,
   childPidPath,
   lifecyclePath,
+  observationPath,
   teamKnowledgeEvidencePath,
   nativeMcpEvidencePath
 }: ControlledShutdownExtensionOptions): Promise<void> {
@@ -51,6 +54,17 @@ export async function writeControlledShutdownExtension({
     import { createAssistantMessageEventStream, getCurrentTools } from "@earendil-works/pi-ai";
 
     export default function controlledShutdownFixture(pi) {
+      let observationCount = 0;
+      const observe = (stage, detail = {}) => {
+        ${observationPath ? `if (observationCount++ >= 64) return;
+        try {
+          appendFileSync(${JSON.stringify(observationPath)}, JSON.stringify({ stage, ...detail }) + "\\n");
+        } catch {
+          observationCount = 64;
+          console.warn("[controlled-fixture] observations unavailable");
+        }` : ""}
+      };
+      observe("extension-loaded");
       let child;
       let nativeToolCallObserved = false;
       let nativeModelSelected = false;
@@ -85,6 +99,13 @@ export async function writeControlledShutdownExtension({
           stdio: "ignore",
           env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" }
         });
+        observe("child-created", { pid: child.pid ?? null });
+        child.once("spawn", () => observe("child-spawned"));
+        child.once("error", (error) => {
+          observe("child-error", { code: typeof error.code === "string" ? error.code.slice(0, 64) : null });
+          throw error;
+        });
+        child.once("exit", (code, signal) => observe("child-exited", { code, signal }));
         writeFileSync(${JSON.stringify(childPidPath)}, String(child.pid));
         return child;
       };
@@ -92,6 +113,7 @@ export async function writeControlledShutdownExtension({
         if (child && child.exitCode === null && child.signalCode === null) child.kill();
       };
       pi.on("session_shutdown", (event) => {
+        observe("session-shutdown", { reason: event.reason });
         appendFileSync(${JSON.stringify(lifecyclePath)}, "shutdown:" + event.reason + "\\n");
         stopChild();
       });
@@ -117,6 +139,7 @@ export async function writeControlledShutdownExtension({
           maxTokens: 256
         }],
         streamSimple: (model, _context, options) => {
+          observe("provider-started", { aborted: options?.signal?.aborted === true });
           ${teamKnowledgeEvidencePath ? `writeFileSync(${JSON.stringify(teamKnowledgeEvidencePath)}, JSON.stringify({
             canonicalMode: process.env.PI67_CANONICAL_TEAM_KNOWLEDGE,
             privateMode: process.env.PI67_MANAGED_LOCAL_MEMORY,
@@ -163,6 +186,7 @@ export async function writeControlledShutdownExtension({
           const settle = (reason) => {
             if (settled) return;
             settled = true;
+            observe("stream-settled", { reason });
             output.stopReason = reason;
             if (reason === "aborted") {
               stream.push({ type: "error", reason, error: output });
@@ -173,6 +197,7 @@ export async function writeControlledShutdownExtension({
           };
           stream.push({ type: "start", partial: output });
           options?.signal?.addEventListener("abort", () => {
+            observe("provider-aborted");
             stopChild();
             settle("aborted");
           }, { once: true });

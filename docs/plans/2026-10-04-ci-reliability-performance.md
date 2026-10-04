@@ -407,3 +407,29 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
   structure, Action pins, PowerShell source discovery and whitespace checks passed.
   Independent final diff review found no blocker. New exact-SHA Windows evidence
   is required before claiming this verifier path passes; no blind retry of the old run.
+
+## Followup: preserve controlled-prompt failure evidence
+
+- Exact `7123d6821f5ceee6968028c10e60c5eb73e295e2`, run `37222493744` / attempt 1:
+  source, Renderer, macOS native, Windows hidden smoke, all six recovery scenarios
+  and full NSIS lifecycle passed. Windows native took 849 s and correctly failed
+  only its synthetic UI gate. Scale 1.25 passed through an actual New Session
+  Intent. Scale 1.5 hydrated the controlled model but lacked a visible Stop button
+  within the unchanged 10 s budget. This is a later failure, not proof of its cause.
+- Early upload worked: UI evidence was available at 18:06:41 UTC, while independent
+  NSIS verification completed at 18:11:13 UTC, saving 272 s of diagnostic waiting.
+- Independent source review found no support for stale shared extension caching.
+  The fixture currently treats unexpected child exit as normal model completion;
+  without Provider/child observations this remains an unconfirmed possibility.
+  A bounded local macOS probe against the existing packaged artifact passed three
+  activations, but all used runtime-ready, so it is not current-SHA Windows proof.
+- Add optional bounded fixture lifecycle observations, capture prompt-stage
+  initialization/surface state, and retain before-cleanup observations/child liveness
+  and failure screenshots. Preserve the original error when diagnostics fail; keep
+  all budgets/assertions and no retries. This is diagnostic work, not a root-cause
+  fix claim. Read the exact owned child PID on failure for fallback cleanup.
+- Review corrections: cap stalled-renderer evidence at 1 s with timer cleanup;
+  optional observation write failure must not interrupt Provider abort or child
+  cleanup. Both have regressions, including a real Pi prompt with an unwritable
+  observation target. Focused 28 tests, type-aware lint, structure and whitespace
+  passed. Existing fixed-field prompt-ACK parser also records dispatch progress.
