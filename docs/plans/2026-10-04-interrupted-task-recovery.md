@@ -1,6 +1,6 @@
 # Recover interrupted tasks on native Pi
 
-Status: active ordinary Windows quit follow-up; interrupted-task recovery acceptance remains completed
+Status: interrupted-task recovery accepted; shutdown diagnostics delivered; Windows quit root cause and intermittent source failures remain open
 Owner: Codex
 Started: 2026-10-04
 
@@ -112,6 +112,37 @@ browser runtime acceptance uses browser67 when needed.
   test-only and this correction is not claimed as the historical Windows cause.
   The instrumented parent CI completed: quality, renderer and macOS passed;
   Windows and CI Gate failed at the preserved ordinary quit-hook assertion.
+- Bounded follow-up result at clean `11619f5267e7e6909f4c78aa3a785249d06c4e07`:
+  CI `37198926766` passed all selected gates, including 945 files / 6248 source
+  tests (9 files / 24 optional tests skipped), renderer, macOS/Windows native and
+  all three recovery cases on each platform. Its Windows NSIS lane was **quick**.
+  Windows ordinary quit was graceful, not forced, with 866.5ms product exit.
+  One additional fixed same-SHA dispatch, `37199938580`, explicitly selected
+  **full** NSIS. Both native lanes, renderer, all recovery cases and the complete
+  Windows install/restarts/same-version reinstall/theme/uninstall/data-retention
+  lifecycle passed. Windows ordinary quit was again graceful (905.3ms).
+  These two successes do not repair or disprove the earlier missing quit hook;
+  no failing sample reached the new Operation sub-stage instrumentation.
+- The full-mode dispatch is **FAIL**, not an overall acceptance: source tests
+  reported 6246 passed / 2 failed. Provider configuration hit its unchanged 4000ms
+  file-access budget; Codemode hit its unchanged 150ms sandbox deadline before
+  the expected `before-timeout` output was observed. Both exact test files passed
+  locally without edits or changed budgets (8 tests). This neither establishes
+  their root causes nor erases the CI failures. They remain separate open timing
+  investigations; do not widen budgets or weaken assertions to report green.
+- Latest local macOS preview is the clean `11619f52` artifact and passed ordinary
+  smoke (617.2ms product exit). ASAR: 195114902 bytes,
+  `5bf642cdc9ece33b39b1f88c1cc0218674c63f3fe5f34de4eb2c6524554296b2`.
+  Both Windows runs used ASAR 195238131 bytes,
+  `675425a4568fcf388139d32c94d35bf65ebbecfffba695f67cb5701e8ecb9f88`.
+  Recovery receipts confirm zero real model requests, unchanged canonical
+  Sessions and successful owned-process cleanup. Evidence is retained under
+  `artifacts/validation/pi-durable-compat/ci-37198206376/`, `ci-37198926766/`
+  and `ci-37199938580/`, plus their sibling job logs and `windows-quit-follow-up.json`.
+  No further blind repetition is planned. Next work needs either a failing
+  Windows sub-stage trace or a controlled reproduction of the independent source
+  timing failures. Official Pi Durable remains absent; no runtime/Session/receipt
+  schema, shutdown ordering, 3000ms watchdog or 5000ms product gate changed.
 
 - Final acceptance: clean `cff4d410d99a6dec5f6a93c28609ebb3b91d3b59`, CI
   `37194297858` attempt 2 and CI Gate passed. Source: 944 files / 6230 tests
