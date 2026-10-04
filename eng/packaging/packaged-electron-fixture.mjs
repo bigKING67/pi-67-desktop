@@ -248,9 +248,9 @@ export async function isolatePackagedAutomationWindow(
     const window = BrowserWindow.getAllWindows()[0];
     if (!window) throw new Error("Packaged BrowserWindow is unavailable.");
 
-    window.webContents.setBackgroundThrottling(false);
     window.setIgnoreMouseEvents(true);
     if (!shouldHideNativeWindow) {
+      window.webContents.setBackgroundThrottling(false);
       window.setSkipTaskbar(true);
       window.blur();
       return;
@@ -258,7 +258,12 @@ export async function isolatePackagedAutomationWindow(
 
     window.setFocusable(false);
     const keepHidden = () => {
-      if (!window.isDestroyed()) window.hide();
+      if (window.isDestroyed()) return;
+      // Let hide mark the widget hidden before Electron restores hidden-but-painting.
+      // Repeat the transition after later show events, retaining native window isolation.
+      window.webContents.setBackgroundThrottling(true);
+      window.hide();
+      window.webContents.setBackgroundThrottling(false);
     };
     window.on("show", keepHidden);
     keepHidden();

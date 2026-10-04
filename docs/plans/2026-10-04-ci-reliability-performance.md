@@ -3,7 +3,7 @@
 Status: active
 Owner: Codex
 Started: 2026-10-04
-Last updated: 2026-10-04
+Last updated: 2026-10-05
 
 ## Goal and acceptance
 
@@ -313,3 +313,30 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
 - Local validation: 3 files / 32 tests passed after the demonstrated failures, plus
   Desktop typecheck, type-aware lint, structure and whitespace checks. Independent
   review found no blocker and confirmed unchanged deadlines/cleanup ordering.
+- Exact-SHA `555c953d7641eaee513a26c0d23d80130af7e85d`, run `37217255461` /
+  attempt 1 passed all gates: source 947 files / 6,288 tests (24 optional skips),
+  Renderer, macOS native 281 s and Windows native 898 s. All six recovery receipts
+  passed with clean source, unchanged canonical Profile, cleanup and zero real model
+  requests. Windows hidden smoke took 183 s; the full dual-Profile NSIS lifecycle
+  passed in 249 s. This validates the recovery metadata fix, not the intermittent stall.
+
+## Followup: hidden widget painting order
+
+- Convergence `717f8c7a`, run `37216175815` / attempt 1 passed all gates. Windows
+  recovery total changed from 91 s in the latest hidden sample to 86 s, but total
+  Windows duration was 970 s versus the earlier ordinary 942 s. This is not proof
+  of a substantial or persistent performance improvement. Hidden UI stages still
+  showed the same 2-second-per-action pattern.
+- Exact Electron 43.7.3 source `WebContents::SetBackgroundThrottling` restores
+  `kHiddenButPainting` through the view when the widget is already hidden. The
+  fixture previously disabled throttling before native hide, skipping that branch
+  for a visible widget. Hypothesis: let hide mark the widget hidden, then disable
+  throttling. Repeat on future show events; retain native hiding and input isolation.
+- This changes only the test fixture, with one original full hidden smoke still
+  gated. No visible-window substitution, assertions, timeouts or product scheduling
+  changes. Require real Windows timings before calling the hypothesis successful;
+  it is not a fix claim for the intermittent Host receipt stall.
+- Local validation: 3 files / 33 tests, type-aware lint, structure and whitespace
+  checks passed. Independent review found no blocking issue, no native Show call
+  or recursive show path in the pinned Electron implementation. Native timing and
+  complete platform validation remain pending for this fixture change.
