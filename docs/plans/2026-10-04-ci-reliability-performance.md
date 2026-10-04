@@ -230,3 +230,35 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
 - Scope closed with independent reviews and no open blocking finding. Preserve
   concurrent native-image WIP; no publish, release, paid model calls, global
   configuration changes or local preview replacement were performed in this task.
+
+
+## Followup: Windows total duration
+
+- User continued the CI performance task after full acceptance. Live main/origin are
+  `defaf367`; the same unrelated native-image WIP remains protected. Existing delivery
+  authorization and rollback limits remain.
+- Latest Windows critical path: 179 s ordinary smoke, 133 s three recoveries, 288 s
+  NSIS; packaging 60 s. The native-MCP-to-workbench segment is 106.97 s on Windows
+  versus 7.42 s on macOS. Existing logs do not separate its settings/update/journey steps.
+- A readonly explorer independently confirmed that timing gap, no proven single slow
+  operation, and a Windows-only hidden-window/actionability hypothesis. Existing
+  `setBackgroundThrottling(false)` prevents simply assuming ordinary background timers.
+  Historical Electron issues are supporting context, not proof against this version.
+- First measure fixed stage timings and one Windows hidden/visible/hidden full-smoke
+  experiment against the same package, with isolated profiles and all assertions retained.
+  The visible path already exists for screenshot evidence; it ignores mouse input,
+  skips the taskbar and blurs. Explicit fixture-only opt-in leaves local defaults intact.
+- Do not parallelize NSIS with another Electron app on the same Windows desktop;
+  installer process/lifecycle effects require isolation. Splitting runners also incurs
+  transfer/setup costs for large packages, so defer until the simple hypothesis is tested.
+- [x] Verify measurement regressions and independently review the experiment.
+- [ ] Collect exact-SHA controlled Windows evidence; accept or reject the hypothesis.
+- [ ] Keep only an evidence-backed improvement, remove paired CI overhead, validate
+  the final exact-SHA full CI and report total as well as individual step times.
+
+- Focused validation: 3 files / 28 tests, type-aware lint, structure, Action pins and
+  PowerShell discovery passed. Independent review identified shared failure paths;
+  the visible run now has its own directory and the reviewer confirmed closure.
+  Keep a final hidden confirmation with a third independent evidence directory,
+  so warm filesystem caches cannot alone explain a visible-mode improvement.
+  This is a bounded three-run mechanism experiment, not automatic retries.

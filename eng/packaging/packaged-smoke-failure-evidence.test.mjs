@@ -19,6 +19,29 @@ async function guardFixture(window) {
 }
 
 describe("packaged smoke failure evidence", () => {
+  it("reports elapsed stages without operation results or error bodies", async () => {
+    const { guard } = await guardFixture();
+    const log = vi.spyOn(console, "info").mockImplementation(() => {});
+    const now = vi.spyOn(performance, "now");
+    now.mockReturnValueOnce(10).mockReturnValueOnce(27.5)
+      .mockReturnValueOnce(30).mockReturnValueOnce(35);
+    const failure = new Error("synthetic private error");
+    try {
+      await expect(guard.stage("success-stage", async () => "synthetic private result"))
+        .resolves.toBe("synthetic private result");
+      await expect(guard.stage("failure-stage", () => { throw failure; })).rejects.toBe(failure);
+      expect(log.mock.calls.map(([line]) => JSON.parse(line.split("Packaged smoke timing: ")[1])))
+        .toEqual([
+          { stage: "success-stage", outcome: "passed", durationMs: 17.5 },
+          { stage: "failure-stage", outcome: "failed", durationMs: 5 }
+        ]);
+    } finally {
+      guard.stop();
+      now.mockRestore();
+      log.mockRestore();
+    }
+  });
+
   it("fails a hung stage at its own bound with the stage name", async () => {
     const { guard } = await guardFixture();
     await expect(guard.stage("workbench-journey", () => new Promise(() => {}), 20))

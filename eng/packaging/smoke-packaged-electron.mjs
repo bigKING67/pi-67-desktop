@@ -71,7 +71,7 @@ try {
     agentDir,
     artifact,
     environment: smokeEnvironment,
-    hideNativeWindow: !packagedScreenshotDirectory,
+    hideNativeWindow: !packagedScreenshotDirectory && process.env.PI67_PACKAGED_SMOKE_VISIBLE_WINDOW !== "1",
     isolateNativeWindow: true,
     userDataDirectory
   });
@@ -115,21 +115,21 @@ try {
   }
   await guard.stage("native-mcp", () => runPackagedNativeMcpScenario(window, nativeMcp));
   await guard.stage("changes-inspector", () => verifyPackagedChangesInspector(window, capturePackagedScreenshot));
-  const workspaceSettings = await verifyReadySessionCatalog(window);
+  const workspaceSettings = await guard.stage("settings-catalog", () => verifyReadySessionCatalog(window));
   await assertNoWorkspaceChangesAuthorityWarning(window);
-  await verifyPackagedProviderSettings({
+  await guard.stage("provider-settings", () => verifyPackagedProviderSettings({
     capturePackagedScreenshot,
     packagedCredential,
     window,
     workspaceSettings
-  });
+  }));
   await workspaceSettings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "扩展", exact: true }).click();
   const extensionWorkspace = workspaceSettings.getByTestId("extension-management-workspace");
   const extensionList = extensionWorkspace.getByTestId("extension-package-list-scroll");
   const extensionDetail = extensionWorkspace.getByTestId("extension-package-detail-scroll");
   await extensionList.waitFor({ state: "visible", timeout: 30_000 });
-  await verifyPackagedExtensionUpdateCheck(extensionWorkspace, window);
+  await guard.stage("extension-update", () => verifyPackagedExtensionUpdateCheck(extensionWorkspace, window));
   await prepareOfflinePackageNetwork(userDataDirectory);
   if (await extensionDetail.isVisible()) {
     throw new Error("Packaged resource detail must not share the Package Catalog surface.");
@@ -222,7 +222,7 @@ try {
   const globalSkillPanel = skillSettingsWorkspace.getByRole("tabpanel", { name: "全局可用", exact: true });
   await globalSkillPanel.getByText("packaged-skill", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
-  await verifyPackagedSkillUpdateCheck(skillSettingsWorkspace, window);
+  await guard.stage("skill-update", () => verifyPackagedSkillUpdateCheck(skillSettingsWorkspace, window));
   if (await globalSkillPanel.getByText("pi67-smoke-extension", { exact: true }).count()) {
     throw new Error("Packaged global Skill view repeated an Extension-only Package.");
   }
@@ -279,7 +279,7 @@ try {
   await capturePackagedScreenshot(window, "09-rule-context-project-catalog.png");
   await ruleSettingsWorkspace.getByRole("heading", { name: "继承的工作规则", exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
-  await verifyPackagedLarkSettings({ capturePackagedScreenshot, settingsNavigation, window, workspaceSettings });
+  await guard.stage("lark-settings", () => verifyPackagedLarkSettings({ capturePackagedScreenshot, settingsNavigation, window, workspaceSettings }));
   if (window.url() !== "app://pi67/index.html") throw new Error(`Unexpected packaged renderer URL: ${window.url()}`);
   const security = await window.evaluate(() => ({
     hasNodeProcess: "process" in globalThis,
@@ -377,7 +377,7 @@ try {
     agentDir,
     artifact,
     environment: smokeEnvironment,
-    hideNativeWindow: !packagedScreenshotDirectory,
+    hideNativeWindow: !packagedScreenshotDirectory && process.env.PI67_PACKAGED_SMOKE_VISIBLE_WINDOW !== "1",
     isolateNativeWindow: true,
     userDataDirectory
   });

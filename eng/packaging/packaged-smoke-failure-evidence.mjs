@@ -74,9 +74,18 @@ export function createPackagedSmokeGuard({
     /** Run one named stage; a hang fails at its own bound instead of the job timeout. */
     async stage(name, operation, timeoutMs = 3 * 60_000) {
       current = name;
-      const result = await withTimeout(operation(), timeoutMs, `Packaged smoke stage "${name}" exceeded ${timeoutMs} ms.`);
-      current = `after:${name}`;
-      return result;
+      const startedAt = performance.now();
+      let outcome = "failed";
+      try {
+        const result = await withTimeout(operation(), timeoutMs, `Packaged smoke stage "${name}" exceeded ${timeoutMs} ms.`);
+        current = `after:${name}`;
+        outcome = "passed";
+        return result;
+      } finally {
+        console.info(`Packaged smoke timing: ${JSON.stringify({
+          stage: name, outcome, durationMs: Math.round((performance.now() - startedAt) * 10) / 10
+        })}`);
+      }
     },
     fail: (error) => record(error).catch(() => undefined),
     stop: () => clearTimeout(watchdog)
