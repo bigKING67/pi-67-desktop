@@ -108,7 +108,9 @@ export async function runSessionBootstrapTransition(
     }
   }
   if (committed && options.refreshSessionCatalogFor) {
-    await queryFirstSessionCatalog(options.refreshSessionCatalogFor, { refresh: true });
+    // Bootstrap is the Session authority. Catalog owns its refresh/error/retry
+    // state and must not delay the first Prompt after successful materialization.
+    void queryFirstSessionCatalog(options.refreshSessionCatalogFor, { refresh: true });
   }
   return committed;
 }

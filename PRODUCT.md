@@ -1716,7 +1716,9 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   or global Pi default. That first submit materializes the same Workbench Task
   under one stable creation authority, waits for its exact physical Session identity,
   confirms the selected model and thinking level in that order, and only then sends
-  `prompt.submit`. Any configuration or creation failure keeps the text and
+  `prompt.submit`. A committed authoritative bootstrap does not wait for the disposable
+  Session Catalog refresh; catalog loading, errors and retries remain independently
+  visible and cannot delay the first Prompt. Any configuration or creation failure keeps the text and
   attachments on the intent; if creation succeeds but Prompt submission fails, retry uses
   the already materialized Session and never creates a second JSONL.
 - A provisional conversation row exposes `丢弃草稿` in its hover/focus menu. A draft

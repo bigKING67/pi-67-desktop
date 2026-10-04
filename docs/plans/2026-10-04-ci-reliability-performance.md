@@ -433,3 +433,31 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
   cleanup. Both have regressions, including a real Pi prompt with an unwritable
   observation target. Focused 28 tests, type-aware lint, structure and whitespace
   passed. Existing fixed-field prompt-ACK parser also records dispatch progress.
+
+## Followup: remove catalog refresh from committed bootstrap completion
+
+- Diagnostic run `37224151534` / attempt 1 at `d5d78bfe` reproduced the UI failure
+  at scale 1.25: creation/model/bootstrap finished, Runtime ready, but zero Prompt
+  ACK records, zero Provider calls and no child. The input still contained the draft.
+  Only extension load occurred before cleanup; child-exit speculation is unsupported.
+- Source identifies an unnecessary dependency: `runSessionBootstrapTransition`
+  awaited the disposable catalog query after authoritative bootstrap committed.
+  That query has a 15 s request deadline, longer than the verifier's unchanged 10 s
+  operation-start gate. Exact identity binding and submission do not begin until it
+  returns. A deterministic delayed-catalog regression fails before the fix with
+  Runtime ready while the transition result remains pending. This proves the blocking
+  mechanism; the previous CI report did not directly time the catalog request.
+- Let the existing Catalog controller own asynchronous refresh/error/retry state;
+  committed Session completion returns without waiting for it. Preserve fail-closed
+  bootstrap validation, exact physical identity binding, selected model/thinking
+  confirmation and first-Prompt submission. No timeout, assertion or retry changes.
+- Frontend route L1-F / normal, design-craft, current PRODUCT/DESIGN authority;
+  functional state flow only, no visual design change. Main implementation and bounded
+  independent review; native CI remains the target-platform acceptance authority.
+- The regression passed after the fix, together with 54 focused tests and Renderer
+  typecheck. Type-aware lint, structure, whitespace and Renderer production build
+  passed; independent review checked every bootstrap caller and found no dependency
+  on a completed catalog refresh. Catalog failure remains independently observable.
+- The preceding diagnostic run finished with source/Renderer/macOS and the full
+  Windows NSIS lifecycle passing. Hidden shutdown remained strict graceful (Main
+  694.3 ms, Host 631.5 ms). Only the synthetic UI gate failed. Do not call that run green.

@@ -11,7 +11,8 @@ import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { useConversationStore } from "../conversation/conversation-store.js";
 import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
-import { useSessionCatalogStore } from "../navigation/session-catalog-store.js";
+import { useSessionCatalogStore, selectWorkspaceSessionCatalog } from "../navigation/session-catalog-store.js";
+import { cancelSessionCatalogRetries } from "../navigation/session-catalog-controller.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { installSessionProjectionFixture } from "../session/session-projection-test-support.js";
 import { currentRendererSessionAuthority } from "../session/session-authority.js";
@@ -106,6 +107,44 @@ describe("renderer session transition authority", () => {
       sessionId: "session-new",
       sessionGeneration: 4
     });
+  });
+
+  it("releases a committed Session while its disposable catalog refresh is pending", async () => {
+    vi.useFakeTimers();
+    const catalog = Promise.withResolvers<never>();
+    const request = vi.spyOn(agentConnectionController, "request").mockReturnValue(catalog.promise);
+    const onError = vi.fn();
+    let committed: boolean | undefined;
+    const transition = runSessionBootstrapTransition(useAppStore.getState, useAppStore.setState, {
+      detail: "Creating",
+      refreshSessionCatalogFor: "workspace-1",
+      onError,
+      request: async () => {
+        const event = { type: "session.bootstrap", payload: { snapshot: snapshot("session-new"), reason: "session-create" } } as const;
+        useAppStore.getState().receiveAgentEvent(event, eventEnvelope(event.type, event.payload, taskEventFixture({
+          hostEpoch: 9, sequence: 1, sessionId: "session-new", sessionGeneration: 4
+        })));
+        return bootstrapAcknowledgement("session-new", 4);
+      }
+    }).then(result => { committed = result; });
+    try {
+      await vi.advanceTimersByTimeAsync(0);
+      expect(useAppStore.getState().runtime.phase).toBe("ready");
+      expect(request).toHaveBeenCalledWith("session.catalog.query", expect.anything(), [], {
+        context: { scope: "workspace", workspaceId: "workspace-1" }
+      });
+      expect(committed).toBe(true);
+    } finally {
+      catalog.reject(new Error("Synthetic catalog unavailable"));
+      await transition;
+      await vi.advanceTimersByTimeAsync(0);
+      cancelSessionCatalogRetries();
+      vi.useRealTimers();
+    }
+    expect(onError).not.toHaveBeenCalled();
+    expect(selectWorkspaceSessionCatalog(useSessionCatalogStore.getState(), "workspace-1").error)
+      .toBe("Synthetic catalog unavailable");
+    expect(useAppStore.getState().runtime.phase).toBe("ready");
   });
 
   it("fails closed when the acknowledgement arrives without a bootstrap event", async () => {
