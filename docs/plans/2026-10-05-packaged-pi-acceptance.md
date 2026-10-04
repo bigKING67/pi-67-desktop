@@ -1,6 +1,6 @@
 # Local packaged Pi acceptance
 
-Status: completed for local automated acceptance; native observation unverified
+Status: completed for scoped source delivery, CI and local package; native observation unverified
 Owner: Codex
 Started: 2026-10-05
 
@@ -46,6 +46,42 @@ an individual failure, and retain bounded per-process results. Product runtime,
 timeouts and acceptance assertions stay unchanged. The focused process/workflow
 regressions pass (52 tests), including the independently reviewed deadline-before-
 query boundary; new-SHA target-platform validation is still required.
+
+### Final source and package acceptance
+
+- Fix/source SHA: `ba1d237c8a1897f410fabfac1e5a1895b9429ccd`, pushed to `main`.
+  CI run `37232140882`, attempt 1, passed every required job and the final gate.
+  No rerun of either the failed or corrected SHA was used.
+- Clean-source validation: 952 files / 6,352 tests passed; 9 files / 24 tests
+  skipped; branch coverage 78.77%. Fifteen packaged Python tests passed.
+  Renderer: 295 passed / one skipped. Independent review has no open blocker.
+- macOS arm64 and Windows x64 packaged smoke and all six recovery receipts passed.
+  Each receipt binds the exact clean source/run/attempt, preserves the original
+  Session, uses one synthetic Auto judge decision, leaves the canonical Profile
+  unchanged, records every owned process as exited, and passes fixture cleanup.
+  The previously failing Windows app-after-tool case confirmed all six owned
+  process exits. Real model requests remained zero.
+- Windows synthetic scale/IME passed at 1.25/1.5/2, including controlled child and
+  graceful process shutdown. The installer receipt is `full`, passed through
+  `uninstall:completed`, with nine recorded launches across clean/existing Pi
+  Profile lanes. This is hosted synthetic certification, not manual user testing.
+- Job times: source 449 s, Renderer 664 s, macOS native 388 s, Windows native 941 s.
+  This Windows run includes full installer certification; do not compare its
+  duration directly with an earlier quick-mode run as a performance regression.
+- The local macOS arm64 Alpha.43 app/DMG/ZIP was rebuilt from clean `ba1d237c`.
+  Packaged smoke and DMG/ZIP container verification passed; file hashes match the
+  regenerated candidate identity. ASAR remains exactly 195,179,733 bytes,
+  SHA-256 `8626a0c354419f6a5a2b60d754fbb2ec71fd14ceb55afe3ab27086a5099357e7`.
+  The Codemode execution/cold-restore receipt matches these exact ASAR bytes.
+- An additional isolated display probe reached ready with Auto selected, but its
+  later Playwright cleanup encountered a released driver handle. Retain that
+  probe as PARTIAL; the owned PID was independently absent and its exact fixture
+  was verified unused and cleaned. It is not new native Computer Use evidence.
+- Final evidence: `artifacts/validation/pi-source-delivery-20261005/final/`;
+  the earlier failure remains separately retained in its parent directory.
+  This documentation closeout does not change the tested product/package source
+  SHA above. No artifact upload, installation replacement, release, paid model
+  request or destructive real-Profile acceptance was performed.
 
 ## Observed starting state
 
