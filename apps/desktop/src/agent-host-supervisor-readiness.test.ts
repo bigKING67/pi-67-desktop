@@ -4,8 +4,8 @@ import type { BrowserWindow, UtilityProcess } from "electron";
 const electronMocks = vi.hoisted(() => ({
   fork: vi.fn(),
   MessageChannelMain: class {
-    readonly port1 = {};
-    readonly port2 = {};
+    readonly port1 = { close: vi.fn() };
+    readonly port2 = { close: vi.fn() };
   }
 }));
 
@@ -91,7 +91,7 @@ describe("AgentHostSupervisor readiness", () => {
     supervisor.connect();
     expect(host.postMessage).not.toHaveBeenCalled();
     host.emit("spawn"); host.emit("message", readyMessage());
-    expect(host.postMessage.mock.calls[0]?.[0]).toEqual({ type: "enterprise-power-transition", state: "suspend" });
+    expect(host.postMessage.mock.calls[1]?.[0]).toEqual({ type: "enterprise-power-transition", state: "suspend" });
     supervisor.notifyPowerTransition("resume");
     expect(host.postMessage).toHaveBeenLastCalledWith({ type: "enterprise-power-transition", state: "resume" });
   });
@@ -117,14 +117,14 @@ describe("AgentHostSupervisor readiness", () => {
     host.emit("message", { type: "agent-host-ready", detail: "not allowed" });
 
     expect(supervisor.diagnostics()).toMatchObject({ phase: "starting", portHandoffCount: 0 });
-    expect(host.postMessage).not.toHaveBeenCalled();
+    expect(host.postMessage).toHaveBeenCalledExactlyOnceWith({ type: "agent-host-owner" }, [expect.anything()]);
     expect(window.postMessage).not.toHaveBeenCalled();
 
     host.emit("message", readyMessage());
     host.emit("message", readyMessage());
 
     expect(supervisor.diagnostics()).toMatchObject({ phase: "running", portHandoffCount: 1 });
-    expect(host.postMessage).toHaveBeenCalledOnce();
+    expect(host.postMessage).toHaveBeenCalledTimes(2);
     expect(window.postMessage).toHaveBeenCalledOnce();
   });
 
@@ -193,7 +193,7 @@ describe("AgentHostSupervisor readiness", () => {
 
     expect(supervisor.diagnostics()).toMatchObject({ phase: "running", portHandoffCount: 1 });
     expect(window.postMessage).toHaveBeenCalledOnce();
-    expect(host.postMessage).toHaveBeenCalledOnce();
+    expect(host.postMessage).toHaveBeenCalledTimes(2);
 
     resolveLoad({ storage: "available" });
     await vi.waitFor(() => {
@@ -217,7 +217,7 @@ describe("AgentHostSupervisor readiness", () => {
 
     expect(supervisor.diagnostics()).toMatchObject({ phase: "stopping", portHandoffCount: 0 });
     expect(window.postMessage).not.toHaveBeenCalled();
-    expect(host.postMessage).toHaveBeenCalledOnce();
+    expect(host.postMessage).toHaveBeenCalledTimes(2);
     expect(host.postMessage).toHaveBeenCalledWith({
       type: "agent-host-shutdown",
       reason: "application-quit",

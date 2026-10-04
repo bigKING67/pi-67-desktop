@@ -2101,7 +2101,10 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   retried. Provider and Context validation failures retain their existing guarded
   rollback instead of reporting a partial success.
 - After an application/Agent interruption, reopening the original Session preserves
-  recorded conversation and results without automatically calling a model. When
+  recorded conversation and results without automatically calling a model.
+  A dedicated Main/Agent Host lifetime connection makes a surviving
+  Host close its task resources and exit when Main disappears, including on Windows;
+  Renderer reloads do not own this connection. When
   the current Pi branch contains unfinished work and all recorded Tool calls have
   results, the user can explicitly choose `继续当前任务`. This continues through
   native Pi, with current authorization, safety mode and configuration; Auto uses

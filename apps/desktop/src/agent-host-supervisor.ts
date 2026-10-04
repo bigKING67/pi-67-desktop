@@ -12,7 +12,7 @@ import {
 } from "@pi67/protocol";
 import { agentHostEnvironment } from "./agent-host-environment.js";
 import { planAgentHostRestart } from "./agent-host-restart.js";
-import { handoffAgentHostPort } from "./agent-host-port-handoff.js";
+import { bindAgentHostOwner, handoffAgentHostPort } from "./agent-host-port-handoff.js";
 import { AgentHostInitializationOutputForwarder } from "./agent-host-initialization-output.js";
 import { redact } from "./redaction.js";
 import { LocalMemorySupervisor } from "./local-memory-supervisor.js";
@@ -203,7 +203,6 @@ export class AgentHostSupervisor {
     }
     return this.#stopPromise;
   }
-
   attachPort(window = this.#options.getMainWindow(), replaceCurrent = false): void {
     if (
       this.#stopping
@@ -260,6 +259,7 @@ export class AgentHostSupervisor {
     this.#agentHost = host;
     host.on("spawn", () => {
       if (this.#agentHost !== host || this.#stopping) return;
+      try { bindAgentHostOwner(host); } catch { host.kill(); return; }
       this.#processStartedAt = Date.now();
       this.#lastSpawnDurationMs = Math.max(
         0,

@@ -7,8 +7,8 @@ const electronMocks = vi.hoisted(() => {
   return {
     fork: vi.fn(),
     MessageChannelMain: class {
-      readonly port1 = { id: `host-port-${++nextPortId}` };
-      readonly port2 = { id: `renderer-port-${nextPortId}` };
+      readonly port1 = { id: `host-port-${++nextPortId}`, close: vi.fn() };
+      readonly port2 = { id: `renderer-port-${nextPortId}`, close: vi.fn() };
     }
   };
 });

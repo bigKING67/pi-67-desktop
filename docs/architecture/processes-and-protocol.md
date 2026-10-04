@@ -1915,6 +1915,16 @@ drive/UNC/ADS 形式，并在单次解码后验证 resolved Renderer root contai
 
 ## Application shutdown
 
+Main 在每个 utility 的 OS `spawn` 后先传递严格校验的 `agent-host-owner` parent message 和一个
+专用 MessagePort，再允许 Renderer handoff。Main 持有对端直到该 exact Host 退出；Renderer
+reload、port replacement 与窗口导航不影响它。Host 在异步 startup 前监听 owner Port 的 `close`，
+Main 消失时执行同一有界 shutdown（默认 1000ms），不发送无法送达的 completion，也不继续推理。
+Main 的 watchdog 此时已不存在，因此 Host 另设 1250ms 的退出上限，清理挂起也不能无限残留。
+startup 尚未构造 Server 时直接退出；fork 后 10 秒内未收到 owner Port 也退出，以覆盖 Main 在
+transfer 前消失的窗口。该期限只约束 owner transfer，不限制 capability bootstrap 或任务时长。
+重复 Port 被关闭且不能替换 owner；首次畸形消息或错误 Port 数量 fail closed。Main transfer
+失败则停止该 Host。此机制使用本地 Electron MessagePort，不使用 PID 轮询、网络或 Renderer 心跳。
+
 `before-quit` 由 Desktop Main 的单一 shutdown controller 持有。第一次 quit 会阻止 Electron
 继续退出，立即把 Supervisor 置为 stopping，并执行以下有界链路：
 

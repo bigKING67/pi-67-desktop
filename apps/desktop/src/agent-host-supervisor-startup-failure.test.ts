@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const electronMocks = vi.hoisted(() => ({
   fork: vi.fn(),
   MessageChannelMain: class {
-    readonly port1 = {};
-    readonly port2 = {};
+    readonly port1 = { close: vi.fn() };
+    readonly port2 = { close: vi.fn() };
   }
 }));
 

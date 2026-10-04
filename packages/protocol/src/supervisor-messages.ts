@@ -91,6 +91,16 @@ export const AgentHostAttachPortMessageSchema = strictObject({
 
 export type AgentHostAttachPortMessage = Static<typeof AgentHostAttachPortMessageSchema>;
 
+export const AgentHostOwnerMessageSchema = strictObject({
+  type: Type.Literal("agent-host-owner")
+});
+
+export type AgentHostOwnerMessage = Static<typeof AgentHostOwnerMessageSchema>;
+
+export function isAgentHostOwnerMessage(value: unknown): value is AgentHostOwnerMessage {
+  return Value.Check(AgentHostOwnerMessageSchema, value);
+}
+
 export const AgentHostReadyMessageSchema = strictObject({
   type: Type.Literal("agent-host-ready"),
   startup: AgentHostStartupStateSchema

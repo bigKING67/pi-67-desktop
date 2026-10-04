@@ -3,9 +3,22 @@ import {
   type BrowserWindow,
   type UtilityProcess
 } from "electron";
-import type { AgentHostAttachPortMessage, AgentHostStartupState, DesktopAgentHostStartupState } from "@pi67/protocol";
+import type { AgentHostAttachPortMessage, AgentHostOwnerMessage, AgentHostStartupState, DesktopAgentHostStartupState } from "@pi67/protocol";
 import { rendererDocumentHandoffKey } from "./agent-host-supervisor-contract.js";
 import { isExpectedRendererLocation } from "./renderer-security.js";
+
+/** Main retains this endpoint until this exact utility exits, independently of Renderer ports. */
+export function bindAgentHostOwner(host: UtilityProcess): void {
+  const { port1, port2 } = new MessageChannelMain();
+  try {
+    host.postMessage({ type: "agent-host-owner" } satisfies AgentHostOwnerMessage, [port2]);
+  } catch (error) {
+    port1.close();
+    port2.close();
+    throw error;
+  }
+  host.on("exit", () => port1.close());
+}
 
 export function handoffAgentHostPort(input: {
   host: UtilityProcess;

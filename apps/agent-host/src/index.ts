@@ -28,6 +28,7 @@ import { enterprisePowerEpoch } from "./context/enterprise-power-epoch.js";
 import { TeamWorkerBrokerClient } from "./context/team-worker-broker-client.js";
 import { TeamIndexSettingsClient } from "./context/team-index-settings-client.js";
 import { TeamIndexHeadResponder } from "./context/team-index-head-responder.js";
+import { watchAgentHostOwner } from "./agent-host-owner.js";
 
 interface ParentMessageEvent {
   data: unknown;
@@ -66,6 +67,12 @@ void startAgentHost();
 async function startAgentHost(): Promise<void> {
   let started;
   let shuttingDown = false;
+  let shutdown: ((deadlineMs?: number, notifyParent?: boolean) => Promise<void>) | undefined;
+  const stopOwnerWatch = watchAgentHostOwner(parentPort!, () => {
+    shuttingDown = true;
+    if (shutdown) void shutdown();
+    else scheduleExit(70);
+  }, () => process.exit(70));
   try {
     const agentDir = resolveAgentDirectory(undefined);
     started = await coordinateAgentHostStartup({
@@ -94,6 +101,7 @@ async function startAgentHost(): Promise<void> {
       }
     });
   } catch (error) {
+    stopOwnerWatch();
     const failure = error instanceof AgentHostStartupError
       ? error
       : new AgentHostStartupError({ stage: "server-construction", code: "unknown" });
@@ -107,12 +115,14 @@ async function startAgentHost(): Promise<void> {
   }
 
   const { server, startup } = started;
+  if (shuttingDown) { await server.shutdown(1_000); return; }
   const teamIndexHeads = new TeamIndexHeadResponder(parentPort!, (input, signal) =>
     server.observeIndexHead(input, AbortSignal.any([signal, teamIndexSettings.signal])));
   let shutdownPromise: Promise<void> | undefined;
-  const shutdown = (deadlineMs = 1_000, notifyParent = false): Promise<void> => {
+  shutdown = (deadlineMs = 1_000, notifyParent = false): Promise<void> => {
     if (shutdownPromise) return shutdownPromise;
     shuttingDown = true;
+    stopOwnerWatch();
     teamIndexHeads.shutdown();
     localMemoryBroker.shutdown();
     teamIndexSettings.shutdown();
@@ -148,7 +158,7 @@ async function startAgentHost(): Promise<void> {
       return;
     }
     if (isAgentHostShutdownRequest(event.data)) {
-      void shutdown(event.data.deadlineMs, true);
+      void shutdown!(event.data.deadlineMs, true);
       return;
     }
     if (!isAgentHostAttachPortMessage(event.data) || event.ports.length !== 1) return;
@@ -160,9 +170,9 @@ async function startAgentHost(): Promise<void> {
     }
     server.attachPort(port, event.data);
   });
-  process.once("SIGTERM", () => void shutdown());
-  process.once("SIGINT", () => void shutdown());
-  process.once("beforeExit", () => void shutdown());
+  process.once("SIGTERM", () => void shutdown!());
+  process.once("SIGINT", () => void shutdown!());
+  process.once("beforeExit", () => void shutdown!());
   parentPort!.postMessage({ type: "agent-host-ready", startup });
 }
 

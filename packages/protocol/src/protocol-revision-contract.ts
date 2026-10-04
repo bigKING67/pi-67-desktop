@@ -39,6 +39,7 @@ import {
 } from "./desktop-bridge-messages.js";
 import {
   AgentHostAttachPortMessageSchema,
+  AgentHostOwnerMessageSchema,
   AgentHostReadyMessageSchema,
   AgentHostRuntimePoisonedMessageSchema,
   AgentHostStartupFailedMessageSchema,
@@ -134,6 +135,7 @@ export function canonicalProtocolRevisionMaterial(): string {
       teamIndexSettingsMessage: TeamIndexSettingsMessageSchema,
       localMemoryConnectResult: LocalMemoryConnectResultSchema,
       attachPort: AgentHostAttachPortMessageSchema,
+      owner: AgentHostOwnerMessageSchema,
       ready: AgentHostReadyMessageSchema,
       startupFailed: AgentHostStartupFailedMessageSchema,
       runtimePoisoned: AgentHostRuntimePoisonedMessageSchema,

@@ -1,6 +1,6 @@
 # Recover interrupted tasks on native Pi
 
-Status: complete for local macOS source and packaged acceptance; Windows/live Provider recovery unverified
+Status: active; Windows Main-death lifecycle fix and exact-SHA CI acceptance pending
 Owner: Codex
 Started: 2026-10-04
 
@@ -11,7 +11,8 @@ Keep coding-agent as the only runtime and Pi JSONL as conversation truth. After
 reopening the same Session, offer an explicit continuation for an unfinished
 recorded turn. Reuse existing results and the previous Auto physical selection.
 No automatic background inference, Pi Durable dependency, Session migration,
-second loop, hosted worker, commit, push or release is authorized by this plan.
+second loop or hosted worker. The user subsequently authorized scoped commits,
+push to main and Windows/macOS CI acceptance; distribution and release remain outside scope.
 
 ## Current evidence
 
@@ -68,6 +69,38 @@ tokens and component library. Native desktop readback uses Computer Use;
 browser runtime acceptance uses browser67 when needed.
 
 ## Implementation and evidence
+
+- CI `37188370268` attempt 1 at clean `bb92992` passed source (942 files / 6210 tests),
+  renderer (294 passed / 1 skipped), macOS native/recovery and Windows general
+  packaged smoke. The prior missing Windows quit observation did not recur; its
+  isolated cause remains unproven. Windows `agent-before-response` passed. Windows
+  `app-after-tool` persisted the Tool Result, then proved that the old Agent Host
+  survived forced Main death; the runner failed waiting for its exit. Cleanup and
+  canonical-session preservation passed. The unknown-Tool case was not reached.
+- Fix the observed orphan at the existing Main/Host lifecycle boundary with a
+  dedicated owner MessagePort. Install its listener before async startup; reuse
+  bounded shutdown after disconnect. Keep crash-runner assertions unchanged.
+  Rollback is scoped removal of this lifetime contract and its protocol revision;
+  it changes no Session/config format. Required evidence: lifecycle unit regressions,
+  aggregate source gate, new local macOS preview/three crash cases, then clean-SHA
+  Windows/macOS CI. The prior ASAR cannot certify changed production lifecycle code.
+- The user clarified the experimental Pi Durable concern. Live dependency/source
+  inspection confirms no `@earendil-works/pi-durable` dependency or runtime import.
+  Keep the product name “interrupted-task recovery”; retained `pi-durable-compat`
+  evidence paths are historical investigation labels, not package adoption.
+  The official 2026-10-01 announcement describes Pi Durable as a separate experimental
+  harness with an evolving API. This change continues native coding-agent Sessions
+  and explicit continuation only, with no checkpoint engine or unattended resume.
+- Lifetime fix local acceptance passed: `check:source` (944 files / 6219 tests;
+  9 files / 24 optional tests skipped), unchanged coverage floors, packaged smoke
+  and all three isolated macOS crash scenarios. Current ASAR is 195103058 bytes,
+  SHA-256 `2df76594a004a60a01b37c2545f05c20e5f9a161d4344aee90f1ea1707948cfe`.
+  Every crash receipt confirms original Session, one judge call, canonical profile
+  unchanged, cleanup passed and zero real model requests. These local receipts bind
+  dirty `bb92992` plus this scoped diff; clean-SHA Windows/macOS CI is still pending.
+  Evidence: `owner-lifetime-source-gate.log`, `owner-lifetime-macos-preview.log`,
+  and the three `owner-lifetime-macos-<scenario>.log` receipt pointers under the
+  existing ignored validation directory. Preview reopened the repository app.
 
 - Next bounded acceptance uses `eng/packaging/verify-packaged-task-recovery.mjs`:
   separate temporary profile per scenario, in-process synthetic provider, Auto

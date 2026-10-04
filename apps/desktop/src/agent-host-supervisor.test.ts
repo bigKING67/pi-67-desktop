@@ -6,8 +6,8 @@ const electronMocks = vi.hoisted(() => {
   return {
     fork: vi.fn(),
     MessageChannelMain: class {
-      readonly port1 = { id: `host-port-${++nextPortId}` };
-      readonly port2 = { id: `renderer-port-${nextPortId}` };
+      readonly port1 = { id: `host-port-${++nextPortId}`, close: vi.fn() };
+      readonly port2 = { id: `renderer-port-${nextPortId}`, close: vi.fn() };
     }
   };
 });
@@ -63,7 +63,7 @@ describe("AgentHostSupervisor", () => {
     supervisor.connect();
 
     expect(electronMocks.fork).toHaveBeenCalledOnce();
-    expect(host.postMessage).toHaveBeenCalledOnce();
+    expect(host.postMessage).toHaveBeenCalledTimes(2);
     expect(window.postMessage).toHaveBeenCalledOnce();
     expect(firstHandoff?.hostEpoch).toBe(1);
   });
@@ -80,7 +80,7 @@ describe("AgentHostSupervisor", () => {
     supervisor.connect();
 
     expect(electronMocks.fork).toHaveBeenCalledOnce();
-    expect(host.postMessage).toHaveBeenCalledTimes(2);
+    expect(host.postMessage).toHaveBeenCalledTimes(3);
     expect(window.postMessage).toHaveBeenCalledTimes(2);
   });
 
@@ -95,7 +95,7 @@ describe("AgentHostSupervisor", () => {
     supervisor.connect(true);
 
     expect(electronMocks.fork).toHaveBeenCalledOnce();
-    expect(host.postMessage).toHaveBeenCalledTimes(2);
+    expect(host.postMessage).toHaveBeenCalledTimes(3);
     expect(window.postMessage).toHaveBeenCalledTimes(2);
   });
 
@@ -244,7 +244,7 @@ describe("AgentHostSupervisor", () => {
     makeHostReady(host);
     supervisor.connect();
 
-    expect(host.postMessage).not.toHaveBeenCalled();
+    expect(host.postMessage).toHaveBeenCalledExactlyOnceWith({ type: "agent-host-owner" }, [expect.anything()]);
     expect(window.postMessage).not.toHaveBeenCalled();
   });
 
@@ -349,7 +349,7 @@ describe("AgentHostSupervisor", () => {
     const stopping = supervisor.stop();
     supervisor.connect();
     supervisor.attachPort();
-    expect(host.postMessage).toHaveBeenCalledTimes(2);
+    expect(host.postMessage).toHaveBeenCalledTimes(3);
     expect(window.postMessage).toHaveBeenCalledOnce();
     await vi.advanceTimersByTimeAsync(100);
 

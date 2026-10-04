@@ -4,6 +4,7 @@ import { mkdir, readFile, readdir, realpath } from "node:fs/promises";
 import { isAbsolute, join, sep } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { resolveDesktopToolchain } from "../../apps/desktop/src/desktop-toolchain.js";
+import { bindAgentHostOwner } from "../../apps/desktop/src/agent-host-port-handoff.js";
 import type { EnterpriseCredentialSupervisor } from "../../apps/desktop/src/enterprise-credential-supervisor.js";
 import { probeLiveHostSession } from "./agent-host-session-live-probe.js";
 import {
@@ -42,6 +43,7 @@ async function startHost(root: string, epoch: number, credentials?: EnterpriseCr
       PI67_SESSION_CATALOG_DIR: join(storageRoot, "projections", "session-catalog"), PI67_MANAGED_LOCAL_MEMORY: "0",
       PI67_TOOLCHAIN_ROOT: toolchain.root, PI67_NODE_EXECUTABLE: toolchain.nodeExecutable!, PI67_NPM_CLI: toolchain.npmCli!,
       PI67_GIT_EXECUTABLE: toolchain.gitExecutable!, PI67_GIT_EXEC_PATH: toolchain.gitExecPath! } });
+  child.once("spawn", () => { try { bindAgentHostOwner(child); } catch { child.kill(); } });
   let ready = false, startupRejected = false, exited = false, exitCode: number | undefined, shutdown: AgentHostShutdownCompleteMessage | undefined;
   let logBytes = 0;
   for (const stream of [child.stdout, child.stderr]) stream?.on("data", (data: Buffer) => {

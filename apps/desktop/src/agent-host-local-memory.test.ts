@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LocalMemoryConnection } from "@pi67/protocol";
 
 const electronMocks = vi.hoisted(() => ({ fork: vi.fn() }));
-vi.mock("electron", () => ({ utilityProcess: { fork: electronMocks.fork } }));
+vi.mock("electron", () => ({ utilityProcess: { fork: electronMocks.fork },
+  MessageChannelMain: class { readonly port1 = { close: vi.fn() }; readonly port2 = { close: vi.fn() }; }
+}));
 import { AgentHostSupervisor } from "./agent-host-supervisor.js";
 import type { LocalMemoryServicePort } from "./local-memory-supervisor.js";
 import type { LocalMemoryModelSettingsStore } from "./local-memory-model-settings.js";
