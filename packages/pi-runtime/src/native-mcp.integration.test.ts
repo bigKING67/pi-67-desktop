@@ -216,4 +216,66 @@ describe("Desktop native MCP integration", () => {
       await fixture.close();
     }
   }, 20_000);
+
+  // Windows uses taskkill /T /F, not POSIX signals.
+  it.skipIf(process.platform === "win32").each(["delayed", "ignored"] as const)("closes a POSIX descendant with %s SIGTERM handling before shutdown returns", async descendantTermination => {
+    const fixture = await createNativeMcpFixture({ pendingInitialize: true, descendantTermination });
+    try {
+      // The handshake proves the signal handler is installed before shutdown starts.
+      await vi.waitFor(async () => expect((await fixture.records()).some(event => event.type === "child-ready")).toBe(true));
+      const start = (await fixture.records()).find(event => event.type === "start")!;
+      expect(isProcessAlive(start.pid)).toBe(true);
+      expect(isProcessAlive(start.childPid!)).toBe(true);
+      await fixture.session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
+      // No post-shutdown wait or second shutdown: the public lifecycle must finish the tree.
+      expect(isProcessAlive(start.pid)).toBe(false);
+      expect(isProcessAlive(start.childPid!)).toBe(false);
+    } finally { await fixture.close(); }
+  }, 20_000);
+
+  it.skipIf(process.platform === "win32")("waits for descendants after an established server exits with inherited stdio", async () => {
+    const fixture = await createNativeMcpFixture({ descendantTermination: "ignored", descendantInheritsStdio: true });
+    try {
+      await vi.waitFor(async () => expect((await fixture.records()).some(event => event.type === "child-ready")).toBe(true));
+      const start = (await fixture.records()).find(event => event.type === "start")!;
+      process.kill(start.pid, "SIGTERM"); // Only the fixture's direct server, not its group.
+      await vi.waitFor(() => expect(isProcessAlive(start.pid)).toBe(false));
+      expect(isProcessAlive(start.childPid!)).toBe(true);
+      await fixture.session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
+      expect(isProcessAlive(start.childPid!)).toBe(false);
+      expect(fixture.extensionErrors).toEqual([]);
+    } finally { await fixture.close(); }
+  }, 20_000);
+
+  it.skipIf(process.platform === "win32")("reports an unconfirmed process group through the public shutdown error channel", async () => {
+    const fixture = await createNativeMcpFixture({ pendingInitialize: true });
+    let restoreKill: (() => void) | undefined;
+    let start: Awaited<ReturnType<typeof fixture.records>>[number] | undefined;
+    const terminateOwnedGroup = (pid: number) => {
+      try { process.kill(-pid, "SIGKILL"); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error; }
+    };
+    try {
+      await vi.waitFor(async () => expect((await fixture.records()).some(event => event.type === "start")).toBe(true));
+      start = (await fixture.records()).find(event => event.type === "start")!;
+      const groupPid = -start.pid;
+      const kill = process.kill.bind(process);
+      const spy = vi.spyOn(process, "kill").mockImplementation((pid, signal) => {
+        if (pid === groupPid && signal === 0) throw Object.assign(new Error("Synthetic group inspection denied"), { code: "EPERM" });
+        return kill(pid, signal);
+      });
+      restoreKill = () => spy.mockRestore();
+      await fixture.session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
+      expect(fixture.extensionErrors).toContainEqual(expect.objectContaining({ event: "session_shutdown", error: "MCP shutdown failed" }));
+      expect(isProcessAlive(start.pid)).toBe(true); // Explicit failure, never a successful-close assertion.
+    } finally {
+      restoreKill?.();
+      // Forced cleanup only after observing the public failure, limited to the owned synthetic group.
+      if (start) {
+        terminateOwnedGroup(start.pid);
+        await vi.waitFor(() => expect(isProcessAlive(start!.pid) || isProcessAlive(start!.childPid!)).toBe(false), { timeout: 5_000 });
+      }
+      await fixture.close();
+    }
+  }, 20_000);
 });

@@ -40,6 +40,12 @@ unsigned preview 共用该 contract，不维护另一份运行时版本常量。
   保持上游将截断的文本写入临时文件；Desktop 传入 `false` 时不写完整文本、不返回路径，
   并在截断结果中明确说明该输出未按 host 隐私策略保存。上游替代版本必须重新通过同样的
   行为回归后才能移除补丁。
+- `patches/@earendil-works__pi-mcp@1.0.0.patch` 同样锁定版本与 hash，补齐 POSIX
+  进程树关闭：连接关闭须等待拥有的进程组退出，保留 stdin 宽限和 TERM→KILL 时限，
+  忽略 TERM 的后代仍强制退出，并有界确认系统回收。重复关闭共用同一完成结果；
+  服务进程自行退出也清理其后代。Windows 保持原生 taskkill 路径，不能从 POSIX
+  信号用例推断其平台验收。无法确认退出时，原生连接及 Session 层等待所有清理结束，
+  再通过公开 Extension 错误通道报告失败。补丁不新增 Desktop transport 或第二套 MCP client。
 - 原有 runtime-only cache warming suppression 保持不变，不改用户 TUI 设置。
 - 当前验证进展见 `docs/plans/2026-10-03-pi-1-upgrade.md`；仅完成的证据层可用于
   验收。Windows、付费 Provider 和发布认证不得从本机离线测试推断。

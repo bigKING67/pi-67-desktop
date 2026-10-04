@@ -2012,7 +2012,10 @@ Desktop 显式注册 Pi 原生 MCP 与 tool-search factory，移除 pi-mcp-adapt
 不覆盖用户显式 Tool 列表。原生 MCP 不是第三方 Extension 进程隔离。
 Pi 1.0.0 使用锁定 pnpm 补丁暴露配置校验、精确注册绑定、日志/输出持久化开关及
 Agent Profile 目录，并修复初始化/工具列举尚未完成时的退出。Desktop 仅消费公开 SDK
-入口，不私有导入、复制 transport 或实现第二个 MCP client/agent loop。
+入口，不私有导入、复制 transport 或实现第二个 MCP client/agent loop。额外锁定
+`pi-mcp@1.0.0` 的原生 transport 补丁，使 POSIX 关闭等待拥有的进程组退出；保留
+原有 stdin 宽限与 TERM→KILL 时限，避免直系进程先退出便取消后代强制退出。重复
+关闭共享完成结果，系统回收确认有界；Windows 沿用原生 taskkill 路径。
 原生连接器与权限目录消费同一有效文件配置；Desktop 不连接 extension-registered MCP，
 资源枚举与读取同样受该来源边界约束。权限核验精确 owner、原始/最终 Tool 名、
 schema 与 exposure。旧缓存不再授权，native Tool 不经旧 mcp 代理。资源撤回、reload、

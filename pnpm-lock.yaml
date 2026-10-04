@@ -16,7 +16,8 @@ overrides:
   undici@8.5.0: 8.9.0
 
 patchedDependencies:
-  '@earendil-works/pi-coding-agent@1.0.0': bb17867d372d03f3d31f4bb9c3038e25698165baaaea241aff4cf79a1c6bffab
+  '@earendil-works/pi-coding-agent@1.0.0': f3b9857673e4a4d618e1d3a86571a37a4faead01b31f100a5facfabc1513c457
+  '@earendil-works/pi-mcp@1.0.0': 23249993885f6da6a382cf1c42254ff91225efe0b80b9bdcc2a54b4b601f4ed6
 
 importers:
 
@@ -352,7 +353,7 @@ importers:
         version: 1.0.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.2)(supports-color@8.1.1)(undici@7.29.1)(ws@8.21.1)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: 1.0.0
-        version: 1.0.0(patch_hash=bb17867d372d03f3d31f4bb9c3038e25698165baaaea241aff4cf79a1c6bffab)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.2)(supports-color@8.1.1)(ws@8.21.1)(zod@4.4.3)
+        version: 1.0.0(patch_hash=f3b9857673e4a4d618e1d3a86571a37a4faead01b31f100a5facfabc1513c457)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.2)(supports-color@8.1.1)(ws@8.21.1)(zod@4.4.3)
       '@pi67/domain':
         specifier: workspace:*
         version: link:../domain
@@ -5513,13 +5514,13 @@ snapshots:
     dependencies:
       quickjs-wasi: 3.6.2
 
-  '@earendil-works/pi-coding-agent@1.0.0(patch_hash=bb17867d372d03f3d31f4bb9c3038e25698165baaaea241aff4cf79a1c6bffab)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.2)(supports-color@8.1.1)(ws@8.21.1)(zod@4.4.3)':
+  '@earendil-works/pi-coding-agent@1.0.0(patch_hash=f3b9857673e4a4d618e1d3a86571a37a4faead01b31f100a5facfabc1513c457)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.2)(supports-color@8.1.1)(ws@8.21.1)(zod@4.4.3)':
     dependencies:
       '@earendil-works/chord': 1.0.0
       '@earendil-works/pi-agent-core': 1.0.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.2)(supports-color@8.1.1)(undici@8.10.2)(ws@8.21.1)(zod@4.4.3)
       '@earendil-works/pi-ai': 1.0.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.2)(supports-color@8.1.1)(undici@8.10.2)(ws@8.21.1)(zod@4.4.3)
       '@earendil-works/pi-codemode': 1.0.0
-      '@earendil-works/pi-mcp': 1.0.0
+      '@earendil-works/pi-mcp': 1.0.0(patch_hash=23249993885f6da6a382cf1c42254ff91225efe0b80b9bdcc2a54b4b601f4ed6)
       '@earendil-works/pi-tui': 1.0.0
       '@silvia-odwyer/photon-node': 0.3.4
       chalk: 6.0.0
@@ -5549,7 +5550,7 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-mcp@1.0.0':
+  '@earendil-works/pi-mcp@1.0.0(patch_hash=23249993885f6da6a382cf1c42254ff91225efe0b80b9bdcc2a54b4b601f4ed6)':
     dependencies:
       cross-spawn: 7.0.6
 

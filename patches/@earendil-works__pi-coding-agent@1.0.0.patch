@@ -1,5 +1,5 @@
 diff --git a/dist/extensions/codemode/execute.js b/dist/extensions/codemode/execute.js
-index b75b6801fa46363a948d8bb61b4aac248b6bcec5..06a16faa25ca6c5bae2118f8d6b6d9fbfcd378ac 100644
+index b75b6801fa46363a948d8bb61b4aac248b6bcec5..feac2e3a0659b50209fe5f288d7903959f650473 100644
 --- a/dist/extensions/codemode/execute.js
 +++ b/dist/extensions/codemode/execute.js
 @@ -223,9 +223,9 @@ async function spillOutput(text) {
@@ -37,7 +37,7 @@ index b75b6801fa46363a948d8bb61b4aac248b6bcec5..06a16faa25ca6c5bae2118f8d6b6d9fb
      const header = `${result.ok ? "Script completed" : "Script failed"}\nWall time ${wallTime} seconds\nOutput:\n`;
      const details = snapshot();
 diff --git a/dist/extensions/codemode/index.d.ts b/dist/extensions/codemode/index.d.ts
-index 7de9c24e9d7ac437265eeb911ca9c841b36dca9f..f0ae1b450359d5b7888290e48845904173fc65bc 100644
+index 7de9c24e9d7ac437265eeb911ca9c841b36dca9f..fd82b02e9435ef2606d148d186aebbe94033cc39 100644
 --- a/dist/extensions/codemode/index.d.ts
 +++ b/dist/extensions/codemode/index.d.ts
 @@ -14,6 +14,8 @@ export interface CodemodeExtensionOptions {
@@ -50,7 +50,7 @@ index 7de9c24e9d7ac437265eeb911ca9c841b36dca9f..f0ae1b450359d5b7888290e488459041
  export declare function createCodemodeExtension(options?: CodemodeExtensionOptions): ExtensionFactory;
  declare const _default: ExtensionFactory;
 diff --git a/dist/extensions/codemode/index.js b/dist/extensions/codemode/index.js
-index a810a29c7ae7c7626e92edbfc8a2cac419c2befc..0c87d1149d430f61203665ec454150dc945fcfb4 100644
+index a810a29c7ae7c7626e92edbfc8a2cac419c2befc..29c529af93ec1a43708867ae0ecba08571d3e4ec 100644
 --- a/dist/extensions/codemode/index.js
 +++ b/dist/extensions/codemode/index.js
 @@ -22,6 +22,7 @@ export function createCodemodeExtension(options = {}) {
@@ -62,7 +62,7 @@ index a810a29c7ae7c7626e92edbfc8a2cac419c2befc..0c87d1149d430f61203665ec454150dc
              defaultActive: false,
          });
 diff --git a/dist/extensions/codemode/tool.d.ts b/dist/extensions/codemode/tool.d.ts
-index 705ca75a77efef84a60e848bc33c293fedd54ceb..1cf216641e905cbf9ce25277c2fd327536d99ec1 100644
+index 705ca75a77efef84a60e848bc33c293fedd54ceb..035b46d8fd2c121ae96f87bfb72a5dfa4ca7f451 100644
 --- a/dist/extensions/codemode/tool.d.ts
 +++ b/dist/extensions/codemode/tool.d.ts
 @@ -52,6 +52,8 @@ export interface CodemodeToolOptions {
@@ -125,7 +125,7 @@ index 5c39af847eee2489421b3ee12edeb52bee408e92..a929c53667f30ea99f5aa9d1012a5f36
      openUrl?: (url: string) => void;
      /** Saves `/mcp` changes to the server's config file. Defaults to editing its `mcp.json`. */
 diff --git a/dist/extensions/mcp/index.js b/dist/extensions/mcp/index.js
-index fbbb30c87e610b98ffbe47fa71f93dbc3bd0bc45..93015b316abbf2a910f34675c3aaef7afab602c0 100644
+index fbbb30c87e610b98ffbe47fa71f93dbc3bd0bc45..bdad895751bd551c37a0aec9594b6fa4d9cc0aaf 100644
 --- a/dist/extensions/mcp/index.js
 +++ b/dist/extensions/mcp/index.js
 @@ -28,6 +28,7 @@
@@ -308,7 +308,7 @@ index fbbb30c87e610b98ffbe47fa71f93dbc3bd0bc45..93015b316abbf2a910f34675c3aaef7a
              const added = registered.servers.filter((server) => !findServer(server.entry.name));
              servers.push(...added);
              emitChange();
-@@ -977,6 +1009,8 @@ export function createMcpExtension(options = {}) {
+@@ -977,9 +1009,14 @@ export function createMcpExtension(options = {}) {
              sessionActive = false;
              generation++;
              const closing = connections();
@@ -316,8 +316,15 @@ index fbbb30c87e610b98ffbe47fa71f93dbc3bd0bc45..93015b316abbf2a910f34675c3aaef7a
 +                hideTools(server.entry.name, server.entry);
              servers = [];
              emitChange();
-             await Promise.all(closing.map((connection) => connection.close()));
-@@ -1020,6 +1054,10 @@ export function createMcpExtension(options = {}) {
+-            await Promise.all(closing.map((connection) => connection.close()));
++            const results = await Promise.allSettled(closing.map((connection) => connection.close()));
++            const failures = results.filter((result) => result.status === "rejected").map((result) => result.reason);
++            if (failures.length)
++                throw new AggregateError(failures, "MCP shutdown failed");
+         });
+         pi.registerCommand("mcp", {
+             description: "Manage MCP servers: sign in, reconnect, enable or disable, and change exposure",
+@@ -1020,6 +1057,10 @@ export function createMcpExtension(options = {}) {
                  }
                  switch (action) {
                      case "login": {
@@ -328,7 +335,7 @@ index fbbb30c87e610b98ffbe47fa71f93dbc3bd0bc45..93015b316abbf2a910f34675c3aaef7a
                          const server = await pickServer(name, ctx, oauthPick);
                          if (server)
                              await loginCommand(server, ctx);
-@@ -1059,8 +1097,8 @@ export function createMcpExtension(options = {}) {
+@@ -1059,8 +1100,8 @@ export function createMcpExtension(options = {}) {
          });
      };
  }
@@ -339,7 +346,6 @@ index fbbb30c87e610b98ffbe47fa71f93dbc3bd0bc45..93015b316abbf2a910f34675c3aaef7a
  }
  export default createMcpExtension();
  //# sourceMappingURL=index.js.map
-\ No newline at end of file
 diff --git a/dist/extensions/mcp/resources.d.ts b/dist/extensions/mcp/resources.d.ts
 index e0d8d9d265ff9266dd730cb6a16b36277e7cd215..9ac0948d5e5241df0472c84d38eff1d6980198e9 100644
 --- a/dist/extensions/mcp/resources.d.ts
@@ -419,7 +425,7 @@ index 3ac39f55c66f2134d71d187537717dda2501a06c..2ba6d48947db99682518f66b1b527c0d
      /** Stderr of the last stdio server that failed to connect. */
      private stderrTail;
 diff --git a/dist/extensions/mcp/runtime.js b/dist/extensions/mcp/runtime.js
-index 2b767459cdc79eb664e89595d0ea1a133486fab7..50a2a5d4c74486bce58a4f87cfedd68dc5e76080 100644
+index 2b767459cdc79eb664e89595d0ea1a133486fab7..1ac23ea59c3951c69cdd8e9e879ded6af4752622 100644
 --- a/dist/extensions/mcp/runtime.js
 +++ b/dist/extensions/mcp/runtime.js
 @@ -116,6 +116,7 @@ export class McpServerConnection {
@@ -456,7 +462,7 @@ index 2b767459cdc79eb664e89595d0ea1a133486fab7..50a2a5d4c74486bce58a4f87cfedd68d
              await client.close().catch(() => undefined);
              if (transport instanceof StdioTransport) {
                  this.stderrTail = transport.stderr.trim().slice(-STDERR_TAIL_CHARS) || undefined;
-@@ -385,8 +391,14 @@ export class McpServerConnection {
+@@ -385,11 +391,20 @@ export class McpServerConnection {
          this.state = "closed";
          this.changed();
          const client = this.client;
@@ -465,13 +471,19 @@ index 2b767459cdc79eb664e89595d0ea1a133486fab7..50a2a5d4c74486bce58a4f87cfedd68d
          this.client = undefined;
 -        await client?.close().catch(() => undefined);
 +        this.pendingClient = undefined;
-+        await Promise.all([client, pendingClient]
++        const results = await Promise.allSettled([client, pendingClient]
 +            .filter((candidate, index, clients) => candidate && clients.indexOf(candidate) === index)
-+            .map((candidate) => candidate.close().catch(() => undefined)));
++            .map((candidate) => candidate.close()));
 +        await opening?.catch(() => undefined);
          // A refresh the server already answered may have rotated the refresh token; exiting before the
          // new tokens are saved would lose the grant.
          await this.authProvider?.settled();
++        const failures = results.filter((result) => result.status === "rejected").map((result) => result.reason);
++        if (failures.length)
++            throw new AggregateError(failures, "MCP connection shutdown failed");
+     }
+ }
+ //# sourceMappingURL=runtime.js.map
 diff --git a/dist/extensions/mcp/tools.d.ts b/dist/extensions/mcp/tools.d.ts
 index aaab8f2f93f4982ac047565a802871e858f1f806..0cafe93210a47e0804a66cf06a22b9aeb97754b3 100644
 --- a/dist/extensions/mcp/tools.d.ts

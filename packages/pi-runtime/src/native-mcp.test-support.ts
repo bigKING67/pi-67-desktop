@@ -20,10 +20,17 @@ const serverSource = String.raw`
 import { appendFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
-const [receipt, pendingInitialize] = process.argv.slice(2);
-const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+const [receipt, pendingInitialize, descendantTermination, inheritedStdio] = process.argv.slice(2);
+const descendantSource = descendantTermination
+  ? "process.on('SIGTERM', () => {" + (descendantTermination === "delayed" ? "setTimeout(() => process.exit(0), 100);" : "")
+    + "}); setInterval(() => {}, 1000); process.send('ready');"
+  : "setInterval(() => {}, 1000)";
+const child = spawn(process.execPath, ["-e", descendantSource], {
+  stdio: descendantTermination ? ["ignore", inheritedStdio ? "inherit" : "ignore", inheritedStdio ? "inherit" : "ignore", "ipc"] : "ignore"
+});
 const record = (event) => appendFileSync(receipt, JSON.stringify({ pid: process.pid, ...event }) + "\n");
 record({ type: "start", childPid: child.pid });
+child.once("message", () => record({ type: "child-ready", childPid: child.pid }));
 setInterval(() => {}, 1000);
 let changed = false;
 const send = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + "\n");
@@ -78,6 +85,8 @@ export function isProcessAlive(pid: number): boolean {
 export async function createNativeMcpFixture(options: {
   safety?: { taskToolMode: TaskToolMode; interactionMode?: SessionInteractionMode; trust?: WorkspaceTrust };
   pendingInitialize?: boolean;
+  descendantTermination?: "delayed" | "ignored";
+  descendantInheritsStdio?: boolean;
   upstreamDefaults?: boolean;
   exposure?: "direct" | "deferred";
   excludeTools?: string[];
@@ -96,7 +105,7 @@ export async function createNativeMcpFixture(options: {
   await writeFile(receipt, "");
   await writeFile(join(agentDir, "mcp.json"), JSON.stringify({ mcpServers: {
     synthetic: { command: process.execPath,
-      args: [script, receipt, ...(options.pendingInitialize ? ["pending"] : [])],
+      args: [script, receipt, options.pendingInitialize ? "pending" : "", options.descendantTermination ?? "", options.descendantInheritsStdio ? "inherit" : ""],
       exposure: options.exposure ?? "direct", timeout: 10,
       ...(options.excludeTools === undefined ? {} : { excludeTools: options.excludeTools }) }
   } }));
@@ -108,6 +117,7 @@ export async function createNativeMcpFixture(options: {
   const getSafety = () => ({ cwd: root, trust: options.safety?.trust ?? "trusted" as const, taskToolMode: options.safety?.taskToolMode ?? "auto" as const });
   const requestApproval = vi.fn<DesktopApprovalRequester>(async () => ({ status: "denied" }));
   const uiEvents = vi.fn<(event: AgentEvent) => void>();
+  const extensionErrors: Array<{ event: string; error: string }> = [];
   const bridge = new DesktopExtensionUiBridge(uiEvents);
   let session: AgentSession | undefined;
   const spilledFiles = new Set<string>();
@@ -190,12 +200,12 @@ export async function createNativeMcpFixture(options: {
       const details = event.result.details as { fullOutputPath?: string } | undefined;
       if (details?.fullOutputPath) spilledFiles.add(details.fullOutputPath);
     });
-    await session.bindExtensions({ uiContext: bridge.context, mode: "rpc" });
+    await session.bindExtensions({ uiContext: bridge.context, mode: "rpc", onError: error => extensionErrors.push(error) });
     if (!options.pendingInitialize) {
       await vi.waitFor(() => expect(session!.getToolDefinition("mcp__synthetic__echo")).toBeDefined(),
         { timeout: 10_000 });
     }
-    return { session, root, agentDir, logPath, requestApproval, uiEvents, records, close };
+    return { session, root, agentDir, logPath, requestApproval, uiEvents, extensionErrors, records, close };
   } catch (error) {
     await close();
     throw error;

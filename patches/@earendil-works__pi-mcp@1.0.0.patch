@@ -1,0 +1,137 @@
+diff --git a/dist/transports/stdio.d.ts b/dist/transports/stdio.d.ts
+index d0c99213c3455d6da94b17fa7dc6ce9d594bfdf3..52ee4d00f1adc34d5a01e3577fba6f638524de23 100644
+--- a/dist/transports/stdio.d.ts
++++ b/dist/transports/stdio.d.ts
+@@ -16,6 +16,8 @@ export interface StdioTransportOptions {
+ export declare class StdioTransport extends TransportEvents implements McpTransport {
+     readonly options: Readonly<StdioTransportOptions>;
+     private child;
++    private processGroupId;
++    private closing;
+     private stdoutBuffer;
+     private stderrBuffer;
+     private started;
+@@ -26,6 +28,7 @@ export declare class StdioTransport extends TransportEvents implements McpTransp
+     start(): Promise<void>;
+     send(message: JsonRpcMessage): Promise<void>;
+     close(): Promise<void>;
++    private closeOwnedProcess;
+     private handleStdout;
+     private handleStderr;
+ }
+diff --git a/dist/transports/stdio.js b/dist/transports/stdio.js
+index f57a3b19e2efb8d836cd2f7336f245f4de27fd53..e736ab5200e23a77ec92a1af7beb838de660883e 100644
+--- a/dist/transports/stdio.js
++++ b/dist/transports/stdio.js
+@@ -1,5 +1,6 @@
+ import { spawn } from "node:child_process";
+ import process from "node:process";
++import { setTimeout as delay } from "node:timers/promises";
+ import crossSpawn from "cross-spawn";
+ import { McpConnectionClosedError, parseJsonRpcMessage } from "../protocol/jsonrpc.js";
+ import { DEFAULT_MAX_MESSAGE_BYTES, TransportEvents } from "./transport.js";
+@@ -11,6 +12,41 @@ const USE_PROCESS_GROUPS = process.platform !== "win32";
+ /** Process groups of running servers, killed if the host exits without closing them. */
+ const liveProcessGroups = new Set();
+ let exitHookInstalled = false;
++function processGroupExists(pid) {
++    try {
++        process.kill(-pid, 0);
++        return true;
++    }
++    catch (error) {
++        if (error?.code === "ESRCH")
++            return false;
++        throw error;
++    }
++}
++async function closeProcessGroup(child, pid, closeTimeoutMs) {
++    const startedAt = performance.now();
++    const grace = Math.min(STDIN_CLOSE_GRACE_MS, closeTimeoutMs);
++    let terminated = false;
++    let killed = false;
++    child?.stdin?.end();
++    while (processGroupExists(pid)) {
++        const elapsed = performance.now() - startedAt;
++        const directExited = !child || child.exitCode !== null || child.signalCode !== null;
++        const signal = !killed && elapsed >= grace + closeTimeoutMs ? "SIGKILL"
++            : !terminated && (directExited || elapsed >= grace) ? "SIGTERM" : undefined;
++        if (signal) {
++            try { process.kill(-pid, signal); }
++            catch (error) { if (error?.code !== "ESRCH") throw error; }
++            if (signal === "SIGKILL") killed = true;
++            else terminated = true;
++        }
++        // Preserve the existing grace and TERM-to-KILL budget, then bound OS reaping.
++        if (elapsed >= grace + closeTimeoutMs + STDIN_CLOSE_GRACE_MS)
++            throw new Error("MCP stdio process group did not exit after SIGKILL");
++        await delay(10);
++    }
++    liveProcessGroups.delete(pid);
++}
+ function killProcessTree(child, signal) {
+     const pid = child.pid;
+     if (process.platform === "win32" && pid !== undefined) {
+@@ -52,6 +88,8 @@ function installExitHook() {
+ export class StdioTransport extends TransportEvents {
+     options;
+     child;
++    processGroupId;
++    closing;
+     stdoutBuffer = Buffer.alloc(0);
+     stderrBuffer = Buffer.alloc(0);
+     started = false;
+@@ -85,8 +123,19 @@ export class StdioTransport extends TransportEvents {
+         const pid = child.pid;
+         if (USE_PROCESS_GROUPS && pid !== undefined) {
+             installExitHook();
++            this.processGroupId = pid;
+             liveProcessGroups.add(pid);
+-            child.once("exit", () => liveProcessGroups.delete(pid));
++            child.once("exit", () => {
++                try {
++                    if (!processGroupExists(pid)) {
++                        liveProcessGroups.delete(pid);
++                        this.processGroupId = undefined;
++                    }
++                }
++                catch (error) { this.emitError(error); }
++                // Inherited stdio may delay `close`; begin owned-tree cleanup at direct exit.
++                void this.close().catch((error) => this.emitError(error));
++            });
+         }
+         child.stdout?.on("data", (chunk) => this.handleStdout(chunk));
+         child.stdout?.on("error", (error) => this.emitError(error));
+@@ -102,7 +151,9 @@ export class StdioTransport extends TransportEvents {
+                 this.emitError(new Error("MCP stdio server closed with an incomplete JSON-RPC message"));
+             }
+             this.stdoutBuffer = Buffer.alloc(0);
+-            this.emitClose();
++            // Keep the connection owned until its process group has actually finished.
++            if (!USE_PROCESS_GROUPS || this.processGroupId === undefined)
++                this.emitClose();
+         });
+         await new Promise((resolve, reject) => {
+             const onSpawn = () => {
+@@ -131,10 +182,21 @@ export class StdioTransport extends TransportEvents {
+         });
+     }
+     async close() {
++        if (!this.closing)
++            this.closing = this.closeOwnedProcess();
++        await this.closing;
++    }
++    async closeOwnedProcess() {
+         if (this.closed)
+             return;
+         this.closed = true;
+         const child = this.child;
++        if (USE_PROCESS_GROUPS && this.processGroupId !== undefined) {
++            await closeProcessGroup(child, this.processGroupId, this.options.closeTimeoutMs ?? DEFAULT_CLOSE_TIMEOUT_MS);
++            this.processGroupId = undefined;
++            this.emitClose();
++            return;
++        }
+         if (!child) {
+             this.emitClose();
+             return;

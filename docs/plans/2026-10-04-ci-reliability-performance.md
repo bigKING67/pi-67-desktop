@@ -46,7 +46,7 @@ Do not increase retries or product timeout budgets to obtain a passing result.
 
 ## Boundaries and decisions
 
-CI/test/packaging tooling only unless direct evidence requires a scoped product fix.
+CI/test/packaging tooling plus the directly evidenced native MCP shutdown fix below.
 No protocol or persistent-state migration planned. Preserve frozen dependencies,
 fixed source worker bounds, all source coverage and final fail-closed CI gate.
 The pnpm store remains uncached: installation is not the measured bottleneck and
@@ -127,3 +127,43 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
 - Followup local validation: 4 files / 35 tests, type-aware lint, structure,
   workflow Action pins and PowerShell discovery passed. Independent review
   confirmed the diagnostic-blocking finding is closed, with no new finding.
+
+## Third exact-SHA CI and native MCP correction
+
+- `bd7d6ae01c175d54b79de08173399a5195cd5543`, full dispatch `37207160931`
+  attempt 1: Renderer (505 s), macOS native (288 s) and Windows native (957 s)
+  passed, including all six recovery receipts and full NSIS lifecycle. Source
+  failed one assertion: an initializing MCP server's descendant PID remained
+  alive immediately after public session shutdown; its parent was already gone.
+- The installed Pi MCP transport waits for direct child close, sends group TERM,
+  cancels the later KILL timer and immediately resolves. A bounded standalone
+  synthetic probe with an IPC-ready delayed TERM handler reproduced real execution
+  after return: parent gone at 502 ms, descendant alive for a further 101 ms.
+  This violates the existing Product process-tree contract; do not weaken the test.
+- Add an exact-version native `pi-mcp@1.0.0` pnpm patch for POSIX group completion,
+  preserving 500 ms stdin grace and 2,000 ms TERM-to-KILL timing, then at most
+  500 ms to observe OS reaping. Keep owned-group tracking after direct exit,
+  complete concurrent close callers together, and clean descendants on unsolicited
+  server exit. Windows taskkill behavior remains unchanged; no Desktop transport.
+- Real SDK regressions retain immediate parent/descendant checks and add IPC-ready
+  delayed/ignored TERM descendants. Initial 17 tests passed; final source/independent
+  review and exact-SHA native evidence remain required after the completed patch.
+- Packaging alone is faster, but total Windows time is not yet improved: this run
+  built in 83 s and full NSIS took 317 s, versus 141 s / 244 s in the baseline.
+  Report the tradeoff and runner variance, not a total-time improvement claim.
+- Concurrent native-image WIP is present in the canonical checkout. Preserve it;
+  stage only this task's paths and exact MCP documentation hunks. Remote CI must
+  verify the scoped committed source, not infer its identity from a mixed local check.
+- Independent review found natural-exit cleanup could be detached by early close
+  notification, and connection-close errors were swallowed. Both are corrected:
+  start cleanup at direct `exit` even with inherited stdio, notify closure only
+  after group completion, and await all close attempts before publishing an
+  aggregate error through the public Extension error channel. Final review found
+  no new blocker and independently confirmed error propagation.
+- Final focused MCP integration: 19 tests passed. Added real SDK inherited-stdio
+  and injected owned-group EPERM cases, retaining immediate exit assertions;
+  negative-case forced cleanup occurs only after observing the public failure.
+  Type-aware lint passed. Full local coverage: 948 files / 6,280 tests passed,
+  branches 78.78%, including concurrent native-image WIP. Local aggregate source
+  check stopped on that WIP's 463-line runtime binding file (460 limit), not on
+  the MCP change; it is not an aggregate source PASS for this scoped commit.

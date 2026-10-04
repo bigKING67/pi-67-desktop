@@ -3,6 +3,7 @@ packages:
   - packages/*
 patchedDependencies:
   '@earendil-works/pi-coding-agent@1.0.0': patches/@earendil-works__pi-coding-agent@1.0.0.patch
+  '@earendil-works/pi-mcp@1.0.0': patches/@earendil-works__pi-mcp@1.0.0.patch
 overrides:
   '@earendil-works/pi-agent-core': 1.0.0
   '@earendil-works/pi-ai': 1.0.0
