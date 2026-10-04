@@ -1,6 +1,6 @@
 # CI reliability and measured performance
 
-Status: active
+Status: complete (scoped source and CI acceptance)
 Owner: Codex
 Started: 2026-10-04
 Last updated: 2026-10-05
@@ -499,3 +499,38 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
   a repeated full local lint hit its `openviking-runtime-retirement.ts` unbound-method
   warnings. Preserve that WIP and use scoped Renderer lint plus clean exact-SHA CI
   for this delivery; the earlier full lint passed before those concurrent changes.
+
+## Final acceptance: Workspace startup fix
+
+- Source `10d15177a4d48b99e303ecb5b0e7b79f55823a7a`, CI run `37227002031`,
+  attempt 1: all required jobs and the final CI Gate passed without rerunning.
+  https://github.com/bigKING67/pi-67-desktop/actions/runs/37227002031
+- Clean source gate: 949 test files and 6,312 tests passed (9 files / 24 tests
+  skipped), coverage floors passed (branches 78.72%), plus 15 Python tests.
+  Renderer browser acceptance: 294 passed, one skipped. Scoped local regression
+  coverage: 81 tests; independent review has no remaining blocking finding.
+- macOS arm64 and Windows x64 packaged runtime checks passed. All six recovery
+  receipts match the exact source SHA/run/attempt, have clean source, report PASS,
+  preserve the canonical Profile, complete cleanup, and record zero real model calls.
+- Windows synthetic UI passed at 1.25/1.5/2 scale. Each startup correctly selected
+  runtime-ready; controlled operations started and all owned processes exited.
+  Product exit observations were 363.6/847.7/568.5 ms. The ordinary hidden smoke
+  also reported graceful Host shutdown without force (Main 650.9 ms, Host 607.3 ms).
+- NSIS receipt passed the existing CI `quick` mode: silent install, installed launch,
+  three clean-profile and three existing-Pi-profile restarts, uninstall and isolated
+  data preservation. The earlier references to a full NSIS lane mean the entire
+  configured CI lane, not full release certification. Interactive installer,
+  SmartScreen, distinct-version upgrade and real-user profiles remain unverified.
+  Installer identity: 883,778,758 bytes, SHA-256
+  `ed6009b4e964a2da90021ca993ced3bce1231c65bd2b37def2b9fcb1a294d01f`.
+- Observed job durations: Windows native 749 s, macOS native 298 s, source 581 s,
+  Renderer 537 s. Windows hidden smoke (179 s) and NSIS lifecycle (177 s) remain
+  major costs. Earlier Windows baseline was 965 s; these individual runs do not
+  establish a stable percentage improvement or zero flakiness. Keep the existing
+  deadlines, coverage and platform checks; no additional stability reruns performed.
+- Delivery is scoped source/CI. Concurrent native-image and local-memory-retirement
+  WIP remains outside the commit. No candidate publication, paid model call, global
+  configuration edit or installed-app replacement. A local preview would include
+  unrelated uncommitted WIP, so it was not produced as this task's candidate.
+- Evidence: ignored `artifacts/validation/pi-durable-compat/ci-37227002031/`
+  receipts plus sibling source/Renderer/native job logs and local before/after probes.
