@@ -32,6 +32,7 @@ const PI_FFF_FIND_TOOLS = new Set(["find", "fffind"]);
 export type ToolSafetyProfile =
   | { kind: "builtin"; toolName: string; sourceLabel: "Pi 内置" }
   | { kind: "pi67-web"; toolName: string; sourceLabel: "Pi-67 原生搜索" }
+  | { kind: "pi67-images"; toolName: string; sourceLabel: "Pi SDK 原生生图" }
   | { kind: "pi67-plan"; toolName: string; sourceLabel: "Pi-67 原生计划" }
   | { kind: "pi67-context"; toolName: string; sourceLabel: "Pi-67 企业知识" }
   | { kind: "pi-web-access"; toolName: string; sourceLabel: "pi-web-access@0.17.0" }
@@ -94,6 +95,11 @@ export function createToolSafetyProfileResolver(catalog?: ConfiguredCapabilityCa
     }
     if (PI_WEB_ACCESS_TOOLS.has(toolName) && isFirstPartyWebIdentity(toolName, source)) {
       return { kind: "pi67-web", toolName, sourceLabel: "Pi-67 原生搜索" };
+    }
+    if (toolName === "image_models" || toolName === "generate_image") {
+      return isFirstPartySdkIdentity(toolName, source)
+        ? { kind: "pi67-images", toolName, sourceLabel: "Pi SDK 原生生图" }
+        : reservedIdentityMismatch(toolName, "Pi SDK 原生生图");
     }
     if (PI67_PLAN_TOOLS.has(toolName) && isFirstPartySdkIdentity(toolName, source)) {
       return { kind: "pi67-plan", toolName, sourceLabel: "Pi-67 原生计划" };

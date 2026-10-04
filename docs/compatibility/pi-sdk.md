@@ -52,6 +52,13 @@ unsigned preview 共用该 contract，不维护另一份运行时版本常量。
 - Codemode 接入与本地验收见 `docs/plans/2026-10-03-codemode-desktop.md`。
 - 原生 MCP 与现有 adapter 的来源、配置、权限、隐私及生命周期差异见
   [接入评估与迁移证据](pi-native-mcp-assessment.md)；各平台是否通过以实际收口记录为准。
+- 桌面生图通过 `image_models` / `generate_image` 调用 SDK
+  `ModelRegistry.getAvailableOfType("image")` / `generateImages()`；Provider、
+  image model、凭据与用量均保持 Pi 权威。当前上游内置 image API 为
+  `openrouter-images`，旧 OpenAI Images 扩展配置不自动迁移。Codemode 继续
+  `models: false`，通过普通子 Tool 调用同一路径；AUTO 单次确认、PLAN 拒绝，
+  参考图经 SDK `executeTool("read")` 保持叶子权限。验收记录见
+  `docs/plans/2026-10-04-extension-cleanup-native-images.md`。
 
 ## 0.86.1 adaptation and evidence boundary
 

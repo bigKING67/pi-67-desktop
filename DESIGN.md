@@ -585,6 +585,9 @@ loading error where the operation can produce those states
   loading/unavailable/retry states, and renders from a lazy Blob URL. Host
   replacement revokes cached URLs so an old connection cannot remain visually
   authoritative.
+- SDK 原生生图沿用通用 Tool card 和上述 Session image 展示：执行状态显示明确
+  Provider/model，成功结果显示图片数量；没有配置可用 image model、失败或取消时
+  显示明确原因。AUTO 使用既有单次确认，图片不自动另存为 Workspace 文件。
 - A stopped, aborted, or crashed turn never appears completed.
 - A Session compatibility banner appears above known transcript content only for
   `partial` or `future-format`. It names supported and observed format versions plus

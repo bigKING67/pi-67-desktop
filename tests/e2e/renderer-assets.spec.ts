@@ -87,4 +87,32 @@ test("shows a retryable state when an asset handle is unavailable", async ({ pag
   ).filter((command) => command === "asset.read").length).toBe(2);
 });
 
+test("shows SDK-generated images and the selected model in the ordinary tool card", async ({ page }) => {
+  const bytes = Buffer.from(PIXEL_PNG_BASE64, "base64");
+  await page.goto("/");
+  await attachMockAgent(page, [
+    { id: "image-request", role: "user", parts: [{ type: "text", text: "生成一张图片" }] },
+    { id: "image-call", role: "assistant", parts: [{
+      type: "tool-call", id: "native-image", name: "generate_image", status: "completed"
+    }] },
+    { id: "native-image", role: "tool", toolName: "generate_image", parts: [
+      { type: "text", text: "已通过 image-fixture/fixture-image 生成 1 张图片。" },
+      { type: "image", mimeType: "image/png", name: "generated.png",
+        asset: { id: "native-image-asset", byteLength: bytes.byteLength, sessionGeneration: 1 } }
+    ] },
+    { id: "image-answer", role: "assistant", parts: [{ type: "text", text: "图片已生成。" }] }
+  ], {}, { assets: {
+    "native-image-asset": { mimeType: "image/png", dataBase64: PIXEL_PNG_BASE64, sessionGeneration: 1 }
+  } });
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
+  const group = page.getByTestId("transcript-process-group");
+  await group.locator(":scope > summary").click();
+  const card = group.locator('details[data-presenter="generic"]');
+  await card.locator(":scope > summary").click();
+  await expect(card).toContainText("image-fixture/fixture-image");
+  await expect(card.getByRole("img", { name: "generated.png" })).toBeVisible();
+  await expect(card.getByRole("img", { name: "generated.png" })).toHaveAttribute("src", /^blob:/u);
+});
+
 const PIXEL_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";

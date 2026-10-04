@@ -42,6 +42,10 @@ color:
 Dark mode uses the same product purpose, information architecture, typography,
 spacing, component states, and motion as `DESIGN.md`.
 
+SDK-native generated images use the same generic Tool cards, approval states and
+generation-bound image assets as the light theme; no new image-specific palette
+or implicit Workspace save is introduced.
+
 - Dark may come from the operating system or an explicit persisted selection;
   both paths resolve to the same semantic tokens and component states.
 - Large backgrounds use achromatic near-black and gray surfaces; ordinary text,

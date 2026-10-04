@@ -32,6 +32,7 @@ import {
 import type { PromptAttachmentAccess } from "./prompt-attachment.js";
 import { resolveExistingSessionFileIdentity } from "./session-path-identity.js";
 import { createFirstPartyWebTools } from "./first-party-web-tools.js";
+import { createNativeImageTools } from "./native-image-tools.js";
 import { PlanModeController } from "./plan-mode-controller.js";
 import {
   NativeSubagentCoordinator,
@@ -146,7 +147,7 @@ export class RuntimeSessionBindings {
       const toolAliases = createDesktopToolAliasBinding();
       let sharedManager = sessionManager;
       const customTools = [
-        ...createFirstPartyWebTools(),
+        ...createFirstPartyWebTools(), ...createNativeImageTools(),
         ...createSessionSharedKnowledgeTools(this.options.sharedExperienceAccess, this.options.sharedSopAccess, () => sharedManager, this.options.teamKnowledgeAccess),
         ...this.planMode.createTools(),
         ...createNativeSubagentTools(this.options.subagents),
@@ -245,7 +246,7 @@ export class RuntimeSessionBindings {
       const services = await this.createServices(cwd);
       const toolAliases = createDesktopToolAliasBinding();
       const customTools = [
-        ...createFirstPartyWebTools(),
+        ...createFirstPartyWebTools(), ...createNativeImageTools(),
         ...createSessionSharedKnowledgeTools(this.options.sharedExperienceAccess, this.options.sharedSopAccess, () => sessionManager, this.options.teamKnowledgeAccess),
         ...this.planMode.createTools(),
         ...createNativeSubagentTools(this.options.subagents),
@@ -334,7 +335,7 @@ export class RuntimeSessionBindings {
     }
     const toolAliases = createDesktopToolAliasBinding();
     const customTools = [
-      ...createFirstPartyWebTools(),
+      ...createFirstPartyWebTools(), ...createNativeImageTools(),
       ...createSessionSharedKnowledgeTools(this.options.sharedExperienceAccess, this.options.sharedSopAccess, () => input.sessionManager, this.options.teamKnowledgeAccess),
       ...createNativeSubagentTools(this.options.subagents, {
         parentChildId: input.lineage.childId,

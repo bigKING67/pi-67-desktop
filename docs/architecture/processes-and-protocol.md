@@ -2613,6 +2613,14 @@ Notification history 已迁移到独立 `notificationStore`，App Store 不再�
   替换身份均拒绝。可信 PLAN 可运行容器，但每个子工具继续经过原有叶子 Safety hook，
   写入/删除仍被 PLAN 拒绝，AUTO/YOLO 删除仍逐次精确确认，不从容器继承权限。
   Team Chat toolsDisabled 在容器准入之前拒绝，且不注册该 factory。
+- `image_models` / `generate_image` 为 exact `sdk/<sdk:name>/temporary/top-level`
+  来源的第一方 customTools；初始、切换和原生子 Session 统一注册。发现只返回
+  SDK 可用 image model 元数据，生成使用明确 Provider/model 的
+  `ModelRegistry.generateImages()`，不绕过 Runtime credential resolution。
+  AUTO 对生成逐次按 `external-submit` 确认，PLAN 拒绝；参考图通过
+  `ExtensionToolContext.executeTool("read")` 形成真实 nested call 并保留原权限。
+  SDK usage 随原生 Tool Result 进入 Pi JSONL，标准 image content 经现有 asset
+  投影，不增加 IPC schema、raw-payload store 或 Renderer 网络访问。
 - ToolExecutionView 的可选 `parentToolCallId` 随现有事件/快照传输；根的
   `nestedRecord.complete` 表达有界记录完整性。live receipt 仅补 identity/status/timing，
   不保存原始子输入/输出。冷恢复解析 Pi 原生 `toolResult.nestedCalls`，最多 256 calls，

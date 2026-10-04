@@ -24,6 +24,7 @@ import {
 } from "./tool-routing-extension.js";
 import { boundUtf8 } from "./utf8-boundary.js";
 import { isVerifiedDesktopAttachmentTool } from "./prompt-attachment-extension.js";
+import { hasNativeImageToolInput } from "./native-image-tools.js";
 import type { LoadedResourceReadAccess } from "./loaded-resource-read-access.js";
 import type { ConfiguredCapabilityCatalog } from "./configured-capability-catalog.js";
 import { classifyConfiguredToolIntent } from "./configured-tool-safety.js";
@@ -283,6 +284,17 @@ async function classifyToolIntent(
     );
   }
   const profile = await resolveToolProfile(pi, toolName);
+  if (profile.kind === "pi67-images") {
+    if (!hasNativeImageToolInput(toolName, record)) return {
+      toolName, category: "unverified-tool", target: toolName, targetKind: "tool", sourceLabel: profile.sourceLabel,
+      nonApprovableReason: "生图 Tool 输入不符合已注册合同；请修正参数后重试。"
+    };
+    return {
+      toolName, category: toolName === "image_models" ? "capability-read" : "external-submit",
+      target: toolName === "image_models" ? toolName : `${stringField(record, "provider")}/${stringField(record, "model")}`,
+      targetKind: "tool", sourceLabel: profile.sourceLabel
+    };
+  }
   if (profile.kind === "pi67-plan" && hasPi67PlanToolContract(toolName, record)) {
     return {
       toolName,

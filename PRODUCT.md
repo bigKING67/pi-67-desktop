@@ -1171,6 +1171,22 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   Desktop does not start the native OAuth loopback login flow; `/mcp login` reports
   that limitation. Pending connections and their process trees close before the
   Session shutdown completes. No new transport, loop or Session store is introduced.
+- Image generation uses Pi's public `ModelRegistry` image API, not a third-party
+  image-gen Package or a second Provider adapter. `image_models` lists up to 64
+  authenticated SDK image models without credentials or endpoints;
+  `generate_image` requires an explicit Provider/model and bounded prompt.
+  The SDK currently supplies `openrouter-images`; chat/vision models and legacy
+  `image-gen.json` are not implicitly converted into image models or credentials.
+  Up to four explicitly selected local references cross the ordinary nested
+  `read` authorization path. Generation is an external submission requiring one
+  AUTO approval per call, is unavailable in PLAN, and follows existing trusted
+  YOLO policy. Forged, duplicate or malformed identities fail closed. The chat
+  model never changes, failed requests never fall back to another model, and
+  cancellation remains SDK-owned. Results keep SDK usage in Pi JSONL and return
+  up to four standard PNG/JPEG/WebP/GIF image blocks, each at most 10 MiB, through
+  the existing generation-bound asset display. No implicit Workspace file save,
+  new credential store, automatic account setup or Codemode model-global grant
+  is introduced; Codemode calls the same authorized Tool.
 - Codemode child execution identity, status and duration remain visible independently
   of the root script outcome. On reopen, Desktop projects Pi's bounded native
   `toolResult.nestedCalls` summaries from JSONL; it does not persist a second copy of
