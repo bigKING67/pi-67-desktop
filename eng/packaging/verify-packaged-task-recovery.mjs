@@ -5,7 +5,7 @@ import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { readRecoveryProcess, signalRecoveryProcess } from "./packaged-recovery-process.mjs";
+import { readRecoveryProcess, readWindowsRecoveryExitState, signalRecoveryProcess } from "./packaged-recovery-process.mjs";
 import { fileURLToPath } from "node:url";
 import { cleanupPackagedTestDirectories, createPackagedTestDirectories, installWorkspaceDialogResult,
   launchPackagedApplication, resolvePackagedArtifact } from "./packaged-electron-fixture.mjs";
@@ -72,6 +72,7 @@ try {
     assert(initialEntries.some(entry => entry.type === "message" && entry.message.role === "toolResult"));
     await track(hostPid);
     const main = application.process();
+    assert.equal((await readRecoveryProcess(hostPid))?.parentPid, main.pid, "The fixture Host must be owned by this exact Main.");
     const conversationId = await window.locator('[data-testid="conversation-row"][aria-current="page"][data-conversation-id^="session:"]').getAttribute("data-conversation-id");
     assert(conversationId);
     assert.equal(await realpath(await application.evaluate(({ app }) => app.getPath("userData"))), directories.userDataDirectory);
@@ -128,6 +129,14 @@ try {
   const body = await window?.locator("body").innerText().catch(() => "unavailable");
   await writeFile(join(evidence, "failure.txt"), `stage=${stage}\n${error.stack}\n${body?.slice(0, 8000) ?? ""}\n`);
 } finally {
+  if (failure && process.platform === "win32") {
+    const states = [];
+    for (const [pid, identity] of tracked) {
+      try { states.push({ pid, identityMatches: await processIdentity(pid) === identity, ...await readWindowsRecoveryExitState(pid) }); }
+      catch (error) { states.push({ pid, inspectionError: error.message.slice(0, 512) }); }
+    }
+    await writeFile(join(evidence, "exit-state-before-cleanup.json"), JSON.stringify(states, null, 2) + "\n");
+  }
   const protocol = await window?.evaluate(() => globalThis.__pi67RecoveryProtocol).catch(() => undefined);
   await writeFile(join(evidence, "observations.json"), JSON.stringify({ protocol, model: await observations() }, null, 2) + "\n");
   for (const entry of await observations()) {
@@ -175,6 +184,7 @@ async function launch() {
     hideNativeWindow: true, isolateNativeWindow: true, offline: true });
   application = app; // Retain the owned driver even if the first identity read fails.
   await track(app.process().pid);
+  assert.equal(await app.evaluate(() => process.pid), app.process().pid, "The driver PID must be the actual Main.");
   assert.equal(await realpath(await app.evaluate(({ app: main }) => main.getPath("userData"))), directories.userDataDirectory);
   return app;
 }

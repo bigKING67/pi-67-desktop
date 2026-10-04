@@ -1,12 +1,25 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { describe, expect, it, vi } from "vitest";
-import { readRecoveryProcess, signalRecoveryProcess } from "./packaged-recovery-process.mjs";
+import { readRecoveryProcess, readWindowsRecoveryExitState, signalRecoveryProcess } from "./packaged-recovery-process.mjs";
 
 const pid = 123456;
 const win = { pid, parentPid: 123455, startedAt: "639267123456789012", executablePath: "C:\\隔离 测试\\New Money.exe" };
 
 describe("packaged recovery process ownership", () => {
+  it.each([{ missing: true }, { missing: false, hasExited: false, exitCode: null },
+    { missing: false, hasExited: true, exitCode: 70 }])("keeps native exit diagnostics separate from PID ownership: %j", async value => {
+    const execute = vi.fn().mockResolvedValue({ stdout: JSON.stringify(value) });
+    expect(await readWindowsRecoveryExitState(pid, { execute })).toEqual(value);
+    expect(execute.mock.calls[0][1].at(-1)).toContain(`[System.Diagnostics.Process]::GetProcessById(${pid})`);
+    expect(execute.mock.calls[0][1].at(-1)).not.toMatch(/Stop-Process|taskkill|CommandLine/u);
+  });
+
+  it("does not interpret missing or failed native exit diagnostics as successful termination", async () => {
+    const execute = vi.fn().mockResolvedValueOnce({ stdout: '{}' }).mockRejectedValueOnce(new Error("query unavailable"));
+    await expect(readWindowsRecoveryExitState(pid, { execute })).rejects.toThrow("Invalid Windows");
+    await expect(readWindowsRecoveryExitState(pid, { execute })).rejects.toThrow("query unavailable");
+  });
   it("queries only the exact Windows PID and binds identity to creation time and image", async () => {
     const execute = vi.fn().mockResolvedValue({ stdout: JSON.stringify(win) });
     expect(await readRecoveryProcess(pid, { platform: "win32", execute })).toEqual({

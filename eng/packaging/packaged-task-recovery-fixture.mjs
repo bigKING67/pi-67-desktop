@@ -55,6 +55,11 @@ const scenario = ${JSON.stringify(scenario)};
 const crashMarker = ${JSON.stringify(crashMarker)};
 const effectPath = ${JSON.stringify(effectPath)};
 const record = data => appendFileSync(${JSON.stringify(observationPath)}, JSON.stringify({ ...data, pid: process.pid }) + "\\n");
+const exitReceiptKey = Symbol.for("pi67.syntheticRecoveryExit");
+if (!process[exitReceiptKey]) {
+  process[exitReceiptKey] = true;
+  process.once("exit", code => record({ kind: "host-exit", code }));
+}
 globalThis.fetch = async () => { record({ kind: "network-denied" }); throw new Error("Synthetic recovery fixture forbids network requests."); };
 function answer(model, content, reason = "stop") {
   const message = { role: "assistant", content, api: model.api, provider: model.provider, model: model.id,
@@ -65,7 +70,7 @@ function answer(model, content, reason = "stop") {
   stream.push({ type: "done", reason, message }); stream.end(); return stream;
 }
 export default function recoveryFixture(pi) {
-  record({ kind: "loaded" });
+  record({ kind: "loaded", parentPid: process.ppid });
   pi.registerProvider("pi67-recovery-fixture", {
     name: "Synthetic recovery", baseUrl: "https://recovery.invalid", apiKey: "synthetic-only", api: "openai-responses",
     models: ["judge", "standard", "complex"].map(id => ({ id, name: "Recovery " + id, reasoning: false, input: ["text"],

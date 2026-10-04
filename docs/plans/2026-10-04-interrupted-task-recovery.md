@@ -101,6 +101,18 @@ browser runtime acceptance uses browser67 when needed.
   Evidence: `owner-lifetime-source-gate.log`, `owner-lifetime-macos-preview.log`,
   and the three `owner-lifetime-macos-<scenario>.log` receipt pointers under the
   existing ignored validation directory. Preview reopened the repository app.
+- Clean `ca55e1f4`, CI `37190452668`: attempt 1 passed macOS recovery and renderer,
+  but Windows ordinary shutdown missed the quit hook (all processes exited within
+  2569.3ms) and one configuration access exceeded the unchanged 4000ms budget.
+  Same-SHA bounded failed-job rerun, attempt 2, passed quality and Windows ordinary
+  smoke; neither transient failure has an independently established root cause.
+  Windows `agent-before-response` passed, while `app-after-tool` still timed out
+  waiting for the Host PID to disappear. The owner MessagePort alone has not
+  certified the Windows scenario. Preserve assertions and add diagnostic-only
+  actual-Main/parent PID checks, synthetic Host exit events and Windows native
+  `HasExited`/exit-code observations before cleanup to distinguish execution state
+  from a still-enumerable WMI object. Do not add a heartbeat or another runtime on
+  the basis of PID visibility alone. Current Windows acceptance remains partial.
 
 - Next bounded acceptance uses `eng/packaging/verify-packaged-task-recovery.mjs`:
   separate temporary profile per scenario, in-process synthetic provider, Auto
