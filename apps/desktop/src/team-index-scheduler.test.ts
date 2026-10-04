@@ -26,7 +26,7 @@ function fixture() {
   const prepared = { owner, scopeKey: binding.scopeKey, directory: "/fixture/staging/run-test", bootstrap: "/fixture/runtime/worker.py",
     runtime: { python: "/fixture/runtime/python", runtimeRoot: "/fixture/runtime", tree: { sha256: "a".repeat(64), fileCount: 1, totalBytes: 1 } },
     assertCurrent: vi.fn(async () => undefined), assertStorage: vi.fn(async () => undefined),
-    assertLaunchable: vi.fn(async () => undefined), discard: vi.fn(async () => undefined) };
+    onVerified: vi.fn(), assertLaunchable: vi.fn(async () => undefined), discard: vi.fn(async () => undefined) };
   const result = { snapshot: { receiptRecord: "fixture-record" }, documents: [] };
   const job = { ...result, discardInput: vi.fn(async () => undefined), assertSnapshotCurrent: vi.fn(async () => undefined),
     verifyResult: vi.fn(async (completion: Promise<"completed" | "cancelled">) => {
@@ -46,6 +46,7 @@ function fixture() {
 
 it("registers the fixed Main launch only once and waits for exact physical completion", async () => {
   const f = fixture(), task = await f.prepare();
+  expect(f.prepared.onVerified).not.toHaveBeenCalled();
   expect(f.launch).not.toHaveBeenCalled(); task.register(id); f.start();
   await vi.waitFor(() => expect(f.launch).toHaveBeenCalledOnce());
   expect(f.prepared.assertLaunchable).toHaveBeenCalledOnce(); expect(f.job.assertSnapshotCurrent).toHaveBeenCalledOnce();
@@ -54,6 +55,7 @@ it("registers the fixed Main launch only once and waits for exact physical compl
   await Promise.resolve(); expect(finished).toBe(false);
   f.exit.resolve({ code: 0, signal: null });
   await expect(task.completion).resolves.toMatchObject({ directory: f.prepared.directory, scopeKey: f.binding.scopeKey });
+  expect(f.prepared.onVerified).toHaveBeenCalledOnce();
   expect(f.job.discardInput).not.toHaveBeenCalled(); expect(f.prepared.discard).not.toHaveBeenCalled();
   expect(f.host.listenerCount("exit")).toBe(0); await f.workers.shutdown();
 });
@@ -137,6 +139,7 @@ it.each(["prepare", "writer", "read-grant", "verify"])("does not acknowledge %s 
     f.job.verifyResult.mockImplementationOnce(async completion => { await completion; throw new Error("stale result"); });
     task.register(id); f.start(); await vi.waitFor(() => expect(f.launch).toHaveBeenCalledOnce());
     f.exit.resolve({ code: 0, signal: null }); await expect(task.completion).rejects.toThrow("stale result");
+    expect(f.prepared.onVerified).not.toHaveBeenCalled();
     expect(f.job.discardInput).not.toHaveBeenCalled();
   }
   await f.workers.shutdown();

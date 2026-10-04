@@ -457,8 +457,16 @@ testing on newer macOS does not substitute for minimum-OS validation.
 
 Main owns managed sidecar lifecycle; Agent Host owns clients/tools; Renderer uses
 validated messages only. Bind authenticated random loopback, lazy start, no system
-service. Signed manifest plus SHA-256 identifies bundles. Keep previous runtime;
-back up before incompatible data changes. Three crashes in ten minutes stop session
+service. Signed manifest plus SHA-256 identifies bundles. Keep previous runtime until the same purpose completes actual verified use (private
+startup and scope provisioning, verified index output, or a current verified query).
+Then Main retires only signed older same-purpose runtime payloads; retain manifests
+and a small inode-bound pending receipt for resuming interrupted cleanup on the next
+successful use. Busy, unknown, tampered, or unsafe paths defer with fixed diagnostics
+without failing the successful operation. No ordinary startup sweep or private/team
+cross-purpose success inference; no data/settings/team-projections deletion. Current
+and pending identities are checked again before removal; the single-instance app owns
+maintenance. Old payload removal forfeits offline rollback and requires reinstallation.
+Back up before incompatible data changes. Three crashes in ten minutes stop session
 restarts. Use bounded background indexing and cancellation. External mode is explicit
 development compatibility, not the consumer installation path.
 

@@ -236,3 +236,14 @@ describe("Main local memory admission and broker composition", () => {
     expect(await readdir(directory)).toEqual(["runtime"]);
   });
 });
+
+it("schedules retirement only after successful native startup, not admission alone", async () => {
+  const f = await fixture(), onRuntimeVerified = vi.fn();
+  const service = new LocalMemoryService({ trustedKey: keys.publicKey, loadConfiguration: f.loadConfiguration, onRuntimeVerified });
+  native.start.mockRejectedValueOnce(new Error("startup failed"));
+  await expect(service.connect()).rejects.toThrow();
+  expect(onRuntimeVerified).not.toHaveBeenCalled();
+  await service.connect();
+  expect(onRuntimeVerified).toHaveBeenCalledWith(JSON.parse(f.configuration.manifest.toString()).treeSha256);
+  await service.stop();
+});

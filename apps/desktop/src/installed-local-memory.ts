@@ -1,3 +1,4 @@
+import type { LocalMemoryRuntimePurpose } from "@pi67/protocol";
 import type { KeyObject } from "node:crypto";
 import { realpath } from "node:fs/promises";
 import { isAbsolute, join, resolve, sep } from "node:path";
@@ -18,6 +19,7 @@ import type { SharedKnowledgeReceiptOwner } from "./shared-knowledge-owner.js";
 
 /** Main composition with source-pinned trust, no downloads or implicit Lab adoption. */
 export function createInstalledLocalMemory(options: {
+  onRuntimeVerified?(purpose: LocalMemoryRuntimePurpose, tree: string): void;
   memoryRoot: string;
   installationRoot: string;
   /** Explicit team-only revision; application wiring must never fall back to private. */
@@ -58,7 +60,7 @@ export function createInstalledLocalMemory(options: {
   const loadRuntime = (signal: AbortSignal) => loadFrom(installation, signal);
   const loadTeamRuntime = (signal: AbortSignal) => loadFrom(teamInstallation, signal);
   const settings = new LocalMemoryModelSettingsStore(join(memory, "settings"), encryption);
-  const service = new LocalMemoryService({ trustedKey, recordStartup: receipt => writeLocalMemoryStartupReceipt(memory, receipt), loadConfiguration: createLocalMemoryConfigurationLoader({
+  const service = new LocalMemoryService({ trustedKey, onRuntimeVerified: tree => options.onRuntimeVerified?.("private", tree), recordStartup: receipt => writeLocalMemoryStartupReceipt(memory, receipt), loadConfiguration: createLocalMemoryConfigurationLoader({
     settings, models, loadRuntime
   }) });
   const prepare = (owner: SharedKnowledgeReceiptOwner, signal: AbortSignal) =>
@@ -79,12 +81,13 @@ export function createInstalledLocalMemory(options: {
         }
         await prepared.assertCurrent(); currentSignal.throwIfAborted();
       };
-      return Object.freeze({ ...prepared, bootstrap, assertLaunchable });
+      return Object.freeze({ ...prepared, bootstrap, assertLaunchable,
+        ...(options.onRuntimeVerified ? { onVerified: () => options.onRuntimeVerified?.("team-index-v1", prepared.runtime.tree.sha256) } : {}) });
     } catch (error) { await prepared.discard(); throw error; }
   } };
   const teamQuery = { async prepareRuntime(signal: AbortSignal) {
     if (queryInstallation === undefined) throw new Error("Team query runtime is not configured.");
-    return prepareTeamQueryRuntime({ trustedKey, async loadRuntime(currentSignal) {
+    return prepareTeamQueryRuntime({ trustedKey, onVerified: tree => options.onRuntimeVerified?.("team-query-v1", tree), async loadRuntime(currentSignal) {
       const installed = await loadFrom(queryInstallation, currentSignal);
       const physicalQuery = await realpath(queryInstallation);
       // Lexically separate paths can still share a symlinked ancestor. Do not

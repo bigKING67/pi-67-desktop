@@ -79,6 +79,7 @@ export class TeamIndexQuerySessions {
     try {
       const hits = await reader.queryVector({ vector: input.vector, limit: input.limit, runtime });
       this.#check(input.handleId, entry); await reader.assertCurrent(hits); this.#check(input.handleId, entry);
+      try { runtime.onVerified?.(); } catch { console.error("Query runtime retirement scheduling failed."); }
       return { snapshot: { ...reader.snapshot }, hits: hits.map(hit => ({ ...hit })) };
     } catch { throw unavailable(); }
     finally { entry.pending = false; this.#release(input.handleId, entry); }

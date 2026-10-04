@@ -11,7 +11,7 @@ function fixture() {
     assertCurrent: vi.fn(async () => {}), dispose: vi.fn(() => readerLife.abort()),
     queryVector: vi.fn(async () => [{ assetId: id, contentRevision: "a".repeat(64), score: 0.5 }]),
     readDocument: vi.fn(async () => ({ assetId: id, contentRevision: "a".repeat(64), canonicalContent: "synthetic body" })) };
-  const runtime = { python: "/synthetic/python", bootstrap: "/synthetic/query.py", assertLaunchable: vi.fn(async () => {}) };
+  const runtime = { onVerified: vi.fn(), python: "/synthetic/python", bootstrap: "/synthetic/query.py", assertLaunchable: vi.fn(async () => {}) };
   const prepare = vi.fn<ConstructorParameters<typeof TeamIndexQuerySessions>[0]>(async () => ({ reader, runtime }) as never);
   const prepareRead = vi.fn<NonNullable<ConstructorParameters<typeof TeamIndexQuerySessions>[1]>>(async () => reader as never);
   const report = vi.fn();
@@ -24,7 +24,9 @@ function fixture() {
 }
 it("returns metadata only and consumes an exact query once after current-version checks", async () => {
   const f = fixture(), input = await f.query();
+  expect(f.runtime.onVerified).not.toHaveBeenCalled();
   expect(await f.owner.query(input)).toEqual({ snapshot: f.reader.snapshot, hits: [{ assetId: id, contentRevision: "a".repeat(64), score: 0.5 }] });
+  expect(f.runtime.onVerified).toHaveBeenCalledOnce();
   expect(f.reader.queryVector).toHaveBeenCalledWith({ vector: [1, 2, 3, 4], limit: 4, runtime: f.runtime });
   expect(f.reader.assertCurrent).toHaveBeenLastCalledWith([{ assetId: id, contentRevision: "a".repeat(64), score: 0.5 }]);
   expect(f.reader.dispose).toHaveBeenCalledOnce(); expect(f.owner.has(id)).toBe(false);
@@ -70,6 +72,7 @@ it.each(["query", "versions"])("rejects %s failure without returning a result", 
   if (mode === "query") f.reader.queryVector.mockRejectedValueOnce(new Error("synthetic-sensitive"));
   else f.reader.assertCurrent.mockRejectedValueOnce(new Error("revoked"));
   await expect(f.owner.query(input)).rejects.toThrow("Team index query unavailable.");
+  expect(f.runtime.onVerified).not.toHaveBeenCalled();
   expect(f.reader.dispose).toHaveBeenCalledOnce(); expect(f.owner.has(id)).toBe(false);
 });
 const read = { type: "shared-knowledge-index-read" as const, requestId: "read", handleId: id,

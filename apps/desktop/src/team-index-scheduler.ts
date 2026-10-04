@@ -81,6 +81,7 @@ export class TeamIndexScheduler {
       // state, a port close or an unrelated task's completion.
       const verified = await written.verifyResult(permit.completion);
       assertCurrent();
+      try { selected.onVerified?.(); } catch { console.error("Index runtime retirement scheduling failed."); }
       return Object.freeze({ ...verified, directory: selected.directory, scopeKey: key });
     });
     const cleanup = async () => {

@@ -28,6 +28,7 @@ export class LocalMemoryService {
     trustedKey: KeyObject;
     /** Must honor cancellation; no credential values may be logged. */
     loadConfiguration(signal: AbortSignal): Promise<LocalMemoryServiceConfiguration>;
+    onRuntimeVerified?(tree: string): void;
     recordStartup?(receipt: LocalMemoryStartupReceipt): Promise<void>;
   }) {
     // Trust is separate from the loaded manifest/configuration; never accept a
@@ -42,7 +43,7 @@ export class LocalMemoryService {
       try {
         const configuration = await trace.measure("configuration", () => options.loadConfiguration(signal));
         signal.throwIfAborted();
-        const { python } = await trace.measure("runtime-admission", () => admitOpenVikingRuntime(configuration, trustedKey, signal));
+        const { python, tree } = await trace.measure("runtime-admission", () => admitOpenVikingRuntime(configuration, trustedKey, signal));
         signal.throwIfAborted();
         const localProfileId = await trace.measure("storage-binding", async () => {
           const identity = await loadLocalMemoryIdentity(configuration.dataRoot);
@@ -54,6 +55,7 @@ export class LocalMemoryService {
         const handle = await trace.measure("native-start", () => startNativeOpenViking({ python, dataRoot: configuration.dataRoot, localProfileId,
           embedding: configuration.embedding, extraction: configuration.extraction,
           ...(configuration.queryPlanner ? { queryPlanner: configuration.queryPlanner } : {}), startupTrace: trace }, signal, onExit));
+        try { if (!signal.aborted) options.onRuntimeVerified?.(tree.sha256); } catch { console.error("Runtime retirement scheduling failed."); }
         outcome = "completed";
         return handle;
       } finally {

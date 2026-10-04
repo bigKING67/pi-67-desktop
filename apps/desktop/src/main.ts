@@ -163,7 +163,7 @@ const applicationShutdown = createApplicationShutdownController({
   stopAgentHost: (deadlineMs) => agentHostSupervisor.stop(deadlineMs),
   afterAgentHostStop: async () => {
     try {
-      const results = await Promise.allSettled([localMemory?.activation.stop(), localMemory?.runtime.stop(), agentHostSupervisor.stopLocalMemory()]);
+      const results = await Promise.allSettled([localMemory?.retirement.stop(), localMemory?.activation.stop(), localMemory?.runtime.stop(), agentHostSupervisor.stopLocalMemory()]);
       if (results.some(result => result.status === "rejected")) throw new Error("Local memory shutdown did not complete.");
     }
     finally { await promptAttachments?.cleanup(); }

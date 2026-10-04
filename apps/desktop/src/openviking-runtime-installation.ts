@@ -14,14 +14,14 @@ export async function loadOpenVikingRuntimeInstallation(installationRoot: string
       throw new Error("Unsafe runtime installation directory.");
     }
   }
-  const manifest = await readMetadata(join(installationRoot, "manifest.json"), 8_192, signal);
-  const signature = await readMetadata(join(installationRoot, "manifest.sig"), 64, signal);
+  const manifest = await readOpenVikingMetadata(join(installationRoot, "manifest.json"), 8_192, signal);
+  const signature = await readOpenVikingMetadata(join(installationRoot, "manifest.sig"), 64, signal);
   if (!manifest.length || signature.length !== 64) throw new Error("Invalid runtime installation metadata.");
   signal.throwIfAborted();
   return { runtimeRoot, manifest, signature };
 }
 
-async function readMetadata(path: string, limit: number, signal: AbortSignal): Promise<Buffer> {
+export async function readOpenVikingMetadata(path: string, limit: number, signal: AbortSignal): Promise<Buffer> {
   signal.throwIfAborted();
   const metadata = await lstat(path);
   if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > limit) throw new Error("Invalid runtime metadata file.");

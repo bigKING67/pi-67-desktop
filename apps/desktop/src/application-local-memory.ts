@@ -1,3 +1,4 @@
+import { OpenVikingRuntimeRetirement } from "./openviking-runtime-retirement.js";
 import { isAbsolute, join } from "node:path";
 import type { DesktopTextEncryption } from "./desktop-text-encryption.js";
 import type { LocalMemoryModelClient } from "./local-memory-model-client.js";
@@ -31,7 +32,8 @@ export function createApplicationLocalMemory(options: {
   const installationRoot = join(memoryRoot, "runtime", OPENVIKING_INSTALLATION_NAME);
   const teamInstallationRoot = join(memoryRoot, "runtime", OPENVIKING_TEAM_INSTALLATION_NAME);
   const queryInstallationRoot = join(memoryRoot, "runtime", OPENVIKING_QUERY_INSTALLATION_NAME);
-  const installed = createInstalledLocalMemory({ memoryRoot, installationRoot, teamInstallationRoot, queryInstallationRoot,
+  const retirement = new OpenVikingRuntimeRetirement(join(memoryRoot, "runtime"));
+  const installed = createInstalledLocalMemory({ onRuntimeVerified: (purpose, tree) => retirement.verified(purpose, tree), memoryRoot, installationRoot, teamInstallationRoot, queryInstallationRoot,
     encryption: options.encryption, models: options.models });
   const runtime = new LocalMemoryRuntimeController(options.isolatedUserData ?? options.appData!,
     options.isolatedUserData === undefined ? ["New Money", "openviking"] : ["openviking"]);
@@ -42,5 +44,5 @@ export function createApplicationLocalMemory(options: {
       return await installed.settings.load() ? "ready" : "models-missing";
     }
   });
-  return { ...installed, memoryRoot, activation, runtime, modelSettings: new LocalMemorySettingsController(installed.settings) };
+  return { ...installed, retirement, memoryRoot, activation, runtime, modelSettings: new LocalMemorySettingsController(installed.settings) };
 }

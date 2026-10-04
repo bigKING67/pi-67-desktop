@@ -9,6 +9,7 @@ import { locateTeamQueryBootstrap } from "./team-worker-bootstrap.js";
  */
 export async function prepareTeamQueryRuntime(options: {
   trustedKey: KeyObject;
+  onVerified?(tree: string): void;
   loadRuntime(this: void, signal: AbortSignal): Promise<{ runtimeRoot: string; manifest: Buffer; signature: Buffer }>;
 }, lifetime: AbortSignal) {
   const { trustedKey, loadRuntime } = options;
@@ -24,7 +25,7 @@ export async function prepareTeamQueryRuntime(options: {
     return { ...runtime, bootstrap };
   };
   const prepared = await admit(lifetime);
-  return Object.freeze({ python: prepared.python, bootstrap: prepared.bootstrap,
+  return Object.freeze({ ...(options.onVerified ? { onVerified: () => options.onVerified?.(prepared.tree.sha256) } : {}), python: prepared.python, bootstrap: prepared.bootstrap,
     async assertLaunchable(signal: AbortSignal) {
       const current = await admit(signal);
       if (current.runtimeRoot !== prepared.runtimeRoot || current.python !== prepared.python

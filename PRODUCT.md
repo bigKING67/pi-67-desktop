@@ -350,6 +350,13 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   Other recommended third-party Packages remain user-initiated. `pi-hy-memory`,
   `@ff-labs/pi-fff`, and `@victor-software-house/pi-curated-themes` are retired from
   the default catalog.
+- Managed OpenViking upgrades retain old runtime payloads until the same purpose
+  succeeds: private startup/scope provisioning, verified team indexing, or a verified
+  current team query. Main then retires only signed older same-purpose payloads,
+  preserving small identity/retirement records and all memory data. Busy or unsafe
+  targets defer; deletion failure does not fail the successful operation. Interrupted
+  cleanup resumes after renewed successful use, never from an ordinary startup sweep.
+  Once retired, offline rollback requires reinstalling the old runtime.
 - OpenViking private Memory and Experience remain usable without New Money login.
   New Money account presentation is shared by the navigation footer, Account & Data
   settings and memory settings, using the Host identity result without credentials.
