@@ -218,14 +218,19 @@ jobs:
           PI67_TEST_CAPTURE_AGENT_INIT: "1"
         run: pnpm exec playwright test --config=playwright.electron.config.ts --project=electron --workers=1
       - name: Build fast unsigned Windows smoke package
+        id: native-package
         run: pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources --ci-fast
       - name: Smoke packaged Electron runtime
+        if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         run: pnpm run package:smoke
       - name: Verify packaged task recovery (agent-before-response)
+        if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         run: pnpm run package:smoke:task-recovery -- agent-before-response
       - name: Verify packaged task recovery (app-after-tool)
+        if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         run: pnpm run package:smoke:task-recovery -- app-after-tool
       - name: Verify packaged task recovery (agent-unconfirmed-tool)
+        if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         run: pnpm run package:smoke:task-recovery -- agent-unconfirmed-tool
       - name: Upload packaged task recovery evidence
         if: always()
@@ -236,8 +241,10 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
       - name: Verify Windows packaged synthetic scale and IME contracts
+        if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         run: pnpm run package:smoke:windows-ui
       - name: Verify Windows NSIS installer lifecycle
+        if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         shell: bash
         env:
           CI_EVENT_NAME: ${{ github.event_name }}
@@ -343,14 +350,19 @@ jobs:
           PI67_TEST_CAPTURE_AGENT_INIT: "1"
         run: pnpm exec playwright test --config=playwright.electron.config.ts --project=electron --workers=1
       - name: Build fast unsigned macOS smoke app
+        id: native-package
         run: pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources --ci-fast
       - name: Smoke packaged Electron runtime
+        if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         run: pnpm run package:smoke
       - name: Verify packaged task recovery (agent-before-response)
+        if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         run: pnpm run package:smoke:task-recovery -- agent-before-response
       - name: Verify packaged task recovery (app-after-tool)
+        if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         run: pnpm run package:smoke:task-recovery -- app-after-tool
       - name: Verify packaged task recovery (agent-unconfirmed-tool)
+        if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         run: pnpm run package:smoke:task-recovery -- agent-unconfirmed-tool
       - name: Upload packaged task recovery evidence
         if: always()

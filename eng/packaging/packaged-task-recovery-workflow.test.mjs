@@ -63,6 +63,24 @@ it.each(RECOVERY_SCENARIOS)("accepts direct and pnpm-separated scenario %s", sce
   expect(selectRecoveryScenario(["--", scenario])).toBe(scenario);
 });
 
+it.each(["native-windows", "native-macos"])("keeps independent packaged evidence after a failure without bypassing the gate: %s", async job => {
+  const text = await readFile(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
+  const body = text.split(`\n  ${job}:\n`)[1].split(/\n  [a-z][a-z-]+:\n/u)[0];
+  const steps = body.split("      - name: ");
+  const packageStep = steps.find(step => step.startsWith("Build fast unsigned "));
+  expect(packageStep).toContain("id: native-package\n");
+  const names = ["Smoke packaged Electron runtime", ...RECOVERY_SCENARIOS.map(scenario => `Verify packaged task recovery (${scenario})`),
+    ...(job === "native-windows" ? ["Verify Windows packaged synthetic scale and IME contracts", "Verify Windows NSIS installer lifecycle"] : [])];
+  for (const name of names) {
+    const step = steps.find(value => value.startsWith(`${name}\n`));
+    expect(step).toBeDefined();
+    // Explicit status predicate continues after failure, but never after cancellation or failed packaging.
+    expect(step).toContain("if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}\n");
+    expect(step).not.toContain("continue-on-error:");
+  }
+  expect(body).not.toContain("continue-on-error: true");
+});
+
 it.each([[], ["--"], ["all"], ["agent-before-response", "app-after-tool"], ["--", "--", "agent-before-response"]].map(args => ({ args })))(
   "rejects ambiguous or unbounded scenario arguments $args", ({ args }) => {
     expect(() => selectRecoveryScenario(args)).toThrow("Select exactly one bounded scenario");

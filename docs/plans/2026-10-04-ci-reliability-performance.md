@@ -100,5 +100,30 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
   state to the caller's unchanged 45 s readiness gate, without another click.
   Missing/stuck readiness and other driver failures still fail. A comparison against
   the committed helper reproduces the premature rejection; 15 focused tests pass.
-- Followup independent review and target-platform CI pending. No product behavior,
+- Followup independent review found no blocking issue. No product behavior,
   timeout budget, retry count or release packaging defaults changed.
+
+## Second exact-SHA CI and bootstrap evidence gap
+
+- `0d512f84afb92fec500b785e542ce1312d44d0e7`, run `37205539394` attempt 1:
+  source, Renderer and macOS native passed. Windows ordinary smoke, agent-before-response
+  and the previously failing app-after-tool all passed.
+- Windows agent-unconfirmed-tool failed before any model/Agent operation, at the
+  unchanged 30 s DOMContentLoaded deadline. Main and driver were alive; no body,
+  screenshot or protocol was available. Same ASAR SHA-256 as the prior run;
+  cleanup and canonical isolation passed. This does not yet distinguish actual
+  native loading failure from driver attachment. Installer was skipped again.
+- Followup adds bounded Main bootstrap evidence before window isolation, without
+  changing acceptance deadlines, plus shorter failure-only screenshot/body reads.
+  This is diagnostic instrumentation, not a claimed fix for the blank window.
+- Ordinary CI now continues independent isolated packaged checks after earlier
+  failures when packaging succeeded and the run was not cancelled. Every failure
+  still fails the job and aggregate gate; no retry or candidate qualification is added.
+- Independent review identified an existing unbounded Renderer protocol read in
+  failure cleanup. It now has a 2 s diagnostic-only deadline and a hung-renderer
+  regression preserving the original error and subsequent cleanup.
+- Focused validation and exact-SHA full Windows lifecycle evidence are required
+  before closeout; no acceptance claim for the blank-window root cause.
+- Followup local validation: 4 files / 35 tests, type-aware lint, structure,
+  workflow Action pins and PowerShell discovery passed. Independent review
+  confirmed the diagnostic-blocking finding is closed, with no new finding.

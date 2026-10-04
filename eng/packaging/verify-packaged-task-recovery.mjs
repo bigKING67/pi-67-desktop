@@ -8,7 +8,8 @@ import { promisify } from "node:util";
 import { readRecoveryMainProcess, readRecoveryProcess, readWindowsRecoveryExitState, signalRecoveryProcess } from "./packaged-recovery-process.mjs";
 import { fileURLToPath } from "node:url";
 import { cleanupPackagedTestDirectories, createPackagedTestDirectories, installWorkspaceDialogResult,
-  launchPackagedApplication, resolvePackagedArtifact } from "./packaged-electron-fixture.mjs";
+  isolatePackagedAutomationWindow, launchPackagedApplication, resolvePackagedArtifact } from "./packaged-electron-fixture.mjs";
+import { observeRecoveryBootstrap, readRecoveryBootstrap, readRecoveryProtocolEvidence } from "./packaged-recovery-bootstrap.mjs";
 import { closeElectronApplicationWithinTimeout } from "./electron-shutdown-measurement.mjs";
 import { collectIsolatedSessionEvidence, snapshotDirectoryMetadata, watchDirectoryMutationDigests } from "./packaged-context-isolation-receipt.mjs";
 import { clickRecoveryAction, observeRecoveryProtocol, prepareTaskRecoveryProfile, RECOVERY_RESPONSE, selectRecoveryScenario } from "./packaged-task-recovery-fixture.mjs";
@@ -127,8 +128,10 @@ try {
   mark("verified");
 } catch (error) {
   failure = error;
-  await window?.screenshot({ path: join(evidence, "failure.png") }).catch(() => undefined);
-  const body = await window?.locator("body").innerText().catch(() => "unavailable");
+  if (application) await writeFile(join(evidence, "bootstrap-failure.json"),
+    JSON.stringify(await readRecoveryBootstrap(application, window), null, 2) + "\n");
+  await window?.screenshot({ path: join(evidence, "failure.png"), timeout: 5_000 }).catch(() => undefined);
+  const body = await window?.locator("body").innerText({ timeout: 5_000 }).catch(() => "unavailable");
   await writeFile(join(evidence, "failure.txt"), `stage=${stage}\n${error.stack}\n${body?.slice(0, 8000) ?? ""}\n`);
 } finally {
   if (failure && process.platform === "win32") {
@@ -139,7 +142,7 @@ try {
     }
     await writeFile(join(evidence, "exit-state-before-cleanup.json"), JSON.stringify(states, null, 2) + "\n");
   }
-  const protocol = await window?.evaluate(() => globalThis.__pi67RecoveryProtocol).catch(() => undefined);
+  const protocol = await readRecoveryProtocolEvidence(window);
   await writeFile(join(evidence, "observations.json"), JSON.stringify({ protocol, model: await observations() }, null, 2) + "\n");
   for (const entry of await observations()) {
     if (entry.kind !== "loaded") continue;
@@ -183,9 +186,11 @@ if (failure) throw failure;
 async function launch() {
   const app = await launchPackagedApplication({ agentDir: directories.agentDir, artifact, userDataDirectory: directories.userDataDirectory,
     environment: { HOME: directories.userDataDirectory, USERPROFILE: directories.userDataDirectory },
-    hideNativeWindow: true, isolateNativeWindow: true, offline: true });
+    hideNativeWindow: true, isolateNativeWindow: false, offline: true });
   application = app; // Retain the owned driver even if the first identity read fails.
   applicationMainPid = undefined;
+  await observeRecoveryBootstrap(app);
+  await isolatePackagedAutomationWindow(app, { hideNativeWindow: true });
   await track(app.process().pid);
   assert.equal(await realpath(await app.evaluate(({ app: main }) => main.getPath("userData"))), directories.userDataDirectory);
   const main = await readRecoveryMainProcess(app);
@@ -198,7 +203,7 @@ async function openWorkspace(app, conversationId) {
   const page = await app.firstWindow({ timeout: 30_000 });
   // Capture the new page even if bootstrap fails, rather than inspecting the closed pre-crash page.
   window = page;
-  await page.waitForLoadState("domcontentloaded");
+  await page.waitForLoadState("domcontentloaded", { timeout: 30_000 });
   assert.equal(page.url(), "app://pi67/index.html");
   await observeRecoveryProtocol(page);
   await recordFixtureNavigation("opened-profile");

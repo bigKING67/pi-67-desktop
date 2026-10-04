@@ -75,6 +75,9 @@ PowerShell 时限；查询超时不能解释为进程已退出。启动后即保
 普通 CI 的两平台 native job 和 Windows candidate 的 build job 在常规 packaged smoke
 后各执行三个独立步骤，并始终上传隔离验收证据。新增入口和本机通过不代表 Windows
 已通过，必须读取该平台精确构建的实际回执。
+普通 CI 打包成功后，后续相互隔离的 smoke、恢复、Windows UI 与安装器检查即使前一项
+失败也继续执行；打包失败或任务取消则不启动。任一步失败仍使 native job 和最终门禁
+失败，不采用 `continue-on-error`，后续证据不把失败构建变成候选资格。
 冷启动用崩溃前的精确侧栏 Session identity 打开原对话；不假定导航选中状态已在
 强制退出前落盘。该场景明确经过工作区首页，验证从侧栏续接；身份含分隔字符，
 必须按属性值完整比较，不能拼入 CSS selector。失败取证使用本次启动的新窗口。
@@ -82,6 +85,10 @@ PowerShell 时限；查询超时不能解释为进程已退出。启动后即保
 明确处于 starting/recovering 时继续观察，不重复点击。后者仍须在原有 45 秒上限内达到
 ready 并通过原 Session/工具结果验收；按钮超时且没有打开中的状态、驱动错误和持续不就绪
 均失败，不能把 bootstrap 进行中当作恢复成功。
+页面 DOM 加载仍限 30 秒。恢复夹具在窗口隔离前监听 Main 的加载/渲染退出事件；失败时
+保留最多 32 条事件及丢弃计数、相对时间、窗口/PID、加载状态和 app/blank/other 分类，
+不记录原始 URL、错误正文或路径。Main 诊断与 Renderer 协议读取各限 2 秒，失败截图和正文读取各限 5 秒；
+这些是失败取证预算，不放宽启动验收。仅补诊断不能宣称已修复空白窗口超时。
 
 ## Configuration and command ownership
 
