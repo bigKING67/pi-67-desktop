@@ -271,7 +271,7 @@ export class AgentHostSupervisor {
     host.on("exit", (code) => this.#handleExit(host, code));
     host.stdout?.on("data", () => undefined);
     const initializationOutput = process.env.NODE_ENV === "test"
-      && process.env.PI67_TEST_CAPTURE_AGENT_INIT === "1"
+      && (process.env.PI67_TEST_CAPTURE_AGENT_INIT === "1" || process.env.PI67_TEST_CAPTURE_SHUTDOWN === "1")
       ? new AgentHostInitializationOutputForwarder((line) => process.stderr.write(`${line}\n`))
       : undefined;
     host.stderr?.on("data", (chunk) => {

@@ -6,6 +6,15 @@ import {
 } from "./electron-shutdown-measurement.mjs";
 
 describe("Electron shutdown measurement", () => {
+  it("retains explicit graceful and forced outcomes without treating stop completion as graceful", () => {
+    const report = { budgetMs: 3_000, deadlineExceeded: false, durationMs: 2_500,
+      rendererCheckpointed: true, agentHostStopped: true, agentHostGraceful: false, agentHostForced: true };
+    expect(parseApplicationShutdownReport(`Application shutdown: ${JSON.stringify({ ...report, private: "drop" })}`)).toEqual(report);
+    for (const invalid of [{ agentHostGraceful: "true" }, { agentHostForced: 1 }]) {
+      expect(parseApplicationShutdownReport(`Application shutdown: ${JSON.stringify({ ...report, ...invalid })}`)).toBeNull();
+    }
+  });
+
   it("extracts only the bounded application shutdown stage report", () => {
     const report = parseApplicationShutdownReport([
       "unrelated output",

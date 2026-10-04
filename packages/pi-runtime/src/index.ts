@@ -54,3 +54,4 @@ export {
   type SessionCatalogDiscoveryOptions
 } from "./session-discovery.js";
 export { resolveManagedSessionPath } from "./session-import.js";
+export { observeShutdownPhase } from "./shutdown-phase-observation.js";

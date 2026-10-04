@@ -1,4 +1,4 @@
-import { createRuntimeCredentialOverrideStore, PiConfigurationServiceRegistry, type AgentRuntime, type RuntimeCredentialOverrideStore } from "@pi67/pi-runtime";
+import { createRuntimeCredentialOverrideStore, observeShutdownPhase, PiConfigurationServiceRegistry, type AgentRuntime, type RuntimeCredentialOverrideStore } from "@pi67/pi-runtime";
 import type { AgentCommand, AgentCommandType, CommandResults, ProtocolPort, RequestEnvelope } from "@pi67/protocol";
 import { HostConnectionContext, type HostConnectionIdentity } from "./connection-context.js";
 import { forkSessionFromTask } from "./cross-task-session-fork.js";
@@ -339,7 +339,7 @@ export class AgentHostServer {
     const resourceShutdownBudget = Math.max(20, Math.min(750, Math.floor(deadlineMs / 4)));
     // Package-tree termination and resource-command fencing must not consume the
     // window needed to abort Pi operations and release JSONL writers.
-    const requestShutdown = this.requests.shutdown(resourceShutdownBudget).catch(rememberError);
+    const requestShutdown = observeShutdownPhase("host-requests", () => this.requests.shutdown(resourceShutdownBudget)).catch(rememberError);
     const connectionCloseRuntimes = new Set(this.taskRuntimes.values()
       .map((record) => record.runtime)
       .filter((runtime): runtime is AgentRuntime => runtime !== undefined));
@@ -363,7 +363,7 @@ export class AgentHostServer {
     } catch (error) {
       rememberError(error);
     }
-    const operationResults = await Promise.all(this.tasks.values().map(async (state) => (
+    const operationResults = await observeShutdownPhase("host-operations", () => Promise.all(this.tasks.values().map(async (state) => (
       state.operations?.shutdown(
         "Cancelled because the application is shutting down.",
         Math.max(1, Math.min(this.options.abortWatchdogMs ?? deadlineMs, Math.floor(deadlineMs / 2)))
@@ -371,11 +371,11 @@ export class AgentHostServer {
         rememberError(error);
         return "lost" as const;
       }) ?? "none"
-    )));
+    ))));
     const activeOperation = operationResults.includes("lost")
       ? "lost"
       : operationResults.includes("cancelled") ? "cancelled" : "none";
-    const writerRuntimesDisposed = await this.taskLifecycle.disposeAllForShutdown(rememberError);
+    const writerRuntimesDisposed = await observeShutdownPhase("host-task-runtimes", () => this.taskLifecycle.disposeAllForShutdown(rememberError));
     let compatibilityRuntime = this.compatibilityRuntime;
     if (!compatibilityRuntime && this.compatibilityRuntimeLoad) {
       try {
@@ -392,26 +392,26 @@ export class AgentHostServer {
     }
     this.compatibilityRuntimeUnsubscribe = undefined;
     try {
-      await compatibilityRuntime?.dispose();
+      await observeShutdownPhase("host-compatibility-runtime", () => compatibilityRuntime?.dispose() ?? Promise.resolve());
     } catch (error) {
       rememberError(error);
     }
     this.compatibilityRuntime = undefined;
     this.compatibilityRuntimeLoad = undefined;
-    await this.taskLifecycle.releaseWriterLeasesForShutdown(writerRuntimesDisposed, rememberError);
+    await observeShutdownPhase("host-writer-leases", () => this.taskLifecycle.releaseWriterLeasesForShutdown(writerRuntimesDisposed, rememberError));
     await requestShutdown;
     try {
-      await this.workspaces.disposeAll();
+      await observeShutdownPhase("host-workspaces", () => this.workspaces.disposeAll());
     } catch (error) {
       rememberError(error);
     }
     try {
-      await this.runtimeCredentialOverrides.clear();
+      await observeShutdownPhase("host-credentials", () => this.runtimeCredentialOverrides.clear());
     } catch (error) {
       rememberError(error);
     }
     try {
-      await this.options.promptAttachments?.dispose();
+      await observeShutdownPhase("host-attachments", () => this.options.promptAttachments?.dispose() ?? Promise.resolve());
     } catch (error) {
       rememberError(error);
     }

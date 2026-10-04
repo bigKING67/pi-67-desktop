@@ -18,11 +18,15 @@ export function parseApplicationShutdownReport(output) {
         || !isNonNegativeFinite(report.durationMs)
         || typeof report.rendererCheckpointed !== "boolean"
         || typeof report.agentHostStopped !== "boolean"
+        || !isOptionalBoolean(report.agentHostGraceful)
+        || !isOptionalBoolean(report.agentHostForced)
         || !isOptionalNonNegativeFinite(report.rendererCheckpointDurationMs)
         || !isOptionalNonNegativeFinite(report.agentHostStopDurationMs)
       ) continue;
       result = {
         agentHostStopped: report.agentHostStopped,
+        ...(report.agentHostGraceful === undefined ? {} : { agentHostGraceful: report.agentHostGraceful }),
+        ...(report.agentHostForced === undefined ? {} : { agentHostForced: report.agentHostForced }),
         budgetMs: round(report.budgetMs),
         deadlineExceeded: report.deadlineExceeded,
         durationMs: round(report.durationMs),
@@ -245,6 +249,10 @@ function isNonNegativeFinite(value) {
 
 function isOptionalNonNegativeFinite(value) {
   return value === undefined || isNonNegativeFinite(value);
+}
+
+function isOptionalBoolean(value) {
+  return value === undefined || typeof value === "boolean";
 }
 
 function settleWithin(promise, timeoutMs) {

@@ -14,12 +14,14 @@ interface ApplicationShutdownReport {
   rendererCheckpointed: boolean;
   rendererCheckpointDurationMs?: number;
   agentHostStopped: boolean;
+  agentHostGraceful?: boolean;
+  agentHostForced?: boolean;
   agentHostStopDurationMs?: number;
 }
 
 interface ApplicationShutdownOptions {
   checkpointRenderer?: (deadlineMs: number) => Promise<boolean>;
-  stopAgentHost: (deadlineMs: number) => Promise<unknown>;
+  stopAgentHost: (deadlineMs: number) => Promise<void | { graceful: boolean; forced: boolean }>;
   afterAgentHostStop?: () => Promise<unknown>;
   markCleanExit?: () => Promise<unknown>;
   quit: () => void;
@@ -82,6 +84,7 @@ export function createApplicationShutdownController(
       let rendererCheckpointed = options.checkpointRenderer === undefined;
       let rendererCheckpointDurationMs: number | undefined;
       let agentHostStopped = false;
+      let agentHostOutcome: { graceful: boolean; forced: boolean } | void;
       let agentHostStopDurationMs: number | undefined;
       let watchdog: ReturnType<typeof setTimeout> | undefined;
 
@@ -103,6 +106,9 @@ export function createApplicationShutdownController(
           rendererCheckpointed,
           ...(rendererCheckpointDurationMs === undefined ? {} : { rendererCheckpointDurationMs }),
           agentHostStopped,
+          ...(agentHostOutcome === undefined ? {} : {
+            agentHostGraceful: agentHostOutcome.graceful, agentHostForced: agentHostOutcome.forced
+          }),
           ...(agentHostStopDurationMs === undefined ? {} : { agentHostStopDurationMs })
         };
         try {
@@ -134,7 +140,7 @@ export function createApplicationShutdownController(
         const hostStopStartedAt = now();
         const hostDeadlineMs = remainingStageBudget(deadlineAt, now(), finalizationReserveMs);
         try {
-          await options.stopAgentHost(hostDeadlineMs);
+          agentHostOutcome = await options.stopAgentHost(hostDeadlineMs);
           agentHostStopped = true;
         } catch (error) {
           reportError(error);

@@ -30,25 +30,27 @@ describe("AgentHostSupervisor", () => {
     vi.restoreAllMocks();
   });
 
-  it("forwards only sanitized Agent Host initialization output in the test capture lane", () => {
+  it.each(["PI67_TEST_CAPTURE_AGENT_INIT", "PI67_TEST_CAPTURE_SHUTDOWN"])("forwards only sanitized Agent Host output with %s", (flag) => {
     vi.stubEnv("NODE_ENV", "test");
-    vi.stubEnv("PI67_TEST_CAPTURE_AGENT_INIT", "1");
+    vi.stubEnv("PI67_TEST_CAPTURE_AGENT_INIT", "");
+    vi.stubEnv("PI67_TEST_CAPTURE_SHUTDOWN", "");
+    vi.stubEnv(flag, "1");
     const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const host = fakeUtilityProcess();
     electronMocks.fork.mockReturnValue(host as unknown as UtilityProcess);
     const supervisor = createSupervisor(fakeWindow("app://pi67/index.html").value);
-
     supervisor.connect();
     host.emitStderr([
       "private utility output",
       '[agent-host:init] {"stage":"load-model-runtime","outcome":"completed","durationMs":12.4,"private":"drop"}',
+      '[agent-host:shutdown] {"sequence":1,"stage":"runtime-session","outcome":"started","durationMs":0,"private":"drop"}',
       ""
     ].join("\n"));
 
-    expect(write).toHaveBeenCalledOnce();
-    expect(write).toHaveBeenCalledWith(
-      '[agent-host:init] {"stage":"load-model-runtime","outcome":"completed","durationMs":12}\n'
-    );
+    expect(write.mock.calls).toEqual([
+      ['[agent-host:init] {"stage":"load-model-runtime","outcome":"completed","durationMs":12}\n'],
+      ['[agent-host:shutdown] {"sequence":1,"stage":"runtime-session","outcome":"started","durationMs":0}\n']
+    ]);
   });
 
   it("reuses the MessagePort for the same Renderer document", () => {

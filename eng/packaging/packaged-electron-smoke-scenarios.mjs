@@ -311,7 +311,7 @@ export async function runControlledShutdownScenario({
     application,
     budgetMs: PACKAGED_SHUTDOWN_BUDGET_MS,
     childPid: shutdownState.childPid,
-    mainPid: application.process().pid,
+    mainPid: await application.evaluate(() => process.pid),
     utilityPids
   });
   const shutdown = {

@@ -40,8 +40,8 @@ import { createRuntimeAgentTurnControls } from "./runtime-agent-turn.js";
 import { NativeSubagentCoordinator } from "./native-subagent-coordinator.js";
 import { NativeSubagentAdmission } from "./native-subagent-admission.js";
 import type { PiSdkRuntimeOptions } from "./pi-sdk-runtime-options.js";
+import { observeShutdownPhase } from "./shutdown-phase-observation.js";
 export type { PiSdkRuntimeOptions } from "./pi-sdk-runtime-options.js";
-
 export class PiSdkRuntime implements AgentRuntime {
   private readonly events = new PiRuntimeEventBus();
   private readonly runtimeCredentialOverrides: RuntimeCredentialOverrideStore;
@@ -251,11 +251,11 @@ export class PiSdkRuntime implements AgentRuntime {
     this.conversationActions.cancelSemanticTitle();
     this.streamBatcher.drop();
     this.uiBridge.cancelAll("runtime-dispose");
-    await this.subagents.dispose();
-    await this.configurationReload.dispose();
-    await this.sessionBindings.settleAndDispose();
+    await observeShutdownPhase("runtime-subagents", () => this.subagents.dispose());
+    await observeShutdownPhase("runtime-configuration", () => this.configurationReload.dispose());
+    await observeShutdownPhase("runtime-session", () => this.sessionBindings.settleAndDispose());
     this.toolSafety.resetTaskAuthorizations();
-    await this.sessionCatalog.dispose();
+    await observeShutdownPhase("runtime-catalog", () => this.sessionCatalog.dispose());
     this.runtimeCredentialUnsubscribe?.();
     this.runtimeCredentialUnsubscribe = undefined;
     this.configurationRuntimeUnsubscribe?.();

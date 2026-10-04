@@ -1,5 +1,6 @@
 const INITIALIZATION_PREFIX = "[agent-host:init] ";
 const PROMPT_ACK_PREFIX = "[agent-host:prompt-ack] ";
+const SHUTDOWN_PREFIX = "[agent-host:shutdown] ";
 const MAX_PENDING_LINE_LENGTH = 8_192;
 
 const INITIALIZATION_STAGES = new Set([
@@ -20,6 +21,11 @@ const INITIALIZATION_STAGES = new Set([
 ]);
 
 const INITIALIZATION_OUTCOMES = new Set(["started", "completed", "failed"]);
+const SHUTDOWN_STAGES = new Set([
+  "host-operations", "host-task-runtimes", "host-compatibility-runtime",
+  "host-writer-leases", "host-requests", "host-workspaces", "host-credentials", "host-attachments",
+  "runtime-subagents", "runtime-configuration", "runtime-session", "runtime-catalog"
+]);
 const PROMPT_ACK_STAGES = new Set([
   "received", "dispatch-started", "runtime-ready",
   "receipt-reconcile-started", "receipt-reconcile-completed",
@@ -31,6 +37,7 @@ export class AgentHostInitializationOutputForwarder {
   readonly #emit: (line: string) => void;
   #pending = "";
   #promptRecords = 0;
+  #shutdownRecords = 0;
 
   constructor(emit: (line: string) => void) {
     this.#emit = emit;
@@ -45,6 +52,10 @@ export class AgentHostInitializationOutputForwarder {
 
   #forward(line: string): void {
     if (line.length > MAX_PENDING_LINE_LENGTH) return;
+    if (line.startsWith(SHUTDOWN_PREFIX)) {
+      this.#forwardShutdown(line);
+      return;
+    }
     if (line.startsWith(PROMPT_ACK_PREFIX)) {
       this.#forwardPromptAcknowledgement(line);
       return;
@@ -67,6 +78,25 @@ export class AgentHostInitializationOutputForwarder {
       })}`);
     } catch {
       // Utility stderr is untrusted diagnostics; malformed records are ignored.
+    }
+  }
+
+  #forwardShutdown(line: string): void {
+    if (this.#shutdownRecords >= 128) return;
+    try {
+      const value = JSON.parse(line.slice(SHUTDOWN_PREFIX.length)) as Record<string, unknown>;
+      if (typeof value.stage !== "string" || !SHUTDOWN_STAGES.has(value.stage)
+        || typeof value.outcome !== "string" || !INITIALIZATION_OUTCOMES.has(value.outcome)
+        || typeof value.sequence !== "number" || !Number.isSafeInteger(value.sequence)
+        || value.sequence < 1 || value.sequence > 64
+        || typeof value.durationMs !== "number" || !Number.isSafeInteger(value.durationMs)
+        || value.durationMs < 0 || value.durationMs > 60_000) return;
+      this.#shutdownRecords += 1;
+      this.#emit(`${SHUTDOWN_PREFIX}${JSON.stringify({
+        sequence: value.sequence, stage: value.stage, outcome: value.outcome, durationMs: value.durationMs
+      })}`);
+    } catch {
+      // Project only fixed fields from untrusted utility stderr.
     }
   }
 

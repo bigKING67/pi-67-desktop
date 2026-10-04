@@ -2,6 +2,26 @@ import { describe, expect, it, vi } from "vitest";
 import { AgentHostInitializationOutputForwarder } from "./agent-host-initialization-output.js";
 
 describe("AgentHostInitializationOutputForwarder", () => {
+  it("projects split shutdown stages without private fields and rejects invalid or excessive records", () => {
+    const emit = vi.fn<(line: string) => void>();
+    const forwarder = new AgentHostInitializationOutputForwarder(emit);
+    const prefix = "[agent-host:shutdown] ";
+    const valid = { sequence: 1, stage: "runtime-session", outcome: "started", durationMs: 0 };
+    const record = `${prefix}${JSON.stringify({ ...valid, secret: "private" })}\n`;
+    forwarder.write(record.slice(0, 35));
+    expect(emit).not.toHaveBeenCalled();
+    forwarder.write(record.slice(35));
+    for (const invalid of [
+      { stage: "private" }, { outcome: "unknown" }, { sequence: 0 }, { sequence: 65 },
+      { sequence: 1.5 }, { durationMs: -1 }, { durationMs: 60_001 }, { durationMs: 1.5 }
+    ]) forwarder.write(`${prefix}${JSON.stringify({ ...valid, ...invalid })}\n`);
+    forwarder.write(`${prefix}null\n${prefix}not-json\n`);
+    forwarder.write(`${prefix}${JSON.stringify({ ...valid, secret: "x".repeat(8_192) })}\n`);
+    expect(emit.mock.calls).toEqual([[`${prefix}${JSON.stringify(valid)}`]]);
+    for (let index = 0; index < 129; index += 1) forwarder.write(`${prefix}${JSON.stringify(valid)}\n`);
+    expect(emit).toHaveBeenCalledTimes(128);
+  });
+
   it("projects bounded Prompt ACK stages and drops payloads, unknown stages and invalid counters", () => {
     const emit = vi.fn<(line: string) => void>();
     const forwarder = new AgentHostInitializationOutputForwarder(emit);

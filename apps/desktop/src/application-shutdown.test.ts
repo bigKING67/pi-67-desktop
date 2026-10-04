@@ -4,6 +4,20 @@ import { createApplicationShutdownController } from "./application-shutdown.js";
 describe("ApplicationShutdownController", () => {
   afterEach(() => vi.useRealTimers());
 
+  it.each([{ graceful: true, forced: false }, { graceful: false, forced: true }])(
+    "reports the actual Host outcome even when stop resolves: %j", async (outcome) => {
+      const onComplete = vi.fn();
+      const controller = createApplicationShutdownController({
+        stopAgentHost: async () => outcome, quit: vi.fn(), onComplete
+      });
+      controller.handleBeforeQuit({ preventDefault: vi.fn() });
+      await vi.waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
+      expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({
+        agentHostStopped: true, agentHostGraceful: outcome.graceful, agentHostForced: outcome.forced
+      }));
+    }
+  );
+
   it("prevents quit until the Agent Host stop settles, then allows the recursive quit", async () => {
     let finishStop!: () => void;
     const stopAgentHost = vi.fn(() => new Promise<void>((resolve) => { finishStop = resolve; }));

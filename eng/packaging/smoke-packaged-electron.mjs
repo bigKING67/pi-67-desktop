@@ -35,7 +35,7 @@ import {
   verifyPackagedHeicAttachment,
   verifyPackagedProjectedImage
 } from "./packaged-heic-attachment-smoke.mjs";
-import { closeElectronApplicationWithinTimeout } from "./electron-shutdown-measurement.mjs";
+import { closeElectronApplicationWithinTimeout, parseApplicationShutdownReport } from "./electron-shutdown-measurement.mjs";
 import { assertPackagedSkillSuites } from "./smoke-packaged-skill-suites.mjs";
 import { assertNoWorkspaceChangesAuthorityWarning, verifyPackagedChangesInspector } from "./packaged-changes-inspector-smoke.mjs";
 import { verifyPackagedWorkbenchJourney } from "./packaged-workbench-journey-smoke.mjs";
@@ -387,9 +387,9 @@ try {
   await restorePackagedColdConversation({ packagedProcessOutput, window });
   await window.locator('[data-runtime-phase="ready"]').waitFor({ state: "visible", timeout: 30_000 });
   await verifyPackagedProjectedImage(window, "cold Restore Task");
-
   console.info("Packaged smoke stage: cold restart restored; starting controlled shutdown.");
   const closingApplication = application;
+  packagedProcessOutput = captureProcessOutput(closingApplication.process());
   application = undefined;
   const shutdown = await runControlledShutdownScenario({
     application: closingApplication,
@@ -399,6 +399,7 @@ try {
     window
   });
   childPid = shutdownState.childPid;
+  console.info(`Packaged shutdown report: ${JSON.stringify(parseApplicationShutdownReport(packagedProcessOutput()))}`);
   await completePackagedNativeMcpShutdown(nativeMcp);
   await runPackagedLocalMemorySettingsSmoke(artifact);
   console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, packaged-direct Agent Host startup (${startupDiagnostics.totalDurationMs}ms), packaged private-Node native MCP discovery/source receipt plus one AUTO-pipeline synthetic echo and owned-process cleanup, private toolchain + first-party capabilities, Desktop browser67 packaged-direct dependency resolution, packaged GUI Extension/Skill update checks with bounded worker cleanup, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, Lark user-first Tabs + persisted Main layout, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), projected image assets after submission plus warm/cold Restore Task, cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt product shutdown (${shutdown.productExitDurationMs}ms; Playwright driver close ${shutdown.driverCloseDurationMs}ms).`);
@@ -422,7 +423,6 @@ try {
     await cleanupPackagedTestDirectories(userDataDirectory);
   }
 }
-
 async function assertBoundedApplicationClose(applicationToClose, stage) {
   const close = await closeElectronApplicationWithinTimeout({ application: applicationToClose });
   if (close.timedOut || close.error || close.mainAliveAfterClose) {
@@ -438,6 +438,7 @@ function packagedSmokeEnvironment(profileRoot) {
     APPDATA: join(profileRoot, "app-data", "roaming"),
     LOCALAPPDATA: join(profileRoot, "app-data", "local"),
     PI67_MEMORY_PRIVACY_MODE: "off", PI67_TEST_CAPTURE_AGENT_INIT: "1", // names a startup budget miss's phase
+    PI67_TEST_CAPTURE_SHUTDOWN: "1", // fixed phase observations in this isolated test profile only
     PATH: process.platform === "win32"
       ? [join(windowsRoot, "System32"), windowsRoot].join(delimiter)
       : "/usr/bin:/bin:/usr/sbin:/sbin"

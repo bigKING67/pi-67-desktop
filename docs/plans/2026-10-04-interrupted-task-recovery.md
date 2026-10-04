@@ -1,6 +1,6 @@
 # Recover interrupted tasks on native Pi
 
-Status: completed scoped implementation and synthetic recovery acceptance; ordinary Windows quit stability risk retained
+Status: active ordinary Windows quit follow-up; interrupted-task recovery acceptance remains completed
 Owner: Codex
 Started: 2026-10-04
 
@@ -70,6 +70,30 @@ tokens and component library. Native desktop readback uses Computer Use;
 browser runtime acceptance uses browser67 when needed.
 
 ## Implementation and evidence
+
+- 2026-10-04 follow-up authorization: the user asked to continue with the ordinary
+  Windows quit risk. Start at clean `c9288c19`; no unrelated WIP. Keep the 3000ms
+  Main watchdog, 5000ms external exit gate, Pi quit hook and canonical-profile
+  isolation unchanged. First add test-only fixed shutdown-phase observations and
+  explicit Main graceful/forced outcomes; no prompts, paths, model requests or raw
+  errors. Use actual Electron Main PID in the shutdown measurement. A stage that
+  starts without finishing is evidence of the blocked boundary, not automatically
+  its cause. Reproduce before changing shutdown ordering or budgets. Then add a
+  failing regression, make the smallest root correction and validate scoped tests,
+  source gates, macOS preview and exact-SHA Windows evidence. Existing scoped
+  commit/push/CI delivery remains authorized; no paid inference or distribution.
+  Rollback is scoped source/test removal; no Session/config schema migration.
+- Shutdown observation checkpoint: fixed 12 Host/Runtime stages are gated by
+  test environment plus explicit capture, projected by Main through a 128-record
+  allowlist. Main now reports the real Supervisor graceful/forced result. The
+  controlled smoke tracks the actual Electron Main PID and starts a fresh bounded
+  output capture before shutdown so startup output cannot fill its 8 KiB buffer.
+  Targeted 7 files / 51 tests and all three affected package typechecks passed.
+  Complete source gate: 945 files / 6241 tests passed; 9 files / 24 optional tests
+  skipped. Initial file-length gate failures were corrected without changing
+  limits; the final smoke capture/report additions passed scoped lint and the
+  structure gate. No shutdown ordering, deadline or lifecycle assertion changed.
+  Windows root cause remains unconfirmed pending the instrumented exact-SHA run.
 
 - Final acceptance: clean `cff4d410d99a6dec5f6a93c28609ebb3b91d3b59`, CI
   `37194297858` attempt 2 and CI Gate passed. Source: 944 files / 6230 tests
