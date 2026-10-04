@@ -71,6 +71,8 @@ export async function inspectRealUserRuntimeSurface(window, privateRoot) {
 
 export function realUserLifecycleFailureKind(error) {
   if (!(error instanceof Error)) return "unknown";
+  if (error.message === "Windows real-user Provider configuration became unavailable.") return "provider-unavailable";
+  if (error.message === "Windows real-user targeted credential dialog rendered a second Provider picker.") return "credential-picker-duplicated";
   if (error.message.includes("raw acknowledgement timeout")) return "raw-acknowledgement-timeout";
   if (error.message.includes("failure notification")) return "failure-notification";
   if (error.name === "TimeoutError" || /timed? out|timeout/iu.test(error.message)) return "bounded-timeout";

@@ -167,3 +167,30 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
   branches 78.78%, including concurrent native-image WIP. Local aggregate source
   check stopped on that WIP's 463-line runtime binding file (460 limit), not on
   the MCP change; it is not an aggregate source PASS for this scoped commit.
+
+
+## Fourth exact-SHA CI and installer verifier race
+
+- `b35de8088dbd46188b3102701cac344865886269`, run `37209280529` attempt 1:
+  source passed 946 files / 6,265 tests, including all 19 native MCP regressions.
+  Renderer, macOS native and every Windows prerequisite passed. All six recovery
+  receipts report clean exact source, cleanup/isolation success and zero real model requests.
+- Windows full NSIS passed initial install, first launch, reinstall and three clean-Profile
+  launches, then failed Provider configuration on clean-Profile launch 3. Runtime was ready
+  with no Provider error notification; the old generic lifecycle error did not preserve the
+  failing assertion. This is not proof that the selected-tab race was the sole cause.
+- The verifier clicked the configured tab and immediately read aria-selected, before React
+  necessarily committed the state. It now clicks once and waits for selected=true using the
+  same shared 10-second budget. Seeded Provider, credential target/persistence and return to
+  workbench checks remain. Add fixed substep/allowlisted failure codes, with no raw errors.
+- Regressions cover delayed state, stuck state and time already consumed before selection.
+  Extend the exact verifier-only allowlist by these two extracted files and run their tests
+  in the reuse workflow. All immutable-attempt, exact artifact/source and successful Windows
+  prerequisite requirements remain. Exact-diff classification found that editing the reusable
+  workflow itself selects full CI, although explicit debug dispatch could reuse the source
+  artifact. Preserve that conservative policy and run one full CI for this combined change;
+  do not claim automatic reuse or run a second redundant installer workflow.
+- Local validation: 6 files / 81 tests passed; after simplifying the new diagnostic callback,
+  the affected 2 files / 28 tests passed again. Type-aware lint, structure, workflow Action
+  pins, PowerShell discovery and diff whitespace checks passed. Independent readonly review
+  found no blocker and independently confirmed the full-CI routing requirement.

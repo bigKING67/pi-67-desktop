@@ -2,18 +2,21 @@ import { WINDOWS_REAL_USER_CONFIGURED_PROVIDER } from "./windows-real-user-profi
 
 export const REAL_USER_PROVIDER_TIMEOUT_MS = 10_000;
 
-export async function verifyProviderConfiguration(window) {
+export async function verifyProviderConfiguration(window, onStep = () => {}) {
   const startedAt = performance.now();
+  onStep("open-settings");
   await window.keyboard.press("Control+,");
   const settings = window.getByLabel("New Money 设置");
   await settings.waitFor({
     state: "visible",
     timeout: remainingTimeout(startedAt)
   });
+  onStep("model-section");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "模型", exact: true })
     .click({ timeout: remainingTimeout(startedAt) });
   const panel = settings.getByTestId("provider-configuration-panel");
+  onStep("provider-panel");
   const unavailable = settings.getByText("Pi 配置尚不可用", { exact: true });
   await panel.or(unavailable).waitFor({
     state: "visible",
@@ -27,12 +30,14 @@ export async function verifyProviderConfiguration(window) {
     timeout: remainingTimeout(startedAt)
   });
   // The configured view lists only configured Providers; its rows no longer repeat the state.
-  const configuredTab = panel.getByRole("tablist", { name: "模型服务分类" })
-    .getByRole("tab", { name: /^已配置 \d+$/u });
+  const tabs = panel.getByRole("tablist", { name: "模型服务分类" });
+  const configuredTab = tabs.getByRole("tab", { name: /^已配置 \d+$/u });
+  onStep("configured-view-click");
   await configuredTab.click({ timeout: remainingTimeout(startedAt) });
-  if ((await configuredTab.getAttribute("aria-selected")) !== "true") {
-    throw new Error("Windows real-user Provider Catalog did not select the configured view.");
-  }
+  onStep("configured-view-selected");
+  await tabs.getByRole("tab", { name: /^已配置 \d+$/u, selected: true })
+    .waitFor({ state: "visible", timeout: remainingTimeout(startedAt) });
+  onStep("configured-provider");
   const configuredProvider = panel.getByTestId("provider-configuration-list")
     .getByRole("button", { name: /^OpenAI\b/u });
   await configuredProvider.waitFor({
@@ -40,6 +45,7 @@ export async function verifyProviderConfiguration(window) {
     timeout: remainingTimeout(startedAt)
   });
   await configuredProvider.click({ timeout: remainingTimeout(startedAt) });
+  onStep("credential-open");
   await settings.getByRole("button", { name: "更新 API Key", exact: true })
     .click({ timeout: remainingTimeout(startedAt) });
   const credentialDialog = window.getByRole("dialog", { name: "配置 OpenAI API Key" });
@@ -47,19 +53,23 @@ export async function verifyProviderConfiguration(window) {
     state: "visible",
     timeout: remainingTimeout(startedAt)
   });
+  onStep("credential-target");
   if (await credentialDialog.getByLabel("Pi Provider 列表").count()) {
     throw new Error("Windows real-user targeted credential dialog rendered a second Provider picker.");
   }
+  onStep("credential-persisted");
   await credentialDialog.getByText("已持久化到 Pi auth.json", { exact: true }).waitFor({
     state: "visible",
     timeout: remainingTimeout(startedAt)
   });
+  onStep("close-credential");
   await credentialDialog.getByRole("button", { name: "关闭", exact: true })
     .click({ timeout: remainingTimeout(startedAt) });
   await credentialDialog.waitFor({
     state: "hidden",
     timeout: remainingTimeout(startedAt)
   });
+  onStep("return-workbench");
   await settings.getByRole("button", { name: "返回工作台", exact: true })
     .click({ timeout: remainingTimeout(startedAt) });
   await settings.waitFor({

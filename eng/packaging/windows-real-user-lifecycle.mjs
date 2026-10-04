@@ -246,8 +246,8 @@ async function runRealUserLaunch({
       failureStage = "initial-profile-preservation";
       initialProfileVerification = await verifyInitialProfileState();
     }
-    failureStage = "provider-configuration";
-    const providerConfiguration = await verifyProviderConfiguration(window);
+    const providerConfiguration = await verifyProviderConfiguration(window,
+      (step) => { failureStage = `provider-configuration:${step}`; });
     failureStage = "file-projection";
     const fileProjection = await verifyGitMetadataIsHidden(window);
 

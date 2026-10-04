@@ -23,6 +23,8 @@ const ALLOWED_PACKAGING_BASENAMES = new Set([
   "windows-installer-lifecycle-report.test.mjs",
   "windows-real-user-lifecycle.mjs",
   "windows-real-user-lifecycle.test.mjs",
+  "windows-real-user-provider-configuration.mjs",
+  "windows-real-user-provider-configuration.test.mjs",
   "windows-real-user-catalog-discovery.mjs",
   "windows-real-user-catalog-discovery.test.mjs",
   "windows-real-user-catalog-state.mjs",

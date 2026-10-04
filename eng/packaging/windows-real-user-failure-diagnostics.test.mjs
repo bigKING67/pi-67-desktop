@@ -111,6 +111,10 @@ describe("Windows real-user failure diagnostics", () => {
   });
 
   it("classifies failures without retaining arbitrary error text", () => {
+    expect(realUserLifecycleFailureKind(new Error("Windows real-user Provider configuration became unavailable.")))
+      .toBe("provider-unavailable");
+    expect(realUserLifecycleFailureKind(new Error("Windows real-user targeted credential dialog rendered a second Provider picker.")))
+      .toBe("credential-picker-duplicated");
     expect(realUserLifecycleFailureKind(new Error(
       "Windows real-user lifecycle exposed a raw acknowledgement timeout."
     ))).toBe("raw-acknowledgement-timeout");

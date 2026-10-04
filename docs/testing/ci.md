@@ -155,8 +155,12 @@ Changes limited to the Windows installer verifier allowlist may reuse an install
 from the exact base commit instead of rebuilding Electron and NSIS. Documentation may accompany
 the verifier change without disabling reuse.
 
-The allowlist includes the real-user failure diagnostics and lifecycle report modules and
-their tests. Changes to packaged application code still disable this reuse path.
+The allowlist includes the real-user Provider configuration verifier, failure diagnostics,
+lifecycle report modules and their tests. Changes to packaged application code still disable
+this reuse path. Provider configuration clicks the configured tab once, then waits for its
+selected state within the existing shared 10-second budget before checking the seeded Provider
+and persisted credential. Failures retain a fixed substep name and allowlisted assertion code,
+never raw driver error bodies; a generic historical failure cannot prove which assertion failed.
 Lifecycle execution prints bounded stage names for installation, reinstall, launch, shutdown,
 and uninstall. `summary.json` is replaced after each completed phase and each real-user launch
 checkpoint; `progress` identifies the latest checkpoint, and `completedLaunches` preserves

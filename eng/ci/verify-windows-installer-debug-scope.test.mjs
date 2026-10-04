@@ -25,6 +25,8 @@ describe("Windows installer debug artifact reuse", () => {
       "eng/packaging/windows-installer-lifecycle-contract.mjs",
       "eng/packaging/windows-real-user-lifecycle.mjs",
       "eng/packaging/windows-real-user-lifecycle.test.mjs",
+      "eng/packaging/windows-real-user-provider-configuration.mjs",
+      "eng/packaging/windows-real-user-provider-configuration.test.mjs",
       "eng/packaging/windows-real-user-catalog-discovery.mjs",
       "eng/packaging/windows-real-user-catalog-discovery.test.mjs",
       "eng/packaging/windows-real-user-catalog-state.mjs",
@@ -167,6 +169,7 @@ describe("Windows installer debug artifact reuse", () => {
     expect(workflow).toContain("BASELINE_RUN_ATTEMPT: ${{ inputs.baseline_run_attempt }}");
     expect(workflow).toContain("PI67_WINDOWS_BASELINE_INSTALLER");
     expect(workflow).toContain("eng/ci/verify-windows-installer-debug-scope.test.mjs");
+    expect(workflow).toContain("eng/packaging/windows-real-user-provider-configuration.test.mjs");
     expect(workflow).toContain("eng/packaging/windows-real-user-failure-diagnostics.test.mjs");
     expect(workflow).toContain("eng/packaging/windows-installer-lifecycle-report.test.mjs");
     expect(workflow).toContain("eng/packaging/windows-artifact-identity.test.mjs");

@@ -11,6 +11,8 @@ describe("CI change scope classifier", () => {
     const paths = [
       "eng/packaging/windows-real-user-failure-diagnostics.mjs",
       "eng/packaging/windows-real-user-failure-diagnostics.test.mjs",
+      "eng/packaging/windows-real-user-provider-configuration.mjs",
+      "eng/packaging/windows-real-user-provider-configuration.test.mjs",
       "eng/packaging/windows-installer-lifecycle-report.mjs",
       "eng/packaging/windows-installer-lifecycle-report.test.mjs"
     ];
