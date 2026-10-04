@@ -294,3 +294,22 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
   Action pins and PowerShell discovery passed. Independent review found no blocker
   and confirmed retention of the known hidden failure path. Full Windows
   receipt/timing validation remains pending.
+
+## Followup: forced shutdown must preserve recovery
+
+- While checking the observed forced-exit path, found a deterministic correctness
+  defect: Main treated any resolved Host stop as clean and called `finishWorkbenchRun`,
+  which clears `runtimeRecovery`. This proves recovery metadata loss is possible;
+  it does not prove loss of Pi JSONL or Tool results in the earlier CI samples.
+- Regression first failed for forced, non-graceful/non-forced and missing outcomes
+  against the real Workbench state store (`forced-shutdown-recovery-before.log`).
+  Independent review confirmed the production call chain and minimal fix scope.
+- Require explicit graceful/non-forced completion before marking clean, preserving
+  transient cleanup and all shutdown budgets. Test real persisted state/reload for
+  successful, forced, unconfirmed, inconsistent and missing outcomes, plus a late
+  successful result after the watchdog. Keep the intermittent receipt stall separately open.
+- This source fix requires another exact-SHA full gate after the in-flight performance
+  convergence run; do not cancel that run or call the forced-exit fix platform-verified yet.
+- Local validation: 3 files / 32 tests passed after the demonstrated failures, plus
+  Desktop typecheck, type-aware lint, structure and whitespace checks. Independent
+  review found no blocker and confirmed unchanged deadlines/cleanup ordering.

@@ -84,7 +84,7 @@ export function createApplicationShutdownController(
       let rendererCheckpointed = options.checkpointRenderer === undefined;
       let rendererCheckpointDurationMs: number | undefined;
       let agentHostStopped = false;
-      let agentHostOutcome: { graceful: boolean; forced: boolean } | void;
+      let agentHostOutcome: { graceful: boolean; forced: boolean } | void = undefined;
       let agentHostStopDurationMs: number | undefined;
       let watchdog: ReturnType<typeof setTimeout> | undefined;
 
@@ -154,7 +154,8 @@ export function createApplicationShutdownController(
         }
         if (readyToQuit()) return;
 
-        if (rendererCheckpointed && agentHostStopped && options.markCleanExit) {
+        if (rendererCheckpointed && agentHostStopped && agentHostOutcome?.graceful === true
+          && agentHostOutcome.forced === false && options.markCleanExit) {
           await options.markCleanExit().catch(reportError);
         }
       })().catch(reportError).finally(() => finishQuit(false));

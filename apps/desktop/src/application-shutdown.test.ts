@@ -61,7 +61,7 @@ describe("ApplicationShutdownController", () => {
   it("marks the workbench clean only after the Agent Host stops", async () => {
     const order: string[] = [];
     const controller = createApplicationShutdownController({
-      stopAgentHost: async () => { order.push("host-stopped"); },
+      stopAgentHost: async () => { order.push("host-stopped"); return { graceful: true, forced: false }; },
       markCleanExit: async () => { order.push("workbench-clean"); },
       quit: () => { order.push("quit"); }
     });
@@ -74,7 +74,7 @@ describe("ApplicationShutdownController", () => {
     const order: string[] = [];
     const controller = createApplicationShutdownController({
       checkpointRenderer: async () => { order.push("renderer-checkpointed"); return true; },
-      stopAgentHost: async () => { order.push("host-stopped"); },
+      stopAgentHost: async () => { order.push("host-stopped"); return { graceful: true, forced: false }; },
       markCleanExit: async () => { order.push("workbench-clean"); },
       quit: () => { order.push("quit"); }
     });
@@ -90,7 +90,7 @@ describe("ApplicationShutdownController", () => {
 
   it("keeps the workbench dirty when the renderer checkpoint is not acknowledged", async () => {
     const markCleanExit = vi.fn();
-    const stopAgentHost = vi.fn(async () => undefined);
+    const stopAgentHost = vi.fn(async () => ({ graceful: true, forced: false }));
     const quit = vi.fn();
     const controller = createApplicationShutdownController({
       checkpointRenderer: async () => false,
@@ -108,7 +108,7 @@ describe("ApplicationShutdownController", () => {
   it("cleans Main-owned transient resources after the Agent Host stops", async () => {
     const order: string[] = [];
     const controller = createApplicationShutdownController({
-      stopAgentHost: async () => { order.push("host-stopped"); },
+      stopAgentHost: async () => { order.push("host-stopped"); return { graceful: true, forced: false }; },
       afterAgentHostStop: async () => { order.push("transient-cleaned"); },
       markCleanExit: async () => { order.push("workbench-clean"); },
       quit: () => { order.push("quit"); }
@@ -143,8 +143,8 @@ describe("ApplicationShutdownController", () => {
     const checkpointRenderer = vi.fn((deadlineMs: number) => new Promise<boolean>((resolve) => {
       setTimeout(() => resolve(false), deadlineMs);
     }));
-    const stopAgentHost = vi.fn((deadlineMs: number) => new Promise<void>((resolve) => {
-      setTimeout(resolve, deadlineMs);
+    const stopAgentHost = vi.fn((deadlineMs: number) => new Promise<{ graceful: boolean; forced: boolean }>((resolve) => {
+      setTimeout(() => resolve({ graceful: true, forced: false }), deadlineMs);
     }));
     const markCleanExit = vi.fn(async () => undefined);
     const quit = vi.fn();
@@ -172,6 +172,8 @@ describe("ApplicationShutdownController", () => {
     expect(onComplete).toHaveBeenCalledWith({
       agentHostStopDurationMs: 1_300,
       agentHostStopped: true,
+      agentHostGraceful: true,
+      agentHostForced: false,
       budgetMs: 2_000,
       deadlineExceeded: false,
       durationMs: 1_700,
@@ -252,7 +254,7 @@ describe("ApplicationShutdownController", () => {
     const quit = vi.fn();
     const controller = createApplicationShutdownController({
       checkpointRenderer: async () => true,
-      stopAgentHost: async () => undefined,
+      stopAgentHost: async () => ({ graceful: true, forced: false }),
       afterAgentHostStop: () => new Promise<never>(() => undefined),
       markCleanExit,
       quit,

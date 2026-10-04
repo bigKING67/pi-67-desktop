@@ -1950,6 +1950,9 @@ Desktop Main 的默认 shutdown-controller watchdog 为 3 秒，给 Windows 5 �
 用于 Electron 自身的 utility/Main teardown。watchdog 到期后必须继续 `app.quit()`，不能为等待 Host 或
 Main-owned finalization 延长外部门槛；阶段报告只包含预算、耗时及布尔完成状态。
 Main 报告分别保留 Supervisor 返回的 graceful/forced；stop Promise 返回不等于 graceful。
+`finishWorkbenchRun` 会清空 Workbench `runtimeRecovery`，因此只有 Renderer checkpoint 成功且
+Host 明确返回 `graceful=true`、`forced=false` 时才可调用。forced、未确认或缺失结果仍执行
+Main transient cleanup，但保留 dirty 状态和原恢复记录；watchdog 放行后的迟到完成不得清理记录。
 隔离测试仅在 `NODE_ENV=test` 且 `PI67_TEST_CAPTURE_SHUTDOWN=1` 时捕获 Host/Runtime 固定
 关闭阶段的 started/completed/failed、序号和耗时；每个 Host 最多 64 个阶段、128 条记录。
 Operation 子阶段区分 Pi abort、执行结算、排队收尾和 receipt 持久化；Prompt 结算另区分

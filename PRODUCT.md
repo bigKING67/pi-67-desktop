@@ -1692,6 +1692,9 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   active Operation, disposes the Pi Runtime, and exits before Electron continues
   quitting. A bounded deadline force-kills an unresponsive Host rather than
   leaving an Agent or Tool process behind indefinitely.
+  Only a confirmed graceful, non-forced Host exit and a successful Renderer
+  checkpoint permit a clean-exit marker and clearing Workbench task-recovery
+  records. Forced or unconfirmed exits retain those records for the next launch.
 - Synchronous runtime, workspace, Session, model, thinking, and resource mutations
   use stable idempotency keys and a bounded same-key transport retry. Lost responses
   cannot duplicate Session creation or replay a control mutation into a newer Session
