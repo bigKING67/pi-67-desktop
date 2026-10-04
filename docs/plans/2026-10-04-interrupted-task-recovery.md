@@ -1,6 +1,6 @@
 # Recover interrupted tasks on native Pi
 
-Status: active; Windows fault-injection PID correction and exact-SHA CI acceptance pending
+Status: active; Windows recovery-click race correction and exact-SHA CI acceptance pending
 Owner: Codex
 Started: 2026-10-04
 
@@ -140,6 +140,23 @@ browser runtime acceptance uses browser67 when needed.
   effect counts, zero real model requests, canonical profile unchanged and cleanup
   passed. Receipts are linked from `owner-deadline-<scenario>.log` in the existing
   evidence directory. The full source gate precedes only runner/test/plan edits.
+- Clean `611294f9`, CI `37193363633` attempt 1 passed source (944 files / 6227
+  tests), renderer, macOS native/three recovery cases and Windows ordinary smoke.
+  Windows `agent-before-response` passed. `app-after-tool` now killed actual Main
+  9192, observed both Main and Host 1180 exit, and reopened the original Session
+  under Main 5016. It failed on a test click: automatic bootstrap removed the
+  `恢复任务` button while Playwright waited for actionability. Protocol evidence
+  records successful `runtime.ready`/inspection, and the captured UI text displays
+  the expected continuation notice. This is a runner race, not failed Host exit.
+  Bound the optional recovery click to 2 seconds and accept a timeout only when
+  the actual Session-ready state is observed; preserve other errors and all final
+  continuation/identity/effect assertions. Three new regressions cover already
+  ready, ready-during-click and genuine driver/non-ready failures. The 38 focused
+  tests, lint and structure checks passed. Product source and ASAR are unchanged.
+  All three local macOS crash cases passed once with the corrected runner on ASAR
+  `20c24066...`, preserving canonical isolation and cleanup. Evidence:
+  `recovery-ready-race-<scenario>.log`. Complete the next clean-SHA Windows run;
+  the previous run did not reach unknown-Tool, scale/IME or installer lifecycle.
 
 - Next bounded acceptance uses `eng/packaging/verify-packaged-task-recovery.mjs`:
   separate temporary profile per scenario, in-process synthetic provider, Auto

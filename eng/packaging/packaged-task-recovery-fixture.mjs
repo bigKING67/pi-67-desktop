@@ -12,6 +12,15 @@ export function selectRecoveryScenario(argv) {
   return args[0];
 }
 
+export async function clickRecoveryAction(action, isReady) {
+  if (await isReady()) return;
+  try { await action.click({ timeout: 2_000 }); }
+  catch (error) {
+    // Automatic reopen can finish and remove this action during Playwright's click.
+    if (error.name !== "TimeoutError" || !await isReady()) throw error;
+  }
+}
+
 // Only installed inside this runner's isolated test window. No payloads or results.
 export async function observeRecoveryProtocol(page) {
   await page.evaluate(() => {

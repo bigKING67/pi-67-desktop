@@ -11,7 +11,7 @@ import { cleanupPackagedTestDirectories, createPackagedTestDirectories, installW
   launchPackagedApplication, resolvePackagedArtifact } from "./packaged-electron-fixture.mjs";
 import { closeElectronApplicationWithinTimeout } from "./electron-shutdown-measurement.mjs";
 import { collectIsolatedSessionEvidence, snapshotDirectoryMetadata, watchDirectoryMutationDigests } from "./packaged-context-isolation-receipt.mjs";
-import { observeRecoveryProtocol, prepareTaskRecoveryProfile, RECOVERY_RESPONSE, selectRecoveryScenario } from "./packaged-task-recovery-fixture.mjs";
+import { clickRecoveryAction, observeRecoveryProtocol, prepareTaskRecoveryProfile, RECOVERY_RESPONSE, selectRecoveryScenario } from "./packaged-task-recovery-fixture.mjs";
 
 const execute = promisify(execFile);
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -233,10 +233,11 @@ async function openWorkspace(app, conversationId) {
 }
 async function reopenConversation(page, requireRecoveryNotice = false) {
   let clicked = false;
+  const isReady = () => page.locator('[data-runtime-phase="ready"]').isVisible();
   await waitUntil(async () => {
     const action = page.getByRole("button", { name: /^(打开对话|恢复任务)$/u });
-    if (!clicked && await action.isVisible()) { clicked = true; await action.click(); }
-    return await page.locator('[data-runtime-phase="ready"]').isVisible()
+    if (!clicked && await action.isVisible()) { clicked = true; await clickRecoveryAction(action, isReady); }
+    return await isReady()
       && (!requireRecoveryNotice || await page.getByTestId("interrupted-task-notice").isVisible());
   }, 45_000, "Session ready after recovery");
 }

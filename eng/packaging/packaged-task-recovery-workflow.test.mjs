@@ -1,6 +1,30 @@
 import { readFile } from "node:fs/promises";
-import { expect, it } from "vitest";
-import { RECOVERY_SCENARIOS, selectRecoveryScenario } from "./packaged-task-recovery-fixture.mjs";
+import { expect, it, vi } from "vitest";
+import { clickRecoveryAction, RECOVERY_SCENARIOS, selectRecoveryScenario } from "./packaged-task-recovery-fixture.mjs";
+
+it("does not click a recovery action after automatic reopen already finished", async () => {
+  const action = { click: vi.fn() };
+  await clickRecoveryAction(action, async () => true);
+  expect(action.click).not.toHaveBeenCalled();
+});
+
+it("accepts a detached recovery action only when the Session actually became ready", async () => {
+  const error = Object.assign(new Error("action detached"), { name: "TimeoutError" });
+  const action = { click: vi.fn().mockRejectedValue(error) };
+  const isReady = vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true);
+  await clickRecoveryAction(action, isReady);
+  expect(action.click).toHaveBeenCalledExactlyOnceWith({ timeout: 2_000 });
+  await expect(clickRecoveryAction(action, async () => false)).rejects.toBe(error);
+});
+
+it("performs manual recovery and preserves non-timeout driver failures", async () => {
+  const error = new Error("driver disconnected");
+  const action = { click: vi.fn().mockResolvedValueOnce(undefined).mockRejectedValue(error) };
+  await clickRecoveryAction(action, async () => false);
+  await expect(clickRecoveryAction(action, async () => true)).resolves.toBeUndefined();
+  await expect(clickRecoveryAction(action, async () => false)).rejects.toBe(error);
+  expect(action.click).toHaveBeenCalledTimes(2);
+});
 
 it.each([
   ["ci.yml", "native-windows"], ["ci.yml", "native-macos"], ["windows-candidate.yml", "build-windows"]
