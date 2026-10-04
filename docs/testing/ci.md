@@ -52,6 +52,12 @@ Renderer CI 使用预构建资源、2 workers、0 retries；Electron CI 使用 1
 超时、定向运行通过时，保留首次失败证据，再使用 `check:source` 核对完整门禁；
 不能仅凭定向通过宣称全量通过，也不能仅凭固定并发通过认定产品性能问题已修复。
 
+Host 配置集成夹具按消息到达等待关联响应，先匹配 request ID 再校验完整协议，
+避免反复解析历史大模型目录阻塞文件 I/O。产品的配置文件访问预算仍为 4 秒。
+Codemode 的原生超时包含 Worker/WASM 启动：真实时钟用例验证启动/死循环退出和后续
+脚本可用；部分输出用例先以合成 MCP 子调用确认输出已越过 Worker 通道，再推进受控
+时钟触发同一个原生 deadline，检查部分输出、子调用取消和输出不落盘。
+
 中断任务的 macOS arm64 / Windows x64 打包验收使用
 `corepack pnpm run package:smoke:task-recovery -- <scenario>`，每次只接受一个场景：
 `agent-before-response`、`app-after-tool` 或 `agent-unconfirmed-tool`。
@@ -176,6 +182,16 @@ faster than restoring and saving the current store archive on the hosted runners
 The Windows native lane instead caches Electron and electron-builder download directories. These
 contain versioned Electron and NSIS tool downloads rather than repository build output; the cache
 key is bound to the lockfile and `electron-builder.yml`.
+
+Ordinary native CI passes `--ci-fast` to the unsigned packager. On Windows this
+uses stored NSIS payloads and disables differential packaging: electron-builder
+otherwise overrides `compression=store` with normal compression and creates an
+unused blockmap. The real NSIS install/uninstall and selected quick/full lifecycle
+checks remain required. On macOS it builds the unpacked `.app` with `--dir`, which
+is the artifact consumed by native smoke and all three recovery scenarios.
+Neither fast artifact certifies distribution containers or differential updates.
+Candidate, preview and release flows retain DMG/ZIP and normal NSIS/update output;
+they must not opt into ordinary CI's fast packaging.
 
 ## Two-tier Windows installer certification
 

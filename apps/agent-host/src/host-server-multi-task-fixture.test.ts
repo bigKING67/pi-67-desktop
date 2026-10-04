@@ -48,6 +48,20 @@ it("rejects pending waiters and clears deadlines when the port closes", async ()
   expect(vi.getTimerCount()).toBe(0);
 });
 
+it("observes each new message once without polling history and keeps a custom deadline", async () => {
+  vi.useFakeTimers();
+  const port = new FakePort();
+  port.postMessage("old-catalog");
+  const predicate = vi.fn((value: unknown) => value === "response");
+  const pending = port.waitForMessage(predicate, 60_000);
+  await vi.advanceTimersByTimeAsync(4_000);
+  expect(predicate).toHaveBeenCalledTimes(1);
+  port.postMessage("response");
+  await expect(pending).resolves.toBe("response");
+  expect(predicate).toHaveBeenCalledTimes(2);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
 it("bounds missing prompt-start signals without retaining deadline timers", async () => {
   vi.useFakeTimers();
   const runtime = new FakeRuntime("deadline-test");

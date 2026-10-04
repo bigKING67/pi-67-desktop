@@ -22,7 +22,7 @@ describe("unsigned native packaging policy", () => {
     });
     expect(resolveUnsignedNativeTarget("win32", "x64", { ciFast: true })).toEqual({
       label: "windows-x64",
-      arguments: ["--win", "nsis", "--x64", "-c.compression=store", "--publish", "never"]
+      arguments: ["--win", "nsis", "--x64", "-c.compression=store", "-c.nsis.differentialPackage=false", "--publish", "never"]
     });
     expect(resolveUnsignedNativeTarget("darwin", "arm64")).toEqual({
       label: "macos-arm64",
@@ -31,8 +31,10 @@ describe("unsigned native packaging policy", () => {
     expect(() => resolveUnsignedNativeTarget("win32", "arm64")).toThrow(/does not support win32\/arm64/u);
     expect(() => resolveUnsignedNativeTarget("darwin", "x64")).toThrow(/does not support darwin\/x64/u);
     expect(() => resolveUnsignedNativeTarget("linux", "x64")).toThrow(/does not support linux\/x64/u);
-    expect(() => resolveUnsignedNativeTarget("darwin", "arm64", { ciFast: true }))
-      .toThrow(/only for Windows CI smoke/u);
+    expect(resolveUnsignedNativeTarget("darwin", "arm64", { ciFast: true })).toEqual({
+      label: "macos-arm64",
+      arguments: ["--mac", "--dir", "--arm64", "-c.mac.notarize=false", "--publish", "never"]
+    });
   });
 
   it("parses only explicit CI packaging flags", () => {

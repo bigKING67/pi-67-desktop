@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { createCodemodeExtension } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 import { callNativeTool, createNativeMcpFixture } from "./native-mcp.test-support.js";
+import { runCodemodeWithOutputBeforeDeadline } from "./codemode-deadline.test-support.js";
 
 async function createCodemodeOutputFixture(saveOutput?: boolean) {
   const fixture = await createNativeMcpFixture({
@@ -59,12 +60,14 @@ describe("Codemode output persistence host option", () => {
 
   it.each([
     ["script error", `// @options: {"max_output_tokens": 16}\ntext("PI67_CODEMODE_ERROR_SPILL:" + "x".repeat(5_000)); throw new Error("synthetic error");`],
-    ["script timeout", `// @options: {"max_output_tokens": 16, "timeout_ms": 150}\ntext("PI67_CODEMODE_TIMEOUT_SPILL:" + "x".repeat(5_000)); while (true) {}`]
-  ])("does not save truncated %s output when disabled", async (_scenario, code) => {
+    ["script timeout", 'text("PI67_CODEMODE_TIMEOUT_SPILL:" + "x".repeat(5_000));']
+  ])("does not save truncated %s output when disabled", async (scenario, code) => {
     const fixture = await createCodemodeOutputFixture(false);
     try {
       const before = await readdir(fixture.root);
-      const result = await withFixtureTempDir(fixture.root, () => callNativeTool(
+      const result = await withFixtureTempDir(fixture.root, () => scenario === "script timeout"
+        ? runCodemodeWithOutputBeforeDeadline(fixture, code!, 16)
+        : callNativeTool(
         fixture.session,
         "codemode",
         { code }

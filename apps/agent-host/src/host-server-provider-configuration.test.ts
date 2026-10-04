@@ -272,16 +272,17 @@ async function hostCommand<T extends AgentCommandType>(
   idempotencyKey?: string
 ): Promise<{ response: ResponseEnvelope<T> }> {
   const request = commandEnvelopeForContext(type, payload, context, 7, idempotencyKey);
-  port.emit(request);
   const phase = "awaiting-correlated-response";
   let response: ResponseEnvelope<T> | undefined;
   try {
-    await vi.waitFor(() => {
-      response = port.sent.find((candidate) => (
-        isResponseEnvelope(candidate) && candidate.requestId === request.requestId
-      )) as ResponseEnvelope<T> | undefined;
-      expect(response).toBeDefined();
-    }, { timeout: HOST_RESPONSE_TIMEOUT_MS, interval: 20 });
+    // Correlate before schema validation: re-parsing every historical catalog
+    // every 20 ms starves real configuration I/O under coverage instrumentation.
+    const pending = port.waitForMessage((candidate) => (
+      typeof candidate === "object" && candidate !== null && "requestId" in candidate
+      && candidate.requestId === request.requestId && isResponseEnvelope(candidate)
+    ), HOST_RESPONSE_TIMEOUT_MS);
+    port.emit(request);
+    response = await pending as ResponseEnvelope<T>;
   } catch (error) {
     const recent = port.sent.slice(-8).map(safeProtocolMessageSummary);
     throw new Error(

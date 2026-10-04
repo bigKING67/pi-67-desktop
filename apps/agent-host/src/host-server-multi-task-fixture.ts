@@ -32,7 +32,7 @@ export class FakePort implements ProtocolPort {
     for (const waiter of this.waiters) waiter.accept(message);
   }
 
-  waitForMessage(predicate: (message: unknown) => boolean): Promise<unknown> {
+  waitForMessage(predicate: (message: unknown) => boolean, timeoutMs = 1_000): Promise<unknown> {
     const existing = this.sent.find(predicate);
     if (existing !== undefined) return Promise.resolve(existing);
     return new Promise((resolve, reject) => {
@@ -43,7 +43,7 @@ export class FakePort implements ProtocolPort {
         },
         reject: (error: Error) => { cleanup(); reject(error); }
       };
-      const timer = setTimeout(() => waiter.reject(new Error("Timed out waiting for correlated Host message.")), 1_000);
+      const timer = setTimeout(() => waiter.reject(new Error("Timed out waiting for correlated Host message.")), timeoutMs);
       this.waiters.add(waiter);
     });
   }

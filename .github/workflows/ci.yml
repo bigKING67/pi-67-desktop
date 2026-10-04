@@ -342,8 +342,8 @@ jobs:
           PI67_E2E_SHARED_AGENT_ROOT: ${{ runner.temp }}/pi67-native-electron
           PI67_TEST_CAPTURE_AGENT_INIT: "1"
         run: pnpm exec playwright test --config=playwright.electron.config.ts --project=electron --workers=1
-      - name: Build unsigned macOS smoke package
-        run: pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources
+      - name: Build fast unsigned macOS smoke app
+        run: pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources --ci-fast
       - name: Smoke packaged Electron runtime
         run: pnpm run package:smoke
       - name: Verify packaged task recovery (agent-before-response)

@@ -25,17 +25,19 @@ export function resolveUnsignedNativeTarget(platform, arch, options = {}) {
         "--win",
         "nsis",
         "--x64",
-        ...(options.ciFast ? ["-c.compression=store"] : []),
+        // Differential-aware NSIS archives force compression back to normal.
+        // Ordinary smoke does not distribute updates or consume blockmaps.
+        ...(options.ciFast ? ["-c.compression=store", "-c.nsis.differentialPackage=false"] : []),
         "--publish",
         "never"
       ]
     };
   }
   if (platform === "darwin" && arch === "arm64") {
-    if (options.ciFast) throw new Error("Fast unsigned packaging is supported only for Windows CI smoke.");
     return {
       label: "macos-arm64",
-      arguments: ["--mac", "dmg", "zip", "--arm64", "-c.mac.notarize=false", "--publish", "never"]
+      arguments: ["--mac", ...(options.ciFast ? ["--dir"] : ["dmg", "zip"]),
+        "--arm64", "-c.mac.notarize=false", "--publish", "never"]
     };
   }
   throw new Error(`Unsigned native packaging does not support ${platform}/${arch}.`);

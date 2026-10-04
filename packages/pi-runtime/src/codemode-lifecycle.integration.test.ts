@@ -1,6 +1,7 @@
 import { SessionManager, type AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 import { createCodemodeFixture, resultText } from "./codemode.test-support.js";
+import { runCodemodeWithOutputBeforeDeadline } from "./codemode-deadline.test-support.js";
 import { DurableToolExecutionIndex } from "./durable-tool-execution-index.js";
 import { normalizeMessages } from "./message-normalizer.js";
 import type { DesktopApprovalDecision } from "./safety-extension.js";
@@ -12,7 +13,9 @@ describe("Desktop Codemode lifecycle and recovery", () => {
       const prompt = f.run("text('before-abort'); await tools.mcp__synthetic__hold({});");
       await vi.waitFor(async () => expect((await f.records()).some((r) => r.name === "hold")).toBe(true));
       await f.session.abort();
-      await prompt;
+      const result = await prompt;
+      expect(result?.isError).toBe(true);
+      expect(resultText(result)).toContain("before-abort");
       await vi.waitFor(async () => {
         const records = await f.records();
         expect(records.find((r) => r.type === "cancel")?.id).toBe(records.find((r) => r.name === "hold")?.id);
@@ -65,13 +68,27 @@ describe("Desktop Codemode lifecycle and recovery", () => {
     } finally { await f.close(); }
   }, 20_000);
 
-  it("enforces a sandbox deadline and preserves partial output", async () => {
+  it("enforces the real startup/runaway deadline and permits the next script", async () => {
     const f = await createCodemodeFixture();
     try {
-      const result = await f.run('// @options: {"timeout_ms": 150}\ntext("before-timeout"); while (true) {}');
+      const result = await f.run('// @options: {"timeout_ms": 150}\nwhile (true) {}');
+      expect(result?.isError).toBe(true);
+      expect(resultText(result)).toContain("timed out");
+      expect(await f.run("text('after-timeout');")).toMatchObject({ isError: false });
+    } finally { await f.close(); }
+  }, 20_000);
+
+  it("preserves output produced before the deadline and cancels its pending child", async () => {
+    const f = await createCodemodeFixture();
+    try {
+      const result = await runCodemodeWithOutputBeforeDeadline(f, 'text("before-timeout");');
       expect(result?.isError).toBe(true);
       expect(resultText(result)).toContain("before-timeout");
       expect(resultText(result)).toContain("timed out");
+      await vi.waitFor(async () => {
+        const records = await f.records();
+        expect(records.find((r) => r.type === "cancel")?.id).toBe(records.find((r) => r.name === "hold")?.id);
+      });
       expect(await f.run("text('after-timeout');")).toMatchObject({ isError: false });
     } finally { await f.close(); }
   }, 20_000);
