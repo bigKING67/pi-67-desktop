@@ -1,6 +1,6 @@
 # Recover interrupted tasks on native Pi
 
-Status: active; Windows recovery-click race correction and exact-SHA CI acceptance pending
+Status: completed scoped implementation and synthetic recovery acceptance; ordinary Windows quit stability risk retained
 Owner: Codex
 Started: 2026-10-04
 
@@ -50,6 +50,7 @@ push to main and Windows/macOS CI acceptance; distribution and release remain ou
 - [x] Implement branch assessment, exact-anchor command and bounded UI states.
 - [x] Complete relevant protocol/runtime/Host/renderer regression checks.
 - [x] Complete local preview/packaged evidence and report remaining platform gaps.
+- [x] Commit/push scoped delivery and complete clean-SHA Windows/macOS CI acceptance.
 
 ## Rollback and delivery
 
@@ -69,6 +70,28 @@ tokens and component library. Native desktop readback uses Computer Use;
 browser runtime acceptance uses browser67 when needed.
 
 ## Implementation and evidence
+
+- Final acceptance: clean `cff4d410d99a6dec5f6a93c28609ebb3b91d3b59`, CI
+  `37194297858` attempt 2 and CI Gate passed. Source: 944 files / 6230 tests
+  (9 files / 24 optional tests skipped); renderer: 294 passed / 1 skipped.
+  Windows and macOS each passed all three isolated recovery scenarios, preserving
+  the original Session, exactly one classifier call, exact Tool effect counts,
+  unknown-outcome blocking, canonical-profile isolation and owned-process cleanup.
+  Every recovery receipt reports zero real model requests. Windows additionally
+  passed normal packaged smoke, synthetic scale/IME contracts and full NSIS
+  lifecycle (install, installed launch, 3 clean-profile and 3 existing-profile
+  restarts, same-version reinstall, uninstall and user-data preservation).
+  macOS ASAR: 195103050 bytes,
+  `20c2406623648baff63448cf1eae41268937e3ac5b19ab52ae970d1ef8be2f69`;
+  Windows ASAR: 195226279 bytes,
+  `1e106e25768f8cefade9436b45ef17d31d43b190fce39defe738f168e35fbea0`.
+  Receipts: `artifacts/validation/pi-durable-compat/ci-37194297858/`;
+  the running local preview matches the macOS CI ASAR. This accepts explicit
+  interrupted-task recovery on native Pi, not Pi Durable or unattended resume.
+  The ordinary Windows quit-hook recurrence in attempt 1 remains unexplained;
+  attempt 2 passed unchanged gates, but is not proof of a stability fix. Real-paid
+  Provider crash recovery, long-run stability, target-user manual acceptance and
+  distribution/release are not covered. Subsequent closeout changes are plan-only.
 
 - CI `37188370268` attempt 1 at clean `bb92992` passed source (942 files / 6210 tests),
   renderer (294 passed / 1 skipped), macOS native/recovery and Windows general
@@ -157,6 +180,15 @@ browser runtime acceptance uses browser67 when needed.
   `20c24066...`, preserving canonical isolation and cleanup. Evidence:
   `recovery-ready-race-<scenario>.log`. Complete the next clean-SHA Windows run;
   the previous run did not reach unknown-Tool, scale/IME or installer lifecycle.
+- Clean `cff4d410`, CI `37194297858` attempt 1 passed source (944 files / 6230
+  tests; 24 skipped), renderer (294 passed / 1 skipped) and all macOS native/
+  packaged recovery checks. Windows ordinary smoke again recorded zero Pi quit
+  hooks; tracked processes exited within 2659.9ms of the unchanged 5000ms gate.
+  Main reported a 583.5ms renderer checkpoint and 1917.4ms Host stop. This does
+  not establish graceful Pi disposal or its missing-stage root cause. No new
+  recovery scenario ran in this attempt. Retain the recurrence as an unresolved
+  ordinary-shutdown stability risk. One bounded failed-job rerun on the identical
+  SHA, attempt 2, passed; this does not prove the intermittent issue fixed.
 
 - Next bounded acceptance uses `eng/packaging/verify-packaged-task-recovery.mjs`:
   separate temporary profile per scenario, in-process synthetic provider, Auto
