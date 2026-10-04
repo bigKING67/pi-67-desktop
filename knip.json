@@ -16,6 +16,7 @@
         "eng/capabilities/team-worker-electron-probe.ts",
         "eng/capabilities/team-worker-utility-probe.ts",
         "eng/capabilities/team-index-deadline-probe.ts",
+        "eng/packaging/probe-packaged-runtime-retirement.mjs",
         "eng/packaging/probe-packaged-team-runtimes.mjs",
         "eng/packaging/probe-packaged-team-session.mjs"
       ]
