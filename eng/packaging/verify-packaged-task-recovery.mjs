@@ -5,7 +5,7 @@ import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { readRecoveryMainProcess, readRecoveryProcess, readWindowsRecoveryExitState, signalRecoveryProcess } from "./packaged-recovery-process.mjs";
+import { cleanupRecoveryProcesses, readRecoveryMainProcess, readRecoveryProcess, readWindowsRecoveryExitState, signalRecoveryProcess } from "./packaged-recovery-process.mjs";
 import { fileURLToPath } from "node:url";
 import { cleanupPackagedTestDirectories, createPackagedTestDirectories, installWorkspaceDialogResult,
   isolatePackagedAutomationWindow, launchPackagedApplication, resolvePackagedArtifact } from "./packaged-electron-fixture.mjs";
@@ -159,20 +159,14 @@ try {
     const result = await closeFixtureApplication(application);
     if (result.timedOut || result.error || result.mainAliveAfterClose) failure ??= new Error("Test application shutdown did not complete cleanly.");
   }
-  // Only processes launched by this fixture, still matching their observed identity.
-  for (const [pid, identity] of tracked) {
-    try {
-      await signalRecoveryProcess(pid, identity, "SIGTERM");
-      await waitUntil(async () => !await processIdentity(pid), 5000, "fixture process cleanup");
-    } catch (error) { failure ??= error; }
-  }
-  const allExited = (await Promise.all([...tracked.keys()].map(pid => processIdentity(pid).catch(() => "unverified")))).every(value => value === undefined);
+  const cleanup = await cleanupRecoveryProcesses(tracked);
+  failure ??= cleanup.failure;
   canonicalWatch?.close();
   const canonicalAfter = await snapshotDirectoryMetadata(canonicalRoot);
   const canonicalUnchanged = JSON.stringify(canonicalBefore) === JSON.stringify(canonicalAfter) && (canonicalWatch?.observations.length ?? 0) === 0;
   if (!canonicalUnchanged) failure ??= new Error("Canonical Session root changed; isolation acceptance is inconclusive.");
   let cleanupError;
-  if (allExited) {
+  if (cleanup.allExited) {
     try { await cleanupPackagedTestDirectories(directories.userDataDirectory); cleanupPassed = true; }
     catch (error) { cleanupError = error.message; failure ??= error; }
   }
@@ -180,7 +174,8 @@ try {
   await writeFile(join(evidence, "receipt.json"), JSON.stringify({ ...receipt,
     status: failure ? "FAIL" : "PASS", scenario, stage, windowMode: hideNativeWindow ? "hidden" : "visible-isolated",
     ...provenance, artifactSha256, artifactSize: asar.length, canonicalUnchanged, cleanupPassed,
-    ownedPids: [...tracked.keys()], launches, journal, ...(cleanupError ? { cleanupError } : {}), ...(failure ? { error: failure.message } : {}) }, null, 2) + "\n");
+    ownedPids: [...tracked.keys()], processCleanup: cleanup.processes, launches, journal,
+    ...(cleanupError ? { cleanupError } : {}), ...(failure ? { error: failure.message } : {}) }, null, 2) + "\n");
 }
 console.log(`Recovery receipt: ${evidence}/receipt.json`);
 if (failure) throw failure;

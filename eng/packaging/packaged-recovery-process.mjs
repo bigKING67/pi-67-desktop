@@ -83,3 +83,32 @@ export async function signalRecoveryProcess(pid, expectedIdentity, signal, {
   try { kill(pid, signal); return true; }
   catch (error) { if (error.code === "ESRCH") return false; throw error; }
 }
+
+/** An observed exit retires that owned identity; never query its reusable PID again. */
+export async function cleanupRecoveryProcesses(tracked, {
+  read = readRecoveryProcess, kill = (pid, signal) => process.kill(pid, signal),
+  timeoutMs = 5000, now = Date.now, wait = ms => new Promise(resolve => setTimeout(resolve, ms))
+} = {}) {
+  const processes = [];
+  let failure;
+  for (const [pid, identity] of tracked) {
+    try {
+      const signaled = await signalRecoveryProcess(pid, identity, "SIGTERM", { read, kill });
+      if (signaled) {
+        const deadline = now() + timeoutMs;
+        for (;;) {
+          if (now() >= deadline) throw new Error("Timed out: fixture process cleanup");
+          const current = await read(pid);
+          if (!current) break;
+          if (current.identity !== identity) throw new Error("Recovery process identity changed before exit confirmation.");
+          await wait(100);
+        }
+      }
+      processes.push({ pid, status: "exited" });
+    } catch (error) {
+      failure ??= error;
+      processes.push({ pid, status: "unverified", error: error.message.slice(0, 512) });
+    }
+  }
+  return { allExited: processes.every(process => process.status === "exited"), failure, processes };
+}

@@ -1,10 +1,72 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { describe, expect, it, vi } from "vitest";
-import { readRecoveryMainProcess, readRecoveryProcess, readWindowsRecoveryExitState, signalRecoveryProcess } from "./packaged-recovery-process.mjs";
+import { cleanupRecoveryProcesses, readRecoveryMainProcess, readRecoveryProcess, readWindowsRecoveryExitState, signalRecoveryProcess } from "./packaged-recovery-process.mjs";
 
 const pid = 123456;
 const win = { pid, parentPid: 123455, startedAt: "639267123456789012", executablePath: "C:\\隔离 测试\\New Money.exe" };
+
+describe("packaged recovery process cleanup", () => {
+  it.each(["reused", "query-fails"])("does not re-query a confirmed exit when its PID later %s", async later => {
+    const read = vi.fn().mockResolvedValueOnce({ identity: "owned" }).mockResolvedValueOnce(undefined);
+    if (later === "reused") read.mockResolvedValue({ identity: "unrelated" });
+    else read.mockRejectedValue(new Error("late query unavailable"));
+    const kill = vi.fn();
+    expect(await cleanupRecoveryProcesses(new Map([[pid, "owned"]]), { read, kill })).toEqual({
+      allExited: true, failure: undefined, processes: [{ pid, status: "exited" }]
+    });
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(kill).toHaveBeenCalledExactlyOnceWith(pid, "SIGTERM");
+  });
+
+  it("retires an already absent identity without another query or signal", async () => {
+    const read = vi.fn().mockResolvedValueOnce(undefined).mockResolvedValue({ identity: "replacement" });
+    const kill = vi.fn();
+    expect((await cleanupRecoveryProcesses(new Map([[pid, "owned"]]), { read, kill })).allExited).toBe(true);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(kill).not.toHaveBeenCalled();
+  });
+
+  it.each(["query", "identity", "unknown", "alive"])("retains %s failure and continues cleaning other owned processes", async mode => {
+    let time = 0;
+    const queryError = new Error("CIM lookup unavailable");
+    const read = vi.fn(async target => {
+      if (target !== pid) return undefined;
+      if (mode === "query") throw queryError;
+      return { identity: mode === "identity" ? "replacement" : "owned" };
+    });
+    const kill = vi.fn();
+    const result = await cleanupRecoveryProcesses(new Map([[pid, mode === "unknown" ? undefined : "owned"], [pid + 1, "other"]]),
+      { read, kill, timeoutMs: 200, now: () => time, wait: async ms => { time += ms; } });
+    expect(result.allExited).toBe(false);
+    expect(result.processes).toEqual([
+      { pid, status: "unverified", error: expect.any(String) }, { pid: pid + 1, status: "exited" }
+    ]);
+    expect(result.failure.message).toMatch(/unavailable|identity changed|Unowned|Timed out/u);
+    if (mode === "query") expect(result.failure).toBe(queryError);
+    if (mode !== "alive") expect(kill).not.toHaveBeenCalled();
+  });
+
+  it("rejects identity replacement during exit polling instead of claiming an exit", async () => {
+    const read = vi.fn().mockResolvedValueOnce({ identity: "owned" }).mockResolvedValue({ identity: "replacement" });
+    const result = await cleanupRecoveryProcesses(new Map([[pid, "owned"]]), { read, kill: vi.fn() });
+    expect(result.allExited).toBe(false);
+    expect(result.failure.message).toContain("identity changed before exit confirmation");
+  });
+
+  it("does not begin another query after the exit deadline and still cleans other processes", async () => {
+    let time = 0;
+    let ownedReads = 0;
+    const read = vi.fn(async target => target === pid && ++ownedReads <= 2 ? { identity: "owned" } : undefined);
+    const result = await cleanupRecoveryProcesses(new Map([[pid, "owned"], [pid + 1, "other"]]), {
+      read, kill: vi.fn(), timeoutMs: 50, now: () => time, wait: async ms => { time += ms; }
+    });
+    expect(ownedReads).toBe(2);
+    expect(result.allExited).toBe(false);
+    expect(result.failure.message).toBe("Timed out: fixture process cleanup");
+    expect(result.processes[1]).toEqual({ pid: pid + 1, status: "exited" });
+  });
+});
 
 describe("packaged recovery process ownership", () => {
   it.each(["darwin", "win32"])("uses the application Main PID instead of assuming the driver PID on %s", async platform => {

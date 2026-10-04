@@ -28,6 +28,25 @@ confirmed no production change since local acceptance. Reuse that source evidenc
 new CI and clean-package receipts must bind the committed SHA and new bytes.
 Record this followup in ignored `artifacts/validation/pi-source-delivery-20261005/`.
 
+### Windows cleanup followup
+
+Source delivery `ce6c365dd856492cf653ae9b1c3a5e0a0297f694` reached CI run
+`37230911558`, attempt 1. Source (6,343 passing tests), Renderer and macOS passed.
+Windows `app-after-tool` completed all recovery assertions but failed final cleanup;
+the other two recovery scenarios and synthetic scale checks passed. The receipt
+reported only `Owned test processes remain`, after every individual exit wait had
+already succeeded. The first failed receipt is retained; there was no blind rerun.
+
+Independent review confirmed the verifier re-queried all old bare PIDs after
+observing their exit. A reused PID or failed final CIM query could invalidate that
+observation and erase the actual query error. The retained evidence does not
+distinguish those triggers or prove a product process leak. Keep confirmed exits
+terminal, reject identity drift/query failure before exit, continue cleanup after
+an individual failure, and retain bounded per-process results. Product runtime,
+timeouts and acceptance assertions stay unchanged. The focused process/workflow
+regressions pass (52 tests), including the independently reviewed deadline-before-
+query boundary; new-SHA target-platform validation is still required.
+
 ## Observed starting state
 
 - HEAD/origin main: `0340c55157d5a35b206e418184f7bc08510abab5`; code CI at
