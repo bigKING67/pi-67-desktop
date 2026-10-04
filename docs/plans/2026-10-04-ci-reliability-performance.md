@@ -252,7 +252,7 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
   installer process/lifecycle effects require isolation. Splitting runners also incurs
   transfer/setup costs for large packages, so defer until the simple hypothesis is tested.
 - [x] Verify measurement regressions and independently review the experiment.
-- [ ] Collect exact-SHA controlled Windows evidence; accept or reject the hypothesis.
+- [x] Collect exact-SHA controlled Windows evidence; accept or reject the hypothesis.
 - [ ] Keep only an evidence-backed improvement, remove paired CI overhead, validate
   the final exact-SHA full CI and report total as well as individual step times.
 
@@ -262,3 +262,18 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
   Keep a final hidden confirmation with a third independent evidence directory,
   so warm filesystem caches cannot alone explain a visible-mode improvement.
   This is a bounded three-run mechanism experiment, not automatic retries.
+
+- Experiment `0083cb2c`, run `37213032680` / attempt 1: hidden 182 s failed,
+  visible 33 s passed, warmed hidden 180 s failed. Provider interaction was
+  20.001 / 1.294 / 20.002 s; workbench journey 15.990 / 1.223 / 15.985 s.
+  Window isolation mode has a reproducible effect; filesystem warmup alone cannot
+  explain it. The exact Chromium/Windows scheduling mechanism remains unproven.
+- Both hidden runs lacked the required Pi `session_shutdown(reason=quit)` record.
+  Main reported forced Host termination; the last Host boundary was terminal
+  receipt persistence. This is a real graceful-shutdown failure, not merely a
+  driver timeout. Other Windows recovery, UI and full NSIS gates passed; full CI
+  correctly failed. Source gate: 946 files / 6,269 tests passed, 24 optional skips.
+- Independent review accepted visible UI testing but flagged deletion of the known
+  hidden shutdown failure as a P1 coverage loss. Keep the failure and original
+  budgets gated while adding bounded, opt-in receipt filesystem phase diagnostics.
+  No retry, weaker lifecycle assertion or durability relaxation is permitted.

@@ -3,7 +3,10 @@ import { AgentHostInitializationOutputForwarder } from "./agent-host-initializat
 
 describe("AgentHostInitializationOutputForwarder", () => {
   it.each(["operation-abort", "operation-execution", "operation-queues", "operation-receipt",
-    "operation-prompt-catalog", "operation-prompt-configuration"])("forwards bounded Operation phase %s", (stage) => {
+    "operation-prompt-catalog", "operation-prompt-configuration",
+    "receipt-directory", "receipt-lock", "receipt-read", "receipt-open", "receipt-write",
+    "receipt-file-sync", "receipt-close", "receipt-replace", "receipt-directory-sync", "receipt-unlock"
+  ])("forwards bounded Operation phase %s", (stage) => {
     const emit = vi.fn<(line: string) => void>();
     const forwarder = new AgentHostInitializationOutputForwarder(emit);
     const record = `[agent-host:shutdown] ${JSON.stringify({ sequence: 1, stage, outcome: "completed", durationMs: 20 })}`;

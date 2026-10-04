@@ -1,4 +1,5 @@
 import type { OperationSettled } from "@pi67/protocol";
+import { observeShutdownPhase } from "@pi67/pi-runtime";
 import { HostCommandError } from "./protocol-error.js";
 import {
   MAX_OPERATION_RECEIPTS,
@@ -119,19 +120,21 @@ export class OperationReceiptStore {
         record.updatedAt = this.now();
       }
       return cloneOperationReceiptRecords(matches);
-    }, true);
+    }, true, observeShutdownPhase);
   }
 
   private async withLedger<T>(
     operation: (ledger: OperationReceiptLedger) => T,
-    write: boolean
+    write: boolean,
+    observe?: typeof observeShutdownPhase
   ): Promise<T> {
     if (this.ledgerPath) {
       return withStoredOperationReceiptLedger(
         this.ledgerPath,
         this.scopeKey,
         write,
-        operation
+        operation,
+        observe
       );
     }
     const draft = cloneOperationReceiptLedger(this.memoryLedger);

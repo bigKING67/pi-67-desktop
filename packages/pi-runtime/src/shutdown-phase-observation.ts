@@ -4,6 +4,8 @@ type ShutdownPhase =
   | "host-credentials" | "host-attachments"
   | "operation-abort" | "operation-execution" | "operation-queues" | "operation-receipt"
   | "operation-prompt-catalog" | "operation-prompt-configuration"
+  | "receipt-directory" | "receipt-lock" | "receipt-read" | "receipt-open" | "receipt-write"
+  | "receipt-file-sync" | "receipt-close" | "receipt-replace" | "receipt-directory-sync" | "receipt-unlock"
   | "runtime-subagents" | "runtime-configuration" | "runtime-session" | "runtime-catalog";
 
 let nextSequence = 0;

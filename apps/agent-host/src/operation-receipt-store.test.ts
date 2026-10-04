@@ -3,7 +3,7 @@ import { link, lstat, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import type { OperationAccepted, OperationSettled } from "@pi67/protocol";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { operationReceiptScopeKey } from "./operation-receipt-contract.js";
 import { operationReceiptLedgerPath } from "./operation-receipt-storage.js";
 import { OperationReceiptStore } from "./operation-receipt-store.js";
@@ -11,10 +11,37 @@ import { OperationReceiptStore } from "./operation-receipt-store.js";
 const roots: string[] = [];
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
 describe("OperationReceiptStore", () => {
+  it("captures only settlement filesystem phases without receipt identities or paths", async () => {
+    vi.stubEnv("PI67_TEST_CAPTURE_SHUTDOWN", "1");
+    const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const root = await temporaryRoot();
+    const store = durableStore(root);
+    await remember(store, "private-submission", "private-operation", 10);
+    await store.markRunning("private-submission", fingerprint("private-submission"));
+    await store.records();
+    expect(write).not.toHaveBeenCalled();
+
+    await store.settleOperation("private-operation", completed("private-operation", 7));
+    const records = write.mock.calls.map(([line]) => JSON.parse(String(line).slice("[agent-host:shutdown] ".length)));
+    expect(records).toHaveLength(20);
+    for (const stage of ["receipt-directory", "receipt-lock", "receipt-read", "receipt-open", "receipt-write",
+      "receipt-file-sync", "receipt-close", "receipt-replace", "receipt-directory-sync", "receipt-unlock"]) {
+      expect(records.filter((record) => record.stage === stage).map((record) => record.outcome))
+        .toEqual(["started", "completed"]);
+    }
+    expect(JSON.stringify(records)).not.toContain("private");
+    expect(JSON.stringify(records)).not.toContain(root);
+    await expect(durableStore(root).records()).resolves.toEqual([
+      expect.objectContaining({ stage: "settled", terminal: completed("private-operation", 7) })
+    ]);
+  });
+
   it("persists only bounded authority metadata and never raw operation content", async () => {
     const root = await temporaryRoot();
     const store = durableStore(root);

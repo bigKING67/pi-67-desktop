@@ -152,6 +152,13 @@ summary error. No stage changes the existing 5-second Prompt ACK deadline or dur
 `response-posted` proves the Host port write returned; it does not prove Renderer receipt. Instrumentation
 alone is not evidence that a Windows timeout is repaired.
 
+The isolated shutdown capture additionally splits terminal receipt persistence into fixed
+directory, lock, read, temporary-file open/write/sync/close, replace, directory-sync and unlock
+phases. Only settlement uses these observations, so normal acceptance/read transactions do not
+consume the bounded shutdown record budget. It preserves locking, fsync, atomic replacement and
+the original error; records contain no paths, receipt identities or contents. A started phase
+without completion narrows the pending boundary but does not identify the underlying OS cause.
+
 Keep source checks, browser E2E, native Electron, packaged smoke, installer certification and manual acceptance
 as separate evidence. Report missing evidence explicitly. Report settings, cache keys, concurrency and thresholds
 must be changed with their consumers and boundary tests; preserve unknown-input fallback and release authorization.

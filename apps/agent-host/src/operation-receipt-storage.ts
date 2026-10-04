@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { chmod, lstat, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import lockfile from "proper-lockfile";
+import type { observeShutdownPhase } from "@pi67/pi-runtime";
 import {
   assertConsistentOperationTerminals,
   cloneOperationReceiptLedger,
@@ -32,22 +33,23 @@ export async function withStoredOperationReceiptLedger<T>(
   path: string,
   scopeKey: string,
   write: boolean,
-  operation: (ledger: OperationReceiptLedger) => T
+  operation: (ledger: OperationReceiptLedger) => T,
+  observe: typeof observeShutdownPhase = (_phase, run) => run()
 ): Promise<T> {
   try {
-    await ensurePrivateDirectory(dirname(path));
-    const release = await lockfile.lock(path, {
+    await observe("receipt-directory", () => ensurePrivateDirectory(dirname(path)));
+    const release = await observe("receipt-lock", () => lockfile.lock(path, {
       realpath: false,
       retries: { retries: 8, factor: 1.5, minTimeout: 25, maxTimeout: 250 },
       stale: 10_000
-    });
+    }));
     try {
-      const ledger = await readLedger(path, scopeKey);
+      const ledger = await observe("receipt-read", () => readLedger(path, scopeKey));
       const result = operation(ledger);
-      if (write) await writeLedger(path, ledger);
+      if (write) await writeLedger(path, ledger, observe);
       return result;
     } finally {
-      await release();
+      await observe("receipt-unlock", release);
     }
   } catch (error) {
     if (error instanceof HostCommandError) throw error;
@@ -75,7 +77,9 @@ async function readLedger(path: string, scopeKey: string): Promise<OperationRece
   return cloneOperationReceiptLedger(parsed);
 }
 
-async function writeLedger(path: string, ledger: OperationReceiptLedger): Promise<void> {
+async function writeLedger(
+  path: string, ledger: OperationReceiptLedger, observe: typeof observeShutdownPhase
+): Promise<void> {
   if (!isOperationReceiptLedger(ledger, ledger.scopeKey)) {
     throw operationReceiptIntegrityError("The durable Operation receipt ledger is invalid.");
   }
@@ -85,17 +89,17 @@ async function writeLedger(path: string, ledger: OperationReceiptLedger): Promis
   }
   const directory = dirname(path);
   const temporaryPath = join(directory, `.${randomUUID()}.pi67-operation-tmp`);
-  const file = await open(temporaryPath, "wx", PRIVATE_FILE_MODE);
+  const file = await observe("receipt-open", () => open(temporaryPath, "wx", PRIVATE_FILE_MODE));
   try {
-    await file.writeFile(serialized, "utf8");
-    await file.sync();
+    await observe("receipt-write", () => file.writeFile(serialized, "utf8"));
+    await observe("receipt-file-sync", () => file.sync());
   } finally {
-    await file.close();
+    await observe("receipt-close", () => file.close());
   }
   try {
     if (process.platform !== "win32") await chmod(temporaryPath, PRIVATE_FILE_MODE);
-    await replaceWithBoundedRetry(temporaryPath, path);
-    await syncDirectory(directory);
+    await observe("receipt-replace", () => replaceWithBoundedRetry(temporaryPath, path));
+    await observe("receipt-directory-sync", () => syncDirectory(directory));
   } catch (error) {
     await unlink(temporaryPath).catch(() => undefined);
     throw error;
