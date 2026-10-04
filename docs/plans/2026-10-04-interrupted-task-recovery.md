@@ -250,3 +250,19 @@ unchanged production just to validate a test harness.
   and zero retries. Test TypeScript checking passed. The follow-up modifies only
   test fixtures, owned-process acceptance code and these evidence contracts;
   production behavior and the already-tested packaged ASAR remain unchanged.
+- Follow-up commit `39d1f279d5a3de1ac5186ab17a4fe2896bcaafe5`, CI
+  `37187427966` attempt 1: macOS native and all recovery cases passed again.
+  The original 11 Renderer failures are resolved; a different search case read
+  `workspace-test` before registration changed it to `workspace-pi-demo` (trace
+  confirms both). Await ready before binding that fixture; all 7 search tests
+  pass. A 200 ms response-delay experiment alone did not reproduce the race.
+- The real-filesystem previous-Host receipt test exceeded Vitest's default
+  one-second `waitFor` while settling the old Host. Its ledger lock retry budget
+  alone can exceed one second; use a bounded five-second semantic wait and keep
+  the no-replay/no-completion assertions. The unchanged case passes locally.
+- Windows stopped earlier in general packaged shutdown: all measured processes
+  exited within the existing gate, but no `session_shutdown(quit)` entry was
+  observed. This is unresolved, and the revised recovery probe was not reached.
+  Retain the failed run and add bounded shutdown measurements to that existing
+  error; do not change the product budget, expected lifecycle count or retry
+  policy. The next CI run must establish Windows evidence before claiming pass.

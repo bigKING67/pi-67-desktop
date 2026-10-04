@@ -332,7 +332,11 @@ export async function runControlledShutdownScenario({
   }
   await waitForProcessExit(shutdownState.childPid);
   for (const pid of utilityPids) await waitForProcessExit(pid);
-  await assertSingleShutdownQuitLifecycle(lifecyclePath, "Packaged Pi Runtime");
+  try {
+    await assertSingleShutdownQuitLifecycle(lifecyclePath, "Packaged Pi Runtime");
+  } catch (error) {
+    throw new Error(`${error.message} Shutdown diagnostics: ${JSON.stringify(shutdown)}`, { cause: error });
+  }
   return shutdown;
 }
 

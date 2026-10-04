@@ -84,15 +84,17 @@ describe("AgentHostServer Operation crash recovery", () => {
     expect(replacementSubmit).not.toHaveBeenCalled();
 
     finishFirst();
+    // The real cross-Host ledger includes bounded lock retries and fsync; this is
+    // a terminal-authority assertion, not a one-second storage latency budget.
     await vi.waitFor(() => expect(first.port.sent.some((value) => (
       isEventEnvelope(value) && value.type === "operation.lost"
-    ))).toBe(true));
+    ))).toBe(true), { timeout: 5_000 });
     expect(first.port.sent.some((value) => (
       isEventEnvelope(value) && value.type === "operation.completed"
     ))).toBe(false);
     await first.server.shutdown();
     await replacement.server.shutdown();
-  });
+  }, 10_000);
 });
 
 async function createHarness(

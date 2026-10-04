@@ -193,6 +193,8 @@ test("searches Workspace conversation text and opens the exact Session result", 
     }
   });
   await page.getByRole("button", { name: "选择工作区" }).click();
+  // The click precedes async workspace registration; bind the search fixture to the ready Session.
+  await expect(page.locator('[data-runtime-phase="ready"]')).toBeVisible();
   const workspaceId = await page.evaluate(() => (
     window as unknown as { __pi67TestAgent: { workspaceId: string } }
   ).__pi67TestAgent.workspaceId);
