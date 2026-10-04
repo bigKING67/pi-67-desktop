@@ -53,11 +53,15 @@ Renderer CI 使用预构建资源、2 workers、0 retries；Electron CI 使用 1
 不能仅凭定向通过宣称全量通过，也不能仅凭固定并发通过认定产品性能问题已修复。
 
 打包 smoke 输出固定阶段名、结果和耗时，不记录操作结果或错误正文。
-`PI67_PACKAGED_SMOKE_VISIBLE_WINDOW=1` 只作用于 smoke 夹具，复用已有可见但不接收鼠标、
-跳过任务栏并失焦的隔离窗口分支；默认及本机行为仍隐藏窗口。Windows CI 临时对同一
-安装包执行隐藏→可见→隐藏三次完整 smoke，每次使用独占临时 Profile 和失败证据目录，
-不改变原断言或超时上限；末次隐藏用于区分窗口状态与文件/系统缓存预热影响。
-对照完成后移除重复运行，不作为永久策略。
+`PI67_PACKAGED_SMOKE_VISIBLE_WINDOW=1` 只作用于普通 smoke 和任务恢复夹具，复用已有
+可见但不接收鼠标、跳过任务栏并失焦的隔离窗口分支；默认及本机行为仍隐藏窗口。
+Windows CI 仅在三项任务恢复步骤显式启用该模式，回执记录 `windowMode`；原始完整
+packaged smoke 保持隐藏窗口，继续覆盖已观测到的隐藏状态关闭失败。两轮同包
+隐藏→可见→隐藏对照已结束，重复步骤移除。切换恢复夹具不删除断言、提高超时或
+增加重试；该步骤的实际节时仍以目标 Windows 的新回执和计时为准。
+普通 packaged smoke 还必须从 Main 的完整报告确认 Renderer checkpoint 和 Host graceful
+shutdown：强制终止、超期、缺失报告或缺失 graceful/forced 字段均失败，不能仅凭 PID
+退出和 Pi callback 记录报告关闭成功。既有 3 秒 Main、5 秒产品退出预算不变。
 
 Host 配置集成夹具按消息到达等待关联响应，先匹配 request ID 再校验完整协议，
 避免反复解析历史大模型目录阻塞文件 I/O。产品的配置文件访问预算仍为 4 秒。

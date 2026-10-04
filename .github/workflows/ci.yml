@@ -223,25 +223,20 @@ jobs:
       - name: Smoke packaged Electron runtime
         if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         run: pnpm run package:smoke
-      - name: Compare visible Windows packaged smoke
+      - name: Verify packaged task recovery (agent-before-response)
         if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         env:
           PI67_PACKAGED_SMOKE_VISIBLE_WINDOW: "1"
-          PI67_PACKAGED_FAILURE_EVIDENCE_DIR: test-results/packaged-smoke-visible
-        run: pnpm run package:smoke
-      - name: Confirm hidden Windows packaged smoke after warmup
-        if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
-        env:
-          PI67_PACKAGED_FAILURE_EVIDENCE_DIR: test-results/packaged-smoke-hidden-confirmation
-        run: pnpm run package:smoke
-      - name: Verify packaged task recovery (agent-before-response)
-        if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         run: pnpm run package:smoke:task-recovery -- agent-before-response
       - name: Verify packaged task recovery (app-after-tool)
         if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
+        env:
+          PI67_PACKAGED_SMOKE_VISIBLE_WINDOW: "1"
         run: pnpm run package:smoke:task-recovery -- app-after-tool
       - name: Verify packaged task recovery (agent-unconfirmed-tool)
         if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
+        env:
+          PI67_PACKAGED_SMOKE_VISIBLE_WINDOW: "1"
         run: pnpm run package:smoke:task-recovery -- agent-unconfirmed-tool
       - name: Upload packaged task recovery evidence
         if: always()

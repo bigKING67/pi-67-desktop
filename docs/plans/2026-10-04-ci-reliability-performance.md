@@ -277,3 +277,20 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
   hidden shutdown failure as a P1 coverage loss. Keep the failure and original
   budgets gated while adding bounded, opt-in receipt filesystem phase diagnostics.
   No retry, weaker lifecycle assertion or durability relaxation is permitted.
+- Receipt tracing `f522f595`, run `37215010644` / attempt 1: both hidden runs and
+  the visible run passed, as did source (946 files / 6,280 tests, 24 optional skips),
+  Renderer and macOS native checks. This change only adds observations; the earlier
+  intermittent hidden shutdown failure remains OPEN/PARTIAL, not repaired by a
+  passing sample. Final Windows lifecycle completion and timings still need readback.
+- Converge conservatively: remove the two temporary repeated full-smoke steps but
+  retain the original full hidden smoke as a required gate. Limit visible-isolated
+  windows to the three Windows task-recovery steps, retaining each exact crash,
+  Session, replay and cleanup assertion. Recovery receipts record the window mode.
+  This can reduce independent UI overhead without replacing the hidden failure path.
+- Strengthen the existing smoke shutdown gate to require Main's explicit successful
+  Renderer checkpoint and graceful/non-forced Host result, in addition to the Pi
+  callback and product PID budget. A callback followed by failed cleanup cannot pass.
+- Local convergence validation: 3 files / 33 tests, type-aware lint, structure,
+  Action pins and PowerShell discovery passed. Independent review found no blocker
+  and confirmed retention of the known hidden failure path. Full Windows
+  receipt/timing validation remains pending.

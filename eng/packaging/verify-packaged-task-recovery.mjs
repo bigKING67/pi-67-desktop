@@ -17,6 +17,7 @@ import { clickRecoveryAction, observeRecoveryProtocol, prepareTaskRecoveryProfil
 const execute = promisify(execFile);
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const scenario = selectRecoveryScenario(process.argv.slice(2));
+const hideNativeWindow = process.env.PI67_PACKAGED_SMOKE_VISIBLE_WINDOW !== "1";
 const artifact = resolvePackagedArtifact();
 const asarPath = join(artifact.resourcesPath, "app.asar");
 const { stdout: sourceHead } = await execute("git", ["rev-parse", "HEAD"], { cwd: root });
@@ -177,7 +178,8 @@ try {
   }
   else failure ??= new Error("Owned test processes remain; isolated profile retained.");
   await writeFile(join(evidence, "receipt.json"), JSON.stringify({ ...receipt,
-    status: failure ? "FAIL" : "PASS", scenario, stage, ...provenance, artifactSha256, artifactSize: asar.length, canonicalUnchanged, cleanupPassed,
+    status: failure ? "FAIL" : "PASS", scenario, stage, windowMode: hideNativeWindow ? "hidden" : "visible-isolated",
+    ...provenance, artifactSha256, artifactSize: asar.length, canonicalUnchanged, cleanupPassed,
     ownedPids: [...tracked.keys()], launches, journal, ...(cleanupError ? { cleanupError } : {}), ...(failure ? { error: failure.message } : {}) }, null, 2) + "\n");
 }
 console.log(`Recovery receipt: ${evidence}/receipt.json`);
@@ -186,11 +188,11 @@ if (failure) throw failure;
 async function launch() {
   const app = await launchPackagedApplication({ agentDir: directories.agentDir, artifact, userDataDirectory: directories.userDataDirectory,
     environment: { HOME: directories.userDataDirectory, USERPROFILE: directories.userDataDirectory },
-    hideNativeWindow: true, isolateNativeWindow: false, offline: true });
+    hideNativeWindow, isolateNativeWindow: false, offline: true });
   application = app; // Retain the owned driver even if the first identity read fails.
   applicationMainPid = undefined;
   await observeRecoveryBootstrap(app);
-  await isolatePackagedAutomationWindow(app, { hideNativeWindow: true });
+  await isolatePackagedAutomationWindow(app, { hideNativeWindow });
   await track(app.process().pid);
   assert.equal(await realpath(await app.evaluate(({ app: main }) => main.getPath("userData"))), directories.userDataDirectory);
   const main = await readRecoveryMainProcess(app);

@@ -63,6 +63,20 @@ it.each(RECOVERY_SCENARIOS)("accepts direct and pnpm-separated scenario %s", sce
   expect(selectRecoveryScenario(["--", scenario])).toBe(scenario);
 });
 
+it("uses visible isolated Windows recovery while retaining the full hidden shutdown gate", async () => {
+  const text = await readFile(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
+  const body = text.split("\n  native-windows:\n")[1].split(/\n  [a-z][a-z-]+:\n/u)[0];
+  const steps = body.split("      - name: ");
+  const smoke = steps.find(step => step.startsWith("Smoke packaged Electron runtime\n"));
+  expect(smoke).toContain("run: pnpm run package:smoke\n");
+  expect(smoke).not.toContain("PI67_PACKAGED_SMOKE_VISIBLE_WINDOW");
+  for (const scenario of RECOVERY_SCENARIOS) {
+    const recovery = steps.find(step => step.startsWith(`Verify packaged task recovery (${scenario})\n`));
+    expect(recovery).toContain('PI67_PACKAGED_SMOKE_VISIBLE_WINDOW: "1"');
+  }
+  expect(body.match(/run: pnpm run package:smoke\n/gu)).toHaveLength(1);
+});
+
 it.each(["native-windows", "native-macos"])("keeps independent packaged evidence after a failure without bypassing the gate: %s", async job => {
   const text = await readFile(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
   const body = text.split(`\n  ${job}:\n`)[1].split(/\n  [a-z][a-z-]+:\n/u)[0];

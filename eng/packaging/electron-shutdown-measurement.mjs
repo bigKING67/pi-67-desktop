@@ -5,6 +5,15 @@ const DEFAULT_DRIVER_CLOSE_TIMEOUT_MS = 15_000;
 const DEFAULT_FORCED_TERMINATION_GRACE_MS = 2_000;
 const APPLICATION_SHUTDOWN_PREFIX = "Application shutdown: ";
 
+export function requireGracefulApplicationShutdown(output) {
+  const report = parseApplicationShutdownReport(output);
+  if (!report || report.deadlineExceeded || !report.rendererCheckpointed
+    || !report.agentHostStopped || report.agentHostGraceful !== true || report.agentHostForced !== false) {
+    throw new Error(`Packaged application did not confirm graceful shutdown: ${JSON.stringify(report)}`);
+  }
+  return report;
+}
+
 export function parseApplicationShutdownReport(output) {
   let result = null;
   for (const line of output.split(/\r?\n/u)) {

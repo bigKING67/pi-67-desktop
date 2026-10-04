@@ -2,10 +2,28 @@ import { describe, expect, it, vi } from "vitest";
 import {
   measureElectronApplicationShutdown,
   parseApplicationShutdownReport,
-  productShutdownWithinBudget
+  productShutdownWithinBudget,
+  requireGracefulApplicationShutdown
 } from "./electron-shutdown-measurement.mjs";
 
 describe("Electron shutdown measurement", () => {
+  it("rejects forced, incomplete and unconfirmed Main shutdown even after all PIDs exit", () => {
+    const graceful = { budgetMs: 3_000, deadlineExceeded: false, durationMs: 800,
+      rendererCheckpointed: true, agentHostStopped: true, agentHostGraceful: true, agentHostForced: false };
+    const output = (report) => `Application shutdown: ${JSON.stringify({ ...report, private: "drop" })}`;
+    expect(requireGracefulApplicationShutdown(output(graceful))).toEqual(graceful);
+    for (const incomplete of [
+      { agentHostGraceful: false, agentHostForced: true }, { agentHostGraceful: undefined },
+      { agentHostForced: undefined }, { agentHostStopped: false },
+      { rendererCheckpointed: false }, { deadlineExceeded: true }
+    ]) {
+      expect(() => requireGracefulApplicationShutdown(output({ ...graceful, ...incomplete })))
+        .toThrow("did not confirm graceful shutdown");
+    }
+    expect(() => requireGracefulApplicationShutdown("private invalid output"))
+      .toThrow("did not confirm graceful shutdown: null");
+  });
+
   it("retains explicit graceful and forced outcomes without treating stop completion as graceful", () => {
     const report = { budgetMs: 3_000, deadlineExceeded: false, durationMs: 2_500,
       rendererCheckpointed: true, agentHostStopped: true, agentHostGraceful: false, agentHostForced: true };
