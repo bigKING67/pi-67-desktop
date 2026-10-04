@@ -14,7 +14,20 @@ it("accepts a detached recovery action only when the Session actually became rea
   const isReady = vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true);
   await clickRecoveryAction(action, isReady);
   expect(action.click).toHaveBeenCalledExactlyOnceWith({ timeout: 2_000 });
-  await expect(clickRecoveryAction(action, async () => false)).rejects.toBe(error);
+  await expect(clickRecoveryAction(action, async () => false, async () => false)).rejects.toBe(error);
+});
+
+it("defers a click timeout during observed bootstrap to the caller's readiness deadline", async () => {
+  const error = Object.assign(new Error("action detached during bootstrap"), { name: "TimeoutError" });
+  const action = { click: vi.fn().mockRejectedValue(error) };
+  const isReady = vi.fn().mockResolvedValue(false);
+  const isOpening = vi.fn().mockResolvedValue(true);
+  await clickRecoveryAction(action, isReady, isOpening);
+  expect(action.click).toHaveBeenCalledExactlyOnceWith({ timeout: 2_000 });
+  expect(isOpening).toHaveBeenCalledOnce();
+  expect(await isReady()).toBe(false); // Action completion does not certify readiness.
+  isOpening.mockResolvedValue(false);
+  await expect(clickRecoveryAction(action, isReady, isOpening)).rejects.toBe(error);
 });
 
 it("performs manual recovery and preserves non-timeout driver failures", async () => {
@@ -22,7 +35,7 @@ it("performs manual recovery and preserves non-timeout driver failures", async (
   const action = { click: vi.fn().mockResolvedValueOnce(undefined).mockRejectedValue(error) };
   await clickRecoveryAction(action, async () => false);
   await expect(clickRecoveryAction(action, async () => true)).resolves.toBeUndefined();
-  await expect(clickRecoveryAction(action, async () => false)).rejects.toBe(error);
+  await expect(clickRecoveryAction(action, async () => false, async () => true)).rejects.toBe(error);
   expect(action.click).toHaveBeenCalledTimes(2);
 });
 

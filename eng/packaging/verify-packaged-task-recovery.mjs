@@ -234,9 +234,10 @@ async function openWorkspace(app, conversationId) {
 async function reopenConversation(page, requireRecoveryNotice = false) {
   let clicked = false;
   const isReady = () => page.locator('[data-runtime-phase="ready"]').isVisible();
+  const isOpening = () => page.locator('[data-runtime-phase="starting"], [data-runtime-phase="recovering"]').isVisible();
   await waitUntil(async () => {
     const action = page.getByRole("button", { name: /^(打开对话|恢复任务)$/u });
-    if (!clicked && await action.isVisible()) { clicked = true; await clickRecoveryAction(action, isReady); }
+    if (!clicked && await action.isVisible()) { clicked = true; await clickRecoveryAction(action, isReady, isOpening); }
     return await isReady()
       && (!requireRecoveryNotice || await page.getByTestId("interrupted-task-notice").isVisible());
   }, 45_000, "Session ready after recovery");

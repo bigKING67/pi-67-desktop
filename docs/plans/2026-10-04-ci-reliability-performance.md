@@ -82,3 +82,23 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
   files / 12 tests passed after that strengthening.
 - Coverage probes intentionally ran only the routing file, so their repository
   coverage-floor failures are expected diagnostic output, not source-gate passes.
+
+## First exact-SHA CI and followup
+
+- `a087cb582e097c433d6123cb3f802c7eea8daa0b`, run `37204444462` attempt 1:
+  source 945 files / 6,250 tests passed; Renderer and macOS native passed.
+  Host configuration test 4.94 s (previous failed run 81.39 s). macOS packaging
+  53 s (previous 132 s); Windows packaging 62 s (previous 141 s).
+- Windows ordinary packaged smoke and agent-before-response passed. App-after-tool
+  failed during cold reopen: the recovery button detached during its 2 s click
+  budget while the screenshot still showed `starting`. The later finally-captured
+  protocol includes native `runtime.ready`, initialization ACK and recovery inspect.
+  Both process cleanup and canonical Session isolation passed. Installer and later
+  scenarios were skipped; the failed run is not overall acceptance or total-time proof.
+- The action helper previously tolerated a click timeout only after complete
+  readiness. The followup also defers an explicitly observed starting/recovering
+  state to the caller's unchanged 45 s readiness gate, without another click.
+  Missing/stuck readiness and other driver failures still fail. A comparison against
+  the committed helper reproduces the premature rejection; 15 focused tests pass.
+- Followup independent review and target-platform CI pending. No product behavior,
+  timeout budget, retry count or release packaging defaults changed.

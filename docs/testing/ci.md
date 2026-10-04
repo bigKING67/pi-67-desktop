@@ -78,6 +78,10 @@ PowerShell 时限；查询超时不能解释为进程已退出。启动后即保
 冷启动用崩溃前的精确侧栏 Session identity 打开原对话；不假定导航选中状态已在
 强制退出前落盘。该场景明确经过工作区首页，验证从侧栏续接；身份含分隔字符，
 必须按属性值完整比较，不能拼入 CSS selector。失败取证使用本次启动的新窗口。
+恢复按钮可能在自动 bootstrap 过程中被替换；2 秒点击超时后仅当 Runtime 已就绪，或
+明确处于 starting/recovering 时继续观察，不重复点击。后者仍须在原有 45 秒上限内达到
+ready 并通过原 Session/工具结果验收；按钮超时且没有打开中的状态、驱动错误和持续不就绪
+均失败，不能把 bootstrap 进行中当作恢复成功。
 
 ## Configuration and command ownership
 

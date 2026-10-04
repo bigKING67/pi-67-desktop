@@ -12,12 +12,14 @@ export function selectRecoveryScenario(argv) {
   return args[0];
 }
 
-export async function clickRecoveryAction(action, isReady) {
+export async function clickRecoveryAction(action, isReady, isOpening) {
   if (await isReady()) return;
   try { await action.click({ timeout: 2_000 }); }
   catch (error) {
-    // Automatic reopen can finish and remove this action during Playwright's click.
-    if (error.name !== "TimeoutError" || !await isReady()) throw error;
+    // Automatic reopen can replace the action before its runtime is ready.
+    // The caller still owns the original 45 s readiness deadline and does not
+    // click again. A pending bootstrap is not a successful recovery receipt.
+    if (error.name !== "TimeoutError" || (!await isReady() && !await isOpening())) throw error;
   }
 }
 
