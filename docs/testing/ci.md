@@ -63,6 +63,9 @@ Renderer CI 使用预构建资源、2 workers、0 retries；Electron CI 使用 1
 真实 Provider 或外部副作用的 exactly-once 认证。Windows 进程身份使用精确 PID 的
 CIM 创建时间与可执行文件路径；查询失败、身份变化或无法确认退出时保留夹具并失败，
 不按应用名结束进程。回执包含平台、架构、源码 HEAD/dirty 状态与 CI run/attempt。
+Windows 查询先在启动 Electron 前预检，使用与现有安装器探针一致的 15 秒有界
+PowerShell 时限；查询超时不能解释为进程已退出。启动后即保留自有应用句柄，
+身份查询失败仍尝试正常关闭；清理异常必须保留原始失败和最终回执。
 普通 CI 的两平台 native job 和 Windows candidate 的 build job 在常规 packaged smoke
 后各执行三个独立步骤，并始终上传隔离验收证据。新增入口和本机通过不代表 Windows
 已通过，必须读取该平台精确构建的实际回执。

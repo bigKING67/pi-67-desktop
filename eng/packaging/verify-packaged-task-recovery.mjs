@@ -43,6 +43,9 @@ const journal = [];
 const mark = value => { stage = value; journal.push({ stage, at: new Date().toISOString() }); console.log(`Recovery ${scenario}: ${stage}`); };
 
 try {
+  mark("process-query-preflight");
+  assert(await readRecoveryProcess(process.ppid), "The runner parent process must be observable before launching Electron.");
+  mark("launch");
   application = await launch();
   window = await openWorkspace(application);
   const picker = window.getByRole("button", { name: "Pi 模型", exact: true });
@@ -131,7 +134,7 @@ try {
     if (entry.kind !== "loaded") continue;
     try {
       const observed = await readRecoveryProcess(entry.pid);
-      if (observed && tracked.has(observed.parentPid)
+      if (observed && tracked.get(observed.parentPid)
         && await processIdentity(observed.parentPid) === tracked.get(observed.parentPid)) {
         if (!tracked.has(entry.pid)) tracked.set(entry.pid, observed.identity);
       }
@@ -153,11 +156,15 @@ try {
   const canonicalAfter = await snapshotDirectoryMetadata(canonicalRoot);
   const canonicalUnchanged = JSON.stringify(canonicalBefore) === JSON.stringify(canonicalAfter) && (canonicalWatch?.observations.length ?? 0) === 0;
   if (!canonicalUnchanged) failure ??= new Error("Canonical Session root changed; isolation acceptance is inconclusive.");
-  if (allExited) { await cleanupPackagedTestDirectories(directories.userDataDirectory); cleanupPassed = true; }
+  let cleanupError;
+  if (allExited) {
+    try { await cleanupPackagedTestDirectories(directories.userDataDirectory); cleanupPassed = true; }
+    catch (error) { cleanupError = error.message; failure ??= error; }
+  }
   else failure ??= new Error("Owned test processes remain; isolated profile retained.");
   await writeFile(join(evidence, "receipt.json"), JSON.stringify({ ...receipt,
     status: failure ? "FAIL" : "PASS", scenario, stage, ...provenance, artifactSha256, artifactSize: asar.length, canonicalUnchanged, cleanupPassed,
-    ownedPids: [...tracked.keys()], journal, ...(failure ? { error: failure.message } : {}) }, null, 2) + "\n");
+    ownedPids: [...tracked.keys()], journal, ...(cleanupError ? { cleanupError } : {}), ...(failure ? { error: failure.message } : {}) }, null, 2) + "\n");
 }
 console.log(`Recovery receipt: ${evidence}/receipt.json`);
 if (failure) throw failure;
@@ -166,9 +173,9 @@ async function launch() {
   const app = await launchPackagedApplication({ agentDir: directories.agentDir, artifact, userDataDirectory: directories.userDataDirectory,
     environment: { HOME: directories.userDataDirectory, USERPROFILE: directories.userDataDirectory },
     hideNativeWindow: true, isolateNativeWindow: true, offline: true });
+  application = app; // Retain the owned driver even if the first identity read fails.
   await track(app.process().pid);
-  try { assert.equal(await realpath(await app.evaluate(({ app: main }) => main.getPath("userData"))), directories.userDataDirectory); }
-  catch (error) { await closeFixtureApplication(app); throw error; }
+  assert.equal(await realpath(await app.evaluate(({ app: main }) => main.getPath("userData"))), directories.userDataDirectory);
   return app;
 }
 async function openWorkspace(app, conversationId) {
@@ -237,7 +244,13 @@ async function closeFixtureApplication(app) {
     // The caller performs checked termination after this bounded close attempt.
     terminateProcess: () => { throw new Error("Recovery cleanup requires a fresh process identity check."); } });
 }
-async function track(pid) { const identity = await processIdentity(pid); if (identity && !tracked.has(pid)) tracked.set(pid, identity); }
+async function track(pid) {
+  if (tracked.has(pid)) return;
+  tracked.set(pid, undefined); // Unknown identity must not be mistaken for an empty, fully exited process set.
+  const identity = await processIdentity(pid);
+  assert(identity, "Owned process exited before identity capture.");
+  tracked.set(pid, identity);
+}
 async function waitUntil(predicate, timeoutMs, label) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) { if (await predicate()) return; await new Promise(resolve => setTimeout(resolve, 100)); }

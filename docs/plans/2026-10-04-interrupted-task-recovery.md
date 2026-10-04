@@ -221,3 +221,32 @@ unchanged production just to validate a test harness.
   `artifacts/validation/pi-durable-compat/auto-recovery-delivery-scope.json`.
   Windows execution, paid-provider recovery and distribution remain unverified.
   Commit/push still await explicit authorization; no remote write was performed.
+
+### Authorized CI follow-up
+
+- The user explicitly authorized the reviewed 106-file scoped commit, push to
+  main and CI acceptance. Commit `abc165859c591dc6908829ece6d35285d905a1de`
+  matches every approved file hash; CI run `37186301728`, attempt 1 completed.
+- Source quality and macOS native jobs passed. All three downloaded macOS
+  recovery receipts bind that clean SHA and the unchanged `ea822e67...` ASAR.
+- Renderer E2E had 11 failures / 283 passes / 1 skip. Every failure counted the
+  new read-only `session.recovery.inspect` as a scenario action. Add it to the
+  existing setup/read query filter; retain `session.recovery.continue` and all
+  turn-producing commands, verified by a dedicated regression. The affected
+  18 browser cases pass locally after this fixture-only correction.
+- Windows general packaged smoke passed, but recovery stopped during launch:
+  the first CIM identity query failed, then an occupied DIPS file caused cleanup
+  to throw before receipt output. No synthetic task had started. Failure text
+  and observations remain in `ci-37186301728/Windows/`; the missing receipt is
+  a harness defect, not a passed scenario. The exact initial query cause was not
+  preserved; timeout is a hypothesis, not a confirmed diagnosis.
+- Correct the harness to retain the owned application immediately, track unknown
+  identities as unknown, preserve original failure and cleanup error in receipts,
+  and preflight process lookup before launching. Align the bounded Windows query
+  timeout with the existing 15-second installer probes and retain timeout/code/
+  signal diagnostics. Local process tests, lint, structure and the macOS Agent
+  crash regression pass; actual Windows proof still requires the follow-up CI.
+- Final local Renderer suite passed 294 cases / 1 existing skip, with 2 workers
+  and zero retries. Test TypeScript checking passed. The follow-up modifies only
+  test fixtures, owned-process acceptance code and these evidence contracts;
+  production behavior and the already-tested packaged ASAR remain unchanged.

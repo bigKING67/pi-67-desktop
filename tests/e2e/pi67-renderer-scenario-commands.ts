@@ -8,7 +8,8 @@ const WORKBENCH_SETUP_OR_READ_COMMANDS = new Set([
   "workspace.file.list",
   "command.list",
   "enterprise.identity.get",
-  "session.catalog.query"
+  "session.catalog.query",
+  "session.recovery.inspect"
 ]);
 
 export async function scenarioCommands(

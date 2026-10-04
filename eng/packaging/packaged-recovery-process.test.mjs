@@ -16,7 +16,7 @@ describe("packaged recovery process ownership", () => {
     expect(command).toBe("powershell.exe");
     expect(args).toEqual(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", expect.stringContaining(`-Filter 'ProcessId = ${pid}'`)]);
     expect(args.at(-1)).not.toMatch(/CommandLine|Stop-Process|taskkill/u);
-    expect(options).toMatchObject({ timeout: 5000, windowsHide: true });
+    expect(options).toMatchObject({ timeout: 15000, windowsHide: true });
   });
 
   it.each([null, { ...win, pid: 7 }, { ...win, startedAt: "" }, { ...win, executablePath: "" }, { ...win, parentPid: -1 }])(
@@ -30,6 +30,14 @@ describe("packaged recovery process ownership", () => {
     const execute = vi.fn().mockResolvedValueOnce({ stdout: "\r\n" }).mockRejectedValueOnce(new Error("CIM lookup failed"));
     expect(await readRecoveryProcess(pid, { platform: "win32", execute })).toBeUndefined();
     await expect(readRecoveryProcess(pid, { platform: "win32", execute })).rejects.toThrow("CIM lookup failed");
+  });
+
+  it("retains bounded Windows query timeout evidence without treating it as process exit", async () => {
+    const cause = Object.assign(new Error("Command failed"), { killed: true, signal: "SIGTERM", stderr: "" });
+    const execute = vi.fn().mockRejectedValue(cause);
+    await expect(readRecoveryProcess(pid, { platform: "win32", execute })).rejects.toMatchObject({
+      message: "Windows recovery process query failed (timed out after 15000 ms): Command failed", cause
+    });
   });
 
   it.each([0, -1, 1.5, process.pid, "12; Stop-Process -Name test"])("rejects invalid/self PID %s before execution", async value => {

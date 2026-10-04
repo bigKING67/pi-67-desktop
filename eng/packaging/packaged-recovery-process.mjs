@@ -6,7 +6,7 @@ const executeFile = promisify(execFile);
 /** Identity is kept in memory only; never select processes by application name. */
 export async function readRecoveryProcess(pid, { platform = process.platform, execute = executeFile } = {}) {
   if (!Number.isSafeInteger(pid) || pid <= 0 || pid === process.pid) throw new Error("Invalid recovery process PID.");
-  const options = { timeout: 5000, maxBuffer: 64 * 1024, windowsHide: true };
+  const options = { timeout: platform === "win32" ? 15000 : 5000, maxBuffer: 64 * 1024, windowsHide: true };
   if (platform === "darwin") {
     try {
       const { stdout } = await execute("/bin/ps", ["-p", String(pid), "-o", "ppid=,lstart=,comm="], options);
@@ -26,7 +26,13 @@ export async function readRecoveryProcess(pid, { platform = process.platform, ex
     `$p = Get-CimInstance -ClassName Win32_Process -Filter 'ProcessId = ${pid}'`,
     "if ($null -ne $p) { [PSCustomObject]@{ pid = [int]$p.ProcessId; parentPid = [int]$p.ParentProcessId; startedAt = $p.CreationDate.ToUniversalTime().Ticks.ToString(); executablePath = [string]$p.ExecutablePath } | ConvertTo-Json -Compress }"
   ].join("; ");
-  const { stdout } = await execute("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], options);
+  let stdout;
+  try {
+    ({ stdout } = await execute("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], options));
+  } catch (error) {
+    const reason = error.killed ? `timed out after ${options.timeout} ms` : `code=${error.code ?? "unknown"}, signal=${error.signal ?? "none"}`;
+    throw new Error(`Windows recovery process query failed (${reason}): ${(error.stderr || error.message).trim().slice(0, 1200)}`, { cause: error });
+  }
   if (!stdout.trim()) return undefined;
   const value = JSON.parse(stdout);
   if (value?.pid !== pid || !Number.isSafeInteger(value.parentPid) || value.parentPid < 0
