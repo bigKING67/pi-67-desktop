@@ -1695,6 +1695,10 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   Only a confirmed graceful, non-forced Host exit and a successful Renderer
   checkpoint permit a clean-exit marker and clearing Workbench task-recovery
   records. Forced or unconfirmed exits retain those records for the next launch.
+  Before aborting for application quit, Runtime stops starting disposable Session
+  index, pending-configuration and automatic-title refreshes. Already-started work
+  is still awaited; ordinary user stop retains its normal refresh behavior. Pi
+  Session shutdown, JSONL ownership and durable Operation receipts remain required.
 - Synchronous runtime, workspace, Session, model, thinking, and resource mutations
   use stable idempotency keys and a bounded same-key transport retry. Lost responses
   cannot duplicate Session creation or replay a control mutation into a newer Session

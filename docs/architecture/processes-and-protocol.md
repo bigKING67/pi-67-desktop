@@ -1935,7 +1935,10 @@ transfer 前消失的窗口。该期限只约束 owner transfer，不限制 capa
    supervisor 同时拒绝新操作，对所有 active worker 执行 graceful tree termination，再在有界 grace 后执行
    forced tree termination，并等待 root exit。POSIX worker 以 detached process group 启动；Windows 使用
    `taskkill /PID <pid> /T` 与 `/F` 的两阶段 tree cleanup。只有观察到退出才算该 worker 已清理。
-4. Runtime 以 `runtime-dispose` 取消 Extension/Approval 请求；Operation Registry 使用关闭专用语义尝试
+4. Host 在 abort 前调用已加载 Runtime 的幂等 `beginShutdown()`，停止新建 Prompt 收尾的可重建
+   Session Catalog、待应用配置刷新和自动标题；已开始的刷新仍被等待，每个 await 后重新检查关闭
+   状态，不能继续启动下一项。直接 `dispose()` 同样先设置该状态；普通用户 abort 不设置此状态。
+   Runtime 以 `runtime-dispose` 取消 Extension/Approval 请求；Operation Registry 使用关闭专用语义尝试
    abort active Operation。成功产生一次 `operation.cancelled`，不可取消、abort failure 或 abort timeout 产生
    一次 `operation.lost`，但不触发 poisoned-runtime restart。
 5. Runtime dispose 保留 Pi `session_shutdown(reason="quit")` 与 JSONL 所有权；Desktop 不自行写 Session 文件。

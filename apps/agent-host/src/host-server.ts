@@ -349,19 +349,17 @@ export class AgentHostServer {
       queuedCommandsDropped += state.scheduler?.shutdown().queuedCommandsDropped ?? 0;
     }
     let extensionRequestsCancelled = 0;
-    for (const record of this.taskRuntimes.values()) {
+    for (const runtime of connectionCloseRuntimes) {
       try {
-        extensionRequestsCancelled += record.runtime
-          ?.cancelInteractiveRequests("runtime-dispose").length ?? 0;
+        runtime.beginShutdown?.();
       } catch (error) {
         rememberError(error);
       }
-    }
-    try {
-      extensionRequestsCancelled += this.compatibilityRuntime
-        ?.cancelInteractiveRequests("runtime-dispose").length ?? 0;
-    } catch (error) {
-      rememberError(error);
+      try {
+        extensionRequestsCancelled += runtime.cancelInteractiveRequests("runtime-dispose").length;
+      } catch (error) {
+        rememberError(error);
+      }
     }
     const operationResults = await observeShutdownPhase("host-operations", () => Promise.all(this.tasks.values().map(async (state) => (
       state.operations?.shutdown(

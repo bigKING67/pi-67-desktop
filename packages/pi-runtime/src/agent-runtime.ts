@@ -80,6 +80,8 @@ export interface AgentRuntime {
     options: RuntimeInitializeOptions,
     observeStage?: RuntimeInitializationObserver
   ): Promise<SessionSnapshot>;
+  /** Stop starting disposable projections; dispose still owns durable cleanup. */
+  beginShutdown?(): void;
   dispose(): Promise<void>;
   subscribe(listener: (event: AgentEvent) => void): () => void;
   subscribeOperationActivity?(listener: (activity: RuntimeOperationActivity) => void): () => void;

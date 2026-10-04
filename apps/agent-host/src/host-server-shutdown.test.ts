@@ -46,6 +46,7 @@ describe("AgentHostServer shutdown", () => {
     const abort = vi.fn(async () => {
       order.push("operation.abort");
     });
+    const beginShutdown = vi.fn(() => order.push("runtime.beginShutdown"));
     const dispose = vi.fn(() => new Promise<void>((resolve) => {
       order.push("runtime.dispose");
       finishDispose = resolve;
@@ -66,6 +67,7 @@ describe("AgentHostServer shutdown", () => {
         new Promise<void>((resolve) => signal?.addEventListener("abort", () => resolve(), { once: true }))
       ),
       abort,
+      beginShutdown,
       flushStream,
       cancelInteractiveRequests,
       dispose
@@ -114,6 +116,7 @@ describe("AgentHostServer shutdown", () => {
     });
     expect(order).toEqual([
       "package-worker.shutdown:250",
+      "runtime.beginShutdown",
       "interactive.cancel:runtime-dispose",
       "operation.abort",
       "stream.flush",
@@ -121,6 +124,7 @@ describe("AgentHostServer shutdown", () => {
       "interactive.cancel:connection-close"
     ]);
     expect(abort).toHaveBeenCalledOnce();
+    expect(beginShutdown).toHaveBeenCalledOnce();
     expect(dispose).toHaveBeenCalledOnce();
     expect(packageWorker.shutdown).toHaveBeenCalledOnce();
     expect(port.close).toHaveBeenCalledOnce();

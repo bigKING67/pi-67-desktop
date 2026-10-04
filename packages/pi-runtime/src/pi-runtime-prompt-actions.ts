@@ -19,7 +19,10 @@ interface PiRuntimePromptActionsOptions {
 }
 
 export class PiRuntimePromptActions {
+  private shuttingDown = false;
   constructor(private readonly options: PiRuntimePromptActionsOptions) {}
+
+  beginShutdown(): void { this.shuttingDown = true; }
 
   async submit(
     text: string,
@@ -46,10 +49,9 @@ export class PiRuntimePromptActions {
           timing ? () => timing.mark("sdkPromptInvokedMs") : undefined);
         completed = true;
       } finally {
-        await observeShutdownPhase("operation-prompt-catalog", () => this.options.sessionCatalog.upsertCurrent("session-updated"));
-        await observeShutdownPhase("operation-prompt-configuration", () => this.options.configurationReload.apply());
+        await this.refreshAfterPrompt();
       }
-      if (completed) this.options.generateSemanticTitle();
+      if (completed && !this.shuttingDown) this.options.generateSemanticTitle();
       outcome = "resolved";
     } finally {
       unsubscribe?.();
@@ -91,8 +93,7 @@ export class PiRuntimePromptActions {
     } finally {
       signal?.removeEventListener("abort", abort);
       await aborting;
-      await this.options.sessionCatalog.upsertCurrent("session-updated");
-      await this.options.configurationReload.apply();
+      await this.refreshAfterPrompt();
     }
   }
 
@@ -122,8 +123,14 @@ export class PiRuntimePromptActions {
     try {
       await session.prompt(normalized, session.isStreaming ? { streamingBehavior: "followUp" } : {});
     } finally {
-      await this.options.sessionCatalog.upsertCurrent("session-updated");
-      await this.options.configurationReload.apply();
+      await this.refreshAfterPrompt();
     }
+  }
+
+  private async refreshAfterPrompt(): Promise<void> {
+    if (this.shuttingDown) return;
+    await observeShutdownPhase("operation-prompt-catalog", () => this.options.sessionCatalog.upsertCurrent("session-updated"));
+    if (this.shuttingDown) return;
+    await observeShutdownPhase("operation-prompt-configuration", () => this.options.configurationReload.apply());
   }
 }

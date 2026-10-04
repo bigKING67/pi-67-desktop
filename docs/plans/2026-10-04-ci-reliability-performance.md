@@ -340,3 +340,40 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
   checks passed. Independent review found no blocking issue, no native Show call
   or recursive show path in the pinned Electron implementation. Native timing and
   complete platform validation remain pending for this fixture change.
+- Experiment `053b0b774645321aa3f207d8e39c9b4be6aec672`, run `37218617596` /
+  attempt 1 did not support the performance hypothesis: Windows hidden smoke still
+  took 182 s and failed. Revert the fixture, its experimental assertions and CI
+  contract text to their previously validated `555c953d` contents. Preserve this
+  negative result; await the failure trace before attributing the runtime failure.
+  Source (947 files / 6,288 tests, 24 optional skips), Renderer and macOS native
+  passed, as did all six recovery receipts with source identity, Profile isolation,
+  cleanup and zero real model requests. Full dual-Profile Windows installer lifecycle
+  also passed. The overall run correctly failed its strict graceful-shutdown gate.
+
+## Followup: quiesce disposable prompt refreshes before shutdown
+
+- The new trace narrows the failure: `operation-prompt-catalog` completed in 933 ms;
+  the receipt completed in 953 ms (lock acquisition 758 ms, file sync 186 ms).
+  `host-operations` completed at 1,893 ms, then `runtime-session` started but did
+  not finish before forced Host termination (Main 2,501 ms; Host 2,331 ms).
+  This sample does not show a stuck receipt or establish the cause of lock delay.
+- The prompt finally path unconditionally started disposable Session Catalog and
+  configuration refreshes during quit, before necessary Session disposal. Add an
+  explicit synchronous Runtime `beginShutdown()` hook before Host operation abort;
+  direct disposal sets the same state. Suppress new post-prompt catalog/config/title
+  work only in this state, including interrupted-task continuation and commands.
+  Recheck after each await; never detach already-started work. Ordinary user abort
+  keeps its refreshes. The optional port hook preserves the old full cleanup path
+  for lightweight runtime test doubles; the production Pi SDK Runtime implements it.
+- Preserve the order of Operation cancellation, terminal receipt durability, Pi
+  Session disposal and writer-lease release, with unchanged Main/product budgets.
+  Do not change receipt locks, retry policy or fsync based on the 758 ms observation.
+- Independent direction review supports removing observed discretionary work but
+  requires race regressions and a new real Windows graceful result. It does not
+  establish that every possible Session shutdown stall is fixed.
+- Local validation: 7 focused files / 24 tests passed, including active Pi command
+  child cleanup and valid JSONL recovery. Pi Runtime/Host typechecks and structure
+  passed; complete `check:source` passed (950 files / 6,314 tests, 24 optional skips,
+  branches 78.78%). Local counts include the protected native-image WIP; exact-SHA
+  CI remains the authority for the scoped commit. Independent final diff review
+  found no blocker and verified the failed fixture experiment was fully reverted.

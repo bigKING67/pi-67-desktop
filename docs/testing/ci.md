@@ -59,11 +59,6 @@ Windows CI 仅在三项任务恢复步骤显式启用该模式，回执记录 `w
 packaged smoke 保持隐藏窗口，继续覆盖已观测到的隐藏状态关闭失败。两轮同包
 隐藏→可见→隐藏对照已结束，重复步骤移除。切换恢复夹具不删除断言、提高超时或
 增加重试；该步骤的实际节时仍以目标 Windows 的新回执和计时为准。
-隐藏窗口夹具在每次 hide 前临时恢复节流，hide 后再关闭节流；这保留真实原生隐藏，
-并让 Electron 对已隐藏的 widget 执行 hidden-but-painting 转换。后续 show 事件重复同一
-顺序，已销毁窗口不再调用 API。依据是当前锁定版本
-[Electron 43.7.3 的实现](https://github.com/electron/electron/blob/v43.7.3/shell/browser/api/electron_api_web_contents.cc#L2555)。
-调用顺序回归仅证明夹具遵守该 API 合同，实际节时仍须用 Windows 阶段计时验证。
 普通 packaged smoke 还必须从 Main 的完整报告确认 Renderer checkpoint 和 Host graceful
 shutdown：强制终止、超期、缺失报告或缺失 graceful/forced 字段均失败，不能仅凭 PID
 退出和 Pi callback 记录报告关闭成功。既有 3 秒 Main、5 秒产品退出预算不变。

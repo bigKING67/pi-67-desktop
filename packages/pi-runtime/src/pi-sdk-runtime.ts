@@ -247,8 +247,12 @@ export class PiSdkRuntime implements AgentRuntime {
     if (options.sessionPath) this.conversationActions.scheduleSemanticTitle();
     return snapshot;
   }
-  async dispose(): Promise<void> {
+  beginShutdown(): void {
+    this.promptActions.beginShutdown();
     this.conversationActions.cancelSemanticTitle();
+  }
+  async dispose(): Promise<void> {
+    this.beginShutdown();
     this.streamBatcher.drop();
     this.uiBridge.cancelAll("runtime-dispose");
     await observeShutdownPhase("runtime-subagents", () => this.subagents.dispose());
@@ -271,9 +275,7 @@ export class PiSdkRuntime implements AgentRuntime {
   }
   getTaskToolMode(): TaskToolMode { return this.toolSafety.getTaskToolMode(); }
   setTaskToolMode(mode: TaskToolMode): TaskToolMode { return this.toolSafety.setTaskToolMode(mode); }
-  async requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState> {
-    return this.configurationReload.request(revision);
-  }
+  async requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState> { return this.configurationReload.request(revision); }
   async requestModelCatalogReload(): Promise<PiConfigurationReloadState> { return this.configurationReload.requestModelCatalog(); }
   listSubagents(): NativeSubagentView[] { return this.subagents.list(); }
   getSubagentStatus(id: string): NativeSubagentView { return this.subagents.status(id); }
@@ -408,9 +410,7 @@ export class PiSdkRuntime implements AgentRuntime {
   async inspectPrivateMemory(sessionId: string) { return this.sessionBindings.inspectPrivateMemory(sessionId); }
   getCommands(): SlashCommandCatalogResult { return this.projections.getCommands(); }
   getExtensionCatalog(): ExtensionCatalogResult { return this.projections.getCatalog(); }
-  getWorkspaceChanges() {
-    return this.projections.getWorkspaceChanges(this.sessionBindings.requireSession());
-  }
+  getWorkspaceChanges() { return this.projections.getWorkspaceChanges(this.sessionBindings.requireSession()); }
 
   resolveExtensionUi(requestId: string, value?: string | boolean, cancelled?: boolean): boolean { return this.uiBridge.resolve(requestId, value, cancelled); }
   resolveApproval(
