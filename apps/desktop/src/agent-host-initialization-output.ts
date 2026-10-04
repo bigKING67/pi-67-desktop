@@ -24,6 +24,8 @@ const INITIALIZATION_OUTCOMES = new Set(["started", "completed", "failed"]);
 const SHUTDOWN_STAGES = new Set([
   "host-operations", "host-task-runtimes", "host-compatibility-runtime",
   "host-writer-leases", "host-requests", "host-workspaces", "host-credentials", "host-attachments",
+  "operation-abort", "operation-execution", "operation-queues", "operation-receipt",
+  "operation-prompt-catalog", "operation-prompt-configuration",
   "runtime-subagents", "runtime-configuration", "runtime-session", "runtime-catalog"
 ]);
 const PROMPT_ACK_STAGES = new Set([

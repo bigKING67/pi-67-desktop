@@ -94,6 +94,24 @@ browser runtime acceptance uses browser67 when needed.
   limits; the final smoke capture/report additions passed scoped lint and the
   structure gate. No shutdown ordering, deadline or lifecycle assertion changed.
   Windows root cause remains unconfirmed pending the instrumented exact-SHA run.
+- Instrumented Windows reproduction: `a8644143`, CI `37198206376` attempt 1,
+  ordinary packaged smoke failed the unchanged quit-hook assertion (0 entries).
+  Actual Main/all tracked processes exited in 3189.7ms. Main recorded renderer
+  checkpoint timeout at 750.4ms and forced Host stop at 1749.8ms. Host requests
+  finished in 1ms; `host-operations` started and never settled before termination;
+  no Runtime disposal stage was reached. This establishes the blocked Operation
+  boundary, not which awaited sub-operation caused it. Add fixed abort/execution/
+  queued-work/receipt and Prompt catalog/configuration sub-stages before changing
+  behavior. Local macOS exact-SHA preview passed (graceful Host, 592.9ms product
+  exit); remote macOS native, ordinary smoke and all three recovery cases passed.
+- Sub-stage instrumentation passed 7 files / 52 tests, three affected package
+  typechecks and scoped lint/structure. A targeted queue-completion regression
+  caught an extra microtask in the disabled observation wrapper; an added
+  promise-identity test failed before the correction, then both passed with the
+  capture-off path returning the original Promise directly. Capture remains
+  test-only and this correction is not claimed as the historical Windows cause.
+  The instrumented parent CI completed: quality, renderer and macOS passed;
+  Windows and CI Gate failed at the preserved ordinary quit-hook assertion.
 
 - Final acceptance: clean `cff4d410d99a6dec5f6a93c28609ebb3b91d3b59`, CI
   `37194297858` attempt 2 and CI Gate passed. Source: 944 files / 6230 tests

@@ -2,12 +2,14 @@ type ShutdownPhase =
   | "host-operations" | "host-task-runtimes" | "host-compatibility-runtime"
   | "host-writer-leases" | "host-requests" | "host-workspaces"
   | "host-credentials" | "host-attachments"
+  | "operation-abort" | "operation-execution" | "operation-queues" | "operation-receipt"
+  | "operation-prompt-catalog" | "operation-prompt-configuration"
   | "runtime-subagents" | "runtime-configuration" | "runtime-session" | "runtime-catalog";
 
 let nextSequence = 0;
 
 /** Isolated test capture only; a started phase alone never certifies completion. */
-export async function observeShutdownPhase<T>(phase: ShutdownPhase, operation: () => Promise<T>): Promise<T> {
+export function observeShutdownPhase<T>(phase: ShutdownPhase, operation: () => Promise<T>): Promise<T> {
   if (process.env.NODE_ENV !== "test" || process.env.PI67_TEST_CAPTURE_SHUTDOWN !== "1"
     || nextSequence >= 64) return operation();
   const sequence = ++nextSequence;
@@ -21,12 +23,14 @@ export async function observeShutdownPhase<T>(phase: ShutdownPhase, operation: (
     }
   };
   emit("started");
-  try {
-    const result = await operation();
-    emit("completed");
-    return result;
-  } catch (error) {
-    emit("failed");
-    throw error;
-  }
+  return (async () => {
+    try {
+      const result = await operation();
+      emit("completed");
+      return result;
+    } catch (error) {
+      emit("failed");
+      throw error;
+    }
+  })();
 }

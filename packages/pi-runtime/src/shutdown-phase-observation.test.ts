@@ -34,6 +34,13 @@ describe("shutdown phase observations", () => {
     expect(JSON.stringify(records())).not.toContain("private");
   });
 
+  it("returns the original promise when capture is off, preserving completion scheduling", async () => {
+    vi.stubEnv("PI67_TEST_CAPTURE_SHUTDOWN", "");
+    const { observeShutdownPhase } = await import("./shutdown-phase-observation.js");
+    const operation = Promise.resolve("done");
+    expect(observeShutdownPhase("operation-receipt", () => operation)).toBe(operation);
+  });
+
   it("preserves the original error while projecting only a failed outcome", async () => {
     const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const { observeShutdownPhase } = await import("./shutdown-phase-observation.js");

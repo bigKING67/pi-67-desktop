@@ -1,4 +1,5 @@
 import type { OperationView, RuntimeIdentity } from "@pi67/domain";
+import { observeShutdownPhase } from "@pi67/pi-runtime";
 import type { AgentEvent, OperationSubmissionResult } from "@pi67/protocol";
 import { assertCurrentOperationAuthority } from "./operation-authority.js";
 import { acceptedOperation } from "./operation-registry-authority.js";
@@ -51,9 +52,9 @@ export class OperationExecutionRunner {
 
   async stop(operation: ActiveOperation): Promise<void> {
     operation.queueAbortController?.abort();
-    await operation.abort?.();
+    await observeShutdownPhase("operation-abort", () => operation.abort?.() ?? Promise.resolve());
     operation.abortController.abort();
-    await operation.executionPromise;
+    await observeShutdownPhase("operation-execution", () => operation.executionPromise ?? Promise.resolve());
   }
 
   async start(

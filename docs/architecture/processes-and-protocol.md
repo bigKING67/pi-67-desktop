@@ -1952,6 +1952,8 @@ Main-owned finalization 延长外部门槛；阶段报告只包含预算、耗�
 Main 报告分别保留 Supervisor 返回的 graceful/forced；stop Promise 返回不等于 graceful。
 隔离测试仅在 `NODE_ENV=test` 且 `PI67_TEST_CAPTURE_SHUTDOWN=1` 时捕获 Host/Runtime 固定
 关闭阶段的 started/completed/failed、序号和耗时；每个 Host 最多 64 个阶段、128 条记录。
+Operation 子阶段区分 Pi abort、执行结算、排队收尾和 receipt 持久化；Prompt 结算另区分
+可重建 Catalog 更新和待执行配置刷新。这些诊断不改变原有等待链或关闭期限。
 Main 按阶段白名单和有界数值重新投影 stderr，不转发其他字段。started 而无结算记录只证明
 该边界尚未完成，不能单独作为内部根因。普通 packaged smoke 用 Electron Main 实际 PID
 测量退出，不以 Windows Playwright 启动包装进程代替 Main。

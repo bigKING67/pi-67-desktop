@@ -2,6 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 import { AgentHostInitializationOutputForwarder } from "./agent-host-initialization-output.js";
 
 describe("AgentHostInitializationOutputForwarder", () => {
+  it.each(["operation-abort", "operation-execution", "operation-queues", "operation-receipt",
+    "operation-prompt-catalog", "operation-prompt-configuration"])("forwards bounded Operation phase %s", (stage) => {
+    const emit = vi.fn<(line: string) => void>();
+    const forwarder = new AgentHostInitializationOutputForwarder(emit);
+    const record = `[agent-host:shutdown] ${JSON.stringify({ sequence: 1, stage, outcome: "completed", durationMs: 20 })}`;
+    forwarder.write(`${record}\n`);
+    expect(emit).toHaveBeenCalledWith(record);
+  });
+
   it("projects split shutdown stages without private fields and rejects invalid or excessive records", () => {
     const emit = vi.fn<(line: string) => void>();
     const forwarder = new AgentHostInitializationOutputForwarder(emit);

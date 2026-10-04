@@ -6,6 +6,7 @@ import type { createRuntimeSessionCatalog } from "./runtime-session-catalog.js";
 import { clearSessionQueue } from "./session-queue.js";
 import type { RuntimeResponseTimings } from "./runtime-response-timing.js";
 import { continueInterruptedTask, inspectInterruptedTask } from "./interrupted-task-recovery.js";
+import { observeShutdownPhase } from "./shutdown-phase-observation.js";
 
 interface PiRuntimePromptActionsOptions {
   responseTimings?: RuntimeResponseTimings;
@@ -45,8 +46,8 @@ export class PiRuntimePromptActions {
           timing ? () => timing.mark("sdkPromptInvokedMs") : undefined);
         completed = true;
       } finally {
-        await this.options.sessionCatalog.upsertCurrent("session-updated");
-        await this.options.configurationReload.apply();
+        await observeShutdownPhase("operation-prompt-catalog", () => this.options.sessionCatalog.upsertCurrent("session-updated"));
+        await observeShutdownPhase("operation-prompt-configuration", () => this.options.configurationReload.apply());
       }
       if (completed) this.options.generateSemanticTitle();
       outcome = "resolved";

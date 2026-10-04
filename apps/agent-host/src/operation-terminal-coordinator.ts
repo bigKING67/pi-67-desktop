@@ -1,4 +1,5 @@
 import type { OperationView, RuntimeIdentity } from "@pi67/domain";
+import { observeShutdownPhase } from "@pi67/pi-runtime";
 import type { AgentEvent, OperationSettled, OperationSubmissionResult, ProtocolError } from "@pi67/protocol";
 import type { OperationActivityController } from "./operation-activity-controller.js";
 import type { OperationHeartbeatController } from "./operation-heartbeat-controller.js";
@@ -58,15 +59,15 @@ export class OperationTerminalCoordinator {
     operation: ActiveOperation,
     details: OperationTerminalDetails
   ): Promise<boolean> {
-    await Promise.allSettled(operation.pendingQueues);
+    await observeShutdownPhase("operation-queues", () => Promise.allSettled(operation.pendingQueues));
     this.options.heartbeat.stop(operation.view.operationId);
     this.prepare(operation);
     this.options.toolExecutions.settle(operation, details.lifecycle, details.settledAt);
-    const terminal = await this.options.withDurability(() => this.options.results.settle(
+    const terminal = await observeShutdownPhase("operation-receipt", () => this.options.withDurability(() => this.options.results.settle(
       operation.view,
       this.options.getIdentity(),
       details
-    ));
+    )));
     operation.terminalLifecycle = terminal.lifecycle;
     this.options.emit(eventFromTerminal(terminal));
     this.options.activity.reset();
