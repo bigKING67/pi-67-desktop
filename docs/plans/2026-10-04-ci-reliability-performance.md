@@ -377,3 +377,33 @@ not conflate its absence with a fix. Keep first-failure evidence and no blind re
   branches 78.78%). Local counts include the protected native-image WIP; exact-SHA
   CI remains the authority for the scoped commit. Independent final diff review
   found no blocker and verified the failed fixture experiment was fully reverted.
+- Exact `4b276d79684ada498b460e0e44ab17439745f385`, run `37220677304` / attempt 1:
+  source 948 files / 6,299 tests passed (24 optional skips), Renderer 294 passed,
+  macOS native and all six recovery receipts passed. Windows hidden smoke passed
+  strict graceful shutdown: Main 759 ms, checkpoint 83.8 ms, Host 644.7 ms,
+  graceful true / forced false. Full NSIS lifecycle passed. The run still correctly
+  failed because the separate synthetic-scale UI gate failed; it is not a full PASS.
+
+## Followup: first-prompt activation and early failure evidence
+
+- Windows UI scale 1.5 timed out after 60 s with Runtime stopped, no Session rows,
+  no initialization observations, no ACK timeout and no Workspace-open error.
+  Scale 1.25 passed. The old verifier required Runtime ready before sending the
+  first Prompt, contrary to the existing legitimate New Session Intent contract.
+  The old report did not capture Intent visibility, so it cannot prove that this
+  particular failure was an Intent rather than a different empty-surface failure.
+- Accept only a visible `new-session-intent` or Runtime ready before activation;
+  an explicit failed Runtime takes precedence. Keep stopped/starting/blank failures
+  and the 60 s wait. The same activation helper must then await the controlled
+  model and running Operation; real child PID, responsive/IME and shutdown checks
+  remain required. Record the actual initial surface in successful receipts and
+  Intent visibility in failure diagnostics. No product behavior change is needed.
+- Failure reports were only uploaded after the independent NSIS lane, adding
+  several minutes before diagnosis. Move existing Windows smoke/UI uploads to
+  their completed producer steps, preserving artifact identity/retention/conditions,
+  independent checks and final fail-closed gate. Later recovery/installer evidence
+  is already stored and uploaded separately.
+- Local validation: 2 files / 34 focused tests, type-aware lint, dead-code check,
+  structure, Action pins, PowerShell source discovery and whitespace checks passed.
+  Independent final diff review found no blocker. New exact-SHA Windows evidence
+  is required before claiming this verifier path passes; no blind retry of the old run.

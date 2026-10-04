@@ -89,6 +89,14 @@ PowerShell 时限；查询超时不能解释为进程已退出。启动后即保
 普通 CI 打包成功后，后续相互隔离的 smoke、恢复、Windows UI 与安装器检查即使前一项
 失败也继续执行；打包失败或任务取消则不启动。任一步失败仍使 native job 和最终门禁
 失败，不采用 `continue-on-error`，后续证据不把失败构建变成候选资格。
+Windows smoke 失败证据在 smoke 返回后立即上传，Windows UI 报告在 UI 步骤返回后上传，
+均不再等待后续 NSIS 检查；原有产物名称、路径、条件和保留期不变。恢复和安装器继续
+各自保留证据，提前上传不改变最终门禁或失败候选的资格。
+Windows synthetic-scale/IME 夹具在首条 Prompt 前等待可见的 Runtime ready、明确 failed 或
+New Session Intent surface，仍使用 60 秒上限；单独 stopped、starting 或空白不能放行，failed
+优先报错。合法 Intent 按产品合同等待首条消息才启动 Pi；夹具随后必须通过受控模型、
+运行中的 Operation、真实子进程以及原有缩放/输入法/5 秒退出断言，不能用 Intent 代替
+Runtime 成功。回执记录 `initialSessionSurface`，失败诊断记录 `newSessionIntentVisible`。
 冷启动用崩溃前的精确侧栏 Session identity 打开原对话；不假定导航选中状态已在
 强制退出前落盘。该场景明确经过工作区首页，验证从侧栏续接；身份含分隔字符，
 必须按属性值完整比较，不能拼入 CSS selector。失败取证使用本次启动的新窗口。

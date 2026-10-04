@@ -223,6 +223,16 @@ jobs:
       - name: Smoke packaged Electron runtime
         if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         run: pnpm run package:smoke
+      - name: Upload native smoke failure evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: failure()
+        with:
+          name: native-smoke-failure-evidence-x64
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Verify packaged task recovery (agent-before-response)
         if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         env:
@@ -249,6 +259,14 @@ jobs:
       - name: Verify Windows packaged synthetic scale and IME contracts
         if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         run: pnpm run package:smoke:windows-ui
+      - name: Upload Windows packaged UI evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: windows-packaged-ui-x64
+          path: artifacts/validation/windows-packaged-ui/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Verify Windows NSIS installer lifecycle
         if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         shell: bash
@@ -277,26 +295,10 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
-          name: windows-packaged-ui-x64
-          path: artifacts/validation/windows-packaged-ui/
-          if-no-files-found: warn
-          retention-days: 14
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        if: always()
-        with:
           name: windows-installer-lifecycle-x64
           path: artifacts/validation/windows-installer-lifecycle/
           if-no-files-found: warn
           retention-days: 14
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        if: failure()
-        with:
-          name: native-smoke-failure-evidence-x64
-          path: |
-            playwright-report/
-            test-results/
-          if-no-files-found: ignore
-          retention-days: 7
 
   windows-installer-reuse:
     name: Windows installer lifecycle / reused candidate

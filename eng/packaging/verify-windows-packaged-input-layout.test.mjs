@@ -1,17 +1,23 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
+import {
+  inspectWindowsSyntheticRuntimeSurface,
+  startWindowsSyntheticControlledOperation,
+  WINDOWS_SYNTHETIC_RUNTIME_TIMEOUT_MS
+} from "./windows-synthetic-session-activation.mjs";
 import {
   assertContextPanelActivation,
   assertLayoutObservation,
-  inspectWindowsSyntheticRuntimeSurface,
   locateTaskInspector,
   prepareResponsiveLayoutControls,
   viewportWidthMatches,
-  waitForWindowsSyntheticRuntimeReady,
   WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
-  WINDOWS_SYNTHETIC_RUNTIME_TIMEOUT_MS,
   WINDOWS_SYNTHETIC_SCALE_FACTORS,
   WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS
 } from "./verify-windows-packaged-input-layout.mjs";
+
+vi.mock("./controlled-provider-interaction.mjs", () => ({ startControlledPrompt: vi.fn(async () => undefined) }));
+afterEach(() => vi.clearAllMocks());
 
 describe("Windows packaged synthetic-scale UI contract", () => {
   it("keeps the release scale matrix explicit", () => {
@@ -21,20 +27,28 @@ describe("Windows packaged synthetic-scale UI contract", () => {
     expect(WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS).toBe(5_000);
   });
 
-  it("waits for either a ready or explicit failed runtime phase", async () => {
+  it.each([false, true])("waits for a Session surface before the first prompt, intent=%s", async (intentVisible) => {
     const waitFor = vi.fn();
     const isVisible = vi.fn(async () => false);
     const failed = { isVisible };
-    const ready = { or: vi.fn(() => ({ waitFor })) };
+    const intent = { isVisible: vi.fn(async () => intentVisible) };
+    const combined = { first: vi.fn(() => ({ waitFor })), or: vi.fn() };
+    combined.or.mockReturnValue(combined);
+    const ready = { or: vi.fn(() => combined) };
     const window = {
+      getByTestId: vi.fn(() => intent),
       locator: vi.fn((selector) => selector.includes("ready") ? ready : failed)
     };
 
-    await waitForWindowsSyntheticRuntimeReady(window, () => "", 1.5, 12_345);
+    await expect(startWindowsSyntheticControlledOperation(window, () => "", 1.5, 12_345))
+      .resolves.toBe(intentVisible ? "new-session-intent" : "runtime-ready");
 
     expect(ready.or).toHaveBeenCalledWith(failed);
+    expect(combined.or).toHaveBeenCalledWith(intent);
+    expect(window.getByTestId).toHaveBeenCalledWith("new-session-intent");
     expect(waitFor).toHaveBeenCalledWith({ state: "visible", timeout: 12_345 });
     expect(isVisible).toHaveBeenCalledOnce();
+    expect(startControlledPrompt).toHaveBeenCalledExactlyOnceWith(window);
   });
 
   it("reports bounded runtime and initialization diagnostics on failure", async () => {
@@ -42,11 +56,14 @@ describe("Windows packaged synthetic-scale UI contract", () => {
       throw new Error("timeout");
     });
     const failed = { isVisible: vi.fn(async () => false) };
-    const ready = { or: vi.fn(() => ({ waitFor })) };
+    const combined = { first: vi.fn(() => ({ waitFor })), or: vi.fn() };
+    combined.or.mockReturnValue(combined);
+    const ready = { or: vi.fn(() => combined) };
     const surface = {
       acknowledgementTimedOut: false,
       conversationRowCount: 0,
-      runtimePhase: "starting",
+      newSessionIntentVisible: false,
+      runtimePhase: "stopped",
       title: "New Money",
       url: "app://pi67/index.html",
       workspaceOpenFailed: false,
@@ -54,6 +71,7 @@ describe("Windows packaged synthetic-scale UI contract", () => {
     };
     const window = {
       evaluate: vi.fn(async () => surface),
+      getByTestId: vi.fn(),
       locator: vi.fn((selector) => selector.includes("ready") ? ready : failed)
     };
     const output = [
@@ -61,9 +79,38 @@ describe("Windows packaged synthetic-scale UI contract", () => {
       '[agent-host:init] {"stage":"load-model-runtime","outcome":"completed","durationMs":8}'
     ].join("\n");
 
-    await expect(waitForWindowsSyntheticRuntimeReady(window, () => output, 1.25, 30_000))
-      .rejects.toThrow(/"runtimePhase":"starting"/u);
+    await expect(startWindowsSyntheticControlledOperation(window, () => output, 1.25, 30_000))
+      .rejects.toThrow(/"runtimePhase":"stopped"/u);
+    expect(startControlledPrompt).not.toHaveBeenCalled();
     await expect(inspectWindowsSyntheticRuntimeSurface(window)).resolves.toEqual(surface);
+  });
+
+  it("rejects an explicit failed Runtime even alongside a visible intent", async () => {
+    const combined = { or: vi.fn(), first: () => ({ waitFor: vi.fn() }) };
+    combined.or.mockReturnValue(combined);
+    const failed = { isVisible: vi.fn(async () => true) };
+    const window = {
+      locator: vi.fn(selector => selector.includes("ready") ? combined : failed),
+      getByTestId: vi.fn(() => ({ isVisible: vi.fn(async () => true) })),
+      evaluate: vi.fn(async () => ({ runtimePhase: "failed", newSessionIntentVisible: true }))
+    };
+    await expect(startWindowsSyntheticControlledOperation(window, () => "", 1.5))
+      .rejects.toMatchObject({ cause: { message: "Pi SDK entered the failed runtime phase." } });
+    expect(startControlledPrompt).not.toHaveBeenCalled();
+  });
+
+  it("cannot pass an intent whose controlled model or prompt fails to initialize", async () => {
+    const combined = { or: vi.fn(), first: () => ({ waitFor: vi.fn() }) };
+    combined.or.mockReturnValue(combined);
+    const failed = { isVisible: vi.fn(async () => false) };
+    const window = {
+      locator: vi.fn(selector => selector.includes("ready") ? combined : failed),
+      getByTestId: vi.fn(() => ({ isVisible: vi.fn(async () => true) }))
+    };
+    const failure = new Error("Controlled model did not hydrate");
+    vi.mocked(startControlledPrompt).mockRejectedValueOnce(failure);
+    await expect(startWindowsSyntheticControlledOperation(window, () => "", 1.5)).rejects.toBe(failure);
+    expect(startControlledPrompt).toHaveBeenCalledExactlyOnceWith(window);
   });
 
   it("locates only the task inspector complementary region", () => {
