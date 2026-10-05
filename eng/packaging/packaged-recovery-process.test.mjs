@@ -108,6 +108,11 @@ describe("packaged recovery process ownership", () => {
     const [command, args, options] = execute.mock.calls[0];
     expect(command).toBe("powershell.exe");
     expect(args).toEqual(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", expect.stringContaining(`-Filter 'ProcessId = ${pid}'`)]);
+    // A fresh process must resolve only the two known modules, including output
+    // serialization; an unqualified cmdlet must not trigger broad discovery.
+    expect(args.at(-1)).toContain("$PSModuleAutoLoadingPreference = 'ModuleQualified'");
+    expect(args.at(-1)).toContain("CimCmdlets\\Get-CimInstance");
+    expect(args.at(-1)).toContain("Microsoft.PowerShell.Utility\\ConvertTo-Json");
     expect(args.at(-1)).not.toMatch(/CommandLine|Stop-Process|taskkill/u);
     expect(options).toMatchObject({ timeout: 15000, windowsHide: true });
   });
@@ -123,6 +128,14 @@ describe("packaged recovery process ownership", () => {
     const execute = vi.fn().mockResolvedValueOnce({ stdout: "\r\n" }).mockRejectedValueOnce(new Error("CIM lookup failed"));
     expect(await readRecoveryProcess(pid, { platform: "win32", execute })).toBeUndefined();
     await expect(readRecoveryProcess(pid, { platform: "win32", execute })).rejects.toThrow("CIM lookup failed");
+  });
+
+  it("keeps missing qualified modules fatal without falling back to command discovery", async () => {
+    const cause = Object.assign(new Error("Required module unavailable"), { code: 1 });
+    const execute = vi.fn().mockRejectedValue(cause);
+    await expect(readRecoveryProcess(pid, { platform: "win32", execute })).rejects.toMatchObject({ cause });
+    expect(execute).toHaveBeenCalledOnce();
+    expect(execute.mock.calls[0][1].at(-1)).not.toMatch(/Import-Module|SilentlyContinue|AutoLoadingPreference = 'All'/u);
   });
 
   it("retains bounded Windows query timeout evidence without treating it as process exit", async () => {

@@ -138,3 +138,21 @@ query, module-loading behavior and 15-second deadline. Retain partial stderr
 timings on timeout without retaining identity payloads. This is diagnostic work,
 not yet a root-cause fix. Revert the scoped instrumentation commit if it changes
 acceptance or cannot preserve the existing process-ownership contract.
+
+Diagnostic source `099ea49a2ba64ba38dcfe6f15c1797e23ccd5ac8`, CI `37289227450`,
+completed all CI gates successfully and produced three passing Windows recovery
+receipts on the unchanged candidate ASAR. Its installer lifecycle also passed.
+First preflight: 5,924 ms total; script entry 235 ms, query start 272 ms, query
+complete 2,940 ms, output complete 5,861 ms. Later preflights took 487 / 417 ms.
+This sample localizes cold overhead after PowerShell script entry, in both the
+CIM and JSON-output commands. It does not retrospectively prove the exact stage
+of the older uninstrumented 15-second failures.
+
+The targeted correction qualifies both commands with their built-in module names
+and restricts autoload to `ModuleQualified` in the temporary query process only.
+Microsoft's Windows PowerShell 5.1 preference-variable contract documents this
+mode: <https://github.com/MicrosoftDocs/PowerShell-Docs/blob/main/reference/5.1/Microsoft.PowerShell.Core/About/about_Preference_Variables.md#psmoduleautoloadingpreference>.
+No query fields, timeout, identity checks, retry count, runner policy or product
+bytes change. Missing modules remain fatal. Verify timing and all recovery cases
+on a fresh exact-source Windows CI run; a timing improvement alone is not full
+acceptance or proof against all hosted-runner variability.

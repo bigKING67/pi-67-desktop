@@ -68,11 +68,12 @@ export async function readRecoveryProcess(pid, { platform = process.platform, ex
   // PID is a validated integer; no profile/path/command-line strings enter PowerShell.
   const script = [
     "$ErrorActionPreference = 'Stop'",
+    "$PSModuleAutoLoadingPreference = 'ModuleQualified'",
     mark("script-started"),
     mark("query-started"),
-    `$p = Get-CimInstance -ClassName Win32_Process -Filter 'ProcessId = ${pid}'`,
+    `$p = CimCmdlets\\Get-CimInstance -ClassName Win32_Process -Filter 'ProcessId = ${pid}'`,
     mark("query-completed"),
-    "if ($null -ne $p) { [PSCustomObject]@{ pid = [int]$p.ProcessId; parentPid = [int]$p.ParentProcessId; startedAt = $p.CreationDate.ToUniversalTime().Ticks.ToString(); executablePath = [string]$p.ExecutablePath } | ConvertTo-Json -Compress }",
+    "if ($null -ne $p) { [PSCustomObject]@{ pid = [int]$p.ProcessId; parentPid = [int]$p.ParentProcessId; startedAt = $p.CreationDate.ToUniversalTime().Ticks.ToString(); executablePath = [string]$p.ExecutablePath } | Microsoft.PowerShell.Utility\\ConvertTo-Json -Compress }",
     mark("output-completed")
   ].join("; ");
   let output;
