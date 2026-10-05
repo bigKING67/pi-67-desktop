@@ -43,12 +43,16 @@ let failure;
 let stage = "launch";
 let receipt;
 let cleanupPassed = false;
+let processQueryPreflight;
 const journal = [];
 const mark = value => { stage = value; journal.push({ stage, at: new Date().toISOString() }); console.log(`Recovery ${scenario}: ${stage}`); };
 
 try {
   mark("process-query-preflight");
-  assert(await readRecoveryProcess(process.ppid), "The runner parent process must be observable before launching Electron.");
+  assert(await readRecoveryProcess(process.ppid, { onDiagnostic: diagnostic => {
+    processQueryPreflight = diagnostic;
+    console.log(`Recovery process-query preflight: ${JSON.stringify(diagnostic)}`);
+  } }), "The runner parent process must be observable before launching Electron.");
   mark("launch");
   application = await launch();
   window = await openWorkspace(application);
@@ -175,6 +179,8 @@ try {
     status: failure ? "FAIL" : "PASS", scenario, stage, windowMode: hideNativeWindow ? "hidden" : "visible-isolated",
     ...provenance, artifactSha256, artifactSize: asar.length, canonicalUnchanged, cleanupPassed,
     ownedPids: [...tracked.keys()], processCleanup: cleanup.processes, launches, journal,
+    ...(processQueryPreflight ? { processQueryPreflight } : {}),
+    ...(failure?.processQueryDiagnostic ? { processQueryFailure: failure.processQueryDiagnostic } : {}),
     ...(cleanupError ? { cleanupError } : {}), ...(failure ? { error: failure.message } : {}) }, null, 2) + "\n");
 }
 console.log(`Recovery receipt: ${evidence}/receipt.json`);

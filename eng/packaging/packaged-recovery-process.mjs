@@ -34,7 +34,7 @@ export async function readWindowsRecoveryExitState(pid, { execute = executeFile 
 }
 
 /** Identity is kept in memory only; never select processes by application name. */
-export async function readRecoveryProcess(pid, { platform = process.platform, execute = executeFile } = {}) {
+export async function readRecoveryProcess(pid, { platform = process.platform, execute = executeFile, onDiagnostic } = {}) {
   if (!Number.isSafeInteger(pid) || pid <= 0 || pid === process.pid) throw new Error("Invalid recovery process PID.");
   const options = { timeout: platform === "win32" ? 15000 : 5000, maxBuffer: 64 * 1024, windowsHide: true };
   if (platform === "darwin") {
@@ -50,19 +50,42 @@ export async function readRecoveryProcess(pid, { platform = process.platform, ex
     }
   }
   if (platform !== "win32") throw new Error(`Unsupported recovery process platform: ${platform}`);
+  const startedAt = performance.now();
+  const startedEpoch = Date.now();
+  // Console writes do not load another PowerShell module before the measured query.
+  const mark = stage => `[Console]::Error.WriteLine('PI67_RECOVERY_PROCESS_QUERY:${stage}:' + ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() - ${startedEpoch})); [Console]::Error.Flush()`;
+  const diagnose = (outcome, stderr = "") => {
+    const stages = [];
+    const expected = ["script-started", "query-started", "query-completed", "output-completed"];
+    for (const line of stderr.split(/\r?\n/u)) {
+      const match = line.match(/^PI67_RECOVERY_PROCESS_QUERY:([a-z-]+):([0-9]{1,9})$/u);
+      if (match && match[1] === expected[stages.length]) stages.push({ stage: match[1], elapsedMs: Number(match[2]) });
+    }
+    const diagnostic = { outcome, durationMs: Math.round(performance.now() - startedAt), timeoutMs: options.timeout, stages };
+    onDiagnostic?.(diagnostic);
+    return diagnostic;
+  };
   // PID is a validated integer; no profile/path/command-line strings enter PowerShell.
   const script = [
     "$ErrorActionPreference = 'Stop'",
+    mark("script-started"),
+    mark("query-started"),
     `$p = Get-CimInstance -ClassName Win32_Process -Filter 'ProcessId = ${pid}'`,
-    "if ($null -ne $p) { [PSCustomObject]@{ pid = [int]$p.ProcessId; parentPid = [int]$p.ParentProcessId; startedAt = $p.CreationDate.ToUniversalTime().Ticks.ToString(); executablePath = [string]$p.ExecutablePath } | ConvertTo-Json -Compress }"
+    mark("query-completed"),
+    "if ($null -ne $p) { [PSCustomObject]@{ pid = [int]$p.ProcessId; parentPid = [int]$p.ParentProcessId; startedAt = $p.CreationDate.ToUniversalTime().Ticks.ToString(); executablePath = [string]$p.ExecutablePath } | ConvertTo-Json -Compress }",
+    mark("output-completed")
   ].join("; ");
-  let stdout;
+  let output;
   try {
-    ({ stdout } = await execute("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], options));
+    output = await execute("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], options);
   } catch (error) {
     const reason = error.killed ? `timed out after ${options.timeout} ms` : `code=${error.code ?? "unknown"}, signal=${error.signal ?? "none"}`;
-    throw new Error(`Windows recovery process query failed (${reason}): ${(error.stderr || error.message).trim().slice(0, 1200)}`, { cause: error });
+    const failure = new Error(`Windows recovery process query failed (${reason}): ${(error.stderr || error.message).trim().slice(0, 1200)}`, { cause: error });
+    failure.processQueryDiagnostic = diagnose("command-failed", error.stderr);
+    throw failure;
   }
+  diagnose("command-completed", output.stderr);
+  const { stdout } = output;
   if (!stdout.trim()) return undefined;
   const value = JSON.parse(stdout);
   if (value?.pid !== pid || !Number.isSafeInteger(value.parentPid) || value.parentPid < 0

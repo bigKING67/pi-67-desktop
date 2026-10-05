@@ -133,6 +133,48 @@ describe("packaged recovery process ownership", () => {
     });
   });
 
+  it("separates PowerShell startup, query and output timing from process identity", async () => {
+    const stages = ["script-started", "query-started", "query-completed", "output-completed"];
+    const stderr = stages.map((stage, index) => `PI67_RECOVERY_PROCESS_QUERY:${stage}:${(index + 1) * 100}`).join("\r\n");
+    const onDiagnostic = vi.fn();
+    const execute = vi.fn().mockResolvedValue({ stdout: JSON.stringify(win), stderr });
+    const result = await readRecoveryProcess(pid, { platform: "win32", execute, onDiagnostic });
+    expect(result.identity).toBe(JSON.stringify([win.startedAt, win.executablePath]));
+    expect(onDiagnostic).toHaveBeenCalledExactlyOnceWith({ outcome: "command-completed", durationMs: expect.any(Number),
+      timeoutMs: 15000, stages: stages.map((stage, index) => ({ stage, elapsedMs: (index + 1) * 100 })) });
+    expect(JSON.stringify(onDiagnostic.mock.calls)).not.toContain(win.executablePath);
+    const script = execute.mock.calls[0][1].at(-1);
+    expect(script.indexOf("script-started")).toBeLessThan(script.indexOf("Get-CimInstance"));
+    expect(script).toContain("[Console]::Error.Flush()");
+    expect(script).not.toContain("Import-Module");
+  });
+
+  it("retains partial stage evidence on timeout even when stdout resembles a valid identity", async () => {
+    const stderr = "PI67_RECOVERY_PROCESS_QUERY:script-started:920\nPI67_RECOVERY_PROCESS_QUERY:query-started:922\n";
+    const cause = Object.assign(new Error("Command timed out"), { killed: true, stderr, stdout: JSON.stringify(win) });
+    const execute = vi.fn().mockRejectedValue(cause);
+    const onDiagnostic = vi.fn();
+    await expect(readRecoveryProcess(pid, { platform: "win32", execute, onDiagnostic })).rejects.toMatchObject({
+      cause, processQueryDiagnostic: { outcome: "command-failed", timeoutMs: 15000,
+        stages: [{ stage: "script-started", elapsedMs: 920 }, { stage: "query-started", elapsedMs: 922 }] }
+    });
+    expect(execute).toHaveBeenCalledOnce();
+    expect(onDiagnostic).toHaveBeenCalledOnce();
+  });
+
+  it("excludes unknown fields and bounds diagnostic records without changing query acceptance", async () => {
+    const stderr = ["secret-output", "PI67_RECOVERY_PROCESS_QUERY:query-started:0",
+      "PI67_RECOVERY_PROCESS_QUERY:script-started:1:secret", "PI67_RECOVERY_PROCESS_QUERY:script-started:1",
+      ...Array(50).fill("PI67_RECOVERY_PROCESS_QUERY:script-started:1"),
+      "PI67_RECOVERY_PROCESS_QUERY:query-started:2", "PI67_RECOVERY_PROCESS_QUERY:query-completed:3",
+      "PI67_RECOVERY_PROCESS_QUERY:output-completed:4", "PI67_RECOVERY_PROCESS_QUERY:output-completed:5"].join("\n");
+    const onDiagnostic = vi.fn();
+    const execute = vi.fn().mockResolvedValue({ stdout: "", stderr });
+    expect(await readRecoveryProcess(pid, { platform: "win32", execute, onDiagnostic })).toBeUndefined();
+    expect(onDiagnostic.mock.calls[0][0].stages).toHaveLength(4);
+    expect(JSON.stringify(onDiagnostic.mock.calls)).not.toContain("secret");
+  });
+
   it.each([0, -1, 1.5, process.pid, "12; Stop-Process -Name test"])("rejects invalid/self PID %s before execution", async value => {
     const execute = vi.fn();
     await expect(readRecoveryProcess(value, { platform: "win32", execute })).rejects.toThrow("Invalid recovery process PID");

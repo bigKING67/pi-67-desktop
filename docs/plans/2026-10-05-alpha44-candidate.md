@@ -1,6 +1,6 @@
 # Alpha.44 internal candidate preparation
 
-Status: local candidate preparation complete; ordinary CI follow-up open
+Status: active CI follow-up; local candidate preparation complete
 Owner: Codex
 Started: 2026-10-05
 Last updated: 2026-10-05
@@ -118,3 +118,23 @@ Evidence and the first-attempt diagnosis remain under
 `artifacts/validation/alpha44-candidate/`. No paid model requests or distribution
 actions were performed. A later documentation-only closeout retains the frozen
 candidate source above.
+
+## Windows query reliability follow-up
+
+The user accepted continuing with the remaining Windows preflight issue. Keep
+the verified Alpha.44 files and their frozen identity intact; no distribution or
+paid inference. Continue scoped implementation, commit/push and Windows CI
+validation under the existing authorization. The canonical checkout was clean
+at `1340cce73a3ad9515626d25fa8ffe30aa0bc099d`, equal to origin/main.
+
+- [ ] Identify the timeout boundary on a real Windows runner.
+- [ ] Apply the smallest evidence-supported correction and retain ownership,
+  timeout, cleanup and fail-closed contracts.
+- [ ] Verify the fix with focused regression tests and exact-source Windows CI.
+
+Initial evidence lacks any PowerShell internal output. Add bounded timing for
+script entry, CIM call start/completion and output completion; keep the exact
+query, module-loading behavior and 15-second deadline. Retain partial stderr
+timings on timeout without retaining identity payloads. This is diagnostic work,
+not yet a root-cause fix. Revert the scoped instrumentation commit if it changes
+acceptance or cannot preserve the existing process-ownership contract.
