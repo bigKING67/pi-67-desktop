@@ -1,16 +1,36 @@
 import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { observeWindowsUiShutdown, parseWindowsUiHostShutdown, parseWindowsUiShutdownObservations } from "./windows-ui-shutdown-observation.mjs";
+import { captureWindowsUiShutdown, observeWindowsUiShutdown, parseWindowsUiShutdownObservations } from "./windows-ui-shutdown-observation.mjs";
 
 afterEach(() => vi.restoreAllMocks());
 
 describe("Windows UI shutdown observations", () => {
   it("uses the existing bounded Host parser without exposing raw fields", () => {
+    const child = { stdout: new EventEmitter(), stderr: new EventEmitter() };
+    const capture = captureWindowsUiShutdown(child);
     const record = { sequence: 1, stage: "runtime-session", outcome: "completed", durationMs: 14 };
     const line = value => `[agent-host:shutdown] ${JSON.stringify(value)}\n`;
-    expect(parseWindowsUiHostShutdown("private output\n" + line({ ...record, secret: "drop" })
-      + line({ ...record, stage: "private-stage" }))).toEqual([record]);
-    expect(parseWindowsUiHostShutdown(line(record).repeat(140))).toHaveLength(128);
+    child.stderr.emit("data", "private output\n" + line({ ...record, secret: "drop" })
+      + line({ ...record, stage: "private-stage" }));
+    expect(capture().hostStages).toEqual([record]);
+    child.stderr.emit("data", line(record).repeat(140));
+    expect(capture().hostStages).toHaveLength(128);
+  });
+
+  it("retains late shutdown evidence after noisy startup and fragmented independent streams", () => {
+    const child = { stdout: new EventEmitter(), stderr: new EventEmitter() };
+    const capture = captureWindowsUiShutdown(child);
+    child.stderr.emit("data", "private".repeat(2_000));
+    child.stderr.emit("data", 'Application shutdown: {"ignored":true}\n');
+    const report = { budgetMs: 3_000, deadlineExceeded: false, durationMs: 150,
+      rendererCheckpointed: true, agentHostStopped: true, agentHostGraceful: true, agentHostForced: false };
+    child.stdout.emit("data", 'Application shutdown: {"budgetMs":');
+    const stage = 'Windows UI shutdown stage: {"stage":"quit","sequence":2,"elapsedMs":160}\r\n';
+    child.stderr.emit("data", stage.repeat(20));
+    child.stdout.emit("data", JSON.stringify(report).slice('{"budgetMs":'.length) + '\n');
+    expect(capture()).toEqual({ application: report, hostStages: [],
+      stages: Array.from({ length: 16 }, () => ({ stage: "quit", sequence: 2, elapsedMs: 160 })) });
+    expect(JSON.stringify(capture())).not.toContain("private");
   });
 
   it("classifies native child exits without collecting process names", async () => {

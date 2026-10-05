@@ -10,10 +10,9 @@ import {
   writeControlledShutdownExtension
 } from "./controlled-shutdown-fixture.ts";
 import { startWindowsSyntheticControlledOperation } from "./windows-synthetic-session-activation.mjs";
-import { observeWindowsUiShutdown, parseWindowsUiHostShutdown, parseWindowsUiShutdownObservations } from "./windows-ui-shutdown-observation.mjs";
+import { captureWindowsUiShutdown, observeWindowsUiShutdown } from "./windows-ui-shutdown-observation.mjs";
 import {
   measureElectronApplicationShutdown,
-  parseApplicationShutdownReport,
   productShutdownWithinBudget
 } from "./electron-shutdown-measurement.mjs";
 import {
@@ -135,6 +134,7 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory, verifi
       userDataDirectory: directories.userDataDirectory
     });
     processOutput = captureProcessOutput(application.process());
+    const shutdownEvidence = captureWindowsUiShutdown(application.process());
     window = await application.firstWindow();
     await window.waitForLoadState("domcontentloaded");
     await window.getByRole("button", { name: "选择工作区" }).waitFor({ state: "visible", timeout: 15_000 });
@@ -179,12 +179,10 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory, verifi
     });
     application = undefined;
     const shutdown = {
-      application: parseApplicationShutdownReport(processOutput()),
+      ...shutdownEvidence(),
       budgetMs: WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS,
       driverCloseDurationMs: round(shutdownMeasurement.driverCloseDurationMs),
       driverProcessId,
-      stages: parseWindowsUiShutdownObservations(processOutput()),
-      hostStages: parseWindowsUiHostShutdown(processOutput()),
       sampling: shutdownMeasurement.sampling,
       processes: shutdownMeasurement.processes,
       productExitDurationMs: round(shutdownMeasurement.productExitDurationMs)

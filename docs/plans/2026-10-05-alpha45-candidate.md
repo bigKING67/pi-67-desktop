@@ -3,7 +3,7 @@
 Status: active
 Owner: Codex
 Started: 2026-10-05
-Last updated: 2026-10-05
+Last updated: 2026-10-06
 
 ## Goal and acceptance
 
@@ -144,6 +144,23 @@ separate and cannot inherit Alpha.44 receipts.
   product shutdown or candidate runner strategy. Current candidate remains not ready.
 
 ## Validation and rollback
+
+Source `95dd9033433b5c5b12b8318eb28e4754d43276cc` passed unchanged local
+candidate gates (6,426 tests / 24 skips), full Renderer CI (303 passed / 1 skip),
+macOS native CI and a newly packaged macOS preview (612.3 ms product exit).
+Ordinary CI `37335435521` encountered an HTTP 500 during Electron packaging after
+its Windows native E2E passed; the log does not identify the failing URL. Preserve
+attempt 1 and distinguish this transport failure from product shutdown evidence.
+
+Windows candidate `37335598354` completed all nine diagnostic UI scenarios within
+5 seconds (370.1–3,576.1 ms) and all three recovery cases. However, enabling Host
+phases consumed the existing first-8-KiB raw startup buffer: every final application
+shutdown report was absent and Host evidence stopped around sequence 26/27.
+The OS PID timings remain valid, but these samples do not establish the earlier
+slow-exit cause. Fix this verifier-only loss by projecting bounded records as they
+arrive, retaining independent stdout/stderr fragments and rejecting oversized lines.
+Regression covers noisy startup, fragmented/interleaved streams, fixed output fields
+and record caps. Do not call the historical intermittent Windows delay root-fixed.
 
 Run `corepack pnpm run check:candidate`, frozen-source Windows preflight and the
 existing Windows candidate workflow. On macOS run `preview:mac:unsigned`, which

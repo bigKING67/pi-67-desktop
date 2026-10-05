@@ -1,4 +1,5 @@
 import { AgentHostInitializationOutputForwarder } from "../../apps/desktop/src/agent-host-initialization-output.ts";
+import { parseApplicationShutdownReport } from "./electron-shutdown-measurement.mjs";
 
 const PREFIX = "Windows UI shutdown stage: ";
 const STAGES = new Set([
@@ -7,6 +8,41 @@ const STAGES = new Set([
   "agent-host-exit", "utility-exit", "gpu-exit"
 ]);
 const MAX_RECORDS = 16;
+
+// Project bounded records as they arrive: startup output must not consume the
+// shutdown evidence budget, and stdout/stderr fragments must never be joined.
+export function captureWindowsUiShutdown(child) {
+  let application = null;
+  const stages = [];
+  const hostStages = [];
+  const hostPrefix = "[agent-host:shutdown] ";
+  const forwarder = new AgentHostInitializationOutputForwarder(line => {
+    if (line.startsWith(hostPrefix)) hostStages.push(JSON.parse(line.slice(hostPrefix.length)));
+  });
+  const accept = line => {
+    application = parseApplicationShutdownReport(line) ?? application;
+    if (stages.length < MAX_RECORDS) stages.push(...parseWindowsUiShutdownObservations(line));
+    forwarder.write(`${line}\n`);
+  };
+  for (const stream of [child.stdout, child.stderr]) {
+    let pending = "";
+    let dropping = false;
+    stream?.on("data", chunk => {
+      const parts = String(chunk).split("\n");
+      for (const [index, part] of parts.entries()) {
+        if (!dropping) {
+          if (pending.length + part.length > 8_192) { pending = ""; dropping = true; }
+          else pending += part;
+        }
+        if (index < parts.length - 1) {
+          if (!dropping) accept(pending.replace(/\r$/u, ""));
+          pending = ""; dropping = false;
+        }
+      }
+    });
+  }
+  return () => ({ application, stages: [...stages], hostStages: [...hostStages] });
+}
 
 // Installs passive observers only in the verifier's isolated application.
 // Main's own clock separates Electron teardown from a late driver-side PID poll.
@@ -44,16 +80,6 @@ export async function observeWindowsUiShutdown(application) {
     app.on("quit", () => record("quit"));
     process.once("exit", () => record("process-exit"));
   }, { prefix: PREFIX, maximum: MAX_RECORDS });
-}
-
-export function parseWindowsUiHostShutdown(output) {
-  const records = [];
-  const prefix = "[agent-host:shutdown] ";
-  const forwarder = new AgentHostInitializationOutputForwarder(line => {
-    if (line.startsWith(prefix)) records.push(JSON.parse(line.slice(prefix.length)));
-  });
-  forwarder.write(`${output}\n`);
-  return records;
 }
 
 export function parseWindowsUiShutdownObservations(output) {

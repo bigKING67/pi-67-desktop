@@ -131,7 +131,9 @@ Windows UI 还在隔离测试 Main 内被动记录最多 16 条关闭事件：be
 不强制退出或延长期限。PID 测量同时保留采样次数和最大采样间隔，用于区分 Electron teardown
 与驱动事件循环延迟；缺少事件不表示事件已完成，诊断记录本身不构成修复或预算豁免。
 UI 隔离 Profile 同时启用既有 `PI67_TEST_CAPTURE_SHUTDOWN`，复用 Main 的白名单 parser
-保留最多 128 条 Host 阶段记录；native child 退出只分 Agent Host、其他 Utility 和 GPU，
+保留最多 128 条 Host 阶段记录；关闭证据按 stdout/stderr 独立分片逐行投影，单行上限
+8 KiB，超长行丢弃至换行；不与启动诊断共用总量上限，以免最终关闭报告被启动日志截断。
+native child 退出只分 Agent Host、其他 Utility 和 GPU，
 不保留服务名称或原始 stderr，用于区分 Host 清理与退出后的原生进程尾部延迟。
 Windows candidate 默认仍跑一轮缩放矩阵。仅显式 `ui_probe_rounds=3` 调度可诊断性运行三轮，
 每轮记录独立 Profile、轮次和关闭证据；首个失败立即使步骤失败，不自动重试，不跳过失败轮，
