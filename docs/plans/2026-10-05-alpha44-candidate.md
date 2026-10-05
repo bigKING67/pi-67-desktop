@@ -1,6 +1,6 @@
 # Alpha.44 internal candidate preparation
 
-Status: active
+Status: local candidate preparation complete; ordinary CI follow-up open
 Owner: Codex
 Started: 2026-10-05
 Last updated: 2026-10-05
@@ -21,7 +21,8 @@ on clean and existing-Pi Windows desktops remains a later acceptance step.
 
 ## Current evidence
 
-- Clean canonical main and origin/main at `030e73f111dce9b8106ab63d597552ea5190fa92`.
+- Starting canonical main and origin/main were clean at
+  `030e73f111dce9b8106ab63d597552ea5190fa92`.
 - Its full CI `37279476520` passed; Windows installer mode was quick.
 - Alpha.43 already has an earlier candidate at source `05529cd3`; use a new
   version to avoid assigning one filename to different candidate bytes.
@@ -46,10 +47,10 @@ on clean and existing-Pi Windows desktops remains a later acceptance step.
 ## Checkpoints
 
 - [x] Version consistency and candidate source gates pass.
-- [ ] Scoped version commit pushed; exact source and dispatch inputs recorded.
-- [ ] macOS clean-source preview, smoke and DMG/ZIP container/identity checks pass.
-- [ ] Windows full candidate certification passes; downloaded bytes verified.
-- [ ] Three product files share version/source/runtime; final local receipt ready.
+- [x] Scoped version commit pushed; exact source and dispatch inputs recorded.
+- [x] macOS clean-source preview, smoke and DMG/ZIP container/identity checks pass.
+- [x] Windows full candidate certification passes; downloaded bytes verified.
+- [x] Three product files share version/source/runtime; final local receipt ready.
 
 ## Validation and evidence
 
@@ -76,5 +77,44 @@ does not certify real user desktops, real IME, SmartScreen or enterprise storage
 
 ## Closeout
 
-Pending exact-source candidate results. Machine-readable receipts will remain
-ignored; update this plan with the frozen source and verified final outcome.
+Frozen candidate source: `4f04a830b3ac847b505582adcada53ee564719e2`, pushed to
+main. All ten application versions are Alpha.44; other manifest values and the
+lockfile are unchanged. Frozen Windows inputs are in
+`artifacts/validation/alpha44-candidate/windows-dispatch-inputs.json`.
+
+macOS clean-source packaging, full packaged smoke, DMG/ZIP container checks and
+independent byte verification passed. Pi runtime is
+`@earendil-works/pi-coding-agent@1.0.0`; ASAR SHA-256 is
+`64cfab1085f0cd1678b31446d32b3181f718ee054e1d0cdce560c8500927e7c0`.
+
+Windows first attempts failed and remain retained. CI `37283805081` failed
+graceful shutdown, all three CIM preflights and reinstall process inspection.
+Candidate `37283874495` passed smoke and two recovery cases, then lost the Main
+diagnostic execution context before the third task began. Both used identical
+ASAR bytes. These observations support an environment/driver instability
+hypothesis, but do not establish its precise root cause. One bounded failed-job
+revalidation per workflow uses unchanged source, deadlines and assertions.
+Candidate attempt 2 passed all three recovery scenarios on identical ASAR bytes,
+including canonical Session isolation and owned-process cleanup. Its complete
+workflow passed, including synthetic scale/IME, exact Alpha.42 baseline bytes,
+cross-version upgrade, three restarts in each configuration lane, uninstall and
+isolated user-data preservation. Downloaded installer and executable hashes match
+candidate identity `60be078c6602ad29e4d4daf8b376130ecfd473cbf06437895efb00a85af75194`.
+
+Ordinary CI attempt 2 remains **failed**: only `agent-before-response` failed,
+at its 15-second CIM process-query preflight, before launching Electron. Ordinary
+smoke, the other two recovery cases, Windows UI and full same-version installer
+lifecycle passed; source, Renderer and macOS jobs retain their successful first
+attempt results. No third retry was started. This is a recurring validation
+reliability issue requiring a focused follow-up; do not claim all CI is green or
+that the original failure has been fixed. Distribution is not recommended until
+that follow-up is resolved, despite the separately verified candidate files.
+
+The three final product files, exact local paths, byte lengths and SHA-256 values
+are recorded in `artifacts/validation/alpha44-candidate/products.json` and
+`SHA256SUMS`; `readiness.md` distinguishes candidate passes from the open CI issue.
+
+Evidence and the first-attempt diagnosis remain under
+`artifacts/validation/alpha44-candidate/`. No paid model requests or distribution
+actions were performed. A later documentation-only closeout retains the frozen
+candidate source above.
