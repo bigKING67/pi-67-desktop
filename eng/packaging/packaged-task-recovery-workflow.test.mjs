@@ -81,10 +81,10 @@ it.each(["native-windows", "native-macos"])("keeps independent packaged evidence
   const text = await readFile(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
   const body = text.split(`\n  ${job}:\n`)[1].split(/\n  [a-z][a-z-]+:\n/u)[0];
   const steps = body.split("      - name: ");
-  const packageStep = steps.find(step => step.startsWith("Build fast unsigned "));
+  const packageStep = steps.find(step => step.startsWith(job === "native-windows" ? "Verify and restore Windows runtime transport" : "Build fast unsigned "));
   expect(packageStep).toContain("id: native-package\n");
   const names = ["Smoke packaged Electron runtime", ...RECOVERY_SCENARIOS.map(scenario => `Verify packaged task recovery (${scenario})`),
-    ...(job === "native-windows" ? ["Verify Windows packaged synthetic scale and IME contracts", "Verify Windows NSIS installer lifecycle"] : [])];
+    ...(job === "native-windows" ? ["Verify Windows packaged synthetic scale and IME contracts"] : [])];
   for (const name of names) {
     const step = steps.find(value => value.startsWith(`${name}\n`));
     expect(step).toBeDefined();
@@ -95,7 +95,7 @@ it.each(["native-windows", "native-macos"])("keeps independent packaged evidence
   expect(body).not.toContain("continue-on-error: true");
 });
 
-it("uploads completed Windows failure evidence before independent installer work", async () => {
+it("uploads Windows failure evidence without waiting for the independent installer job", async () => {
   const text = await readFile(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
   const body = text.split("\n  native-windows:\n")[1].split(/\n  [a-z][a-z-]+:\n/u)[0];
   const smoke = body.indexOf("name: Smoke packaged Electron runtime\n");
@@ -103,15 +103,15 @@ it("uploads completed Windows failure evidence before independent installer work
   const recovery = body.indexOf("name: Verify packaged task recovery (agent-before-response)\n");
   const ui = body.indexOf("name: Verify Windows packaged synthetic scale and IME contracts\n");
   const uiEvidence = body.indexOf("name: Upload Windows packaged UI evidence\n");
-  const installer = body.indexOf("name: Verify Windows NSIS installer lifecycle\n");
+  expect(body).not.toContain("Verify Windows NSIS installer lifecycle");
   expect(failureEvidence).toBeGreaterThan(smoke);
   expect(failureEvidence).toBeLessThan(recovery);
   expect(uiEvidence).toBeGreaterThan(ui);
-  expect(uiEvidence).toBeLessThan(installer);
+  expect(body).toContain("needs: [change-scope, windows-build]");
   expect(body.match(/name: native-smoke-failure-evidence-x64\n/gu)).toHaveLength(1);
   expect(body.match(/name: windows-packaged-ui-x64\n/gu)).toHaveLength(1);
   expect(body.slice(failureEvidence, recovery)).toContain("if: failure()");
-  expect(body.slice(uiEvidence, installer)).toContain("if: always()");
+  expect(body.slice(uiEvidence)).toContain("if: always()");
 });
 
 it.each([[], ["--"], ["all"], ["agent-before-response", "app-after-tool"], ["--", "--", "agent-before-response"]].map(args => ({ args })))(

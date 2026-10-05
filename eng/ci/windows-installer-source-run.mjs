@@ -1,4 +1,6 @@
 export const WINDOWS_NATIVE_JOB_NAME = "Native smoke / Windows x64";
+const WINDOWS_BUILD_JOB_NAME = "Build / Windows x64";
+const WINDOWS_INSTALLER_JOB_NAME = "Windows installer lifecycle / Windows x64";
 export const WINDOWS_INSTALLER_LIFECYCLE_STEP_NAME = "Verify Windows NSIS installer lifecycle";
 export const WINDOWS_PACKAGED_UI_STEP_NAME = "Verify Windows packaged synthetic scale and IME contracts";
 
@@ -21,6 +23,21 @@ export function verifySourceRunMetadata(metadata, sourceSha) {
 
 export function verifySourceRunJobsMetadata(metadata, { allowPackagedUiFailure = false } = {}) {
   const jobs = Array.isArray(metadata?.jobs) ? metadata.jobs : [];
+  if (jobs.some(job => [WINDOWS_BUILD_JOB_NAME, WINDOWS_INSTALLER_JOB_NAME].includes(job?.name))) {
+    for (const [name, conclusion] of [[WINDOWS_BUILD_JOB_NAME, "success"], [WINDOWS_NATIVE_JOB_NAME, "success"], [WINDOWS_INSTALLER_JOB_NAME, "failure"]]) {
+      const matches = jobs.filter(job => job?.name === name);
+      if (matches.length !== 1 || matches[0].status !== "completed" || matches[0].conclusion !== conclusion) {
+        throw new Error(`Split Windows prerequisite ${name} did not complete with ${conclusion}.`);
+      }
+    }
+    const steps = jobs.find(job => job.name === WINDOWS_INSTALLER_JOB_NAME).steps ?? [];
+    const lifecycle = steps.filter(step => step?.name === WINDOWS_INSTALLER_LIFECYCLE_STEP_NAME);
+    if (lifecycle.length !== 1 || lifecycle[0].conclusion !== "failure") {
+      throw new Error("Split Windows installer job did not fail at the lifecycle step.");
+    }
+    verifySuccessfulPredecessors(steps, lifecycle[0]);
+    return;
+  }
   const windowsJobs = jobs.filter((job) => job?.name === WINDOWS_NATIVE_JOB_NAME);
   if (windowsJobs.length !== 1) {
     throw new Error("Source run did not expose exactly one latest Windows native job.");

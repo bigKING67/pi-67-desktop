@@ -95,7 +95,7 @@ Windows 查询在脚本开始、模块加载前后、CIM 调用前后和输出�
 导入也计入原 15 秒总预算，避免通过预热挪出成本；使用当前引擎自带模块而非按名称搜索。
 偏好仅存在于该临时 PowerShell 进程，
 不更改用户或 runner 的全局配置；缺失模块仍失败，不回退到通用发现或其他查询器。
-Windows native job 在应用构建前运行进程身份回归，实际创建、查询并关闭自己的 Node 子进程，
+Windows build job 在应用构建前运行进程身份回归，实际创建、查询并关闭自己的 Node 子进程，
 记录首次冷查询阶段耗时，尽早暴露系统模块/进程查询不兼容。该检查自身使用相同 15 秒
 查询预算，失败阻止后续构建；打包后的三个恢复场景及各自预检仍完整执行。
 清理按登记的进程身份逐个执行；权威查询明确确认缺席后，该身份的退出结果终结，
@@ -220,8 +220,10 @@ Reuse is selected only when all of the following are true:
 
 1. the base SHA has a completed failed `CI` run;
 2. the source is the first immutable run attempt, avoiding ambiguous same-run artifacts;
-3. the Windows native job failed at `Verify Windows NSIS installer lifecycle`;
-4. every Windows native step before the lifecycle step succeeded;
+3. the Windows installer job (or historical combined native job) failed at
+   `Verify Windows NSIS installer lifecycle`;
+4. every predecessor in that job succeeded; for split workflows, exactly one
+   completed successful Windows build and native smoke job must also exist;
 5. exactly one `windows-installer-debug-candidate-<run-id>` artifact exists, is non-empty, and is not expired;
 6. the verifier ref descends from the source SHA;
 7. every source change is in the verifier allowlist or documentation.
@@ -242,7 +244,7 @@ pnpm and Node through separate setup actions. CI verifies both the direct Node r
 runtime resolved through `pnpm exec`. The pnpm store is not cached because a frozen install is
 faster than restoring and saving the current store archive on the hosted runners.
 
-The Windows native lane instead caches Electron and electron-builder download directories. These
+The Windows build lane instead caches Electron and electron-builder download directories. These
 contain versioned Electron and NSIS tool downloads rather than repository build output; the cache
 key is bound to the lockfile and `electron-builder.yml`.
 
@@ -255,6 +257,36 @@ is the artifact consumed by native smoke and all three recovery scenarios.
 Neither fast artifact certifies distribution containers or differential updates.
 Candidate, preview and release flows retain DMG/ZIP and normal NSIS/update output;
 they must not opt into ordinary CI's fast packaging.
+
+### Isolated parallel Windows validation
+
+Ordinary Windows CI builds the application and NSIS once in `windows-build`,
+including the native Electron E2E and early real process-ownership gate. After
+that job succeeds, `native-windows` runs the original full hidden smoke, three
+recovery scenarios and synthetic UI; `windows-installer` runs the selected
+quick/full lifecycle on another Windows runner. Neither consumer waits for the
+other or rebuilds the application. This preserves isolation from installer
+process/desktop effects; do not run both suites concurrently on one desktop.
+
+The build uploads two one-day, same-run transports: the complete unpacked runtime
+for smoke, and the NSIS plus reference executable for installer verification.
+Fixed-path tar files receive one level-1 artifact compression pass. Producer job
+outputs bind the exact artifact ID and identity SHA-256; the manifest also binds
+source SHA, run ID, original build attempt, kind, version and payload size/hash.
+Consumers verify these before extracting into an empty release directory and
+verify executable/ASAR or installer identities after extraction. No build cache,
+name-only fallback, rebuilding on failure or cross-run artifact substitution is
+permitted. A failed-job rerun uses the original producer attempt through its job
+outputs, not the consumer's new attempt number.
+
+All three Windows job results are mandatory when Windows validation is selected.
+Failure, cancellation, a missing result or an unexpected skip fails the aggregate
+gate. Independent consumers retain their own existing failure evidence. The build
+stores native E2E failures as `native-build-failure-evidence-x64`; smoke, recovery,
+UI and installer artifact names and retention remain unchanged. Successful
+transports are CI inputs, not distribution candidates. Report complete elapsed
+time and aggregate runner time including transfer/setup costs before claiming
+that parallelization improves performance.
 
 ## Two-tier Windows installer certification
 

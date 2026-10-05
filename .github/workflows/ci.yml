@@ -162,15 +162,21 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  native-windows:
-    name: Native smoke / Windows x64
+  windows-build:
+    name: Build / Windows x64
     needs: change-scope
     if: >-
       needs.change-scope.outputs.run_windows == 'true' ||
       (needs.change-scope.outputs.reuse_windows_installer == 'true' &&
        needs.change-scope.outputs.reuse_windows_installer_available != 'true')
     runs-on: windows-2025
-    timeout-minutes: 35
+    timeout-minutes: 15
+    outputs:
+      runtime-artifact-id: ${{ steps.upload-runtime.outputs.artifact-id }}
+      installer-artifact-id: ${{ steps.upload-installer.outputs.artifact-id }}
+      runtime-identity: ${{ steps.runtime-identity.outputs.identity-sha256 }}
+      installer-identity: ${{ steps.installer-identity.outputs.identity-sha256 }}
+      build-attempt: ${{ steps.runtime-identity.outputs.build-attempt }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
@@ -222,6 +228,77 @@ jobs:
       - name: Build fast unsigned Windows smoke package
         id: native-package
         run: pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources --ci-fast
+      - name: Prepare Windows runtime transport
+        id: runtime-identity
+        run: node eng/ci/windows-ci-artifact.mjs create runtime
+      - name: Upload Windows runtime transport
+        id: upload-runtime
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: windows-ci-runtime-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/ci/windows-runtime/
+          compression-level: 1
+          if-no-files-found: error
+          retention-days: 1
+      - name: Prepare Windows installer transport
+        id: installer-identity
+        run: node eng/ci/windows-ci-artifact.mjs create installer
+      - name: Upload Windows installer transport
+        id: upload-installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: windows-ci-installer-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/ci/windows-installer/
+          compression-level: 1
+          if-no-files-found: error
+          retention-days: 1
+      - name: Upload native smoke failure evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: failure()
+        with:
+          name: native-build-failure-evidence-x64
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  native-windows:
+    name: Native smoke / Windows x64
+    needs: [change-scope, windows-build]
+    if: ${{ !cancelled() && needs.windows-build.result == 'success' }}
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: 11.16.0
+          runtime: node@24.18.0
+          cache: false
+          install: false
+      - name: Verify runner toolchain
+        shell: bash
+        run: |
+          node -e "if (process.arch !== 'x64' || process.version !== 'v24.18.0') throw new Error('Unexpected Node runtime: ' + process.version + ' ' + process.arch)"
+          test "$(pnpm --version)" = "11.16.0"
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify pnpm execution runtime
+        run: pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
+      - name: Build verifier workspace dependencies
+        run: pnpm run build:packages
+      - name: Download Windows runtime transport
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.windows-build.outputs.runtime-artifact-id }}
+          path: artifacts/ci/windows-runtime
+      - name: Verify and restore Windows runtime transport
+        id: native-package
+        env:
+          PI67_WINDOWS_BUILD_ATTEMPT: ${{ needs.windows-build.outputs.build-attempt }}
+          PI67_WINDOWS_IDENTITY_SHA256: ${{ needs.windows-build.outputs.runtime-identity }}
+        run: node eng/ci/windows-ci-artifact.mjs restore runtime
       - name: Smoke packaged Electron runtime
         if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         run: pnpm run package:smoke
@@ -269,6 +346,43 @@ jobs:
           path: artifacts/validation/windows-packaged-ui/
           if-no-files-found: warn
           retention-days: 14
+
+  windows-installer:
+    name: Windows installer lifecycle / Windows x64
+    needs: [change-scope, windows-build]
+    if: ${{ !cancelled() && needs.windows-build.result == 'success' }}
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: 11.16.0
+          runtime: node@24.18.0
+          cache: false
+          install: false
+      - name: Verify runner toolchain
+        shell: bash
+        run: |
+          node -e "if (process.arch !== 'x64' || process.version !== 'v24.18.0') throw new Error('Unexpected Node runtime: ' + process.version + ' ' + process.arch)"
+          test "$(pnpm --version)" = "11.16.0"
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify pnpm execution runtime
+        run: pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
+      - name: Build verifier workspace dependencies
+        run: pnpm run build:packages
+      - name: Download Windows installer transport
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.windows-build.outputs.installer-artifact-id }}
+          path: artifacts/ci/windows-installer
+      - name: Verify and restore Windows installer transport
+        id: native-package
+        env:
+          PI67_WINDOWS_BUILD_ATTEMPT: ${{ needs.windows-build.outputs.build-attempt }}
+          PI67_WINDOWS_IDENTITY_SHA256: ${{ needs.windows-build.outputs.installer-identity }}
+        run: node eng/ci/windows-ci-artifact.mjs restore installer
       - name: Verify Windows NSIS installer lifecycle
         if: ${{ !cancelled() && steps.native-package.outcome == 'success' }}
         shell: bash
@@ -395,7 +509,7 @@ jobs:
   ci-gate:
     name: CI Gate
     if: always()
-    needs: [change-scope, quality-gates, renderer-e2e, native-windows, native-macos, windows-installer-reuse]
+    needs: [change-scope, quality-gates, renderer-e2e, windows-build, native-windows, windows-installer, native-macos, windows-installer-reuse]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -407,7 +521,9 @@ jobs:
           QUALITY_RESULT: ${{ needs.quality-gates.result }}
           RENDERER_RESULT: ${{ needs.renderer-e2e.result }}
           RUN_WINDOWS: ${{ needs.change-scope.outputs.run_windows }}
+          WINDOWS_BUILD_RESULT: ${{ needs.windows-build.result }}
           WINDOWS_RESULT: ${{ needs.native-windows.result }}
+          WINDOWS_INSTALLER_RESULT: ${{ needs.windows-installer.result }}
           RUN_MACOS: ${{ needs.change-scope.outputs.run_macos }}
           MACOS_RESULT: ${{ needs.native-macos.result }}
           REUSE_WINDOWS_INSTALLER: ${{ needs.change-scope.outputs.reuse_windows_installer }}
@@ -417,6 +533,6 @@ jobs:
           node eng/ci/verify-ci-gate.mjs
           "$SCOPE_RESULT"
           "$RUN_QUALITY" "$QUALITY_RESULT" "$RENDERER_RESULT"
-          "$RUN_WINDOWS" "$WINDOWS_RESULT"
+          "$RUN_WINDOWS" "$WINDOWS_BUILD_RESULT" "$WINDOWS_RESULT" "$WINDOWS_INSTALLER_RESULT"
           "$RUN_MACOS" "$MACOS_RESULT"
           "$REUSE_WINDOWS_INSTALLER" "$REUSE_AVAILABLE" "$WINDOWS_REUSE_RESULT"

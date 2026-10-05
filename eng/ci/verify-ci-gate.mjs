@@ -15,7 +15,9 @@ export function verifyCiGateResults(input) {
 
   assertRequiredResult("quality", String(qualityRequired), input.qualityResult);
   assertRequiredResult("Renderer E2E", String(qualityRequired), input.rendererResult);
+  assertRequiredResult("Windows build", String(windowsRequired), input.windowsBuildResult);
   assertRequiredResult("Windows native", String(windowsRequired), input.windowsResult);
+  assertRequiredResult("Windows installer", String(windowsRequired), input.windowsInstallerResult);
   assertRequiredResult("macOS native", input.runMacos, input.macosResult);
   assertRequiredResult("Windows installer reused candidate", String(reuseSelected), input.windowsReuseResult);
 }
@@ -30,8 +32,8 @@ function assertRequiredResult(label, required, result) {
 }
 
 function parseArguments(arguments_) {
-  if (arguments_.length !== 11) {
-    throw new Error("Expected scope result, quality selection with two results, two native validation pairs, and Windows installer reuse resolution.");
+  if (arguments_.length !== 13) {
+    throw new Error("Expected scope, quality/Renderer results, Windows build/smoke/installer results, macOS result, and installer reuse resolution.");
   }
   return {
     scopeResult: arguments_[0],
@@ -39,12 +41,14 @@ function parseArguments(arguments_) {
     qualityResult: arguments_[2],
     rendererResult: arguments_[3],
     runWindows: arguments_[4],
-    windowsResult: arguments_[5],
-    runMacos: arguments_[6],
-    macosResult: arguments_[7],
-    reuseWindowsInstaller: arguments_[8],
-    reuseAvailable: arguments_[9],
-    windowsReuseResult: arguments_[10]
+    windowsBuildResult: arguments_[5],
+    windowsResult: arguments_[6],
+    windowsInstallerResult: arguments_[7],
+    runMacos: arguments_[8],
+    macosResult: arguments_[9],
+    reuseWindowsInstaller: arguments_[10],
+    reuseAvailable: arguments_[11],
+    windowsReuseResult: arguments_[12]
   };
 }
 
