@@ -1748,6 +1748,12 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   visible and cannot delay the first Prompt. Any configuration or creation failure keeps the text and
   attachments on the intent; if creation succeeds but Prompt submission fails, retry uses
   the already materialized Session and never creates a second JSONL.
+  Until the first Prompt is accepted, an encrypted draft marker retains the pending
+  model, thinking and interaction-mode configuration on that physical Session.
+  A retry, including after draft restoration, confirms those choices again before
+  sending. The draft selectors remain available to explicitly replace failed choices;
+  missing configuration never silently discards a pending choice. Switching Tasks
+  during confirmation prevents subsequent configuration or submission into another Task.
 - A provisional conversation row exposes `丢弃草稿` in its hover/focus menu. A draft
   containing no user-authored text, attachment, Workspace reference, review comment, or
   prompt stash is discarded directly; a content-bearing draft requires confirmation.

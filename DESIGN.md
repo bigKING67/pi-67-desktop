@@ -1709,6 +1709,11 @@ loading error where the operation can produce those states
   intent. First submit creates the Session, confirms model, confirms thinking, then
   sends the Prompt; failure at any stage keeps the draft and names the unconfirmed
   setting. The controls never mutate Provider defaults merely by being changed.
+  If creation succeeds but first-send configuration or submission fails, keep these
+  draft controls on the materialized Session until the first Prompt is accepted.
+  Show the retained choices after reload, let the user explicitly replace them, and
+  confirm model, thinking and interaction mode on retry. Pending choices unavailable
+  in the current catalog remain visible instead of falling back silently.
 - The primary model selector lists configured models only. It may retain the
   current model if authentication changes so the selected value never disappears.
 - Provider setup belongs to the `Provider 与凭据` dialog rather than the model
@@ -1743,7 +1748,13 @@ loading error where the operation can produce those states
 - A model change returns controls and its model catalog as one authoritative
   mutation result. The Renderer updates the selected model, clamped thinking
   value, and available thinking levels together; both controls remain disabled
-  while that model mutation is pending.
+  while that model mutation is pending. Matching Session metadata alone cannot
+  confirm the mutation: the complete catalog must be installed from its ACK or
+  an authoritative projection resync. A newer catalog revision requires resync
+  instead of confirming against potentially stale thinking options.
+  A thinking-only mutation may be confirmed by matching metadata that precedes
+  its ACK, but only for the same model and Session authority. A newer conflicting
+  model or thinking value is preserved and cannot be reported as that request's success.
 - Inline Turn activity is a bounded execution timeline rather than one generic
   spinner. It names import and compaction, displays the bounded real Tool name,
   maps verified Tool presentation kinds to reading, search, edit, command,

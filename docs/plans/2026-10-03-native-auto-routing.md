@@ -1,9 +1,9 @@
 # Native Auto routing and isolated Durable compatibility
 
-Status: complete for authorized local delivery (bounded live Auto acceptance and profile setup pass; packaged live dispatch and Windows remain unverified)
+Status: complete for bounded local Auto delivery and startup-configuration retry repair (macOS packaged live dispatch and cold readback passed on the earlier recorded package; repaired startup retries passed synthetic acceptance on the rebuilt package; Windows remains unverified)
 Owner: Codex
 Started: 2026-10-03
-Last updated: 2026-10-04
+Last updated: 2026-10-05
 
 ## Goal
 
@@ -44,7 +44,9 @@ Durable does not enter the production dependency graph in this change.
 ## Delivery boundary
 
 - Local implementation: authorized by user's continue and classifier selection.
-- Commit/push: not part of this change's authorization.
+- Original local delivery excluded commit/push. On 2026-10-05, the user authorized
+  separate scoped commits for Workspace conversation defaults and model confirmation /
+  startup retries, one push to origin/main, and exact-SHA CI follow-up. No publication.
 - Candidate: local macOS preview only under repository default; no upload.
 - Release and user data migration: out of scope.
 - 2026-10-04 follow-up: user accepted Doubao 2.1 Lite judge, DeepSeek Flash
@@ -62,6 +64,11 @@ Durable does not enter the production dependency graph in this change.
   continue: at most 20 requests / 6,656 requested output tokens, no retries,
   with the combined v2+v3 ceiling revised to 21 / 6,784. The single v3 run
   passed and consumed exactly that ceiling. No further paid calls are included.
+- 2026-10-05: the user separately authorized two exact synthetic tasks through
+  the packaged Composer: at most 4 requests / 4,608 requested output tokens,
+  no retries. Work paused for the workspace conversation-default change, then
+  resumed on explicit confirmation that it was complete. This single campaign
+  passed and consumed all four admitted requests; its ledger cannot be reset.
 
 ## Current evidence
 
@@ -91,6 +98,46 @@ Durable does not enter the production dependency graph in this change.
 
 ## Checkpoints
 
+### 2026-10-05 startup configuration retry repair (complete locally)
+
+User authorized the follow-up after packaged live acceptance. Preserve all existing
+WIP and the exhausted live ledger; no paid calls, commit, push or distribution.
+The existing encrypted Composer draft will retain a bounded pending flag and
+startup preferences after materialization. Retry reuses the physical Session,
+confirms model, thinking and Plan intent, and sends only after success. While
+pending, the same draft selectors let the user explicitly replace those choices.
+Pi JSONL stays Session truth; this flag represents unsent UI configuration only.
+
+- [x] Persist and restore pending startup intent on the materialized conversation.
+- [x] Reapply pending configuration before retry; retain failure and reject stale authority.
+- [x] Verify failure/retry, explicit replacement, cold restore and one Session with synthetic tests.
+- [x] Source gates and rebuilt macOS preview/smoke; no live provider requests.
+
+Acceptance: aggregate source gate passed 955 files / 6,378 tests (9 files /
+24 tests skipped); Renderer E2E passed all three setup-failure cases plus bootstrap.
+The first native probe exposed a thinking-ACK race: matching metadata arrived
+before the ACK and made its projection revision stale. Confirmation now checks the
+exact ACK Session/model/level and current authority/controls, preserving newer
+state while accepting matching metadata. Its three regressions and independent
+read-only review passed; the initial FAIL receipt is retained.
+
+The rebuilt Alpha.43 macOS arm64 preview and smoke passed. ASAR: 195,194,047 bytes,
+SHA-256 `b82263711b753bd507a41b56793d70e7e1514b52905ed0a139b9c28f4180c17d`.
+On these exact bytes, isolated model-failure and thinking-failure cases both
+passed cold restoration, explicit replacement, high thinking, same-Session retry
+and exactly one synthetic response. Owned processes exited normally and both
+Profiles were removed. No paid requests were made. Evidence:
+`artifacts/validation/startup-configuration-retry-20261005/acceptance.md`,
+`model-receipt.json` and `thinking-receipt.json` in the same directory.
+The earlier paid Auto receipt and exhausted ledger were preserved; that receipt
+does not establish real-provider acceptance for the rebuilt ASAR. No commit,
+push or distribution was performed; Windows remains unverified.
+
+Rollback: revert only this follow-up's scoped source. Older binaries reject the
+new optional encrypted-draft field, so do not use an older binary against a
+Profile with pending drafts without preserving its encrypted state. No existing
+Pi JSONL format, global settings or credentials are migrated.
+
 - [x] 1. Native API and current authority checked; classifier approach accepted.
 - [x] 2. Configuration and native dispatch implemented with synthetic regressions.
 - [x] 3. Settings and decision/usage projection implemented and verified.
@@ -105,10 +152,11 @@ Durable does not enter the production dependency graph in this change.
 
 | Layer | Procedure | Result |
 | --- | --- | --- |
-| Source | aggregate check:source; narrow follow-up typecheck/lint/tests | PASS: 934 files / 6,135 tests; 9 files / 24 tests skipped; later fork regression and draft choice follow-up pass |
+| Source | aggregate check:source; narrow follow-up typecheck/lint/tests | PASS on 2026-10-05: 955 files / 6,378 tests; 9 files / 24 tests skipped; final model/thinking/session regression subset 39/39 passed |
 | Pi SDK | isolated real SDK transports, cancellation/retry/steering, JSONL reopen/fork | PASS synthetic; native PLAN context and pre-dispatch decision notification regressions included |
 | Renderer | focused E2E and browser67 light/dark inspection | PASS: 4 feature tests + bootstrap; two retained screenshots |
-| macOS | preview:mac:unsigned package/smoke + native AX readback | PASS on arm64; user-assisted post-save navigation exposed all three saved Auto references and disabled Save. Live v3 dispatch used isolated native SDK sessions; packaged UI live dispatch is still unverified |
+| macOS | preview:mac:unsigned package/smoke + actual packaged Composer | PASS on arm64: two synthetic live tasks, expected physical routes, same JSONL sessions after cold reopen, and three-model usage UI readback; 4 requests, 0 retries, 0 cold classification requests |
+| Startup retry | Renderer failure injection; rebuilt macOS isolated synthetic provider | PASS: 3 Renderer failure cases + bootstrap; 2 native cold-reopen cases, explicit replacement, high thinking, one original Session and one synthetic response each; 0 paid calls |
 | Windows | real target acceptance | unverified locally |
 | Live Auto | frozen author-created suite, repeats, two native session.prompt tasks | PASS: 12/12 fixed cases + 4/4 repeats; 18 valid judge responses, both candidate routes and JSONL reopens; 20 calls / 6,656 requested output tokens, no retries |
 | User configuration | production exact-revision mutation and native offline readback | PASS: judge/standard/complex saved; default, other settings, models and auth preserved; no inference calls |
@@ -135,6 +183,34 @@ Durable storage, approvals and extension APIs may require a migration rather
 than a wrapper; its package remains experimental.
 
 ## Progress log
+
+- 2026-10-05 resumed packaged acceptance: fixed Renderer selection confirmation
+  racing with matching Session metadata. Pending selection now waits for its
+  complete catalog ACK or resync; a failed selection recovers only when controls
+  and catalog are installed together. Four regressions cover early metadata,
+  stale catalog revisions, failed same-model reselection and partial-catalog
+  recovery. Shared test fixture extraction preserves the file-size gate.
+  Independent read-only review passed after the partial-catalog case was fixed.
+- The earlier unsigned macOS preview used for the paid campaign was based on `886bcbc3250b98887dbde0249d2b14be435a211c`
+  plus the preserved workspace-default WIP and this local fix. Its ASAR is
+  195,192,357 bytes, SHA-256
+  `f43db7dfc6c753268473cea35d5b4b1f79f6cbb9d4bcc7ad0fa7e7b01f505a8f`.
+  This is local dirty-preview evidence, not an exact clean-SHA distribution.
+  The isolated packaged campaign passed on these exact bytes: Doubao judged
+  twice, DeepSeek Flash and GPT-6.1 Sol each completed one task; reported usage
+  was 2,108 total tokens, including 556 output tokens. The requested output
+  ceilings totalled 4,608. Costs in JSONL are not provider billing evidence.
+  Cold reopening retained both session identities, decisions, answers and usage
+  without another request. Canonical settings/models/auth were unchanged,
+  credentials were not copied, owned processes exited and the fixture was removed.
+  Bounded receipt: `artifacts/validation/pi-source-delivery-20261005/packaged-auto-live/live/receipt.json`;
+  receipt SHA-256 `73cd5fc1d3c357948db3d9b6e81056958d181cfb8aefd27fcaad2f64c72ff7cb`.
+- Follow-up found by source review: if first-message model/thinking setup fails
+  after materialization, the next ordinary Composer submission can bypass the
+  retained startup preference. This failure/retry path was not exercised by the
+  successful campaign; the separately authorized repair and synthetic acceptance
+  are now complete as recorded above. The former Host `UNSUPPORTED` startup failure did not recur in the
+  resumed package; no speculative SDK initialization change was made.
 
 - 2026-10-04 scope resolved: the user chose recovery of the current task after an
   app/Agent crash. Implementation continues in

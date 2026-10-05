@@ -19,13 +19,12 @@ import {
 import type { DesktopTextEncryption } from "./desktop-text-encryption.js";
 import { isBoundedSessionFileIdentity } from "./workbench-state-value-contract.js";
 import { parseConversationScopeChoice } from "@pi67/protocol";
-import { parseDraftTeamScope, parseStartupModel } from "./composer-draft-creation-intent.js";
+import { parseDraftTeamScope, parseStartupConfiguration } from "./composer-draft-creation-intent.js";
 
 export const MAX_STORED_COMPOSER_DRAFT_STATE_BYTES = 8 * 1024 * 1024;
 const MAX_ID_CHARS = 1_024;
 const MAX_DRAFT_ID_CHARS = 200;
 const MAX_SESSION_PATH_CHARS = 32_768;
-const MAX_THINKING_LEVEL_CHARS = 64;
 export interface StoredComposerDraftState {
   version: 1;
   encryptedState?: string;
@@ -49,7 +48,7 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
       candidate,
       [
         "conversation", "text", "streamBehavior", "updatedAt", "workspaceFiles", "reviewComments",
-        "promptStash", "environmentIntent", "interactionMode", "startupModel", "startupThinkingLevel", "teamScope", "scopeChoice"
+        "promptStash", "environmentIntent", "interactionMode", "startupModel", "startupThinkingLevel", "startupConfigurationPending", "teamScope", "scopeChoice"
       ],
       ["conversation", "text", "streamBehavior", "updatedAt"]
     )) return undefined;
@@ -67,17 +66,16 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
     if (candidate.reviewComments !== undefined && !reviewComments) return undefined;
     const promptStash = parsePromptStash(candidate.promptStash);
     if (candidate.promptStash !== undefined && !promptStash) return undefined;
-    const startupModel = parseStartupModel(candidate.startupModel);
-    if (candidate.startupModel !== undefined && !startupModel) return undefined;
-    const startupThinkingLevel = candidate.startupThinkingLevel;
-    if (startupThinkingLevel !== undefined
-      && !isBoundedString(startupThinkingLevel, MAX_THINKING_LEVEL_CHARS)) return undefined;
+    const startup = parseStartupConfiguration(candidate, conversation.kind === "provisional");
+    if (!startup) return undefined;
+    const { startupModel, startupThinkingLevel, startupConfigurationPending } = startup;
     if (
       candidate.text.length === 0
       && !reviewComments?.length
       && !promptStash?.length
       && !startupModel
       && !startupThinkingLevel
+      && !startupConfigurationPending
     ) return undefined;
     const textBytes = Buffer.byteLength(candidate.text, "utf8");
     const reviewBytes = (reviewComments ?? []).reduce(
@@ -105,14 +103,6 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
         && candidate.environmentIntent !== "worktree"
       )
       || (candidate.environmentIntent !== undefined && conversation.kind !== "provisional")
-      || (
-        candidate.interactionMode !== undefined
-        && candidate.interactionMode !== "execute"
-        && candidate.interactionMode !== "plan"
-      )
-      || (candidate.interactionMode !== undefined && conversation.kind !== "provisional")
-      || (candidate.startupModel !== undefined && conversation.kind !== "provisional")
-      || (candidate.startupThinkingLevel !== undefined && conversation.kind !== "provisional")
       || !Number.isSafeInteger(candidate.updatedAt)
       || Number(candidate.updatedAt) < 0
     ) return undefined;
@@ -130,9 +120,7 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
       ...(candidate.environmentIntent ? { environmentIntent: candidate.environmentIntent } : {}),
       ...(teamScope ? { teamScope } : {}),
       ...(scopeChoice ? { scopeChoice } : {}),
-      ...(candidate.interactionMode ? { interactionMode: candidate.interactionMode } : {}),
-      ...(startupModel ? { startupModel } : {}),
-      ...(startupThinkingLevel ? { startupThinkingLevel } : {})
+      ...startup
     });
   }
   const selectedConversation = value.selectedConversation === undefined

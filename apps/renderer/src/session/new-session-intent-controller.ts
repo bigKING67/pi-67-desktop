@@ -42,11 +42,13 @@ async function submitIntent(
   workspaceFiles: readonly ComposerWorkspaceFileRef[]
 ): Promise<PromptSubmissionResult> {
   const selected = selectedWorkbenchTask(rendererWorkbenchStore.getState());
+  const draft = useTaskDraftStore.getState().drafts[taskId];
   if (
     !selected
     || selected.id !== taskId
-    || selected.conversation.kind !== "provisional"
-    || selected.lifecycle !== "draft"
+    || (selected.conversation.kind === "provisional"
+      ? selected.lifecycle !== "draft"
+      : !draft?.startupConfigurationPending)
     || selected.creationStatus !== undefined
   ) {
     return { accepted: false, error: "当前新对话草稿已失效，请重新选择后再发送。" };
@@ -61,20 +63,23 @@ async function submitIntent(
     return { accepted: false, error };
   }
 
-  const draft = useTaskDraftStore.getState().drafts[taskId];
   const interactionMode = draft?.interactionMode ?? "execute";
   const startupModel = draft?.startupModel;
   const startupThinkingLevel = draft?.startupThinkingLevel;
 
-  const materialized = await materializeRendererSessionIntent(taskId);
-  if (materialized.status !== "materialized") {
-    return { accepted: false, error: materialized.error };
+  useTaskDraftStore.getState().setStartupConfigurationPending(taskId, true);
+  if (selected.conversation.kind === "provisional") {
+    const materialized = await materializeRendererSessionIntent(taskId);
+    if (materialized.status !== "materialized") {
+      return { accepted: false, error: materialized.error };
+    }
   }
   if (!await waitForMaterializedTask(taskId)) {
     const error = "对话已经创建，但界面尚未完成绑定。草稿和附件已保留，请稍候后重试。";
     publishNotification({ level: "warning", title: "首条消息尚未发送", message: error });
     return { accepted: false, error };
   }
+  if (!taskMatchesActiveProjection(taskId)) return startupConfigurationFailure("当前会话已切换");
   if (
     startupModel
     && !await selectSessionModel(startupModel.provider, startupModel.model)
@@ -83,18 +88,18 @@ async function submitIntent(
   }
   if (
     startupThinkingLevel
+    && taskMatchesActiveProjection(taskId)
     && !await setSessionThinkingLevel(startupThinkingLevel)
   ) {
     return startupConfigurationFailure("思考级别未能确认");
   }
   if (
-    interactionMode === "plan"
-    && !await setRendererSessionInteractionMode("plan")
+    taskMatchesActiveProjection(taskId)
+    && !await setRendererSessionInteractionMode(interactionMode)
   ) {
-    const error = "对话已经创建，但计划模式未能确认。草稿和附件已保留，请重试。";
-    publishNotification({ level: "warning", title: "首条消息尚未发送", message: error });
-    return { accepted: false, error };
+    return startupConfigurationFailure(interactionMode === "plan" ? "计划模式未能确认" : "执行模式未能确认");
   }
+  if (!taskMatchesActiveProjection(taskId)) return startupConfigurationFailure("当前会话已切换");
   return submitRendererPrompt(text, "send", submissionId, attachments, workspaceFiles);
 }
 
@@ -131,6 +136,7 @@ function taskMatchesActiveProjection(taskId: string): boolean {
   const projection = useSessionProjectionStore.getState();
   return Boolean(
     task
+    && selectedWorkbenchTask(rendererWorkbenchStore.getState())?.id === taskId
     && task.conversation.kind === "session"
     && projection.authority.phase === "active"
     && projection.identity?.sessionFileIdentity === task.conversation.sessionFileIdentity

@@ -92,6 +92,7 @@ export interface ComposerDraftRecord {
   interactionMode?: SessionInteractionMode;
   startupModel?: ComposerDraftModelSelection;
   startupThinkingLevel?: string;
+  startupConfigurationPending?: true;
 }
 
 export interface ComposerDraftPersistedState {

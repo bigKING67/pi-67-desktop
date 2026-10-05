@@ -104,7 +104,7 @@ function matchesModelSelectionToken(
     && modelSelectionTargetKey(selection.target) === token.targetKey;
 }
 
-useSessionProjectionStore.subscribe((state) => {
+useSessionProjectionStore.subscribe((state, previous) => {
   const selection = useModelSelectionStore.getState();
   if (!selection.authorityKey || state.authority.phase !== "active") return;
   const activeAuthorityKey = modelSelectionAuthorityKey(state.authority);
@@ -115,7 +115,11 @@ useSessionProjectionStore.subscribe((state) => {
   const selectedModel = state.controls?.selectedModel;
   const targetKey = modelSelectionTargetKey(selection.target);
   if (
-    (selection.status === "pending" || selection.status === "failed")
+    // Metadata alone has no model-specific thinking catalog. Pending choices
+    // are confirmed by the command controller after a full ACK or resync.
+    selection.status === "failed"
+    && state.modelCatalog !== previous.modelCatalog
+    && state.controls !== previous.controls
     && targetKey !== undefined
     && modelSelectionTargetKey(selectedModel) === targetKey
   ) {

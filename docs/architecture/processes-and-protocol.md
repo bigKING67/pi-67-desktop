@@ -1324,6 +1324,12 @@ validates exact bounded scope keys on provisional records only, rejects malforme
 scope rather than stripping it, and stores no permission grant. Renderer snapshots
 scope before connection recovery, rejects drift and stale cross-scope draft restore,
 and drops creation intent once the conversation materializes; Pi JSONL remains truth.
+Separately, `ComposerDraftRecord.startupConfigurationPending?: true` retains unsent
+model/thinking/interaction intent after materialization. Main accepts those preferences
+on a physical-session draft only with the exact boolean marker; ordinary session
+drafts still reject them. This encrypted checkpoint stores no model authority or
+permission grant. Renderer retries configuration against the active physical Session,
+skips `session.create`, and clears the marker when the first Prompt is accepted.
 SessionSnapshot.memoryOrigin is a read-only projection of validated full-history
 provenance: private, team with teamId/projectId, or unverified. It carries no userId,
 endpoint or lease and grants no access. Missing fields in older snapshots are

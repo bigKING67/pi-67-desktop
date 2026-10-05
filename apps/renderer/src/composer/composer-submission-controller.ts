@@ -21,7 +21,7 @@ export function submitComposerDraft(input: {
 }): Promise<PromptSubmissionResult> {
   const validationError = promptTextValidationMessage(input.text);
   if (validationError) return Promise.resolve({ accepted: false, error: validationError });
-  return input.provisional
+  return input.provisional || useTaskDraftStore.getState().drafts[input.taskId]?.startupConfigurationPending
     ? submitRendererNewSessionIntent(
         input.taskId,
         input.text,
@@ -55,4 +55,5 @@ export function clearAcceptedComposerDraft(input: {
   drafts.setAttachments(input.taskId, []);
   drafts.setStartupModel(input.taskId, undefined);
   drafts.setStartupThinkingLevel(input.taskId, undefined);
+  drafts.setStartupConfigurationPending(input.taskId, false);
 }

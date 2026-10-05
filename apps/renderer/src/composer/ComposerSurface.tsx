@@ -69,7 +69,7 @@ interface ComposerSurfaceProps {
   filePickerOpen: boolean;
   hasDraft: boolean;
   interactionMode: "execute" | "plan";
-  newSessionIntent: boolean;
+  startupConfiguration: boolean;
   sessionTransitionPending: boolean;
   slashActiveIndex: number;
   slashCatalog: ComposerSlashCatalogState;
@@ -260,8 +260,8 @@ export function ComposerSurface(props: ComposerSurfaceProps) {
           </div>
           <div className={styles.actions}>
             {props.activeSessionAuthority ? <ComposerContextPressure /> : null}
-            {props.activeSessionAuthority ? <ComposerRuntimeControls submitting={props.submitting} /> : null}
-            {props.newSessionIntent && props.activeTaskId ? (
+            {props.activeSessionAuthority && !props.startupConfiguration ? <ComposerRuntimeControls submitting={props.submitting} /> : null}
+            {props.startupConfiguration && props.activeTaskId ? (
               <ComposerIntentRuntimeControls
                 key={props.activeTaskId}
                 submitting={props.submitting}

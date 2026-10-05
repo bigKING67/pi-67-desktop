@@ -64,6 +64,7 @@ export function selectSessionModel(
   const selection = useModelSelectionStore.getState();
   if (
     selection.status !== "pending"
+    && selection.status !== "failed"
     && modelSelectionTargetKey(useSessionProjectionStore.getState().controls?.selectedModel)
       === modelSelectionTargetKey(modelTarget)
   ) {
@@ -140,14 +141,22 @@ export async function setSessionThinkingLevel(
   try {
     const authority = requireSessionAuthority(get());
     const target = requireProjectionTarget(authority);
+    const expectedModel = modelSelectionTargetKey(useSessionProjectionStore.getState().controls?.selectedModel);
     const result = await agentConnectionController.request("thinking.set", { level });
-    const applied = applyProjectionResponse(
+    if (result.sessionId !== authority.sessionId
+      || result.controls.thinkingLevel !== level
+      || modelSelectionTargetKey(result.controls.selectedModel) !== expectedModel) return false;
+    applyProjectionResponse(
       get,
       authority,
       () => useSessionProjectionStore.getState().applyControlResult(target, result)
     );
-    if (applied) rememberCurrentSessionRuntime(authority);
-    return applied;
+    const controls = useSessionProjectionStore.getState().controls;
+    const confirmed = acceptRendererSessionResponse(get(), authority)
+      && controls?.thinkingLevel === level
+      && modelSelectionTargetKey(controls.selectedModel) === expectedModel;
+    if (confirmed) rememberCurrentSessionRuntime(authority);
+    return confirmed;
   } catch (error) {
     publishActionError(error, "无法调整思考级别");
     return false;
@@ -260,7 +269,11 @@ async function performModelSelection(
       if (isPendingModelSelection(token)) resetModelSelection();
       return false;
     }
-    if (authoritativeModelMatches(modelTarget)) {
+    if (
+      resultMatchesTarget
+      && useSessionProjectionStore.getState().modelCatalog === result.modelCatalog
+      && authoritativeModelMatches(modelTarget)
+    ) {
       confirmModelSelection(token);
       rememberCurrentSessionRuntime(authority);
       return true;

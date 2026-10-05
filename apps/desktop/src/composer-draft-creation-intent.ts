@@ -1,9 +1,33 @@
 import type { ComposerDraftRecord } from "@pi67/protocol";
 
-export function parseStartupModel(value: unknown): ComposerDraftRecord["startupModel"] | undefined {
+function parseStartupModel(value: unknown): ComposerDraftRecord["startupModel"] | undefined {
   const record = exactPair(value, "provider", "model");
   if (!record || !bounded(record.provider, 512) || !bounded(record.model, 512)) return undefined;
   return { provider: record.provider, model: record.model };
+}
+
+type StartupConfiguration = Pick<ComposerDraftRecord,
+  "startupModel" | "startupThinkingLevel" | "interactionMode" | "startupConfigurationPending">;
+
+export function parseStartupConfiguration(
+  candidate: Record<string, unknown>,
+  provisional: boolean
+): StartupConfiguration | undefined {
+  const pending = candidate.startupConfigurationPending;
+  if (pending !== undefined && pending !== true) return undefined;
+  const model = parseStartupModel(candidate.startupModel);
+  if (candidate.startupModel !== undefined && !model) return undefined;
+  const thinking = candidate.startupThinkingLevel;
+  if (thinking !== undefined && !bounded(thinking, 64)) return undefined;
+  const mode = candidate.interactionMode;
+  if (mode !== undefined && mode !== "execute" && mode !== "plan") return undefined;
+  if (!provisional && !pending && [model, thinking, mode].some((value) => value !== undefined)) return undefined;
+  return {
+    ...(pending ? { startupConfigurationPending: pending } : {}),
+    ...(model ? { startupModel: model } : {}),
+    ...(thinking ? { startupThinkingLevel: thinking } : {}),
+    ...(mode ? { interactionMode: mode } : {})
+  };
 }
 
 export function parseDraftTeamScope(value: unknown): ComposerDraftRecord["teamScope"] | undefined {

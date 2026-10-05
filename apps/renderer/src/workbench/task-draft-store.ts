@@ -30,6 +30,7 @@ export interface TaskDraft {
   interactionMode: "execute" | "plan";
   startupModel?: ComposerDraftModelSelection;
   startupThinkingLevel?: string;
+  startupConfigurationPending?: true;
 }
 
 export const EMPTY_TASK_DRAFT: TaskDraft = {
@@ -61,11 +62,12 @@ interface TaskDraftState {
   setInteractionMode: (taskId: string, interactionMode: TaskDraft["interactionMode"]) => void;
   setStartupModel: (taskId: string, startupModel: ComposerDraftModelSelection | undefined) => void;
   setStartupThinkingLevel: (taskId: string, startupThinkingLevel: string | undefined) => void;
+  setStartupConfigurationPending: (taskId: string, pending: boolean) => void;
   restore: (
     taskId: string,
     draft: Pick<TaskDraft, "text" | "streamBehavior"> & Partial<Pick<TaskDraft,
       "interactionMode" | "workspaceFiles" | "reviewComments" | "promptStash"
-      | "startupModel" | "startupThinkingLevel">>
+      | "startupModel" | "startupThinkingLevel" | "startupConfigurationPending">>
   ) => "restored" | "conflict";
   transfer: (sourceTaskId: string, targetTaskId: string) => "empty" | "moved" | "conflict";
   discard: (taskId: string) => void;
@@ -209,6 +211,14 @@ export const useTaskDraftStore = create<TaskDraftState>((set, get) => ({
     }));
   },
 
+  setStartupConfigurationPending(taskId, pending) {
+    set((state) => {
+      const { startupConfigurationPending: _pending, ...draft } = draftFor(state, taskId);
+      return { drafts: { ...state.drafts, [taskId]: pending
+        ? { ...draft, startupConfigurationPending: true } : draft } };
+    });
+  },
+
   restore(taskId, draft) {
     const current = get().drafts[taskId];
     // Any existing record represents a newer live-window mutation, including
@@ -225,6 +235,7 @@ export const useTaskDraftStore = create<TaskDraftState>((set, get) => ({
           promptStash: draft.promptStash?.map(cloneStashItem) ?? [],
           streamBehavior: draft.streamBehavior,
           interactionMode: draft.interactionMode ?? "execute",
+          ...(draft.startupConfigurationPending ? { startupConfigurationPending: true as const } : {}),
           ...(draft.startupModel ? { startupModel: { ...draft.startupModel } } : {}),
           ...(draft.startupThinkingLevel ? { startupThinkingLevel: draft.startupThinkingLevel } : {})
         }
@@ -271,6 +282,7 @@ function draftFor(state: TaskDraftState, taskId: string): TaskDraft {
 
 export function taskDraftHasContent(draft: TaskDraft): boolean {
   return taskDraftHasUserContent(draft)
+    || draft.startupConfigurationPending === true
     || draft.startupModel !== undefined
     || draft.startupThinkingLevel !== undefined;
 }

@@ -1,3 +1,4 @@
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import type { SessionSnapshot, WorkspaceChangesProjection } from "@pi67/domain";
 import {
   eventEnvelope,
@@ -207,4 +208,37 @@ function snapshot(sessionId: string, overrides: Partial<SessionSnapshot> = {}): 
 
 function emptyChanges(): WorkspaceChangesProjection {
   return { sessionId: "session-1", items: [], truncated: false, total: 0 };
+}
+
+export function installWorkbenchSession(): void {
+  rendererWorkbenchStore.getState().registerWorkspace({
+    id: "workspace-a",
+    displayName: "Workspace A",
+    identity: { canonicalPath: "/workspace", assurance: "path-only" },
+    trust: "trusted",
+    trustProvenance: "native-picker",
+    availability: "available"
+  });
+  rendererWorkbenchStore.getState().restoreTask({
+    id: "task-session-1",
+    conversation: {
+      kind: "session",
+      workspaceId: "workspace-a",
+      sessionFileIdentity: "session-file-session-1",
+      sessionPath: "/sessions/session-1.jsonl"
+    },
+    workspaceId: "workspace-a",
+    sessionId: "session-1",
+    taskGeneration: 1,
+    sessionGeneration: 3,
+    sessionFileIdentity: "session-file-session-1",
+    sessionPath: "/sessions/session-1.jsonl",
+    lifecycle: "idle",
+    runtime: { phase: "ready", detail: "ready", recoverable: true },
+    title: "Session 1",
+    hasDraft: false,
+    toolMode: "auto",
+    attachmentCount: 0
+  });
+  rendererWorkbenchStore.getState().selectTask("task-session-1");
 }

@@ -41,6 +41,7 @@ export function ComposerIntentRuntimeControls({
 }) {
   const draftModel = useTaskDraftStore((state) => state.drafts[taskId]?.startupModel);
   const draftThinking = useTaskDraftStore((state) => state.drafts[taskId]?.startupThinkingLevel);
+  const pending = useTaskDraftStore((state) => state.drafts[taskId]?.startupConfigurationPending);
   const credentialDialogOpen = useShellStore((state) => state.credentialDialogOpen);
   const setCredentialDialogOpen = useShellStore((state) => state.setCredentialDialogOpen);
   const [snapshot, setSnapshot] = useState<PiProviderConfigurationSnapshot>();
@@ -57,7 +58,7 @@ export function ComposerIntentRuntimeControls({
     if (!recentPreference) return;
     const drafts = useTaskDraftStore.getState();
     const current = drafts.drafts[taskId];
-    if (current?.startupModel || current?.startupThinkingLevel) return;
+    if (current?.startupConfigurationPending || current?.startupModel || current?.startupThinkingLevel) return;
     drafts.setStartupModel(taskId, recentPreference.model);
     drafts.setStartupThinkingLevel(taskId, recentPreference.thinkingLevel);
   }, [recentPreference, taskId]);
@@ -86,6 +87,7 @@ export function ComposerIntentRuntimeControls({
       ))
     : undefined;
   const unavailableAuto = !selected && draftModel?.provider === "pi67-auto" && draftModel.model === "auto";
+  const unavailablePendingModel = pending && draftModel && !selected;
   const modelGroups: ComposerRuntimeSelectOptionGroup[] = providers
     .filter((provider) => provider.configured && provider.models.length > 0)
     .map((provider) => ({
@@ -124,7 +126,7 @@ export function ComposerIntentRuntimeControls({
   );
 
   useEffect(() => {
-    if (!snapshot || !draftModel) return;
+    if (!snapshot || !draftModel || pending) return;
     const selectedModel = runtimeModels(runtimeProviders(snapshot)).find((candidate) => (
       candidate.provider.id === draftModel.provider
       && candidate.model.id === draftModel.model
@@ -146,7 +148,7 @@ export function ComposerIntentRuntimeControls({
       useTaskDraftStore.getState().setStartupThinkingLevel(taskId, undefined);
       if (workspaceId && usingRecentPreference) forgetSessionRuntimePreference(workspaceId);
     }
-  }, [draftModel, draftThinking, recentPreference, snapshot, taskId, usingRecentPreference, workspaceId]);
+  }, [draftModel, draftThinking, pending, recentPreference, snapshot, taskId, usingRecentPreference, workspaceId]);
 
   return (
     <div className={styles.runtimeControls} aria-label={messages.composer.runtimeSettings}>
@@ -154,7 +156,8 @@ export function ComposerIntentRuntimeControls({
         <ComposerRuntimeSelect
           ariaLabel={messages.composer.modelLabel}
           disabled={submitting || loading}
-          footer={unavailableAuto ? "Auto 配置不可用。请更新配置或明确选择其他模型。" : usingRecentPreference
+          footer={unavailableAuto || unavailablePendingModel ? "所选模型配置不可用。请更新配置或明确选择其他模型。" : pending
+            ? "首条消息尚未发送；下次发送前会重新确认这些设置。" : usingRecentPreference
             ? "沿用当前工作区最近一次成功配置。"
             : draftModel
               ? "将在创建会话后、发送首条消息前应用。"
@@ -185,7 +188,7 @@ export function ComposerIntentRuntimeControls({
           optionGroups={modelGroups}
           options={modelOptions}
           selectedKey={selected?.key ?? null}
-          valueText={loading ? "正在读取模型…" : unavailableAuto ? "Auto · 配置不可用" : selected?.model.name ?? selected?.model.id ?? messages.composer.selectModel}
+          valueText={loading ? "正在读取模型…" : unavailableAuto ? "Auto · 配置不可用" : unavailablePendingModel ? `${draftModel.model} · 配置不可用` : selected?.model.name ?? selected?.model.id ?? messages.composer.selectModel}
           variant="model"
         />
       </div>

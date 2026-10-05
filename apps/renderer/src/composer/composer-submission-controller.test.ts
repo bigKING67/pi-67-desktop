@@ -109,8 +109,17 @@ describe("composer submission controller", () => {
     expect(mocks.prompt).not.toHaveBeenCalled();
   });
 
+  it("routes a materialized draft with pending configuration back through startup confirmation", async () => {
+    useTaskDraftStore.getState().setStartupConfigurationPending("task-a", true);
+    await submitComposerDraft({ taskId: "task-a", provisional: false, text: "retry",
+      submissionId: "retry-a", attachments: [], workspaceFiles: [], activeStreaming: false, streamBehavior: "followUp" });
+    expect(mocks.newSession).toHaveBeenCalledWith("task-a", "retry", "retry-a", [], []);
+    expect(mocks.prompt).not.toHaveBeenCalled();
+  });
+
   it("clears only the exact accepted review snapshot and releases unretained previews", () => {
     seedDraft("task-a");
+    useTaskDraftStore.getState().setStartupConfigurationPending("task-a", true);
 
     clearAcceptedComposerDraft({
       taskId: "task-a",
@@ -130,6 +139,7 @@ describe("composer submission controller", () => {
       reviewComments: []
     });
     expect(mocks.revoke).toHaveBeenCalledOnce();
+    expect(useTaskDraftStore.getState().drafts["task-a"]?.startupConfigurationPending).toBeUndefined();
   });
 
   it("preserves review comments after an accepted terminal failure and retained previews", () => {

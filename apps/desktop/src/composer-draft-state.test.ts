@@ -45,6 +45,18 @@ describe("parseComposerDraftPersistedState", () => {
     expect(parseComposerDraftPersistedState(canonical)).toEqual(canonical);
   });
 
+  it("admits materialized startup choices only with a strictly typed pending marker", () => {
+    const state = draftState();
+    const record = { ...state.drafts[0], startupConfigurationPending: true,
+      startupModel: { provider: "pi67-auto", model: "auto" }, startupThinkingLevel: "medium", interactionMode: "plan" };
+    const pending = { ...state, drafts: [record] };
+    expect(parseComposerDraftPersistedState(pending)).toEqual(pending);
+    for (const value of [false, "true", 1, null]) {
+      expect(parseComposerDraftPersistedState({ ...state, drafts: [{ ...record, startupConfigurationPending: value }] })).toBeUndefined();
+    }
+    expect(parseComposerDraftPersistedState({ ...state, drafts: [{ ...record, startupThinkingLevel: "bad\0level" }] })).toBeUndefined();
+  });
+
   it("rejects duplicate identities and selected conversations without a draft", () => {
     const state = draftState();
     expect(parseComposerDraftPersistedState({

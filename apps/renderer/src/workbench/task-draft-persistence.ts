@@ -245,6 +245,7 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
       && draft.promptStash.length === 0
       && draft.startupModel === undefined
       && draft.startupThinkingLevel === undefined
+      && !draft.startupConfigurationPending
     )) continue;
     const textBytes = encoder.encode(draft.text).byteLength;
     const reviewBytes = draft.reviewComments.reduce(
@@ -293,12 +294,13 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
         : {}),
       ...(task.conversation.kind === "provisional" && task.scopeChoice ? { scopeChoice: { ...task.scopeChoice } } : {}),
       ...(task.conversation.kind === "provisional" && task.teamScope ? { teamScope: { ...task.teamScope } } : {}),
-      ...(task.conversation.kind === "provisional" && draft.interactionMode === "plan"
+      ...(draft.startupConfigurationPending ? { startupConfigurationPending: true as const } : {}),
+      ...((task.conversation.kind === "provisional" || draft.startupConfigurationPending) && draft.interactionMode === "plan"
         ? { interactionMode: "plan" as const }
         : {}),
-      ...(task.conversation.kind === "provisional" && draft.startupModel
+      ...((task.conversation.kind === "provisional" || draft.startupConfigurationPending) && draft.startupModel
         ? { startupModel: { ...draft.startupModel } } : {}),
-      ...(task.conversation.kind === "provisional" && draft.startupThinkingLevel
+      ...((task.conversation.kind === "provisional" || draft.startupConfigurationPending) && draft.startupThinkingLevel
         ? { startupThinkingLevel: draft.startupThinkingLevel } : {})
     });
   }
@@ -361,7 +363,8 @@ function serializedStateIncludesTaskDraft(
         && draft.reviewComments.length === 0
         && draft.promptStash.length === 0
         && draft.startupModel === undefined
-        && draft.startupThinkingLevel === undefined;
+        && draft.startupThinkingLevel === undefined
+        && !draft.startupConfigurationPending;
     }
   }
   return Boolean(

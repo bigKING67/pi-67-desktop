@@ -285,6 +285,58 @@ describe("new Session intent controller", () => {
     expect(materializeIntent).not.toHaveBeenCalled();
     expect(submitPrompt).not.toHaveBeenCalled();
   });
+
+  it.each(["model", "thinking", "plan"])("retries failed %s configuration in the same Session", async (stage) => {
+    const drafts = useTaskDraftStore.getState();
+    drafts.setStartupModel("task-intent", { provider: "pi67-auto", model: "auto" });
+    drafts.setStartupThinkingLevel("task-intent", "medium");
+    drafts.setInteractionMode("task-intent", "plan");
+    const failing = stage === "model" ? selectModel : stage === "thinking" ? setThinkingLevel : setInteractionMode;
+    failing.mockResolvedValueOnce(false);
+    materializeIntent.mockImplementation(async () => { installMaterializedTask(); return { status: "materialized" }; });
+    submitPrompt.mockResolvedValue(acceptedPrompt());
+    await expect(submitRendererNewSessionIntent("task-intent", "retry", "first")).resolves.toMatchObject({ accepted: false });
+    expect(submitPrompt).not.toHaveBeenCalled();
+    expect(useTaskDraftStore.getState().drafts["task-intent"]?.startupConfigurationPending).toBe(true);
+
+    // Explicit replacement remains draft intent and is confirmed on the retry.
+    drafts.setStartupModel("task-intent", { provider: "groland", model: "replacement" });
+    drafts.setStartupThinkingLevel("task-intent", "high");
+    drafts.setInteractionMode("task-intent", "execute");
+    await expect(submitRendererNewSessionIntent("task-intent", "retry", "second")).resolves.toEqual(acceptedPrompt());
+    expect(materializeIntent).toHaveBeenCalledOnce();
+    expect(selectModel).toHaveBeenLastCalledWith("groland", "replacement");
+    expect(setThinkingLevel).toHaveBeenLastCalledWith("high");
+    expect(setInteractionMode).toHaveBeenLastCalledWith("execute");
+    expect(submitPrompt).toHaveBeenCalledOnce();
+  });
+
+  it("does not configure or send into another Task selected during model confirmation", async () => {
+    useTaskDraftStore.getState().setStartupModel("task-intent", { provider: "pi67-auto", model: "auto" });
+    useTaskDraftStore.getState().setStartupThinkingLevel("task-intent", "medium");
+    materializeIntent.mockImplementation(async () => { installMaterializedTask(); return { status: "materialized" }; });
+    selectModel.mockImplementation(async () => {
+      rendererWorkbenchStore.getState().openTask({ ...provisionalTask(), id: "other-task" });
+      return true;
+    });
+    await expect(submitRendererNewSessionIntent("task-intent", "retry", "stale")).resolves.toMatchObject({ accepted: false });
+    expect(setThinkingLevel).not.toHaveBeenCalled();
+    expect(submitPrompt).not.toHaveBeenCalled();
+  });
+
+  it("rechecks the selected Task after the materialization wait yields", async () => {
+    useTaskDraftStore.getState().setStartupModel("task-intent", { provider: "pi67-auto", model: "auto" });
+    materializeIntent.mockImplementation(async () => {
+      installMaterializedTask();
+      queueMicrotask(() => queueMicrotask(() => {
+        rendererWorkbenchStore.getState().openTask({ ...provisionalTask(), id: "other-task" });
+      }));
+      return { status: "materialized" };
+    });
+    await expect(submitRendererNewSessionIntent("task-intent", "retry", "stale")).resolves.toMatchObject({ accepted: false });
+    expect(selectModel).not.toHaveBeenCalled();
+    expect(submitPrompt).not.toHaveBeenCalled();
+  });
 });
 
 function installMaterializedTask(): void {

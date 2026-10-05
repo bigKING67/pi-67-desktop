@@ -72,8 +72,7 @@ export function Composer() {
   const draft = useTaskDraftStore((state) => (
     activeTaskId ? state.drafts[activeTaskId] ?? EMPTY_TASK_DRAFT : EMPTY_TASK_DRAFT
   ));
-  const text = draft.text;
-  const attachments = draft.attachments;
+  const { text, attachments } = draft;
   const workspaceFiles = draft.workspaceFiles;
   const reviewComments = draft.reviewComments;
   const streamBehavior = draft.streamBehavior;
@@ -102,7 +101,8 @@ export function Composer() {
   );
   const newSessionIntent = activeTask?.conversation.kind === "provisional"
     && activeTask.lifecycle === "draft" && activeTask.creationStatus === undefined;
-  const interactionMode = activeSessionAuthority
+  const startupConfiguration = newSessionIntent || draft.startupConfigurationPending === true;
+  const interactionMode = activeSessionAuthority && !startupConfiguration
     ? authoritativeInteractionMode
     : draft.interactionMode;
   const activeStreaming = activeSessionAuthority && streaming;
@@ -166,7 +166,7 @@ export function Composer() {
     if (!activeTaskId || mode === interactionMode || changingInteractionMode) return;
     submissionIdRef.current = undefined;
     setSubmissionError(undefined);
-    if (!activeSessionAuthority) {
+    if (!activeSessionAuthority || startupConfiguration) {
       useTaskDraftStore.getState().setInteractionMode(activeTaskId, mode);
       return;
     }
@@ -404,7 +404,7 @@ export function Composer() {
     filePickerOpen={filePickerOpen}
     hasDraft={hasDraft}
     interactionMode={interactionMode}
-    newSessionIntent={newSessionIntent}
+    startupConfiguration={startupConfiguration}
     sessionTransitionPending={sessionTransitionPending}
     slashActiveIndex={slashActiveIndex}
     slashCatalog={slashCatalog}

@@ -312,6 +312,29 @@ describe("task draft persistence", () => {
     expect(serializeTaskDraftState(803).drafts[0]?.interactionMode).toBeUndefined();
   });
 
+  it("preserves pending startup choices across a materialized Session checkpoint and restore", () => {
+    const task = sessionTask("task-pending", "session-file-pending");
+    rendererWorkbenchStore.getState().restoreTask(task);
+    const drafts = useTaskDraftStore.getState();
+    drafts.setText(task.id, "unsent");
+    drafts.setStartupModel(task.id, { provider: "pi67-auto", model: "auto" });
+    drafts.setStartupThinkingLevel(task.id, "medium");
+    drafts.setInteractionMode(task.id, "plan");
+    drafts.setStartupConfigurationPending(task.id, true);
+    const serialized = serializeTaskDraftState(805);
+    expect(parseComposerDraftPersistedState(serialized)).toEqual(serialized);
+    expect(serialized.drafts[0]).toMatchObject({ conversation: task.conversation,
+      startupModel: { provider: "pi67-auto", model: "auto" }, startupThinkingLevel: "medium",
+      startupConfigurationPending: true, interactionMode: "plan" });
+    useTaskDraftStore.getState().dispose();
+    restorePersistedDrafts(serialized, { restoreSelection: false });
+    expect(useTaskDraftStore.getState().drafts[task.id]).toMatchObject({ text: "unsent",
+      startupConfigurationPending: true, startupThinkingLevel: "medium", interactionMode: "plan" });
+    useTaskDraftStore.getState().setStartupConfigurationPending(task.id, false);
+    expect(serializeTaskDraftState(806).drafts[0]).not.toHaveProperty("startupModel");
+    expect(serializeTaskDraftState(806).drafts[0]).not.toHaveProperty("interactionMode");
+  });
+
   it("persists provisional startup runtime choices without creating a Pi Session", () => {
     const provisional = provisionalTask("task-intent-runtime");
     expect(rendererWorkbenchStore.getState().restoreTask(provisional)).toBe(provisional.id);
