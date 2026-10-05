@@ -75,3 +75,43 @@ the separate manual candidate acceptance.
   aggregate run as passed.
 - The diff classifier selects all platforms and `full` NSIS, enabling comparison
   against the full baseline without omitting reinstall. No dispatch override needed.
+
+## First exact-source CI checkpoint
+
+- Implementation `eaeb500ce824420630799a8e573110da629c1818` was scoped, committed
+  and pushed. Full CI `37313169801`, attempt 1, completed **FAIL**; the final gate
+  correctly rejected two failed validation lanes. Do not mark acceptance complete.
+- Source quality passed: 6,408 tests, 24 skips, zero failures; line coverage 87.97%.
+  Both transport identities verified on separate Windows runners. Build, complete
+  hidden smoke, all three Windows recovery cases, all macOS native checks, and full
+  NSIS install/reinstall/dual-profile/uninstall/data-retention checks passed.
+- Both platforms' recovery receipts retain clean exact-source identity, unchanged
+  canonical profiles, successful owned-process cleanup and zero real model requests.
+  Packaged ASARs still match the frozen Alpha.44 candidate byte-for-byte.
+- Observed workflow elapsed: 826 seconds versus baseline 1,161; Windows runner
+  sum: 1,178 versus 1,140 seconds. This failed-run comparison is **not** accepted
+  performance evidence: Windows UI stopped early and full installer execution
+  fell from 454 to 307 seconds on a different hosted runner. Do not attribute the
+  entire difference to parallel scheduling or claim a stable percentile.
+- Transport: 866,772,333 compressed bytes total, one-day retention; producer
+  preparation/upload 49 seconds, runtime download/restore 32, installer 29.
+  Evidence: ignored `artifacts/validation/ci-parallel-windows/comparison.json`,
+  exact run metadata, downloaded receipts, failure screenshot and trace.
+
+### Acceptance blockers and scope decision
+
+1. Renderer E2E: 298 passed, one intentional skip, one failure. After opening older
+   chat search history, "jump to latest" loaded message 400 but left it outside
+   the viewport; the failure screenshot ends at message 398. Ten bounded local
+   repetitions of this unchanged test passed without retries; root cause remains
+   unverified. Do not weaken the viewport assertion or label the CI failure flaky.
+2. Windows packaged UI: scale 1.5 process exit measured 5,771.2 ms against the
+   unchanged 5,000 ms contract. Main reported 1,998.1 ms for its shutdown stage,
+   graceful Host exit, and a missing Renderer checkpoint; all tracked processes
+   eventually exited. The exact cause of the extra exit latency is unverified.
+
+No product source, test assertions, deadlines or retries were changed to clear
+these failures. The user has been asked whether to include their root-cause fixes
+in this task because the accepted CI-only boundary keeps the existing candidate
+bytes frozen. Continue independent evidence work; application edits and candidate
+replacement remain pending that scope decision. No blind CI rerun or distribution.
