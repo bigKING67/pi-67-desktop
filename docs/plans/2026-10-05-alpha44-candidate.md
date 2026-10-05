@@ -1,6 +1,6 @@
 # Alpha.44 internal candidate preparation
 
-Status: active CI follow-up; local candidate preparation complete
+Status: complete; local candidate preparation and bounded CI follow-up verified
 Owner: Codex
 Started: 2026-10-05
 Last updated: 2026-10-05
@@ -106,13 +106,15 @@ at its 15-second CIM process-query preflight, before launching Electron. Ordinar
 smoke, the other two recovery cases, Windows UI and full same-version installer
 lifecycle passed; source, Renderer and macOS jobs retain their successful first
 attempt results. No third retry was started. This is a recurring validation
-reliability issue requiring a focused follow-up; do not claim all CI is green or
-that the original failure has been fixed. Distribution is not recommended until
-that follow-up is resolved, despite the separately verified candidate files.
+reliability issue requiring the focused follow-up below. This historical source
+CI remains failed; the later successful fix run does not rewrite that result.
+Distribution was held pending the follow-up, despite the separately verified
+candidate files.
 
 The three final product files, exact local paths, byte lengths and SHA-256 values
 are recorded in `artifacts/validation/alpha44-candidate/products.json` and
-`SHA256SUMS`; `readiness.md` distinguishes candidate passes from the open CI issue.
+`SHA256SUMS`; `readiness.md` distinguishes candidate passes, historical CI failure
+and the follow-up verification.
 
 Evidence and the first-attempt diagnosis remain under
 `artifacts/validation/alpha44-candidate/`. No paid model requests or distribution
@@ -127,10 +129,11 @@ paid inference. Continue scoped implementation, commit/push and Windows CI
 validation under the existing authorization. The canonical checkout was clean
 at `1340cce73a3ad9515626d25fa8ffe30aa0bc099d`, equal to origin/main.
 
-- [ ] Identify the timeout boundary on a real Windows runner.
-- [ ] Apply the smallest evidence-supported correction and retain ownership,
+- [x] Measure query stages on a real Windows runner; preserve the limit that
+  older uninstrumented timeouts cannot be retrospectively localized.
+- [x] Apply the smallest evidence-supported correction and retain ownership,
   timeout, cleanup and fail-closed contracts.
-- [ ] Verify the fix with focused regression tests and exact-source Windows CI.
+- [x] Verify the fix with focused regression tests and exact-source Windows CI.
 
 Initial evidence lacks any PowerShell internal output. Add bounded timing for
 script entry, CIM call start/completion and output completion; keep the exact
@@ -178,3 +181,47 @@ before building. Its real owned-child case records the first cold query and
 verifies creation identity, parent ownership, termination and confirmed absence.
 It retains the same query deadline; later packaged scenarios and preflights are
 unchanged. This is an early compatibility gate, not a discarded warm-up sample.
+
+## CI follow-up closeout
+
+Accepted correction: `97903e9758cf79c2205697a0c948ca6301aa4e83`.
+CI [37293280719, attempt 1](https://github.com/bigKING67/pi-67-desktop/actions/runs/37293280719)
+passed all required jobs without a retry. Total workflow elapsed time was
+19 minutes 21 seconds; full Windows installer verification took 7 minutes
+34 seconds. This follow-up addresses process-query compatibility and diagnosis,
+not a claim that the complete CI performance budget has been optimized.
+
+- Local focused regression: 81 tests passed. Type-aware lint, structure,
+  PowerShell source discovery, workflow action pins and diff checks passed.
+- Full source CI: 6,382 tests passed, 24 environment-gated tests skipped,
+  zero failures. Renderer E2E and both native platform jobs passed.
+- Windows early process suite: 37 tests passed, including the real owned-child
+  test. Its first cold query took 4,399 ms: script entry 2,496 ms, module start
+  2,524 ms, module completion/query start 3,234 ms, query completion 3,339 ms,
+  output completion 4,343 ms. Module import remains inside the 15-second budget.
+- Windows packaged recovery: all three scenarios passed. Preflights took
+  399 / 361 / 375 ms in scenario order (before-response / after-tool /
+  unconfirmed-tool). These followed the early real process test, so they are
+  not comparable to the previous first cold preflight as a speedup benchmark.
+- Both platforms' six recovery receipts confirm canonical Session isolation,
+  owned-process cleanup and zero real model requests. Their ASAR hashes match
+  the frozen candidate bytes: Windows `6f0ecb303b0f34ab77e0c490c2e904af1a8d246b89a4e4fc4aff4c30b70f8f02`,
+  macOS `64cfab1085f0cd1678b31446d32b3181f718ee054e1d0cdce560c8500927e7c0`.
+- Windows packaged UI and full same-version NSIS install/reinstall, both profile
+  lanes with three restarts each, uninstall and fixture data retention passed.
+  The existing candidate run remains the distinct-version Alpha.42 upgrade
+  evidence; this follow-up does not relabel its fast CI installer as a product.
+
+Evidence is retained under
+`artifacts/validation/alpha44-candidate/query-explicit-import/`, including the
+exact-source CI result, first cold-query diagnostic, recovery receipts, source
+test results and full installer summary. Application/dependency/packaging inputs
+under `apps`, `packages`, `package.json`, `pnpm-lock.yaml` and
+`electron-builder.yml` are unchanged from the frozen candidate source.
+
+The bounded CI follow-up is accepted and its distribution hold is resolved.
+The older timeout's precise cause remains unverified; one successful fresh-runner
+sample is not proof against every hosted-runner fluctuation. Retain stage timing
+for any recurrence. Real Windows desktop manual acceptance and separately
+authorized distribution remain outstanding; no upload, publication, cleanup or
+paid model request was performed.
