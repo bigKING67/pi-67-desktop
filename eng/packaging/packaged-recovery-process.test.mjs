@@ -101,27 +101,27 @@ describe("packaged recovery process ownership", () => {
     await expect(readWindowsRecoveryExitState(pid, { execute })).rejects.toThrow("query unavailable");
   });
   it("queries only the exact Windows PID and binds identity to creation time and image", async () => {
-    const execute = vi.fn().mockResolvedValue({ stdout: JSON.stringify(win) });
+    const execute = vi.fn().mockResolvedValue({ stdout: windowsIdentityOutput(win) });
     expect(await readRecoveryProcess(pid, { platform: "win32", execute })).toEqual({
       parentPid: win.parentPid, identity: JSON.stringify([win.startedAt, win.executablePath])
     });
     const [command, args, options] = execute.mock.calls[0];
     expect(command).toBe("powershell.exe");
     expect(args).toEqual(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", expect.stringContaining(`-Filter 'ProcessId = ${pid}'`)]);
-    // A fresh process must resolve only the two known modules, including output
-    // serialization; an unqualified cmdlet must not trigger broad discovery.
+    // Query only the built-in CIM module; scalar output must not load JSON serialization.
     expect(args.at(-1)).toContain("$PSModuleAutoLoadingPreference = 'None'");
     expect(args.at(-1)).toContain('Microsoft.PowerShell.Core\\Import-Module -Name "$PSHOME\\Modules\\CimCmdlets\\CimCmdlets.psd1" -ErrorAction Stop');
-    expect(args.at(-1)).toContain('Microsoft.PowerShell.Core\\Import-Module -Name "$PSHOME\\Modules\\Microsoft.PowerShell.Utility\\Microsoft.PowerShell.Utility.psd1" -ErrorAction Stop');
     expect(args.at(-1)).toContain("CimCmdlets\\Get-CimInstance");
-    expect(args.at(-1)).toContain("Microsoft.PowerShell.Utility\\ConvertTo-Json");
+    expect(args.at(-1)).toContain("[Console]::Out.WriteLine('PI67_RECOVERY_PROCESS:'");
+    expect(args.at(-1)).toContain("[Text.Encoding]::UTF8.GetBytes");
+    expect(args.at(-1)).not.toMatch(/ConvertTo-Json|Microsoft.PowerShell.Utility/u);
     expect(args.at(-1)).not.toMatch(/CommandLine|Stop-Process|taskkill/u);
     expect(options).toMatchObject({ timeout: 15000, windowsHide: true });
   });
 
   it.each([null, { ...win, pid: 7 }, { ...win, startedAt: "" }, { ...win, executablePath: "" }, { ...win, parentPid: -1 }])(
     "rejects unverifiable Windows identity: %j", async value => {
-      const execute = vi.fn().mockResolvedValue({ stdout: JSON.stringify(value) });
+      const execute = vi.fn().mockResolvedValue({ stdout: windowsIdentityOutput(value) });
       await expect(readRecoveryProcess(pid, { platform: "win32", execute })).rejects.toThrow("Invalid Windows");
     }
   );
@@ -130,6 +130,19 @@ describe("packaged recovery process ownership", () => {
     const execute = vi.fn().mockResolvedValueOnce({ stdout: "\r\n" }).mockRejectedValueOnce(new Error("CIM lookup failed"));
     expect(await readRecoveryProcess(pid, { platform: "win32", execute })).toBeUndefined();
     await expect(readRecoveryProcess(pid, { platform: "win32", execute })).rejects.toThrow("CIM lookup failed");
+  });
+
+  it.each([
+    "PI67_RECOVERY_PROCESS:123456:1:1:Qx==", // Non-canonical base64.
+    "PI67_RECOVERY_PROCESS:123456:1:1:/w==", // Invalid UTF-8.
+    "PI67_RECOVERY_PROCESS:123456:9007199254740992:1:Qw==",
+    `${windowsIdentityOutput(win)}\n${windowsIdentityOutput(win)}`,
+    `${windowsIdentityOutput(win)}:extra`,
+    JSON.stringify(win)
+  ])("rejects malformed process output without signaling a process", async stdout => {
+    const execute = vi.fn().mockResolvedValue({ stdout });
+    await expect(readRecoveryProcess(pid, { platform: "win32", execute })).rejects.toThrow("Invalid Windows");
+    expect(execute).toHaveBeenCalledOnce();
   });
 
   it("keeps missing built-in modules fatal without falling back to command discovery", async () => {
@@ -152,7 +165,7 @@ describe("packaged recovery process ownership", () => {
     const stages = ["script-started", "modules-started", "modules-completed", "query-started", "query-completed", "output-completed"];
     const stderr = stages.map((stage, index) => `PI67_RECOVERY_PROCESS_QUERY:${stage}:${(index + 1) * 100}`).join("\r\n");
     const onDiagnostic = vi.fn();
-    const execute = vi.fn().mockResolvedValue({ stdout: JSON.stringify(win), stderr });
+    const execute = vi.fn().mockResolvedValue({ stdout: windowsIdentityOutput(win), stderr });
     const result = await readRecoveryProcess(pid, { platform: "win32", execute, onDiagnostic });
     expect(result.identity).toBe(JSON.stringify([win.startedAt, win.executablePath]));
     expect(onDiagnostic).toHaveBeenCalledExactlyOnceWith({ outcome: "command-completed", durationMs: expect.any(Number),
@@ -167,7 +180,7 @@ describe("packaged recovery process ownership", () => {
 
   it("retains partial stage evidence on timeout even when stdout resembles a valid identity", async () => {
     const stderr = "PI67_RECOVERY_PROCESS_QUERY:script-started:920\nPI67_RECOVERY_PROCESS_QUERY:modules-started:922\n";
-    const cause = Object.assign(new Error("Command timed out"), { killed: true, stderr, stdout: JSON.stringify(win) });
+    const cause = Object.assign(new Error("Command timed out"), { killed: true, stderr, stdout: windowsIdentityOutput(win) });
     const execute = vi.fn().mockRejectedValue(cause);
     const onDiagnostic = vi.fn();
     await expect(readRecoveryProcess(pid, { platform: "win32", execute, onDiagnostic })).rejects.toMatchObject({
@@ -242,3 +255,8 @@ describe("packaged recovery process ownership", () => {
     }
   }, 15000);
 });
+
+function windowsIdentityOutput(value) {
+  if (!value) return "invalid";
+  return `PI67_RECOVERY_PROCESS:${value.pid}:${value.parentPid}:${value.startedAt}:${Buffer.from(value.executablePath, "utf8").toString("base64")}`;
+}

@@ -79,6 +79,29 @@ separate and cannot inherit Alpha.44 receipts.
   real model requests. Preserve the failed original candidate and compare Main
   events against polling gaps before interpreting the result.
 
+## Instrumented CI and process-query output correction
+
+- Instrumented source `19dd431f225e05424b94143b43e0eef40ac09f5e`, CI
+  `37326893335` attempt 1 failed before the first Windows recovery launch.
+  All three UI scales passed (450.8 / 357.1 / 313.6 ms product exit); Main
+  lifecycle events completed in 304.3 / 190.4 / 202.5 ms and maximum sampling
+  gaps were 53.1 / 54.2 / 59.1 ms. These successful samples do not explain or
+  supersede the original candidate's 6,826 ms failure.
+- The failed 15-second process-query preflight entered PowerShell at 12,231 ms,
+  imported modules by 13,266 ms and completed CIM at 13,610 ms; output completion
+  was never observed. No Electron process was launched. Other recovery cases,
+  full Windows installer, source/Renderer/macOS gates passed. Receipts are retained
+  in `artifacts/validation/alpha45-candidate/ci-19dd-*`.
+- Remove the query's unnecessary Utility/JSON serializer dependency: emit four
+  exact fields through Console, with the only arbitrary string encoded as UTF-8
+  base64, then strictly parse back into the unchanged in-memory identity. Preserve
+  the CIM query, ownership checks, 15-second total deadline, fail-closed cleanup
+  and no-retry policy. This removes observed post-query cold work; it does not
+  claim to fix the earlier 12-second engine startup or all host variability.
+- Validate encoding rejection and real Windows owned-child lifecycle before
+  interpreting the next candidate's three-round shutdown evidence. No product
+  source, dependency or process-termination policy changes.
+
 ## Validation and rollback
 
 Run `corepack pnpm run check:candidate`, frozen-source Windows preflight and the

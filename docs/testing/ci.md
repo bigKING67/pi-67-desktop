@@ -90,8 +90,10 @@ Windows 查询在脚本开始、模块加载前后、CIM 调用前后和输出�
 超时保留已输出的阶段；无阶段只能说明尚未观测到脚本开始，不能证明具体 OS 根因。
 这些记录不重试查询、不放宽期限，也不能把诊断补充本身称为修复。
 查询子进程禁用自动模块发现（`None`），使用当前引擎 `$PSHOME/Modules/` 下的
-两个明确 manifest 导入 `Microsoft.PowerShell.Utility` 与 `CimCmdlets`，再显式调用
-`CimCmdlets\Get-CimInstance` 和 `Microsoft.PowerShell.Utility\ConvertTo-Json`。
+明确 manifest 导入 `CimCmdlets`，再显式调用 `CimCmdlets\Get-CimInstance`。
+固定前缀的单行输出只含 PID、parent PID、创建时间 ticks 和 UTF-8 base64 路径，直接写 Console，
+避免为四个标量加载 Utility/JSON 序列化。Node 严格检查字段、数值范围、base64/UTF-8 可逆性，
+再生成原有内存身份；多行、额外字段、空路径或损坏编码均失败，不把原始输出写入回执。
 导入也计入原 15 秒总预算，避免通过预热挪出成本；使用当前引擎自带模块而非按名称搜索。
 偏好仅存在于该临时 PowerShell 进程，
 不更改用户或 runner 的全局配置；缺失模块仍失败，不回退到通用发现或其他查询器。

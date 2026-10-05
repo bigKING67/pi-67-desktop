@@ -71,13 +71,13 @@ export async function readRecoveryProcess(pid, { platform = process.platform, ex
     "$PSModuleAutoLoadingPreference = 'None'",
     mark("script-started"),
     mark("modules-started"),
-    'Microsoft.PowerShell.Core\\Import-Module -Name "$PSHOME\\Modules\\Microsoft.PowerShell.Utility\\Microsoft.PowerShell.Utility.psd1" -ErrorAction Stop',
     'Microsoft.PowerShell.Core\\Import-Module -Name "$PSHOME\\Modules\\CimCmdlets\\CimCmdlets.psd1" -ErrorAction Stop',
     mark("modules-completed"),
     mark("query-started"),
     `$p = CimCmdlets\\Get-CimInstance -ClassName Win32_Process -Filter 'ProcessId = ${pid}'`,
     mark("query-completed"),
-    "if ($null -ne $p) { [PSCustomObject]@{ pid = [int]$p.ProcessId; parentPid = [int]$p.ParentProcessId; startedAt = $p.CreationDate.ToUniversalTime().Ticks.ToString(); executablePath = [string]$p.ExecutablePath } | Microsoft.PowerShell.Utility\\ConvertTo-Json -Compress }",
+    // Fixed numeric fields and UTF-8 base64 need no JSON cmdlet/serializer load.
+    "if ($null -ne $p) { [Console]::Out.WriteLine('PI67_RECOVERY_PROCESS:' + [string]$p.ProcessId + ':' + [string]$p.ParentProcessId + ':' + $p.CreationDate.ToUniversalTime().Ticks.ToString() + ':' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$p.ExecutablePath))) }",
     mark("output-completed")
   ].join("; ");
   let output;
@@ -92,13 +92,14 @@ export async function readRecoveryProcess(pid, { platform = process.platform, ex
   diagnose("command-completed", output.stderr);
   const { stdout } = output;
   if (!stdout.trim()) return undefined;
-  const value = JSON.parse(stdout);
-  if (value?.pid !== pid || !Number.isSafeInteger(value.parentPid) || value.parentPid < 0
-    || typeof value.startedAt !== "string" || !/^\d+$/u.test(value.startedAt)
-    || typeof value.executablePath !== "string" || !value.executablePath.trim()) {
+  const match = stdout.trim().match(/^PI67_RECOVERY_PROCESS:([1-9]\d*):(\d+):(\d+):([A-Za-z0-9+/]+={0,2})$/u);
+  const parentPid = match ? Number(match[2]) : NaN;
+  const executablePath = match ? Buffer.from(match[4], "base64").toString("utf8") : "";
+  if (!match || Number(match[1]) !== pid || !Number.isSafeInteger(parentPid) || parentPid < 0
+    || !executablePath.trim() || Buffer.from(executablePath, "utf8").toString("base64") !== match[4]) {
     throw new Error("Invalid Windows recovery process identity.");
   }
-  return { parentPid: value.parentPid, identity: JSON.stringify([value.startedAt, value.executablePath]) };
+  return { parentPid, identity: JSON.stringify([match[3], executablePath]) };
 }
 
 export async function signalRecoveryProcess(pid, expectedIdentity, signal, {
