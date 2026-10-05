@@ -156,7 +156,8 @@ export function ComposerIntentRuntimeControls({
         <ComposerRuntimeSelect
           ariaLabel={messages.composer.modelLabel}
           disabled={submitting || loading}
-          footer={unavailableAuto || unavailablePendingModel ? "所选模型配置不可用。请更新配置或明确选择其他模型。" : pending
+          footer={unavailableAuto ? "Auto 配置不可用。请更新配置或明确选择其他模型。"
+            : unavailablePendingModel ? "所选模型配置不可用。请更新配置或明确选择其他模型。" : pending
             ? "首条消息尚未发送；下次发送前会重新确认这些设置。" : usingRecentPreference
             ? "沿用当前工作区最近一次成功配置。"
             : draftModel

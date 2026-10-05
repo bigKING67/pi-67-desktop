@@ -184,6 +184,17 @@ than a wrapper; its package remains experimental.
 
 ## Progress log
 
+- 2026-10-05 Git delivery: `f1eab371` records Workspace conversation defaults;
+  `1532656e` records model confirmation and startup retries. Both were scoped and
+  pushed together after final source parity checks. CI run `37278071596` found one
+  Renderer regression (298 passed, one skipped): the unavailable-Auto footer had
+  been generalized to an ordinary-model message. Restored its explicit Auto wording
+  while retaining the ordinary unavailable-model branch and the existing assertion.
+  Auto plus startup-retry E2E passed 8/8 locally; Renderer typecheck, lint and diff
+  checks passed. Rebuilt macOS preview and native smoke also passed. Corrective
+  delivery and exact-SHA CI remain in progress; this
+  entry does not claim the failed CI run passed.
+
 - 2026-10-05 resumed packaged acceptance: fixed Renderer selection confirmation
   racing with matching Session metadata. Pending selection now waits for its
   complete catalog ACK or resync; a failed selection recovers only when controls
