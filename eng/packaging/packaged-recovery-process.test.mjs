@@ -108,13 +108,14 @@ describe("packaged recovery process ownership", () => {
     const [command, args, options] = execute.mock.calls[0];
     expect(command).toBe("powershell.exe");
     expect(args).toEqual(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", expect.stringContaining(`-Filter 'ProcessId = ${pid}'`)]);
-    // Query only the built-in CIM module; scalar output must not load JSON serialization.
+    // CIM needs Utility's Set-Alias; scalar output must not load JSON serialization.
     expect(args.at(-1)).toContain("$PSModuleAutoLoadingPreference = 'None'");
     expect(args.at(-1)).toContain('Microsoft.PowerShell.Core\\Import-Module -Name "$PSHOME\\Modules\\CimCmdlets\\CimCmdlets.psd1" -ErrorAction Stop');
+    expect(args.at(-1)).toContain('Microsoft.PowerShell.Core\\Import-Module -Name "$PSHOME\\Modules\\Microsoft.PowerShell.Utility\\Microsoft.PowerShell.Utility.psd1" -ErrorAction Stop');
     expect(args.at(-1)).toContain("CimCmdlets\\Get-CimInstance");
     expect(args.at(-1)).toContain("[Console]::Out.WriteLine('PI67_RECOVERY_PROCESS:'");
     expect(args.at(-1)).toContain("[Text.Encoding]::UTF8.GetBytes");
-    expect(args.at(-1)).not.toMatch(/ConvertTo-Json|Microsoft.PowerShell.Utility/u);
+    expect(args.at(-1)).not.toContain("ConvertTo-Json");
     expect(args.at(-1)).not.toMatch(/CommandLine|Stop-Process|taskkill/u);
     expect(options).toMatchObject({ timeout: 15000, windowsHide: true });
   });

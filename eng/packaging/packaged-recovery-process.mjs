@@ -71,6 +71,8 @@ export async function readRecoveryProcess(pid, { platform = process.platform, ex
     "$PSModuleAutoLoadingPreference = 'None'",
     mark("script-started"),
     mark("modules-started"),
+    // CimCmdlets' Windows PowerShell manifest needs Utility's Set-Alias.
+    'Microsoft.PowerShell.Core\\Import-Module -Name "$PSHOME\\Modules\\Microsoft.PowerShell.Utility\\Microsoft.PowerShell.Utility.psd1" -ErrorAction Stop',
     'Microsoft.PowerShell.Core\\Import-Module -Name "$PSHOME\\Modules\\CimCmdlets\\CimCmdlets.psd1" -ErrorAction Stop',
     mark("modules-completed"),
     mark("query-started"),

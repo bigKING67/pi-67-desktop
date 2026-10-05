@@ -92,7 +92,7 @@ separate and cannot inherit Alpha.44 receipts.
   was never observed. No Electron process was launched. Other recovery cases,
   full Windows installer, source/Renderer/macOS gates passed. Receipts are retained
   in `artifacts/validation/alpha45-candidate/ci-19dd-*`.
-- Remove the query's unnecessary Utility/JSON serializer dependency: emit four
+- Remove the query's unnecessary JSON serializer initialization: emit four
   exact fields through Console, with the only arbitrary string encoded as UTF-8
   base64, then strictly parse back into the unchanged in-memory identity. Preserve
   the CIM query, ownership checks, 15-second total deadline, fail-closed cleanup
@@ -101,6 +101,12 @@ separate and cannot inherit Alpha.44 receipts.
 - Validate encoding rejection and real Windows owned-child lifecycle before
   interpreting the next candidate's three-round shutdown evidence. No product
   source, dependency or process-termination policy changes.
+- The first correction `944c5dff`, CI `37329540507`, failed its early real Windows
+  owned-child test: CimCmdlets' manifest requires Utility's `Set-Alias` while
+  autoload is disabled. Restore that explicit prerequisite import and remove only
+  `ConvertTo-Json` execution. The premature diagnostic candidate `37329639681`
+  was cancelled before accepting any artifacts; it cannot certify this source.
+  Preserve the failure and validate the corrected dependency order on Windows.
 
 ## Validation and rollback
 
