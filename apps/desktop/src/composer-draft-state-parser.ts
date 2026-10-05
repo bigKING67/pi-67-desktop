@@ -18,6 +18,7 @@ import {
 } from "@pi67/protocol";
 import type { DesktopTextEncryption } from "./desktop-text-encryption.js";
 import { isBoundedSessionFileIdentity } from "./workbench-state-value-contract.js";
+import { parseConversationScopeChoice } from "@pi67/protocol";
 import { parseDraftTeamScope, parseStartupModel } from "./composer-draft-creation-intent.js";
 
 export const MAX_STORED_COMPOSER_DRAFT_STATE_BYTES = 8 * 1024 * 1024;
@@ -48,13 +49,17 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
       candidate,
       [
         "conversation", "text", "streamBehavior", "updatedAt", "workspaceFiles", "reviewComments",
-        "promptStash", "environmentIntent", "interactionMode", "startupModel", "startupThinkingLevel", "teamScope"
+        "promptStash", "environmentIntent", "interactionMode", "startupModel", "startupThinkingLevel", "teamScope", "scopeChoice"
       ],
       ["conversation", "text", "streamBehavior", "updatedAt"]
     )) return undefined;
     const conversation = parseConversation(candidate.conversation);
     if (!conversation || typeof candidate.text !== "string") return undefined;
     const teamScope = parseDraftTeamScope(candidate.teamScope);
+    const scopeChoice = parseConversationScopeChoice(candidate.scopeChoice);
+    if (candidate.scopeChoice !== undefined && (!scopeChoice || conversation.kind !== "provisional"
+      || (scopeChoice.kind === "private" ? teamScope !== undefined
+        : scopeChoice.teamId !== teamScope?.teamId || scopeChoice.projectId !== teamScope?.projectId))) return undefined;
     if (candidate.teamScope !== undefined && (!teamScope || conversation.kind !== "provisional")) return undefined;
     const workspaceFiles = parseWorkspaceFileReferences(candidate.workspaceFiles);
     if (candidate.workspaceFiles !== undefined && !workspaceFiles) return undefined;
@@ -124,6 +129,7 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
       ...(promptStash?.length ? { promptStash } : {}),
       ...(candidate.environmentIntent ? { environmentIntent: candidate.environmentIntent } : {}),
       ...(teamScope ? { teamScope } : {}),
+      ...(scopeChoice ? { scopeChoice } : {}),
       ...(candidate.interactionMode ? { interactionMode: candidate.interactionMode } : {}),
       ...(startupModel ? { startupModel } : {}),
       ...(startupThinkingLevel ? { startupThinkingLevel } : {})

@@ -4,15 +4,14 @@
   min-width: 0;
   gap: 8px;
   margin: 0;
-  padding: 12px 0;
+  padding: 0;
   border: 0;
-  border-top: 1px solid var(--border);
 }
 
 .scope legend { color: var(--text-primary); font-weight: var(--font-weight-semibold); }
 .scope p { overflow-wrap: anywhere; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.fields { display: grid; gap: 10px; min-width: 0; }
+.fields { display: grid; gap: 10px; min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
 .actions > button,
 .fields > button {
   justify-self: start;
@@ -33,3 +32,15 @@
 .actions > button:disabled,
 .fields > button:disabled { background: var(--surface-disabled); color: var(--text-disabled); cursor: not-allowed; }
 .origin { grid-area: origin; margin: 0; padding: 8px 16px; color: var(--text-secondary); font-size: var(--font-size-support); overflow-wrap: anywhere; }
+
+.trigger { display: inline-flex; justify-self: start; align-items: center; gap: 6px; max-width: 100%; min-height: 32px; border: 0; padding: 2px 0; background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--font-size-support); cursor: pointer; }
+.trigger span { overflow-wrap: anywhere; text-align: left; }
+.trigger small { margin-left: 8px; color: var(--text-tertiary); }
+.trigger:hover { color: var(--text-primary); }
+.trigger:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.trigger:disabled { color: var(--text-disabled); cursor: not-allowed; }
+.kinds { display: flex; flex-wrap: wrap; gap: 16px; border: 0; padding: 0; margin: 0; }
+.kinds legend { margin-bottom: 8px; }
+.kinds label { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; }
+
+.kinds input { accent-color: var(--accent); }

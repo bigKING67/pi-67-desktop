@@ -43,6 +43,7 @@ export interface RendererWorkbenchTask {
   creationStatus?: "pending" | "confirming" | "unconfirmed" | undefined;
   environmentIntent?: RendererTaskEnvironmentIntent | undefined;
   teamScope?: TeamSessionScope | undefined;
+  scopeChoice?: import("@pi67/domain").ConversationScopeChoice | undefined;
   environmentCreationId?: string | undefined;
   environmentSourceWorkspaceId?: WorkspaceId | undefined;
   environmentCreationState?: RendererTaskEnvironmentCreationState | undefined;
@@ -55,6 +56,7 @@ type TaskOpenResult = "opened" | "selected" | "workspace-missing";
 type TaskRunAdmission = "allowed" | "run-limit" | "task-missing";
 
 export interface RendererWorkbenchState {
+  conversationDefaults?: import("@pi67/domain").WorkspaceConversationDefault[];
   workspaces: Record<WorkspaceId, WorkspaceDescriptor>;
   workspaceOrder: WorkspaceId[];
   expandedWorkspaceIds: WorkspaceId[];

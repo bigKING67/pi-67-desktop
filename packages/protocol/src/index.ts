@@ -1,4 +1,7 @@
 export {
+  parseConversationScopeChoice,
+  type ConversationScopeChoice,
+  type WorkspaceConversationDefault,
   WORKBENCH_SETTINGS_SECTIONS,
   isWorkbenchSettingsSection,
   type SettingsSection

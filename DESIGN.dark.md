@@ -299,3 +299,7 @@ The reading-first Transcript hierarchy (answer emphasis, quiet process line, fla
 Nested Tool rows reuse these dark border/text roles for their single left guide
 and quiet `子调用` label. Incomplete nested records use the existing warning role;
 root script success and individual child failures retain independent statuses.
+
+The compact new-conversation scope disclosure uses secondary text on the canvas;
+its expanded panel uses surface/border tokens and the same controls and focus
+states as light mode. Team selection does not introduce a separate accent color.

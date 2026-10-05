@@ -203,14 +203,21 @@ Application-level surfaces use a separate wide-window shell:
   selected for Worktree restores that selection after restart; switching back
   to Local checkpoints the removal of Worktree intent immediately. Environment
   intent never appears on an already materialized Pi Session.
-- Below environment selection, `会话范围` shows the current draft intent and a quiet
-  team/project disclosure. Reuse the Settings React Aria team/project Select family,
-  with no new primitive or palette. Selection never changes the current draft:
-  `另开团队草稿` / `另开私人草稿` preserve it and create separate empty work. No default
-  team/project is inferred. Loading, empty, error/retry and creation-locked states
-  are explicit. Live materialized conversations show a compact, wrapping origin row
-  above Transcript; unknown origins never appear private, and team origin explicitly
-  does not certify current permission. No credential identity is rendered.
+- New drafts show a compact `对话归属` disclosure directly below the Workspace name,
+  displaying `私人` or human-readable team/project names. The collapsed state has
+  no explanatory block. The expanded panel reuses the Settings React Aria Select
+  family and native private/team radio choices; no new primitive or palette.
+  `仅本次使用` changes only this draft; `设为工作区默认` explicitly saves the choice
+  and applies it; `沿用工作区默认` restores the saved choice for this draft. New
+  drafts inherit the explicit Workspace default. Missing defaults remain private
+  without inferred consent; an existing knowledge binding or sole available project
+  may prefill the panel but requires an explicit action. Empty drafts can change
+  scope in place; drafts with text, attachments, file references, review comments or
+  stashed prompts are preserved and a separate empty draft opens. Existing Sessions
+  never retarget. Loading, empty, error/retry, save failure, account mismatch and
+  creation-locked states are explicit. Expanded help explains private-memory and
+  permission boundaries. Live materialized conversations retain their origin row;
+  team origin does not certify current permission.
 - Clicking a conversation selects both that conversation and its Workspace.
   Switching conversations, collapsing a Workspace, or opening Settings never
   stops or reorders background tasks.

@@ -147,6 +147,7 @@ export interface StagedPromptAttachmentResult extends StagedPromptAttachment {
 
 /** Renderer-owned fields persisted through Electron Main. */
 export interface WorkbenchLayoutV5 {
+  conversationDefaults?: import("@pi67/domain").WorkspaceConversationDefault[];
   expandedWorkspaceIds: string[];
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;

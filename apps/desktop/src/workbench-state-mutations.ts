@@ -336,6 +336,7 @@ function removeWorkspaceRegistrationState(
     )),
     workspaceEnvironments: state.workspaceEnvironments.filter((binding) => binding.workspaceId !== workspaceId),
     environmentMutations: [...environmentMutations],
+    ...(state.conversationDefaults ? { conversationDefaults: state.conversationDefaults.filter(item => item.workspaceId !== workspaceId) } : {}),
     settings,
     cleanExit: state.cleanExit
   };
@@ -392,6 +393,7 @@ function parseWorkbenchLayout(
     ...(parsed.selectedSurface ? { selectedSurface: parsed.selectedSurface } : {}),
     runtimeRecovery: parsed.runtimeRecovery,
     sessionCreationRecovery: parsed.sessionCreationRecovery,
+    ...(parsed.conversationDefaults ? { conversationDefaults: parsed.conversationDefaults } : {}),
     settings: parsed.settings
   };
 }
@@ -399,6 +401,7 @@ function parseWorkbenchLayout(
 function isWorkbenchLayoutRecord(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const allowed = [
+    "conversationDefaults",
     "expandedWorkspaceIds",
     "currentWorkspaceId",
     "selectedSurface",

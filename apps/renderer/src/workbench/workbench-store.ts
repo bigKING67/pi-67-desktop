@@ -46,6 +46,7 @@ export function createRendererWorkbenchStore() {
       ], workspaces);
       set({
         workspaces,
+        conversationDefaults: state.conversationDefaults ?? [],
         workspaceOrder: state.workspaceOrder.filter((id) => workspaces[id] !== undefined),
         expandedWorkspaceIds,
         currentWorkspaceId: state.currentWorkspaceId && workspaces[state.currentWorkspaceId]
@@ -105,6 +106,7 @@ export function createRendererWorkbenchStore() {
       set({
         workspaces,
         workspaceOrder,
+        conversationDefaults: (current.conversationDefaults ?? []).filter(item => item.workspaceId !== workspaceId),
         tasks,
         runtimeTaskOrder,
         expandedWorkspaceIds: current.expandedWorkspaceIds.filter((id) => id !== workspaceId),
@@ -379,6 +381,7 @@ export function selectedWorkbenchTask(state: RendererWorkbenchState): RendererWo
 
 function emptyWorkbenchState() {
   return {
+    conversationDefaults: [],
     workspaces: {},
     workspaceOrder: [],
     expandedWorkspaceIds: [],

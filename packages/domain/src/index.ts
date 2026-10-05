@@ -36,6 +36,7 @@ export * from "./team-chat-search.js";
 export * from "./tool-execution.js";
 export * from "./workspace-change.js";
 export * from "./workbench.js";
+export * from "./conversation-default.js";
 export * from "./worktree-environment.js";
 export * from "./workspace-file.js";
 export * from "./user-message-index.js";

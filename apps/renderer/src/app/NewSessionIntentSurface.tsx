@@ -36,6 +36,7 @@ export function NewSessionIntentSurface({ task, workspace }: {
       <TrustBanner />
       <div className={styles.newSessionIntent}>
         <span className="section-label">{workspace.displayName}</span>
+        <SessionScopePicker key={task.id} task={task} />
         <h2>准备新对话</h2>
         <p>先写下第一条消息。只有点击发送后才会创建 Pi JSONL 会话；创建或发送失败时，草稿会继续保留。</p>
         <fieldset
@@ -105,7 +106,6 @@ export function NewSessionIntentSurface({ task, workspace }: {
             ) : null}
           </div>
         </fieldset>
-        <SessionScopePicker key={task.id} task={task} />
         {task.hasDraft ? <small>草稿会使用系统安全存储跨应用重启恢复。</small> : null}
       </div>
       <Composer />

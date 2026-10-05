@@ -151,6 +151,7 @@ export interface SessionCreationRecoveryRecord {
 }
 
 export interface WorkbenchStateV5 {
+  conversationDefaults?: import("./conversation-default.js").WorkspaceConversationDefault[];
   version: 5;
   workspaces: WorkspaceDescriptor[];
   workspaceOrder: WorkspaceId[];

@@ -26,10 +26,10 @@ it.each(["private", "team"] as const)("shows %s origin without claiming current 
 it.each([false, true])("shows explicit draft scope and preserves the separate-draft contract: %s", (team) => {
   const task = { id: "task", ...(team ? { teamScope: { teamId: "team", projectId: "project" } } : {}) } as RendererWorkbenchTask;
   const markup = renderToStaticMarkup(createElement(SessionScopePicker, { task }));
-  expect(markup).toContain("会话范围");
-  expect(markup).toContain("更换范围会另开草稿，原内容保留");
-  expect(markup).toContain(team ? "团队草稿" : "私人草稿");
-  expect(markup.includes("另开私人草稿")).toBe(team);
+  expect(markup).toContain("对话归属");
+  expect(markup).not.toContain("设为工作区默认</button>");
+  expect(markup).toContain(team ? "team / project" : "私人");
+  expect(markup).toContain('aria-expanded="false"');
 });
 
 it("disables selection once creation has started", () => {

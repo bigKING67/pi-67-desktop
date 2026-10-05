@@ -12,6 +12,7 @@ import { beginRendererSessionIntent, createRendererSession, materializeRendererS
 import { restorePersistedDrafts, serializeTaskDraftState } from "../workbench/task-draft-persistence.js";
 import { parseComposerDraftPersistedState } from "../../../desktop/src/composer-draft-state.js";
 
+vi.mock("../connection/connection-recovery.js", () => ({ ensureAgentConnection: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("../app/session-transition.js", () => ({ runSessionBootstrapTransition: vi.fn() }));
 vi.mock("./session-creation-authority.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./session-creation-authority.js")>()),
@@ -143,4 +144,49 @@ it("retains team intent when immediate creation fails after draft input", async 
   bootstrap.mock.calls[0]![2].onError(new Error("team access denied"));
   expect(serializeTaskDraftState(100).drafts[0]?.teamScope).toEqual(scope);
   expect(rendererWorkbenchStore.getState().tasks[task.id]?.creationStatus).toBeUndefined();
+});
+
+const defaultTeam = { kind: "team" as const, ...scope, teamName: "团队", projectName: "项目", userId: "user-1", serviceEndpoint: "https://newmoney.example" };
+
+it("inherits only the current Workspace default and snapshots it without retargeting existing drafts", () => {
+  const privateId = beginRendererSessionIntent()!;
+  useTaskDraftStore.getState().setText(privateId, "private work");
+  rendererWorkbenchStore.setState({ conversationDefaults: [{ workspaceId: "workspace-a", choice: defaultTeam }] });
+  const teamId = beginRendererSessionIntent()!;
+  expect(rendererWorkbenchStore.getState().tasks[teamId]).toMatchObject({ teamScope: scope, scopeChoice: defaultTeam });
+  expect(rendererWorkbenchStore.getState().tasks[privateId]?.teamScope).toBeUndefined();
+  rendererWorkbenchStore.getState().registerWorkspace(workspaceDescriptorFixture("workspace-b", "/work/b", "filesystem"));
+  const otherId = beginRendererSessionIntent("workspace-b")!;
+  expect(rendererWorkbenchStore.getState().tasks[otherId]?.teamScope).toBeUndefined();
+  rendererWorkbenchStore.setState({ conversationDefaults: [{ workspaceId: "workspace-a", choice: { kind: "private" } }] });
+  expect(rendererWorkbenchStore.getState().tasks[teamId]?.scopeChoice).toEqual(defaultTeam);
+});
+
+it("roundtrips inherited account and service identity through encrypted draft validation", () => {
+  rendererWorkbenchStore.setState({ conversationDefaults: [{ workspaceId: "workspace-a", choice: defaultTeam }] });
+  const id = beginRendererSessionIntent()!;
+  useTaskDraftStore.getState().setText(id, "scoped work");
+  const serialized = serializeTaskDraftState(100);
+  const stored = parseComposerDraftPersistedState(serialized)!;
+  expect(stored.drafts[0]?.scopeChoice).toEqual(defaultTeam);
+  rendererWorkbenchStore.getState().reset(); useTaskDraftStore.getState().dispose();
+  rendererWorkbenchStore.getState().registerWorkspace(workspaceDescriptorFixture("workspace-a", "/work/a", "filesystem"));
+  restorePersistedDrafts(stored);
+  expect(rendererWorkbenchStore.getState().tasks[id]?.scopeChoice).toEqual(defaultTeam);
+  expect(parseComposerDraftPersistedState({ ...stored, drafts: [{ ...stored.drafts[0], teamScope: { ...scope, projectId: "wrong" } }] })).toBeUndefined();
+});
+
+it.each(["different-user", "different-service", "signed-out"])("blocks inherited creation on %s without private fallback or draft loss", async mismatch => {
+  rendererWorkbenchStore.setState({ conversationDefaults: [{ workspaceId: "workspace-a", choice: defaultTeam }] });
+  const id = beginRendererSessionIntent()!;
+  useTaskDraftStore.getState().setText(id, "keep me");
+  const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async type => {
+    if (type === "enterprise.identity.get") return { state: mismatch === "signed-out" ? "signed-out" : "signed-in", userId: mismatch === "different-user" ? "user-2" : "user-1" } as never;
+    if (type === "context.config.get") return { enterpriseGatewayEndpoint: mismatch === "different-service" ? "https://other.example" : defaultTeam.serviceEndpoint } as never;
+    throw new Error("unexpected creation");
+  });
+  expect(await materializeRendererSessionIntent(id)).toMatchObject({ status: "failed" });
+  expect(request.mock.calls.some(call => call[0] === "session.create")).toBe(false);
+  expect(useTaskDraftStore.getState().drafts[id]?.text).toBe("keep me");
+  expect(rendererWorkbenchStore.getState().tasks[id]?.teamScope).toEqual(scope);
 });

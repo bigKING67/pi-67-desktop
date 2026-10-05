@@ -1791,8 +1791,9 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   or binding, or retries a rejected team creation as private. Ambiguous creation
   retains the existing exact-creation recovery fence. Provisional creation intent now
   carries explicit team scope through non-empty draft persistence, recovery and first
-  send. Main accepts only bounded teamId/projectId on provisional records, never a
-  user identity or reusable grant; malformed scope rejects the record envelope rather
+  send. Main accepts bounded teamId/projectId on provisional records and an optional
+  explicit UI choice snapshot (including expected account/service for mismatch checks),
+  never a reusable grant or authoritative birth identity; malformed scope rejects the record envelope rather
   than converting it to private. Empty drafts are reused only within the same scope.
   Stale recovery cannot overwrite a different current scope; scope drift during
   connection recovery stops materialization. Materialized drafts omit this creation
@@ -1801,11 +1802,12 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   Missing, malformed, contradictory or inherited provenance is never displayed as
   verified private. This describes origin, not current membership or authorization;
   old snapshots without this optional field are unverified, not implicitly private.
-  The provisional surface now exposes explicit team/project selection. Applying it
-  opens a separate empty draft, preserving the original draft and attachments;
-  returning to private also opens separate work and never reclassifies a Session.
-  Lists load only on disclosure, expose loading/error/empty/retry states, and do not
-  auto-select a project. Materialized live conversations show projected origin,
+  The provisional surface exposes a compact scope disclosure and explicit Workspace
+  defaults. Empty drafts may change in place; populated drafts open separate empty
+  work, preserving original content and attachments. No Session is reclassified.
+  Lists load only on disclosure and expose loading/error/empty/retry states. Existing
+  bindings and sole available projects may prefill a choice but never apply it without
+  consent; subsequent new drafts inherit only an explicitly saved default. Materialized live conversations show projected origin,
   not current permission; stopped history does not yet expose this label.
   Omitted scope stays private; team model processing still requires the separate history authorization
   above, and forks, compaction and private capture remain restricted.
@@ -2246,3 +2248,16 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
 - Arbitrary rendering of TUI `ctx.ui.custom()` components.
 - Embedded code editor, general terminal, or browser panel.
 - Windows ARM64/x86, macOS Intel/Universal, or Linux artifacts.
+
+### Explicit Workspace conversation defaults
+
+Each Workspace may remember an explicit private or team/project default for new
+conversation drafts. Login and shared-knowledge binding alone never grant this
+consent. Existing bindings and a sole available choice may prefill selection;
+users explicitly apply it once. Temporary selections never overwrite the default.
+Defaults retain selecting user and service identity; inherited drafts snapshot the
+choice and preserve it across recovery. Account/service mismatch blocks first send
+and preserves the draft; no automatic private fallback occurs. Host still authorizes
+the exact team/project at creation and subsequent processing. Existing drafts and
+Pi Sessions never follow later default changes. No sync, indexing, sharing or
+private-memory capture is enabled by selecting a default.

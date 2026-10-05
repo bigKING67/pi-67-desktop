@@ -112,7 +112,8 @@ export function restorePersistedDrafts(
     if (!workbench.workspaces[record.conversation.workspaceId]) continue;
     const existing = taskForConversation(workbench.tasks, record.conversation);
     if (existing && (existing.teamScope?.teamId !== record.teamScope?.teamId
-      || existing.teamScope?.projectId !== record.teamScope?.projectId)) continue;
+      || existing.teamScope?.projectId !== record.teamScope?.projectId
+      || JSON.stringify(existing.scopeChoice) !== JSON.stringify(record.scopeChoice))) continue;
     const taskId = existing?.id ?? workbench.restoreTask(restoredTask(record));
     if (!taskId) continue;
     const identity = conversationKeyIdentity(record.conversation);
@@ -130,6 +131,7 @@ export function restorePersistedDrafts(
       )),
       attachmentCount: draft?.attachments.length ?? 0,
       ...(record.environmentIntent ? { environmentIntent: record.environmentIntent } : {}),
+      ...(record.scopeChoice ? { scopeChoice: { ...record.scopeChoice } } : {}),
       ...(record.teamScope ? { teamScope: { ...record.teamScope } } : {})
     });
     restoredTaskByConversation.set(identity, taskId);
@@ -264,7 +266,7 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
       continue;
     }
     const identity = conversationKeyIdentity(task.conversation);
-    const fingerprint = taskDraftFingerprint(draft, task.environmentIntent, task.teamScope);
+    const fingerprint = taskDraftFingerprint(draft, task.environmentIntent, task.teamScope, task.scopeChoice);
     if (contentFingerprintByConversation.get(identity) !== fingerprint) {
       contentFingerprintByConversation.set(identity, fingerprint);
       updatedAtByConversation.set(identity, now);
@@ -289,6 +291,7 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
       ...(task.conversation.kind === "provisional" && task.environmentIntent === "worktree"
         ? { environmentIntent: "worktree" as const }
         : {}),
+      ...(task.conversation.kind === "provisional" && task.scopeChoice ? { scopeChoice: { ...task.scopeChoice } } : {}),
       ...(task.conversation.kind === "provisional" && task.teamScope ? { teamScope: { ...task.teamScope } } : {}),
       ...(task.conversation.kind === "provisional" && draft.interactionMode === "plan"
         ? { interactionMode: "plan" as const }
@@ -363,7 +366,7 @@ function serializedStateIncludesTaskDraft(
   }
   return Boolean(
     record
-    && draftContentFingerprint(record) === taskDraftFingerprint(draft, task.environmentIntent, task.teamScope)
+    && draftContentFingerprint(record) === taskDraftFingerprint(draft, task.environmentIntent, task.teamScope, task.scopeChoice)
   );
 }
 

@@ -12,6 +12,7 @@ describe("Renderer Session creation persistence", () => {
     expect(workbenchLayout(store.getState(), {
       identity: undefined
     })).toEqual({
+      conversationDefaults: [],
       expandedWorkspaceIds: ["workspace-a"],
       currentWorkspaceId: "workspace-a",
       selectedSurface: {

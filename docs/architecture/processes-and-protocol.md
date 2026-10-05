@@ -1328,8 +1328,10 @@ SessionSnapshot.memoryOrigin is a read-only projection of validated full-history
 provenance: private, team with teamId/projectId, or unverified. It carries no userId,
 endpoint or lease and grants no access. Missing fields in older snapshots are
 unverified. Login, Workspace binding and draft state cannot establish this origin.
-The provisional selector loads teams/projects on explicit disclosure and opens a
-separate scoped draft; it never mutates a materialized Session or copies private
+The provisional selector loads teams/projects on explicit disclosure. It may change
+an empty draft in place; content-bearing drafts open separate empty scoped work.
+Explicit Workspace defaults are preferences snapshotted into new drafts, not birth
+authority. The selector never mutates a materialized Session or copies private
 draft content. Live origin display uses the Session identity projection, not login
 or draft data. Omitted creation intent still creates private.
 Model-facing shared Experience/SOP reads resolve team/project from the Runtime's
@@ -2816,3 +2818,15 @@ ADR 0003 是权威合同。Team Chat 不经过 Pi Runtime、Task Scheduler 或 S
   projection/response lifecycle，`notifications` 独占内存通知历史、
   Toast 生命周期和 terminal dedupe；`operation`、`tool-cards` 和 feature 目录拥有 UI。基础样式位于 `styles`，
   feature-specific 样式使用 colocated CSS Modules。`team-chat` 拥有 Team Chat 状态、控制器与 UI。
+
+### Workspace conversation preference persistence
+
+Main validates optional `conversationDefaults` in WorkbenchStateV5 and its layout
+bridge: at most one entry per registered Workspace, at most 100 entries, bounded
+explicit private/team choice, with account/service identity and display names for
+team choices. Absent legacy fields mean unset, never inferred from a knowledge
+binding. Workspace removal drops its preference. Renderer snapshots an applied
+choice into provisional draft `scopeChoice`; encrypted draft parsing rejects
+scope/choice mismatch. First-send identity validation precedes creation; Host
+remains the authority for team/project permission. This preference is neither a
+Session provenance marker nor an authorization grant.

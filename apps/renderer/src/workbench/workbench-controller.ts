@@ -96,6 +96,7 @@ export function workbenchLayout(
   };
   const selectedSurface = persistedSelectedSurface(state.selectedSurface, state);
   return {
+    conversationDefaults: (state.conversationDefaults ?? []).filter(item => state.workspaces[item.workspaceId]),
     expandedWorkspaceIds: state.expandedWorkspaceIds,
     ...(state.currentWorkspaceId ? { currentWorkspaceId: state.currentWorkspaceId } : {}),
     ...(selectedSurface ? { selectedSurface } : {}),
@@ -272,6 +273,7 @@ function errorMessage(error: unknown): string {
 }
 
 interface WorkbenchLayoutV5 {
+  conversationDefaults?: import("@pi67/domain").WorkspaceConversationDefault[];
   expandedWorkspaceIds: string[];
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;

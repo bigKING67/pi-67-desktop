@@ -88,6 +88,7 @@ export interface ComposerDraftRecord {
   promptStash?: PromptStashItem[];
   environmentIntent?: ComposerDraftEnvironmentIntent;
   teamScope?: TeamSessionScope;
+  scopeChoice?: import("./conversation-default.js").ConversationScopeChoice;
   interactionMode?: SessionInteractionMode;
   startupModel?: ComposerDraftModelSelection;
   startupThinkingLevel?: string;

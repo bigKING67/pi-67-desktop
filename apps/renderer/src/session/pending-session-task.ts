@@ -16,6 +16,7 @@ export function beginPendingTask(
     intent?: boolean;
     environmentIntent?: RendererTaskEnvironmentIntent;
     teamScope?: TeamSessionScope;
+    scopeChoice?: import("@pi67/domain").ConversationScopeChoice;
   } = {}
 ): RendererWorkbenchTask | undefined {
   const workbench = rendererWorkbenchStore.getState();
@@ -35,6 +36,7 @@ export function beginPendingTask(
     title: options.title ?? messages.runtime.workbench.unnamedSession,
     ...(options.title ? { pendingTitle: options.title } : {}),
     ...(options.creationId ? { creationId: options.creationId } : {}),
+    ...(options.scopeChoice ? { scopeChoice: { ...options.scopeChoice } } : {}),
     ...(options.teamScope ? { teamScope: { teamId: options.teamScope.teamId, projectId: options.teamScope.projectId } } : {}),
     ...(options.environmentIntent && options.environmentIntent !== "local"
       ? { environmentIntent: options.environmentIntent }

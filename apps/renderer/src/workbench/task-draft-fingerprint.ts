@@ -5,13 +5,14 @@ import type { TaskDraft } from "./task-draft-store.js";
 export function taskDraftFingerprint(
   draft: TaskDraft,
   environmentIntent: RendererWorkbenchTask["environmentIntent"],
-  teamScope?: ComposerDraftRecord["teamScope"]
+  teamScope?: ComposerDraftRecord["teamScope"],
+  scopeChoice?: ComposerDraftRecord["scopeChoice"]
 ): string {
-  return `${JSON.stringify(teamScope ?? null)}\0${draft.streamBehavior}\0${draft.interactionMode}\0${environmentIntent ?? "local"}\0${startupModelFingerprint(draft.startupModel)}\0${draft.startupThinkingLevel ?? ""}\0${draft.text}\0${workspaceFileFingerprint(draft.workspaceFiles)}\0${reviewCommentFingerprint(draft.reviewComments)}\0${promptStashFingerprint(draft.promptStash)}`;
+  return `${JSON.stringify(scopeChoice ?? null)}\0${JSON.stringify(teamScope ?? null)}\0${draft.streamBehavior}\0${draft.interactionMode}\0${environmentIntent ?? "local"}\0${startupModelFingerprint(draft.startupModel)}\0${draft.startupThinkingLevel ?? ""}\0${draft.text}\0${workspaceFileFingerprint(draft.workspaceFiles)}\0${reviewCommentFingerprint(draft.reviewComments)}\0${promptStashFingerprint(draft.promptStash)}`;
 }
 
 export function draftContentFingerprint(record: ComposerDraftRecord): string {
-  return `${JSON.stringify(record.teamScope ?? null)}\0${record.streamBehavior}\0${record.interactionMode ?? "execute"}\0${record.environmentIntent ?? "local"}\0${startupModelFingerprint(record.startupModel)}\0${record.startupThinkingLevel ?? ""}\0${record.text}\0${workspaceFileFingerprint(record.workspaceFiles ?? [])}\0${reviewCommentFingerprint(record.reviewComments ?? [])}\0${promptStashFingerprint(record.promptStash ?? [])}`;
+  return `${JSON.stringify(record.scopeChoice ?? null)}\0${JSON.stringify(record.teamScope ?? null)}\0${record.streamBehavior}\0${record.interactionMode ?? "execute"}\0${record.environmentIntent ?? "local"}\0${startupModelFingerprint(record.startupModel)}\0${record.startupThinkingLevel ?? ""}\0${record.text}\0${workspaceFileFingerprint(record.workspaceFiles ?? [])}\0${reviewCommentFingerprint(record.reviewComments ?? [])}\0${promptStashFingerprint(record.promptStash ?? [])}`;
 }
 
 function startupModelFingerprint(selection: ComposerDraftRecord["startupModel"]): string {

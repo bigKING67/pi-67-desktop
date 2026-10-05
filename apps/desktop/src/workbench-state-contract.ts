@@ -1,3 +1,4 @@
+import { parseWorkspaceConversationDefaults } from "./workbench-conversation-defaults.js";
 import { MAX_RUNNING_TASKS, isWorkbenchSettingsSection } from "@pi67/protocol";
 import { MAX_WORKSPACE_ID_LENGTH, parseWorkspaceDescriptor,
   workspaceDescriptorsReferToSameDirectory, type WorkspaceDescriptor } from "./workspace-identity.js";
@@ -193,6 +194,7 @@ export function parseWorkbenchStateV5(value: unknown): WorkbenchStateV5 | undefi
   if (!isRecordWithAllowedKeys(
     value,
     [
+      "conversationDefaults",
       "version",
       "workspaces",
       "workspaceOrder",
@@ -219,6 +221,7 @@ export function parseWorkbenchStateV5(value: unknown): WorkbenchStateV5 | undefi
     ]
   ) || value.version !== WORKBENCH_STATE_VERSION) return undefined;
   const {
+    conversationDefaults: defaultsValue,
     workspaceEnvironments: workspaceEnvironmentsValue,
     environmentMutations: environmentMutationsValue,
     ...legacyValue
@@ -226,6 +229,8 @@ export function parseWorkbenchStateV5(value: unknown): WorkbenchStateV5 | undefi
   const legacy = parseWorkbenchStateV4({ ...legacyValue, version: 4 });
   if (!legacy) return undefined;
   const workspaceIds = new Set(legacy.workspaces.map((workspace) => workspace.id));
+  const defaults = defaultsValue === undefined ? undefined : parseWorkspaceConversationDefaults(defaultsValue, workspaceIds);
+  if (defaultsValue !== undefined && !defaults) return undefined;
   const workspaceEnvironments = parseWorkspaceEnvironmentBindings(
     workspaceEnvironmentsValue,
     workspaceIds,
@@ -239,6 +244,7 @@ export function parseWorkbenchStateV5(value: unknown): WorkbenchStateV5 | undefi
   if (!workspaceEnvironments || !environmentMutations) return undefined;
   return {
     ...legacy,
+    ...(defaults ? { conversationDefaults: defaults } : {}),
     version: WORKBENCH_STATE_VERSION,
     workspaceEnvironments,
     environmentMutations

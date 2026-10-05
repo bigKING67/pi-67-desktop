@@ -82,6 +82,7 @@ export interface WorkbenchStateV4 {
 }
 
 export interface WorkbenchStateV5 extends Omit<WorkbenchStateV4, "version"> {
+  conversationDefaults?: import("@pi67/protocol").WorkspaceConversationDefault[];
   version: typeof WORKBENCH_STATE_VERSION;
   workspaceEnvironments: WorkspaceEnvironmentBinding[];
   environmentMutations: EnvironmentMutationRecoveryRecord[];
@@ -89,6 +90,7 @@ export interface WorkbenchStateV5 extends Omit<WorkbenchStateV4, "version"> {
 
 /** Renderer-owned fields. Main retains Workspace registrations, ordering, and clean-exit state. */
 export interface WorkbenchLayoutV5 {
+  conversationDefaults?: import("@pi67/protocol").WorkspaceConversationDefault[];
   expandedWorkspaceIds: string[];
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;

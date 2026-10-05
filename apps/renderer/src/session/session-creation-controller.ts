@@ -1,5 +1,6 @@
 import { createMessageId, ProtocolRequestError } from "@pi67/protocol";
-import type { TeamSessionScope } from "@pi67/domain";
+import { assertConversationScopeIdentity } from "./session-scope-identity.js";
+import type { ConversationScopeChoice, TeamSessionScope } from "@pi67/domain";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { messages } from "../localization/message-catalog.js";
 import { useAppStore } from "../app/app-store.js";
@@ -34,7 +35,7 @@ export type RendererSessionMaterializationResult =
 
 export function beginRendererSessionIntent(
   workspaceId?: string,
-  options: { environmentIntent?: RendererTaskEnvironmentIntent; teamScope?: TeamSessionScope } = {}
+  options: { environmentIntent?: RendererTaskEnvironmentIntent; teamScope?: TeamSessionScope; scopeChoice?: ConversationScopeChoice; useWorkspaceDefault?: boolean } = {}
 ): string | undefined {
   const state = useAppStore.getState();
   if (state.sessionTransitionPending || state.workspaceOpenPending) return undefined;
@@ -42,6 +43,10 @@ export function beginRendererSessionIntent(
   const workbench = rendererWorkbenchStore.getState();
   const targetWorkspaceId = workspaceId ?? workbench.currentWorkspaceId;
   if (!targetWorkspaceId || !workbench.workspaces[targetWorkspaceId]) return undefined;
+  const scopeChoice = options.scopeChoice ?? (options.teamScope || options.useWorkspaceDefault === false ? undefined
+    : workbench.conversationDefaults?.find(item => item.workspaceId === targetWorkspaceId)?.choice);
+  const teamScope = options.teamScope ?? (scopeChoice?.kind === "team"
+    ? { teamId: scopeChoice.teamId, projectId: scopeChoice.projectId } : undefined);
   const selected = selectedWorkbenchTask(workbench);
   const selectedDraft = selected ? useTaskDraftStore.getState().drafts[selected.id] : undefined;
   if (
@@ -49,15 +54,19 @@ export function beginRendererSessionIntent(
     && selected.conversation.kind === "provisional"
     && selected.lifecycle === "draft"
     && selected.creationStatus === undefined
-    && sameTeamScope(selected.teamScope, options.teamScope)
+    && sameTeamScope(selected.teamScope, teamScope)
+    && JSON.stringify(selected.scopeChoice) === JSON.stringify(scopeChoice)
     && !selectedDraft?.text.trim()
     && (selectedDraft?.attachments.length ?? 0) === 0
     && (selectedDraft?.workspaceFiles.length ?? 0) === 0
+    && (selectedDraft?.reviewComments.length ?? 0) === 0
+    && (selectedDraft?.promptStash.length ?? 0) === 0
   ) return selected.id;
   return beginPendingTask(undefined, {
     workspaceId: targetWorkspaceId,
     intent: true,
-    ...(options.teamScope ? { teamScope: options.teamScope } : {}),
+    ...(teamScope ? { teamScope } : {}),
+    ...(scopeChoice ? { scopeChoice: { ...scopeChoice } } : {}),
     ...(options.environmentIntent ? { environmentIntent: options.environmentIntent } : {})
   })?.id;
 }
@@ -112,6 +121,7 @@ export async function materializeRendererSessionIntent(
   }
   try {
     await ensureRendererSessionCreationAuthority();
+    await assertConversationScopeIdentity(before.scopeChoice);
   } catch (error) {
     if (rendererWorkbenchStore.getState().tasks[taskId]?.taskGeneration === before.taskGeneration) {
       reportSessionError(error, set, messages.runtime.session.createFailed);
@@ -127,6 +137,7 @@ export async function materializeRendererSessionIntent(
     || current.lifecycle !== "draft"
     || current.creationStatus !== undefined
     || !sameTeamScope(current.teamScope, teamScope)
+    || JSON.stringify(current.scopeChoice) !== JSON.stringify(before.scopeChoice)
     || selectedWorkbenchTask(workbench)?.id !== taskId
     || get().sessionTransitionPending
     || get().workspaceOpenPending
