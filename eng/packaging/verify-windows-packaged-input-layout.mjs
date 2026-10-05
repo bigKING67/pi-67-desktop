@@ -145,7 +145,9 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
     const utilityPids = await application.evaluate(({ app }) => app.getAppMetrics()
       .filter((metric) => metric.type === "Utility")
       .map((metric) => metric.pid));
-    const mainPid = application.process().pid;
+    // On Windows application.process() is Playwright's outer Shell, not Main.
+    const mainPid = await application.evaluate(() => process.pid);
+    const driverProcessId = application.process().pid;
 
     const { contextViewport, navigationViewport } = await verifyPackagedResponsiveLayout(
       window,
@@ -170,6 +172,7 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
       application: parseApplicationShutdownReport(processOutput()),
       budgetMs: WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS,
       driverCloseDurationMs: round(shutdownMeasurement.driverCloseDurationMs),
+      driverProcessId,
       processes: shutdownMeasurement.processes,
       productExitDurationMs: round(shutdownMeasurement.productExitDurationMs)
     };

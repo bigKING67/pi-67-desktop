@@ -55,7 +55,7 @@ export function TeamChatTimeline({ conversation, directory, entries, target, hea
   firstKey.current = entries[0]?.key;
 
   useEffect(() => {
-    if (scrollRequest > 0) virtuoso.current?.scrollToIndex({ index: "LAST", behavior: "auto" });
+    if (scrollRequest > 0) virtuoso.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "auto" });
   }, [scrollRequest]);
 
   const [highlighted, setHighlighted] = useState<number>();
@@ -86,9 +86,11 @@ export function TeamChatTimeline({ conversation, directory, entries, target, hea
       firstItemIndex={firstItemIndex.current}
       followOutput={(atBottom) => atBottom && !hasNewer ? "auto" : false}
       increaseViewportBy={{ top: 400, bottom: 200 }}
+      // Body line-height is fractional; rounding each row accumulates scroll drift.
+      itemSize={(element) => element.getBoundingClientRect().height}
       initialTopMostItemIndex={focusIndex >= 0 && windowStart !== undefined
         ? { index: focusIndex, align: "center" }
-        : Math.max(0, entries.length - 1)}
+        : { index: "LAST", align: "end" }}
       itemContent={(_, entry) => (
         <div className={styles.timelineColumn}>
           <TimelineMessage conversation={conversation} directory={directory} entry={entry} focused={entry.seq !== undefined && entry.seq === highlighted} target={target} />

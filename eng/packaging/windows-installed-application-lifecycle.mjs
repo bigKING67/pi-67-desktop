@@ -75,7 +75,7 @@ export async function launchInstalledApplication({
       userDataDirectory
     });
     const packagedProcessOutput = captureProcessOutput(application.process());
-    const mainPid = application.process().pid;
+    const mainPid = await application.evaluate(() => process.pid);
     const window = await application.firstWindow();
     await window.waitForLoadState("domcontentloaded");
     const startupSurface = await waitForInstalledStartupSurface(window, legacyUserInterface);

@@ -2100,7 +2100,10 @@ loading error where the operation can produce those states
   timeline that opens at the newest message, follows new messages only while the
   reader is at the bottom, loads older pages when the top is reached, and keeps
   short timelines above the composer. Group and day spacing uses padding so item
-  measurement stays exact; `在工作中处理` floats at the row's top-right and takes no
+  measurement stays exact; fractional line heights remain fractional in the
+  virtualizer. Opening the latest page, jumping to latest, and sending align the
+  last message's end above the composer, including messages taller than the viewport.
+  `在工作中处理` floats at the row's top-right and takes no
   layout space. A channel intro (name, visibility, member count) precedes
   day separators (`今天`, `昨天`, dates) and sender groups that repeat the name and
   time only after a sender change or five minutes. Message text is primary,

@@ -45,33 +45,44 @@ test("searches messages and Work Cards from the Chat rail and opens a result", a
   await expect(results).toHaveCount(0);
 });
 
-test("opens a far older search result in a window and jumps back to the newest message", async ({ page }) => {
-  await page.goto("/");
-  await attachMockAgent(page);
-  await page.evaluate(() => {
-    const chat = (window as unknown as { __pi67MockTeamChat: MockTeamChatState }).__pi67MockTeamChat;
-    const channel = chat.directory.conversations.find((conversation) => conversation.id === "conv-ops")!;
-    const base = Date.now() - 80 * 3_600_000;
-    chat.messages["conv-ops"] = Array.from({ length: 400 }, (_, index) => ({
-      id: `ops-${index + 1}`, conversationId: "conv-ops", seq: index + 1, senderUserId: "user-wang",
-      body: `复盘记录 ${index + 1}号`, clientKey: `ops-key-${String(index + 1).padStart(4, "0")}`, createdAt: base + index * 600_000
-    }));
-    Object.assign(channel, { joined: true, lastSeq: 400, lastReadSeq: 400, lastMessageAt: base + 399 * 600_000 });
+for (const longLastMessage of [false, true]) {
+  test(`opens older search history and reaches the newest message end, long=${longLastMessage}`, async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-10-05T13:05:00Z"));
+    await page.goto("/");
+    await attachMockAgent(page);
+    await page.evaluate((longLastMessage) => {
+      const chat = (window as unknown as { __pi67MockTeamChat: MockTeamChatState }).__pi67MockTeamChat;
+      const channel = chat.directory.conversations.find((conversation) => conversation.id === "conv-ops")!;
+      const base = Date.now() - 80 * 3_600_000;
+      chat.messages["conv-ops"] = Array.from({ length: 400 }, (_, index) => ({
+        id: `ops-${index + 1}`, conversationId: "conv-ops", seq: index + 1, senderUserId: "user-wang",
+        body: `复盘记录 ${index + 1}号` + (longLastMessage && index === 399 ? "\n最新消息的详细记录".repeat(60) : ""),
+        clientKey: `ops-key-${String(index + 1).padStart(4, "0")}`, createdAt: base + index * 600_000
+      }));
+      Object.assign(channel, { joined: true, lastSeq: 400, lastReadSeq: 400, lastMessageAt: base + 399 * 600_000 });
+    }, longLastMessage);
+    await page.getByRole("button", { name: "选择工作区" }).click();
+    await page.getByRole("group", { name: "工作模式" }).getByRole("button", { name: "聊天" }).click();
+    await signIn(page);
+    const field = page.getByRole("searchbox", { name: "搜索团队聊天消息" });
+    await field.fill("记录 20号");
+    await field.press("Enter");
+    await page.getByTestId("team-chat-search-result").click();
+    const log = page.getByRole("log", { name: "#交易复盘" });
+    await expect(log.locator("[data-focused]")).toContainText("复盘记录 20号");
+    const jump = page.getByRole("button", { name: "跳到最新消息" });
+    await expect(jump).toBeVisible();
+    // The overlay shares the timeline's cell; the workbench stays a single column.
+    expect(await page.getByTestId("team-chat-workbench").evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(1);
+    await jump.click();
+    const latest = log.getByText("复盘记录 400号", { exact: !longLastMessage });
+    await expect(latest).toBeInViewport();
+    // The latest message can be taller than the viewport. Its end, rather than
+    // just its first line or an overscanned DOM node, must be above the Composer.
+    await expect.poll(() => latest.evaluate(element => {
+      const viewport = element.closest('[role="log"]')!;
+      return element.getBoundingClientRect().bottom - viewport.getBoundingClientRect().bottom;
+    })).toBeLessThanOrEqual(1);
+    await expect(jump).toHaveCount(0);
   });
-  await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.getByRole("group", { name: "工作模式" }).getByRole("button", { name: "聊天" }).click();
-  await signIn(page);
-  const field = page.getByRole("searchbox", { name: "搜索团队聊天消息" });
-  await field.fill("记录 20号");
-  await field.press("Enter");
-  await page.getByTestId("team-chat-search-result").click();
-  const log = page.getByRole("log", { name: "#交易复盘" });
-  await expect(log.locator("[data-focused]")).toContainText("复盘记录 20号");
-  const jump = page.getByRole("button", { name: "跳到最新消息" });
-  await expect(jump).toBeVisible();
-  // The overlay shares the timeline's cell; the workbench stays a single column.
-  expect(await page.getByTestId("team-chat-workbench").evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(1);
-  await jump.click();
-  await expect(log.getByText("复盘记录 400号", { exact: true })).toBeInViewport();
-  await expect(jump).toHaveCount(0);
-});
+}

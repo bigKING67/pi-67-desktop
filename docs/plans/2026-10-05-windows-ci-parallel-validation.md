@@ -18,8 +18,12 @@ and single-sample limits, not an unsupported long-term performance claim.
 
 The user prioritized completing CI performance before candidate distribution.
 Continue authorized local implementation, scoped commit/push and GitHub CI.
-No application/dependency changes, candidate replacement, distribution, paid
-model requests, user profiles, global configuration or artifact cleanup.
+The user subsequently included root-cause fixes for the chat latest-message
+viewport failure and Windows shutdown-budget failure. Minimal application and
+regression-test changes for those failures are authorized. Prepare a new candidate
+only after full CI passes and timing is reviewed; frozen Alpha.44 files cannot
+represent changed application inputs. No distribution, paid model requests, user
+profile changes, global configuration or artifact cleanup.
 Use the canonical checkout; main/origin were clean at `e3426fa7`.
 
 ## Baseline evidence and decisions
@@ -110,8 +114,36 @@ the separate manual candidate acceptance.
    graceful Host exit, and a missing Renderer checkpoint; all tracked processes
    eventually exited. The exact cause of the extra exit latency is unverified.
 
-No product source, test assertions, deadlines or retries were changed to clear
-these failures. The user has been asked whether to include their root-cause fixes
-in this task because the accepted CI-only boundary keeps the existing candidate
-bytes frozen. Continue independent evidence work; application edits and candidate
-replacement remain pending that scope decision. No blind CI rerun or distribution.
+No product source, test assertions, deadlines or retries were changed in the first
+experiment. The user then authorized including both root-cause fixes and preparing
+a new candidate after full CI passes. Preserve the failed run as evidence, first
+establish reproducible causes, and keep existing assertions and budgets. No blind
+CI rerun or distribution.
+
+## Authorized failure remediation
+
+- Chat: default Virtuoso measurement rounds each row, but the product's 14px /
+  1.75 line-height produces fractional row heights. Latest navigation also used
+  implicit start alignment. Preserve actual bounding-rectangle height and use
+  explicit `LAST` / end alignment for initial latest pages and later scroll requests.
+  Search focus stays centered; previous-history follow policy is unchanged.
+- Controlled regression with a latest message taller than the viewport: original
+  source leaves its end 708.5px below the viewport; end alignment alone still leaves
+  4.5px clipped; end alignment plus fractional measurement passes. Short and long
+  latest-message tests passed three repetitions without retry; full Chat/search
+  E2E passed 15 tests. No timing sleeps or relaxed viewport assertion were added.
+  The original short-message CI timing failure remains preserved separately.
+- Windows: Playwright 1.61.1 launches Electron through a Shell on Windows; four
+  Windows lifecycle/UI callers passed `application.process().pid` as Main, unlike
+  the existing ordinary smoke. All now capture `process.pid` inside Electron Main.
+  UI evidence records driver PID separately. The 5,000ms product and 15,000ms
+  driver limits remain unchanged; fresh Windows evidence is still required to
+  determine whether the prior 5,771.2ms Shell observation masked a product delay.
+- Local full source check passed 6,408 tests / 24 skips and all gates, line coverage
+  87.98%; targeted shutdown/layout tests passed 24. Frontend route L1-F, normal risk,
+  main serial; actual skills design-craft and browser67, existing DESIGN authority.
+  Real Chrome synthetic-fixture navigation reached the 1,494.5px-tall message's end
+  in both themes with zero bottom scroll gap. Dark measurement was visible; Light
+  was a DOM/geometry check, not a screenshot/visual claim. One managed tab was
+  closed and verified, zero remaining; user tabs preserved. Bounded receipt:
+  `/tmp/pi67-ci-chat-20261005-browser.json`. No new layout, tokens or primitives.

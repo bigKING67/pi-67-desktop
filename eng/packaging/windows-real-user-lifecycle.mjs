@@ -161,7 +161,7 @@ async function runRealUserLaunch({
       }, environmentDriftAgentDir);
     }
     processOutput = captureProcessOutput(application.process());
-    const mainPid = application.process().pid;
+    const mainPid = await application.evaluate(() => process.pid);
     const window = await application.firstWindow();
     failureWindow = window;
     await window.waitForLoadState("domcontentloaded");

@@ -35,7 +35,7 @@ export async function bootstrapFreshProfileLaunch({
     await application.evaluate((_electron, driftAgentDir) => {
       process.env.PI_CODING_AGENT_DIR = driftAgentDir;
     }, environmentDriftAgentDir);
-    const mainPid = application.process().pid;
+    const mainPid = await application.evaluate(() => process.pid);
     const window = await application.firstWindow();
     await window.waitForLoadState("domcontentloaded");
     const startupSurface = await waitForInstalledStartupSurface(window, false);

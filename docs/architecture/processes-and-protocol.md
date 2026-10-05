@@ -1969,8 +1969,9 @@ Main transient cleanup，但保留 dirty 状态和原恢复记录；watchdog 放
 Operation 子阶段区分 Pi abort、执行结算、排队收尾和 receipt 持久化；Prompt 结算另区分
 可重建 Catalog 更新和待执行配置刷新。这些诊断不改变原有等待链或关闭期限。
 Main 按阶段白名单和有界数值重新投影 stderr，不转发其他字段。started 而无结算记录只证明
-该边界尚未完成，不能单独作为内部根因。普通 packaged smoke 用 Electron Main 实际 PID
-测量退出，不以 Windows Playwright 启动包装进程代替 Main。
+该边界尚未完成，不能单独作为内部根因。普通 packaged smoke、Windows 缩放/IME 和安装器
+生命周期均从 Electron Main 上下文读取实际 PID 测量退出，不以 Windows Playwright 启动
+包装进程代替 Main；驱动关闭耗时独立保留，不能记入产品退出预算。
 
 ## Skill Pack process completion
 
@@ -2778,7 +2779,9 @@ ADR 0003 是权威合同。Team Chat 不经过 Pi Runtime、Task Scheduler 或 S
   重连后重新读取目录并对已打开会话做 `after=<tail>` 补齐；跳号 push 从推送前的 tail 补齐。所有状态是
   可丢弃的内存缓存，登出时清空并忽略迟到响应。日志与诊断不记录消息正文、ticket 或 token。
 - 时间线用 Virtuoso 虚拟化（`team-chat/TeamChatTimeline.tsx`）：线程就绪后才挂载以定位到最新消息，
-  日期标签挂在当天首条消息上，使加载更早消息成为纯前插（`firstItemIndex` 递减）。
+  日期标签挂在当天首条消息上，使加载更早消息成为纯前插（`firstItemIndex` 递减）。行测量保留
+  `getBoundingClientRect().height` 的小数精度，避免正文小数行高的逐行取整误差；最新页初始
+  位置和显式滚动请求均使用 `LAST`/`align: end`，搜索目标仍居中，读取旧消息时不强制跟随。
 - Work Card：卡片是带 `workCard` 的消息；`work_card.changed` 推送按 revision 替换已加载线程中的卡片，
   revision 冲突会重载该线程。Chat→Work 只经 `team-chat/team-chat-work-bridge.ts` 打开带 `teamScope`
   的草稿（`beginRendererSessionIntentInWorkspace` + 草稿 `setText`），从不自动发送，也不创建私人范围 Session。
