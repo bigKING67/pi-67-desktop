@@ -6,12 +6,13 @@ import type { WorkspaceFileNavigationIntent } from "./workspace-file-state.js";
 export interface FileEditorProps {
   content: string;
   fileName: string;
+  focusOrigin: Element | null;
   onChange: (content: string) => void;
   onSave: () => void;
   navigation?: WorkspaceFileNavigationIntent | undefined;
 }
 
-export function FileEditor({ content, fileName, onChange, onSave, navigation }: FileEditorProps) {
+export function FileEditor({ content, fileName, focusOrigin, onChange, onSave, navigation }: FileEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | undefined>(undefined);
   const navigationRef = useRef(navigation);
@@ -25,7 +26,6 @@ export function FileEditor({ content, fileName, onChange, onSave, navigation }: 
   useEffect(() => {
     let disposed = false;
     let view: EditorView | undefined;
-    const focusOrigin = containerRef.current?.ownerDocument.activeElement;
     // Any failure while loading or applying the language (not only a rejected chunk) falls back to a
     // plain editor with the same focus handoff; an editor that already mounted is never duplicated.
     const mount = (language?: Awaited<ReturnType<typeof loadLanguage>>) => {
@@ -46,7 +46,7 @@ export function FileEditor({ content, fileName, onChange, onSave, navigation }: 
       viewRef.current = undefined;
       view?.destroy();
     };
-  }, [fileName, initialContent]);
+  }, [fileName, initialContent, focusOrigin]);
 
   useEffect(() => {
     if (viewRef.current) applyNavigation(viewRef.current, navigation);

@@ -1,10 +1,37 @@
 import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { observeWindowsUiShutdown, parseWindowsUiShutdownObservations } from "./windows-ui-shutdown-observation.mjs";
+import { observeWindowsUiShutdown, parseWindowsUiHostShutdown, parseWindowsUiShutdownObservations } from "./windows-ui-shutdown-observation.mjs";
 
 afterEach(() => vi.restoreAllMocks());
 
 describe("Windows UI shutdown observations", () => {
+  it("uses the existing bounded Host parser without exposing raw fields", () => {
+    const record = { sequence: 1, stage: "runtime-session", outcome: "completed", durationMs: 14 };
+    const line = value => `[agent-host:shutdown] ${JSON.stringify(value)}\n`;
+    expect(parseWindowsUiHostShutdown("private output\n" + line({ ...record, secret: "drop" })
+      + line({ ...record, stage: "private-stage" }))).toEqual([record]);
+    expect(parseWindowsUiHostShutdown(line(record).repeat(140))).toHaveLength(128);
+  });
+
+  it("classifies native child exits without collecting process names", async () => {
+    const app = new EventEmitter();
+    const write = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    vi.spyOn(process, "once").mockReturnValue(process);
+    await observeWindowsUiShutdown({ evaluate: (callback, options) => callback({
+      app, BrowserWindow: { getAllWindows: () => [] }
+    }, options) });
+    app.emit("before-quit");
+    for (const details of [
+      { type: "Utility", serviceName: "Pi-67 Agent Host" },
+      { type: "Utility", serviceName: "private-service" },
+      { type: "GPU" }, { type: "unrelated" }
+    ]) app.emit("child-process-gone", {}, details);
+    const output = write.mock.calls.map(([line]) => line).join("");
+    expect(parseWindowsUiShutdownObservations(output).map(record => record.stage))
+      .toEqual(["before-quit", "agent-host-exit", "utility-exit", "gpu-exit"]);
+    expect(output).not.toContain("private-service");
+  });
+
   it("records ordered Main events without preventing or forcing shutdown", async () => {
     const app = new EventEmitter();
     const window = new EventEmitter();

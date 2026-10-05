@@ -108,6 +108,41 @@ separate and cannot inherit Alpha.44 receipts.
   was cancelled before accepting any artifacts; it cannot certify this source.
   Preserve the failure and validate the corrected dependency order on Windows.
 
+## Exact-byte shutdown failure and editor focus regression
+
+- Corrected source `48f1602651f106544e1b76d6a25aa6d96f5e3ea3` passed local
+  `check:candidate` on an unchanged clean checkout (6,424 tests / 24 skips).
+  CI `37330177016` passed source, macOS native, Windows build/native/full NSIS.
+  Windows owned-child tests passed 43/43; first cold query 2,828 ms, with only
+  71 ms between CIM completion and output completion. The three recovery cases
+  passed on both CI and candidate hosts.
+- Source CI still failed one Renderer case: file-row Enter lost its menu target.
+  The retained trace shows the newly lazy-loaded FileEditor taking focus between
+  button focus and key delivery, leaving an unintended dirty document. A controlled
+  delayed editor chunk reproduces the focus theft; ordinary editor autofocus passes.
+  Capture opening focus in the eager file surface, keyed by Workspace/path, and
+  pass it through both editor/language loading boundaries. The previous guard
+  incorrectly captured the user's later menu focus as its own origin.
+  Seven targeted E2Es and Renderer typecheck/build pass; real Chrome confirms
+  delayed loading preserves menu focus, Rename opens and no dirty tab appears.
+  Browser receipt `/tmp/pi67-editor-focus-browser/receipt.json`; its managed tab
+  was finalized and owned fixture server stopped. Existing primitives/tokens stay
+  unchanged; `design-craft` L1-F/main serial, PRODUCT/DESIGN authority enforced.
+- Instrumented candidate `37330963832` failed round 1 at 125% (no retry/remaining
+  rounds, installer skipped). Main OS exit was 8,052.5 ms with maximum polling gap
+  63.7 ms, ruling out a multi-second sampling stall in this sample. Host reached
+  its deadline (forced=true); Main window/will-quit/quit stages ended at 2,523.7 ms,
+  final utility exit at 6,316.2 ms. Do not call this only an outer-driver delay.
+- Exact-byte comparison: both hosts ran executable SHA-256
+  `2a8b375d127713ddabf460408d7dc852a38e28e004b3322380c068b302afb233` and ASAR
+  `6d3c4f2d23ea6608f71e545e64902c331ef20c7b1f985201766234f3d105a0a3`
+  (195,317,407 bytes). Ordinary CI's three UI exits were 316 / 356.4 / 311.3 ms.
+  This supports host/workflow context as a variable, not a proven OS mechanism.
+- Next observation enables the existing bounded Host shutdown phases and labels
+  native child-exit stages. Preserve all deadlines and fail-closed assertions;
+  determine whether Host cleanup or post-JS native exit dominates before changing
+  product shutdown or candidate runner strategy. Current candidate remains not ready.
+
 ## Validation and rollback
 
 Run `corepack pnpm run check:candidate`, frozen-source Windows preflight and the

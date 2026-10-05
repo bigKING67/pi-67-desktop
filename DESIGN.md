@@ -701,6 +701,10 @@ loading error where the operation can produce those states
   invalid UTF-8, oversized, symlink, missing, and special files own explicit
   unavailable states. Clean inactive tabs release source text and reopen it on
   demand rather than retaining every file body indefinitely.
+  Editor autofocus compares against the focus owner captured when its file surface
+  opens, before file reads and lazy editor/language imports. If focus has moved to
+  another control while loading, completion preserves that control's keyboard
+  interaction instead of recapturing it as the editor's opening focus.
 - Save carries the opened opaque revision and cannot overwrite an external
   change. Its acknowledgement applies only to the submitted content snapshot;
   edits made while saving remain dirty, and save-and-close keeps the tab open

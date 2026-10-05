@@ -1,7 +1,10 @@
+import { AgentHostInitializationOutputForwarder } from "../../apps/desktop/src/agent-host-initialization-output.ts";
+
 const PREFIX = "Windows UI shutdown stage: ";
 const STAGES = new Set([
   "before-quit", "window-close", "window-closed", "webcontents-destroyed",
-  "will-prevent-unload", "will-quit", "quit", "process-exit"
+  "will-prevent-unload", "will-quit", "quit", "process-exit",
+  "agent-host-exit", "utility-exit", "gpu-exit"
 ]);
 const MAX_RECORDS = 16;
 
@@ -32,9 +35,25 @@ export async function observeWindowsUiShutdown(application) {
       window.webContents.on("will-prevent-unload", () => record("will-prevent-unload"));
     }
     app.on("will-quit", () => record("will-quit"));
+    app.on("child-process-gone", (_event, details) => {
+      if (details.type === "GPU") record("gpu-exit");
+      else if (details.type === "Utility") {
+        record(details.serviceName === "Pi-67 Agent Host" ? "agent-host-exit" : "utility-exit");
+      }
+    });
     app.on("quit", () => record("quit"));
     process.once("exit", () => record("process-exit"));
   }, { prefix: PREFIX, maximum: MAX_RECORDS });
+}
+
+export function parseWindowsUiHostShutdown(output) {
+  const records = [];
+  const prefix = "[agent-host:shutdown] ";
+  const forwarder = new AgentHostInitializationOutputForwarder(line => {
+    if (line.startsWith(prefix)) records.push(JSON.parse(line.slice(prefix.length)));
+  });
+  forwarder.write(`${output}\n`);
+  return records;
 }
 
 export function parseWindowsUiShutdownObservations(output) {

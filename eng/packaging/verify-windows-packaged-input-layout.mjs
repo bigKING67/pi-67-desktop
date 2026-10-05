@@ -10,7 +10,7 @@ import {
   writeControlledShutdownExtension
 } from "./controlled-shutdown-fixture.ts";
 import { startWindowsSyntheticControlledOperation } from "./windows-synthetic-session-activation.mjs";
-import { observeWindowsUiShutdown, parseWindowsUiShutdownObservations } from "./windows-ui-shutdown-observation.mjs";
+import { observeWindowsUiShutdown, parseWindowsUiHostShutdown, parseWindowsUiShutdownObservations } from "./windows-ui-shutdown-observation.mjs";
 import {
   measureElectronApplicationShutdown,
   parseApplicationShutdownReport,
@@ -131,7 +131,7 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory, verifi
       agentDir: agentDirectory,
       applicationArguments: [`--force-device-scale-factor=${scaleFactor}`],
       artifact,
-      environment: { PI67_TEST_CAPTURE_AGENT_INIT: "1" },
+      environment: { PI67_TEST_CAPTURE_AGENT_INIT: "1", PI67_TEST_CAPTURE_SHUTDOWN: "1" },
       userDataDirectory: directories.userDataDirectory
     });
     processOutput = captureProcessOutput(application.process());
@@ -184,6 +184,7 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory, verifi
       driverCloseDurationMs: round(shutdownMeasurement.driverCloseDurationMs),
       driverProcessId,
       stages: parseWindowsUiShutdownObservations(processOutput()),
+      hostStages: parseWindowsUiHostShutdown(processOutput()),
       sampling: shutdownMeasurement.sampling,
       processes: shutdownMeasurement.processes,
       productExitDurationMs: round(shutdownMeasurement.productExitDurationMs)

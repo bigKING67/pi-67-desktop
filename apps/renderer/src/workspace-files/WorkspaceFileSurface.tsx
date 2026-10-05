@@ -120,6 +120,7 @@ export function WorkspaceFileSurface({
       <div className="workspace-file-surface-body">
         {activeTab ? (
           <FileDocumentSurface
+            key={`${workspace.id}:${activeTab.relativePath}`}
             draftPersistence={draftPersistence}
             persistenceError={persistenceError}
             navigation={navigation?.relativePath === activeTab.relativePath ? navigation : undefined}
@@ -179,6 +180,9 @@ function FileDocumentSurface({
   onReload: () => void;
   onSaveAs: () => void;
 }) {
+  // Capture before either the file read or lazy editor/language chunks finish.
+  // A later keyboard/pointer destination keeps ownership of focus.
+  const [focusOrigin] = useState(() => document.activeElement);
   const save = () => void saveWorkspaceFile(workspace, tab.relativePath);
   return (
     <section aria-label={tab.relativePath} className="workspace-file-document">
@@ -227,6 +231,7 @@ function FileDocumentSurface({
           <FileEditor
             content={tab.content}
             fileName={tab.name}
+            focusOrigin={focusOrigin}
             key={`${tab.relativePath}:${tab.documentVersion}`}
             navigation={navigation}
             onChange={(content) => workspaceFileStore.getState().updateContent(workspace.id, tab.relativePath, content)}
