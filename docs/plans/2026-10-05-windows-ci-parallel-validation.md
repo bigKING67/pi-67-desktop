@@ -147,3 +147,30 @@ CI rerun or distribution.
   was a DOM/geometry check, not a screenshot/visual claim. One managed tab was
   closed and verified, zero remaining; user tabs preserved. Bounded receipt:
   `/tmp/pi67-ci-chat-20261005-browser.json`. No new layout, tokens or primitives.
+
+## Follow-up Windows startup evidence
+
+- Remediation source `7b5038f27851619cca3e3834e89bedbf4366f426`, CI `37318493295`
+  attempt 1: source 6,408 passed / 24 skipped, Renderer 300 passed / one skipped;
+  macOS native, Windows build, full hidden smoke, six recovery receipts and full
+  NSIS lifecycle passed. Windows UI remained failed; performance is not accepted.
+- Real Windows Main PIDs are distinct from the driver PIDs. The 125% / 150% UI
+  scenarios exited in 333.3 / 1,293.0 ms with Renderer checkpoints, graceful Host
+  shutdown and no remaining tracked processes. This does not retrospectively
+  isolate the cause of the earlier uninstrumented 5,771.2 ms Shell observation.
+- At 200%, the screenshot shows the empty Workspace with its explicit New action,
+  no Session or Pi initialization. Product authority deliberately stops automatic
+  bootstrap after a five-second unresolved Catalog decision; the synthetic harness
+  waited only for ready or Intent and never handled a later recovered empty Catalog.
+  The historical receipt does not record Catalog state, so the exact cold-stage
+  delay remains unverified; add bounded state diagnostics rather than infer it.
+- Admit the explicit New action only after connected/nonpending Workspace plus
+  ready, complete, empty, nonloading, nonrebuilding, error-free Catalog. Click once,
+  wait for Intent within the original 60-second total deadline, then require the
+  unchanged controlled model, active Operation/child and layout/shutdown assertions.
+  Unknown Catalogs and failed Runtime remain failures. No product startup change.
+- A real Renderer regression reproduces the five-second decision timeout, rejects
+  unknown Catalog admission, then recovers it and verifies exactly one Session on
+  first submit and no hidden `workspace.open`. Local focused tests: 27 passed;
+  complete Catalog browser tests plus this regression: 15 passed, no retries.
+  Full exact-source Windows acceptance is still pending.

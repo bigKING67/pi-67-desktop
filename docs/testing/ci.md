@@ -112,10 +112,14 @@ Windows smoke 失败证据在 smoke 返回后立即上传，Windows UI 报告在
 均不再等待后续 NSIS 检查；原有产物名称、路径、条件和保留期不变。恢复和安装器继续
 各自保留证据，提前上传不改变最终门禁或失败候选的资格。
 Windows synthetic-scale/IME 夹具在首条 Prompt 前等待可见的 Runtime ready、明确 failed 或
-New Session Intent surface，仍使用 60 秒上限；单独 stopped、starting 或空白不能放行，failed
+New Session Intent surface，仍使用 60 秒上限。工作区的 5 秒目录决策已结束后，只有连接有效、
+工作区打开完成、目录 ready/完整/空且无 loading/rebuilding/error 的可见“新建对话”入口，
+才允许显式点击一次并等待 Intent；点击和后续等待共用原 60 秒 deadline。其他 stopped、starting
+或空白不能放行，failed
 优先报错。合法 Intent 按产品合同等待首条消息才启动 Pi；夹具随后必须通过受控模型、
 运行中的 Operation、真实子进程以及原有缩放/输入法/5 秒退出断言，不能用 Intent 代替
-Runtime 成功。回执记录 `initialSessionSurface`，失败诊断记录 `newSessionIntentVisible`。
+Runtime 成功。回执记录 `initialSessionSurface`，包含 `ready-empty-workspace`；失败诊断记录
+`newSessionIntentVisible`、连接/工作区状态和有界目录状态，不记录 Session 内容。
 受控 Prompt 失败也保留初始化/界面阶段；Provider 与子进程可选记录最多 64 条固定字段
 生命周期观察，不记录模型输入。Windows UI 失败时在关闭应用前保存观察快照、子进程
 存活状态与截图；关闭导致的 abort/exit 不能反推为失败原因。

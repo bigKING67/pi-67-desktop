@@ -17,7 +17,7 @@ import {
 } from "./verify-windows-packaged-input-layout.mjs";
 
 vi.mock("./controlled-provider-interaction.mjs", () => ({ startControlledPrompt: vi.fn(async () => undefined) }));
-afterEach(() => { vi.clearAllMocks(); vi.useRealTimers(); });
+afterEach(() => { vi.clearAllMocks(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe("Windows packaged synthetic-scale UI contract", () => {
   it("keeps the release scale matrix explicit", () => {
@@ -28,105 +28,99 @@ describe("Windows packaged synthetic-scale UI contract", () => {
   });
 
   it.each([false, true])("waits for a Session surface before the first prompt, intent=%s", async (intentVisible) => {
-    const waitFor = vi.fn();
-    const isVisible = vi.fn(async () => false);
-    const failed = { isVisible };
-    const intent = { isVisible: vi.fn(async () => intentVisible) };
-    const combined = { first: vi.fn(() => ({ waitFor })), or: vi.fn() };
-    combined.or.mockReturnValue(combined);
-    const ready = { or: vi.fn(() => combined) };
-    const window = {
-      getByTestId: vi.fn(() => intent),
-      locator: vi.fn((selector) => selector.includes("ready") ? ready : failed)
-    };
-
-    await expect(startWindowsSyntheticControlledOperation(window, () => "", 1.5, 12_345))
+    const fixture = sessionSurfaceFixture({ intentVisible });
+    await expect(startWindowsSyntheticControlledOperation(fixture.window, () => "", 1.5, 12_345))
       .resolves.toBe(intentVisible ? "new-session-intent" : "runtime-ready");
-
-    expect(ready.or).toHaveBeenCalledWith(failed);
-    expect(combined.or).toHaveBeenCalledWith(intent);
-    expect(window.getByTestId).toHaveBeenCalledWith("new-session-intent");
-    expect(waitFor).toHaveBeenCalledWith({ state: "visible", timeout: 12_345 });
-    expect(isVisible).toHaveBeenCalledOnce();
-    expect(startControlledPrompt).toHaveBeenCalledExactlyOnceWith(window);
+    expect(fixture.waitFor).toHaveBeenCalledOnce();
+    expect(fixture.waitFor.mock.calls[0][0]).toMatchObject({ state: "visible" });
+    expect(fixture.waitFor.mock.calls[0][0].timeout).toBeLessThanOrEqual(12_345);
+    expect(fixture.click).not.toHaveBeenCalled();
+    expect(startControlledPrompt).toHaveBeenCalledExactlyOnceWith(fixture.window);
   });
 
-  it("reports bounded runtime and initialization diagnostics on failure", async () => {
-    const waitFor = vi.fn(async () => {
-      throw new Error("timeout");
-    });
-    const failed = { isVisible: vi.fn(async () => false) };
-    const combined = { first: vi.fn(() => ({ waitFor })), or: vi.fn() };
-    combined.or.mockReturnValue(combined);
-    const ready = { or: vi.fn(() => combined) };
-    const surface = {
-      acknowledgementTimedOut: false,
-      conversationRowCount: 0,
-      newSessionIntentVisible: false,
-      runtimePhase: "stopped",
-      title: "New Money",
-      url: "app://pi67/index.html",
-      workspaceOpenFailed: false,
-      workspacePickerVisible: false
-    };
-    const window = {
-      evaluate: vi.fn(async () => surface),
-      getByTestId: vi.fn(),
-      locator: vi.fn((selector) => selector.includes("ready") ? ready : failed)
-    };
-    const output = [
-      '[agent-host:init] {"stage":"create-session","outcome":"started","durationMs":0}',
-      '[agent-host:init] {"stage":"load-model-runtime","outcome":"completed","durationMs":8}'
-    ].join("\n");
+  it("explicitly creates one Intent only from an authoritative ready-empty Workspace", async () => {
+    const fixture = sessionSurfaceFixture({ emptyVisible: true });
+    await expect(startWindowsSyntheticControlledOperation(fixture.window, () => "", 2))
+      .resolves.toBe("ready-empty-workspace");
+    expect(fixture.click).toHaveBeenCalledOnce();
+    expect(fixture.intentWaitFor).toHaveBeenCalledOnce();
+    expect(startControlledPrompt).toHaveBeenCalledExactlyOnceWith(fixture.window);
+    const selector = fixture.window.locator.mock.calls.find(([value]) => value.startsWith(".application-shell"))[0];
+    for (const required of [
+      '[data-agent-connected="true"]', '[data-workspace-open-pending="false"]',
+      '[data-runtime-phase="stopped"]', '[data-catalog-state="ready"]',
+      '[data-catalog-loading="false"]', '[data-catalog-rebuilding="false"]',
+      '[data-catalog-incomplete="false"]', '[data-catalog-error="false"]', '[data-catalog-item-count="0"]'
+    ]) expect(selector).toContain(required);
+  });
 
-    await expect(startWindowsSyntheticControlledOperation(window, () => output, 1.25, 30_000))
-      .rejects.toThrow(/"runtimePhase":"stopped"/u);
+  it("keeps the empty Workspace action and Intent wait inside the original deadline", async () => {
+    let now = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const fixture = sessionSurfaceFixture({ emptyVisible: true });
+    fixture.waitFor.mockImplementation(async () => { now = 8_000; });
+    fixture.click.mockImplementation(async () => { now = 9_000; });
+    await startWindowsSyntheticControlledOperation(fixture.window, () => "", 2, 10_000);
+    expect(fixture.click).toHaveBeenCalledWith({ timeout: 2_000 });
+    expect(fixture.intentWaitFor).toHaveBeenCalledWith({ state: "visible", timeout: 1_000 });
+  });
+
+  it("does not submit if the explicit New action consumes the remaining deadline", async () => {
+    let now = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const fixture = sessionSurfaceFixture({ emptyVisible: true });
+    fixture.click.mockImplementation(async () => { now = 10_000; });
+    await expect(startWindowsSyntheticControlledOperation(fixture.window, () => "", 2, 10_000))
+      .rejects.toThrow(/Session surface deadline exceeded/u);
+    expect(fixture.intentWaitFor).not.toHaveBeenCalled();
     expect(startControlledPrompt).not.toHaveBeenCalled();
-    await expect(inspectWindowsSyntheticRuntimeSurface(window)).resolves.toEqual(surface);
   });
 
-  it("rejects an explicit failed Runtime even alongside a visible intent", async () => {
-    const combined = { or: vi.fn(), first: () => ({ waitFor: vi.fn() }) };
-    combined.or.mockReturnValue(combined);
-    const failed = { isVisible: vi.fn(async () => true) };
-    const window = {
-      locator: vi.fn(selector => selector.includes("ready") ? combined : failed),
-      getByTestId: vi.fn(() => ({ isVisible: vi.fn(async () => true) })),
-      evaluate: vi.fn(async () => ({ runtimePhase: "failed", newSessionIntentVisible: true }))
-    };
-    await expect(startWindowsSyntheticControlledOperation(window, () => "", 1.5))
+  it("reports bounded runtime and initialization diagnostics without admitting an unknown Catalog", async () => {
+    const fixture = sessionSurfaceFixture();
+    fixture.waitFor.mockRejectedValue(new Error("timeout"));
+    const surface = { runtimePhase: "stopped", catalog: { state: "unavailable" } };
+    fixture.window.evaluate.mockResolvedValue(surface);
+    const output = '[agent-host:init] {"stage":"create-session","outcome":"started","durationMs":0}';
+    await expect(startWindowsSyntheticControlledOperation(fixture.window, () => output, 2, 30_000))
+      .rejects.toThrow('"catalog":{"state":"unavailable"}');
+    expect(fixture.click).not.toHaveBeenCalled();
+    expect(startControlledPrompt).not.toHaveBeenCalled();
+    await expect(inspectWindowsSyntheticRuntimeSurface(fixture.window)).resolves.toEqual(surface);
+  });
+
+  it.each([false, true])("rejects an explicit failed Runtime before New or Prompt, empty=%s", async (emptyVisible) => {
+    const fixture = sessionSurfaceFixture({ emptyVisible, intentVisible: true, failed: true });
+    await expect(startWindowsSyntheticControlledOperation(fixture.window, () => "", 1.5))
       .rejects.toMatchObject({ cause: { message: "Pi SDK entered the failed runtime phase." } });
+    expect(fixture.click).not.toHaveBeenCalled();
     expect(startControlledPrompt).not.toHaveBeenCalled();
   });
 
-  it("cannot pass an intent whose controlled model or prompt fails to initialize", async () => {
-    const combined = { or: vi.fn(), first: () => ({ waitFor: vi.fn() }) };
-    combined.or.mockReturnValue(combined);
-    const failed = { isVisible: vi.fn(async () => false) };
-    const window = {
-      locator: vi.fn(selector => selector.includes("ready") ? combined : failed),
-      getByTestId: vi.fn(() => ({ isVisible: vi.fn(async () => true) })),
-      evaluate: vi.fn(async () => ({ runtimePhase: "ready", firstPromptNotSent: true }))
-    };
+  it("does not submit if Runtime fails after the explicit New action", async () => {
+    const fixture = sessionSurfaceFixture({ emptyVisible: true });
+    fixture.failed.isVisible.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    await expect(startWindowsSyntheticControlledOperation(fixture.window, () => "", 2))
+      .rejects.toMatchObject({ cause: { message: "Pi SDK entered the failed runtime phase." } });
+    expect(fixture.click).toHaveBeenCalledOnce();
+    expect(startControlledPrompt).not.toHaveBeenCalled();
+  });
+
+  it("cannot pass an Intent whose controlled model or Prompt fails to initialize", async () => {
+    const fixture = sessionSurfaceFixture({ intentVisible: true });
     const failure = new Error("Controlled model did not hydrate");
     vi.mocked(startControlledPrompt).mockRejectedValueOnce(failure);
-    await expect(startWindowsSyntheticControlledOperation(window, () => "", 1.5))
+    await expect(startWindowsSyntheticControlledOperation(fixture.window, () => "", 1.5))
       .rejects.toMatchObject({ cause: failure, message: expect.stringContaining('"stage":"controlled-prompt"') });
-    expect(startControlledPrompt).toHaveBeenCalledExactlyOnceWith(window);
-    expect(window.evaluate).toHaveBeenCalledOnce();
+    expect(startControlledPrompt).toHaveBeenCalledExactlyOnceWith(fixture.window);
   });
 
-  it("preserves a prompt failure when the renderer is already unavailable", async () => {
-    const combined = { or: vi.fn(), first: () => ({ waitFor: vi.fn() }) };
-    combined.or.mockReturnValue(combined);
-    const window = {
-      locator: vi.fn(selector => selector.includes("ready") ? combined : { isVisible: async () => false }),
-      getByTestId: vi.fn(() => ({ isVisible: async () => true })),
-      evaluate: vi.fn(async () => { throw new Error("page closed"); })
-    };
+  it("preserves a Prompt failure when the renderer is already unavailable", async () => {
+    const fixture = sessionSurfaceFixture({ intentVisible: true });
+    fixture.window.evaluate.mockRejectedValue(new Error("page closed"));
     const failure = new Error("Stop never appeared");
     vi.mocked(startControlledPrompt).mockRejectedValueOnce(failure);
-    await expect(startWindowsSyntheticControlledOperation(window, () => "", 1.5))
+    await expect(startWindowsSyntheticControlledOperation(fixture.window, () => "", 1.5))
       .rejects.toMatchObject({ cause: failure, message: expect.stringContaining('"surface":{"unavailable":true}') });
   });
 
@@ -319,4 +313,26 @@ function observation() {
     visualViewportHeight: 800,
     visualViewportWidth: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX
   };
+}
+
+function sessionSurfaceFixture({ intentVisible = false, emptyVisible = false, failed: runtimeFailed = false } = {}) {
+  const waitFor = vi.fn(async () => undefined);
+  const intentWaitFor = vi.fn(async () => undefined);
+  const click = vi.fn(async () => undefined);
+  const combined = { or: vi.fn(), first: () => ({ waitFor }) };
+  combined.or.mockReturnValue(combined);
+  const failed = { isVisible: vi.fn(async () => runtimeFailed) };
+  const intent = {
+    isVisible: vi.fn(async () => intentVisible),
+    or: vi.fn(() => ({ first: () => ({ waitFor: intentWaitFor }) }))
+  };
+  const empty = { isVisible: vi.fn(async () => emptyVisible), click };
+  const window = {
+    locator: vi.fn(selector => selector.startsWith(".application-shell")
+      ? { getByRole: vi.fn(() => empty) }
+      : selector.includes("ready") ? combined : failed),
+    getByTestId: vi.fn(() => intent),
+    evaluate: vi.fn(async () => ({ runtimePhase: "stopped" }))
+  };
+  return { window, waitFor, intentWaitFor, click, failed };
 }
