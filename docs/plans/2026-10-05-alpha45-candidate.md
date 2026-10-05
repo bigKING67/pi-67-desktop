@@ -35,7 +35,7 @@ separate and cannot inherit Alpha.44 receipts.
   capability versions and pnpm lockfile remain unchanged.
 - Upgrade baseline: retained Alpha.44 candidate source
   `4f04a830b3ac847b505582adcada53ee564719e2`, Windows run `37283874495`,
-  build attempt 1 / successful artifact attempt 2. Recheck metadata preflight for
+  identity build attempt 2 / successful artifact attempt 2. Recheck metadata preflight for
   the new frozen SHA, then use its complete workflow inputs.
 - Existing automatic archive retention remains part of the packaging contract;
   no separate cleanup or replacement of the verified distribution pool.
@@ -47,6 +47,31 @@ separate and cannot inherit Alpha.44 receipts.
 - [ ] macOS clean-source preview, smoke and DMG/ZIP container/identity checks pass.
 - [ ] Windows full candidate certification passes; downloaded bytes verified.
 - [ ] Three product files share version/source/runtime and local readiness receipt.
+
+## First frozen source and remaining shutdown failure
+
+- Frozen source `98e9d441c943b810cdac3ee4a5a83ea6e7b25912` was pushed clean.
+  The actual retained baseline identity records attempt **2**; the preflight and
+  dispatch correctly used build/artifact attempt 2, correcting the initial plan's
+  assumption. Inputs are retained in `windows-dispatch-inputs.json`.
+- Local `check:candidate` passed: 6,413 tests / 24 skips and all required gates.
+  Full source CI `37324145559` attempt 1 also passed every selected lane.
+- macOS preview, full smoke, container verification and independent hashes passed;
+  the repository preview opened. Identity, smoke, byte-verification receipt and log
+  are retained under `artifacts/validation/alpha45-candidate/`. These bind source
+  `98e9d441`, not subsequent verifier or product changes.
+- Windows candidate `37324283727` attempt 1 **failed** at its 125% UI shutdown;
+  installer certification did not run. The observed real Main exit was 6,826 ms,
+  driver 6,825.6 ms, versus the unchanged 5,000 ms budget. Application cleanup was
+  142.9 ms, Renderer checkpoint succeeded, Host graceful=true/forced=false, child
+  exit 50 ms and final utility exit 4,267.2 ms. No tracked process remained alive.
+  Source CI success does not make this candidate ready or prove shutdown stability.
+- Existing evidence cannot distinguish post-controller Electron lifecycle delay
+  from late verifier-loop sampling. Add passive, bounded Main event timings and
+  PID sampling-gap metadata to the UI verifier; preserve every deadline, assertion,
+  event behavior and product input. This is diagnosis, not a claimed root-cause fix.
+  No blind identical-source retry or distribution. Read the next Windows evidence
+  before deciding on a product or harness correction.
 
 ## Validation and rollback
 

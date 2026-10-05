@@ -74,8 +74,15 @@ export async function measureElectronApplicationShutdown({
     .filter(Boolean);
   const controlledChild = trackedProcess(childPid, processAlive);
   const tracked = [main, ...utilities, controlledChild].filter(Boolean);
+  let previousSampleAt = startedAt;
+  let maximumSampleGapMs = 0;
+  let sampleCount = 0;
   const sample = () => {
-    const elapsedMs = round(now() - startedAt);
+    const sampledAt = now();
+    maximumSampleGapMs = Math.max(maximumSampleGapMs, sampledAt - previousSampleAt);
+    previousSampleAt = sampledAt;
+    sampleCount += 1;
+    const elapsedMs = round(sampledAt - startedAt);
     for (const state of tracked) {
       state.aliveAfterClose = processAlive(state.pid);
       if (!state.aliveAfterClose && state.exitObservedMs === null) {
@@ -125,6 +132,7 @@ export async function measureElectronApplicationShutdown({
     driverCloseError,
     driverCloseTimedOut,
     forcedTerminationRequested,
+    sampling: { intervalMs: pollIntervalMs, maximumGapMs: round(maximumSampleGapMs), sampleCount },
     processes,
     productExitDurationMs: productExitDuration({
       childExpected: childPid !== undefined,

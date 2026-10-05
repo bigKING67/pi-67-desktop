@@ -87,6 +87,8 @@ describe("Electron shutdown measurement", () => {
       expect(result.driverCloseTimedOut).toBe(false);
       expect(result.forcedTerminationRequested).toBe(false);
       expect(result.productExitDurationMs).toBe(600);
+      expect(result.sampling.maximumGapMs).toBe(50);
+      expect(result.sampling.sampleCount).toBeGreaterThanOrEqual(12);
       expect(productShutdownWithinBudget(result, 5_000)).toBe(true);
       expect(result.processes.main).toMatchObject({
         aliveAfterClose: false,
@@ -144,6 +146,22 @@ describe("Electron shutdown measurement", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("exposes delayed sampling without exempting an observed over-budget exit", async () => {
+    let clock = 0;
+    let alive = true;
+    const result = await measureElectronApplicationShutdown({
+      application: { close: async () => { alive = false; clock = 6_500; } },
+      budgetMs: 5_000,
+      mainPid: 101,
+      utilityPids: [],
+      now: () => clock,
+      processAlive: () => alive
+    });
+    expect(result.sampling.maximumGapMs).toBe(6_500);
+    expect(result.productExitDurationMs).toBe(6_500);
+    expect(productShutdownWithinBudget(result, 5_000)).toBe(false);
   });
 
   it("bounds a hung Playwright close and fails the shutdown gate closed", async () => {

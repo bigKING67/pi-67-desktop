@@ -123,6 +123,10 @@ Runtime 成功。回执记录 `initialSessionSurface`，包含 `ready-empty-work
 受控 Prompt 失败也保留初始化/界面阶段；Provider 与子进程可选记录最多 64 条固定字段
 生命周期观察，不记录模型输入。Windows UI 失败时在关闭应用前保存观察快照、子进程
 存活状态与截图；关闭导致的 abort/exit 不能反推为失败原因。
+Windows UI 还在隔离测试 Main 内被动记录最多 16 条关闭事件：before-quit、窗口与 WebContents
+关闭、阻止 unload、will-quit、quit 和 process exit，只含固定阶段、序号和本地耗时；不拦截事件、
+不强制退出或延长期限。PID 测量同时保留采样次数和最大采样间隔，用于区分 Electron teardown
+与驱动事件循环延迟；缺少事件不表示事件已完成，诊断记录本身不构成修复或预算豁免。
 冷启动用崩溃前的精确侧栏 Session identity 打开原对话；不假定导航选中状态已在
 强制退出前落盘。该场景明确经过工作区首页，验证从侧栏续接；身份含分隔字符，
 必须按属性值完整比较，不能拼入 CSS selector。失败取证使用本次启动的新窗口。

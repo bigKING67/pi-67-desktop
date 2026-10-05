@@ -10,6 +10,7 @@ import {
   writeControlledShutdownExtension
 } from "./controlled-shutdown-fixture.ts";
 import { startWindowsSyntheticControlledOperation } from "./windows-synthetic-session-activation.mjs";
+import { observeWindowsUiShutdown, parseWindowsUiShutdownObservations } from "./windows-ui-shutdown-observation.mjs";
 import {
   measureElectronApplicationShutdown,
   parseApplicationShutdownReport,
@@ -157,6 +158,7 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
     const composition = await verifySyntheticComposition(window, scaleFactor);
     const screenshotPath = join(outputDirectory, `scale-${scaleLabel}.png`);
     await window.screenshot({ animations: "disabled", path: screenshotPath });
+    await observeWindowsUiShutdown(application);
 
     // Packaged smoke owns session_shutdown(reason=quit); this UI gate repeats the
     // independent no-leaked-process boundary for its responsive/IME scenario.
@@ -173,6 +175,8 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
       budgetMs: WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS,
       driverCloseDurationMs: round(shutdownMeasurement.driverCloseDurationMs),
       driverProcessId,
+      stages: parseWindowsUiShutdownObservations(processOutput()),
+      sampling: shutdownMeasurement.sampling,
       processes: shutdownMeasurement.processes,
       productExitDurationMs: round(shutdownMeasurement.productExitDurationMs)
     };
