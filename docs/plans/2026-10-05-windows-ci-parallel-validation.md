@@ -1,6 +1,6 @@
 # Windows CI parallel validation
 
-Status: active
+Status: complete; exact-source full CI and single-sample performance accepted
 Owner: Codex
 Started: 2026-10-05
 Last updated: 2026-10-05
@@ -51,8 +51,8 @@ Use the canonical checkout; main/origin were clean at `e3426fa7`.
 - [x] Implement transport identity and split CI; preserve legacy reuse and gate semantics.
 - [x] Pass artifact corruption/source/attempt tests, gate/reuse/routing regressions,
   lint, structure, workflow pins and PowerShell validation.
-- [ ] Push scoped source and validate one full exact-SHA Windows/macOS CI run.
-- [ ] Compare complete elapsed time, runner seconds, transfer size and all receipts;
+- [x] Push scoped source and validate one full exact-SHA Windows/macOS CI run.
+- [x] Compare complete elapsed time, runner seconds, transfer size and all receipts;
   keep only a demonstrated improvement, or revert the experiment with evidence.
 
 ## Rollback and limitations
@@ -174,3 +174,27 @@ CI rerun or distribution.
   first submit and no hidden `workspace.open`. Local focused tests: 27 passed;
   complete Catalog browser tests plus this regression: 15 passed, no retries.
   Full exact-source Windows acceptance is still pending.
+
+## Accepted CI checkpoint
+
+- Source `d7e26042a4717c176b278aabc163919a5b74a05a`, full CI `37321775755`,
+  attempt 1: every selected lane and final gate passed. Source tests 6,413 passed /
+  24 skipped; Renderer 301 passed / one skipped. Full hidden smoke, six clean-source
+  recovery receipts, all Windows UI scales and full NSIS lifecycle passed.
+- Total elapsed 811 seconds (13m31) versus 1,161 (19m21): observed reduction
+  350 seconds / 30.1%. Windows runner sum 1,139 versus 1,140 seconds. Keep the
+  split architecture, but do not claim a stable percentile or isolated scheduling
+  effect: full NSIS execution varied from 454 to 276 seconds across hosted runners.
+- Transport preparation/upload took 52 seconds; download/verification/extraction
+  took 24 seconds for runtime and 21 for installer, already included above.
+  Exact metadata, source logs and receipts: ignored
+  `artifacts/validation/ci-parallel-windows/verification-37321775755/`;
+  comparison: `artifacts/validation/ci-parallel-windows/passing-comparison.json`.
+- Windows product exit at 125/150/200% was 340.2 / 318.4 / 658.2 ms; real Main
+  and Shell PIDs differ, all Renderer checkpoints and graceful Host exits passed.
+  This native sample entered Runtime ready directly at all scales; delayed Catalog
+  recovery is verified by the deterministic Renderer regression and harness tests,
+  not claimed as exercised in this Windows sample.
+- No paid inference, user-profile mutation or distribution. Alpha.44 candidate
+  bytes remain historical. Continue the authorized new candidate preparation as
+  Alpha.45 with a separate frozen source and candidate evidence.
