@@ -1,6 +1,6 @@
 # Alpha.45 internal candidate preparation
 
-Status: active
+Status: complete (automated candidate preparation; target-user acceptance pending)
 Owner: Codex
 Started: 2026-10-05
 Last updated: 2026-10-06
@@ -42,11 +42,11 @@ separate and cannot inherit Alpha.44 receipts.
 
 ## Checkpoints
 
-- [ ] Version consistency and candidate source gates pass.
-- [ ] Scoped source commit pushed; frozen SHA and preflight inputs recorded.
-- [ ] macOS clean-source preview, smoke and DMG/ZIP container/identity checks pass.
-- [ ] Windows full candidate certification passes; downloaded bytes verified.
-- [ ] Three product files share version/source/runtime and local readiness receipt.
+- [x] Version consistency and candidate source gates pass.
+- [x] Scoped source commit pushed; frozen SHA and preflight inputs recorded.
+- [x] macOS clean-source preview, smoke and DMG/ZIP container/identity checks pass.
+- [x] Windows full candidate certification passes; downloaded bytes verified.
+- [x] Three product files share version/source/runtime and local readiness receipt.
 
 ## First frozen source and remaining shutdown failure
 
@@ -143,7 +143,38 @@ separate and cannot inherit Alpha.44 receipts.
   determine whether Host cleanup or post-JS native exit dominates before changing
   product shutdown or candidate runner strategy. Current candidate remains not ready.
 
-## Validation and rollback
+## Final automated acceptance
+
+- Frozen candidate source: `fc9029553a29215329d6c69b2ec154c1674025c7`;
+  version `0.1.0-alpha.45`, Pi runtime `1.0.0`. Later plan-only closeout does not
+  change this recorded artifact identity or certify a different source SHA.
+- Local candidate gates passed on unchanged source: 6,427 tests / 24 skips,
+  958 passing files / 9 environment skips. CI `37337974734` attempt 1 passed
+  every selected lane in 14m23, including 303 Renderer E2Es / 1 skip, Windows
+  native/package/recovery/UI and full NSIS. macOS native CI was correctly skipped
+  for the final verifier-only delta; this exact source passed local packaged smoke.
+- Windows candidate `37338037247` attempt 1 passed provenance, build and full
+  installer certification. Nine installer launches passed, Alpha.44 upgrade was
+  exercised, and uninstall preserved both synthetic profiles' data.
+- Both Windows environments ran the same executable and ASAR hashes. Their
+  combined 12 UI shutdown cases completed in 242.7–493.7 ms; all reported a
+  checkpoint, graceful Host exit, no forced termination and final Host cleanup.
+  All six recovery cases passed with clean source, unchanged canonical profiles,
+  successful owned-process cleanup and zero real model requests.
+- Exact-source macOS preview packaged, smoke-tested, container-verified and opened;
+  active-prompt exit was 616.2 ms. DMG/ZIP and downloaded Windows EXE were checked
+  with the repository's candidate byte verifiers; repository/source/version/runtime
+  agree. Final file paths, sizes, SHA-256 and limitations are retained in
+  `artifacts/validation/alpha45-candidate/readiness-fc902955.json`.
+- This is ready for bounded target-user manual testing, not publication. No
+  Feishu/R2 upload, promotion, Tag, Release, signing, manual cleanup or paid model
+  call occurred. Alpha.44 user receipts do not transfer to these bytes.
+- Historical intermittent Windows post-JS exit delays (6,826 / 8,052.5 ms) remain
+  unexplained. Current passing samples do not prove a root fix for that condition;
+  retain the failed receipts and complete target-user Windows profile/EDR/storage
+  acceptance before making a broader stability claim.
+
+## Prior validation checkpoint
 
 Source `95dd9033433b5c5b12b8318eb28e4754d43276cc` passed unchanged local
 candidate gates (6,426 tests / 24 skips), full Renderer CI (303 passed / 1 skip),
@@ -161,6 +192,8 @@ slow-exit cause. Fix this verifier-only loss by projecting bounded records as th
 arrive, retaining independent stdout/stderr fragments and rejecting oversized lines.
 Regression covers noisy startup, fragmented/interleaved streams, fixed output fields
 and record caps. Do not call the historical intermittent Windows delay root-fixed.
+
+## Validation and rollback
 
 Run `corepack pnpm run check:candidate`, frozen-source Windows preflight and the
 existing Windows candidate workflow. On macOS run `preview:mac:unsigned`, which
