@@ -110,7 +110,9 @@ describe("packaged recovery process ownership", () => {
     expect(args).toEqual(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", expect.stringContaining(`-Filter 'ProcessId = ${pid}'`)]);
     // A fresh process must resolve only the two known modules, including output
     // serialization; an unqualified cmdlet must not trigger broad discovery.
-    expect(args.at(-1)).toContain("$PSModuleAutoLoadingPreference = 'ModuleQualified'");
+    expect(args.at(-1)).toContain("$PSModuleAutoLoadingPreference = 'None'");
+    expect(args.at(-1)).toContain('Microsoft.PowerShell.Core\\Import-Module -Name "$PSHOME\\Modules\\CimCmdlets\\CimCmdlets.psd1" -ErrorAction Stop');
+    expect(args.at(-1)).toContain('Microsoft.PowerShell.Core\\Import-Module -Name "$PSHOME\\Modules\\Microsoft.PowerShell.Utility\\Microsoft.PowerShell.Utility.psd1" -ErrorAction Stop');
     expect(args.at(-1)).toContain("CimCmdlets\\Get-CimInstance");
     expect(args.at(-1)).toContain("Microsoft.PowerShell.Utility\\ConvertTo-Json");
     expect(args.at(-1)).not.toMatch(/CommandLine|Stop-Process|taskkill/u);
@@ -130,12 +132,12 @@ describe("packaged recovery process ownership", () => {
     await expect(readRecoveryProcess(pid, { platform: "win32", execute })).rejects.toThrow("CIM lookup failed");
   });
 
-  it("keeps missing qualified modules fatal without falling back to command discovery", async () => {
+  it("keeps missing built-in modules fatal without falling back to command discovery", async () => {
     const cause = Object.assign(new Error("Required module unavailable"), { code: 1 });
     const execute = vi.fn().mockRejectedValue(cause);
     await expect(readRecoveryProcess(pid, { platform: "win32", execute })).rejects.toMatchObject({ cause });
     expect(execute).toHaveBeenCalledOnce();
-    expect(execute.mock.calls[0][1].at(-1)).not.toMatch(/Import-Module|SilentlyContinue|AutoLoadingPreference = 'All'/u);
+    expect(execute.mock.calls[0][1].at(-1)).not.toMatch(/SilentlyContinue|AutoLoadingPreference = 'All'|AutoLoadingPreference = 'ModuleQualified'/u);
   });
 
   it("retains bounded Windows query timeout evidence without treating it as process exit", async () => {
@@ -147,7 +149,7 @@ describe("packaged recovery process ownership", () => {
   });
 
   it("separates PowerShell startup, query and output timing from process identity", async () => {
-    const stages = ["script-started", "query-started", "query-completed", "output-completed"];
+    const stages = ["script-started", "modules-started", "modules-completed", "query-started", "query-completed", "output-completed"];
     const stderr = stages.map((stage, index) => `PI67_RECOVERY_PROCESS_QUERY:${stage}:${(index + 1) * 100}`).join("\r\n");
     const onDiagnostic = vi.fn();
     const execute = vi.fn().mockResolvedValue({ stdout: JSON.stringify(win), stderr });
@@ -159,17 +161,18 @@ describe("packaged recovery process ownership", () => {
     const script = execute.mock.calls[0][1].at(-1);
     expect(script.indexOf("script-started")).toBeLessThan(script.indexOf("Get-CimInstance"));
     expect(script).toContain("[Console]::Error.Flush()");
-    expect(script).not.toContain("Import-Module");
+    expect(script.indexOf("modules-started")).toBeLessThan(script.indexOf("Import-Module"));
+    expect(script.indexOf("modules-completed")).toBeGreaterThan(script.indexOf("CimCmdlets.psd1"));
   });
 
   it("retains partial stage evidence on timeout even when stdout resembles a valid identity", async () => {
-    const stderr = "PI67_RECOVERY_PROCESS_QUERY:script-started:920\nPI67_RECOVERY_PROCESS_QUERY:query-started:922\n";
+    const stderr = "PI67_RECOVERY_PROCESS_QUERY:script-started:920\nPI67_RECOVERY_PROCESS_QUERY:modules-started:922\n";
     const cause = Object.assign(new Error("Command timed out"), { killed: true, stderr, stdout: JSON.stringify(win) });
     const execute = vi.fn().mockRejectedValue(cause);
     const onDiagnostic = vi.fn();
     await expect(readRecoveryProcess(pid, { platform: "win32", execute, onDiagnostic })).rejects.toMatchObject({
       cause, processQueryDiagnostic: { outcome: "command-failed", timeoutMs: 15000,
-        stages: [{ stage: "script-started", elapsedMs: 920 }, { stage: "query-started", elapsedMs: 922 }] }
+        stages: [{ stage: "script-started", elapsedMs: 920 }, { stage: "modules-started", elapsedMs: 922 }] }
     });
     expect(execute).toHaveBeenCalledOnce();
     expect(onDiagnostic).toHaveBeenCalledOnce();
@@ -179,12 +182,13 @@ describe("packaged recovery process ownership", () => {
     const stderr = ["secret-output", "PI67_RECOVERY_PROCESS_QUERY:query-started:0",
       "PI67_RECOVERY_PROCESS_QUERY:script-started:1:secret", "PI67_RECOVERY_PROCESS_QUERY:script-started:1",
       ...Array(50).fill("PI67_RECOVERY_PROCESS_QUERY:script-started:1"),
-      "PI67_RECOVERY_PROCESS_QUERY:query-started:2", "PI67_RECOVERY_PROCESS_QUERY:query-completed:3",
-      "PI67_RECOVERY_PROCESS_QUERY:output-completed:4", "PI67_RECOVERY_PROCESS_QUERY:output-completed:5"].join("\n");
+      "PI67_RECOVERY_PROCESS_QUERY:modules-started:2", "PI67_RECOVERY_PROCESS_QUERY:modules-completed:3",
+      "PI67_RECOVERY_PROCESS_QUERY:query-started:4", "PI67_RECOVERY_PROCESS_QUERY:query-completed:5",
+      "PI67_RECOVERY_PROCESS_QUERY:output-completed:6", "PI67_RECOVERY_PROCESS_QUERY:output-completed:7"].join("\n");
     const onDiagnostic = vi.fn();
     const execute = vi.fn().mockResolvedValue({ stdout: "", stderr });
     expect(await readRecoveryProcess(pid, { platform: "win32", execute, onDiagnostic })).toBeUndefined();
-    expect(onDiagnostic.mock.calls[0][0].stages).toHaveLength(4);
+    expect(onDiagnostic.mock.calls[0][0].stages).toHaveLength(6);
     expect(JSON.stringify(onDiagnostic.mock.calls)).not.toContain("secret");
   });
 
@@ -226,7 +230,9 @@ describe("packaged recovery process ownership", () => {
     const exited = once(child, "exit");
     await once(child, "spawn");
     try {
-      const observed = await readRecoveryProcess(child.pid);
+      const observed = await readRecoveryProcess(child.pid, {
+        onDiagnostic: diagnostic => console.log(`Windows recovery cold query: ${JSON.stringify(diagnostic)}`)
+      });
       expect(observed.parentPid).toBe(process.pid);
       expect(await signalRecoveryProcess(child.pid, observed.identity, "SIGTERM")).toBe(true);
       await exited;

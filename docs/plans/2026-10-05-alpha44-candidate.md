@@ -156,3 +156,25 @@ No query fields, timeout, identity checks, retry count, runner policy or product
 bytes change. Missing modules remain fatal. Verify timing and all recovery cases
 on a fresh exact-source Windows CI run; a timing improvement alone is not full
 acceptance or proof against all hosted-runner variability.
+
+The first correction (`4fff94e6`, run `37291297456`) exposed an introduced
+compatibility failure: all three preflights failed to auto-load `CimCmdlets` under
+`ModuleQualified`, before launching Electron. The evidence is retained under
+`query-fix/windows-recovery`; this implementation is not accepted. Module search
+path ambiguity is a hypothesis, not a confirmed host configuration diagnosis.
+
+Revise the correction to disable autoload and explicitly import the two manifests
+under the executing engine's `$PSHOME/Modules/`, then invoke qualified commands.
+This removes module-name/path selection ambiguity and surfaces explicit import
+errors. Both imports remain inside the unchanged 15-second total deadline;
+six timing markers include module initialization. No warm-up, engine fallback or
+global configuration change is added. Revalidate on Windows; the superseded
+failed CI may be replaced by the repository's normal push concurrency policy.
+
+The introduced Windows-only import failure also exposed a validation-order gap:
+mocked local tests and PowerShell AST parsing did not exercise real module loading.
+Run the existing recovery-process regression suite in the Windows native job
+before building. Its real owned-child case records the first cold query and
+verifies creation identity, parent ownership, termination and confirmed absence.
+It retains the same query deadline; later packaged scenarios and preflights are
+unchanged. This is an early compatibility gate, not a discarded warm-up sample.

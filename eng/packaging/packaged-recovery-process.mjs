@@ -56,7 +56,7 @@ export async function readRecoveryProcess(pid, { platform = process.platform, ex
   const mark = stage => `[Console]::Error.WriteLine('PI67_RECOVERY_PROCESS_QUERY:${stage}:' + ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() - ${startedEpoch})); [Console]::Error.Flush()`;
   const diagnose = (outcome, stderr = "") => {
     const stages = [];
-    const expected = ["script-started", "query-started", "query-completed", "output-completed"];
+    const expected = ["script-started", "modules-started", "modules-completed", "query-started", "query-completed", "output-completed"];
     for (const line of stderr.split(/\r?\n/u)) {
       const match = line.match(/^PI67_RECOVERY_PROCESS_QUERY:([a-z-]+):([0-9]{1,9})$/u);
       if (match && match[1] === expected[stages.length]) stages.push({ stage: match[1], elapsedMs: Number(match[2]) });
@@ -68,8 +68,12 @@ export async function readRecoveryProcess(pid, { platform = process.platform, ex
   // PID is a validated integer; no profile/path/command-line strings enter PowerShell.
   const script = [
     "$ErrorActionPreference = 'Stop'",
-    "$PSModuleAutoLoadingPreference = 'ModuleQualified'",
+    "$PSModuleAutoLoadingPreference = 'None'",
     mark("script-started"),
+    mark("modules-started"),
+    'Microsoft.PowerShell.Core\\Import-Module -Name "$PSHOME\\Modules\\Microsoft.PowerShell.Utility\\Microsoft.PowerShell.Utility.psd1" -ErrorAction Stop',
+    'Microsoft.PowerShell.Core\\Import-Module -Name "$PSHOME\\Modules\\CimCmdlets\\CimCmdlets.psd1" -ErrorAction Stop',
+    mark("modules-completed"),
     mark("query-started"),
     `$p = CimCmdlets\\Get-CimInstance -ClassName Win32_Process -Filter 'ProcessId = ${pid}'`,
     mark("query-completed"),
