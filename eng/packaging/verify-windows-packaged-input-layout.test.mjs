@@ -11,6 +11,7 @@ import {
   locateTaskInspector,
   prepareResponsiveLayoutControls,
   viewportWidthMatches,
+  windowsUiScenarioMatrix,
   WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
   WINDOWS_SYNTHETIC_SCALE_FACTORS,
   WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS
@@ -25,6 +26,16 @@ describe("Windows packaged synthetic-scale UI contract", () => {
     expect(WINDOWS_SYNTHETIC_SCALE_FACTORS).toEqual([1.25, 1.5, 2]);
     expect(WINDOWS_SYNTHETIC_RUNTIME_TIMEOUT_MS).toBe(60_000);
     expect(WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS).toBe(5_000);
+  });
+
+  it("keeps ordinary coverage unchanged and bounds opt-in diagnostic repetitions", () => {
+    const first = WINDOWS_SYNTHETIC_SCALE_FACTORS.map(scaleFactor => ({ scaleFactor, verificationRound: 1 }));
+    expect(windowsUiScenarioMatrix()).toEqual(first);
+    expect(windowsUiScenarioMatrix(3)).toEqual([1, 2, 3].flatMap(verificationRound =>
+      WINDOWS_SYNTHETIC_SCALE_FACTORS.map(scaleFactor => ({ scaleFactor, verificationRound }))));
+    for (const invalid of [0, 2, 4, -1, 1.5, NaN, "3"]) {
+      expect(() => windowsUiScenarioMatrix(invalid)).toThrow("Windows UI rounds must be 1 or 3");
+    }
   });
 
   it.each([false, true])("waits for a Session surface before the first prompt, intent=%s", async (intentVisible) => {

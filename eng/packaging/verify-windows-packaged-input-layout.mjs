@@ -48,7 +48,14 @@ export const WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS = 5_000;
 const outputDirectory = join(repositoryRoot, "artifacts/validation/windows-packaged-ui");
 const summaryPath = join(outputDirectory, "summary.json");
 
-export async function verifyWindowsPackagedInputLayout() {
+export function windowsUiScenarioMatrix(rounds = 1) {
+  if (rounds !== 1 && rounds !== 3) throw new Error("Windows UI rounds must be 1 or 3.");
+  return Array.from({ length: rounds }, (_, index) => WINDOWS_SYNTHETIC_SCALE_FACTORS
+    .map(scaleFactor => ({ scaleFactor, verificationRound: index + 1 }))).flat();
+}
+
+export async function verifyWindowsPackagedInputLayout({ rounds = 1 } = {}) {
+  const matrix = windowsUiScenarioMatrix(rounds);
   if (process.platform !== "win32" || process.arch !== "x64") {
     throw new Error(`Windows packaged UI verification requires win32/x64, got ${process.platform}/${process.arch}.`);
   }
@@ -79,14 +86,14 @@ export async function verifyWindowsPackagedInputLayout() {
   await mkdir(join(sharedAgentDirectory, "extensions"), { recursive: true });
 
   try {
-    for (const scaleFactor of WINDOWS_SYNTHETIC_SCALE_FACTORS) {
-      report.scenarios.push(await verifyScaleScenario(artifact, scaleFactor, sharedAgentDirectory));
+    for (const { scaleFactor, verificationRound } of matrix) {
+      report.scenarios.push(await verifyScaleScenario(artifact, scaleFactor, sharedAgentDirectory, verificationRound));
       await writeReport(report);
     }
     report.status = "passed";
     await writeReport(report);
     console.log(
-      `Windows packaged synthetic-scale UI smoke passed at ${WINDOWS_SYNTHETIC_SCALE_FACTORS.join(", ")} DPR targets. `
+      `Windows packaged synthetic-scale UI smoke passed at ${WINDOWS_SYNTHETIC_SCALE_FACTORS.join(", ")} DPR targets (${rounds} rounds). `
       + `Evidence: ${relative(repositoryRoot, summaryPath)}.`
     );
   } catch (error) {
@@ -99,8 +106,8 @@ export async function verifyWindowsPackagedInputLayout() {
   }
 }
 
-async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
-  const scaleLabel = String(Math.round(scaleFactor * 100));
+async function verifyScaleScenario(artifact, scaleFactor, agentDirectory, verificationRound) {
+  const scaleLabel = `${verificationRound > 1 ? `round-${verificationRound}-` : ""}${Math.round(scaleFactor * 100)}`;
   const directories = await createPackagedTestDirectories(
     `pi67-windows-ui-${scaleLabel}-`,
     "中文长路径 包含空格的 New Money 工作区验证"
@@ -153,7 +160,8 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
     const { contextViewport, navigationViewport } = await verifyPackagedResponsiveLayout(
       window,
       application,
-      scaleFactor
+      scaleFactor,
+      scaleLabel
     );
     const composition = await verifySyntheticComposition(window, scaleFactor);
     const screenshotPath = join(outputDirectory, `scale-${scaleLabel}.png`);
@@ -193,6 +201,7 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
       navigationViewport,
       initialSessionSurface,
       requestedScaleFactor: scaleFactor,
+      verificationRound,
       runtime,
       shutdown,
       screenshot: {
@@ -209,7 +218,7 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
       ? await window.screenshot({ path: join(outputDirectory, `scale-${scaleLabel}-failed.png`), timeout: 5_000 })
         .then(() => "captured", () => "unavailable")
       : "unavailable";
-    throw new Error(`${error instanceof Error ? error.message : String(error)}. Before cleanup: ${JSON.stringify({
+    throw new Error(`Round ${verificationRound}: ${error instanceof Error ? error.message : String(error)}. Before cleanup: ${JSON.stringify({
       childPresent: childPid !== undefined,
       childAlive: childPid !== undefined && isProcessAlive(childPid),
       observations: observations.split(/\r?\n/u).filter(Boolean).slice(0, 64),
@@ -225,11 +234,11 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
   }
 }
 
-export async function verifyPackagedResponsiveLayout(window, application, scaleFactor) {
+export async function verifyPackagedResponsiveLayout(window, application, scaleFactor, scaleLabel = String(Math.round(scaleFactor * 100))) {
   await prepareResponsiveLayoutControls(window);
   return {
-    contextViewport: await verifyContextDrawerLayout(window, application, scaleFactor),
-    navigationViewport: await verifyNavigationDrawerLayout(window, application, scaleFactor)
+    contextViewport: await verifyContextDrawerLayout(window, application, scaleFactor, scaleLabel),
+    navigationViewport: await verifyNavigationDrawerLayout(window, application, scaleFactor, scaleLabel)
   };
 }
 
@@ -245,7 +254,7 @@ export function locateTaskInspector(window) {
   return window.getByRole("complementary", { name: "任务检查器", exact: true });
 }
 
-async function verifyContextDrawerLayout(window, application, scaleFactor) {
+async function verifyContextDrawerLayout(window, application, scaleFactor, scaleLabel) {
   await setStableContentViewport(window, application, WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX, 800);
   const taskInspector = locateTaskInspector(window);
   await taskInspector.waitFor({ state: "detached" });
@@ -262,7 +271,7 @@ async function verifyContextDrawerLayout(window, application, scaleFactor) {
 
   const activatedObservation = await observeLayout(window);
   const activationMode = assertContextPanelActivation(activatedObservation, scaleFactor);
-  await captureResponsiveScreenshot(window, scaleFactor, `context-${activationMode}`);
+  await captureResponsiveScreenshot(window, scaleLabel, `context-${activationMode}`);
 
   const closeControl = activationMode === "drawer"
     ? window.getByRole("button", { name: "关闭任务检查器抽屉" })
@@ -283,7 +292,7 @@ async function verifyContextDrawerLayout(window, application, scaleFactor) {
   };
 }
 
-async function verifyNavigationDrawerLayout(window, application, scaleFactor) {
+async function verifyNavigationDrawerLayout(window, application, scaleFactor, scaleLabel) {
   await setStableMinimumWindowWidth(window, application, 760);
   const navigation = window.getByLabel("对话导航", { exact: true });
   await navigation.waitFor({ state: "hidden" });
@@ -293,7 +302,7 @@ async function verifyNavigationDrawerLayout(window, application, scaleFactor) {
   await window.getByRole("button", { name: "关闭对话导航" }).waitFor({ state: "visible" });
 
   const drawerObservation = await observeLayout(window);
-  await captureResponsiveScreenshot(window, scaleFactor, "navigation-drawer");
+  await captureResponsiveScreenshot(window, scaleLabel, "navigation-drawer");
   assertLayoutObservation(drawerObservation, {
     allowNativeFrameFloor: true,
     breakpoint: "navigation-drawer",
@@ -318,8 +327,7 @@ async function verifyNavigationDrawerLayout(window, application, scaleFactor) {
   return { ...observation, drawer: drawerObservation };
 }
 
-async function captureResponsiveScreenshot(window, scaleFactor, surface) {
-  const scaleLabel = String(Math.round(scaleFactor * 100));
+async function captureResponsiveScreenshot(window, scaleLabel, surface) {
   await window.screenshot({
     animations: "disabled",
     path: join(outputDirectory, `scale-${scaleLabel}-${surface}.png`)
@@ -429,5 +437,5 @@ function round(value) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  await verifyWindowsPackagedInputLayout();
+  await verifyWindowsPackagedInputLayout({ rounds: Number(process.env.PI67_WINDOWS_UI_ROUNDS || "1") });
 }

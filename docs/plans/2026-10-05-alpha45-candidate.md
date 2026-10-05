@@ -72,6 +72,12 @@ separate and cannot inherit Alpha.44 receipts.
   event behavior and product input. This is diagnosis, not a claimed root-cause fix.
   No blind identical-source retry or distribution. Read the next Windows evidence
   before deciding on a product or harness correction.
+- The next instrumented Windows candidate experiment explicitly selects three
+  UI rounds (nine maximum scale scenarios), stopping at the first failure. This
+  bounded diagnostic choice is not an automatic retry; ordinary CI and default
+  candidates retain one round. It uses only isolated synthetic profiles and zero
+  real model requests. Preserve the failed original candidate and compare Main
+  events against polling gaps before interpreting the result.
 
 ## Validation and rollback
 
