@@ -446,6 +446,17 @@
   min-height: 42px;
 }
 
+.runtimeSelectOption[data-leading] {
+  grid-template-columns: 16px minmax(0, 1fr) 18px;
+  gap: 10px;
+}
+
+.runtimeSelectOptionMark {
+  display: inline-grid;
+  place-items: center;
+  color: var(--text-secondary);
+}
+
 .runtimeSelectOption[data-runtime-select="thinking"] {
   min-height: 34px;
 }

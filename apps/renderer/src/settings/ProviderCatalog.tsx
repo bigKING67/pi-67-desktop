@@ -2,7 +2,7 @@ import type { PiProviderConfigurationView } from "@pi67/protocol";
 import { ChevronRight, Plus, Search, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button, Input } from "react-aria-components";
-import { ProviderBrandIcon } from "./ProviderBrandIcon.js";
+import { ProviderBrandIcon } from "../provider-brand/ProviderBrandIcon.js";
 import { SettingsCatalog, SettingsCatalogRow, SettingsStatus } from "./SettingsPrimitives.js";
 import styles from "./ProviderCatalog.module.css";
 

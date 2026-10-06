@@ -51,6 +51,13 @@ select:focus-visible,
   outline-offset: 2px;
 }
 
+/* React Aria marks the whole Tabs wrapper focus-visible while any descendant has keyboard
+   focus; the focused tab, field or row already draws its own ring, so the wrapper must not
+   outline the entire panel. Radio groups and toolbars carry a role and are unaffected. */
+[data-rac][data-orientation]:not([role])[data-focus-visible] {
+  outline: none;
+}
+
 ::selection {
   background: var(--accent-soft);
   color: var(--text-primary);

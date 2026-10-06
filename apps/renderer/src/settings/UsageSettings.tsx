@@ -15,7 +15,7 @@ import {
   type DailyUsagePoint
 } from "./usage-daily-series.js";
 import { isUsageReportRequestCurrent } from "./usage-report-request.js";
-import { ProviderBrandIcon } from "./ProviderBrandIcon.js";
+import { ProviderBrandIcon } from "../provider-brand/ProviderBrandIcon.js";
 import styles from "./UsageSettings.module.css";
 
 const WINDOWS: Array<{ id: UsageWindow; label: string }> = [

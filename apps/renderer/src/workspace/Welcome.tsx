@@ -12,7 +12,7 @@ export function Welcome() {
         <div className={styles.identity}>
           <img alt="" aria-hidden="true" className={styles.mark} src={piIconUrl} />
           <div>
-            <span className={styles.eyebrow}>{messages.workspace.eyebrow}</span>
+            <span className={styles.productName}>{messages.workspace.eyebrow}</span>
             <h1>{messages.workspace.heading}</h1>
           </div>
         </div>

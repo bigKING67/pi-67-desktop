@@ -11,7 +11,7 @@ import {
   setProjectVisionAssistantConfiguration
 } from "./provider-configuration-controller.js";
 import styles from "./ProviderVisionAssistantEditor.module.css";
-import { ProviderBrandIcon } from "./ProviderBrandIcon.js";
+import { ProviderBrandIcon } from "../provider-brand/ProviderBrandIcon.js";
 import { SettingsRow, SettingsRows, SettingsSectionBlock, SettingsSelect, SettingsStatus } from "./SettingsPrimitives.js";
 
 const DISABLED_KEY = "disabled";

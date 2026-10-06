@@ -14,6 +14,7 @@ import {
 import { useTaskDraftStore } from "../workbench/task-draft-store.js";
 import { visibleModelChoices } from "../session/model-choice-visibility.js";
 import {
+  ComposerModelMark,
   ComposerRuntimeSelect,
   type ComposerRuntimeSelectOptionGroup
 } from "./ComposerRuntimeSelect.js";
@@ -100,6 +101,7 @@ export function ComposerIntentRuntimeControls({
       ).map((model) => ({
         id: `${provider.id}/${model.id}`,
         label: model.name ?? model.id,
+        leading: <ComposerModelMark label={model.name ?? model.id} model={model.id} provider={provider.id} />,
         detail: `${provider.id}/${model.id}${provider.configured ? "" : ` ${messages.composer.unauthenticatedModel}`}`
       }))
     }));
@@ -165,7 +167,9 @@ export function ComposerIntentRuntimeControls({
               : "使用当前项目的默认模型。"}
           icon={error
             ? <RefreshCw aria-hidden="true" size={14} />
-            : <Sparkles aria-hidden="true" size={14} />}
+            : selected
+              ? <ComposerModelMark label={selected.model.name ?? selected.model.id} model={selected.model.id} provider={selected.provider.id} />
+              : <Sparkles aria-hidden="true" size={14} />}
           isOpen={modelPickerOpen}
           onOpenChange={setModelPickerOpen}
           onSelectionChange={(value) => {

@@ -1,4 +1,4 @@
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import {
   Button as AriaButton,
@@ -9,12 +9,21 @@ import {
   Popover,
   Select
 } from "react-aria-components";
+import { ProviderBrandIcon } from "../provider-brand/ProviderBrandIcon.js";
 import styles from "./Composer.module.css";
 
 export interface ComposerRuntimeSelectOption {
   id: string;
   label: string;
   detail?: string;
+  /** Decorative identity mark (a model brand) shown before the option copy. */
+  leading?: ReactNode;
+}
+
+/** The Auto virtual model keeps the generic spark; physical models show their brand mark. */
+export function ComposerModelMark({ provider, model, label }: { provider: string; model: string; label: string }) {
+  if (provider === "pi67-auto") return <Sparkles aria-hidden="true" size={14} />;
+  return <ProviderBrandIcon hints={[model, label, provider]} label={label} size="inline" />;
 }
 
 export interface ComposerRuntimeSelectOptionGroup {
@@ -123,8 +132,10 @@ function RuntimeSelectOption({
       className={styles.runtimeSelectOption!}
       data-runtime-select={variant}
       id={option.id}
+      data-leading={option.leading ? true : undefined}
       textValue={option.label}
     >
+      {option.leading ? <span className={styles.runtimeSelectOptionMark}>{option.leading}</span> : null}
       <span className={styles.runtimeSelectOptionCopy}>
         <strong>{option.label}</strong>
         {option.detail ? <small>{option.detail}</small> : null}

@@ -17,7 +17,7 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
   min-width: 0;
   height: 43px;
-  padding: 5px 7px;
+  padding: 5px 4px;
 }
 
 .context-pane-tabs [role="tab"] {
@@ -25,8 +25,9 @@
   min-width: 0;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 0 3px;
+  /* Five equal tabs share a ~300px Inspector; tight spacing keeps icon and 3-character labels unclipped. */
+  gap: 3px;
+  padding: 0;
   border: 0;
   border-radius: 7px;
   background: transparent;

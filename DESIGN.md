@@ -238,6 +238,8 @@ Application-level surfaces use a separate wide-window shell:
   `消息`, `代理`, and `上下文`. Every action retains its 14px icon and full label on
   one line across platforms and display scaling; columns use `minmax(0, 1fr)`,
   icons never collapse or hide, and the strip never introduces horizontal scroll.
+  Icon-to-label gap is 3px with no inner tab padding and 4px strip inset, so the
+  three-character `上下文` stays unclipped in a ~300px Inspector.
   `上下文` opens one compact secondary segmented row for `会话 / 记忆 / 经验`;
   those detail views never compete for primary-strip width, and their last selection
   persists while switching primary Inspector views.
@@ -360,6 +362,8 @@ use `50%`.
   mixes 12% `text-primary` into that fill. Outlines are reserved for inputs and focus.
 - Status always includes text or an accessible icon, never color alone.
 - Focus-visible must remain stronger than hover on every surface.
+- Only the focused control draws a ring. React Aria's Tabs wrapper reports focus-visible
+  for any focused descendant, so it never outlines the whole tab panel.
 
 ## Color
 
@@ -2780,7 +2784,8 @@ loading error where the operation can produce those states
 ### Empty, loading, and error states
 
 - Empty states point to the first useful action.
-- Welcome is a task entry: it keeps workspace selection available before the
+- Welcome is a task entry: it shows the product name beside the mark in the UI face
+  (interface size, medium), never a monospace eyebrow. It keeps workspace selection available before the
   on-demand Agent Host exists and does not expose SDK/process marketing copy as
   the primary user message.
 - Loading copy names the operation, such as `正在加载 Pi 资源`.
@@ -3009,6 +3014,8 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
   color marks follow `text-primary` through a mask, and unknown identities use a neutral
   monogram tile so the column keeps one rhythm. Marks are decorative (`aria-hidden`); the
   adjacent text always names the entry. They are never used as status or as section icons.
+  The same `provider-brand` mark leads Composer model-picker options and the picker trigger
+  for the selected model; the Auto virtual model keeps the generic spark icon.
 - `SettingsStatus` (dot + short label; neutral, success, warning, danger) is the only status
   language. Colored text, pills and bare dots are not used for state.
 - Section titles are body size, medium, primary (2026-10-06: secondary interface-size titles

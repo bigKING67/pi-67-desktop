@@ -24,6 +24,7 @@ import {
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { useShellStore } from "../shell/shell-store.js";
 import {
+  ComposerModelMark,
   ComposerRuntimeSelect,
   type ComposerRuntimeSelectOption
 } from "./ComposerRuntimeSelect.js";
@@ -98,6 +99,7 @@ export function ComposerRuntimeControls({ submitting }: { submitting: boolean })
     options: group.models.map((model) => ({
       id: `${model.provider}/${model.id}`,
       label: model.label,
+      leading: <ComposerModelMark label={model.label} model={model.id} provider={model.provider} />,
       detail: `${model.provider}/${model.id}${model.configured ? "" : ` ${messages.composer.unauthenticatedModel}`}`
     }))
   }));
@@ -113,7 +115,9 @@ export function ComposerRuntimeControls({ submitting }: { submitting: boolean })
         <ComposerRuntimeSelect
           ariaLabel={messages.composer.modelLabel}
           disabled={disabled || modelSelectionPending}
-          icon={<Sparkles aria-hidden="true" size={14} />}
+          icon={selectedModel
+            ? <ComposerModelMark label={modelLabel} model={selectedModel.id} provider={selectedModel.provider} />
+            : <Sparkles aria-hidden="true" size={14} />}
           isOpen={modelPickerOpen}
           onOpenChange={setModelPickerOpen}
           onSelectionChange={(value) => {

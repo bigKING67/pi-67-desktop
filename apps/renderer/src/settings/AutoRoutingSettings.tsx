@@ -2,7 +2,7 @@ import type { PiAutoRoutingSelection, PiDefaultModelSelection, PiProviderConfigu
 import { useEffect, useState } from "react";
 import { Button } from "react-aria-components";
 import { useSettingsDraftRegistration } from "./SettingsDraftGuard.js";
-import { ProviderBrandIcon } from "./ProviderBrandIcon.js";
+import { ProviderBrandIcon } from "../provider-brand/ProviderBrandIcon.js";
 import { SettingsInfo, SettingsNotice, SettingsRow, SettingsRows, SettingsSectionBlock, SettingsSelect } from "./SettingsPrimitives.js";
 import { setGlobalAutoRoutingConfiguration } from "./provider-configuration-controller.js";
 import styles from "./AutoRoutingSettings.module.css";
