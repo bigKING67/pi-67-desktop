@@ -19,8 +19,8 @@ test("preserves the workspace hierarchy in dark mode", async ({ page }, testInfo
     background: getComputedStyle(body).backgroundColor,
     foreground: getComputedStyle(body).color
   }));
-  expect(colors.background).toBe("rgb(10, 10, 10)");
-  expect(colors.foreground).toBe("rgb(237, 237, 237)");
+  expect(colors.background).toBe("rgb(14, 14, 16)");
+  expect(colors.foreground).toBe("rgb(237, 237, 239)");
   await page.screenshot({ path: testInfo.outputPath("workspace-dark.png"), animations: "disabled" });
 });
 

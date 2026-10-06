@@ -53,7 +53,9 @@ export function AutoRoutingSettings({ snapshot, disabled = false }: { snapshot: 
       }
     } finally { setSaving(false); }
   }
-  return <SettingsSectionBlock title="自动模型选择" description="配置后，在对话的模型菜单中选择 Auto。当前默认模型保持不变。">
+  return <SettingsSectionBlock title="自动模型选择" description="配置后，在对话的模型菜单中选择 Auto。当前默认模型保持不变。"
+    actions={baseline ? <Button className="secondary-button" isDisabled={locked || conflict}
+      onPress={() => void save()}>关闭 Auto</Button> : undefined}>
     <div className={styles.form} data-testid="auto-routing-settings">
       <SettingsRows>
       {roles.map((role) => {
@@ -80,12 +82,10 @@ export function AutoRoutingSettings({ snapshot, disabled = false }: { snapshot: 
       {conflict ? <SettingsNotice tone="warning" actions={<Button className="secondary-button" onPress={() => {
         setBaseline(snapshot.autoRouting); setDraft(snapshot.autoRouting ?? {}); setRevision(snapshot.revision);
       }}>采用最新配置</Button>}>配置已更新，请采用最新配置后重新编辑。</SettingsNotice> : null}
-      {dirty || baseline ? <div className={styles.actions}>
-        {baseline ? <Button className="secondary-button" isDisabled={locked || conflict}
-          onPress={() => void save()}>关闭 Auto</Button> : null}
-        {/* Save exists only for a draft, so an idle form never shows a dimmed primary action. */}
-        {dirty ? <Button className="primary-button" isDisabled={locked || !complete || conflict}
-          onPress={() => void save(draft as PiAutoRoutingSelection)}>保存 Auto 配置</Button> : null}
+      {/* Save exists only for a draft, so an idle form never shows a dimmed primary action. */}
+      {dirty ? <div className={styles.actions}>
+        <Button className="primary-button" isDisabled={locked || !complete || conflict}
+          onPress={() => void save(draft as PiAutoRoutingSelection)}>保存 Auto 配置</Button>
       </div> : null}
       {draft.standard && key(draft.standard) === key(draft.complex)
         ? <SettingsNotice tone="warning">常规任务和复杂任务请选择不同的模型。</SettingsNotice> : null}

@@ -22,9 +22,13 @@ function contrast(foreground: string, background: string): number {
   return (Math.max(...values) + 0.05) / (Math.min(...values) + 0.05);
 }
 
-function expectNeutral(color: string): void {
-  const rgb = channels(color);
-  expect(Math.max(...rgb) - Math.min(...rgb), color).toBeLessThanOrEqual(1);
+/** Light is achromatic; dark may carry a faint cool (zinc) cast but never a green or saturated blue one. */
+function expectNeutral(color: string, theme: "light" | "dark"): void {
+  const [red, green, blue] = channels(color) as [number, number, number];
+  expect(Math.abs(red - green), color).toBeLessThanOrEqual(1);
+  if (theme === "light") expect(Math.abs(blue - red), color).toBeLessThanOrEqual(1);
+  else expect(blue - Math.max(red, green), color).toBeGreaterThanOrEqual(-1);
+  if (theme === "dark") expect(blue - Math.max(red, green), color).toBeLessThanOrEqual(8);
 }
 
 async function appearance(locator: Locator) {
@@ -55,7 +59,7 @@ for (const theme of ["light", "dark"] as const) {
       return Object.fromEntries(names.map((name) => [name, style.getPropertyValue(`--${name}`).trim()]));
     });
     for (const [role, color] of Object.entries(palette)) {
-      if (role !== "success" && role !== "danger") expectNeutral(color);
+      if (role !== "success" && role !== "danger") expectNeutral(color, theme);
     }
     for (const surface of ["canvas", "surface", "surface-muted", "surface-raised", "surface-hover", "surface-active"]) {
       for (const text of ["text-primary", "text-secondary", "text-tertiary"]) {
@@ -72,7 +76,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(send).toBeEnabled();
     await expect(send).toHaveCSS("background-color", `rgb(${channels(palette.accent!).join(", ")})`);
     const idle = await appearance(send);
-    expectNeutral(idle.background);
+    expectNeutral(idle.background, theme);
     expect(contrast(idle.foreground, idle.background)).toBeGreaterThanOrEqual(4.5);
     expect(luminance(idle.background) > luminance(idle.foreground)).toBe(theme === "dark");
     await send.hover();

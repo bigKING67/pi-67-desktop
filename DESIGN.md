@@ -354,6 +354,8 @@ use `--radius-overlay`, pills and badges use `--radius-pill`, and true circles
 use `50%`.
 
 - Accent marks selection, the primary action, and current navigation only.
+- Secondary and small buttons are filled with `surface-active` and no visible border; hover
+  mixes 12% `text-primary` into that fill. Outlines are reserved for inputs and focus.
 - Status always includes text or an accessible icon, never color alone.
 - Focus-visible must remain stronger than hover on every surface.
 
@@ -1522,8 +1524,9 @@ loading error where the operation can produce those states
   Settings rows/selects. It configures the judge, standard and complex models
   from configured Pi chat models, then explicitly saves or disables Auto. The three rows
   form one grouped surface with fixed-width (300px) model selects; the judge-request limits
-  sit in one summary line plus a `SettingsInfo` tip. `保存 Auto 配置` appears only while the
-  draft differs from saved state, beside `关闭 Auto` when Auto is on. The Auto section sits
+  sit in one summary line plus a `SettingsInfo` tip. `关闭 Auto` is a section-header action
+  shown while Auto is on; `保存 Auto 配置` appears below the rows only while the draft differs
+  from saved state. The Auto section sits
   32px below the Provider Catalog so the two tasks do not read as one list.
   Saving does not change the default selection. Unsaved changes participate in
   Settings navigation protection; external revisions require explicit adoption.
@@ -2985,7 +2988,8 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
   adjacent text always names the entry. They are never used as status or as section icons.
 - `SettingsStatus` (dot + short label; neutral, success, warning, danger) is the only status
   language. Colored text, pills and bare dots are not used for state.
-- Section titles are interface size, medium, secondary; section descriptions are optional and
+- Section titles are body size, medium, primary (2026-10-06: secondary interface-size titles
+  were too weak to anchor a group); sections are 32px apart; section descriptions are optional and
   appear only when they change a decision. Boundary, privacy and implementation explanations
   go into `SettingsInfo` (an ⓘ tooltip) or are removed. Single-section pages do not repeat the
   page title as a section title.

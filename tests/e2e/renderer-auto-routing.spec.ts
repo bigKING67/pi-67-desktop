@@ -20,7 +20,7 @@ test("offers Auto in a new task and preserves the explicit choice when its setti
   await page.keyboard.press("Control+,");
   const settings = page.getByLabel("New Money 设置");
   await settings.getByRole("navigation", { name: "设置分类" }).getByRole("button", { name: "模型", exact: true }).click();
-  await settings.getByTestId("auto-routing-settings").getByRole("button", { name: "关闭 Auto" }).click();
+  await settings.getByRole("button", { name: "关闭 Auto" }).click();
   await expect(settings.getByRole("button", { name: "关闭 Auto" })).toHaveCount(0);
   await settings.getByRole("button", { name: "返回工作台", exact: true }).click();
   await expect(picker).toContainText("Auto · 配置不可用");
@@ -46,7 +46,7 @@ test("configures opt-in Auto with exact candidates, keeps the default and can di
   await clearRecordedCommands(page);
   await form.getByRole("button", { name: "保存 Auto 配置" }).click();
   await expect(form.getByRole("button", { name: "保存 Auto 配置" })).toHaveCount(0);
-  await expect(form.getByRole("button", { name: "关闭 Auto" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "关闭 Auto" })).toBeVisible();
   const commands = await recordedCommandDetails(page);
   expect(commands.filter((command) => command.type === "model.routing.global.set")).toHaveLength(1);
   expect(commands).toContainEqual(expect.objectContaining({ type: "model.routing.global.set", context: { scope: "app" },
@@ -59,8 +59,8 @@ test("configures opt-in Auto with exact candidates, keeps the default and can di
     await form.scrollIntoViewIfNeeded();
     await page.screenshot({ path: testInfo.outputPath(`auto-settings-${colorScheme}.png`), animations: "disabled" });
   }
-  await form.getByRole("button", { name: "关闭 Auto" }).click();
-  await expect(form.getByRole("button", { name: "关闭 Auto" })).toHaveCount(0);
+  await page.getByRole("button", { name: "关闭 Auto" }).click();
+  await expect(page.getByRole("button", { name: "关闭 Auto" })).toHaveCount(0);
 });
 
 test("keeps unavailable saved models explicit and permits turning Auto off", async ({ page }) => {
@@ -76,8 +76,8 @@ test("keeps unavailable saved models explicit and permits turning Auto off", asy
   await form.getByRole("button", { name: /Auto 判断模型$/u }).click();
   await expect(page.getByRole("option", { name: "不可用 · missing / judge" })).toBeDisabled();
   await page.keyboard.press("Escape");
-  await form.getByRole("button", { name: "关闭 Auto" }).click();
-  await expect(form.getByRole("button", { name: "关闭 Auto" })).toHaveCount(0);
+  await page.getByRole("button", { name: "关闭 Auto" }).click();
+  await expect(page.getByRole("button", { name: "关闭 Auto" })).toHaveCount(0);
 });
 
 test("shows persisted Auto choices and failure facts without claiming task completion", async ({ page }) => {

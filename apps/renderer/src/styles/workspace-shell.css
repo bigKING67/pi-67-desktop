@@ -233,13 +233,14 @@
   opacity: 0.45;
 }
 
+/* Filled rather than outlined: depth comes from luminance, so it reads on canvas, surface and raised planes. */
 .secondary-button,
 .small-button {
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
+  border: 1px solid transparent;
+  background: var(--surface-active);
   color: var(--text-primary);
 }
 
 .secondary-button:hover,
-.small-button:hover { background: var(--surface-hover); }
+.small-button:hover { background: color-mix(in srgb, var(--surface-active) 88%, var(--text-primary)); }
 .small-button { min-height: 28px; padding: 0 9px; font-size: var(--font-size-support); }

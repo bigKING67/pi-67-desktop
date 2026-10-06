@@ -69,8 +69,8 @@ test("keeps shell ownership while quieting resting header and Composer chrome", 
   await page.mouse.move(0, 0);
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await expectRestingSearch(navigationSearch, "rgb(17, 17, 17)");
-  await expectRestingSearch(inspectorSearch, "rgb(17, 17, 17)");
+  await expectRestingSearch(navigationSearch, "rgb(20, 20, 22)");
+  await expectRestingSearch(inspectorSearch, "rgb(20, 20, 22)");
   await expect(workspaceGroup).toHaveCSS("border-bottom-width", "0px");
   await expect(navigation.locator("header").first()).toHaveCSS("border-bottom-width", "0px");
   await expect(inspector.getByRole("tablist", { name: "任务检查器" }))
