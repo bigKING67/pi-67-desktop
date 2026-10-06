@@ -356,6 +356,7 @@ export const zhCNTeamChatMessages = {
   attachmentRemove: (name: string) => `移除 ${name}`,
   attachmentsUnfinished: "附件上传完成后才能发送。",
   attachmentRefused: "有文件没有添加",
+  attachmentRefusalDismiss: "知道了",
   attachmentRefusal: {
     type: (name: string) => `${name}：不支持这种文件类型，可执行文件和脚本不能发送。`,
     size: (name: string) => `${name}：单个文件不能超过 25 MB。`,

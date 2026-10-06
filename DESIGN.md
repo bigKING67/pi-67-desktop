@@ -2207,6 +2207,10 @@ loading error where the operation can produce those states
   with a 1px border, a 32px rounded thumbnail or file glyph, the name in medium
   support text, a tertiary caption (`上传中 N%`, size, or the danger-role error with
   a danger border), a 2px accent progress line, and 28px retry/remove icon buttons.
+  Refused files are explained inline above the field, not in a Toast: a support-size
+  notice on the default surface with a 3px warning left rule, `有文件没有添加` in
+  semibold, one secondary line per file, and a `知道了` text action; it clears on the
+  next add, send or conversation.
   Dragging files over the composer gives the field a dashed accent border and a
   `松开以添加附件` overlay. Sent images sit under the text in a wrapping row, each
   scaled to fit 320×240 from its stored size (no shift when bytes arrive) with a

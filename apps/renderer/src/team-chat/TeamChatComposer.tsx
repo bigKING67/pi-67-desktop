@@ -93,6 +93,9 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
   const uploadsUnfinished = uploads.some((item) => item.status !== "ready");
   const picker = useRef<HTMLInputElement>(null);
   const [dropping, setDropping] = useState(false);
+  /** Why files were just refused; shown above the field until the next add, send or conversation. */
+  const [refusals, setRefusals] = useState<string[]>([]);
+  useEffect(() => setRefusals([]), [conversation.id]);
   const pickerOpen = query !== undefined && writable;
   const editing = useTeamChat((state) => state.editing?.conversationId === conversation.id ? state.editing : undefined);
   // Files go with new messages only; an edit changes text alone (ADR 0008).
@@ -181,6 +184,7 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
     }
     const attachments = teamChatUploads.take(conversation.id);
     if (!attachments) return;
+    setRefusals([]);
     const body = draft;
     const mentions = teamChatRetainedMentions(body, picks, directory.selfUserId);
     setDraft("");
@@ -243,7 +247,7 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
         if (!isFileDrag(event)) return;
         event.preventDefault();
         setDropping(false);
-        addTeamChatFiles(conversation.id, [...event.dataTransfer.files]);
+        setRefusals(addTeamChatFiles(conversation.id, [...event.dataTransfer.files]));
       }}
       onSubmit={(event) => { event.preventDefault(); send(); }}>
       {notice ? <p className={styles.composerNotice} id={noticeId} role="status">{notice}</p> : null}
@@ -251,6 +255,15 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
         <div className={styles.composerEditing} data-testid="team-chat-editing" role="status">
           <span>{copy.editingMessage}</span>
           <Button className={styles.textAction!} onPress={() => teamChat.stopEditing()}>{copy.cancelEdit}</Button>
+        </div>
+      ) : null}
+      {refusals.length > 0 ? (
+        <div className={files.refusal} data-testid="team-chat-attachment-refusal" role="alert">
+          <span>
+            <strong>{copy.attachmentRefused}</strong>
+            {refusals.map((reason) => <span key={reason}>{reason}</span>)}
+          </span>
+          <Button className={styles.textAction!} onPress={() => setRefusals([])}>{copy.attachmentRefusalDismiss}</Button>
         </div>
       ) : null}
       {askedAgents.length > 0 ? (
@@ -288,7 +301,7 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
           <Paperclip aria-hidden="true" size={16} />
         </Button>
         <input hidden multiple onChange={(event) => {
-          addTeamChatFiles(conversation.id, [...event.currentTarget.files ?? []]);
+          setRefusals(addTeamChatFiles(conversation.id, [...event.currentTarget.files ?? []]));
           event.currentTarget.value = "";
         }} ref={picker} tabIndex={-1} type="file" />
         <textarea
@@ -308,7 +321,7 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
             const pasted = [...event.clipboardData.files];
             if (pasted.length === 0 || !attachable) return;
             event.preventDefault();
-            addTeamChatFiles(conversation.id, pasted);
+            setRefusals(addTeamChatFiles(conversation.id, pasted));
           }}
           placeholder={writable ? copy.composerPlaceholder(target) : ""}
           ref={input}

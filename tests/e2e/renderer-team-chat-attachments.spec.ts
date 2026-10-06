@@ -35,7 +35,11 @@ test("uploads, sends, shows, opens and saves attachments, and refuses executable
   // Executables are refused before any upload; allowed files upload and fill the tray.
   const picker = page.locator("form input[type=file]");
   await picker.setInputFiles({ name: "setup.exe", mimeType: "application/octet-stream", buffer: Buffer.from("MZ") });
-  await expect(page.getByText("setup.exe：不支持这种文件类型，可执行文件和脚本不能发送。")).toBeVisible();
+  // The composer owns the refusal inline (no toast over the field).
+  const refusal = page.getByTestId("team-chat-attachment-refusal");
+  await expect(refusal.getByText("setup.exe：不支持这种文件类型，可执行文件和脚本不能发送。")).toBeVisible();
+  await refusal.getByRole("button", { name: "知道了" }).click();
+  await expect(refusal).toHaveCount(0);
   await picker.setInputFiles([
     { name: "截图.png", mimeType: "image/png", buffer: PNG },
     { name: "季度报告.pdf", mimeType: "application/pdf", buffer: Buffer.alloc(1_500_000, 7) }

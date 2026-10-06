@@ -42,10 +42,14 @@ export async function saveTeamChatAttachment(attachment: TeamChatAttachment): Pr
   return window.pi67.system.saveTeamChatAttachment({ fileName: attachment.fileName, data: bytes.buffer });
 }
 
-// Another account must never see this one's files or previews.
+/** Whose files the tray and image cache hold: another account or team never sees them. */
+let owner: string | undefined;
 teamChat.store.subscribe((state, previous) => {
-  if (state.connection?.status === "signed-out" && previous.connection?.status !== "signed-out") {
+  const signedOut = state.connection?.status === "signed-out" && previous.connection?.status !== "signed-out";
+  const next = state.directory ? `${state.directory.teamId}\n${state.directory.selfUserId}` : owner;
+  if (signedOut || (owner !== undefined && next !== owner)) {
     teamChatUploads.clear();
     teamChatAttachmentImages.clear();
   }
+  owner = signedOut ? undefined : next;
 });

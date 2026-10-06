@@ -53,7 +53,8 @@ common office files and archives allowed while executables are refused.
    and writes only there; Main never opens the file.
 7. **Desktop UI.** The composer adds files by the paperclip, paste or drop, shows a
    tray with progress, retry and remove, refuses blocked types, sizes and the
-   eleventh file with a reason, and sends once every file is stored. Messages show
+   eleventh file with an inline reason, and sends once every file is stored. The
+   tray and the image cache empty when the account or team changes. Messages show
    png/jpeg/gif/webp inline (sized from stored pixel dimensions, read through the
    renderer's bounded image cache, opened in a viewer) and other files as cards
    with `保存`. Agents see `[附件：name]` lines only, never file contents.

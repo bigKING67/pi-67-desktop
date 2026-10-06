@@ -1,22 +1,15 @@
 import { File as FileIcon, RotateCw, X } from "lucide-react";
 import { Button } from "react-aria-components";
 import { messages } from "../localization/message-catalog.js";
-import { publishNotification } from "../notifications/notification-store.js";
 import { teamChatUploads } from "./team-chat-attachment-files.js";
 import { formatTeamChatBytes } from "./team-chat-presentation.js";
 import type { TeamChatUpload } from "./team-chat-uploads.js";
 import styles from "./TeamChatAttachments.module.css";
 
-/** Adds picked, pasted or dropped files and explains any that were refused. */
-export function addTeamChatFiles(conversationId: string, files: readonly File[]): void {
+/** Adds picked, pasted or dropped files; returns why any were refused, for the composer to show. */
+export function addTeamChatFiles(conversationId: string, files: readonly File[]): string[] {
   const copy = messages.teamChat;
-  const refused = teamChatUploads.add(conversationId, files);
-  if (refused.length === 0) return;
-  publishNotification({
-    level: "warning",
-    title: copy.attachmentRefused,
-    message: refused.map((item) => copy.attachmentRefusal[item.reason](item.fileName)).join("\n")
-  });
+  return teamChatUploads.add(conversationId, files).map((item) => copy.attachmentRefusal[item.reason](item.fileName));
 }
 
 /** Files waiting to be sent with the next message. */

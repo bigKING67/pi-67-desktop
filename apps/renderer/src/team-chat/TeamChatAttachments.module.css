@@ -145,7 +145,34 @@
   outline: none;
 }
 
-/* Composer: attach button, drop target and tray. */
+/* Composer: refused files, attach button, drop target and tray. */
+.refusal {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warning);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: var(--font-size-support);
+}
+
+.refusal > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+
+.refusal strong {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.refusal > span > span { color: var(--text-secondary); }
+
 .attachButton {
   display: grid;
   width: 32px;
