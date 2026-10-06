@@ -652,7 +652,8 @@
 }
 
 .modal-surface form { display: grid; gap: 14px; padding: 20px; }
-.dialog-eyebrow { color: var(--text-tertiary); font-family: var(--font-code); font-size: var(--font-size-caption); }
+/* Dialog context line above the title, in the UI face; never a monospace eyebrow. */
+.dialog-eyebrow { color: var(--text-tertiary); font-size: var(--font-size-caption); font-weight: var(--font-weight-medium); }
 .modal-surface h2 { margin: -7px 0 0; font-size: var(--font-size-heading); }
 .dialog-message { max-height: 240px; margin: 0; overflow: auto; color: var(--text-secondary); white-space: pre-wrap; }
 .modal-surface input,

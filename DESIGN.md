@@ -2172,6 +2172,10 @@ loading error where the operation can produce those states
   then the processing disclosure as caption fine print. The disclosure stays visible.
 - Lazy-surface and transcript loading fallbacks are one centered tertiary status with
   the loading line, never unstyled text in a corner.
+- Dialog context lines (`.dialog-eyebrow`, e.g. `New Money 安全授权`) use caption UI
+  text at medium weight, never the code face. The command palette keeps its 2px focus
+  outline on the search field; its selected result uses only the hover fill (no inset
+  accent bar), and shortcut hints are flat `surface-active` keycaps in the UI face.
 - Agents (P3a): Agent rows use a 20px accent-soft tile with a bot glyph and an
   8px presence dot (success fill online, disabled fill otherwise) that the row's
   accessible name repeats as text; your own Agents show a tertiary `我的`. Agent
