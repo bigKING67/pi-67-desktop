@@ -29,13 +29,16 @@ export async function resolveExactCapabilitySource({
     }
     return internal;
   }
+  if (source.sourceDirectory !== undefined && !/^packages\/[a-z0-9][a-z0-9-]{0,79}$/u.test(source.sourceDirectory)) {
+    throw new Error(`Invalid capability source directory: ${source.id}`);
+  }
   const local = resolve(repositoryRoot, source.localSibling);
-  if (await isExactCleanRepository(local, source.commit, git)) return local;
+  if (await isExactCleanRepository(local, source.commit, git)) return resolvePackageDirectory(local, source);
   const destination = join(sourceCacheRoot, source.id);
   if (
     await isExactCleanRepository(destination, source.commit, git)
     && await repositoryRemoteMatches(destination, source.repository, git)
-  ) return destination;
+  ) return resolvePackageDirectory(destination, source);
   await removeSourceTree(destination);
   await mkdir(dirname(destination), { recursive: true });
   let lastError;
@@ -53,13 +56,25 @@ export async function resolveExactCapabilitySource({
       if (await capture(git, ["-C", destination, "rev-parse", "HEAD"]) !== source.commit) {
         throw new Error("checked out commit did not match the lock");
       }
-      return destination;
+      return await resolvePackageDirectory(destination, source);
     } catch (error) {
       lastError = error;
       await removeSourceTree(destination);
     }
   }
   throw new Error(`Unable to obtain locked capability source ${source.id}: ${errorMessage(lastError)}`);
+}
+
+async function resolvePackageDirectory(checkout, source) {
+  if (source.sourceDirectory === undefined) return checkout;
+  const directory = resolve(checkout, source.sourceDirectory);
+  const [metadata, canonical, canonicalRoot] = await Promise.all([
+    lstat(directory), realpath(directory), realpath(checkout)
+  ]);
+  if (!metadata.isDirectory() || metadata.isSymbolicLink() || !isContained(canonical, canonicalRoot)) {
+    throw new Error(`Capability source directory ${source.id} is not contained in its checkout.`);
+  }
+  return directory;
 }
 
 export async function resolveBundledGitToolchain(toolchainManifestPath) {

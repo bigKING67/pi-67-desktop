@@ -79,7 +79,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins two Desktop-internal packages, three first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.10.03.1");
+    expect(lock.catalogVersion).toBe("2026.10.06.1");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi-workspace-resources",
       "openviking-pi-extension",
@@ -113,11 +113,11 @@ describe("Desktop first-party capability source lock", () => {
     expect(lock.sources.find((source) => source.id === "browser67")).toMatchObject({
       version: "0.11.4",
       ref: "refs/heads/main",
-      commit: "71baa17da2831992693bb1f63599ad90c3138230"
+      commit: "502266ef08cde5972efd2948055882cd9e03c1c4"
     });
     expect(lock.sources.find((source) => source.id === "design-craft")).toMatchObject({
       version: "0.7.0",
-      commit: "f52ac60ad8fcebad89b125d761775bf5050cc4d0"
+      commit: "502266ef08cde5972efd2948055882cd9e03c1c4"
     });
     expect(lock.skillPacks).toHaveLength(1);
     expect(lock.skillPacks[0]).toMatchObject({
@@ -211,6 +211,18 @@ describe("Desktop first-party capability source lock", () => {
     expect(() => assertPi67SkillPackSource(unordered)).toThrow(/source is invalid/u);
   });
 
+  it("binds migrated capabilities to their monorepo package directory", async () => {
+    const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
+    for (const id of ["browser67", "design-craft", "commerce-growth-os"]) {
+      const source = lock.sources.find((item) => item.id === id);
+      expect(source.repository).toBe("https://github.com/bigKING67/craft67.git");
+      expect(source.localSibling).toBe("../craft67");
+      expect(source.sourceDirectory).toBe(`packages/${id}`);
+    }
+    lock.sources.find((item) => item.id === "browser67").sourceDirectory = "../escape";
+    expect(() => assertCapabilitySourceLock(lock)).toThrow(/invalid source directory/u);
+  });
+
   it("rejects malformed first-party tracked branch refs", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     lock.sources.find((source) => source.id === "browser67").ref = "refs/heads/../main";
@@ -220,7 +232,7 @@ describe("Desktop first-party capability source lock", () => {
   it("rejects prepared capability metadata that drifts from locked sources", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     const sourceProvenance = (source) => source.internalPath === undefined
-      ? { repository: source.repository, commit: source.commit }
+      ? { repository: source.repository, commit: source.commit, sourceDirectory: source.sourceDirectory }
       : { internalPath: source.internalPath, sourceTreeSha256: source.treeSha256 };
     const generatedFrom = lock.sources.map((source) => ({
       id: source.id,
@@ -252,6 +264,11 @@ describe("Desktop first-party capability source lock", () => {
     };
 
     expect(() => assertCapabilitiesMetadata(lock, catalog, manifest)).not.toThrow();
+    expect(() => assertCapabilitiesMetadata(lock, {
+      ...catalog,
+      entries: entries.map((entry) => entry.id === "browser67"
+        ? { ...entry, sourceDirectory: "packages/design-craft" } : entry)
+    }, manifest)).toThrow(/metadata is stale/u);
     expect(() => assertCapabilitiesMetadata(lock, {
       ...catalog,
       entries: entries.map((entry, index) => index === 0

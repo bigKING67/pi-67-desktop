@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -119,6 +119,45 @@ describe("Desktop capability source resolver", () => {
       git: { executable: "git", execPath: execPathOutput.trim() }
     })).resolves.toBe(destination);
     await expect(readFile(sentinel, "utf8")).resolves.toBe("preserved\n");
+  }, PROCESS_FIXTURE_TIMEOUT_MS);
+
+  it("resolves a pinned monorepo package and isolates dirty sibling changes", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-monorepo-source-"));
+    temporaryRoots.push(root);
+    const checkout = join(root, "craft67");
+    const desktop = join(root, "desktop");
+    const pkg = join(checkout, "packages", "browser67");
+    await mkdir(pkg, { recursive: true });
+    await mkdir(desktop);
+    const gitRun = async (...args) => (await execFileAsync("git", ["-C", checkout, ...args])).stdout.trim();
+    await execFileAsync("git", ["init", checkout]);
+    await gitRun("config", "user.name", "Pi-67 Test");
+    await gitRun("config", "user.email", "pi67@example.invalid");
+    await writeFile(join(pkg, "package.json"), '{"name":"browser67"}\n');
+    await gitRun("add", "packages/browser67/package.json");
+    await gitRun("commit", "-m", "monorepo fixture");
+    const source = { id: "browser67", repository: "https://github.com/example/craft67.git",
+      localSibling: "../craft67", sourceDirectory: "packages/browser67", commit: await gitRun("rev-parse", "HEAD") };
+    const { stdout } = await execFileAsync("git", ["--exec-path"]);
+    const options = { source, repositoryRoot: desktop, sourceCacheRoot: join(root, "cache"),
+      git: { executable: "git", execPath: stdout.trim() } };
+    await expect(resolveExactCapabilitySource(options)).resolves.toBe(pkg);
+    await writeFile(join(pkg, "package.json"), '{"name":"user-wip"}\n');
+    const cached = await resolveExactCapabilitySource(options);
+    expect(cached).toBe(join(root, "cache", "browser67", "packages", "browser67"));
+    expect(JSON.parse(await readFile(join(cached, "package.json"), "utf8")).name).toBe("browser67");
+    expect(JSON.parse(await readFile(join(pkg, "package.json"), "utf8")).name).toBe("user-wip");
+    await expect(resolveExactCapabilitySource(options)).resolves.toBe(cached);
+    for (const sourceDirectory of ["../escape", "/tmp/escape", "packages/../../escape", "packages\\escape"]) {
+      await expect(resolveExactCapabilitySource({ ...options, source: { ...source, sourceDirectory } }))
+        .rejects.toThrow(/Invalid capability source directory/u);
+    }
+    await writeFile(join(pkg, "package.json"), '{"name":"browser67"}\n');
+    await symlink(desktop, join(checkout, "packages", "escaped"), "junction");
+    await writeFile(join(checkout, ".git", "info", "exclude"), "packages/escaped\n");
+    await expect(resolveExactCapabilitySource({ ...options,
+      source: { ...source, sourceDirectory: "packages/escaped", commit: await gitRun("rev-parse", "HEAD") }
+    })).rejects.toThrow(/not contained/u);
   }, PROCESS_FIXTURE_TIMEOUT_MS);
 
   it("terminates a timed-out Git process tree before returning control", async () => {

@@ -75,6 +75,7 @@ function hasMatchingSourceProvenance(candidate, source) {
   }
   return candidate?.repository === source.repository
     && candidate?.commit === source.commit
+    && candidate?.sourceDirectory === source.sourceDirectory
     && candidate?.internalPath === undefined
     && candidate?.sourceTreeSha256 === undefined;
 }
@@ -131,6 +132,9 @@ export function assertCapabilitySourceLock(lock) {
       }
       if (source.ref !== undefined && !isTrackedBranchRef(source.ref)) {
         throw new Error(`Capability source ${source.id} has an invalid tracked branch ref.`);
+      }
+      if (source.sourceDirectory !== undefined && !/^packages\/[a-z0-9][a-z0-9-]{0,79}$/u.test(source.sourceDirectory)) {
+        throw new Error(`Capability source ${source.id} has an invalid source directory.`);
       }
       assertLocalSibling(source.localSibling, "capability local sibling");
     }
@@ -195,6 +199,7 @@ function assertInternalSource(source) {
     || source.ref !== undefined
     || source.commit !== undefined
     || source.localSibling !== undefined
+    || source.sourceDirectory !== undefined
   ) throw new Error(`Capability source ${source.id} is not pinned to a contained Desktop tree.`);
 }
 

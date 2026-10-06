@@ -1,6 +1,6 @@
 {
   "schema": "pi67.capability-sources-lock.v1",
-  "catalogVersion": "2026.10.03.1",
+  "catalogVersion": "2026.10.06.1",
   "sources": [
     {
       "id": "pi-workspace-resources",
@@ -36,29 +36,34 @@
       "id": "browser67",
       "displayName": "browser67",
       "origin": "first-party",
-      "repository": "https://github.com/bigKING67/browser67.git",
+      "repository": "https://github.com/bigKING67/craft67.git",
       "ref": "refs/heads/main",
-      "commit": "71baa17da2831992693bb1f63599ad90c3138230",
-      "localSibling": "../browser67",
-      "version": "0.11.4"
+      "commit": "502266ef08cde5972efd2948055882cd9e03c1c4",
+      "localSibling": "../craft67",
+      "version": "0.11.4",
+      "sourceDirectory": "packages/browser67"
     },
     {
       "id": "design-craft",
       "displayName": "design-craft",
       "origin": "first-party",
-      "repository": "https://github.com/bigKING67/design-craft",
-      "commit": "f52ac60ad8fcebad89b125d761775bf5050cc4d0",
-      "localSibling": "../design-craft",
-      "version": "0.7.0"
+      "repository": "https://github.com/bigKING67/craft67.git",
+      "commit": "502266ef08cde5972efd2948055882cd9e03c1c4",
+      "localSibling": "../craft67",
+      "version": "0.7.0",
+      "ref": "refs/heads/main",
+      "sourceDirectory": "packages/design-craft"
     },
     {
       "id": "commerce-growth-os",
       "displayName": "commerce-growth-os",
       "origin": "first-party",
-      "repository": "https://github.com/bigKING67/commerce-growth-os.git",
-      "commit": "1c28f48ef002ce7dea18bbf5746eb9b4c2876971",
-      "localSibling": "../commerce-growth-os",
-      "version": "2.2.0"
+      "repository": "https://github.com/bigKING67/craft67.git",
+      "commit": "502266ef08cde5972efd2948055882cd9e03c1c4",
+      "localSibling": "../craft67",
+      "version": "2.2.0",
+      "ref": "refs/heads/main",
+      "sourceDirectory": "packages/commerce-growth-os"
     }
   ],
   "skillPacks": [

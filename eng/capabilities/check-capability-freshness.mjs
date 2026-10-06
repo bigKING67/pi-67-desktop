@@ -270,6 +270,7 @@ function assertCapabilityLock(lock) {
         || source.repository.length > 4_096
         || !gitObjectPattern.test(source.commit)
         || (source.ref !== undefined && !isTrackedBranchRef(source.ref))
+        || (source.sourceDirectory !== undefined && !/^packages\/[a-z0-9][a-z0-9-]{0,79}$/u.test(source.sourceDirectory))
       ) throw new Error("Capability source lock entry is invalid");
       parseStableVersion(source.version);
       const repository = new URL(source.repository);

@@ -394,7 +394,8 @@ function catalogEntry(source, packagePath, resourceTypes, bundledExtensions = []
     defaultEnabled: true,
     version: source.version,
     ...(source.internalPath === undefined
-      ? { repository: source.repository, commit: source.commit }
+      ? { repository: source.repository, commit: source.commit,
+          ...(source.sourceDirectory === undefined ? {} : { sourceDirectory: source.sourceDirectory }) }
       : { internalPath: source.internalPath, sourceTreeSha256: source.treeSha256 }),
     packagePath,
     resourceTypes,
