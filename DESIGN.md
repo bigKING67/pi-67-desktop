@@ -45,6 +45,7 @@ radius:
   control: 8
   panel: 14
   overlay: 14
+  composer: 20
   pill: 999
 motion:
   fast: 120
@@ -305,7 +306,8 @@ Application-level surfaces use a separate wide-window shell:
   metadata.
 - Code blocks may use ligatures. Commands, paths, diffs, and exact output do not.
 - Shared typography roles are caption 11px, support 12px, interface 13px,
-  body 14px, section 16px, heading 18px, title 20px, display 22px.
+  body 14px, reading 15px, section 16px, heading 18px, title 20px, display 22px.
+  `reading` is reserved for Transcript Markdown prose and user message text.
   CSS uses `--font-size-*` roles rather than local pixel sizes. Inline code/math
   may retain relative sizing; zero-size icon-font suppression is not text.
 - UI copy never falls below 11px. Navigation titles, file names, form inputs and
@@ -395,7 +397,8 @@ loading error where the operation can produce those states
 - Settled messages and the live turn are separate render paths; the live turn
   occupies the Virtuoso footer and joins history only after it settles.
 - Streaming text is coalesced; token-level React commits are forbidden.
-- User messages use a compact, content-width bubble aligned to the right edge of
+- User messages use a compact, content-width, borderless `surface-active` bubble
+  (18px radius) aligned to the right edge of
   the shared adaptive conversation measure. Short messages never expand to the
   maximum width; long prompts, code, and attachments remain bounded. The visible author
   header is omitted because position and surface already communicate ownership,
@@ -407,7 +410,9 @@ loading error where the operation can produce those states
   Pi answers place `复制回答` and `在新任务中继续` before the timestamp; User
   messages place the timestamp before `复制消息` and `编辑消息`. Action
   targets remain at least 28px, are keyboard-focusable, have named tooltips, and
-  stay discoverable without depending exclusively on hover. Tooltips prefer the
+  stay discoverable without depending exclusively on hover: a resting footer is
+  shown at 45% opacity and returns to full emphasis on message hover, keyboard
+  focus within the message, or touch-only input. Tooltips prefer the
   space below their action and use overlay collision handling; they never cover
   the message content merely to stay attached to the footer.
 - Message timestamps are stable source timestamps and always render the complete
@@ -1912,6 +1917,9 @@ loading error where the operation can produce those states
   Toolbar and runtime controls retain focus on the exact control instead of
   promoting the shell, so nested focus rings never compete.
 - Main action is `发送`/`Send` or `停止`/`Stop`, never a generic submit label.
+  Both render as 32px round icon buttons (up arrow / filled square) whose
+  accessible name carries that label, matching the Team Chat send action. The
+  Composer shell uses `--radius-composer` (20px).
 - Provider-bound Prompt text has one shared 120,000-character limit at the
   Renderer and Protocol boundary. An oversized submission stays editable, does
   not create a provisional Session or start a Provider Turn, and uses the existing
@@ -2970,12 +2978,15 @@ application bundles, Helpers, executables and installer filenames use New Money.
 
 ### Long-form reading refinement
 
-- Inline code keeps its monospace face and muted background, with a subdued
-  border at 35% of the border token. Block-code containers remain unchanged.
+- Inline code keeps its monospace face on a `surface-active` fill without a
+  border (2026-10-06: per-fragment borders made prose look fragmented).
+  Block-code containers remain unchanged.
 - Disabled Composer send actions use disabled surface/text tokens and a
   transparent border instead of a faded accent fill; hover does not promote
-  disabled actions. Enabled send and active stop retain their distinct emphasis.
-- Editorial Markdown keeps the 14px body and shared reading measure, with 1.75
+  disabled actions; the disabled send circle uses `surface-active` because the dark
+  Composer fill equals `surface-disabled`. Enabled send and active stop retain
+  their distinct emphasis.
+- Editorial Markdown uses the 15px reading role and shared reading measure, with 1.75
   line height, 0.85em paragraph spacing, and 600-weight headings with greater
   separation above than below. Streaming and settled content share these rules.
 - Table headers use 600 weight; code toolbar labels use 11px and copy targets

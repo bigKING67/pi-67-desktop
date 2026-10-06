@@ -16,7 +16,7 @@
   margin: 0 auto;
   overflow: hidden;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-panel);
+  border-radius: var(--radius-composer);
   background: var(--surface-raised);
   box-shadow: var(--shadow-composer);
 }
@@ -38,7 +38,7 @@
   width: 100%;
   min-height: 64px;
   max-height: min(220px, 32vh);
-  padding: 13px 14px var(--space-2);
+  padding: 15px 18px var(--space-2);
   overflow-y: auto;
   resize: none;
   border: 0;
@@ -214,9 +214,9 @@
   gap: 2px;
   height: 29px;
   padding: 2px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--surface-muted);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--surface-active);
 }
 
 .interactionMode[data-mode="plan"] {
@@ -266,7 +266,7 @@
   justify-content: space-between;
   min-height: 43px;
   gap: 6px;
-  padding: 5px 7px 7px;
+  padding: 5px 10px 10px;
   flex-wrap: nowrap;
 }
 
@@ -927,21 +927,18 @@
   outline: none;
 }
 
+/* Send and stop are the Composer's only round, filled actions; the accessible name carries the label. */
 .sendButton {
-  display: inline-flex;
+  display: inline-grid;
   flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  min-height: 31px;
-  gap: 7px;
-  padding: 0 13px;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
   border: 1px solid var(--accent-strong);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--canvas);
-  font-size: var(--font-size-interface);
-  font-weight: var(--font-weight-semibold);
-  white-space: nowrap;
 }
 
 .sendButton:hover:not([data-disabled]) {
@@ -959,29 +956,26 @@
 }
 
 .stopButton {
-  display: inline-flex;
+  display: inline-grid;
   flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  min-height: 31px;
-  gap: 7px;
-  padding: 0 13px;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
   border: 1px solid color-mix(in srgb, var(--danger) 78%, var(--border));
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   background: var(--danger);
   color: var(--canvas);
-  font-size: var(--font-size-interface);
-  font-weight: var(--font-weight-semibold);
-  white-space: nowrap;
 }
 
 .stopButton:hover {
   background: color-mix(in srgb, var(--danger) 86%, var(--text-primary));
 }
+/* surface-disabled equals the dark Composer fill, so a disabled send keeps a visible neutral circle. */
 .sendButton[data-disabled] {
   cursor: not-allowed;
   border-color: transparent;
-  background: var(--surface-disabled);
+  background: var(--surface-active);
   color: var(--text-disabled);
 }
 

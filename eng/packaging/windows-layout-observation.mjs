@@ -9,9 +9,9 @@ export async function observeLayout(window) {
     const contextDrawerScrim = document.querySelector(".context-drawer-scrim");
     const navigationDrawer = document.querySelector(".navigation-rail");
     const send = [...document.querySelectorAll("button")]
-      .find((button) => button.textContent?.trim() === "发送");
+      .find((button) => button.getAttribute("aria-label") === "发送");
     const stop = [...document.querySelectorAll("button")]
-      .find((button) => button.textContent?.trim() === "停止");
+      .find((button) => button.getAttribute("aria-label") === "停止");
     const titleBar = document.querySelector(".title-bar");
     const titleActions = document.querySelector(".title-actions");
     const actionControls = titleActions

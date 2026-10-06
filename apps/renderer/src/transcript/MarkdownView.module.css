@@ -1,6 +1,6 @@
 .body {
   color: var(--text-primary);
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-reading);
   line-height: var(--line-height-prose);
   overflow-wrap: anywhere;
 }
@@ -144,11 +144,11 @@
   background-clip: padding-box;
 }
 
+/* A fill alone separates inline code; a border on every fragment made prose look fragmented. */
 .body :not(pre) > code {
-  padding: 0.12em 0.35em;
-  border: 1px solid color-mix(in srgb, var(--border) 35%, transparent);
+  padding: 0.12em 0.38em;
   border-radius: 5px;
-  background: var(--surface-muted);
+  background: var(--surface-active);
   font-family: var(--font-code);
   font-size: 0.88em;
 }

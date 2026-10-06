@@ -38,6 +38,7 @@
   --font-size-support: 12px;
   --font-size-interface: 13px;
   --font-size-body: 14px;
+  --font-size-reading: 15px;
   --font-size-section: 16px;
   --font-size-heading: 18px;
   --font-size-title: 20px;
@@ -95,6 +96,7 @@
   --radius-control: 8px;
   --radius-panel: 14px;
   --radius-overlay: 14px;
+  --radius-composer: 20px;
   --radius-pill: 999px;
   --titlebar-height: 42px;
 }

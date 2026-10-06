@@ -6,8 +6,8 @@ export function composerToolbarGeometry(page: Page) {
     const tools = toolbar?.children.item(0) as HTMLElement | null;
     const actions = toolbar?.children.item(1) as HTMLElement | null;
     const buttons = [...(actions?.querySelectorAll<HTMLElement>("button") ?? [])];
-    const send = buttons.find((button) => button.textContent?.trim() === "发送");
-    const stop = buttons.find((button) => button.textContent?.trim() === "停止");
+    const send = buttons.find((button) => button.getAttribute("aria-label") === "发送");
+    const stop = buttons.find((button) => button.getAttribute("aria-label") === "停止");
     if (!toolbar || !tools || !actions) throw new Error("Composer toolbar geometry is unavailable.");
     const toolbarBox = toolbar.getBoundingClientRect();
     const toolsBox = tools.getBoundingClientRect();

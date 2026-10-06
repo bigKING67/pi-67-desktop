@@ -173,7 +173,7 @@ test("keeps the Composer inside the comfortable docked Inspector work plane", as
     const tools = toolbar?.children.item(0) as HTMLElement | null;
     const actions = toolbar?.children.item(1) as HTMLElement | null;
     const send = [...(actions?.querySelectorAll<HTMLElement>("button") ?? [])]
-      .find((button) => button.textContent?.trim() === "发送");
+      .find((button) => button.getAttribute("aria-label") === "发送");
     if (!conversation || !inspectorElement || !messageElement || !shell || !toolbar || !tools || !actions || !send) {
       throw new Error("Docked Inspector Composer geometry is unavailable.");
     }

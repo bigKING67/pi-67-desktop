@@ -72,13 +72,14 @@
   min-width: 0;
 }
 
+/* Ownership comes from position and a filled surface; the bubble needs no outline. */
 .user .content {
   width: fit-content;
   max-width: min(680px, 100%);
-  padding: 10px 14px;
-  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
-  border-radius: 16px;
-  background: var(--surface-muted);
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 18px;
+  background: var(--surface-active);
 }
 
 .content > [data-attachment-kind] {
@@ -445,6 +446,7 @@
   opacity: 0.42;
 }
 
+/* Resting footers recede but stay visible; hover, keyboard focus and touch restore full emphasis. */
 .footer {
   display: flex;
   align-items: center;
@@ -452,6 +454,18 @@
   gap: 2px;
   margin-top: 10px;
   color: var(--text-tertiary);
+  opacity: 0.45;
+  transition: opacity var(--motion-fast) var(--motion-ease-out);
+}
+
+:is(.card, .user):is(:hover, :focus-within) .footer { opacity: 1; }
+
+@media (hover: none) {
+  .footer { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .footer { transition: none; }
 }
 
 .userFooter {

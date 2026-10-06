@@ -1,5 +1,5 @@
 import type { ComposerWorkspaceFileRef, WorkspaceFileEntry } from "@pi67/domain";
-import { Send, Square } from "lucide-react";
+import { ArrowUp, Square } from "lucide-react";
 import {
   lazy,
   Suspense,
@@ -271,16 +271,17 @@ export function ComposerSurface(props: ComposerSurfaceProps) {
             ) : null}
             {!props.canStop || props.hasDraft ? (
               <Button
+                aria-label={props.submitting ? messages.composer.sending : messages.composer.send}
                 className={`${styles.sendButton} ${props.canStop ? styles.secondarySendButton : ""}`}
                 isDisabled={!props.canSend}
                 onPress={props.onSubmit}
               >
-                <Send size={15} />{props.submitting ? messages.composer.sending : messages.composer.send}
+                <ArrowUp aria-hidden="true" size={17} strokeWidth={2.4} />
               </Button>
             ) : null}
             {props.canStop ? (
-              <Button className={styles.stopButton!} onPress={() => void abortActiveOperation()}>
-                <Square aria-hidden="true" size={12} />{messages.common.stop}
+              <Button aria-label={messages.common.stop} className={styles.stopButton!} onPress={() => void abortActiveOperation()}>
+                <Square aria-hidden="true" fill="currentColor" size={11} />
               </Button>
             ) : null}
           </div>
