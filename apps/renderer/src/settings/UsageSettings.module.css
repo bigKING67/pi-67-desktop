@@ -5,10 +5,11 @@
 .segmented .selected { background: var(--surface); color: var(--text-primary); box-shadow: var(--shadow-control); }
 .loading { display: flex; min-height: 160px; align-items: center; justify-content: center; gap: 8px; color: var(--text-tertiary); }
 .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
-.metrics > div { display: grid; gap: 5px; padding: 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
-.metrics span { color: var(--text-tertiary); font-size: var(--font-size-caption); }
-.metrics strong { overflow: hidden; color: var(--text-primary); font-size: var(--font-size-section); text-overflow: ellipsis; }
-.chartSection, .tableSection { margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
+.metrics > div { display: grid; gap: 6px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.metrics span { color: var(--text-secondary); font-size: var(--font-size-support); }
+/* The value is the tile's subject: one large tabular figure, never the same size as its label. */
+.metrics strong { overflow: hidden; color: var(--text-primary); font-size: var(--font-size-display); font-variant-numeric: tabular-nums; font-weight: var(--font-weight-semibold); letter-spacing: -0.01em; text-overflow: ellipsis; white-space: nowrap; }
+.chartSection, .tableSection { margin-top: 12px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
 .chartSection > header, .tableSection > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .chartSection > header > div { display: flex; align-items: center; gap: 7px; }
 .chartSection header span, .tableSection header span { color: var(--text-tertiary); font-size: var(--font-size-caption); }
@@ -32,9 +33,10 @@
 .xAxis { display: grid; grid-column: 2; grid-row: 2; min-width: 0; padding-top: 6px; }
 .xLabel { overflow: visible; color: var(--text-tertiary); font-size: var(--font-size-caption); font-variant-numeric: tabular-nums; text-align: center; white-space: nowrap; }
 .table { display: grid; }
-.table > div { display: grid; grid-template-columns: minmax(180px, 1fr) 60px 60px 90px 90px; gap: 8px; align-items: center; min-height: 34px; border-top: 1px solid var(--border); font-size: var(--font-size-caption); }
+.table > div { display: grid; grid-template-columns: minmax(180px, 1fr) 60px 60px 90px 90px; gap: 8px; align-items: center; min-height: 40px; border-top: 1px solid var(--border); font-size: var(--font-size-support); font-variant-numeric: tabular-nums; }
 .table .tableHeader { min-height: 26px; border-top: 0; color: var(--text-tertiary); }
-.table > div > span:first-child { display: grid; min-width: 0; }
+.modelCell { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.modelCell > span { display: grid; min-width: 0; }
 .table small { overflow: hidden; color: var(--text-tertiary); text-overflow: ellipsis; white-space: nowrap; }
 .coverage { margin-top: 10px; color: var(--text-tertiary); font-size: var(--font-size-caption); }
 .spin { animation: usage-spin 0.8s linear infinite; }

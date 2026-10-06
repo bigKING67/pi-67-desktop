@@ -15,6 +15,7 @@ import {
   type DailyUsagePoint
 } from "./usage-daily-series.js";
 import { isUsageReportRequestCurrent } from "./usage-report-request.js";
+import { ProviderBrandIcon } from "./ProviderBrandIcon.js";
 import styles from "./UsageSettings.module.css";
 
 const WINDOWS: Array<{ id: UsageWindow; label: string }> = [
@@ -165,7 +166,10 @@ export function UsageSettings() {
             <div className={styles.tableHeader} role="row"><span>Provider / Model</span><span>会话</span><span>条目</span><span>Token</span><span>记录成本</span></div>
             {modelRows.map((row) => (
               <div key={`${row.provider}:${row.model}`} role="row">
-                <span><strong>{row.provider}</strong><small>{row.model}</small></span>
+                <span className={styles.modelCell}>
+                  <ProviderBrandIcon hints={[row.model, row.provider]} label={row.model} size="inline" />
+                  <span><strong>{row.provider}</strong><small>{row.model}</small></span>
+                </span>
                 <span>{row.sessions}</span>
                 <span>{row.turns}</span>
                 <span>{formatNumber(row.totals.total)}</span>

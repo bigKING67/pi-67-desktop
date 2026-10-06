@@ -39,11 +39,9 @@
   display: grid;
 }
 
+/* A standing boundary statement, not an alert: plain support text without a surface. */
 .authorizationNotice {
   margin: 0;
-  padding: 10px 12px;
-  border-radius: var(--radius-control);
-  background: var(--surface-muted);
   color: var(--text-secondary);
   font-size: var(--font-size-support);
   line-height: 1.5;

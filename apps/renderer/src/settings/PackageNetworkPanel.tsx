@@ -191,9 +191,9 @@ export function PackageNetworkPanel() {
       <SettingsSectionBlock
         actions={<>
           {displayedSnapshot?.checkedAt ? <time className={styles.checkedAt}>{new Date(displayedSnapshot.checkedAt).toLocaleString()}</time> : null}
-          <SettingsInfo label="检测方式说明">检测使用公共 ping 或随应用提供的 Git ls-remote，不发送工作区、会话、模型服务或凭据。</SettingsInfo>
           <Button className="secondary-button" isDisabled={!validDraft || busy} onPress={() => void probe()}><RefreshCw aria-hidden="true" size={14} />{phase === "probing" ? "检测中…" : "检测全部源"}</Button>
         </>}
+        info="检测使用公共 ping 或随应用提供的 Git ls-remote，不发送工作区、会话、模型服务或凭据。"
         title="源可达性"
       >
         {probeCompatible && dirty ? <SettingsNotice tone="warning">以下结果基于未保存配置；检测没有写入下载源设置。</SettingsNotice> : null}
