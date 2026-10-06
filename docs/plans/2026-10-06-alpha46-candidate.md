@@ -1,6 +1,6 @@
 # Alpha.46 internal candidate preparation
 
-Status: complete (automated candidate preparation; target-user acceptance pending)
+Status: published to the internal R2 update channel (2026-10-06)
 Owner: Claude
 Started: 2026-10-06
 
@@ -47,9 +47,22 @@ Alpha.44/45 receipts.
   Windows EXE `2a192ed4…d956` (251,404,004 bytes), DMG `b8ee24ff…c92d`,
   ZIP `84329a70…5acc`; identity, size and SHA-256 cross-checked.
 
+## Publication
+
+- The user confirmed acceptance and authorized publication on 2026-10-06. The Windows
+  test receipt binds that confirmation to run `37430329046` attempt 3 and the exact
+  EXE/executable hashes (candidate identity `f0c19d9f…ce40`).
+- Before writing, Alpha.42 (the public version) Main manifest parsing and renderer
+  update-state validation were replayed from `a7e0822d` sources against the new
+  manifest: accepted for Windows and macOS in available/downloading/installing.
+- `release:r2:publish` from tooling `0504fc49` (source `d41922a`): three artifacts
+  uploaded and read back, manifest last, public manifest verified as Alpha.46;
+  retention kept Alpha.46/42/41 and deleted the three Alpha.40 artifacts. Receipt:
+  `artifacts/r2-release-receipts/2026-10-06T09-24-30.430Z-publish-0.1.0-alpha.46.json`.
+
 ## Remaining
 
-- Target-user acceptance on Windows and macOS (Team Chat: image, PDF, Save, viewer,
-  refusal notice). R2 publication only after that and separate authorization.
+- In-app `检查更新 -> 下载并安装 -> restart -> version` on Windows x64 and an
+  installed macOS arm64 copy.
 - The two Windows timing failures are not explained by this change; keep the
   receipts with the Alpha.45 observations.
