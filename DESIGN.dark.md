@@ -5,22 +5,22 @@ status: active
 platform: electron-web
 theme: dark
 color:
-  canvas: "#0a0a0a"
-  surface: "#111111"
-  surface-muted: "#1a1a1a"
-  surface-raised: "#1f1f1f"
-  surface-hover: "#262626"
-  surface-active: "#292929"
-  surface-disabled: "#1a1a1a"
-  text-primary: "#ededed"
-  text-secondary: "#a1a1a1"
-  text-tertiary: "#999999"
-  text-disabled: "#777777"
-  border: "#2e2e2e"
-  border-strong: "#454545"
-  accent: "#ededed"
+  canvas: "#0e0e10"
+  surface: "#141416"
+  surface-muted: "#1b1b1e"
+  surface-raised: "#202024"
+  surface-hover: "#26262a"
+  surface-active: "#2b2b30"
+  surface-disabled: "#1b1b1e"
+  text-primary: "#ededef"
+  text-secondary: "#a3a3aa"
+  text-tertiary: "#9a9aa2"
+  text-disabled: "#77777e"
+  border: "#29292e"
+  border-strong: "#424248"
+  accent: "#ededef"
   accent-strong: "#ffffff"
-  accent-soft: "#292929"
+  accent-soft: "#2b2b30"
   focus: "#83b9f3"
   info: "#84b8f4"
   warning: "#e2ad69"
@@ -48,8 +48,10 @@ or implicit Workspace save is introduced.
 
 - Dark may come from the operating system or an explicit persisted selection;
   both paths resolve to the same semantic tokens and component states.
-- Large backgrounds use achromatic near-black and gray surfaces; ordinary text,
-  borders, selection, and primary actions must not introduce a green cast.
+- Large backgrounds use near-black and gray surfaces with a faint cool (zinc) cast
+  (2026-10-06, softened from pure achromatic after the Magpie/Grok review so depth reads
+  as luminance rather than borders); ordinary text, borders, selection, and primary
+  actions must not introduce a green or saturated blue cast.
 - Primary actions use a light neutral fill with canvas-colored text/icons.
   Selection uses neutral gray surfaces plus the existing label/marker, not hue alone.
 - The composer uses `surface-muted`; elevated menus and dialogs use
@@ -58,7 +60,11 @@ or implicit Workspace save is introduced.
   and the selected Inspector tab uses `surface-active` to remain distinguishable.
 - Green is semantic (success and additions), not a dark-theme brand accent.
   Preserve warning, danger, info, keyboard focus, and code syntax/diff colors.
-- Grok Bot's official design demo informs neutral surface depth; Vercel Geist
+- Provider and model brand marks keep their own brand colors on the neutral dark
+  surfaces; single-color marks follow `text-primary`. They are the only color in a
+  Provider list and never act as status.
+- Grok Bot's official design demo informs neutral surface depth; Magpie's provider list
+  informs brand-mark identity rows; Vercel Geist
   informs state/contrast roles. These are bounded visual references, not copied
   layouts or runtime authorities. See the design interaction reference guide.
 - Raised surfaces are slightly lighter than the canvas.

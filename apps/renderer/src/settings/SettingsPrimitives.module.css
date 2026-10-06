@@ -58,7 +58,6 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
-  padding: 0 4px;
 }
 
 .sectionHeader > span {
@@ -229,11 +228,11 @@
   display: grid;
   width: 100%;
   min-width: 0;
-  min-height: 56px;
+  min-height: 60px;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 16px;
-  padding: 10px 16px;
+  padding: 11px 16px;
   border: 0;
   background: transparent;
   color: var(--text-primary);
@@ -247,6 +246,17 @@
 
 .catalogRow[aria-pressed="true"] {
   background: var(--surface-active);
+}
+
+.catalogRow[data-leading] {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+}
+
+.catalogLeading {
+  display: inline-grid;
+  width: 24px;
+  place-items: center;
 }
 
 .catalogRow:focus-visible {
@@ -263,7 +273,7 @@
 .catalogIdentity strong {
   overflow: hidden;
   color: var(--text-primary);
-  font-size: var(--font-size-interface);
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -553,9 +563,9 @@
   justify-content: space-between;
   gap: 8px;
   padding: 0 10px;
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: var(--radius-control);
-  background: var(--surface);
+  background: var(--surface-muted);
   color: var(--text-primary);
   font-size: var(--font-size-interface);
   text-align: left;
@@ -566,11 +576,31 @@
   color: var(--text-tertiary);
 }
 
-.selectTrigger[data-hovered] { border-color: var(--border-strong); }
+.selectTrigger[data-hovered] { background: var(--surface-hover); }
 .selectTrigger[data-disabled] { color: var(--text-tertiary); }
 .selectTrigger[data-focus-visible] { outline: 2px solid var(--focus); outline-offset: 1px; }
 
 .selectValue {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The closed trigger repeats the option content; its selection check belongs to the list only. */
+.selectValue .selectCheck { display: none; }
+
+.selectOptionLabel {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.selectOptionLabel > span {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

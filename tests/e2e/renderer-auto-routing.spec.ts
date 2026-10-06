@@ -38,14 +38,14 @@ test("configures opt-in Auto with exact candidates, keeps the default and can di
   await settings.getByRole("navigation", { name: "设置分类" }).getByRole("button", { name: "模型", exact: true }).click();
   const form = settings.getByTestId("auto-routing-settings");
   await expect(form).toBeVisible();
-  await expect(form.getByRole("button", { name: "保存 Auto 配置" })).toBeDisabled();
+  await expect(form.getByRole("button", { name: "保存 Auto 配置" })).toHaveCount(0);
   for (const [role, option] of [["判断模型", "OpenAI / GPT Test"], ["常规任务", "OpenAI / GPT Test"], ["复杂任务", "Anthropic / Claude Test"]] as const) {
     await form.getByRole("button", { name: new RegExp(`Auto ${role}$`, "u") }).click();
     await page.getByRole("listbox", { name: `Auto ${role}` }).getByRole("option", { name: option, exact: true }).click();
   }
   await clearRecordedCommands(page);
   await form.getByRole("button", { name: "保存 Auto 配置" }).click();
-  await expect(form.getByRole("button", { name: "保存 Auto 配置" })).toBeDisabled();
+  await expect(form.getByRole("button", { name: "保存 Auto 配置" })).toHaveCount(0);
   await expect(form.getByRole("button", { name: "关闭 Auto" })).toBeVisible();
   const commands = await recordedCommandDetails(page);
   expect(commands.filter((command) => command.type === "model.routing.global.set")).toHaveLength(1);
@@ -72,7 +72,7 @@ test("keeps unavailable saved models explicit and permits turning Auto off", asy
   await page.getByRole("navigation", { name: "设置分类" }).getByRole("button", { name: "模型", exact: true }).click();
   const form = page.getByTestId("auto-routing-settings");
   await expect(form.getByRole("button", { name: /不可用 · missing \/ judge Auto 判断模型/u })).toBeVisible();
-  await expect(form.getByRole("button", { name: "保存 Auto 配置" })).toBeDisabled();
+  await expect(form.getByRole("button", { name: "保存 Auto 配置" })).toHaveCount(0);
   await form.getByRole("button", { name: /Auto 判断模型$/u }).click();
   await expect(page.getByRole("option", { name: "不可用 · missing / judge" })).toBeDisabled();
   await page.keyboard.press("Escape");

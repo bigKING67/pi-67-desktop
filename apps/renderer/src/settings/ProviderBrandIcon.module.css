@@ -1,0 +1,43 @@
+.mark,
+.mono,
+.monogram {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+
+.mark[data-size="inline"],
+.mono[data-size="inline"],
+.monogram[data-size="inline"] {
+  width: 16px;
+  height: 16px;
+}
+
+.mark {
+  object-fit: contain;
+  user-select: none;
+}
+
+.mono {
+  background: var(--text-primary);
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+}
+
+.monogram {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--surface-active);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+}
+
+.monogram[data-size="inline"] {
+  border-radius: 4px;
+  font-size: 10px;
+}

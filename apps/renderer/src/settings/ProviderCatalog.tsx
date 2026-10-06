@@ -2,6 +2,7 @@ import type { PiProviderConfigurationView } from "@pi67/protocol";
 import { ChevronRight, Plus, Search, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button, Input } from "react-aria-components";
+import { ProviderBrandIcon } from "./ProviderBrandIcon.js";
 import { SettingsCatalog, SettingsCatalogRow, SettingsStatus } from "./SettingsPrimitives.js";
 import styles from "./ProviderCatalog.module.css";
 
@@ -98,9 +99,13 @@ export function ProviderCatalog({
               <SettingsCatalogRow
                 {...(sameIdentity(provider.name, provider.id) ? {} : { description: provider.id })}
                 key={provider.id}
+                leading={<ProviderBrandIcon
+                  hints={[provider.id, provider.name, providerHost(provider.baseUrl)]}
+                  label={provider.name ?? provider.id}
+                />}
                 onSelect={() => onSelect(provider.id)}
                 title={provider.name ?? provider.id}
-                meta={`${provider.origin === "builtin" ? "Pi 内置" : "Pi models.json"} · ${provider.modelCount} 个模型`}
+                meta={providerCatalogMeta(provider)}
                 trailing={<>
                   {view === "custom"
                     ? <SettingsStatus tone={provider.configured ? "success" : "neutral"}>{provider.configured ? "已配置" : "待配置"}</SettingsStatus>
@@ -114,6 +119,22 @@ export function ProviderCatalog({
       </div>
     </section>
   );
+}
+
+/** Host first because it is what users recognise; provenance stays visible per the Catalog contract. */
+function providerCatalogMeta(provider: PiProviderConfigurationView): string {
+  const host = providerHost(provider.baseUrl);
+  const origin = provider.origin === "builtin" ? "Pi 内置" : "Pi models.json";
+  return [host, `${provider.modelCount} 个模型`, origin].filter(Boolean).join(" · ");
+}
+
+function providerHost(baseUrl: string | undefined): string | undefined {
+  if (!baseUrl) return undefined;
+  try {
+    return new URL(baseUrl).host || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** A provider ID that only restates its display name adds no information to the row. */

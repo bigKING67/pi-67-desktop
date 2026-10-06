@@ -93,7 +93,7 @@
   --space-5: 24px;
   --space-6: 32px;
   --radius-control: 8px;
-  --radius-panel: 12px;
+  --radius-panel: 14px;
   --radius-overlay: 14px;
   --radius-pill: 999px;
   --titlebar-height: 42px;
@@ -101,22 +101,22 @@
 
 :root[data-theme="dark"] {
     color-scheme: dark;
-    --canvas: #0a0a0a;
-    --surface: #111111;
-    --surface-muted: #1a1a1a;
-    --surface-raised: #1f1f1f;
-    --surface-hover: #262626;
-    --surface-active: #292929;
-    --surface-disabled: #1a1a1a;
-    --text-primary: #ededed;
-    --text-secondary: #a1a1a1;
-    --text-tertiary: #999999;
-    --text-disabled: #777777;
-    --border: #2e2e2e;
-    --border-strong: #454545;
-    --accent: #ededed;
+    --canvas: #0e0e10;
+    --surface: #141416;
+    --surface-muted: #1b1b1e;
+    --surface-raised: #202024;
+    --surface-hover: #26262a;
+    --surface-active: #2b2b30;
+    --surface-disabled: #1b1b1e;
+    --text-primary: #ededef;
+    --text-secondary: #a3a3aa;
+    --text-tertiary: #9a9aa2;
+    --text-disabled: #77777e;
+    --border: #29292e;
+    --border-strong: #424248;
+    --accent: #ededef;
     --accent-strong: #ffffff;
-    --accent-soft: #292929;
+    --accent-soft: #2b2b30;
     --focus: #83b9f3;
     --info: #84b8f4;
     --warning: #e2ad69;

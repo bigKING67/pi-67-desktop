@@ -18,6 +18,8 @@
 
 .catalogView {
   min-height: 0;
+  /* Catalog and Auto are separate tasks; the larger gap keeps them from reading as one list. */
+  row-gap: 32px;
 }
 
 .projectPanel {

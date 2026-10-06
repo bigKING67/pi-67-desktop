@@ -43,7 +43,7 @@ spacing:
   region: 32
 radius:
   control: 8
-  panel: 12
+  panel: 14
   overlay: 14
   pill: 999
 motion:
@@ -961,7 +961,7 @@ loading error where the operation can produce those states
   Settings Tab family: 36px minimum height, selection underline, neutral fill,
   keyboard focus and horizontal overflow confined to the tab strip.
 - Settings uses three intentional content grammars. **Grouped Settings** places
-  related `64px` minimum rows inside one `12px` rounded surface with only row
+  related `64px` minimum rows inside one `14px` rounded surface with only row
   dividers; a row is never an independent card. **Catalog** places tabs, search,
   filters, and `72px` minimum rows directly on the document canvas without one
   giant outline or floating cards. **Editor / Notice** lets a textarea, long
@@ -1520,7 +1520,11 @@ loading error where the operation can produce those states
 
 - The global model catalog includes an `自动模型选择` section using existing
   Settings rows/selects. It configures the judge, standard and complex models
-  from configured Pi chat models, then explicitly saves or disables Auto.
+  from configured Pi chat models, then explicitly saves or disables Auto. The three rows
+  form one grouped surface with fixed-width (300px) model selects; the judge-request limits
+  sit in one summary line plus a `SettingsInfo` tip. `保存 Auto 配置` appears only while the
+  draft differs from saved state, beside `关闭 Auto` when Auto is on. The Auto section sits
+  32px below the Provider Catalog so the two tasks do not read as one list.
   Saving does not change the default selection. Unsaved changes participate in
   Settings navigation protection; external revisions require explicit adoption.
   Missing saved choices remain visible as unavailable and never silently change.
@@ -2971,8 +2975,14 @@ application bundles, Helpers, executables and installer filenames use New Money.
 Settings follows one quiet-list language (2026-09-28, selected from the settings prototypes):
 
 - Row anatomy is title (interface size, medium) plus at most one hint line (support size,
-  tertiary), then value/status and actions on the right. Rows never carry a leading icon;
-  `SettingsRow` has no leading slot.
+  tertiary), then value/status and actions on the right. Settings rows never carry a leading
+  icon; `SettingsRow` has no leading slot. The one exception is identity: a Provider or model
+  is recognised faster by its brand mark than by its name (2026-10-06, after the Magpie
+  provider-list reference). `ProviderBrandIcon` maps Provider ID, name, API host or model ID
+  to a vendored `@lobehub/icons-static-svg` mark; colored marks keep their brand fill, single-
+  color marks follow `text-primary` through a mask, and unknown identities use a neutral
+  monogram tile so the column keeps one rhythm. Marks are decorative (`aria-hidden`); the
+  adjacent text always names the entry. They are never used as status or as section icons.
 - `SettingsStatus` (dot + short label; neutral, success, warning, danger) is the only status
   language. Colored text, pills and bare dots are not used for state.
 - Section titles are interface size, medium, secondary; section descriptions are optional and
@@ -2985,8 +2995,10 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
 - `SettingsNotice` is reserved for states that need action; info tone is a neutral muted
   surface, warning and danger use a light tint without a colored edge.
 - Catalog pages (models, extensions, skills, prompts, rules, usage) use the 1040px frame with
-  catalog cards whose rows follow the same anatomy (`SettingsCatalogRow` has no leading slot;
-  status sits in `trailing` as `SettingsStatus`, metadata is plain text, not pills). Extensions
+  catalog cards whose rows follow the same anatomy (`SettingsCatalogRow` accepts a `leading`
+  slot only for a `ProviderBrandIcon`; rows are at least 60px with a body-size title; status
+  sits in `trailing` as `SettingsStatus`, metadata is plain text, not pills). Provider rows
+  show `API host · N 个模型 · provenance`, omitting the host when Pi provides none. Extensions
   keep their detail beside the list; model, skill and rule editors open as a drill-in page.
   Decision (2026-09-28): no side-by-side detail for these three — their catalogs are short
   (a handful of entries) and each detail is a full editor that a narrow pane would cramp.
@@ -3016,7 +3028,8 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
   standard Appearance page as compact rows: action, individual keycaps, reset only when
   customized, detail and contexts in an on-demand info tip.
 - Choices use `SettingsSelect` and `SettingsCheckbox`; native select and checkbox controls
-  are not used. A select's accessible name is its current value followed by its label.
+  are not used. A select trigger is a borderless `surface-muted` fill that lightens on hover;
+  model options may lead with the same inline brand mark, repeated in the closed trigger. A select's accessible name is its current value followed by its label.
   A disabled checkbox recedes: tertiary label, disabled-surface box with the default
   border, and a checked one fills with the strong-border grey instead of the accent.
 - A page-level save unit shows `SettingsSaveBar` only while its draft differs from saved

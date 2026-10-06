@@ -111,21 +111,24 @@ export interface SettingsSelectOption<T extends string> {
   label: string;
   /** Shown for truthfulness (e.g. an unavailable saved value) but not selectable. */
   disabled?: boolean;
+  /** Decorative mark (e.g. a Provider brand) shown in the list and in the closed trigger. */
+  leading?: ReactNode;
 }
 
 /** Non-native single choice; the trigger is a button named by `label`, options have role "option". */
-export function SettingsSelect<T extends string>({ label, value, options, onChange, isDisabled = false, testId }: {
+export function SettingsSelect<T extends string>({ label, value, options, onChange, isDisabled = false, testId, className }: {
   label: string;
   value: T;
   options: readonly SettingsSelectOption<T>[];
   onChange: (value: T) => void;
   isDisabled?: boolean;
   testId?: string;
+  className?: string;
 }) {
   return (
     <Select
       aria-label={label}
-      className={styles.select!}
+      className={`${styles.select} ${className ?? ""}`}
       disabledKeys={options.filter((option) => option.disabled).map((option) => option.id)}
       isDisabled={isDisabled}
       selectedKey={value}
@@ -139,7 +142,7 @@ export function SettingsSelect<T extends string>({ label, value, options, onChan
         <ListBox aria-label={label} className={styles.selectList!}>
           {options.map((option) => (
             <ListBoxItem className={styles.selectOption!} id={option.id} key={option.id} textValue={option.label}>
-              <span>{option.label}</span>
+              <span className={styles.selectOptionLabel}>{option.leading}<span>{option.label}</span></span>
               <Check aria-hidden="true" className={styles.selectCheck} size={14} />
             </ListBoxItem>
           ))}
@@ -195,8 +198,12 @@ export function SettingsCatalog({ children, className, label }: {
   return <div aria-label={label} className={`${styles.catalog} ${className ?? ""}`} role="list">{children}</div>;
 }
 
-/** Catalog entry: same anatomy as SettingsRow (no leading icon); status belongs in `trailing`. */
+/**
+ * Catalog entry: same anatomy as SettingsRow plus an optional identity mark
+ * (a Provider brand); status belongs in `trailing`.
+ */
 export function SettingsCatalogRow({
+  leading,
   title,
   description,
   meta,
@@ -206,6 +213,7 @@ export function SettingsCatalogRow({
   testId,
   onSelect
 }: {
+  leading?: ReactNode;
   title: ReactNode;
   description?: ReactNode;
   meta?: ReactNode;
@@ -220,10 +228,12 @@ export function SettingsCatalogRow({
       <button
         aria-pressed={selected}
         className={styles.catalogRow}
+        data-leading={leading ? true : undefined}
         data-testid={testId}
         onClick={onSelect}
         type="button"
       >
+        {leading ? <span className={styles.catalogLeading}>{leading}</span> : null}
         <span className={styles.catalogIdentity}>
           <strong>{title}</strong>
           {description ? <small>{description}</small> : null}

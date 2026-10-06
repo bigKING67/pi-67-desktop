@@ -1,17 +1,27 @@
-.notes {
+.form {
   display: grid;
-  gap: 6px;
-  padding: 12px 16px;
+  min-width: 0;
+  gap: 12px;
+}
+
+.modelSelect {
+  width: 300px;
+  max-width: 100%;
+}
+
+.note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
   color: var(--text-secondary);
   font-size: var(--font-size-support);
   line-height: 1.5;
 }
 
-.notes p { margin: 0; }
-
 .actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
-  padding: 0 16px 12px;
 }

@@ -52,6 +52,9 @@ Copyright 2022 The Maple Mono Project Authors。许可证为 SIL Open Font Licen
 - react-markdown / remark-gfm：MIT License
 - Shiki：MIT License
 - Lucide：ISC License
+- LobeHub Icons（`@lobehub/icons-static-svg`，仅打包设置页实际导入的 Provider/模型
+  logo SVG）：MIT License。各 logo 是对应厂商的商标，仅用于标识用户已配置的服务，不表示
+  合作或背书
 - Zustand：MIT License
 
 各组件的完整版权和许可证随其 npm package 保留；打包前应从冻结 lockfile 生成 SBOM
