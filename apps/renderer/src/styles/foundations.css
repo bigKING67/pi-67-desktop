@@ -75,6 +75,16 @@ select:focus-visible,
   border: 0;
 }
 
+/* Lazy-surface and transcript loading: one quiet centered status, never raw text in a corner. */
+.transcript-loading {
+  display: grid;
+  min-height: 100%;
+  place-content: center;
+  justify-items: center;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-support);
+}
+
 .loading-line {
   width: 72px;
   height: 2px;

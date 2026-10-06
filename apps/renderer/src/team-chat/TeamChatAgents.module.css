@@ -69,10 +69,21 @@
   line-height: 1.55;
 }
 
+/* One quiet block: identity line, purpose, then the processing boundary as fine print. */
 .intro {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-panel);
+  background: var(--surface-muted);
+}
+
+.introDescription {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-interface);
+  line-height: 1.55;
 }
 
 .introTitle {

@@ -2161,9 +2161,17 @@ loading error where the operation can produce those states
   with an icon+text status (info for in progress, warning for review, success for
   done, tertiary for closed; closed titles are struck through). The title is the
   body-size semibold line, the owner line is a tertiary caption, and goal,
-  acceptance and summary are captioned sections. References are single-line
+  acceptance and summary are two-column fields (64px caption label beside the
+  value). The status uses support size. References are single-line
   links opened through the desktop bridge. Actions are compact buttons; the
   primary action is `接手` or `在工作中开始`.
+- The Team Chat composer shares the Work Composer shape: `--radius-composer` field
+  and a 32px round send button whose disabled state is a `surface-active` circle.
+- An Agent DM opens with one `surface-muted` intro block (panel radius): the Agent
+  badge with owner and presence, the description at interface size in primary text,
+  then the processing disclosure as caption fine print. The disclosure stays visible.
+- Lazy-surface and transcript loading fallbacks are one centered tertiary status with
+  the loading line, never unstyled text in a corner.
 - Agents (P3a): Agent rows use a 20px accent-soft tile with a bot glyph and an
   8px presence dot (success fill online, disabled fill otherwise) that the row's
   accessible name repeats as text; your own Agents show a tertiary `我的`. Agent
@@ -2184,8 +2192,9 @@ loading error where the operation can produce those states
   same outlined badge as Agents, reading `Bot`. The channel dialog scrolls within
   the viewport.
 - Mentions (P2.5): `@name` runs use the accent-soft fill with accent-strong
-  semibold text; the reader's own mention uses the solid accent fill, and a message
-  that mentions the reader gets a 2px accent rail in its left gutter. Unread
+  semibold text; the reader's own mention uses an 18% accent fill with primary text
+  (2026-10-06: the inverted solid chip was the loudest element on screen), and a
+  message that mentions the reader gets a 2px rail at 45% accent in its left gutter. Unread
   mentions show an `@N` count in the accent outline (accent border, accent-soft
   fill) beside the solid unread count, never the warning role. The mention list
   floats above the composer on the raised surface with the floating shadow, at most

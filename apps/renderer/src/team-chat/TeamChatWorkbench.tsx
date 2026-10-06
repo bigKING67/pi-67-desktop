@@ -218,7 +218,7 @@ function AgentIntro({ conversation, directory }: { conversation: TeamChatConvers
         <TeamChatAgentBadge />
         <span className={agentStyles.rowMeta}>{`${copy.agentOwnedBy(owner)} · ${agentPresenceLabel(agent)}`}</span>
       </div>
-      {agent.description ? <p className={agentStyles.disclosure}>{agent.description}</p> : null}
+      {agent.description ? <p className={agentStyles.introDescription}>{agent.description}</p> : null}
       <p className={agentStyles.disclosure}>{copy.agentDisclosure(owner, agent.modelLabel)}</p>
       {!agent.online && agent.status === "active" ? <p className={agentStyles.disclosure}>{copy.agentOfflineHint}</p> : null}
     </div>

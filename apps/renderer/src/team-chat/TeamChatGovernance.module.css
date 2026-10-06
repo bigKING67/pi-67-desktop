@@ -57,16 +57,17 @@
   font-weight: var(--font-weight-semibold);
 }
 
+/* Mentioning the reader is emphasized by weight and a stronger soft fill, never an inverted chip. */
 .mentionSelf {
-  background: var(--accent);
-  color: var(--canvas);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--text-primary);
 }
 
 /* A message that mentions the reader keeps a quiet rail so it is findable when scrolling. */
 .messageMentionsSelf {
   margin-left: -10px;
   padding-left: 8px;
-  border-left: 2px solid var(--accent);
+  border-left: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 /* A message opened from activity or a notification, briefly. */

@@ -487,9 +487,9 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: end;
   gap: var(--space-2);
-  padding: 8px;
+  padding: 8px 8px 8px 12px;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-panel);
+  border-radius: var(--radius-composer);
   background: var(--surface-raised);
   box-shadow: var(--shadow-composer);
 }
@@ -522,16 +522,17 @@
   place-items: center;
   padding: 0;
   border: 1px solid var(--accent-strong);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--canvas);
 }
 
 .sendButton[data-hovered] { background: var(--accent-strong); }
 
+/* Matches the Work Composer: a visible neutral circle, since surface-disabled can equal the field. */
 .sendButton[data-disabled] {
-  border-color: var(--border);
-  background: var(--surface-disabled);
+  border-color: transparent;
+  background: var(--surface-active);
   color: var(--text-disabled);
 }
 
@@ -710,10 +711,10 @@
 /* Work Cards (ADR 0003 P2): status uses icon + text, never color alone. */
 .workCard {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   max-width: 560px;
   margin-top: 2px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
   background: var(--surface);
@@ -735,9 +736,9 @@
 .workCardStatus {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   color: var(--text-secondary);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-support);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -763,9 +764,12 @@
   font-size: var(--font-size-caption);
 }
 
+/* Label and value side by side so the card scans as fields, not stacked captions. */
 .workCardSection {
   display: grid;
-  gap: 2px;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
 }
 
 .workCardSection strong {
