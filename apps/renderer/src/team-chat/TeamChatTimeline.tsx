@@ -93,7 +93,8 @@ export function TeamChatTimeline({ conversation, directory, entries, target, hea
         ? { index: focusIndex, align: "center" }
         : { index: "LAST", align: "end" }}
       itemContent={(_, entry) => (
-        <div className={styles.timelineColumn}>
+        // The newest row keeps its end, often a bordered file card, off the composer's edge.
+        <div className={`${styles.timelineColumn} ${entry === entries.at(-1) ? styles.timelineLast : ""}`}>
           <TimelineMessage conversation={conversation} directory={directory} entry={entry} focused={entry.seq !== undefined && entry.seq === highlighted} target={target} />
         </div>
       )}
@@ -116,8 +117,6 @@ const TimelineScroller = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElemen
 /** Stable component identities so Virtuoso never remounts the header or scroller. */
 const TIMELINE_COMPONENTS = {
   Header: ({ context }: { context: TimelineContext }) => <div className={styles.timelineColumn}>{context.header}</div>,
-  // Keeps the newest message, often a bordered file card, off the composer's edge.
-  Footer: () => <div aria-hidden="true" className={styles.timelineEnd} />,
   Scroller: TimelineScroller
 };
 

@@ -318,7 +318,7 @@
   padding: 0 var(--space-5);
 }
 
-.timelineEnd { height: var(--space-3); }
+.timelineLast { padding-bottom: var(--space-3); }
 
 .conversationIntro {
   display: flex;
