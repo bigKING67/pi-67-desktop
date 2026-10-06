@@ -122,7 +122,6 @@
   border: 2px solid var(--canvas);
   border-radius: 50%;
   background: var(--border-strong);
-  box-shadow: 0 0 0 1px var(--border);
   content: "";
 }
 
@@ -132,13 +131,13 @@
   bottom: -15px;
   left: -18px;
   width: 1px;
-  background: color-mix(in srgb, var(--border) 82%, transparent);
+  background: color-mix(in srgb, var(--border) 60%, transparent);
   content: "";
 }
 
 .step[data-process-step="tool"]::before,
 .step[data-process-step="orphan-tool-result"]::before {
-  background: color-mix(in srgb, var(--accent) 72%, var(--border));
+  background: color-mix(in srgb, var(--accent) 40%, var(--border));
 }
 
 .step[data-process-step="status"]::before {
@@ -156,11 +155,8 @@
   display: block;
   margin-bottom: 3px;
   color: var(--text-tertiary);
-  font-family: var(--font-code);
   font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-weight: var(--font-weight-medium);
 }
 
 .reasoning > div,

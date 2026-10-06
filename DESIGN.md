@@ -441,7 +441,7 @@ loading error where the operation can produce those states
   summarizes by outcome and then appends `N 次工具调用 · duration`; a process without
   Tools falls back to `N 个步骤 · duration`. Within it, reasoning uses the
   low-emphasis `分析` label, narration uses
-  the parallel `进度` label, and each Tool Call is paired with its correlated Tool
+  the parallel `进度` label (both caption-size UI text, never a monospace uppercase eyebrow), and each Tool Call is paired with its correlated Tool
   Result as one compact logical step; the call and result are never rendered as
   duplicate peer cards. An unmatched legacy Tool Result remains one explicitly inspectable
   compatibility step. This includes visible reasoning carried beside final text in
@@ -501,7 +501,11 @@ loading error where the operation can produce those states
   structured arguments from an unknown Tool collapse to `已提交参数` instead of raw
   JSON, while the unknown Tool name remains visible as its only reliable identity.
   Tool titles use the 13px interface role; semantic summaries and process
-  metadata use the 11px caption role. Desktop widths keep one truncated row; narrow widths use one deliberate
+  metadata use the 11px caption role. A Tool step is a full-width borderless row
+  (control radius) whose icon aligns with narration text; only hover, failure
+  (8% danger fill) or warning (8% warning fill) gives it a surface. `已完成` stays
+  tertiary text with only its check in the success role, so failures stand out.
+  Expanded detail is one borderless `surface-muted` block aligned with the step title. Desktop widths keep one truncated row; narrow widths use one deliberate
   second metadata row rather than arbitrary wrapping or document overflow.
   Failed or integrity-uncertain rows open by default and show the projected real
   error or a specific missing-result explanation; successful rows remain compact.
