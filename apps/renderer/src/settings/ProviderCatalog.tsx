@@ -47,7 +47,6 @@ export function ProviderCatalog({
 
   return (
     <section className={styles.providerCatalog} aria-label="Pi Provider 导航">
-      <p className={styles.catalogIntro}>Desktop 与 Pi TUI 双向共用当前用户的 Pi Profile，保存的 models.json 定义会同步给 Pi TUI。</p>
       <div className={styles.catalogCommandBand}>
         <nav aria-label="模型服务分类" className={styles.catalogTabs} role="tablist">
           {PROVIDER_CATALOG_VIEWS.map((item) => (
@@ -92,6 +91,7 @@ export function ProviderCatalog({
           ) : null}
         </div>
       </div>
+      <p className={styles.catalogIntro}>Desktop 与 Pi TUI 双向共用当前用户的 Pi Profile，保存的 models.json 定义会同步给 Pi TUI。</p>
       <div className={styles.providerList} data-testid="provider-configuration-list">
         {filteredProviders.length > 0 ? (
           <SettingsCatalog label={`${providerCatalogViewLabel(view)}模型服务列表`}>

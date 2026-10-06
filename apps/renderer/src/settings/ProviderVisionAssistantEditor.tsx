@@ -4,7 +4,7 @@ import type {
   PiProviderConfigurationSnapshot
 } from "@pi67/protocol";
 import { Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Button } from "react-aria-components";
 import {
   setGlobalVisionAssistantConfiguration,
@@ -69,9 +69,12 @@ export function ProviderVisionAssistantEditor({
   snapshot,
   scope,
   workspaceId,
-  onUsePreset
+  onUsePreset,
+  status
 }: {
   snapshot: PiProviderConfigurationSnapshot;
+  /** Sync status and reload, placed in the first section header rather than a row of its own. */
+  status?: ReactNode;
   scope: "global" | "project";
   workspaceId?: string;
   onUsePreset?: (preset: PiProviderConfigurationInput) => void;
@@ -152,6 +155,7 @@ export function ProviderVisionAssistantEditor({
   return (
     <div className={styles.editor} data-testid={`vision-assistant-${scope}`}>
       <SettingsSectionBlock
+        actions={status}
         title={global ? "全局设置" : "项目覆盖"}
         description={global
           ? "文本模型遇到图片时，先由选定的视觉模型生成描述；原生视觉模型仍直接处理图片。"

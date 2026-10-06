@@ -4,7 +4,6 @@ import { DEFAULT_MOCK_WORKSPACE } from "./pi67-renderer-desktop-bridge.js";
 import { attachMockAgent, installMockDesktopBridge } from "./pi67-renderer-fixture.js";
 
 const categories = ["外观与通知", "账户与数据", "模型", "上下文与记忆", "视觉辅助", "扩展", "技能", "提示词模板", "工作规则", "飞书", "浏览器集成", "运行服务", "用量分析", "下载源与网络", "更新与诊断", "关于"];
-const wide = new Set(["模型", "扩展", "技能", "提示词模板", "工作规则", "用量分析"]);
 
 for (const theme of ["light", "dark"] as const) {
   for (const width of [1440, 1040, 1000, 840, 720]) {
@@ -37,7 +36,7 @@ for (const theme of ["light", "dark"] as const) {
         await expect(settings.getByRole("heading", { name: category, exact: true, level: 1 })).toBeVisible();
         await expect(settings.getByRole("heading", { level: 1 })).toHaveCount(1);
         const metrics = await settings.evaluate((element) => {
-          const layout = element.querySelector<HTMLElement>("[data-content-width]")!;
+          const layout = element.querySelector<HTMLElement>('[data-testid="settings-page-layout"]')!;
           const frame = layout.parentElement!;
           const region = element.querySelector<HTMLElement>('[data-testid="settings-scroll-region"]')!;
           const heading = layout.querySelector("h1")!.getBoundingClientRect();
@@ -47,7 +46,7 @@ for (const theme of ["light", "dark"] as const) {
             left: box.left, headingLeft: heading.left,
             scrollWidth: region.scrollWidth, clientWidth: region.clientWidth };
         });
-        expect(metrics.width).toBeCloseTo(wide.has(category) ? metrics.frame : Math.min(760, metrics.frame), 0);
+        expect(metrics.width).toBeCloseTo(metrics.frame, 0);
         expect(Math.abs(metrics.center - metrics.frameCenter)).toBeLessThanOrEqual(1);
         expect(Math.abs(metrics.headingLeft - metrics.left)).toBeLessThanOrEqual(1);
         expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);

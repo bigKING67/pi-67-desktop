@@ -76,18 +76,19 @@ export function VisionAssistantSettings() {
 
   return (
     <div className={styles.settings} data-testid="vision-assistant-settings">
-      <ProviderConfigurationStatusBar
-        snapshot={snapshot}
-        busy={phase === "saving"}
-        onReload={() => {
-          if (scope === "global") {
-            void reloadProviderConfiguration();
-          } else if (workspaceId) {
-            void reloadProjectProviderConfiguration(workspaceId);
-          }
-        }}
-      />
       <ProviderVisionAssistantEditor
+        status={<ProviderConfigurationStatusBar
+          inline
+          snapshot={snapshot}
+          busy={phase === "saving"}
+          onReload={() => {
+            if (scope === "global") {
+              void reloadProviderConfiguration();
+            } else if (workspaceId) {
+              void reloadProjectProviderConfiguration(workspaceId);
+            }
+          }}
+        />}
         snapshot={snapshot}
         scope={scope}
         {...(workspaceId === undefined ? {} : { workspaceId })}

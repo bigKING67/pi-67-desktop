@@ -85,9 +85,9 @@ or implicit Workspace save is introduced.
   removed Settings brand/description hero must not reappear as dark-theme-only
   chrome. At narrow widths the grouped Popover uses the same raised neutral surface,
   retains all five group labels, and remains bounded inside the viewport.
-- The right column uses the same centered `min(1120px, 100%)` document
-  frame as light mode with a left-aligned 880px standard inner page or full-width
-  catalog/editor/usage page, and a single vertical scroll owner. Navigation hover
+- The right column uses the same centered `min(1040px, 100%)` document
+  frame as light mode, full width for every category, and a single vertical
+  scroll owner. Navigation hover
   is lighter than persistent selection; all page Tabs share neutral fill and
   underline. Grouped Settings use
   one quiet surface and row dividers;

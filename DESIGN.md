@@ -940,11 +940,14 @@ loading error where the operation can produce those states
 - Existing scope policy remains authoritative: only categories with meaningful
   global/project configuration expose the generic scope switch; Skills and Rules
   retain their own explicit availability tabs. No decorative scope controls.
-- Every category shares a centered `min(1040px, 100%)` outer frame.
-  Account, Appearance, Memory, Lark, Vision, Browser, Runtime, Network, Updates and
-  About use a centered `min(760px, 100%)` column; Model, Extension, Skill,
-  Prompt, Rule and Usage workspaces use the full frame. Headers, page actions and
-  content follow their page's measure, so actions never jump within a page type.
+- Every category shares a centered `min(1040px, 100%)` frame and uses its full
+  width (2026-10-06: the former 760px standard column moved the heading and left
+  edge whenever navigation crossed between a standard page and a catalog). Page
+  headings, page actions, section titles and surfaces therefore keep one left edge
+  and one right edge across all 16 categories. Section headers top-align their
+  actions, and a page's first block starts directly under the page header: status
+  bars sit in a section or command-band header and catalog intros follow the
+  command band rather than occupying a row above it.
   The content region is the only document vertical scroll owner, with `32px` top,
   `clamp(24px, 3vw, 32px)` inline and `48px` bottom padding. Existing narrow
   padding and the `720px` category-menu breakpoint remain in place.
@@ -3002,7 +3005,7 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
   far right. Dirty or erroneous details still cannot collapse.
 - `SettingsNotice` is reserved for states that need action; info tone is a neutral muted
   surface, warning and danger use a light tint without a colored edge.
-- Catalog pages (models, extensions, skills, prompts, rules, usage) use the 1040px frame with
+- Catalog pages (models, extensions, skills, prompts, rules, usage) use the same 1040px frame as every other category, with
   catalog cards whose rows follow the same anatomy (`SettingsCatalogRow` accepts a `leading`
   slot only for a `ProviderBrandIcon`; rows are at least 60px with a body-size title; status
   sits in `trailing` as `SettingsStatus`, metadata is plain text, not pills). Provider rows
@@ -3049,7 +3052,7 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
   as the local memory model keep their own save and undo actions, shown only while dirty.
 
 
-Settings uses General, Models and Memory, Capabilities and Instructions, Integrations, and System/Support groups while preserving all 16 section identities. Standard documents are a centered 760px column and catalogs a centered 1040px body (see Settings visual system). Page H1, section H2 and necessary inner H3 headings use existing typography roles. Account service editing belongs to advanced connection details; private/team boundaries stay visible. Renderer-only team links select the enterprise memory tab through the existing draft guard and consume their transient target. Dirty or erroneous details cannot collapse. Independent save units and existing save/restart semantics remain distinct; Settings navigation cannot interrupt a pending mutation; a blocked request shows a notice instead of doing nothing. Command palette, slash-command and native-notification exits pass the same draft guard before their flow starts, so keeping the draft leaves no partial session switch. Ordinary navigation starts at the page heading; cancelled navigation restores its trigger.
+Settings uses General, Models and Memory, Capabilities and Instructions, Integrations, and System/Support groups while preserving all 16 section identities. Every category uses the same full-width 1040px body (see Settings visual system). Page H1, section H2 and necessary inner H3 headings use existing typography roles. Account service editing belongs to advanced connection details; private/team boundaries stay visible. Renderer-only team links select the enterprise memory tab through the existing draft guard and consume their transient target. Dirty or erroneous details cannot collapse. Independent save units and existing save/restart semantics remain distinct; Settings navigation cannot interrupt a pending mutation; a blocked request shows a notice instead of doing nothing. Command palette, slash-command and native-notification exits pass the same draft guard before their flow starts, so keeping the draft leaves no partial session switch. Ordinary navigation starts at the page heading; cancelled navigation restores its trigger.
 
 Runtime keeps current occupancy and recovery actions visible, with invariant writer/session mechanics in disclosure. Network prioritizes editable download policies and reachability; bundled toolchain versions are secondary and expand when unavailable. About keeps product/version/platform visible and discloses internal technology. Browser integration distinguishes dependencies, extension and verified connection; bundled-source provenance is secondary. Session resource paths are available on demand; existing resource catalogs and rule editors retain their list/detail and scope contracts. Usage labels explicitly distinguish recorded tokens from provider billing. Usage metric tiles lead with one display-size tabular value under a secondary support-size label, and Provider/model usage rows lead with the inline brand mark. Vision saves block Settings navigation until completion.
 

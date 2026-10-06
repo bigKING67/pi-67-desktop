@@ -60,7 +60,8 @@
   flex-wrap: wrap;
   display: flex;
   min-width: 0;
-  align-items: flex-end;
+  /* Top-aligned so a taller action never pushes the title down; every section title starts at the same offset. */
+  align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
 }

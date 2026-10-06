@@ -57,8 +57,7 @@ import {
   SETTINGS_GROUPS,
   SETTINGS_SECTIONS,
   filterSettingsGroups,
-  sectionSupportsProjectScope,
-  settingsContentWidth
+  sectionSupportsProjectScope
 } from "./settings-navigation.js";
 
 export function SettingsWorkbench() {
@@ -171,7 +170,7 @@ export function SettingsWorkbench() {
           ref={scrollRegionRef}
         >
           <div className={styles.documentBody}>
-            <div className={styles.pageLayout} data-content-width={settingsContentWidth(activeSection)}>
+            <div className={styles.pageLayout} data-testid="settings-page-layout">
             {activeSection !== "context-memory" && activeSection !== "network" ? <SettingsPageHeader
               title={currentSection.label}
               description={currentSection.summary}

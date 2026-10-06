@@ -247,8 +247,3 @@ export function filterSettingsGroups(query: string): typeof SETTINGS_GROUPS {
   })).filter((group) => group.items.length > 0);
 }
 
-
-export function settingsContentWidth(section: SettingsSection): "standard" | "wide" {
-  return ["providers", "packages", "extensions", "skills", "prompts", "rules", "usage"].includes(section)
-    ? "wide" : "standard";
-}
