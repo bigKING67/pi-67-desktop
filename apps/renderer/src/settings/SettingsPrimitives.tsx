@@ -8,6 +8,7 @@ import {
   Popover,
   Select,
   SelectValue,
+  Switch,
   Tooltip,
   TooltipTrigger
 } from "react-aria-components";
@@ -29,10 +30,12 @@ export function SettingsPageHeader({ title, description, actions }: {
   );
 }
 
-export function SettingsSectionBlock({ title, description, actions, children, className }: {
+export function SettingsSectionBlock({ title, description, info, actions, children, className }: {
   title: string;
-  /** Only when it changes a decision; boundary explanations belong in `SettingsInfo`. */
+  /** Only when it changes a decision; boundary explanations belong in `info`. */
   description?: string;
+  /** How-to or boundary explanation revealed from an ⓘ beside the title. */
+  info?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
@@ -40,7 +43,10 @@ export function SettingsSectionBlock({ title, description, actions, children, cl
   return (
     <section className={`${styles.section} ${className ?? ""}`}>
       <header className={styles.sectionHeader}>
-        <span><h2>{title}</h2>{description ? <p>{description}</p> : null}</span>
+        <span>
+          <h2>{title}{info ? <SettingsInfo label={`${title}说明`}>{info}</SettingsInfo> : null}</h2>
+          {description ? <p>{description}</p> : null}
+        </span>
         {actions ? <div className={styles.sectionActions}>{actions}</div> : null}
       </header>
       {children}
@@ -163,6 +169,23 @@ export function SettingsCheckbox({ children, isSelected, onChange, isDisabled = 
       <span aria-hidden="true" className={styles.checkboxBox}><Check size={11} strokeWidth={3} /></span>
       {children}
     </Checkbox>
+  );
+}
+
+/**
+ * Binary row setting that applies immediately. The row title is the visible label,
+ * so the switch carries only an accessible name.
+ */
+export function SettingsSwitch({ label, isSelected, onChange, isDisabled = false }: {
+  label: string;
+  isSelected: boolean;
+  onChange: (selected: boolean) => void;
+  isDisabled?: boolean;
+}) {
+  return (
+    <Switch aria-label={label} className={styles.switch!} isDisabled={isDisabled} isSelected={isSelected} onChange={onChange}>
+      <span aria-hidden="true" className={styles.switchTrack}><span className={styles.switchThumb} /></span>
+    </Switch>
   );
 }
 

@@ -72,6 +72,9 @@
 }
 
 .sectionHeader h2 {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   color: var(--text-primary);
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-medium);
@@ -679,6 +682,45 @@
   background: var(--border-strong);
   color: var(--surface-disabled);
 }
+.switch {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+.switchTrack {
+  display: inline-flex;
+  width: 34px;
+  height: 20px;
+  align-items: center;
+  padding: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
+}
+
+.switchThumb {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: var(--canvas);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.24);
+  transition: transform var(--motion-fast) var(--motion-ease-out);
+}
+
+.switch[data-selected] .switchTrack { background: var(--accent); }
+.switch[data-selected] .switchThumb { transform: translateX(14px); }
+.switch[data-hovered]:not([data-disabled]) .switchTrack { filter: brightness(1.08); }
+.switch[data-focus-visible] .switchTrack { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* Disabled switches recede without blanket opacity; a selected one keeps its position as the cue. */
+.switch[data-disabled] .switchTrack { background: var(--surface-active); }
+.switch[data-disabled] .switchThumb { background: var(--text-disabled); box-shadow: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .switchTrack,
+  .switchThumb { transition: none; }
+}
+
 .checkbox[data-focus-visible] .checkboxBox { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 .saveBar {

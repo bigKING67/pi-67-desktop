@@ -377,7 +377,8 @@ export const zhCNTeamChatMessages = {
   muteFailed: "无法更改静音设置。",
   notificationSettings: {
     title: "团队聊天通知",
-    description: "只在这台电脑生效。要静音某个对话，在聊天里打开它，点开头介绍栏的「静音通知」；静音的对话不发通知，但仍计未读。",
+    description: "只在这台电脑生效。",
+    muteHint: "要静音某个对话，在聊天里打开它，点开头介绍栏的「静音通知」；静音的对话不发通知，但仍计未读。",
     system: "系统通知",
     systemDescription: "你不在那个对话时，告诉你谁在哪里找你。",
     enabled: "启用系统通知",

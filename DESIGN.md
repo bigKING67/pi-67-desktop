@@ -2991,7 +2991,8 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
 - Section titles are body size, medium, primary (2026-10-06: secondary interface-size titles
   were too weak to anchor a group); sections are 32px apart; section descriptions are optional and
   appear only when they change a decision. Boundary, privacy and implementation explanations
-  go into `SettingsInfo` (an ⓘ tooltip) or are removed. Single-section pages do not repeat the
+  go into `SettingsInfo` (an ⓘ tooltip) or are removed; `SettingsSectionBlock` places such
+  a tip beside its title through `info`. Single-section pages do not repeat the
   page title as a section title.
 - Tabs mark the selection with an underline only; a page has at most one tab level.
 - `SettingsDetails` is the only disclosure: a rule above, title and summary, chevron at the
@@ -3029,13 +3030,17 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
 - Secondary refresh/reload actions are `SettingsIconAction` (icon with tooltip, accessible
   name = label). Counts use the UI font with tabular numbers; the code font is reserved for
   paths, identifiers and editors. Keyboard shortcuts live on the
-  standard Appearance page as compact rows: action, individual keycaps, reset only when
+  standard Appearance page as compact rows: action, individual flat `surface-active` keycaps, reset only when
   customized, detail and contexts in an on-demand info tip.
 - Choices use `SettingsSelect` and `SettingsCheckbox`; native select and checkbox controls
   are not used. A select trigger is a borderless `surface-muted` fill that lightens on hover;
   model options may lead with the same inline brand mark, repeated in the closed trigger. A select's accessible name is its current value followed by its label.
   A disabled checkbox recedes: tertiary label, disabled-surface box with the default
   border, and a checked one fills with the strong-border grey instead of the accent.
+  A binary row setting that applies immediately (e.g. `启用系统通知`, `显示消息预览`) uses
+  `SettingsSwitch` instead: the row title is the visible label, the switch carries the
+  accessible name, `accent` fills the selected track, and a disabled switch recedes to
+  `surface-active` without blanket opacity. Checkboxes remain for multi-select groups.
 - A page-level save unit shows `SettingsSaveBar` only while its draft differs from saved
   state (放弃 / 保存更改, sticky at the bottom of the scroll region). Independent units such
   as the local memory model keep their own save and undo actions, shown only while dirty.

@@ -412,14 +412,14 @@ test("turns Team Chat notifications and previews on and off in General settings"
   await page.evaluate(() => { localStorage.removeItem("pi67.team-chat-notifications.v1"); });
   await page.getByTestId("settings-entry").click();
   const section = page.locator("section").filter({ hasText: "团队聊天通知" });
-  await expect(section.getByRole("checkbox", { name: "启用系统通知" })).toBeChecked();
-  await expect(section.getByRole("checkbox", { name: "显示消息预览" })).not.toBeChecked();
+  await expect(section.getByRole("switch", { name: "启用系统通知" })).toBeChecked();
+  await expect(section.getByRole("switch", { name: "显示消息预览" })).not.toBeChecked();
   await section.getByText("私信", { exact: true }).click();
-  await section.getByText("显示消息预览", { exact: true }).click();
+  await section.locator("label").filter({ has: page.getByRole("switch", { name: "显示消息预览" }) }).click();
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("pi67.team-chat-notifications.v1") ?? "{}") as unknown);
   expect(stored).toMatchObject({ enabled: true, preview: true, topics: { dm: false, mention: true } });
-  await section.getByText("启用系统通知", { exact: true }).click();
-  await expect(section.getByRole("checkbox", { name: "显示消息预览" })).toBeDisabled();
+  await section.locator("label").filter({ has: page.getByRole("switch", { name: "启用系统通知" }) }).click();
+  await expect(section.getByRole("switch", { name: "显示消息预览" })).toBeDisabled();
   // The app root never scrolls sideways, even when asked to.
   expect(await page.evaluate(() => {
     const root = document.getElementById("root")!;

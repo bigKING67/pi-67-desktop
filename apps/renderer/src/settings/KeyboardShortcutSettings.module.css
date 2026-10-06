@@ -14,7 +14,7 @@
 .combos, .combo { display: inline-flex; align-items: center; gap: 4px; }
 .combos { gap: 8px; }
 .or { color: var(--text-tertiary); font-size: var(--font-size-caption); }
-.combo kbd { display: inline-grid; min-width: 22px; height: 22px; place-items: center; padding: 0 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; background: var(--surface-muted); color: var(--text-primary); font-family: var(--font-ui); font-size: var(--font-size-support); }
+.combo kbd { display: inline-grid; min-width: 22px; height: 22px; place-items: center; padding: 0 5px; border: 0; border-radius: 6px; background: var(--surface-active); color: var(--text-primary); font-family: var(--font-ui); font-size: var(--font-size-support); }
 .reset, .resetAll { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 30px; padding: 0 8px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-secondary); font-size: var(--font-size-support); }
 .reset { width: 30px; padding: 0; }
 .reset[data-hovered], .resetAll[data-hovered] { background: var(--surface-hover); color: var(--text-primary); }

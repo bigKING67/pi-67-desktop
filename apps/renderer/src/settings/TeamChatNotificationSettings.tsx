@@ -4,7 +4,7 @@ import {
   updateTeamChatNotificationPreferences,
   useTeamChatNotificationPreferences
 } from "../team-chat/team-chat-notification-preferences.js";
-import { SettingsCheckbox, SettingsRow, SettingsRows, SettingsSectionBlock } from "./SettingsPrimitives.js";
+import { SettingsCheckbox, SettingsRow, SettingsRows, SettingsSectionBlock, SettingsSwitch } from "./SettingsPrimitives.js";
 import styles from "./SettingsWorkbench.module.css";
 
 /** Team Chat system notifications on this device (ADR 0006); muting a conversation lives in Chat. */
@@ -12,11 +12,11 @@ export function TeamChatNotificationSettings() {
   const copy = messages.teamChat.notificationSettings;
   const preferences = useTeamChatNotificationPreferences();
   return (
-    <SettingsSectionBlock description={copy.description} title={copy.title}>
+    <SettingsSectionBlock description={copy.description} info={copy.muteHint} title={copy.title}>
       <SettingsRows>
         <SettingsRow
-          actions={<SettingsCheckbox isSelected={preferences.enabled}
-            onChange={(enabled) => updateTeamChatNotificationPreferences({ enabled })}>{copy.enabled}</SettingsCheckbox>}
+          actions={<SettingsSwitch isSelected={preferences.enabled} label={copy.enabled}
+            onChange={(enabled) => updateTeamChatNotificationPreferences({ enabled })} />}
           description={copy.systemDescription}
           title={copy.system}
         />
@@ -31,8 +31,8 @@ export function TeamChatNotificationSettings() {
           </span>
         </SettingsRow>
         <SettingsRow
-          actions={<SettingsCheckbox isDisabled={!preferences.enabled} isSelected={preferences.preview}
-            onChange={(preview) => updateTeamChatNotificationPreferences({ preview })}>{copy.preview}</SettingsCheckbox>}
+          actions={<SettingsSwitch isDisabled={!preferences.enabled} isSelected={preferences.preview} label={copy.preview}
+            onChange={(preview) => updateTeamChatNotificationPreferences({ preview })} />}
           description={copy.previewDescription}
           title={copy.previewTitle}
         />
