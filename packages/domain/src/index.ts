@@ -33,6 +33,7 @@ export * from "./team-chat-governance.js";
 export * from "./team-chat-agents.js";
 export * from "./team-chat-activity.js";
 export * from "./team-chat-search.js";
+export * from "./team-chat-attachments.js";
 export * from "./tool-execution.js";
 export * from "./workspace-change.js";
 export * from "./workbench.js";

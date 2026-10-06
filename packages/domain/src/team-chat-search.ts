@@ -4,7 +4,7 @@ export const TEAM_CHAT_SEARCH_PAGE = 50;
 export const TEAM_CHAT_SEARCH_CURSOR_PATTERN = "^[0-9]{1,20}_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$";
 
 /** Where a hit matched: a plain message, or a Work Card section. */
-export type TeamChatSearchField = "message" | "title" | "goal" | "acceptance" | "summary";
+export type TeamChatSearchField = "message" | "title" | "goal" | "acceptance" | "summary" | "attachment";
 
 export interface TeamChatSearchHit {
   messageId: string;

@@ -1,3 +1,4 @@
+import type { TeamChatAttachment } from "./team-chat-attachments.js";
 import type { EnterpriseTeamSummary } from "./context-memory.js";
 import type { TeamChatAgent, TeamChatAgentInvocationSummary, TeamChatBot } from "./team-chat-agents.js";
 import type { TeamChatPolicy } from "./team-chat-governance.js";
@@ -91,6 +92,8 @@ export interface TeamChatMessage {
   /** Recalled by its sender or removed by a channel manager; `body` is then empty. */
   recalledAt?: number;
   recalledBy?: string;
+  /** Files and images (ADR 0009); with any, `body` may be empty. */
+  attachments?: TeamChatAttachment[];
 }
 
 export interface TeamChatMessagePage {

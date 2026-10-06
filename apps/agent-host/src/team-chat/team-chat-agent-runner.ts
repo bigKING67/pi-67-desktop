@@ -141,6 +141,7 @@ export class TeamChatAgentRunner {
         messages: claim.messages.map((message) => ({
           senderName: name(message.senderUserId),
           body: message.body,
+          ...(message.attachments === undefined ? {} : { attachmentNames: message.attachments.map((file) => file.fileName) }),
           createdAt: message.createdAt,
           fromAgent: message.senderUserId === agentUserId
         }))

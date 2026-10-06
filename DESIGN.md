@@ -2201,6 +2201,21 @@ loading error where the operation can produce those states
   button becomes a check labelled `保存修改`. `（已编辑）` follows the text as a
   tertiary caption; a recalled message is a single tertiary support line
   (`你撤回了一条消息`, `X 撤回了一条消息`, `这条消息已被管理员移除`) with no actions.
+- Attachments (ADR 0009): a 32px paperclip ghost button starts the composer field
+  (secondary glyph, hover surface, disabled while editing or read-only). Files wait
+  in a tray spanning the field above the text: 240px items on the default surface
+  with a 1px border, a 32px rounded thumbnail or file glyph, the name in medium
+  support text, a tertiary caption (`上传中 N%`, size, or the danger-role error with
+  a danger border), a 2px accent progress line, and 28px retry/remove icon buttons.
+  Dragging files over the composer gives the field a dashed accent border and a
+  `松开以添加附件` overlay. Sent images sit under the text in a wrapping row, each
+  scaled to fit 320×240 from its stored size (no shift when bytes arrive) with a
+  control-radius border on the muted surface; loading shows the hover surface,
+  failure an image-off glyph with `重试`. Other files are 360px cards (file-type
+  glyph, name, tertiary size, a small bordered `保存` button with a download glyph).
+  The viewer is a 1100×860 maximum overlay: a header with name, size, `保存` and a
+  close button over the image contained on the muted surface.
+  The timeline ends 12px above the composer so a final bordered card never meets it.
 - Mute: a small `静音通知`/`取消静音` button with a bell-off/bell glyph ends the
   conversation intro (before `频道设置` in channels). Muted rows add an 11px
   tertiary bell-off mark after the name, and their unread count switches from the

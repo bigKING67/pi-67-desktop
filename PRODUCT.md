@@ -245,7 +245,15 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   ↑ edits your newest message) and shows `（已编辑）`; earlier text is not kept. Recall
   and removal need a second press, erase the text and leave a placeholder; mentions
   added by an edit notify. Work Cards change through their card.
-- Not yet: threads, reactions, attachments,
+- Attachments and images (contract `docs/adr/0009-team-chat-attachments.md`): add
+  files with the paperclip, paste or drop into the composer; images, PDFs, office
+  files, text/data files and archives up to 25 MB, at most 10 per message;
+  executables and scripts are refused with a reason. The tray shows upload progress
+  with retry and remove, and a message may be files alone. Images show inline and
+  open in a viewer; other files show as cards with `保存`, which asks where to save.
+  Each team has 10 GB; owners and admins see usage in the web console. Recall
+  deletes a message's files. Agents see file names only.
+- Not yet: threads, reactions,
   team invitations (use the New Money web console).
 
 ## Success criteria

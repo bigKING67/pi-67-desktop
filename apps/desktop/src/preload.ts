@@ -32,6 +32,7 @@ import type {
   RepositoryWorkingTreeSnapshot,
   SecureStorageAccess,
   SupportDiagnosticsExportRequest,
+  TeamChatAttachmentSaveRequest,
   SupportDiagnosticsUploadReceipt,
   StagedPromptAttachmentResult,
   WorktreeCreationRequest,
@@ -254,6 +255,9 @@ const systemBridge = {
   },
   saveDiagnostics: (request: SupportDiagnosticsExportRequest): Promise<string | undefined> => (
     ipcRenderer.invoke("pi67:save-diagnostics", request)
+  ),
+  saveTeamChatAttachment: (request: TeamChatAttachmentSaveRequest): Promise<boolean> => (
+    ipcRenderer.invoke("pi67:team-chat-attachment-save", request)
   ),
   showNativeNotification: (request: NativeNotificationRequest): Promise<boolean> => (
     ipcRenderer.invoke("pi67:native-notification-show", request)

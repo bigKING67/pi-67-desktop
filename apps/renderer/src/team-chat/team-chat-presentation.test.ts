@@ -1,6 +1,7 @@
 import type { TeamChatMessage } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
 import {
+  formatTeamChatBytes,
   formatTeamChatTime,
   teamChatInvocationText,
   teamChatMentionCandidates,
@@ -31,6 +32,11 @@ describe("team chat presentation", () => {
     expect(entries.at(-1)).toMatchObject({ senderUserId: "me", pending: { status: "failed", error: "x" } });
     expect(teamChatTimeline([message("m1", "u2", new Date(2025, 0, 2).getTime())], [], "me", now)[0])
       .toMatchObject({ dayLabel: "2025年1月2日" });
+  });
+
+  it("formats file sizes as people read them", () => {
+    expect([12, 1_500, 840 * 1024, 3.44 * 1024 * 1024, 25 * 1024 * 1024].map(formatTeamChatBytes))
+      .toEqual(["12 B", "1 KB", "840 KB", "3.4 MB", "25 MB"]);
   });
 
   it("formats times and reveals the remaining budget only near the limit", () => {

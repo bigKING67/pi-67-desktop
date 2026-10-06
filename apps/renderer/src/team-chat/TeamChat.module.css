@@ -318,6 +318,8 @@
   padding: 0 var(--space-5);
 }
 
+.timelineEnd { height: var(--space-3); }
+
 .conversationIntro {
   display: flex;
   align-items: center;
@@ -481,10 +483,11 @@
 
 .composerField {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  /* Attach, text, send; the attachment tray spans all three above them. */
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: end;
   gap: var(--space-2);
-  padding: 8px 8px 8px 12px;
+  padding: 8px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-panel);
   background: var(--surface-raised);

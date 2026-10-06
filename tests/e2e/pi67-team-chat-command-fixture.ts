@@ -54,7 +54,10 @@ interface MockMessage {
   editedAt?: number;
   recalledAt?: number;
   recalledBy?: string;
+  attachments?: MockAttachment[];
 }
+
+interface MockAttachment { id: string; fileName: string; contentType: string; byteSize: number; width?: number; height?: number }
 
 interface MockAgent {
   userId: string; name: string; description: string; ownerUserId: string; modelLabel: string; dailyLimit: number;
@@ -76,6 +79,8 @@ export interface MockTeamChatState {
   agentHost: { bindings: unknown[]; activity: unknown[] };
   messages: Record<string, MockMessage[]>;
   rosters: Record<string, string[]>;
+  /** Stored attachment bytes; uploads arrive in chunks (ADR 0009). */
+  files: Record<string, { attachment: MockAttachment; bytes: Uint8Array; received: number }>;
   activity: Array<{
     key: string; kind: string; conversationId: string; actorUserId: string; messageSeq?: number; preview?: string;
     cardId?: string; cardTitle?: string; reason?: string; createdAt: number; unread: boolean; doneAt?: number;
@@ -132,6 +137,7 @@ export function installMockTeamChatCommandHandler(): void {
     webhooks: [],
     agentHost: { bindings: [], activity: [] },
     rosters: { "conv-research": [self, "user-wang", "user-li", "agent-macro"], "conv-ops": ["user-wang", "user-li"] },
+    files: {},
     activity: [
       { key: "e:00000000-0000-4000-8000-0000000000c1", kind: "card_assigned", conversationId: "dm-li", actorUserId: "user-li",
         messageSeq: 1, cardId: "card-li-1", cardTitle: "港股口径对齐", createdAt: start + 7_200_000, unread: true },
@@ -147,10 +153,12 @@ export function installMockTeamChatCommandHandler(): void {
   let nextId = 100;
 
   const conversation = (id: unknown) => state.directory.conversations.find((item) => item.id === id);
-  const append = (conversationId: string, senderUserId: string, body: string, clientKey: string, mentions?: unknown): MockMessage => {
+  const append = (conversationId: string, senderUserId: string, body: string, clientKey: string, mentions?: unknown, attachmentIds?: unknown): MockMessage => {
     const target = conversation(conversationId)!;
+    const attachments = Array.isArray(attachmentIds) ? attachmentIds.map((id) => state.files[String(id)]!.attachment) : [];
     const message: MockMessage = { id: `msg-${nextId++}`, conversationId, seq: target.lastSeq + 1, senderUserId, body, clientKey,
-      createdAt: Date.now(), ...(Array.isArray(mentions) && mentions.length > 0 ? { mentionUserIds: mentions as string[] } : {}) };
+      createdAt: Date.now(), ...(Array.isArray(mentions) && mentions.length > 0 ? { mentionUserIds: mentions as string[] } : {}),
+      ...(attachments.length > 0 ? { attachments } : {}) };
     const addressed = state.directory.agents.filter((agent) => agent.status === "active"
       && (message.mentionUserIds?.includes(agent.userId) || (target.kind === "dm" && target.memberUserIds.includes(agent.userId))));
     if (senderUserId === self && addressed.length > 0) {
@@ -158,7 +166,7 @@ export function installMockTeamChatCommandHandler(): void {
     }
     (state.messages[conversationId] ??= []).push(message);
     Object.assign(target, { lastSeq: message.seq, lastMessageAt: message.createdAt, lastSenderUserId: senderUserId,
-      lastPreview: body.slice(0, 140) });
+      lastPreview: (body || (attachments[0]?.fileName ?? "")).slice(0, 140) });
     if (senderUserId === self) Object.assign(target, { lastReadSeq: message.seq, unreadCount: 0, mentionCount: 0 });
     return message;
   };
@@ -182,7 +190,31 @@ export function installMockTeamChatCommandHandler(): void {
       case "teamChat.message.send": {
         const existing = (state.messages[String(payload.conversationId)] ?? [])
           .find((message) => message.clientKey === payload.clientKey);
-        return existing ?? append(String(payload.conversationId), self, String(payload.body), String(payload.clientKey), payload.mentionUserIds);
+        return existing ?? append(String(payload.conversationId), self, String(payload.body), String(payload.clientKey), payload.mentionUserIds, payload.attachmentIds);
+      }
+      case "teamChat.attachment.begin": {
+        const fileName = String(payload.fileName);
+        const extension = fileName.slice(fileName.lastIndexOf(".") + 1).toLowerCase();
+        const types: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", pdf: "application/pdf" };
+        const attachment: MockAttachment = { id: `att-${nextId++}`, fileName, contentType: types[extension] ?? "application/octet-stream",
+          byteSize: Number(payload.byteSize), ...(typeof payload.width === "number" ? { width: payload.width, height: Number(payload.height) } : {}) };
+        state.files[attachment.id] = { attachment, bytes: new Uint8Array(attachment.byteSize), received: 0 };
+        return { attachment };
+      }
+      case "teamChat.attachment.chunk": {
+        const file = state.files[String(payload.attachmentId)]!;
+        file.bytes.set(new Uint8Array(payload.data as ArrayBuffer), Number(payload.offset));
+        file.received = Number(payload.offset) + (payload.data as ArrayBuffer).byteLength;
+        return { received: file.received };
+      }
+      case "teamChat.attachment.finish": return { attachment: state.files[String(payload.attachmentId)]!.attachment };
+      case "teamChat.attachment.discard": return {};
+      case "teamChat.attachment.read": {
+        const file = state.files[String(payload.attachmentId)]!;
+        const offset = Number(payload.offset);
+        const end = Math.min(file.bytes.byteLength, offset + Number(payload.length ?? 1024 * 1024));
+        return { attachmentId: file.attachment.id, contentType: file.attachment.contentType, byteLength: file.bytes.byteLength,
+          offset, data: file.bytes.slice(offset, end).buffer, done: end === file.bytes.byteLength };
       }
       case "teamChat.read.mark": {
         const target = conversation(payload.conversationId)!;

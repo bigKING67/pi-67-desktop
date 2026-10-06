@@ -6,7 +6,8 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HostEventChannel } from "../host-event-channel.js";
 import { isTeamChatCommand, TeamChatCommandRouter, type TeamChatCommandType } from "./team-chat-command-router.js";
-import { parseConversation, parseMessage } from "./team-chat-gateway.js";
+import { parseConversation } from "./team-chat-gateway.js";
+import { parseMessage } from "./team-chat-message-parse.js";
 
 const endpoint = "https://newmoney.example.test";
 const teamBase = `${endpoint}/v1/agent/teams/team-1`;
@@ -357,6 +358,39 @@ describe("TeamChatCommandRouter", () => {
     await expect(run("teamChat.search", { query: "redirect" })).rejects.toBeDefined();
     await expect(run("teamChat.search", { query: "   " })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
     expect(calls).toHaveLength(2);
+    router.shutdown();
+  });
+
+  it("uploads attachments through a granted URL and sends a message carrying only files", async () => {
+    const file = { id: "a1", fileName: "图.png", contentType: "image/png", byteSize: 2, width: 4, height: 3 };
+    const storage = "https://s3.example.test/bucket/chat/team-1/a1?X-Amz-Signature=x";
+    const { router, run, calls } = setup({
+      "POST /chat/conversations/c1/attachments": () => json({ attachment: file, upload: { method: "PUT", url: storage, contentType: "image/png" } }, 201),
+      [`PUT ${storage}`]: () => new Response(null, { status: 200 }),
+      "POST /chat/conversations/c1/messages": () => json({ ...message, body: "", attachments: [file] }, 201),
+      [`POST ${endpoint}/v1/agent/teams/team-1/chat/attachments/a1/download`.replace(teamBase, "")]: () => json({ method: "GET", url: storage }),
+      [`GET ${storage}`]: () => new Response(new Uint8Array([5, 6]), { headers: { "content-type": "image/png" } })
+    });
+    await expect(run("teamChat.attachment.begin", { conversationId: "c1", fileName: "图.png", byteSize: 2, width: 4, height: 3 }))
+      .resolves.toEqual({ attachment: file });
+    await expect(run("teamChat.attachment.chunk", { attachmentId: "a1", offset: 0, data: new Uint8Array([5, 6]).buffer })).resolves.toEqual({ received: 2 });
+    await expect(run("teamChat.attachment.finish", { attachmentId: "a1" })).resolves.toEqual({ attachment: file });
+    await expect(run("teamChat.message.send", { conversationId: "c1", clientKey: "client-key-1", body: " \n", attachmentIds: ["a1"] }))
+      .resolves.toMatchObject({ body: "", attachments: [file] });
+    const read = await run("teamChat.attachment.read", { attachmentId: "a1", offset: 0 });
+    expect(read).toMatchObject({ contentType: "image/png", byteLength: 2, done: true });
+    expect([...new Uint8Array(read.data)]).toEqual([5, 6]);
+    expect(JSON.parse(calls[0]!.init.body as string)).toEqual({ fileName: "图.png", byteSize: 2, width: 4, height: 3 });
+    expect(JSON.parse(calls[2]!.init.body as string)).toEqual({ clientKey: "client-key-1", body: "", attachmentIds: ["a1"] });
+    for (const attempt of [
+      run("teamChat.attachment.begin", { conversationId: "c1", fileName: "setup.exe", byteSize: 2 }),
+      run("teamChat.attachment.begin", { conversationId: "c1", fileName: "big.zip", byteSize: 26 * 1024 * 1024 }),
+      run("teamChat.message.send", { conversationId: "c1", clientKey: "client-key-2", body: "", attachmentIds: [] }),
+      run("teamChat.message.send", { conversationId: "c1", clientKey: "client-key-2", body: "x", attachmentIds: ["a1", "a1"] })
+    ]) {
+      await expect(attempt).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    }
+    expect(calls).toHaveLength(5);
     router.shutdown();
   });
 

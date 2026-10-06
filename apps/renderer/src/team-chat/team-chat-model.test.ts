@@ -82,6 +82,9 @@ describe("team chat model", () => {
     expect(conversation).toMatchObject({ lastSeq: 4, lastReadSeq: 4, unreadCount: 0 });
     expect(teamChatCodePointLength(conversation.lastPreview!)).toBe(140);
     expect(state.pending).toEqual([]);
+    const file = { id: "a1", fileName: "季度.pdf", contentType: "application/pdf", byteSize: 9 };
+    state = applyMessage(state, message(5, { body: "", attachments: [file] }));
+    expect(state.directory!.conversations.find((item) => item.id === "c1")!.lastPreview).toBe("季度.pdf");
   });
 
   it("caps unread at the service limit and leaves unloaded threads alone", () => {

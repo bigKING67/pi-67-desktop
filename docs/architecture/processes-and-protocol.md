@@ -2814,6 +2814,12 @@ ADR 0003 是权威合同。Team Chat 不经过 Pi Runtime、Task Scheduler 或 S
 - 编辑与撤回（`docs/adr/0008-team-chat-message-edit-recall.md`）：`teamChat.message.edit|recall` 转发
   `PATCH|DELETE /chat/conversations/{id}/messages/{messageId}`；推送 `message.updated` 按 id 替换。撤回清空正文并保留占位，
   编辑只保留最新文本；renderer 复用发送框进入编辑模式。
+- 附件与图片（`docs/adr/0009-team-chat-attachments.md`）：`teamChat.attachment.begin|chunk|finish|discard|read` 为 `app`
+  scope 命令。begin 由 Host 向服务申请上传授权（预签名 URL 只留在 Host）；chunk 携带 ≤1 MiB `ArrayBuffer`（与 `asset.read`
+  一样在 envelope 层做跨 realm 校验），Host 按序拼装、缓冲上限 100 MB，finish 时 PUT 到 HTTPS 存储后丢弃字节；read 由 Host
+  取下载 URL、整文件下载进 64 MB LRU 缓存并按 ≤1 MiB 分片返回。账号或团队变化时 Host 清空全部缓冲。`teamChat.message.send`
+  可带 `attachmentIds`（≤10，无正文时必须有附件）。保存经 Main 的 `saveTeamChatAttachment`（系统保存对话框，只写用户选定的
+  位置）；renderer 不接触存储 URL，CSP 不放宽 `connect-src`。
 - Desktop Main：`app-protocol`、`main-window`、`agent-host-supervisor`、`system-bridge` 分别拥有
   scheme/window/process/system 能力，`main.ts` 只做组合。
 - Agent Host：`host-server`、`command-scheduler`、`operation-registry`、`operation-submission-ledger`、

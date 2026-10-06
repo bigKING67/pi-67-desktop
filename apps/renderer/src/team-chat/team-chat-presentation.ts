@@ -1,4 +1,10 @@
-import { teamChatCodePointLength, type TeamChatAgentInvocationSummary, type TeamChatMessage, type TeamChatWorkCard } from "@pi67/domain";
+import {
+  teamChatCodePointLength,
+  type TeamChatAgentInvocationSummary,
+  type TeamChatAttachment,
+  type TeamChatMessage,
+  type TeamChatWorkCard
+} from "@pi67/domain";
 import { messages } from "../localization/message-catalog.js";
 import type { TeamChatPendingMessage } from "./team-chat-model.js";
 
@@ -24,6 +30,7 @@ export interface TeamChatTimelineEntry {
   editedAt?: number;
   recalledAt?: number;
   recalledBy?: string;
+  attachments?: TeamChatAttachment[];
 }
 
 /** Orders confirmed then pending messages into day-labelled sender groups. */
@@ -56,7 +63,8 @@ export function teamChatTimeline(
       ...(message.agentInvocations === undefined ? {} : { agentInvocations: message.agentInvocations }),
       ...(message.editedAt === undefined ? {} : { editedAt: message.editedAt }),
       ...(message.recalledAt === undefined ? {} : { recalledAt: message.recalledAt }),
-      ...(message.recalledBy === undefined ? {} : { recalledBy: message.recalledBy }) });
+      ...(message.recalledBy === undefined ? {} : { recalledBy: message.recalledBy }),
+      ...(message.attachments === undefined ? {} : { attachments: message.attachments }) });
   }
   for (const item of pending) {
     push({
@@ -65,6 +73,7 @@ export function teamChatTimeline(
       body: item.body,
       createdAt: item.createdAt,
       ...(item.mentionUserIds === undefined ? {} : { mentionUserIds: item.mentionUserIds }),
+      ...(item.attachments === undefined ? {} : { attachments: item.attachments }),
       pending: { clientKey: item.clientKey, status: item.status, ...(item.error === undefined ? {} : { error: item.error }) }
     });
   }
@@ -74,6 +83,14 @@ export function teamChatTimeline(
 export function formatTeamChatTime(timestamp: number): string {
   const date = new Date(timestamp);
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+/** File sizes as people read them: "820 KB", "3.4 MB". */
+export function formatTeamChatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  const megabytes = bytes / (1024 * 1024);
+  return `${megabytes < 10 ? megabytes.toFixed(1) : Math.round(megabytes)} MB`;
 }
 
 /** Time today, "昨天 HH:MM", or the date, for activity rows. */

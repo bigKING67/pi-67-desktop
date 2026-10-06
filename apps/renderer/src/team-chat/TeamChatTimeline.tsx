@@ -13,6 +13,7 @@ import { formatTeamChatTime, teamChatInvocationText, teamChatMentionSegments, ty
 import { TeamChatAgentBadge, TeamChatBotBadge } from "./TeamChatParts.js";
 import agentStyles from "./TeamChatAgents.module.css";
 import { chatMessageWorkBrief } from "./team-chat-work-bridge.js";
+import { TeamChatMessageAttachments } from "./TeamChatAttachments.js";
 import { TeamChatWorkCard } from "./TeamChatWorkCard.js";
 import styles from "./TeamChat.module.css";
 import governance from "./TeamChatGovernance.module.css";
@@ -115,6 +116,8 @@ const TimelineScroller = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElemen
 /** Stable component identities so Virtuoso never remounts the header or scroller. */
 const TIMELINE_COMPONENTS = {
   Header: ({ context }: { context: TimelineContext }) => <div className={styles.timelineColumn}>{context.header}</div>,
+  // Keeps the newest message, often a bordered file card, off the composer's edge.
+  Footer: () => <div aria-hidden="true" className={styles.timelineEnd} />,
   Scroller: TimelineScroller
 };
 
@@ -151,6 +154,7 @@ function TimelineMessage({ conversation, directory, entry, focused, target }: {
         ) : entry.workCard ? <TeamChatWorkCard card={entry.workCard} directory={directory} /> : (
           <MessageBody directory={directory} entry={entry} />
         )}
+        {!recalled && entry.attachments ? <TeamChatMessageAttachments attachments={entry.attachments} pending={entry.pending !== undefined} /> : null}
         {recalled ? null : <InvocationStates directory={directory} entry={entry} />}
         {!entry.pending && !recalled ? (
           <MessageActions conversation={conversation} directory={directory} entry={entry} sender={sender} target={target} />
@@ -228,6 +232,8 @@ function MessageBody({ directory, entry }: { directory: TeamChatDirectory; entry
     return member ? [{ userId, displayName: member.displayName }] : [];
   });
   const edited = entry.editedAt === undefined ? null : <span className={styles.messageEdited}>{messages.teamChat.edited}</span>;
+  // A message of files alone has no text line.
+  if (!entry.body && !edited) return null;
   if (mentioned.length === 0) return <p>{entry.body}{edited}</p>;
   return (
     <p>

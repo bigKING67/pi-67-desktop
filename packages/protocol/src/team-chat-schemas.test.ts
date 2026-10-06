@@ -4,6 +4,7 @@ import { CommandPayloadSchemas } from "./command-payload-schemas.js";
 import { CommandResultSchemas, EventPayloadSchemas } from "./schemas.js";
 import { EVENT_CONTEXT_REQUIREMENTS } from "./event-context.js";
 import { Value } from "./typebox-schema.js";
+import { isValidTeamChatAttachmentChunk, isValidTeamChatAttachmentRead } from "./team-chat-attachment-validation.js";
 
 const conversation = {
   id: "11111111-1111-4111-8111-111111111111", kind: "dm", visibility: "private", joined: true, memberCount: 2,
@@ -143,6 +144,24 @@ describe("Team Chat protocol schemas", () => {
     const recalled = { ...message, body: "", recalledAt: 2, recalledBy: "u1" };
     expect(Value.Check(CommandResultSchemas["teamChat.message.recall"], recalled)).toBe(true);
     expect(Value.Check(EventPayloadSchemas["teamChat.pushed"], { type: "message.updated", message: { ...message, editedAt: 3 } })).toBe(true);
+  });
+
+  it("carries attachments and bounds their binary chunks", () => {
+    expect(COMMAND_CONTEXT_SCOPE_REQUIREMENTS["teamChat.attachment.chunk"]).toBe("app");
+    const attachment = { id: "a1", fileName: "截图.png", contentType: "image/png", byteSize: 10, width: 640, height: 480 };
+    expect(Value.Check(CommandResultSchemas["teamChat.message.send"], { ...message, body: "", attachments: [attachment] })).toBe(true);
+    expect(Value.Check(CommandPayloadSchemas["teamChat.message.send"], { conversationId: "c1", clientKey: "client-key-1", body: "", attachmentIds: ["a1"] })).toBe(true);
+    expect(Value.Check(CommandPayloadSchemas["teamChat.attachment.begin"], { conversationId: "c1", fileName: "x.pdf", byteSize: 25 * 1024 * 1024 + 1 })).toBe(false);
+    const chunk = { attachmentId: "a1", offset: 0, data: new ArrayBuffer(16) };
+    expect(Value.Check(CommandPayloadSchemas["teamChat.attachment.chunk"], chunk)).toBe(true);
+    expect(isValidTeamChatAttachmentChunk(chunk)).toBe(true);
+    expect(isValidTeamChatAttachmentChunk({ ...chunk, data: new ArrayBuffer(1024 * 1024 + 1) })).toBe(false);
+    expect(isValidTeamChatAttachmentChunk({ ...chunk, data: "base64" })).toBe(false);
+    expect(isValidTeamChatAttachmentChunk({ ...chunk, offset: 25 * 1024 * 1024 - 8 })).toBe(false);
+    const read = { attachmentId: "a1", contentType: "image/png", byteLength: 16, offset: 0, data: new ArrayBuffer(16), done: true };
+    expect(isValidTeamChatAttachmentRead(read)).toBe(true);
+    expect(isValidTeamChatAttachmentRead({ ...read, done: false })).toBe(false);
+    expect(isValidTeamChatAttachmentRead({ ...read, byteLength: 8 })).toBe(false);
   });
 });
 

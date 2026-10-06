@@ -262,7 +262,9 @@ and floating shadow; the channel settings dialog reuses the dark dialog and dang
 roles. Agent tiles, presence dots, badges and the Agent dialog use the same dark
 accent, success, border and surface roles. Message hover actions, armed recall, edit line and placeholders, the search field, scope chip, result marks and the activity inbox, its segmented
 control, unread dots, the focus highlight (dark accent-soft) and muted counts (dark
-muted surface and border) use the same dark roles. No dark-only Chat color exists.
+muted surface and border) use the same dark roles. The attachment tray, progress
+line, drop overlay, image thumbnails, file cards and the image viewer use the dark
+surface, border, accent and danger roles. No dark-only Chat color exists.
 
 Workbench polish follows DESIGN.md in both themes: matching pane/reading widths,
 quieter navigation weights, transparent model/parameter utilities, labelled file

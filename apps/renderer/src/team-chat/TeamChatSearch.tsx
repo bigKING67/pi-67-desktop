@@ -1,4 +1,4 @@
-import { ClipboardCheck, Search, X } from "lucide-react";
+import { ClipboardCheck, Paperclip, Search, X } from "lucide-react";
 import { useMemo } from "react";
 import { Button } from "react-aria-components";
 import type { TeamChatDirectory, TeamChatSearchHit } from "@pi67/domain";
@@ -119,10 +119,10 @@ function ResultRow({ directory, hit, query }: { directory: TeamChatDirectory; hi
         onPress={() => void teamChat.openMessage(hit.conversationId, hit.seq)}>
         {hit.field === "message"
           ? <TeamChatAvatar name={name} />
-          : <span aria-hidden="true" className={styles.rowIcon}><ClipboardCheck size={14} /></span>}
+          : <span aria-hidden="true" className={styles.rowIcon}>{hit.field === "attachment" ? <Paperclip size={14} /> : <ClipboardCheck size={14} />}</span>}
         <span className={styles.rowText}>
           <strong>{name}</strong>
-          {card ? <span className={styles.rowDetail}>{`${card}${hit.field === "title" ? "" : ` · ${hit.cardTitle ?? ""}`}`}</span> : null}
+          {card ? <span className={styles.rowDetail}>{`${card}${hit.field === "title" || hit.field === "attachment" ? "" : ` · ${hit.cardTitle ?? ""}`}`}</span> : null}
           <span className={styles.snippet}>
             {teamChatSearchSegments(hit.snippet, query).map((segment, index) => segment.match
               ? <mark key={index}>{segment.text}</mark>

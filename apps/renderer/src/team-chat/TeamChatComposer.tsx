@@ -1,6 +1,7 @@
-import { ArrowUp, Check } from "lucide-react";
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { ArrowUp, Check, Paperclip } from "lucide-react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { Button } from "react-aria-components";
+import { useStore } from "zustand";
 import {
   TEAM_CHAT_MESSAGE_MAX_CHARS,
   teamChatCanPost,
@@ -10,6 +11,7 @@ import {
 } from "@pi67/domain";
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
+import { teamChatUploads } from "./team-chat-attachment-files.js";
 import { teamChatErrorMessage } from "./team-chat-controller.js";
 import { canSendTo, memberById } from "./team-chat-model.js";
 import { teamChat, useTeamChat } from "./team-chat-instance.js";
@@ -19,7 +21,9 @@ import {
   teamChatRemainingCharacters,
   type TeamChatMentionCandidate
 } from "./team-chat-presentation.js";
+import { addTeamChatFiles, TeamChatAttachmentTray } from "./TeamChatAttachmentTray.js";
 import { TeamChatAgentAvatar, TeamChatAgentBadge, TeamChatAvatar } from "./TeamChatParts.js";
+import files from "./TeamChatAttachments.module.css";
 import styles from "./TeamChat.module.css";
 import governance from "./TeamChatGovernance.module.css";
 
@@ -84,9 +88,16 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
   const policyAllows = teamChatCanPost(directory);
   const writable = canSendTo(directory, conversation) && policyAllows;
   const remaining = teamChatRemainingCharacters(draft, TEAM_CHAT_MESSAGE_MAX_CHARS);
-  const sendable = writable && draft.trim().length > 0 && (remaining === undefined || remaining >= 0);
+  const allUploads = useStore(teamChatUploads.store, (state) => state.uploads);
+  const uploads = useMemo(() => allUploads.filter((item) => item.conversationId === conversation.id), [allUploads, conversation.id]);
+  const uploadsUnfinished = uploads.some((item) => item.status !== "ready");
+  const picker = useRef<HTMLInputElement>(null);
+  const [dropping, setDropping] = useState(false);
   const pickerOpen = query !== undefined && writable;
   const editing = useTeamChat((state) => state.editing?.conversationId === conversation.id ? state.editing : undefined);
+  // Files go with new messages only; an edit changes text alone (ADR 0008).
+  const hasContent = draft.trim().length > 0 || (!editing && uploads.length > 0);
+  const sendable = writable && hasContent && (remaining === undefined || remaining >= 0) && (editing !== undefined || !uploadsUnfinished);
   const thread = useTeamChat((state) => state.threads[conversation.id]);
   const edited = editing ? thread?.messages.find((item) => item.id === editing.messageId) : undefined;
   const [saving, setSaving] = useState(false);
@@ -168,13 +179,15 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
       save();
       return;
     }
+    const attachments = teamChatUploads.take(conversation.id);
+    if (!attachments) return;
     const body = draft;
     const mentions = teamChatRetainedMentions(body, picks, directory.selfUserId);
     setDraft("");
     setPicks([]);
     setQuery(undefined);
     onSent();
-    void teamChat.send(conversation.id, body, mentions);
+    void teamChat.send(conversation.id, body, mentions, attachments);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -212,11 +225,27 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
     }
   };
 
-  const notice = !policyAllows ? copy.viewerReadOnly : !writable ? copy.peerLeft : undefined;
+  const notice = !policyAllows ? copy.viewerReadOnly : !writable ? copy.peerLeft
+    : !editing && uploadsUnfinished && hasContent ? copy.attachmentsUnfinished : undefined;
+  const attachable = writable && !editing;
+  const isFileDrag = (event: DragEvent) => attachable && event.dataTransfer.types.includes("Files");
   // Edits never ask Agents again (ADR 0008), so the disclosure is for new messages only.
   const askedAgents = editing ? [] : picks.filter((pick) => pick.agent && draft.includes(`@${pick.displayName}`));
   return (
-    <form className={styles.composer} onSubmit={(event) => { event.preventDefault(); send(); }}>
+    <form className={styles.composer}
+      onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropping(false); }}
+      onDragOver={(event) => {
+        if (!isFileDrag(event)) return;
+        event.preventDefault();
+        setDropping(true);
+      }}
+      onDrop={(event) => {
+        if (!isFileDrag(event)) return;
+        event.preventDefault();
+        setDropping(false);
+        addTeamChatFiles(conversation.id, [...event.dataTransfer.files]);
+      }}
+      onSubmit={(event) => { event.preventDefault(); send(); }}>
       {notice ? <p className={styles.composerNotice} id={noticeId} role="status">{notice}</p> : null}
       {editing ? (
         <div className={styles.composerEditing} data-testid="team-chat-editing" role="status">
@@ -229,7 +258,9 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
           {copy.agentMentionDisclosure(askedAgents.map((pick) => `@${pick.displayName}`).join("、"))}
         </p>
       ) : null}
-      <div className={`${styles.composerField} ${governance.composerAnchor}`}>
+      <div className={`${styles.composerField} ${governance.composerAnchor} ${dropping ? files.dropTarget : ""}`}
+        data-drop-hint={dropping ? copy.attachmentDrop : undefined}>
+        {editing ? null : <TeamChatAttachmentTray uploads={uploads} />}
         {pickerOpen ? (
           <div className={governance.mentionPicker}>
             {candidates.length > 0 ? (
@@ -252,6 +283,14 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
             ) : <p role="status">{mentionable.loading ? copy.mentionLoading : copy.mentionNoMatch}</p>}
           </div>
         ) : null}
+        <Button aria-label={copy.attach} className={files.attachButton!} isDisabled={!attachable}
+          onPress={() => picker.current?.click()}>
+          <Paperclip aria-hidden="true" size={16} />
+        </Button>
+        <input hidden multiple onChange={(event) => {
+          addTeamChatFiles(conversation.id, [...event.currentTarget.files ?? []]);
+          event.currentTarget.value = "";
+        }} ref={picker} tabIndex={-1} type="file" />
         <textarea
           aria-activedescendant={pickerOpen && candidates.length > 0 ? `${listId}-${active}` : undefined}
           aria-autocomplete="list"
@@ -265,6 +304,12 @@ export function TeamChatComposer({ conversation, directory, target, onSent }: {
           onClick={(event) => track(event.currentTarget)}
           onKeyDown={onKeyDown}
           onKeyUp={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") track(event.currentTarget); }}
+          onPaste={(event) => {
+            const pasted = [...event.clipboardData.files];
+            if (pasted.length === 0 || !attachable) return;
+            event.preventDefault();
+            addTeamChatFiles(conversation.id, pasted);
+          }}
           placeholder={writable ? copy.composerPlaceholder(target) : ""}
           ref={input}
           rows={1}

@@ -231,6 +231,13 @@ describe("team chat controller", () => {
       { conversationId: "c1", clientKey: "client-key-new", body: "@小王 看下", mentionUserIds: ["u2"] },
       { conversationId: "c1", clientKey: "client-key-new", body: "@小王 看下", mentionUserIds: ["u2"] }
     ]);
+    const file = { id: "a1", fileName: "图.png", contentType: "image/png", byteSize: 9 };
+    fail = true;
+    await controller.send("c1", "", [], [file]);
+    expect(controller.store.getState().pending.at(-1)).toMatchObject({ body: "", attachments: [file], status: "failed" });
+    expect(calls.filter((call) => call.type === "teamChat.message.send").at(-1)?.payload)
+      .toEqual({ conversationId: "c1", clientKey: "client-key-new", body: "", attachmentIds: ["a1"] });
+    fail = false;
     await expect(controller.channelRoster("c1")).resolves.toMatchObject({ ownerUserId: "me" });
     const before = calls.filter((call) => call.type === "teamChat.directory.get").length;
     await controller.manageChannel("c1", { type: "archive" });

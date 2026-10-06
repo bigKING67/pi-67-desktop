@@ -1,12 +1,11 @@
 import {
   TEAM_CHAT_DEFAULT_POLICY,
   type TeamChatActivityItem,
+  type TeamChatAttachment,
   type TeamChatSearchPage,
-  TEAM_CHAT_MENTION_MAX,
   type TeamChatChannelAction,
   type TeamChatChannelRoster,
   type TeamChatConversation,
-  type TeamChatAgentInvocationSummary,
   type TeamChatMember,
   type TeamChatMessage,
   type TeamChatMessagePage,
@@ -27,6 +26,7 @@ import { requestNewMoney } from "../context/new-money-http.js";
 import { parseActivity } from "./team-chat-activity-parse.js";
 import { parseSearchPage } from "./team-chat-search-parse.js";
 import { parseWorkCard } from "./team-chat-work-card-parse.js";
+import { parseAttachment, parseMessage } from "./team-chat-message-parse.js";
 
 export interface TeamChatAccess {
   endpoint: string;
@@ -54,6 +54,15 @@ const TEAM_CHAT_SERVICE_ERRORS: ReadonlySet<string> = new Set([
   "chat_member_not_in_team",
   "chat_client_key_reused",
   "chat_body_invalid",
+  "chat_attachment_invalid",
+  "chat_attachment_name_invalid",
+  "chat_attachment_not_found",
+  "chat_attachment_quota_exceeded",
+  "chat_attachment_storage_unavailable",
+  "chat_attachment_too_large",
+  "chat_attachment_type_not_allowed",
+  "chat_attachment_upload_incomplete",
+  "chat_attachments_unavailable",
   "chat_channel_creation_restricted",
   "chat_viewer_read_only",
   "chat_conversation_archived",
@@ -136,7 +145,7 @@ export class TeamChatGateway {
 
   async postMessage(
     conversationId: string,
-    input: { clientKey: string; body: string; mentionUserIds?: string[] },
+    input: { clientKey: string; body: string; mentionUserIds?: string[]; attachmentIds?: string[] },
     signal?: AbortSignal
   ): Promise<TeamChatMessage> {
     return parseMessage(await this.request(`${conversationPath(conversationId)}/messages`, {
@@ -199,6 +208,27 @@ export class TeamChatGateway {
       }
     })();
     await this.request(`${path}${suffix}`, init, signal);
+  }
+
+  /** Grants a direct upload for one file (ADR 0009). */
+  async createAttachment(
+    conversationId: string,
+    input: { fileName: string; byteSize: number; width?: number; height?: number },
+    signal?: AbortSignal
+  ): Promise<{ attachment: TeamChatAttachment; upload: { url: string; contentType?: string } }> {
+    const value = asRecord(await this.request(`${conversationPath(conversationId)}/attachments`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }, signal));
+    const upload = asRecord(value.upload);
+    return { attachment: parseAttachment(value.attachment), upload: parsePresigned(upload) };
+  }
+
+  /** A short-lived download URL for a readable attachment. */
+  async attachmentDownload(attachmentId: string, signal?: AbortSignal): Promise<{ url: string; contentType?: string }> {
+    return parsePresigned(asRecord(await this.request(`/chat/attachments/${encodeURIComponent(attachmentId)}/download`, {
+      method: "POST"
+    }, signal)));
   }
 
   /** The sender's edit (ADR 0008); earlier text is not kept by the service. */
@@ -358,60 +388,15 @@ export function parseConversation(value: unknown): TeamChatConversation {
   };
 }
 
-export function parseMessage(value: unknown): TeamChatMessage {
-  const record = asRecord(value);
-  const workCard = nullable(record.workCard, parseWorkCard);
-  const mentions = nullable(record.mentionUserIds, (item) => {
-    if (!Array.isArray(item) || item.length > TEAM_CHAT_MENTION_MAX) throw invalidResponse("message.mentionUserIds");
-    return item.map((userId, index) => boundedString(userId, `message.mentionUserIds.${index}`, 128));
-  });
-  const editedAt = nullable(record.editedAt, (item) => parseTimestamp(item, "message.editedAt"));
-  const recalledAt = nullable(record.recalledAt, (item) => parseTimestamp(item, "message.recalledAt"));
-  const recalledBy = nullable(record.recalledBy, (item) => boundedString(item, "message.recalledBy", 128));
-  // Only a recalled message has an empty body.
-  if (recalledAt !== undefined ? record.body !== "" : typeof record.body !== "string" || record.body.length === 0) {
-    throw invalidResponse("message.body");
-  }
-  const invocations = nullable(record.agentInvocations, (item) => {
-    if (!Array.isArray(item) || item.length > TEAM_CHAT_MENTION_MAX) throw invalidResponse("message.agentInvocations");
-    return item.map(parseInvocationSummary);
-  });
-  return {
-    ...(workCard === undefined ? {} : { workCard }),
-    ...(mentions === undefined || mentions.length === 0 ? {} : { mentionUserIds: mentions }),
-    ...(invocations === undefined || invocations.length === 0 ? {} : { agentInvocations: invocations }),
-    id: boundedString(record.id, "message.id", 128),
-    conversationId: boundedString(record.conversationId, "message.conversationId", 128),
-    seq: boundedInteger(record.seq, "message.seq", 1),
-    senderUserId: boundedString(record.senderUserId, "message.senderUserId", 128),
-    body: recalledAt === undefined ? boundedString(record.body, "message.body", 8_000) : "",
-    ...(editedAt === undefined ? {} : { editedAt }),
-    ...(recalledAt === undefined ? {} : { recalledAt }),
-    ...(recalledBy === undefined ? {} : { recalledBy }),
-    clientKey: boundedString(record.clientKey, "message.clientKey", 64),
-    createdAt: parseTimestamp(record.createdAt, "message.createdAt")
-  };
-}
 
-const INVOCATION_STATUSES = new Set(["queued", "running", "replied", "failed", "expired", "rejected"]);
-const INVOCATION_REASONS = new Set(["daily_limit", "agent_disabled", "not_configured", "model_unavailable",
-  "runtime_error", "lease_expired", "cancelled"]);
-
-export function parseInvocationSummary(value: unknown): TeamChatAgentInvocationSummary {
-  const record = asRecord(value);
-  if (typeof record.status !== "string" || !INVOCATION_STATUSES.has(record.status)) throw invalidResponse("invocation.status");
-  const reason = nullable(record.reason, (item) => {
-    if (typeof item !== "string" || !INVOCATION_REASONS.has(item)) throw invalidResponse("invocation.reason");
-    return item as NonNullable<TeamChatAgentInvocationSummary["reason"]>;
-  });
-  return {
-    id: boundedString(record.id, "invocation.id", 128),
-    agentUserId: boundedString(record.agentUserId, "invocation.agentUserId", 128),
-    status: record.status as TeamChatAgentInvocationSummary["status"],
-    ...(reason === undefined ? {} : { reason })
-  };
-}
 
 export function nullable<T>(value: unknown, parse: (item: unknown) => T): T | undefined {
   return value === null || value === undefined ? undefined : parse(value);
 }
+
+
+function parsePresigned(record: Record<string, unknown>): { url: string; contentType?: string } {
+  const contentType = nullable(record.contentType, (item) => boundedString(item, "upload.contentType", 120));
+  return { url: boundedString(record.url, "upload.url", 4_096), ...(contentType === undefined ? {} : { contentType }) };
+}
+

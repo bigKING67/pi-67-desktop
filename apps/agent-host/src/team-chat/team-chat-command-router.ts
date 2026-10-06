@@ -1,9 +1,11 @@
 import {
+  TEAM_CHAT_ATTACHMENT_LIMITS,
   TEAM_CHAT_CHANNEL_NAME_MAX_CHARS,
   TEAM_CHAT_MESSAGE_MAX_CHARS,
   TEAM_CHAT_SEARCH_QUERY_MAX,
   TEAM_CHAT_WEBHOOK_NAME_MAX,
   TEAM_CHAT_WORK_CARD_LIMITS,
+  teamChatAttachmentRejection,
   teamChatCodePointLength,
   teamChatHasControlCharacter
 } from "@pi67/domain";
@@ -19,6 +21,7 @@ import { HostCommandError } from "../protocol-error.js";
 import { appContextAuthority } from "../context/context-memory-support.js";
 import type { EnterpriseCredentialBrokerClient } from "../context/enterprise-credential-broker-client.js";
 import { TeamChatAgentGateway } from "./team-chat-agent-gateway.js";
+import { TeamChatAttachmentTransfers } from "./team-chat-attachment-transfers.js";
 import { TEAM_CHAT_AGENT_COMMANDS, TeamChatAgentHost, type TeamChatAgentCommandType } from "./team-chat-agent-host.js";
 import type { TeamChatAgentTurns } from "./team-chat-agent-turns.js";
 import type { TeamChatAccess } from "./team-chat-gateway.js";
@@ -50,7 +53,12 @@ const TEAM_CHAT_COMMANDS: ReadonlySet<string> = new Set<TeamChatCommandType>([
   "teamChat.conversation.mute",
   "teamChat.search",
   "teamChat.message.edit",
-  "teamChat.message.recall"
+  "teamChat.message.recall",
+  "teamChat.attachment.begin",
+  "teamChat.attachment.chunk",
+  "teamChat.attachment.finish",
+  "teamChat.attachment.discard",
+  "teamChat.attachment.read"
 ]);
 
 export function isTeamChatCommand(type: AgentCommandType): type is TeamChatCommandType {
@@ -66,16 +74,22 @@ export interface TeamChatRouterDependencies {
   storageRoot?: string;
   /** Runs Agent turns; absent in hosts that cannot (Agents are then never claimed here). */
   agentTurns?: TeamChatAgentTurns;
+  /** Object-storage transfers; tests inject a fake `fetch`. */
+  transfers?: TeamChatAttachmentTransfers;
 }
 
 export class TeamChatCommandRouter {
   readonly #realtime: TeamChatRealtime;
   readonly #idle = new AbortController();
   readonly #agents: TeamChatAgentHost;
+  readonly #transfers: TeamChatAttachmentTransfers;
+  /** Whose bytes the transfers hold; another account or team drops them. */
+  #transferOwner: string | undefined;
   #liveGeneration = 0;
 
   constructor(private readonly dependencies: TeamChatRouterDependencies) {
     const { credentials, events } = dependencies;
+    this.#transfers = dependencies.transfers ?? new TeamChatAttachmentTransfers();
     this.#agents = new TeamChatAgentHost({
       access: () => this.#access(),
       storageRoot: dependencies.storageRoot ?? process.env.PI67_STORAGE_ROOT ?? process.cwd(),
@@ -120,6 +134,7 @@ export class TeamChatCommandRouter {
   shutdown(): void {
     this.#agents.runner.stop();
     this.#realtime.stop();
+    this.#transfers.clear();
   }
 
   async dispatch<T extends TeamChatCommandType>(
@@ -160,15 +175,45 @@ export class TeamChatCommandRouter {
         }, signal);
       }
       case "teamChat.message.send": {
-        const { conversationId, clientKey, body, mentionUserIds } = command.payload as TeamChatCommandPayloads["teamChat.message.send"];
-        if (!body.trim() || teamChatCodePointLength(body) > TEAM_CHAT_MESSAGE_MAX_CHARS || body.includes("\0")) {
-          throw invalid("Messages need 1 to 4000 characters.");
+        const { conversationId, clientKey, body, mentionUserIds, attachmentIds = [] } = command.payload as TeamChatCommandPayloads["teamChat.message.send"];
+        // Attachments may stand alone; otherwise the text carries the message.
+        if ((!body.trim() && attachmentIds.length === 0) || teamChatCodePointLength(body) > TEAM_CHAT_MESSAGE_MAX_CHARS || body.includes("\0")
+          || attachmentIds.length > TEAM_CHAT_ATTACHMENT_LIMITS.perMessage || new Set(attachmentIds).size !== attachmentIds.length) {
+          throw invalid("Messages need 1 to 4000 characters or up to 10 distinct attachments.");
         }
         return gateway.postMessage(conversationId, {
           clientKey,
-          body,
-          ...(mentionUserIds === undefined || mentionUserIds.length === 0 ? {} : { mentionUserIds })
+          // Blank text beside files is no text.
+          body: attachmentIds.length > 0 && !body.trim() ? "" : body,
+          ...(mentionUserIds === undefined || mentionUserIds.length === 0 ? {} : { mentionUserIds }),
+          ...(attachmentIds.length === 0 ? {} : { attachmentIds })
         }, signal);
+      }
+      case "teamChat.attachment.begin": {
+        const { conversationId, ...input } = command.payload as TeamChatCommandPayloads["teamChat.attachment.begin"];
+        if (teamChatAttachmentRejection({ name: input.fileName, size: input.byteSize }) !== undefined) {
+          throw invalid("This file cannot be attached.");
+        }
+        const { attachment, upload } = await gateway.createAttachment(conversationId, input, signal);
+        this.#transfers.begin(attachment, upload);
+        return { attachment };
+      }
+      case "teamChat.attachment.chunk": {
+        const { attachmentId, offset, data } = command.payload as TeamChatCommandPayloads["teamChat.attachment.chunk"];
+        return { received: this.#transfers.chunk(attachmentId, offset, data) };
+      }
+      case "teamChat.attachment.finish": {
+        const { attachmentId } = command.payload as TeamChatCommandPayloads["teamChat.attachment.finish"];
+        return { attachment: await this.#transfers.finish(attachmentId, signal) };
+      }
+      case "teamChat.attachment.discard":
+        // The service discards the unused grant on its own (ADR 0009).
+        this.#transfers.discard((command.payload as TeamChatCommandPayloads["teamChat.attachment.discard"]).attachmentId);
+        return {};
+      case "teamChat.attachment.read": {
+        const { attachmentId, offset, length } = command.payload as TeamChatCommandPayloads["teamChat.attachment.read"];
+        return this.#transfers.read(attachmentId, offset, length ?? TEAM_CHAT_ATTACHMENT_LIMITS.chunk,
+          () => gateway.attachmentDownload(attachmentId, signal), signal);
       }
       case "teamChat.message.edit": {
         const { conversationId, messageId, body, mentionUserIds } = command.payload as TeamChatCommandPayloads["teamChat.message.edit"];
@@ -273,6 +318,11 @@ export class TeamChatCommandRouter {
 
   async #access(): Promise<TeamChatAccess> {
     const { endpoint, credential } = await this.dependencies.session();
+    const owner = `${endpoint}\n${credential.accountId}\n${credential.userId}`;
+    if (owner !== this.#transferOwner) {
+      this.#transfers.clear();
+      this.#transferOwner = owner;
+    }
     return { endpoint, accessToken: credential.accessToken, teamId: credential.accountId, userId: credential.userId };
   }
 }

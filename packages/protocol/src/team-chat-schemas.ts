@@ -1,4 +1,5 @@
 import {
+  TEAM_CHAT_ATTACHMENT_LIMITS,
   TEAM_CHAT_ACTIVITY_KEY_PATTERN,
   TEAM_CHAT_ACTIVITY_LIMIT,
   TEAM_CHAT_AGENT_LIMITS,
@@ -162,6 +163,17 @@ export const TeamChatWorkCardSchema = strictObject({
   updatedAt: TimestampSchema
 });
 
+const DimensionSchema = Type.Integer({ minimum: 1, maximum: 20_000 });
+const AttachmentSchema = strictObject({
+  id: IdSchema,
+  fileName: Type.String({ minLength: 1, maxLength: TEAM_CHAT_ATTACHMENT_LIMITS.fileName }),
+  contentType: Type.String({ minLength: 1, maxLength: 120 }),
+  byteSize: Type.Integer({ minimum: 1, maximum: TEAM_CHAT_ATTACHMENT_LIMITS.bytes }),
+  width: Type.Optional(DimensionSchema),
+  height: Type.Optional(DimensionSchema)
+});
+const AttachmentIdsSchema = Type.Array(IdSchema, { maxItems: TEAM_CHAT_ATTACHMENT_LIMITS.perMessage });
+
 export const TeamChatMessageSchema = strictObject({
   id: IdSchema,
   conversationId: IdSchema,
@@ -174,6 +186,7 @@ export const TeamChatMessageSchema = strictObject({
   editedAt: Type.Optional(TimestampSchema),
   recalledAt: Type.Optional(TimestampSchema),
   recalledBy: Type.Optional(IdSchema),
+  attachments: Type.Optional(Type.Array(AttachmentSchema, { maxItems: TEAM_CHAT_ATTACHMENT_LIMITS.perMessage })),
   workCard: Type.Optional(TeamChatWorkCardSchema),
   mentionUserIds: Type.Optional(MentionsSchema),
   agentInvocations: Type.Optional(Type.Array(InvocationSummarySchema, { maxItems: TEAM_CHAT_MENTION_MAX }))
@@ -234,8 +247,10 @@ export const TeamChatCommandPayloadSchemas: Record<keyof TeamChatCommandPayloads
   "teamChat.message.send": strictObject({
     conversationId: IdSchema,
     clientKey: ClientKeySchema,
-    body: BodySchema,
-    mentionUserIds: Type.Optional(MentionsSchema)
+    // Empty only with attachments; Agent Host enforces the pairing.
+    body: Type.String({ maxLength: TEAM_CHAT_MESSAGE_MAX_CHARS }),
+    mentionUserIds: Type.Optional(MentionsSchema),
+    attachmentIds: Type.Optional(AttachmentIdsSchema)
   }),
   "teamChat.read.mark": strictObject({ conversationId: IdSchema, lastReadSeq: SeqSchema }),
   "teamChat.channel.create": strictObject({
@@ -300,7 +315,26 @@ export const TeamChatCommandPayloadSchemas: Record<keyof TeamChatCommandPayloads
     body: BodySchema,
     mentionUserIds: Type.Optional(MentionsSchema)
   }),
-  "teamChat.message.recall": strictObject({ conversationId: IdSchema, messageId: IdSchema })
+  "teamChat.message.recall": strictObject({ conversationId: IdSchema, messageId: IdSchema }),
+  "teamChat.attachment.begin": strictObject({
+    conversationId: IdSchema,
+    fileName: Type.String({ minLength: 1, maxLength: TEAM_CHAT_ATTACHMENT_LIMITS.fileName }),
+    byteSize: Type.Integer({ minimum: 1, maximum: TEAM_CHAT_ATTACHMENT_LIMITS.bytes }),
+    width: Type.Optional(DimensionSchema),
+    height: Type.Optional(DimensionSchema)
+  }),
+  "teamChat.attachment.chunk": strictObject({
+    attachmentId: IdSchema,
+    offset: Type.Integer({ minimum: 0, maximum: TEAM_CHAT_ATTACHMENT_LIMITS.bytes - 1 }),
+    data: Type.Any()
+  }),
+  "teamChat.attachment.finish": strictObject({ attachmentId: IdSchema }),
+  "teamChat.attachment.discard": strictObject({ attachmentId: IdSchema }),
+  "teamChat.attachment.read": strictObject({
+    attachmentId: IdSchema,
+    offset: Type.Integer({ minimum: 0, maximum: TEAM_CHAT_ATTACHMENT_LIMITS.bytes - 1 }),
+    length: Type.Optional(Type.Integer({ minimum: 1, maximum: TEAM_CHAT_ATTACHMENT_LIMITS.chunk }))
+  })
 };
 
 export const TeamChatCommandResultSchemas: Record<keyof TeamChatCommandResults, TSchema> = {
@@ -358,7 +392,19 @@ export const TeamChatCommandResultSchemas: Record<keyof TeamChatCommandResults, 
     nextCursor: Type.Optional(SearchCursorSchema)
   }),
   "teamChat.message.edit": TeamChatMessageSchema,
-  "teamChat.message.recall": TeamChatMessageSchema
+  "teamChat.message.recall": TeamChatMessageSchema,
+  "teamChat.attachment.begin": strictObject({ attachment: AttachmentSchema }),
+  "teamChat.attachment.chunk": strictObject({ received: Type.Integer({ minimum: 0, maximum: TEAM_CHAT_ATTACHMENT_LIMITS.bytes }) }),
+  "teamChat.attachment.finish": strictObject({ attachment: AttachmentSchema }),
+  "teamChat.attachment.discard": EmptySchema,
+  "teamChat.attachment.read": strictObject({
+    attachmentId: IdSchema,
+    contentType: Type.String({ minLength: 1, maxLength: 120 }),
+    byteLength: Type.Integer({ minimum: 1, maximum: TEAM_CHAT_ATTACHMENT_LIMITS.bytes }),
+    offset: Type.Integer({ minimum: 0, maximum: TEAM_CHAT_ATTACHMENT_LIMITS.bytes - 1 }),
+    data: Type.Any(),
+    done: Type.Boolean()
+  })
 };
 
 export const TeamChatEventPayloadSchemas: Record<keyof TeamChatEventPayloads, TSchema> = {

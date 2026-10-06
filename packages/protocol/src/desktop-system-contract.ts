@@ -158,6 +158,12 @@ export interface WorkbenchLayoutV5 {
 
 export type SecureStorageAccess = "available" | "unavailable";
 
+/** A Team Chat attachment the renderer read through Agent Host, to save where the user picks. */
+export interface TeamChatAttachmentSaveRequest {
+  fileName: string;
+  data: ArrayBuffer;
+}
+
 /** Complete, typed surface exposed by the sandboxed Desktop preload. */
 export interface DesktopSystemBridge {
   getPlatformInfo(): Promise<DesktopPlatformInfo>;
@@ -201,6 +207,8 @@ export interface DesktopSystemBridge {
   getRecoverySnapshot(): Promise<DesktopRecoverySnapshot>;
   uploadDiagnostics(request: SupportDiagnosticsExportRequest): Promise<SupportDiagnosticsUploadReceipt>;
   saveDiagnostics(request: SupportDiagnosticsExportRequest): Promise<string | undefined>;
+  /** Asks where to save a Team Chat attachment's bytes; false when the user cancels (ADR 0009). */
+  saveTeamChatAttachment(request: TeamChatAttachmentSaveRequest): Promise<boolean>;
   showNativeNotification(request: NativeNotificationRequest): Promise<boolean>;
   dismissNativeNotification(notificationId: string): Promise<boolean>;
   requestOpenExternal(url: string): Promise<boolean>;

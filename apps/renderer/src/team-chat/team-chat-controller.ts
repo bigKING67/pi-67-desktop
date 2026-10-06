@@ -1,5 +1,6 @@
 import type {
   TeamChatAgentBinding,
+  TeamChatAttachment,
   TeamChatChannelAction,
   TeamChatChannelRoster,
   TeamChatConnectionState,
@@ -27,6 +28,7 @@ import {
   removePending,
   replaceDirectory,
   upsertConversation,
+  type TeamChatPendingMessage,
   type TeamChatState
 } from "./team-chat-model.js";
 import { createTeamChatHistory } from "./team-chat-history.js";
@@ -151,11 +153,14 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
     }
   }
 
-  async function deliver(conversationId: string, clientKey: string, body: string, mentionUserIds: readonly string[] = []): Promise<void> {
+  async function deliver(pending: TeamChatPendingMessage): Promise<void> {
+    const { conversationId, clientKey, body, mentionUserIds = [], attachments = [] } = pending;
     const settle = since();
     try {
       const message = await port.request("teamChat.message.send", {
-        conversationId, clientKey, body, ...(mentionUserIds.length === 0 ? {} : { mentionUserIds: [...mentionUserIds] })
+        conversationId, clientKey, body,
+        ...(mentionUserIds.length === 0 ? {} : { mentionUserIds: [...mentionUserIds] }),
+        ...(attachments.length === 0 ? {} : { attachmentIds: attachments.map((item) => item.id) })
       });
       settle((state) => applyMessage(state, message));
     } catch (error) {
@@ -285,19 +290,25 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
     markRead,
     selectConversation,
     reloadThread: loadLatest,
-    async send(conversationId: string, body: string, mentionUserIds: readonly string[] = []): Promise<void> {
-      const clientKey = port.newClientKey();
-      update((state) => addPending(state, {
-        clientKey, conversationId, body, createdAt: Date.now(), status: "sending",
-        ...(mentionUserIds.length === 0 ? {} : { mentionUserIds: [...mentionUserIds] })
-      }));
-      await deliver(conversationId, clientKey, body, mentionUserIds);
+    async send(
+      conversationId: string,
+      body: string,
+      mentionUserIds: readonly string[] = [],
+      attachments: readonly TeamChatAttachment[] = []
+    ): Promise<void> {
+      const pending: TeamChatPendingMessage = {
+        clientKey: port.newClientKey(), conversationId, body, createdAt: Date.now(), status: "sending",
+        ...(mentionUserIds.length === 0 ? {} : { mentionUserIds: [...mentionUserIds] }),
+        ...(attachments.length === 0 ? {} : { attachments: [...attachments] })
+      };
+      update((state) => addPending(state, pending));
+      await deliver(pending);
     },
     async retrySend(clientKey: string): Promise<void> {
       const pending = store.getState().pending.find((item) => item.clientKey === clientKey);
       if (!pending || pending.status !== "failed") return;
       update((state) => addPending(state, { ...pending, status: "sending" }));
-      await deliver(pending.conversationId, clientKey, pending.body, pending.mentionUserIds);
+      await deliver(pending);
     },
     discardPending: (clientKey: string) => update((state) => removePending(state, clientKey)),
     async openDirectMessage(userId: string): Promise<void> {

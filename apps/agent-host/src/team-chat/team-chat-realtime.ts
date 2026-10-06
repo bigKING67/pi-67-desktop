@@ -4,7 +4,7 @@
 import type { TeamChatConnectionState, TeamChatPushEvent } from "@pi67/domain";
 import { asRecord, boundedInteger, boundedString } from "../context/enterprise-context-gateway-validation.js";
 import { HostCommandError } from "../protocol-error.js";
-import { parseInvocationSummary, parseMessage } from "./team-chat-gateway.js";
+import { parseInvocationSummary, parseMessage } from "./team-chat-message-parse.js";
 import { parseWorkCard } from "./team-chat-work-card-parse.js";
 
 const MAX_FRAME_CHARS = 64 * 1024;

@@ -6,7 +6,8 @@ import {
   invalidResponse,
   parseTimestamp
 } from "../context/enterprise-context-gateway-validation.js";
-import { TeamChatGateway, nullable, parseMessage } from "./team-chat-gateway.js";
+import { TeamChatGateway, nullable } from "./team-chat-gateway.js";
+import { parseMessage } from "./team-chat-message-parse.js";
 
 const MAX_AGENTS = 50;
 const MAX_PENDING = 50;

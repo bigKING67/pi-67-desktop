@@ -14,6 +14,7 @@ import {
   type EventPayloads
 } from "./agent-messages.js";
 import { isValidAssetReadResult } from "./asset-schemas.js";
+import { isValidTeamChatAttachmentChunk, isValidTeamChatAttachmentRead } from "./team-chat-attachment-validation.js";
 import {
   CommandPayloadSchemas,
   CommandResultSchemas,
@@ -209,6 +210,7 @@ export function isRequestEnvelope(value: unknown): value is RequestEnvelope {
   const type = envelope.type as AgentCommandType;
   const schema = CommandPayloadSchemas[type];
   if (!schema || !Value.Check(schema, envelope.payload)) return false;
+  if (type === "teamChat.attachment.chunk" && !isValidTeamChatAttachmentChunk(envelope.payload)) return false;
   if (isReplaySafeControlMutation(type) !== (typeof envelope.idempotencyKey === "string")) return false;
   if (!hasValidCommandContext(type, envelope.context as ProtocolContext)) return false;
   return true;
@@ -276,6 +278,7 @@ export function isResponseEnvelope(value: unknown): value is ResponseEnvelope {
   if (!envelope.ok) return true;
   if (!Value.Check(CommandResultSchemas[type], envelope.result)) return false;
   if (type === "asset.read" && !isValidAssetReadResult(envelope.result)) return false;
+  if (type === "teamChat.attachment.read" && !isValidTeamChatAttachmentRead(envelope.result)) return false;
   return type !== "session.catalog.query" || (
     hasBoundSessionCatalogCursor(envelope.result)
     && isEnvelopeWithinByteLimit(envelope.result, MAX_SESSION_CATALOG_PAGE_JSON_BYTES)

@@ -1,5 +1,6 @@
 import type {
   TeamChatActivityItem,
+  TeamChatAttachment,
   TeamChatAgent,
   TeamChatAgentActivity,
   TeamChatAgentBinding,
@@ -23,7 +24,9 @@ export interface TeamChatCommandPayloads {
   "teamChat.connection.get": Record<string, never>;
   "teamChat.directory.get": Record<string, never>;
   "teamChat.messages.list": { conversationId: string; before?: number; after?: number; limit?: number };
-  "teamChat.message.send": { conversationId: string; clientKey: string; body: string; mentionUserIds?: string[] };
+  "teamChat.message.send": {
+    conversationId: string; clientKey: string; body: string; mentionUserIds?: string[]; attachmentIds?: string[];
+  };
   "teamChat.read.mark": { conversationId: string; lastReadSeq: number };
   "teamChat.channel.create": { name: string; visibility: TeamChatVisibility; memberUserIds: string[] };
   "teamChat.channel.join": { conversationId: string };
@@ -59,6 +62,22 @@ export interface TeamChatCommandPayloads {
   "teamChat.search": { query: string; conversationId?: string; senderUserId?: string; cursor?: string };
   "teamChat.message.edit": { conversationId: string; messageId: string; body: string; mentionUserIds?: string[] };
   "teamChat.message.recall": { conversationId: string; messageId: string };
+  "teamChat.attachment.begin": { conversationId: string; fileName: string; byteSize: number; width?: number; height?: number };
+  /** `data` is an ArrayBuffer of at most one chunk; checked outside TypeBox. */
+  "teamChat.attachment.chunk": { attachmentId: string; offset: number; data: ArrayBuffer };
+  "teamChat.attachment.finish": { attachmentId: string };
+  "teamChat.attachment.discard": { attachmentId: string };
+  "teamChat.attachment.read": { attachmentId: string; offset: number; length?: number };
+}
+
+/** One chunk of an attachment's bytes, read through Agent Host (ADR 0009). */
+export interface TeamChatAttachmentReadResult {
+  attachmentId: string;
+  contentType: string;
+  byteLength: number;
+  offset: number;
+  data: ArrayBuffer;
+  done: boolean;
 }
 
 /** The secret delivery URL appears only in this result, once; it is never stored by Desktop. */
@@ -104,6 +123,11 @@ export interface TeamChatCommandResults {
   "teamChat.search": TeamChatSearchPage;
   "teamChat.message.edit": TeamChatMessage;
   "teamChat.message.recall": TeamChatMessage;
+  "teamChat.attachment.begin": { attachment: TeamChatAttachment };
+  "teamChat.attachment.chunk": { received: number };
+  "teamChat.attachment.finish": { attachment: TeamChatAttachment };
+  "teamChat.attachment.discard": Record<string, never>;
+  "teamChat.attachment.read": TeamChatAttachmentReadResult;
 }
 
 export interface TeamChatEventPayloads {

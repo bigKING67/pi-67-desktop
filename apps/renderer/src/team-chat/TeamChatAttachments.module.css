@@ -1,0 +1,295 @@
+/* Team Chat attachments (ADR 0009): inline images, file cards, composer tray, viewer. */
+
+.attachments {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  margin-top: 4px;
+}
+
+.images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.thumbnail {
+  display: grid;
+  max-width: 100%;
+  place-items: center;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  cursor: zoom-in;
+}
+
+.thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbnail[data-hovered] { border-color: var(--border-strong); }
+.thumbnail[data-disabled] { cursor: default; }
+
+.thumbnailLoading {
+  width: 100%;
+  height: 100%;
+  background: var(--surface-hover);
+}
+
+.thumbnailError {
+  align-content: center;
+  gap: 4px;
+  padding: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  text-align: center;
+  cursor: default;
+}
+
+.fileCard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: min(360px, 100%);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.fileIcon,
+.trayIcon { color: var(--text-secondary); }
+
+.fileText,
+.trayText {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.fileName {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileMeta {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.saveButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font-size: var(--font-size-caption);
+}
+
+.saveButton[data-hovered] { background: var(--surface-hover); }
+
+.saveButton[data-disabled] {
+  background: var(--surface-disabled);
+  color: var(--text-disabled);
+}
+
+.inlineAction {
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--accent-strong);
+  font-size: var(--font-size-caption);
+}
+
+.iconButton {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.iconButton[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.thumbnail[data-focus-visible],
+.saveButton[data-focus-visible],
+.inlineAction[data-focus-visible],
+.iconButton[data-focus-visible] {
+  box-shadow: var(--shadow-focus);
+  outline: none;
+}
+
+/* Composer: attach button, drop target and tray. */
+.attachButton {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.attachButton[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.attachButton[data-disabled] { color: var(--text-disabled); }
+
+.attachButton[data-focus-visible] {
+  box-shadow: var(--shadow-focus);
+  outline: none;
+}
+
+.dropTarget {
+  position: relative;
+  border-color: var(--accent);
+  border-style: dashed;
+}
+
+.dropTarget::after {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  color: var(--accent-strong);
+  content: attr(data-drop-hint);
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-medium);
+  pointer-events: none;
+}
+
+.tray {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0 0 var(--space-1);
+  list-style: none;
+}
+
+.trayItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  width: 240px;
+  max-width: 100%;
+  padding: 4px 4px 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.trayItemFailed { border-color: var(--danger); }
+.trayItemFailed .fileMeta { color: var(--danger); }
+
+.trayPreview {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.trayIcon { margin: 0 7px; }
+
+.progress {
+  display: block;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 1px;
+  background: var(--border);
+}
+
+.progress > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width var(--motion-fast) var(--motion-ease-out);
+}
+
+/* Image viewer. */
+.viewer {
+  width: min(1100px, 100%);
+  height: min(860px, 100%);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-overlay);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+  overflow: hidden;
+}
+
+.viewerDialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  outline: none;
+}
+
+.viewerHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.viewerTitle {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viewerStage {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: var(--space-4);
+  background: var(--surface-muted);
+}
+
+.viewerStage img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress > span { transition: none; }
+}

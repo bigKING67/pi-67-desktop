@@ -5,6 +5,7 @@ import {
   type TeamChatActivityItem,
   type TeamChatAgent,
   type TeamChatAgentInvocationSummary,
+  type TeamChatAttachment,
   type TeamChatConnectionState,
   type TeamChatConversation,
   type TeamChatDirectory,
@@ -35,6 +36,8 @@ export interface TeamChatPendingMessage {
   status: "sending" | "failed";
   error?: string;
   mentionUserIds?: string[];
+  /** Already stored; sent with the message (ADR 0009). */
+  attachments?: TeamChatAttachment[];
 }
 
 /** Disposable presentation cache; New Money remains the chat truth. */
@@ -182,7 +185,7 @@ export function applyMessage(state: TeamChatState, message: TeamChatMessage): Te
     ...(advances ? {
       lastMessageAt: message.createdAt,
       lastSenderUserId: message.senderUserId,
-      lastPreview: teamChatCodePointPrefix(message.body, PREVIEW_CHARS)
+      lastPreview: messagePreview(message)
     } : {})
   });
   return next;
@@ -211,7 +214,7 @@ export function applyMessageUpdate(state: TeamChatState, message: TeamChatMessag
     : state;
   const conversation = state.directory?.conversations.find((item) => item.id === message.conversationId);
   if (conversation && conversation.lastSeq === message.seq) {
-    next = upsertConversation(next, { ...conversation, lastPreview: teamChatCodePointPrefix(message.body, PREVIEW_CHARS) });
+    next = upsertConversation(next, { ...conversation, lastPreview: messagePreview(message) });
   }
   if (message.recalledAt !== undefined) {
     if (next.search?.results.some((hit) => hit.messageId === message.id)) {
@@ -358,4 +361,9 @@ export function canSendTo(directory: TeamChatDirectory | undefined, conversation
   if (!conversation.joined) return false;
   if (conversation.kind === "channel") return true;
   return conversation.memberCount === 2 && memberById(directory, teamChatDirectPeer(conversation, directory?.selfUserId ?? "")) !== undefined;
+}
+
+/** As the service previews: the text, or the first file's name when there is none. */
+function messagePreview(message: TeamChatMessage): string {
+  return teamChatCodePointPrefix(message.body || (message.attachments?.[0]?.fileName ?? ""), PREVIEW_CHARS);
 }

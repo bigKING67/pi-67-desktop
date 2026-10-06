@@ -330,6 +330,11 @@ export async function installMockDesktopBridge(
             health: bridgeFixture.runtimeHealth
           }),
           saveDiagnostics: async () => "/tmp/pi67-diagnostics.json",
+          saveTeamChatAttachment: async (request: { fileName: string; data: ArrayBuffer }) => {
+            const saved = (window as unknown as { __pi67SavedAttachments?: Array<{ fileName: string; byteLength: number }> });
+            (saved.__pi67SavedAttachments ??= []).push({ fileName: request.fileName, byteLength: request.data.byteLength });
+            return true;
+          },
           showNativeNotification: async (request: NativeNotificationRequest) => {
             nativeNotificationTest.requests.push(structuredClone(request));
             return true;
