@@ -1,4 +1,4 @@
-import { newMoneyErrorMessage } from "../context-memory/new-money-error-message.js";
+import { NEW_MONEY_SIGN_IN_EXPIRED_MESSAGE, newMoneyErrorMessage } from "../context-memory/new-money-error-message.js";
 import type {
   ContextMemoryConfiguration,
   EnterpriseProjectSummary,
@@ -120,7 +120,7 @@ export function ContextMemorySettings() {
         setSelectedProjectId(undefined);
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "无法读取上下文与记忆状态。");
+      setError(newMoneyErrorMessage(cause, "无法读取上下文与记忆状态。"));
     } finally {
       setBusy((current) => current === "load" ? undefined : current);
     }
@@ -247,7 +247,7 @@ export function ContextMemorySettings() {
       title={messages.settings.sections.contextMemory.label}
       description={messages.settings.sections.contextMemory.summary}
     />
-    {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
+    {error ? <SettingsNotice tone={error === NEW_MONEY_SIGN_IN_EXPIRED_MESSAGE ? "warning" : "danger"}>{error}</SettingsNotice> : null}
     {overview.status.conflictExtensions.length > 0 ? <SettingsNotice tone="danger">
       检测到冲突的记忆扩展：{overview.status.conflictExtensions.join("、")}。这些扩展已停止加载；对话仍可继续，已有记忆不会删除。
     </SettingsNotice> : null}

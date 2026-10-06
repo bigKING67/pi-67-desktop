@@ -3,7 +3,7 @@ import type { LocalMemorySettingsSnapshot } from "@pi67/protocol";
 import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button, Input } from "react-aria-components";
-import { SettingsNotice, SettingsRow, SettingsRows, SettingsSectionBlock } from "./SettingsPrimitives.js";
+import { SettingsInfo, SettingsNotice, SettingsRow, SettingsRows, SettingsSectionBlock } from "./SettingsPrimitives.js";
 import { useSettingsDraftRegistration } from "./SettingsDraftGuard.js";
 import styles from "./ContextMemorySettings.module.css";
 import { LocalMemoryRuntimeSettings } from "./LocalMemoryRuntimeSettings.js";
@@ -95,21 +95,23 @@ export function LocalMemoryModelSettings({ onPendingChange, children }: { onPend
       ? <SettingsNotice tone="info">此版本或平台尚未提供本地记忆模型设置。</SettingsNotice> : <>
         <SettingsRows>
           {([
-            ["provider", "提取 Provider ID", "使用已有 Pi Provider，不另存其密钥。"],
-            ["extraction", "提取模型 ID", "当前支持 API Key 认证的 OpenAI Chat Completions 模型。"],
-            ["plannerProvider", "召回改写 Provider ID（可选）", "使用已有 Pi Provider。与下方模型 ID 同时留空则关闭召回改写。"],
-            ["planner", "召回改写模型 ID（可选）", "有对话历史时先用它把追问改写成检索词，通常多等 2–4 秒。建议选关闭思考的轻量模型，如方舟 doubao-seed-2-0-mini；需在 Pi 模型配置声明 thinkingFormat 才能关闭思考。"],
-            ["endpoint", "Embedding 服务地址", "HTTPS 或本机 loopback 地址；更换地址需要重新输入密钥。"],
-            ["model", "Embedding 模型 ID", "更换模型可能需要重建现有索引。"],
-            ["dimension", "向量维度", "须与模型输出一致；修改后不会自动迁移索引。"]
-          ] as const).map(([name, label, description]) => <SettingsRow key={name} title={label} description={description}>
-            <Input aria-label={label} className={styles.input!} value={draft[name]} disabled={busy || activationPending}
+            ["provider", "提取 Provider ID", "使用已有 Pi Provider，不另存其密钥。", undefined],
+            ["extraction", "提取模型 ID", "需为 API Key 认证的 OpenAI Chat Completions 模型。", undefined],
+            ["plannerProvider", "召回改写 Provider ID（可选）", "与下方模型 ID 同时留空则关闭召回改写。", undefined],
+            ["planner", "召回改写模型 ID（可选）", "把追问改写成检索词，通常多等 2–4 秒。",
+              "仅在有对话历史时使用。建议选关闭思考的轻量模型，如方舟 doubao-seed-2-0-mini；需在 Pi 模型配置声明 thinkingFormat 才能关闭思考。"],
+            ["endpoint", "Embedding 服务地址", "HTTPS 或本机 loopback；更换后需重新输入密钥。", undefined],
+            ["model", "Embedding 模型 ID", "更换模型可能需要重建现有索引。", undefined],
+            ["dimension", "向量维度", "须与模型输出一致；修改后不会自动迁移索引。", undefined]
+          ] as const).map(([name, label, description, info]) => <SettingsRow key={name} description={description}
+            title={info ? <>{label}<SettingsInfo label={`${label}说明`}>{info}</SettingsInfo></> : label}
+            actions={<Input aria-label={label} className={styles.rowInput!} value={draft[name]} disabled={busy || activationPending}
               inputMode={name === "dimension" ? "numeric" : "text"}
-              onChange={(event) => { hide(); setNotice(undefined); setDraft({ ...draft, [name]: event.currentTarget.value }); }} />
-          </SettingsRow>)}
-          <SettingsRow title="Embedding API Key" description="默认隐藏。点击小眼睛查看；隐藏、切走窗口或离开此页后清除显示用的已保存密钥。">
-            <div className={styles.secretField}>
-              <Input aria-label="Embedding API Key" className={styles.input!} type={visible ? "text" : "password"}
+              onChange={(event) => { hide(); setNotice(undefined); setDraft({ ...draft, [name]: event.currentTarget.value }); }} />} />)}
+          <SettingsRow description="默认隐藏，离开此页后清除显示。"
+            title={<>Embedding API Key<SettingsInfo label="Embedding API Key 说明">点击小眼睛查看；隐藏、切走窗口或离开此页后清除显示用的已保存密钥。</SettingsInfo></>}
+            actions={<div className={styles.secretField}>
+              <Input aria-label="Embedding API Key" className={styles.rowInput!} type={visible ? "text" : "password"}
                 autoComplete="off" spellCheck={false} value={replacement || (visible ? revealed ?? "" : "")}
                 placeholder={snapshot.status === "configured" ? "已保存 · 留空保留" : "输入模型 API Key"} disabled={busy || activationPending}
                 onChange={(event) => { hide(); setReplacement(event.currentTarget.value); setNotice(undefined); }} />
@@ -117,7 +119,7 @@ export function LocalMemoryModelSettings({ onPendingChange, children }: { onPend
                 aria-pressed={visible} isDisabled={busy || activationPending || !canReveal} onPress={() => void toggle()}>
                 {visible ? <EyeOff aria-hidden="true" size={14} /> : <Eye aria-hidden="true" size={14} />}
               </Button>
-            </div>
+            </div>}>
             {loadingKey ? <span role="status">正在读取密钥…</span> : null}
           </SettingsRow>
         </SettingsRows>

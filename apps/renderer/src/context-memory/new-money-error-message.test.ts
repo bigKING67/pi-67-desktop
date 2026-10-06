@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { newMoneyErrorMessage } from "./new-money-error-message.js";
+import { NEW_MONEY_SIGN_IN_EXPIRED_MESSAGE, newMoneyErrorMessage } from "./new-money-error-message.js";
 
 it("distinguishes model policy, membership and request admission without assuming a cause", () => {
   expect(newMoneyErrorMessage(new Error("The current model is not authorized to process this team's shared content."), "失败")).toContain("模型政策");
@@ -8,4 +8,9 @@ it("distinguishes model policy, membership and request admission without assumin
   expect(newMoneyErrorMessage(new Error("Team worker lifecycle unavailable."), "失败")).toContain("运行诊断");
   expect(newMoneyErrorMessage(new Error("Unknown failure"), "失败")).toBe("Unknown failure");
   expect(newMoneyErrorMessage(null, "失败")).toBe("失败");
+});
+
+it("localizes expired sign-in and bare HTTP failures from the Agent Host", () => {
+  expect(newMoneyErrorMessage(new Error("New Money sign-in expired or was rejected."), "失败")).toBe(NEW_MONEY_SIGN_IN_EXPIRED_MESSAGE);
+  expect(newMoneyErrorMessage(new Error("New Money request failed (502)."), "失败")).toBe("New Money 请求失败（502），请稍后重试。");
 });

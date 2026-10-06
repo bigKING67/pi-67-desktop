@@ -958,6 +958,9 @@ loading error where the operation can produce those states
 - Whole-page drafts keep Save in the page header. Provider detail and credential
   edits retain local save/verify/cancel transactions. Test, refresh, install and
   reset remain beside their affected section. No cross-capability master Save.
+- An expired or rejected New Money sign-in on the Memory page is a localized
+  warning that points to `账户与数据`; private memory remains usable, so it is
+  never a red page failure or raw Agent Host English text.
 - Account/Data shows actual identity and device authorization state, followed by
   team/project actions and local/private/shared-data boundaries. The service
   address lives in advanced connection details; login and logout use the existing
@@ -1044,7 +1047,10 @@ loading error where the operation can produce those states
   Save/Discard transaction and the standard unsaved-settings guard. The optional
   Recall query planner uses the same plain Provider ID / model ID field pair as
   extraction, labelled `（可选）`, placed after extraction; its description states the
-  latency cost and a thinking-off lightweight example. Saving with exactly one of
+  latency cost, with the thinking-off lightweight example in its info tip. Every
+  field is an ordinary Settings row: title and one short hint on the left, a
+  300px input (the key input plus its eye share the same 300px column) on the
+  right, never a stacked label/hint/half-width input. Saving with exactly one of
   the two filled shows an inline danger notice and keeps the draft; both empty
   means expansion off. The embedding
   key is hidden by default; an adjacent eye button explicitly reveals the saved

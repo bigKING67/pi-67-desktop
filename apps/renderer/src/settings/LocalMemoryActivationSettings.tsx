@@ -1,7 +1,7 @@
 import type { LocalMemoryActivationSnapshot, LocalMemoryHealthCheck } from "@pi67/protocol";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
-import { SettingsNotice, SettingsRow, SettingsRows, SettingsSectionBlock, SettingsStatus } from "./SettingsPrimitives.js";
+import { SettingsInfo, SettingsNotice, SettingsRow, SettingsRows, SettingsSectionBlock, SettingsStatus } from "./SettingsPrimitives.js";
 import { useSettingsDraftRegistration } from "./SettingsDraftGuard.js";
 
 type Available = Extract<LocalMemoryActivationSnapshot, { available: true }>;
@@ -96,8 +96,9 @@ export function LocalMemoryActivationSettings({ disabled = false, onPendingChang
         actions={snapshot && !current ? undefined : <Button className="secondary-button" isDisabled={locked} onPress={() => void change(current?.preference === "disabled")}>
           {busy ? "正在处理…" : current?.preference === "enabled" ? "关闭私人记忆" : current?.preference === "unknown" ? "关闭并保存" : "启用（重启后生效）"}
         </Button>} />
-      {current ? <SettingsRow title="本次运行状态" value={states[current.lifecycle]}
-        description="由 Desktop 自动管理地址。检测不启动服务、不调用模型，也不读取记忆内容；运行或检测通过不代表已完成记忆学习与召回。"
+      {current ? <SettingsRow value={states[current.lifecycle]}
+        title={<>本次运行状态<SettingsInfo label="本次运行状态说明">检测不启动服务、不调用模型，也不读取记忆内容；运行或检测通过不代表已完成记忆学习与召回。</SettingsInfo></>}
+        description="由 Desktop 自动管理地址。"
         actions={<Button className="secondary-button" isDisabled={locked || current.lifecycle !== "running" || current.restartRequired}
           onPress={() => void check()}>{checking ? "正在检测…" : "检测本地服务"}</Button>} /> : null}
     </SettingsRows>

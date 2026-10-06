@@ -1,7 +1,13 @@
+/** An expired sign-in leaves private memory usable, so callers present it as a warning, not a failure. */
+export const NEW_MONEY_SIGN_IN_EXPIRED_MESSAGE = "New Money 登录已过期或被拒绝，请到「账户与数据」重新登录；私人记忆不受影响。";
+
 /** Presentation only. Never changes authorization or retries a failed operation. */
 export function newMoneyErrorMessage(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) return fallback;
   const message = error.message;
+  if (message === "New Money sign-in expired or was rejected.") return NEW_MONEY_SIGN_IN_EXPIRED_MESSAGE;
+  const failedStatus = /^New Money request failed \((\d{3})\)\.$/u.exec(message)?.[1];
+  if (failedStatus) return `New Money 请求失败（${failedStatus}），请稍后重试。`;
   if (message === "The current model is not authorized to process this team's shared content.") {
     return "当前模型尚未获得团队共享内容的处理授权。请在网页端检查团队模型政策，并确认本地模型配置符合政策。";
   }
