@@ -1,6 +1,6 @@
 # ADR 0009: Team Chat attachments and images
 
-Status: accepted; implemented in source (not deployed); target-OS validation pending.
+Status: accepted; service deployed 2026-10-06 (server `914ec47`, migration 018) and accepted on macOS with an image and a PDF; Windows validation pending.
 Date: 2026-10-06
 
 ## Context
