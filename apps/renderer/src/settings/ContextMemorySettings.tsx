@@ -32,6 +32,7 @@ import {
   SettingsNotice,
   SettingsPageHeader,
   SettingsSaveBar,
+  SettingsDetails,
   SettingsRow,
   SettingsRows,
   SettingsSectionBlock
@@ -337,11 +338,10 @@ export function ContextMemorySettings() {
       </SettingsRows>
     </SettingsSectionBlock>
 
-        <details className={styles.details}>
-          <summary>生效规则与安全边界</summary>
+        <SettingsDetails title="生效规则与安全边界">
           <p>只读和关闭会在当前会话的下一次 Pi 生命周期或 OpenViking 工具边界生效。重新开放学习、变更上下文引擎或服务地址，需要新建会话。</p>
           <p>Pi JSONL 始终是会话事实源。记忆以不可信上下文提供，不能授权 Shell、文件或外部操作。远程服务必须使用 HTTPS；HTTP 仅允许 127.0.0.1 / localhost。</p>
-        </details>
+        </SettingsDetails>
       </TabPanel>
     </Tabs>
     <SettingsSaveBar

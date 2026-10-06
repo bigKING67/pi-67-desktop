@@ -1558,7 +1558,10 @@ loading error where the operation can produce those states
   disable/inherit controls available, shows a bounded empty state, and points to the
   setup presets. A stale saved selection remains visible as unavailable rather than
   being presented as effective. `Qwen3.7 Flash` is the first setup preset and
-  `Doubao Seed 2.0 Mini` is second. Global and project scope use the shared Settings
+  `Doubao Seed 2.0 Mini` is second. The helper choice is one grouped row (effective
+  model as `SettingsStatus` value, fixed-width select with brand marks); presets are a
+  separate `推荐预设` grouped section whose titles lead with the inline brand mark, never
+  numbered cards nested in another card. Global and project scope use the shared Settings
   scope switch. A preset opens the existing custom Provider
   editor with editable Endpoint, protocol, and model fields; it never saves,
   requests a credential, or selects the helper until the user performs those

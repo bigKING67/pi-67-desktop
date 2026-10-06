@@ -26,6 +26,11 @@
   line-height: 1.2;
 }
 
+/* Navigation moves focus here for screen readers; a non-interactive heading shows no ring. */
+.pageHeading h1:focus {
+  outline: none;
+}
+
 .pageHeading p {
   max-width: 720px;
   color: var(--text-secondary);

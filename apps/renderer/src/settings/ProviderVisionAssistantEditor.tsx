@@ -3,7 +3,7 @@ import type {
   PiProviderConfigurationInput,
   PiProviderConfigurationSnapshot
 } from "@pi67/protocol";
-import { Plus, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "react-aria-components";
 import {
@@ -11,7 +11,8 @@ import {
   setProjectVisionAssistantConfiguration
 } from "./provider-configuration-controller.js";
 import styles from "./ProviderVisionAssistantEditor.module.css";
-import { SettingsSelect } from "./SettingsPrimitives.js";
+import { ProviderBrandIcon } from "./ProviderBrandIcon.js";
+import { SettingsRow, SettingsRows, SettingsSectionBlock, SettingsSelect, SettingsStatus } from "./SettingsPrimitives.js";
 
 const DISABLED_KEY = "disabled";
 const INHERIT_KEY = "inherit";
@@ -86,7 +87,9 @@ export function ProviderVisionAssistantEditor({
           key: modelKey(provider.id, model.id),
           provider: provider.id,
           model: model.id,
-          label: `${provider.name ?? provider.id} / ${model.name ?? model.id}`
+          label: `${provider.name ?? provider.id} / ${model.name ?? model.id}`,
+          leading: <ProviderBrandIcon hints={[model.id, model.name, provider.id, provider.name]}
+            label={model.name ?? model.id} size="inline" />
         }))
     )), [snapshot.providers]);
   const selected = scope === "global"
@@ -145,62 +148,64 @@ export function ProviderVisionAssistantEditor({
     }
   };
 
+  const global = scope === "global";
   return (
-    <section className={styles.section} data-testid={`vision-assistant-${scope}`}>
-      <div className={styles.heading}>
-        <span>
-          <strong>{scope === "global" ? "全局设置" : "项目覆盖"}</strong>
-          <small>{scope === "global"
-            ? "文本模型遇到图片时，先由选定的视觉模型生成描述；原生视觉模型仍直接处理图片。"
-            : "仅影响当前可信工作区：继承全局、明确关闭，或指定另一视觉模型。"}</small>
-        </span>
-      </div>
-      <div className={styles.controlRow}>
-        <div className={styles.field}>
-          <span>{scope === "global" ? "辅助模型" : "项目策略"}</span>
-          <SettingsSelect
-            isDisabled={saving}
-            label={scope === "global" ? "全局视觉辅助模型" : "项目视觉辅助策略"}
-            options={[
-              ...(scope === "project" ? [{ id: INHERIT_KEY, label: "继承全局设置" }] : []),
-              { id: DISABLED_KEY, label: scope === "project" ? "当前项目关闭" : "关闭视觉辅助" },
-              ...(selectedUnavailable ? [{ id: selected, label: `当前配置不可用 · ${selectedUnavailableLabel}`, disabled: true }] : []),
-              ...imageModels.map((model) => ({ id: model.key, label: model.label }))
-            ]}
-            value={selected}
-            onChange={(value) => void update(value)}
-          />
-          {imageModels.length === 0 ? (
-            <small className={styles.noModels} role="status">
-              {scope === "global"
+    <div className={styles.editor} data-testid={`vision-assistant-${scope}`}>
+      <SettingsSectionBlock
+        title={global ? "全局设置" : "项目覆盖"}
+        description={global
+          ? "文本模型遇到图片时，先由选定的视觉模型生成描述；原生视觉模型仍直接处理图片。"
+          : "仅影响当前可信工作区：继承全局、明确关闭，或指定另一视觉模型。"}
+      >
+        <SettingsRows>
+          <SettingsRow
+            title={global ? "辅助模型" : "项目策略"}
+            description={imageModels.length === 0 ? (
+              <span role="status">{global
                 ? "暂无已配置的视觉模型。请使用下方预设完成模型服务和 API Key 配置。"
-                : "暂无可用于项目覆盖的已配置视觉模型；可以继续继承全局设置。"}
-            </small>
-          ) : null}
-        </div>
-        <span
-          aria-label={`${effectiveUnavailable ? "配置不可用" : "当前生效"}：${effective}`}
-          className={`${styles.effective} ${effectiveUnavailable ? styles.effectiveWarning : ""}`}
-        >
-          {effectiveUnavailable
-            ? <ShieldAlert aria-hidden="true" size={14} />
-            : <ShieldCheck aria-hidden="true" size={14} />}
-          {effectiveUnavailable ? "配置不可用" : "当前生效"} <strong>{effective}</strong>
-        </span>
-      </div>
-      {scope === "global" && onUsePreset ? (
-        <div className={styles.presets} aria-label="推荐视觉模型预设">
-          {VISION_PROVIDER_PRESETS.map((preset, index) => (
-            <article key={preset.id}>
-              <span><em>{index + 1}</em><strong>{preset.title}</strong><small>{preset.detail}</small></span>
-              <Button className="secondary-button" isDisabled={saving} onPress={() => onUsePreset(clonePreset(preset.provider))}>
-                <Plus aria-hidden="true" size={13} />使用预设
-              </Button>
-            </article>
-          ))}
-        </div>
+                : "暂无可用于项目覆盖的已配置视觉模型；可以继续继承全局设置。"}</span>
+            ) : undefined}
+            value={<span aria-label={`${effectiveUnavailable ? "配置不可用" : "当前生效"}：${effective}`}>
+              <SettingsStatus tone={effectiveUnavailable ? "warning" : effectiveSelection ? "success" : "neutral"}>
+                {effectiveUnavailable ? "配置不可用" : "当前生效"} <strong className={styles.effective}>{effective}</strong>
+              </SettingsStatus>
+            </span>}
+            actions={<SettingsSelect
+              className={styles.select!}
+              isDisabled={saving}
+              label={global ? "全局视觉辅助模型" : "项目视觉辅助策略"}
+              options={[
+                ...(scope === "project" ? [{ id: INHERIT_KEY, label: "继承全局设置" }] : []),
+                { id: DISABLED_KEY, label: scope === "project" ? "当前项目关闭" : "关闭视觉辅助" },
+                ...(selectedUnavailable ? [{ id: selected, label: `当前配置不可用 · ${selectedUnavailableLabel}`, disabled: true }] : []),
+                ...imageModels.map((model) => ({ id: model.key, label: model.label, leading: model.leading }))
+              ]}
+              value={selected}
+              onChange={(value) => void update(value)}
+            />}
+          />
+        </SettingsRows>
+      </SettingsSectionBlock>
+      {global && onUsePreset ? (
+        <SettingsSectionBlock title="推荐预设">
+          <SettingsRows>
+            {VISION_PROVIDER_PRESETS.map((preset) => (
+              <SettingsRow
+                actions={<Button className="secondary-button" isDisabled={saving} onPress={() => onUsePreset(clonePreset(preset.provider))}>
+                  <Plus aria-hidden="true" size={13} />使用预设
+                </Button>}
+                description={preset.detail}
+                key={preset.id}
+                title={<>
+                  <ProviderBrandIcon hints={[preset.provider.models[0]?.id, preset.provider.id]} label={preset.title} size="inline" />
+                  <span>{preset.title}</span>
+                </>}
+              />
+            ))}
+          </SettingsRows>
+        </SettingsSectionBlock>
       ) : null}
-    </section>
+    </div>
   );
 }
 
