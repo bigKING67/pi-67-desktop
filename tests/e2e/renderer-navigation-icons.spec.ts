@@ -23,7 +23,7 @@ test("shows an open folder for an expanded Workspace and working animals in the 
     const icon = page.getByTestId(`workspace-mode-${mode}`).locator("svg[aria-hidden='true']");
     await expect(icon).toHaveCount(1);
   }
-  // The horse is the Lab head plus a two-stroke bridle; the ox carries a nose ring.
-  await expect(page.getByTestId("workspace-mode-chat").locator("svg path")).toHaveCount(5);
-  await expect(page.getByTestId("workspace-mode-work").locator("svg path")).toHaveCount(8);
+  // Deadpan pair: the horse is the Lab head with side-eye, brow and smirk; the ox has 14 strokes.
+  await expect(page.getByTestId("workspace-mode-chat").locator("svg path")).toHaveCount(6);
+  await expect(page.getByTestId("workspace-mode-work").locator("svg path")).toHaveCount(14);
 });

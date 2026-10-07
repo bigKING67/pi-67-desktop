@@ -89,10 +89,13 @@ completing a real session without learning terminal UI conventions first.
   recolor, decorate or replace it with a mode icon. Public brand copy expresses
   `用 AI 创造新的价值。`
 - Brand identity and mode identity are separate: Work uses a bull and Chat uses a
-  horse inside the `工作 | 聊天` mode switch (see `Team Chat`), both shown as animals
-  at work (2026-10-07). Work is a Desktop-owned 24px-grid, 2px round-stroke plough ox
-  with long working horns and a nose ring; Chat is the `@lucide/lab` `horseHead` (ISC)
-  wearing a Desktop-drawn bridle (noseband and cheekpiece). Do not explain private wordplay in product copy or add
+  horse inside the `工作 | 聊天` mode switch (see `Team Chat`), both drawn as deadpan
+  animals at work with a half-lidded "fine, I'll do it" look (2026-10-07; the mood is
+  inspired by a film reference, the drawings are original and copy no character).
+  Work is a Desktop-owned 24px-grid, 2px round-stroke front-facing ox with short horns,
+  side ears, half-lidded eyes and a broad smirking muzzle; Chat is the `@lucide/lab`
+  `horseHead` (ISC) whose dot eye is replaced by a half-lidded side-eye, a flat brow and
+  a slight smirk. Both render at 16px. Do not explain private wordplay in product copy or add
   financial symbols.
 - Native application assets remain the existing white rotationally symmetric
   glyph on a black rounded square. Technical release identifiers retain

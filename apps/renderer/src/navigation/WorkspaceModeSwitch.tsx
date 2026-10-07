@@ -9,33 +9,43 @@ import { useTeamChat } from "../team-chat/team-chat-instance.js";
 import styles from "./NavigationRail.module.css";
 
 /**
- * Work and Chat mode identity (PRODUCT.md): 牛马, animals at work. Work is a plough ox with
- * long working horns and a nose ring; Chat is the Lucide Lab horse head wearing a bridle.
+ * Work and Chat mode identity (PRODUCT.md): 牛马, deadpan animals at work. Both wear the same
+ * half-lidded "fine, I'll do it" look: Work is a front-facing ox with a broad muzzle; Chat is the
+ * Lucide Lab horse head with a side-eye, flat brow and a slight smirk. Original drawings.
  */
 function OxIcon({ size }: { size: number }) {
   return (
     <svg aria-hidden="true" fill="none" height={size} stroke="currentColor" strokeLinecap="round"
       strokeLinejoin="round" strokeWidth={2} viewBox="0 0 24 24" width={size}>
-      <path d="M8.5 9.5C5 9.5 3 8 2.5 5" />
-      <path d="M15.5 9.5c3.5 0 5.5-1.5 6-4.5" />
-      <path d="M8.5 9.5h7l-.7 5.6a2.4 2.4 0 0 1-2.4 2.1h-.8a2.4 2.4 0 0 1-2.4-2.1Z" />
-      <path d="M8.6 11.2 6.5 11.8" />
-      <path d="m15.4 11.2 2.1.6" />
-      <path d="M10.5 12.6h.01" />
-      <path d="M13.5 12.6h.01" />
-      <path d="M10.3 19.4a1.7 1.7 0 1 0 3.4 0a1.7 1.7 0 1 0-3.4 0" />
+      <path d="M7 8.5C7 5.6 9.2 4 12 4s5 1.6 5 4.5V13" />
+      <path d="M7 8.5V13" />
+      <path d="M7.2 16.4a4.8 3.4 0 1 0 9.6 0a4.8 3.4 0 1 0-9.6 0" />
+      <path d="M8.3 5.4C6.8 5 6 3.6 6.3 2.1" />
+      <path d="M15.7 5.4c1.5-.4 2.3-1.8 2-3.3" />
+      <path d="M7 9.3 4.3 8.7l.9 1.8L7 11.2" />
+      <path d="m17 9.3 2.7-.6-.9 1.8-1.8.7" />
+      <path d="M8.9 10.4h2" />
+      <path d="M13.1 10.4h2" />
+      <path d="M9.9 11.2h.01" />
+      <path d="M14.1 11.2h.01" />
+      <path d="M10.4 15.6h.01" />
+      <path d="M13.6 15.6h.01" />
+      <path d="M10.2 17.8c1.2.5 2.6.5 3.8-.1" />
     </svg>
   );
 }
 
-const BRIDLED_HORSE: IconNode = [
-  ...horseHead,
-  ["path", { d: "M17.6 13.6 16.4 19.2", key: "noseband" }],
-  ["path", { d: "M17 16.2 11.6 9.6", key: "cheekpiece" }]
+// The Lab head's dot eye is replaced by a half-lidded side-eye, a flat brow and a smirk.
+const DEADPAN_HORSE: IconNode = [
+  ...horseHead.filter(([, attributes]) => attributes["d"] !== "M11.5 12H11"),
+  ["path", { d: "M10.4 11.6h2.2", key: "eyelid" }],
+  ["path", { d: "M11.8 12.3h.01", key: "pupil" }],
+  ["path", { d: "M10 9.8l2.6-.4", key: "brow" }],
+  ["path", { d: "M15.4 16.9c.9.3 1.8.1 2.5-.6", key: "smirk" }]
 ];
 
 function HorseIcon({ size }: { size: number }) {
-  return <Icon aria-hidden="true" iconNode={BRIDLED_HORSE} size={size} />;
+  return <Icon aria-hidden="true" iconNode={DEADPAN_HORSE} size={size} />;
 }
 
 export function WorkspaceModeSwitch() {
@@ -60,8 +70,8 @@ export function WorkspaceModeSwitch() {
   );
   return (
     <div aria-label={copy.modeSwitch} className={styles.modeSwitch} role="group">
-      {option("work", copy.work, <OxIcon size={15} />)}
-      {option("chat", copy.chat, <HorseIcon size={15} />,
+      {option("work", copy.work, <OxIcon size={16} />)}
+      {option("chat", copy.chat, <HorseIcon size={16} />,
         unread > 0 && mode !== "chat" ? copy.chatUnread(unread) : copy.chat)}
     </div>
   );
