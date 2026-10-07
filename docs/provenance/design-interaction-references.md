@@ -83,7 +83,8 @@ Agent Screen、Recommendation Card 仅作候选；界面不能声称尚不存在
 - 审阅：2026-09-19；2026-09-20 复核 README 指纹及根 LICENSE。
 - 范围：README，以及 [Tool](https://elements.ai-sdk.dev/components/tool)、
   [Plan](https://elements.ai-sdk.dev/components/plan)、[Artifact](https://elements.ai-sdk.dev/components/artifact)、
-  [Confirmation](https://elements.ai-sdk.dev/components/confirmation) 的在线说明与示例。
+  [Confirmation](https://elements.ai-sdk.dev/components/confirmation) 的在线说明与示例；
+  2026-10-07 补充 [Attachments](https://elements.ai-sdk.dev/components/attachments) 的在线说明。
 - 版本：可变 main/在线文档，未做固定 commit 源码审阅；浏览器交互及 Electron 适配未验证。
 - 权利：[根 LICENSE](https://github.com/vercel/ai-elements/blob/main/LICENSE) 标注 Apache-2.0；
   具体组件、依赖及 notice 在采用时复核。
@@ -94,6 +95,16 @@ Tool 文档使用 AI SDK 的 ToolUIPart；Artifact 是带操作区的内容容�
 项目建议：借鉴组件分工与信息层级，继续由 Pi-67 Domain/Protocol 提供真实状态。
 不引入 useChat、AI Gateway 或第二套 Session/执行循环。当前 React Aria 基础保持不变；
 新增依赖或迁移基础组件需有独立问题及兼容性证据。成果容器不等于成果存储、版本或导出能力。
+
+Attachments 来源观察：同一组附件按场景提供三种呈现——消息内缩略图网格、
+输入区紧凑徽标（悬停预览）、带元数据的列表；按媒体类型选择预览或回退图标，
+悬停卡片的打开/关闭延迟可调，移除按钮可设屏幕阅读器标签。文档未说明上传中或失败状态。
+
+Attachments 项目建议：用于检查 Composer 草稿附件与已发送消息附件的呈现是否成套，
+继续以 [DESIGN](../../DESIGN.md) 的附件命名、预览、移除、数量与大小限制为准。
+不采用仅悬停出现的移除按钮：键盘与触控用户须能直接发现并操作移除；
+悬停预览须有键盘可达的等价入口。上传、失败与恢复状态沿用现有合同，
+不引入 AI SDK 的 FileUIPart 类型或 HoverCard 依赖。
 
 ### Astryx
 
@@ -151,6 +162,7 @@ Tool 文档使用 AI SDK 的 ToolUIPart；Artifact 是带操作区的内容容�
 | Beautiful UI license HTML | `db588a7e2e63f66caa252e3cc48a87b9fba221cca24bc0cfb5a19bcfb49f036f` |
 | AI Elements main README 原始字节 | `9ea7b01645a1e45c1b885060c4b0ace42b88b9334b21b24d35a5f272ad86c20a` |
 | AI Elements main LICENSE 原始字节 | `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529` |
+| AI Elements Attachments 文档 HTML（2026-10-07） | `af4ed04c07b0c5d28320ae346cefe4a645f01a9f51043ff4b1ed09d6d33750a5` |
 | Astryx main README 原始字节 | `45c68dfd4966f41863a92c534d5840ecae496be8922b2fa1a96f7bf13c774484` |
 | Astryx main LICENSE 原始字节 | `a6855be541fc8f446acd1bc4f2f8efce1ace6dce71dba32fcd8da553ee54b473` |
 | Claude Artifacts HTML | `54878157b16d967e4a07863b6397872b74578fb670776045d5c7d4fa14a11cf9` |
@@ -182,6 +194,7 @@ main 文件指纹对应 `raw.githubusercontent.com/<owner>/<repo>/main/README.md
 | 可理解且可检查的执行摘要 | Grok Bot、Beautiful UI、AI Elements | 候选建议 | 区分运行、等待、失败和连接未知；详情可达；不伪造进度。 |
 | 成果查看与继续编辑 | Claude、AI Elements、Beautiful UI | 候选建议 | 成果与原任务关联，草稿/保存/执行状态明确，退出后可重新找到。 |
 | 一致的视觉与组件状态 | Astryx、Beautiful UI | 候选建议 | 浅深色、字阶、焦点、错误和 Reduced Motion 一致。 |
+| 附件呈现一致性 | AI Elements Attachments | 候选建议 | 草稿与消息附件成套；移除和预览键盘可达；长文件名、多附件和失败态不溢出。 |
 
 本次实际采用的仅是参考指南及阅读入口；上述 UI 提案均未实施或通过验收。
 未来改变行为或视觉规则时，在同一变更中更新对应权威文档；引用外部原则不能绕过合同。

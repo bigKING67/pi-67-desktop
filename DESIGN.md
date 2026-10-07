@@ -106,6 +106,46 @@ completing a real session without learning terminal UI conventions first.
 - Appearance defaults to the operating system. A compact TitleBar menu lets
   users choose System, Light, or Dark without turning theme into primary UI.
 
+## Visual quality bar
+
+Taste family (2026-10-07): Grok Bot, Manus, Cursor, Linear, Vercel and Magpie —
+restrained, content-first, AI-native interfaces. They calibrate taste only; they
+contribute no branding, pixels, assets or behavior. The in-product exemplar is
+Settings › 模型 (2026-10-06). Each rule below is reviewable on any visible change.
+
+1. **Surfaces before lines.** Regions and groups separate through canvas,
+   surface and surface-muted steps plus spacing. Borders are reserved for inputs,
+   focus, overlays on an equal-color background, and decision cards (approval,
+   plan confirmation), which also lift with surface-raised and shadow. Tool steps
+   render as unframed timeline rows; their expanded output uses a fill, not a
+   frame. Status uses a tint, never a colored edge. Bordered cards are not nested
+   inside bordered cards. Light mode may use a low-contrast hairline where no
+   surface step exists.
+2. **One emphasis per view.** Accent keeps its existing role (selection, primary
+   action); a region shows at most one filled primary action. Semantic colors
+   appear only for their named state; no decorative hue, gradient or glow.
+3. **Content decorates.** Brand marks, avatars, real values and previews carry
+   visual interest. Frames, badges, ornamental icons and explanatory paragraphs do
+   not. An icon must identify something its adjacent text does not.
+4. **Say it once, disclose the rest.** At most one hint line per row or section;
+   boundaries, privacy and implementation detail move to an ⓘ tip, disclosure or
+   detail page. The normal state is not repeated; only exceptions carry status.
+   State-specific actions (save while dirty, retry on failure) appear in that
+   state, but critical actions are never hover-only.
+5. **Hierarchy through size and weight.** Use the typography roles, 400/500/600
+   weights and the three text tones. Do not create hierarchy with extra color,
+   uppercase, letter-spacing or monospace labels.
+6. **Generous and aligned.** One left edge per column; spacing comes from the
+   space tokens; radius uses its semantic roles with no intermediate values.
+7. **Motion explains state.** See Motion; no decorative or idle animation.
+8. **Delegation test.** Before adding a control, label or panel, ask whether it
+   helps the user delegate or check work, or gives them one more thing to manage.
+   Remove the latter unless it carries authorization, recovery or traceability.
+
+All surfaces converge through the phased visual upgrade
+([plan](docs/plans/2026-10-07-visual-quality-upgrade.md)); a phase is complete
+only when its surfaces meet these rules in both themes in the packaged app.
+
 ## Window structure
 
 ```text
@@ -374,9 +414,9 @@ use `50%`.
 
 - Use the semantic roles declared above rather than raw palette values in
   components. Light and dark themes may change values, but not role meaning.
-- Canvas and surface colors establish depth quietly; borders separate regions
-  without turning every group into a card.
-- Dark mode uses achromatic near-black surfaces, neutral selection, and light
+- Canvas and surface steps establish depth and separate regions; borders are the
+  exceptions listed in Visual quality bar.
+- Dark mode uses low-chroma zinc near-black surfaces, neutral selection, and light
   primary buttons with dark content, as calibrated in `DESIGN.dark.md`. Ordinary
   accents are neutral in both themes; semantic status and code colors retain their
   meaning. Light mode uses white canvas/surfaces, light gray sidebars and selection,
