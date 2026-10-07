@@ -29,12 +29,12 @@ color:
   success: "#287248"
   diff-added: "#e0f1e7"
   diff-removed: "#f8e4e2"
-  code-diff-added-text: "#9be9a8"
-  code-diff-removed-text: "#ffb3ad"
-  code-surface: "#0d1117"
-  code-border: "#30363d"
-  code-text: "#e6edf3"
-  code-muted: "#8b949e"
+  code-diff-added-text: "#116329"
+  code-diff-removed-text: "#82071e"
+  code-surface: "#f6f8fa"
+  code-border: "#d0d7de"
+  code-text: "#1f2328"
+  code-muted: "#59636e"
 spacing:
   unit: 4
   compact: 8
@@ -429,9 +429,11 @@ use `50%`.
   warning, danger, success, and diff colors communicate only their named state.
 - Text and interactive-state contrast must remain usable at 200% zoom and in
   both themes. Never rely on hue alone to communicate status or selection.
-- Code roles stay dark in both themes so syntax highlighting has one calibrated
-  contrast surface and uses one dark Shiki theme without re-tokenizing when the
-  surrounding UI theme changes. Overlay and shadow roles adapt by theme and communicate
+- Code roles follow the UI theme (2026-10-07: an always-dark block was the heaviest
+  element of light mode): light mode uses the GitHub-light code surface and syntax
+  palette, dark mode keeps the calibrated dark surface (DESIGN.dark). One Shiki
+  tokenization carries both `github-light-default` and `github-dark-default` colors as
+  CSS variables per token, so switching the UI theme never re-tokenizes code. Overlay and shadow roles adapt by theme and communicate
   depth without becoming component-local color values.
 
 ## Component contract
@@ -2588,6 +2590,10 @@ loading error where the operation can produce those states
 
 - The search field, result groups and footer are separated by spacing only, without
   dividers; result titles and group headings use medium weight (2026-10-07).
+- Small overlays follow the same restraint: tooltips use the soft `shadowComposer` lift
+  rather than `shadowFloating`; the keyboard-help dialog has no decorative heading
+  icon; Doctor rows show a status icon only for exceptions, keeping a passing row's
+  icon slot empty for alignment while its text label still states the result.
 - The search field remains the sole keyboard focus owner and exposes the bounded
   result list through the combobox `aria-activedescendant` pattern. Arrow keys
   change the active option without preventing the user from continuing to type.

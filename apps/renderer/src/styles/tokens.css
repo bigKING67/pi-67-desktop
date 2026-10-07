@@ -72,12 +72,13 @@
   --success: #287248;
   --diff-added: #e0f1e7;
   --diff-removed: #f8e4e2;
-  --code-diff-added-text: #9be9a8;
-  --code-diff-removed-text: #ffb3ad;
-  --code-surface: #0d1117;
-  --code-border: #30363d;
-  --code-text: #e6edf3;
-  --code-muted: #8b949e;
+  /* Light code surfaces match the GitHub light palette used for syntax colors. */
+  --code-diff-added-text: #116329;
+  --code-diff-removed-text: #82071e;
+  --code-surface: #f6f8fa;
+  --code-border: #d0d7de;
+  --code-text: #1f2328;
+  --code-muted: #59636e;
   --overlay-backdrop: rgb(0 0 0 / 0.48);
   --shadow-floating: 0 18px 50px rgb(0 0 0 / 0.14);
   --shadow-focus: 0 0 0 3px rgb(44 112 201 / 0.22);
@@ -128,6 +129,8 @@
     --success: #7bc99c;
     --diff-added: #1d3a2b;
     --diff-removed: #482725;
+    --code-diff-added-text: #9be9a8;
+    --code-diff-removed-text: #ffb3ad;
     --code-surface: #0d1117;
     --code-border: #30363d;
     --code-text: #e6edf3;

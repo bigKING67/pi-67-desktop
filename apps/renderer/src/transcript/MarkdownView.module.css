@@ -332,3 +332,12 @@
   display: block;
   height: 19.2px;
 }
+
+/* Syntax colors: light theme by default, dark theme under data-theme="dark". */
+.codeToken {
+  color: var(--code-token-light, inherit);
+}
+
+:global(:root[data-theme="dark"]) .codeToken {
+  color: var(--code-token-dark, inherit);
+}

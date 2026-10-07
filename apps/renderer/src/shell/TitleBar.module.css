@@ -198,7 +198,8 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
   background: var(--surface-raised);
-  box-shadow: var(--shadow-floating);
+  /* Tooltips are small: a soft lift, not the floating-panel shadow. */
+  box-shadow: var(--shadow-composer);
   color: var(--text-primary);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-medium);

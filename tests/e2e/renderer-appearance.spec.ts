@@ -101,7 +101,8 @@ test("keeps Shiki deferred and permits only its WASM engine when code is present
   await expect(page.locator('[data-highlight-state="ready"]')).toBeVisible({ timeout: 15_000 });
   const highlightedLine = page.locator('[data-code-line="0"]');
   await expect(highlightedLine).toHaveCount(1);
-  await expect(highlightedLine.locator(":scope > span").first()).toHaveCSS("color", "rgb(255, 123, 114)");
+  // The default (light) theme shows the GitHub-light keyword color; dark mode swaps via CSS only.
+  await expect(highlightedLine.locator(":scope > span").first()).toHaveCSS("color", "rgb(207, 34, 46)");
   const loadedResources = await page.evaluate(() => [
     ...performance.getEntriesByType("resource").map((entry) => entry.name),
     ...performance.getEntriesByName("pi67-code-highlight-resources", "mark")

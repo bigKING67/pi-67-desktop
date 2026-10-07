@@ -74,6 +74,12 @@ a surface step or rely on the light-mode hairline allowance.
   Doctor per-row pass icons, keyboard-help heading icon, provider subtitle id/count
   split, credential pane separation in light mode, and re-examining older Team Chat
   border mandates against the quality bar.
+- 2026-10-07 light-mode workbench pass (Settings stays with Phase 5): code roles follow
+  the UI theme via dual-theme Shiki tokens (user decision), Doctor pass icons hidden in
+  place, keyboard-help heading icon removed, tooltips use the softer composer shadow.
+  Pending: replace 8 native `<select>` elements outside Settings (workspace file
+  dialogs, Team Chat dialogs/search/agent card, experience review form) with the shared
+  select component.
 - 2026-10-07: AUTO reasons stay on tool rows (PRODUCT security traceability), even
   though the direction-A mock omitted them.
 

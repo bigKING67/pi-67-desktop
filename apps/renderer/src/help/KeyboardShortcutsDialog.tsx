@@ -1,4 +1,4 @@
-import { Keyboard, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
 import {
   formatDesktopShortcut
@@ -28,7 +28,6 @@ export function KeyboardShortcutsDialog() {
       <Modal className={`modal-surface ${styles.modal}`}>
         <Dialog aria-label="键盘快捷键" className={styles.dialog!}>
           <header className={styles.header}>
-            <span className={styles.headingIcon}><Keyboard aria-hidden="true" size={18} /></span>
             <span>
               <Heading slot="title">键盘快捷键</Heading>
               <p>Windows 使用 Ctrl，macOS 使用 Command。</p>

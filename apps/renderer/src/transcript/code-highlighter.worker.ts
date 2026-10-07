@@ -1,13 +1,14 @@
 import { createHighlighterCore } from "shiki/core";
 import { createOnigurumaEngine } from "shiki/engine/oniguruma";
 import githubDark from "shiki/themes/github-dark-default.mjs";
+import githubLight from "shiki/themes/github-light-default.mjs";
 import {
   createCodeHighlighterWorkerCore,
   type WorkerHighlightRequest
 } from "./code-highlighter-worker-core.js";
 
 const highlighter = createHighlighterCore({
-  themes: [githubDark],
+  themes: [githubDark, githubLight],
   langs: [],
   engine: createOnigurumaEngine(import("shiki/wasm"))
 });
@@ -82,14 +83,20 @@ const core = createCodeHighlighterWorkerCore({
   },
   async tokenize(code, language) {
     const instance = await highlighter;
-    const result = instance.codeToTokens(code, {
+    // One tokenization yields both themes; the Renderer switches colors with CSS only.
+    const lines = instance.codeToTokensWithThemes(code, {
       lang: language as SupportedLanguage,
-      theme: "github-dark-default"
+      themes: { dark: "github-dark-default", light: "github-light-default" }
     });
-    return result.tokens.map((line) => line.map((token) => ({
-      content: token.content,
-      ...(token.color === undefined ? {} : { color: token.color })
-    })));
+    return lines.map((line) => line.map((token) => {
+      const dark = token.variants.dark?.color;
+      const light = token.variants.light?.color;
+      return {
+        content: token.content,
+        ...(dark === undefined ? {} : { color: dark }),
+        ...(light === undefined ? {} : { lightColor: light })
+      };
+    }));
   }
 });
 

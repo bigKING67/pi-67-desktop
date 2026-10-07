@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { Root } from "mdast";
 import type { Plugin } from "unified";
 import { Children, isValidElement, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -301,7 +301,7 @@ function renderCodeLine(line: HighlightToken[], lineIndex: number, virtual: bool
       key={lineIndex}
     >
       {line.map((token, tokenIndex) => (
-        <span key={tokenIndex} style={token.color ? { color: token.color } : undefined}>{token.content}</span>
+        <span className={styles.codeToken} key={tokenIndex} style={codeTokenStyle(token)}>{token.content}</span>
       ))}
       {virtual ? null : "\n"}
     </span>
@@ -324,4 +324,13 @@ function codeText(value: ReactNode): string {
   if (typeof value === "number" || typeof value === "bigint") return `${value}`;
   if (Array.isArray(value)) return value.map(codeText).join("");
   return "";
+}
+
+// Each token carries both theme colors; CSS picks one, so a theme switch never re-tokenizes.
+function codeTokenStyle(token: HighlightToken): CSSProperties | undefined {
+  if (!token.color && !token.lightColor) return undefined;
+  return {
+    ...(token.color ? { "--code-token-dark": token.color } : {}),
+    ...(token.lightColor ? { "--code-token-light": token.lightColor } : {})
+  } as CSSProperties;
 }

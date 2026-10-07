@@ -1,6 +1,8 @@
 export interface HighlightToken {
   content: string;
+  /** Dark-theme color; `lightColor` is the same token in the light theme. */
   color?: string;
+  lightColor?: string;
 }
 
 export interface WorkerHighlightRequest {

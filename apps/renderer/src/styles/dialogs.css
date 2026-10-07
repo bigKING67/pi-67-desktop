@@ -60,7 +60,8 @@
 .doctor-check strong { font-size: var(--font-size-interface); font-weight: var(--font-weight-medium); }
 .doctor-check code { overflow: hidden; color: var(--text-secondary); font-family: var(--font-code); font-size: var(--font-size-caption); text-overflow: ellipsis; white-space: nowrap; }
 .doctor-check > span { color: var(--text-tertiary); font-size: var(--font-size-caption); }
-.doctor-check.status-pass > svg { color: var(--success); }
+/* A passing check is the normal state: its icon slot stays for alignment, only exceptions show a mark. */
+.doctor-check.status-pass > svg { visibility: hidden; }
 .doctor-check.status-warning > svg { color: var(--warning); }
 .doctor-check.status-fail > svg { color: var(--danger); }
 

@@ -11,6 +11,7 @@ const markdown = [
   "| C | `dataops-api-quick-regression.yml` | pull_request(main)、workflow_dispatch、schedule 18:30 UTC | disabled_manually |",
   "### 核验日志",
   "```\nRuntimeError: source readiness timed out\ntarget_date=2026-09-20\n```",
+  "```ts\nconst target = \"2026-09-20\";\n```",
   "行内 `target_date` 保持行内显示。",
   "### **行程安排**",
   "- **Day 1（中心城区）**：早餐之后沿步行街游览，下午参观展览，晚餐后沿江散步，再返回住处休息。\n- **Day 2（河西）**：上午参观校园，中午就近用餐，下午留出休息时间。\n- **Day 3（返程）**：早餐之后整理行李，提前出发前往车站。"
@@ -55,9 +56,18 @@ for (const theme of ["light", "dark"] as const) {
       return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
     });
     expect(lineCount).toBe(1);
-    const block = page.getByTestId("code-block");
+    const block = page.getByTestId("code-block").first();
     await expect(block).toBeVisible();
     await expect(block.locator("pre")).toContainText("RuntimeError: source readiness timed out");
+    // Code follows the UI theme: light surface and syntax palette in light, dark in dark.
+    const highlighted = page.getByTestId("code-block").nth(1);
+    await expect(highlighted).toHaveAttribute("data-highlight-state", "ready");
+    const codeColors = await highlighted.evaluate((element) => ({
+      surface: getComputedStyle(element).backgroundColor,
+      keyword: getComputedStyle(element.querySelector("pre span span")!).color
+    }));
+    expect(codeColors.surface).toBe(theme === "light" ? "rgb(246, 248, 250)" : "rgb(13, 17, 23)");
+    expect(codeColors.keyword).toBe(theme === "light" ? "rgb(207, 34, 46)" : "rgb(255, 123, 114)");
     await block.getByRole("button", { name: "复制", exact: true }).click();
     await expect(block.getByRole("button", { name: "已复制", exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
