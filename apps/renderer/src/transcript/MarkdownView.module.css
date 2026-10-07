@@ -77,15 +77,10 @@
   border-radius: var(--radius-control);
 }
 
-.wideTrack {
-  display: flex;
-  justify-content: center;
-  margin: 1em 0;
-}
-
 .tableScroll {
   width: 100%;
   max-width: 100%;
+  margin: 1em 0;
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -111,7 +106,8 @@
 .tableScroll td {
   min-width: 3rem;
   max-width: 34rem;
-  overflow-wrap: anywhere;
+  /* Break between words, not inside identifiers; a table that needs more room scrolls in place. */
+  overflow-wrap: break-word;
   padding: 8px 12px;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
   text-align: left;
@@ -335,26 +331,4 @@
 .codeLine.virtualLine {
   display: block;
   height: 19.2px;
-}
-
-/* Wide content: inside the Transcript, Assistant tables and code may use up to 1040px when the
-   region is wider than the 800px reading track. Small tables keep the track width; prose never
-   widens. Outside the named container (Team Chat, Settings, previews) nothing changes. */
-@container transcript (width > 848px) {
-  :global([data-message-role="assistant"]) .wideTrack,
-  :global([data-message-role="assistant"]) .codeBlock {
-    --wide-content-width: min(1040px, 100cqw - 48px);
-    width: var(--wide-content-width);
-    margin-inline: calc((100% - var(--wide-content-width)) / 2);
-  }
-
-  :global([data-message-role="assistant"]) .tableScroll {
-    width: auto;
-    min-width: min(100%, var(--conversation-track-width, 800px));
-  }
-
-  :global([data-message-role="assistant"]) .tableScroll table {
-    min-width: 100%;
-    width: auto;
-  }
 }

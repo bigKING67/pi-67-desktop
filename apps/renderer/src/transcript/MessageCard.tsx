@@ -93,7 +93,6 @@ export function MessageCard({
       aria-label={ariaLabel}
       data-delivery-status={deliveryStatus}
       data-message-id={message.id}
-      data-message-role={isUser ? "user" : isTool ? "tool" : "assistant"}
       data-testid="message-card"
       data-render-mode={streaming ? "streaming" : "settled"}
       data-edit-phase={edit?.phase}

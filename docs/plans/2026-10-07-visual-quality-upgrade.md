@@ -33,7 +33,7 @@ pixels or assets. Message actions stay visible at rest rather than hover-only.
 | 1 Quiet chrome | Origin line, turn hairlines, thinking value, context ring, Prompt Stash, palette highlight, unnamed subtitle | committed `f1db0215` |
 | 2 Layout | Inspector closed by default, centered empty entry, centered stopped/resume surface | committed `f7ecf0a4`, `68cf9fb9` |
 | 3 Agent experience | Timeline compaction (`3ea6a086`). Direction A "quiet timeline" chosen over a pinned progress strip: one-line reasoning preview, no visible success marks, medium tool names, 32px rows, no request hairline, tints instead of colored edges, UI-face timestamps, lifted plan card | done (this commit series) |
-| 4 Remaining surfaces | Approval dialog (done), Inspector panels and Composer pickers (done), dialogs and context overlays, Team Chat, Inspector explanatory lines → ⓘ (done, reusing SettingsInfo), wide content breakout (done), remaining Settings editors (Provider configuration, Extension management), Tool summary width cap (done), light-mode surface step | in progress |
+| 4 Remaining surfaces | Approval dialog (done), Inspector panels and Composer pickers (done), dialogs and context overlays, Team Chat, Inspector explanatory lines → ⓘ (done, reusing SettingsInfo), wide content: breakout rejected after packaged review, cells break between words instead (done), remaining Settings editors (Provider configuration, Extension management), Tool summary width cap (done), light-mode surface step | in progress |
 
 Settings quiet-list convergence (`1c420581`) already covers the Settings catalogs
 and is re-audited, not redone, in phase 4.

@@ -1,7 +1,5 @@
 .region {
   position: relative;
-  /* Named so Assistant tables and code can measure the room beside the reading track. */
-  container: transcript / inline-size;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   grid-area: transcript;

@@ -80,16 +80,13 @@ export function MarkdownView({ children, mode = "settled", onOpenWorkspacePath }
       />
     ),
     table: ({ children: tableChildren }) => (
-      // The track lets a wide table break out of the reading measure inside the Transcript.
-      <div className={styles.wideTrack}>
-        <div
-          aria-label="表格，可横向滚动"
-          className={styles.tableScroll}
-          data-markdown-table-scroll="true"
-          tabIndex={0}
-        >
-          <table>{tableChildren}</table>
-        </div>
+      <div
+        aria-label="表格，可横向滚动"
+        className={styles.tableScroll}
+        data-markdown-table-scroll="true"
+        tabIndex={0}
+      >
+        <table>{tableChildren}</table>
       </div>
     )
   }), [onOpenWorkspacePath, streaming]);

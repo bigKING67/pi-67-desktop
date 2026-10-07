@@ -8,6 +8,7 @@ const markdown = [
   "| --- | --- | --- | --- |",
   "| A | 实际经营发生下降 | 需要核对后台实时数据与相同统计周期 | 当前样本尚不完整 |",
   "| B | 同步中断导致看板为空 | 多张表在同一时间停止更新，需要确认任务与源数据状态 | 仍需核对上游来源 |",
+  "| C | `dataops-api-quick-regression.yml` | pull_request(main)、workflow_dispatch、schedule 18:30 UTC | disabled_manually |",
   "### 核验日志",
   "```\nRuntimeError: source readiness timed out\ntarget_date=2026-09-20\n```",
   "行内 `target_date` 保持行内显示。",
@@ -46,6 +47,14 @@ for (const theme of ["light", "dark"] as const) {
     await expect(table).toBeVisible();
     const widths = await table.locator("tbody tr").first().locator("td").evaluateAll((cells) => cells.map((cell) => cell.getBoundingClientRect().width));
     expect(widths[0]).toBeLessThan(widths[2]! / 2);
+    // Identifiers stay whole: cells break between words, and the table scrolls instead.
+    const identifier = table.getByRole("cell", { name: "disabled_manually", exact: true });
+    const lineCount = await identifier.evaluate((cell) => {
+      const range = document.createRange();
+      range.selectNodeContents(cell);
+      return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+    });
+    expect(lineCount).toBe(1);
     const block = page.getByTestId("code-block");
     await expect(block).toBeVisible();
     await expect(block.locator("pre")).toContainText("RuntimeError: source readiness timed out");

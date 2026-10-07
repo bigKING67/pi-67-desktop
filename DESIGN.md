@@ -3075,11 +3075,11 @@ application bundles, Helpers, executables and installer filenames use New Money.
 
 - Desktop navigation and Inspector defaults are 248px and 320px; title-bar tracks
   match pane tracks. Conversation/composer reading width is capped at 800px even
-  when side panels close. Assistant Markdown tables and code blocks may break out of
-  that measure (2026-10-07): when the Transcript region is wider than 848px they use up
-  to `min(1040px, region − 48px)`, centered on the reading track. Code blocks take the
-  full wide measure; a table keeps the reading width unless its content needs more.
-  Prose, user messages, Team Chat and Settings Markdown never widen. Existing responsive drawers and session-local visibility
+  when side panels close. Tables and code blocks stay on that
+  one left edge too (a 2026-10-07 breakout to 1040px was rejected: three edges in one
+  answer read as broken layout). Table cells break between words, never inside an
+  identifier such as `disabled_manually`; a table that needs more room scrolls
+  horizontally inside its own frame. Existing responsive drawers and session-local visibility
   remain; this change introduces no resize handles or persistence migration.
 - Workspace labels use interface/medium; ordinary conversation titles interface/regular, current
   titles medium; conversation metadata uses caption. Current-row gray fill and marker
