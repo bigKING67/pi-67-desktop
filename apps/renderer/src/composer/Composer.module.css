@@ -253,7 +253,7 @@
 
 .interactionMode .interactionModeActive {
   background: var(--surface-raised);
-  box-shadow: var(--shadow-composer);
+  box-shadow: var(--shadow-segment);
   color: var(--text-primary);
 }
 

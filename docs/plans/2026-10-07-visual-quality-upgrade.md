@@ -33,7 +33,7 @@ pixels or assets. Message actions stay visible at rest rather than hover-only.
 | 1 Quiet chrome | Origin line, turn hairlines, thinking value, context ring, Prompt Stash, palette highlight, unnamed subtitle | committed `f1db0215` |
 | 2 Layout | Inspector closed by default, centered empty entry, centered stopped/resume surface | committed `f7ecf0a4`, `68cf9fb9` |
 | 3 Agent experience | Timeline compaction (`3ea6a086`). Direction A "quiet timeline" chosen over a pinned progress strip: one-line reasoning preview, no visible success marks, medium tool names, 32px rows, no request hairline, tints instead of colored edges, UI-face timestamps, lifted plan card | done (this commit series) |
-| 4 Remaining surfaces | Approval dialog (proposal first: it carries security copy), dialogs and context overlays, Team Chat, Inspector panels (Files, Changes, Memory), Composer pickers, remaining Settings editors (Provider configuration, Extension management), Tool summary width cap (done), light-mode surface step | in progress |
+| 4 Remaining surfaces | Approval dialog (done), Inspector panels and Composer pickers (done), dialogs and context overlays, Team Chat, remaining Settings editors (Provider configuration, Extension management), Tool summary width cap (done), light-mode surface step | in progress |
 
 Settings quiet-list convergence (`1c420581`) already covers the Settings catalogs
 and is re-audited, not redone, in phase 4.
@@ -56,6 +56,15 @@ a surface step or rely on the light-mode hairline allowance.
   actions. Follow-up outside visual scope: in one packaged run after reopening a
   conversation, `停止整个任务` was absent because the request did not map to exactly one
   `waiting-approval` Task; eligibility logic is unchanged and needs a runtime check.
+- 2026-10-07 Inspector + Composer batch: accepted audit findings (nested frames,
+  colored edges, uppercase/letter-spacing, non-code monospace, per-row semibold, raw
+  radii, hover borders, popover dividers, bordered secondary buttons) and fixed three
+  undefined shadow tokens (`--shadow-popover`, `--shadow-overlay`, `--shadow-color`);
+  added `--shadow-segment` for selected segments. Deferred to the light-mode step:
+  `.context-pane` edge and Files tab-strip/header dividers; spacing literal → token
+  conversions. Not adopted: moving the Memory boundary copy into ⓘ (private/team
+  boundary must stay visible) and removing the context-pressure border
+  (DESIGN.dark mandates the border role).
 - 2026-10-07: AUTO reasons stay on tool rows (PRODUCT security traceability), even
   though the direction-A mock omitted them.
 

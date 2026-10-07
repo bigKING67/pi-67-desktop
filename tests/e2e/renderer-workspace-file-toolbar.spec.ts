@@ -61,7 +61,7 @@ test("keeps Workspace file controls flat and visually consistent", async ({ page
   expect(buttonStyles[0]).toEqual({
     background: "rgba(0, 0, 0, 0)",
     borderWidth: "0px",
-    borderRadius: "6px",
+    borderRadius: "8px",
     boxShadow: "none"
   });
 

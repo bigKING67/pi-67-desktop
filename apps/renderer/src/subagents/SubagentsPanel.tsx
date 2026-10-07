@@ -83,7 +83,7 @@ export function SubagentsPanel() {
                 <code title={item.childId}>{shortId(item.childId)}</code>
               </div>
               <dl className="inspector-agent-meta">
-                <div><dt>模型</dt><dd>{item.model ? `${item.model.provider} / ${item.model.id}` : "继承父任务"}</dd></div>
+                <div><dt>模型</dt><dd className={item.model ? "inspector-agent-model" : undefined}>{item.model ? `${item.model.provider} / ${item.model.id}` : "继承父任务"}</dd></div>
                 <div><dt>推理</dt><dd>{item.reasoning ?? "继承"}</dd></div>
                 <div><dt>耗时</dt><dd>{durationLabel(item)}</dd></div>
                 <div><dt>用量</dt><dd>{usageLabel(item)}</dd></div>

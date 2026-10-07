@@ -384,7 +384,7 @@ textPrimary textSecondary textTertiary textDisabled textOnDanger
 border borderStrong accent accentStrong accentSoft focus
 info warning danger success diffAdded diffRemoved codeDiffAddedText codeDiffRemovedText
 codeSurface codeBorder codeText codeMuted overlayBackdrop
-shadowFloating shadowFocus shadowComposer shadowHero
+shadowFloating shadowFocus shadowComposer shadowHero shadowSegment
 ```
 
 Spacing uses the 4px scale through named CSS tokens:
@@ -709,6 +709,15 @@ loading error where the operation can produce those states
 
 ### Inspector
 
+- Inspector groups (agent cards, memory rows, resource and status rows, review editors)
+  are unframed fills on the radius roles (2026-10-07, Visual quality bar). The pane
+  scopes `--inspector-group-surface` (`surface` in light, where the pane is already
+  `surface-muted`; `surface-muted` in dark) and `--inspector-nested-surface` for the
+  opposite step, so groups never vanish into the pane. Status pills are borderless
+  `surface-active` fills with medium weight; ordinals, counts, durations, usage and
+  costs use the UI face with tabular figures, while model and child identifiers keep
+  the code face. A resource row keeps its status dot because it is the only visible
+  status signal; a completed agent's dot is transparent beside its visible state label.
 - The primary order is `文件 / 修改 / 消息 / 代理 / 上下文`; Files is the default. The Files
   root preserves expansion, search, selection, and scroll state while the
   Inspector stays mounted. Directories load in pages of at most 200 entries.
@@ -2055,8 +2064,10 @@ loading error where the operation can produce those states
   inspection, first-party web Tools, `plan_ask`, and `plan_complete`. Its safety
   gate precedes YOLO and one-shot approval, so a forbidden write is blocked as
   `PLAN_MODE_READ_ONLY` rather than presented as approvable. The control's plan
-  state uses a restrained accent border/fill and remains distinguishable by icon,
-  label, and pressed state in both themes.
+  state uses a restrained accent fill without a border and remains distinguishable
+  by icon, label, and pressed state in both themes. Selected segments in segmented
+  controls (Composer mode, Changes and Inspector detail tabs) use a raised fill plus
+  the small `shadowSegment` lift, which keeps them legible on near-equal dark tracks.
 - The hidden Plan context requires evidence-grounded, decision-complete output:
   discoverable facts come from applicable instructions, real files, configuration,
   Git, and runtime evidence; `plan_ask` is reserved for materially blocking intent

@@ -83,6 +83,7 @@
   --shadow-focus: 0 0 0 3px rgb(44 112 201 / 0.22);
   --shadow-composer: 0 7px 24px rgb(0 0 0 / 0.08);
   --shadow-hero: 0 28px 80px rgb(0 0 0 / 0.12);
+  --shadow-segment: 0 1px 2px rgb(0 0 0 / 0.15);
   --motion-fast: 120ms;
   --motion-standard: 180ms;
   --motion-deliberate: 240ms;
@@ -136,4 +137,5 @@
     --shadow-focus: 0 0 0 3px rgb(131 185 243 / 0.24);
     --shadow-composer: 0 7px 24px rgb(0 0 0 / 0.3);
     --shadow-hero: 0 28px 80px rgb(0 0 0 / 0.34);
+    --shadow-segment: 0 1px 2px rgb(0 0 0 / 0.4);
 }
