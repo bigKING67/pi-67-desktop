@@ -94,6 +94,26 @@ test("renders one-tool approvals and refuses stale authority context", async ({ 
   await expect(page.getByText("Pi 运行服务未接受这次授权响应，工具将保持阻止状态。", { exact: true })).toBeVisible();
 });
 
+test("reads tool identity as one row, omits a risk row that repeats the reason, and groups task-level actions", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
+  const operationId = "operation-approval-layout";
+  await startApprovalOperation(page, operationId);
+  const request = approvalRequest(operationId, "approval-layout", "git push origin main");
+  await emitMockAgentEvent(page, { ...request, payload: { ...request.payload, reason: "远程 Git 操作" } }, { operationId });
+
+  const dialog = page.getByRole("dialog", { name: "工具单次授权" });
+  await expect(page.getByRole("heading", { name: "需要单次授权" })).toBeVisible({ timeout: 15_000 });
+  expect((await dialog.locator("dt").allTextContents()).filter((term) => term === "风险" || term === "工具来源")).toEqual([]);
+  await expect(dialog.locator("dt", { hasText: /^工具$/u }).locator("xpath=following-sibling::dd")).toHaveText(/bash\s*·\s*Pi 内置/u);
+  const reject = page.getByRole("button", { name: "拒绝" });
+  await expect(reject).toBeFocused();
+  const [yoloBox, rejectBox] = await Promise.all([page.getByRole("button", { name: "本任务开启 YOLO" }).boundingBox(), reject.boundingBox()]);
+  expect((yoloBox?.x ?? 0) + (yoloBox?.width ?? 0)).toBeLessThan(rejectBox?.x ?? 0);
+});
+
 test("renders a host-authored network-read approval when one is required", async ({ page }) => {
   await page.goto("/");
   await attachMockAgent(page);
@@ -169,7 +189,14 @@ test("offers task-scoped trust only for Host-authored external paths", async ({ 
   }, { operationId });
 
   await expect(page.getByRole("heading", { name: "需要单次授权" })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("可加入本任务的可信路径", { exact: true })).toBeVisible();
+  const longestKey = page.getByText("可加入本任务的可信路径", { exact: true });
+  await expect(longestKey).toBeVisible();
+  // The key column fits its longest key, so the key stays on one line beside its value.
+  const [keyBox, toolKeyBox] = await Promise.all([
+    longestKey.boundingBox(),
+    page.locator("[role=dialog] dt", { hasText: /^工具$/u }).boundingBox()
+  ]);
+  expect(keyBox?.height ?? 0).toBeLessThan((toolKeyBox?.height ?? 0) * 1.5);
   await expect(page.getByText("/Users/test/Projects/groland", { exact: true })).toBeVisible();
   await expect(page.getByText(/任务停止、应用重启或工作区失去信任后自动清除/u)).toBeVisible();
   await page.getByRole("button", { name: "本任务信任该路径" }).click();

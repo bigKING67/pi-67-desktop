@@ -504,7 +504,8 @@ loading error where the operation can produce those states
   or unreconciled calls never join a group.
   A successful step carries no visible status mark (its label stays screen-reader text,
   2026-10-07: a column of success checks was noise); every other status keeps its icon
-  and visible label. Tool names use medium weight and steps sit on a compact 32px row. Running calls take the primary text
+  and visible label. Tool names use medium weight and steps sit on a compact 32px row; the compact
+  summary fills the row width before it ellipsizes. Running calls take the primary text
   role, AUTO reasons stay visible as regular-weight metadata, transient timeline
   statuses (`正在准备任务`, `继续处理`) use regular weight, and a running process
   header adds a `m:ss` clock that is excluded from its live-region announcements. An unmatched legacy Tool Result remains one explicitly inspectable
@@ -2683,6 +2684,16 @@ loading error where the operation can produce those states
 - Approval makes bidi, zero-width, control, and non-standard line-separator
   characters explicit in a non-mutating safe display. At constrained height,
   details scroll independently while all applicable decision actions remain visible.
+- Approval presentation (2026-10-07, Visual quality bar): details form one
+  `surface-muted` block without grid lines, keys in tertiary regular text in one
+  shared column sized to the longest key. Tool and
+  verified source share one row (`bash · Pi 内置`, each still a safe literal); the risk
+  row is omitted only when its label equals the reason line already shown. Denial,
+  path-trust and YOLO notices stay visible, verbatim, as caption tertiary text without
+  a box. The action region has no divider and splits into task-level escalations on
+  the left (`停止整个任务` in danger text, `本任务开启 YOLO` in warning text, both
+  borderless) and decisions about this request on the right (`拒绝`, `仅允许本次`,
+  `本任务信任该路径`); DOM order follows that visual order and focus still starts on `拒绝`.
 - Ordinary Approval always offers `拒绝` and `仅允许本次`, with default focus on
   `拒绝`. For a Host-projected canonical external path, it also shows the exact
   bounded roots and a primary `本任务信任该路径` action. Routine built-in `write`

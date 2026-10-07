@@ -99,7 +99,6 @@
 .compact {
   display: block;
   min-width: 0;
-  max-width: 360px;
   overflow: hidden;
   color: var(--text-tertiary);
   font-size: var(--font-size-caption);

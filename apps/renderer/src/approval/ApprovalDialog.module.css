@@ -61,28 +61,41 @@
   font-size: var(--font-size-interface);
 }
 
+/* One muted block without grid lines: rows separate by spacing, keys recede. */
 .details {
   display: grid;
-  gap: 1px;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 2px;
   margin: 0;
-  overflow: hidden;
-  border: 1px solid var(--border);
+  padding: var(--space-2) 0;
   border-radius: var(--radius-control);
-  background: var(--border);
+  background: var(--surface-muted);
 }
 
+/* Rows share the parent columns so the key column fits its longest key on one line. */
 .details > div {
   display: grid;
-  grid-template-columns: 108px minmax(0, 1fr);
-  gap: 12px;
-  padding: 10px 12px;
-  background: var(--surface);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  column-gap: 16px;
+  padding: 6px 12px;
 }
 
 .details dt {
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   font-size: var(--font-size-support);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-regular);
+}
+
+.toolIdentity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.toolIdentity > span[aria-hidden] {
+  color: var(--text-tertiary);
 }
 
 .details dd {
@@ -126,48 +139,75 @@
   font-weight: var(--font-weight-semibold);
 }
 
-.denial {
+.denial,
+.yoloNotice {
+  color: var(--text-tertiary);
   font-size: var(--font-size-caption);
 }
 
-.yoloNotice {
-  padding: 9px 11px;
-  border: 1px solid color-mix(in srgb, var(--warning) 32%, var(--border));
+/* Task-level escalations are quiet text actions in their semantic color, apart from request decisions. */
+.yoloButton,
+.stopTaskButton {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
   border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
-  font-size: var(--font-size-caption);
+  background: transparent;
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
 }
 
 .yoloButton {
-  min-height: 32px;
-  padding: 0 12px;
-  border: 1px solid color-mix(in srgb, var(--warning) 48%, var(--border));
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--warning) 12%, var(--surface));
   color: var(--warning);
-  font-size: var(--font-size-support);
-  font-weight: var(--font-weight-semibold);
+}
+
+.stopTaskButton {
+  color: var(--danger);
 }
 
 .yoloButton[data-hovered] {
-  background: color-mix(in srgb, var(--warning) 18%, var(--surface));
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
 }
 
-.yoloButton[data-focus-visible] {
-  border-color: var(--focus);
+.stopTaskButton[data-hovered] {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.yoloButton[data-focus-visible],
+.stopTaskButton[data-focus-visible] {
   box-shadow: var(--shadow-focus);
   outline: none;
 }
 
-.yoloButton[data-disabled] {
+.yoloButton[data-disabled],
+.stopTaskButton[data-disabled] {
   opacity: 0.5;
+  cursor: default;
 }
 
 .actions {
   flex: none;
-  padding: 14px 20px 20px;
-  border-top: 1px solid var(--border);
+  justify-content: space-between;
+  padding: 16px 20px 20px;
   background: var(--surface-raised);
+}
+
+.taskActions,
+.requestActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.taskActions {
+  margin-inline-start: -10px;
+}
+
+.requestActions {
+  justify-content: flex-end;
+  margin-inline-start: auto;
 }
 
 @media (max-width: 560px) {
@@ -180,8 +220,12 @@
     max-height: calc(100dvh - 24px);
   }
 
+  .details {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .details > div {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 4px;
   }
 
@@ -196,5 +240,9 @@
   .actions {
     flex-wrap: wrap;
     padding: 12px 16px 16px;
+  }
+
+  .requestActions {
+    width: 100%;
   }
 }

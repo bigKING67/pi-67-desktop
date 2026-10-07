@@ -109,15 +109,12 @@ export function ApprovalDialog() {
                 </div>
               ) : null}
               <dl className={styles.details}>
+                {/* Tool identity and its verified source read as one fact: `bash · Pi 内置`. */}
                 <div>
                   <dt>{messages.approval.tool}</dt>
-                  <dd>
+                  <dd className={styles.toolIdentity}>
                     <SecurityLiteral analysis={toolName} kind="tool-name" label={messages.approval.toolName} />
-                  </dd>
-                </div>
-                <div>
-                  <dt>{messages.approval.toolSource}</dt>
-                  <dd>
+                    <span aria-hidden="true">·</span>
                     <SecurityLiteral
                       analysis={toolSource}
                       kind="tool-name"
@@ -125,7 +122,10 @@ export function ApprovalDialog() {
                     />
                   </dd>
                 </div>
-                <div><dt>{messages.approval.risk}</dt><dd>{riskLabel(request.category)}</dd></div>
+                {/* The reason line above already names the risk when both are the same text. */}
+                {riskLabel(request.category) === request.reason ? null : (
+                  <div><dt>{messages.approval.risk}</dt><dd>{riskLabel(request.category)}</dd></div>
+                )}
                 <div>
                   <dt>{targetKindLabel(request.targetKind)}</dt>
                   <dd>
@@ -178,49 +178,56 @@ export function ApprovalDialog() {
               <p className={styles.yoloNotice}>{messages.approval.yoloNotice}</p>
             </div>
             <div className={`dialog-actions ${styles.actions}`}>
-              <Button autoFocus className="secondary-button" isDisabled={submittingDecision !== undefined || stoppingTask} onPress={() => void submit("deny")}>
-                {submittingDecision === "deny" ? messages.approval.submitting : messages.approval.deny}
-              </Button>
-              <Button
-                className={hardStop ? "danger-button" : canTrustTaskPaths ? "secondary-button" : "primary-button"}
-                isDisabled={submittingDecision !== undefined || stoppingTask}
-                onPress={() => void submit("allow-once")}
-              >
-                {submittingDecision === "allow-once"
-                  ? messages.approval.submitting
-                  : hardStop ? messages.approval.executeDestructiveOnce : messages.approval.allowOnce}
-              </Button>
-              {canTrustTaskPaths ? (
+              {/* Task-level escalations sit apart, on the left, from decisions about this one request. */}
+              {stoppableTaskId || !hardStop ? (
+                <div className={styles.taskActions}>
+                  {stoppableTaskId ? (
+                    <Button
+                      className={styles.stopTaskButton!}
+                      isDisabled={submittingDecision !== undefined || stoppingTask}
+                      onPress={() => void stopTask()}
+                    >
+                      {stoppingTask ? "正在停止任务" : "停止整个任务"}
+                    </Button>
+                  ) : null}
+                  {!hardStop ? (
+                    <Button
+                      className={styles.yoloButton!}
+                      isDisabled={submittingDecision !== undefined || stoppingTask}
+                      onPress={() => void submit("enable-task-yolo-and-allow")}
+                    >
+                      {submittingDecision === "enable-task-yolo-and-allow"
+                        ? messages.approval.submitting
+                        : messages.approval.enableTaskYolo}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+              <div className={styles.requestActions}>
+                <Button autoFocus className="secondary-button" isDisabled={submittingDecision !== undefined || stoppingTask} onPress={() => void submit("deny")}>
+                  {submittingDecision === "deny" ? messages.approval.submitting : messages.approval.deny}
+                </Button>
                 <Button
-                  className="primary-button"
+                  className={hardStop ? "danger-button" : canTrustTaskPaths ? "secondary-button" : "primary-button"}
                   isDisabled={submittingDecision !== undefined || stoppingTask}
-                  onPress={() => void submit("trust-task-paths-and-allow")}
+                  onPress={() => void submit("allow-once")}
                 >
-                  {submittingDecision === "trust-task-paths-and-allow"
+                  {submittingDecision === "allow-once"
                     ? messages.approval.submitting
-                    : messages.approval.trustTaskPaths(taskPathGrant.length)}
+                    : hardStop ? messages.approval.executeDestructiveOnce : messages.approval.allowOnce}
                 </Button>
-              ) : null}
-              {!hardStop ? (
-                <Button
-                  className={styles.yoloButton!}
-                  isDisabled={submittingDecision !== undefined || stoppingTask}
-                  onPress={() => void submit("enable-task-yolo-and-allow")}
-                >
-                  {submittingDecision === "enable-task-yolo-and-allow"
-                    ? messages.approval.submitting
-                    : messages.approval.enableTaskYolo}
-                </Button>
-              ) : null}
-              {stoppableTaskId ? (
-                <Button
-                  className="danger-button"
-                  isDisabled={submittingDecision !== undefined || stoppingTask}
-                  onPress={() => void stopTask()}
-                >
-                  {stoppingTask ? "正在停止任务" : "停止整个任务"}
-                </Button>
-              ) : null}
+                {canTrustTaskPaths ? (
+                  <Button
+                    className="primary-button"
+                    isDisabled={submittingDecision !== undefined || stoppingTask}
+                    onPress={() => void submit("trust-task-paths-and-allow")}
+                  >
+                    {submittingDecision === "trust-task-paths-and-allow"
+                      ? messages.approval.submitting
+                      : messages.approval.trustTaskPaths(taskPathGrant.length)}
+                  </Button>
+                ) : null}
+              </div>
             </div>
           </div>
         </Dialog>
