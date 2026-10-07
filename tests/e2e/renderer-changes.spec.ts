@@ -54,6 +54,10 @@ test("reviews bounded Session changes and inline Patch without claiming Git stat
   await expect(inspector.getByText("2 个文件 · 4 条记录", { exact: true })).toBeVisible();
   await expect(inspector.getByText("仅显示预算内最近记录；更早的修改仍保留在 Pi JSONL 中。", { exact: true })).toBeVisible();
   await expect(inspector.getByRole("list", { name: "当前会话修改记录" })).toBeVisible();
+  // The projection boundary stays one hover/focus away instead of a standing paragraph.
+  const projectionInfo = inspector.getByRole("button", { name: "关于修改投影" });
+  await projectionInfo.focus();
+  await expect(page.getByRole("tooltip")).toContainText("不等于当前 Git 或完整 Workspace Diff");
   await expect(inspector.getByRole("region", { name: "修改详情 src/generated.ts" })).toContainText(
     "write Tool Result 不包含写入前版本"
   );

@@ -200,8 +200,9 @@ test("renders structured Markdown without letting wide tables widen the workbenc
         "  - 记录真实使用场景",
         "- [x] 保留可验证证据",
         "",
-        "| 人群 | 场景 | 问题 | 证据 | 标题 | 正文 | 图片 | 复盘 |" + " 附加维度 |".repeat(12),
-        "| --- | --- | --- | --- | --- | --- | --- | --- |" + " --- |".repeat(12),
+        // Wider than the 1040px wide-content measure, so the table must still scroll.
+        "| 人群 | 场景 | 问题 | 证据 | 标题 | 正文 | 图片 | 复盘 |" + " 附加维度 |".repeat(20),
+        "| --- | --- | --- | --- | --- | --- | --- | --- |" + " --- |".repeat(20),
         "| 通勤用户 | 早高峰 | 没时间护肤 | 30 天照片对比 | 油皮通勤底妆 | 步骤与数据 | 实拍对比图 | 收藏与搜索进站 |",
         "| 新手用户 | 第一次购买 | 不会选色号 | 自然光试色 | 新手选色指南 | 肤色判断方法 | 多肤色样本 | 有效评论 |",
         "",

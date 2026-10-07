@@ -2,6 +2,7 @@ import type { NativeSubagentView } from "@pi67/domain";
 import { Bot, CircleStop, CornerDownRight, LoaderCircle, RotateCcw, Send } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
+import { SettingsInfo } from "../settings/SettingsPrimitives.js";
 import {
   selectedWorkbenchTask,
   useWorkbenchStore,
@@ -52,16 +53,16 @@ export function SubagentsPanel() {
       <header className="inspector-agents-header">
         <div>
           <span className="section-label">当前任务</span>
-          <strong>{items.length > 0 ? `${items.length} 个原生子代理` : "原生子代理"}</strong>
+          <span className="inspector-agents-title">
+            <strong>{items.length > 0 ? `${items.length} 个原生子代理` : "原生子代理"}</strong>
+            <SettingsInfo label="关于原生子代理">子代理是独立 Pi JSONL Session；它不等于 Browser Profile，也不占用顶层任务名额。</SettingsInfo>
+          </span>
         </div>
         <button disabled={loading} onClick={() => void loadRoster(currentTask, ++listRequestRevision.current)} type="button">
           {loading ? <LoaderCircle className="spin" size={13} /> : <RotateCcw size={13} />}
           刷新
         </button>
       </header>
-      <p className="inspector-agents-help">
-        子代理是独立 Pi JSONL Session；它不等于 Browser Profile，也不占用顶层任务名额。
-      </p>
       {error ? <p className="inspector-error" role="alert">{error}</p> : null}
       {loading && roster === undefined ? (
         <div className="inspector-loading" role="status"><LoaderCircle className="spin" size={16} />正在读取子代理名册</div>

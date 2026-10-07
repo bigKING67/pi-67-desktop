@@ -53,7 +53,8 @@ async function verifyChangesInspector(window, captureScreenshot) {
   await inspector.getByRole("tab", { name: "修改", exact: true }).click();
   await inspector.getByText("0 个文件 · 0 条记录", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
-  await inspector.getByText("Pi Session 修改投影，不等于当前 Git 或完整 Workspace Diff。", { exact: true })
+  // The projection boundary lives in the header info tip (DESIGN Inspector, Visual quality bar rule 4).
+  await inspector.getByRole("button", { name: "关于修改投影", exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
   await inspector.getByText("当前活动分支还没有 edit 或 write 修改记录。", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });

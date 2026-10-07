@@ -883,8 +883,11 @@ loading error where the operation can produce those states
   and bounded error. The list scrolls independently; refresh, empty, loading, stale,
   and error states remain inside the Inspector. Live children expose `引导` and
   `停止`; non-completed terminal children expose `继续`. Every action carries the
-  exact parent Task and Session authority. The empty state states that a child is an
-  independent Pi JSONL Session, not a Browser Profile and not a top-level Task slot.
+  exact parent Task and Session authority. An ⓘ beside the roster title (`关于原生子代理`)
+  states that a child is an independent Pi JSONL Session, not a Browser Profile and not
+  a top-level Task slot. The Changes header carries the matching `关于修改投影` ⓘ: the
+  Session change projection is not current Git or a complete Workspace Diff. Both
+  reuse `SettingsInfo` rather than standing paragraphs (Visual quality bar rule 4).
   A retained Worktree path may be shown only after Main created it; unsupported
   Worktree isolation must fail visibly rather than rendering invented success.
 - `Cmd/Ctrl+F` searches visible user/Assistant text in the current Pi JSONL branch;
@@ -3072,7 +3075,11 @@ application bundles, Helpers, executables and installer filenames use New Money.
 
 - Desktop navigation and Inspector defaults are 248px and 320px; title-bar tracks
   match pane tracks. Conversation/composer reading width is capped at 800px even
-  when side panels close. Existing responsive drawers and session-local visibility
+  when side panels close. Assistant Markdown tables and code blocks may break out of
+  that measure (2026-10-07): when the Transcript region is wider than 848px they use up
+  to `min(1040px, region − 48px)`, centered on the reading track. Code blocks take the
+  full wide measure; a table keeps the reading width unless its content needs more.
+  Prose, user messages, Team Chat and Settings Markdown never widen. Existing responsive drawers and session-local visibility
   remain; this change introduces no resize handles or persistence migration.
 - Workspace labels use interface/medium; ordinary conversation titles interface/regular, current
   titles medium; conversation metadata uses caption. Current-row gray fill and marker

@@ -479,7 +479,7 @@
 .inspector-agents-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .inspector-agents-header > div { display: grid; }
 .inspector-agents-header strong { margin-top: 2px; font-size: var(--font-size-interface); }
-.inspector-agents-header button,
+.inspector-agents-header > button,
 .inspector-agent-actions button,
 .inspector-agent-steer button {
   display: inline-flex;
@@ -493,14 +493,14 @@
   color: var(--text-secondary);
   font-size: var(--font-size-support);
 }
-.inspector-agents-header button { padding: 0 7px; background: transparent; }
-.inspector-agents-header button:hover { background: var(--surface-hover); color: var(--text-primary); }
+.inspector-agents-header > button { padding: 0 7px; background: transparent; }
+.inspector-agents-header > button:hover { background: var(--surface-hover); color: var(--text-primary); }
 .inspector-agent-actions button:hover,
 .inspector-agent-steer button:hover { background: color-mix(in srgb, var(--text-primary) 12%, var(--surface-active)); color: var(--text-primary); }
-.inspector-agents-header button:disabled,
+.inspector-agents-header > button:disabled,
 .inspector-agent-actions button:disabled,
 .inspector-agent-steer button:disabled { cursor: not-allowed; opacity: 0.45; }
-.inspector-agents-help { margin: 8px 0 10px; color: var(--text-tertiary); font-size: var(--font-size-caption); line-height: 1.45; }
+.inspector-agents-title { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 10px; }
 .inspector-agent-list {
   display: grid;
   min-height: 0;

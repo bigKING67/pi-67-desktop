@@ -30,6 +30,7 @@ import {
 } from "./changes-read-store.js";
 import { ChangeReviewPanel } from "./ChangeReviewPanel.js";
 import { useShellStore } from "../shell/shell-store.js";
+import { SettingsInfo } from "../settings/SettingsPrimitives.js";
 
 export interface ChangesPanelProps {
   active: boolean;
@@ -128,7 +129,10 @@ function SessionChangesPanel({ active }: ChangesPanelProps) {
     <div className={styles.panel}>
       <header className={styles.header}>
         <div>
-          <strong>{sessionName?.trim() || "当前会话"}</strong>
+          <span className={styles.titleRow}>
+            <strong>{sessionName?.trim() || "当前会话"}</strong>
+            <SettingsInfo label="关于修改投影">Pi Session 修改投影，不等于当前 Git 或完整 Workspace Diff。</SettingsInfo>
+          </span>
           <p className={styles.authority}>{summary}</p>
         </div>
         <button
@@ -248,7 +252,7 @@ function ChangesNotices({ error, loading, stale, truncated }: {
   if (stale) {
     return <p className={styles.warning}><TriangleAlert aria-hidden="true" size={14} />当前内容可能已过期，请刷新后再据此审阅。</p>;
   }
-  return <p className={styles.authority}>Pi Session 修改投影，不等于当前 Git 或完整 Workspace Diff。</p>;
+  return null;
 }
 
 function ChangesPanelState({ actionLabel, icon, text }: {

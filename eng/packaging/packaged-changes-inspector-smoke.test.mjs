@@ -12,7 +12,7 @@ describe("packaged Changes Inspector smoke", () => {
       "inspector:visible",
       "tab:changes",
       "text:summary:visible",
-      "text:authority:visible",
+      "info:authority:visible",
       "text:empty:visible",
       "screenshot:01-changes-empty.png",
       "hide",
@@ -29,7 +29,7 @@ describe("packaged Changes Inspector smoke", () => {
       "inspector:visible",
       "tab:changes",
       "text:summary:visible",
-      "text:authority:visible",
+      "info:authority:visible",
       "text:empty:visible",
       "screenshot:01-changes-empty.png"
     ]);
@@ -69,7 +69,12 @@ function inspectorFixture(initiallyVisible, failure) {
   const inspector = {
     getByRole: vi.fn((_role, options) => ({
       click: async () => actions.push(`tab:${options.name === "修改" ? "changes" : options.name}`),
-      isVisible: async () => true
+      isVisible: async () => true,
+      waitFor: async ({ state }) => {
+        if (failure) throw failure;
+        expect(options.name).toBe("关于修改投影");
+        actions.push(`info:authority:${state}`);
+      }
     })),
     getByText: vi.fn((text) => ({
       waitFor: async ({ state }) => {
@@ -114,7 +119,6 @@ function inspectorFixture(initiallyVisible, failure) {
 
 function textLabel(text) {
   if (text === "0 个文件 · 0 条记录") return "summary";
-  if (text === "Pi Session 修改投影，不等于当前 Git 或完整 Workspace Diff。") return "authority";
   if (text === "当前活动分支还没有 edit 或 write 修改记录。") return "empty";
   throw new Error(`Unexpected Inspector text: ${text}`);
 }
