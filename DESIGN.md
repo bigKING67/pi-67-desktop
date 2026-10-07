@@ -231,7 +231,8 @@ Application-level surfaces use a separate wide-window shell:
   visible. Header actions overlay the right edge on hover, keyboard focus or open
   menu, and stay visible on touch input. Background task counts remain visible.
 - Conversation secondary lines use message count and relative date (or existing
-  draft/snooze status). Recent prompt previews remain searchable and available in
+  draft/snooze status). A row without Catalog metadata omits the secondary line
+  rather than repeating its title or an unnamed placeholder. Recent prompt previews remain searchable and available in
   the title tooltip, without displacing metadata. Selection uses a neutral surface
   and medium title weight, without a leading accent stripe. Navigation stays 248px.
 - The Inspector tab strip uses five equal-width compact actions: `文件`, `修改`,
@@ -408,6 +409,11 @@ loading error where the operation can produce those states
   header is omitted because position and surface already communicate ownership,
   while the message article retains an explicit accessible user label. Pi and
   Tool output remain left-aligned, wide editorial content with visible authors.
+  Settled turns separate by vertical rhythm alone; no hairline divides one
+  message from the next.
+- The conversation shows a session-origin line only for a team origin, where it
+  names the team/project and that continuing still requires current permission.
+  Private and unverified origins are the quiet default and render no line.
 - Every settled User or Pi message exposes one low-emphasis action footer without
   widening the adaptive conversation measure or creating document-level
   horizontal scroll.
@@ -1756,6 +1762,8 @@ loading error where the operation can produce those states
   selector. An empty configured-model set names that next action explicitly.
 - The thinking control localizes its product label but preserves Pi's canonical
   lowercase Runtime values, such as `思考：off`, `思考：high`, and `思考：max`.
+  Its trigger sizes to the complete value and never truncates it; only the model
+  trigger yields width.
   Its bounded React Aria picker projects the exact ordered result of Pi SDK
   `AgentSession.getAvailableThinkingLevels()` for the authoritative current model.
   The footer names that model and the returned values, and states that omitted
@@ -2011,7 +2019,9 @@ loading error where the operation can produce those states
   action bar keeps every action reachable while the Composer toolbar may wrap to two
   rows without changing keyboard order or overlapping the editor. Reduced Motion
   removes the disclosure rotation transition.
-- Prompt Stash is a Task-scoped Composer Popover for exact text and images, with at
+- Prompt Stash is a Task-scoped Composer Popover, opened from an unfilled utility
+  icon that matches `+` (only Tool mode and interaction mode rest as filled
+  chips), for exact text and images, with at
   most 20 items, 256 KiB of text per item, 2 MiB of total stashed text, 32 MiB of
   images per item, 128 MiB per Task, and 512 MiB globally. Image-only items are
   allowed; non-image attachments and drafts containing `@file` references are not.
@@ -2028,7 +2038,9 @@ loading error where the operation can produce those states
   retained. Restore is allowed only into an empty Composer,
   creates new staging identities, removes the item through the acknowledged flow,
   closes the Popover, and returns focus to the Composer.
-- Context pressure is a compact status beside the Composer: below 75% is neutral,
+- Context pressure is a compact status beside the Composer: a 14px ring fills with
+  the exact value, and the numeric percent appears only from 50%; below that the
+  value remains in the status name and tooltip. Below 75% is neutral,
   75% is `上下文偏高`, and 92% is `上下文接近上限`. Manual compression calls the
   native `session.compact` controller; automatic and manual compaction have distinct
   progress copy, and automatic compaction never exposes a duplicate manual button.
@@ -2453,6 +2465,8 @@ loading error where the operation can produce those states
 - The search field remains the sole keyboard focus owner and exposes the bounded
   result list through the combobox `aria-activedescendant` pattern. Arrow keys
   change the active option without preventing the user from continuing to type.
+  Pointer movement moves that same active option, so the list paints exactly one
+  highlight; rows have no separate hover fill.
 - IME candidate confirmation follows the same `isComposing` and legacy
   `keyCode 229` boundary as Composer and never executes the active result.
 - Session, Extension, Pi Desktop, compaction, and resource actions reflect the Agent Host

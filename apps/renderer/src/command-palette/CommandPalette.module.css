@@ -100,7 +100,7 @@
   user-select: none;
 }
 
-.item:hover,
+/* Pointer movement already moves the selection, so hover never paints a second highlight. */
 .item[data-selected] {
   background: var(--surface-hover);
   color: var(--text-primary);

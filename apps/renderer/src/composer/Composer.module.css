@@ -294,7 +294,8 @@
 
 .modelRuntimeControl {
   display: grid;
-  min-width: 0;
+  /* Keeps the brand mark and a readable name start when the full-width thinking trigger holds its size. */
+  min-width: 96px;
   /* Sized to the mark plus the model name, up to 240px; it still shrinks before the toolbar wraps. */
   max-width: 240px;
   flex: 0 1 auto;
@@ -306,10 +307,9 @@
   min-width: 0;
 }
 
+/* Thinking values are short canonical words; size to the full `思考：medium` instead of truncating. */
 .runtimeControls > :last-child {
-  min-width: 0;
-  max-width: 128px;
-  flex: 1 1 68px;
+  flex: 0 0 auto;
 }
 
 .runtimeField {
@@ -718,69 +718,6 @@
   font-size: var(--font-size-support);
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.035em;
-}
-
-.contextPressure {
-  display: inline-flex;
-  min-height: 28px;
-  align-items: center;
-  gap: 4px;
-  padding: 0 6px;
-  border-radius: 7px;
-  color: var(--text-tertiary);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-}
-
-.contextPressure[data-tone="warning"] {
-  background: color-mix(in srgb, var(--warning) 8%, transparent);
-  color: var(--warning);
-}
-
-.contextPressure[data-tone="critical"] {
-  background: color-mix(in srgb, var(--danger) 8%, transparent);
-  color: var(--danger);
-}
-
-.contextPressure small,
-.contextPressure button {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--font-size-support);
-}
-
-.contextPressure small {
-  color: inherit;
-}
-
-.contextPressure button {
-  min-height: 22px;
-  padding: 0 6px;
-  border: 1px solid currentColor;
-  border-radius: 6px;
-  background: transparent;
-  color: inherit;
-  font-weight: var(--font-weight-semibold);
-}
-
-.contextPressure button:disabled {
-  cursor: not-allowed;
-  opacity: 0.48;
-}
-
-.contextPressureSpin {
-  animation: context-pressure-spin 900ms linear infinite;
-}
-
-@keyframes context-pressure-spin {
-  to { transform: rotate(360deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .contextPressureSpin {
-    animation: none;
-  }
 }
 
 .toolModeButton[data-mode="auto"] {

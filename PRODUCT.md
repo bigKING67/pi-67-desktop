@@ -1825,8 +1825,9 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   work, preserving original content and attachments. No Session is reclassified.
   Lists load only on disclosure and expose loading/error/empty/retry states. Existing
   bindings and sole available projects may prefill a choice but never apply it without
-  consent; subsequent new drafts inherit only an explicitly saved default. Materialized live conversations show projected origin,
-  not current permission; stopped history does not yet expose this label.
+  consent; subsequent new drafts inherit only an explicitly saved default. Materialized live team conversations show projected
+  origin, not current permission; private and unverified origins are the quiet default and show no label (unverified history
+  already fails closed for memory capture). Stopped history does not yet expose this label.
   Omitted scope stays private; team model processing still requires the separate history authorization
   above, and forks, compaction and private capture remain restricted.
   The journal's

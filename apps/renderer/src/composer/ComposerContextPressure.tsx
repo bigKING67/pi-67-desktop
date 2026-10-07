@@ -1,11 +1,11 @@
-import { CircleGauge, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useAppStore } from "../app/app-store.js";
 import { compactRendererSession } from "../operation/operation-controller.js";
 import { isActiveOperationLifecycle } from "../operation/operation-lifecycle.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { selectSessionStats } from "../session/session-projection-selectors.js";
-import styles from "./Composer.module.css";
+import styles from "./ComposerContextPressure.module.css";
 
 export function ComposerContextPressure() {
   const contextPercent = useSessionProjectionStore(selectSessionStats)?.contextPercent;
@@ -40,8 +40,7 @@ export function ComposerContextPressure() {
       role="status"
       title={`${label}：${boundedPercent.toFixed(1)}%`}
     >
-      <CircleGauge aria-hidden="true" size={14} />
-      <span>{boundedPercent.toFixed(0)}%</span>
+      <ContextPressureValue percent={boundedPercent} />
       {automaticCompaction || manualCompaction || compacting ? (
         <small><RefreshCw aria-hidden="true" className={styles.contextPressureSpin} size={12} />{label}</small>
       ) : showCompact ? (
@@ -63,6 +62,39 @@ export function ComposerContextPressure() {
       setCompacting(false);
     }
   }
+}
+
+/** Below half, the ring alone carries the value visually; the percent stays as screen-reader text and tooltip. */
+const CONTEXT_PERCENT_VISIBLE_FROM = 50;
+const RING_RADIUS = 5.25;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+export function ContextPressureValue({ percent }: { percent: number }) {
+  return (
+    <>
+      <ContextRing percent={percent} />
+      {/* Compare the rounded value so the visible number and the status name never disagree. */}
+      <span className={Number(percent.toFixed(0)) >= CONTEXT_PERCENT_VISIBLE_FROM ? undefined : "sr-only"}>
+        {percent.toFixed(0)}%
+      </span>
+    </>
+  );
+}
+
+function ContextRing({ percent }: { percent: number }) {
+  return (
+    <svg aria-hidden="true" className={styles.contextRing} height={14} viewBox="0 0 14 14" width={14}>
+      <circle className={styles.contextRingTrack} cx={7} cy={7} r={RING_RADIUS} />
+      {percent > 0 ? <circle
+        className={styles.contextRingValue}
+        cx={7}
+        cy={7}
+        r={RING_RADIUS}
+        strokeDasharray={`${(percent / 100) * RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`}
+        transform="rotate(-90 7 7)"
+      /> : null}
+    </svg>
+  );
 }
 
 export function contextPressureTone(percent: number): "normal" | "warning" | "critical" {

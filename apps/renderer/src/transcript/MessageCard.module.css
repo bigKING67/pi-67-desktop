@@ -1,8 +1,8 @@
 .card {
   width: min(var(--conversation-track-width, 860px), calc(100% - 48px));
   margin: 0 auto;
+  /* Turns separate by vertical rhythm; hard lines stay reserved for pane boundaries. */
   padding: 18px 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 66%, transparent);
 }
 
 .highlighted {
@@ -19,7 +19,6 @@
   width: min(var(--conversation-track-width, 860px), calc(100% - 48px));
   margin: 10px auto;
   padding: 0;
-  border-bottom: 0;
   justify-items: end;
 }
 

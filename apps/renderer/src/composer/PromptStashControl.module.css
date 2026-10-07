@@ -8,7 +8,8 @@
   padding: 0;
   border: 1px solid transparent;
   border-radius: 7px;
-  background: var(--surface-muted);
+  /* A utility icon like `+`: unfilled at rest so only mode controls read as chips. */
+  background: transparent;
   color: var(--text-secondary);
 }
 

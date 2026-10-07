@@ -2,7 +2,7 @@ import {
   selectConversationSessionSummary,
   useSessionCatalogStore
 } from "../navigation/session-catalog-store.js";
-import { conversationPrimaryTitle } from "./conversation-title.js";
+import { conversationPrimaryTitle, isUnnamedConversationTitle } from "./conversation-title.js";
 import type { RendererWorkbenchTask } from "./workbench-store.js";
 
 export type TaskTransitionPhase = "recovering" | "ready" | "restoring" | "reconnecting";
@@ -22,7 +22,7 @@ export function rendererTaskTransitionDetail(
     restoring: { titled: "正在恢复", untitled: "正在恢复对话" },
     reconnecting: { titled: "正在重新连接", untitled: "正在重新连接对话" }
   }[phase];
-  if (title === "未命名会话" || title === "未命名任务" || title === "未命名对话") {
+  if (isUnnamedConversationTitle(title)) {
     return copy.untitled;
   }
   return `${copy.titled}「${title}」`;

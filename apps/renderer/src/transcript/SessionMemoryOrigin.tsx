@@ -7,10 +7,14 @@ export function SessionMemoryOrigin() {
   return <SessionMemoryOriginLabel origin={origin} />;
 }
 
+/**
+ * Only a team origin carries an actionable boundary (continuing still needs current
+ * permission). Private and unverified origins are the quiet default: memory capture
+ * already fails closed for unverified history, so neither earns a persistent line.
+ */
 export function SessionMemoryOriginLabel({ origin }: { origin: MemoryOrigin | undefined }) {
+  if (origin?.kind !== "team") return null;
   return <p className={styles.origin} aria-label="会话来源">
-    {origin?.kind === "team" ? `团队会话 · ${origin.teamId} / ${origin.projectId} · 继续处理仍需当前权限`
-      : origin?.kind === "private" ? "私人会话 · 不接入团队知识"
-      : "会话来源未验证 · 不代表私人记忆归属"}
+    {`团队会话 · ${origin.teamId} / ${origin.projectId} · 继续处理仍需当前权限`}
   </p>;
 }

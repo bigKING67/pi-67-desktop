@@ -97,7 +97,23 @@ describe("workspace conversation model", () => {
 
     expect(conversationRows("workspace-test", [task], [], "")[0]).toMatchObject({
       title: "接续：原任务",
-      meta: "接续：原任务"
+      meta: ""
+    });
+  });
+
+  it.each(["未命名会话", "未命名任务", "未命名对话"])("omits an unnamed %s secondary line", (placeholder) => {
+    const task = {
+      id: "task-unnamed",
+      conversation: { kind: "session", workspaceId: "workspace-test", sessionFileIdentity: "file-unnamed", sessionPath: "/s.jsonl" },
+      workspaceId: "workspace-test",
+      lifecycle: "idle",
+      title: placeholder,
+      recentUserMessagePreview: "帮我检查前端实现"
+    } as RendererWorkbenchTask;
+
+    expect(conversationRows("workspace-test", [task], [], "")[0]).toMatchObject({
+      title: "帮我检查前端实现",
+      meta: ""
     });
   });
 

@@ -17,7 +17,12 @@ export function conversationStableTitle(
 ): string {
   if (task.titleSource === "explicit") return task.title;
   if (session && session.nameSource !== "fallback") return session.name;
-  return ["未命名会话", "未命名任务"].includes(task.title) && session
+  return isUnnamedConversationTitle(task.title) && session
     ? session.name
     : task.title;
+}
+
+/** Desktop Task placeholders plus Pi's Catalog fallback name; none identifies a conversation. */
+export function isUnnamedConversationTitle(title: string): boolean {
+  return title === "未命名会话" || title === "未命名任务" || title === "未命名对话";
 }

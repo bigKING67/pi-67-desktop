@@ -119,7 +119,7 @@ export function ConversationRow({
       >
         <span className={styles.conversationCopy} data-testid="conversation-copy">
           <strong title={row.task?.recentUserMessagePreview ? `${row.title}\n${row.task.recentUserMessagePreview}` : row.title}>{row.title}</strong>
-          <small>{row.meta}</small>
+          {row.meta ? <small>{row.meta}</small> : null}
         </span>
         <span className={styles.conversationIndicators}>
           {row.status === "running" ? (

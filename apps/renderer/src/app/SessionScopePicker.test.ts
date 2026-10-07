@@ -10,17 +10,21 @@ import type { SessionSnapshot } from "@pi67/domain";
 
 beforeEach(() => useSessionProjectionStore.setState({ identity: undefined }));
 
-it("does not infer private origin from missing projection or a legacy snapshot", () => {
-  expect(renderToStaticMarkup(createElement(SessionMemoryOrigin))).toContain("会话来源未验证");
+it("renders no origin line without a projection and keeps a legacy snapshot unverified", () => {
+  expect(renderToStaticMarkup(createElement(SessionMemoryOrigin))).toBe("");
   const identity = identityProjectionFromSnapshot({ cwd: "/workspace" } as SessionSnapshot);
   expect(identity.memoryOrigin).toEqual({ kind: "unverified" });
 });
 
-it.each(["private", "team"] as const)("shows %s origin without claiming current access", (kind) => {
-  const memoryOrigin = kind === "team" ? { kind, teamId: "team", projectId: "project" } : { kind };
+it("shows team origin without claiming current access", () => {
+  const memoryOrigin = { kind: "team", teamId: "team", projectId: "project" };
   useSessionProjectionStore.setState({ identity: identityProjectionFromSnapshot({ cwd: "/workspace", memoryOrigin } as SessionSnapshot) });
   const markup = renderToStaticMarkup(createElement(SessionMemoryOriginLabel, { origin: useSessionProjectionStore.getState().identity?.memoryOrigin }));
-  expect(markup).toContain(kind === "team" ? "继续处理仍需当前权限" : "私人会话");
+  expect(markup).toContain("团队会话 · team / project · 继续处理仍需当前权限");
+});
+
+it.each(["private", "unverified"] as const)("keeps the quiet default for %s origin", (kind) => {
+  expect(renderToStaticMarkup(createElement(SessionMemoryOriginLabel, { origin: { kind } }))).toBe("");
 });
 
 it.each([false, true])("shows explicit draft scope and preserves the separate-draft contract: %s", (team) => {

@@ -9,7 +9,8 @@ import {
 } from "../workbench/workbench-store.js";
 import {
   conversationPrimaryTitle,
-  conversationStableTitle
+  conversationStableTitle,
+  isUnnamedConversationTitle
 } from "../workbench/conversation-title.js";
 import { formatSessionRelativeTime } from "./session-navigation.js";
 
@@ -53,7 +54,7 @@ export function conversationRows(
     const title = conversationPrimaryTitle(task, session);
     const meta = session
       ? sessionMeta(session, snoozed)
-      : task.conversation.kind === "provisional" ? "尚未保存 · 当前草稿" : stableTitle;
+      : task.conversation.kind === "provisional" ? "尚未保存 · 当前草稿" : distinctStableTitle(stableTitle, title);
     return {
       identity: rendererConversationIdentity(task.conversation),
       conversation: task.conversation,
@@ -156,6 +157,11 @@ function taskStatus(task: RendererWorkbenchTask): ConversationRowModel["status"]
 
 function taskStatusRank(status: ConversationRowModel["status"]): number {
   return status === "waiting" ? 0 : status === "running" ? 1 : status === "draft" ? 2 : 3;
+}
+
+/** A secondary line that repeats the title or only says "unnamed" adds no information. */
+function distinctStableTitle(stableTitle: string, title: string): string {
+  return stableTitle === title || isUnnamedConversationTitle(stableTitle) ? "" : stableTitle;
 }
 
 function sessionMeta(session: SessionSummary, snoozed: boolean): string {
