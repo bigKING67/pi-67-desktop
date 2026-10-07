@@ -3254,7 +3254,12 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
   back link, one title scale (heading size, semibold), one metadata line (plus an optional
   identifier line such as a path), then `SettingsStatus` and actions. Facts already stated in
   the metadata line are not repeated as rows. Save/discard actions of an existing entry appear
-  only while it has changes; a new entry keeps its save action. The Extension package detail uses
+  only while it has changes; a new entry keeps its save action. The Provider detail carries the Pi sync status and
+  its refresh/reload icons in that header instead of a separate row; its tab panels do not
+  repeat the tab name as a heading; a built-in Provider shows the credential as one card row
+  with a `SettingsStatus` and the read-only service facts as card rows under `服务信息` (ⓘ for
+  the read-only boundary); editor checkboxes are `SettingsCheckbox` and advanced groups are
+  `SettingsDetails` (2026-10-07). The Extension package detail uses
   `SettingsDetailHeader` too (meta `source kind · version · scope`, status, then update /
   restore / confirm-content actions; 2026-10-07), followed by facts and per-resource toggles
   as card rows; installed list rows show only exception statuses on the right, never a

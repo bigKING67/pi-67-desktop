@@ -5,6 +5,7 @@ import { ProviderApiSelect } from "./ProviderApiSelect.js";
 import { ProviderHeaderMutationEditor } from "./ProviderHeaderMutationEditor.js";
 import { ProviderModelDiscovery } from "./ProviderModelDiscovery.js";
 import { useProviderConfigurationStore } from "./provider-configuration-store.js";
+import { SettingsCheckbox, SettingsDetails, SettingsInfo } from "./SettingsPrimitives.js";
 import styles from "./ProviderConfigurationPanel.module.css";
 
 export function ProviderConfigurationEditor({
@@ -31,10 +32,6 @@ export function ProviderConfigurationEditor({
   });
   return (
     <section className={styles.formSection}>
-      <header className={styles.sectionIntro}>
-        <strong>基本配置</strong>
-        <small>一组 Endpoint 与 API Key 可以发现多个协议族；每个模型保存自己的准确 Pi API。</small>
-      </header>
       <div className={styles.fieldGrid}>
         <Field label="Provider ID" detail="写入 providers.<id>">
           <Input disabled={selectedView !== undefined} value={draft.id} onChange={(event) => update((current) => ({ ...current, id: event.target.value }))} />
@@ -53,20 +50,25 @@ export function ProviderConfigurationEditor({
         onApiKeyChange={onApiKeyChange}
       />
       <div className={styles.checkRow}>
-        <label title="关闭后，Anthropic 与 Gemini 会分别使用 x-api-key 与 x-goog-api-key 读取目录和发送请求。">
-          <input checked={draft.authHeader !== false} onChange={(event) => update((current) => ({ ...current, authHeader: event.target.checked }))} type="checkbox" />
-          统一使用 Authorization: Bearer（聚合服务推荐）
-        </label>
-        <label><input checked={draft.oauth === "radius"} onChange={(event) => update((current) => {
-          const next = { ...current };
-          if (event.target.checked) next.oauth = "radius";
-          else delete next.oauth;
-          return next;
-        })} type="checkbox" />启用 Radius OAuth</label>
+        <SettingsCheckbox
+          isSelected={draft.authHeader !== false}
+          onChange={(selected) => update((current) => ({ ...current, authHeader: selected }))}
+        >统一使用 Authorization: Bearer（聚合服务推荐）</SettingsCheckbox>
+        <SettingsInfo label="关于 Authorization 请求头">
+          关闭后，Anthropic 与 Gemini 会分别使用 x-api-key 与 x-goog-api-key 读取目录和发送请求。
+        </SettingsInfo>
+        <SettingsCheckbox
+          isSelected={draft.oauth === "radius"}
+          onChange={(selected) => update((current) => {
+            const next = { ...current };
+            if (selected) next.oauth = "radius";
+            else delete next.oauth;
+            return next;
+          })}
+        >启用 Radius OAuth</SettingsCheckbox>
       </div>
-      <details className={styles.advancedDetails}>
-        <summary>兼容 Provider 默认协议{draft.api ? ` · ${draft.api}` : ""}</summary>
-        <p>聚合服务保持未设置，并由每个模型保存协议；这里只用于维护已有的单协议 Provider。</p>
+      <SettingsDetails summary={draft.api ?? ""} title="兼容 Provider 默认协议">
+        <p className={styles.detailsHint}>聚合服务保持未设置，并由每个模型保存协议；这里只用于维护已有的单协议 Provider。</p>
         <div className={styles.legacyApiField}>
           <ProviderApiSelect
             ariaLabel="兼容 Provider 默认 API 协议"
@@ -76,14 +78,15 @@ export function ProviderConfigurationEditor({
             value={draft.api}
           />
         </div>
-      </details>
-      <details className={styles.advancedDetails}>
-        <summary>自定义 Headers{selectedView?.headerNames.length ? ` · ${selectedView.headerNames.length} 项` : ""}</summary>
+      </SettingsDetails>
+      <SettingsDetails
+        summary={selectedView?.headerNames.length ? `${selectedView.headerNames.length} 项` : ""}
+        title="自定义 Headers"
+      >
         <ProviderHeaderMutationEditor existingNames={selectedView?.headerNames ?? []} readOnly={false} showTitle={false} />
-      </details>
-      <details className={styles.advancedDetails}>
-        <summary>Provider 高级 JSON{hasAdvancedJson(draft.advancedJson) ? " · 已配置" : ""}</summary>
-        <p>仅接受 compat 与 modelOverrides；apiKey 和 headers 必须走专用写入路径。</p>
+      </SettingsDetails>
+      <SettingsDetails summary={hasAdvancedJson(draft.advancedJson) ? "已配置" : ""} title="Provider 高级 JSON">
+        <p className={styles.detailsHint}>仅接受 compat 与 modelOverrides；apiKey 和 headers 必须走专用写入路径。</p>
         <TextArea
           aria-label="Provider 高级 JSON"
           className={styles.codeArea!}
@@ -91,7 +94,7 @@ export function ProviderConfigurationEditor({
           value={draft.advancedJson ?? "{}"}
           onChange={(event) => update((current) => ({ ...current, advancedJson: event.target.value }))}
         />
-      </details>
+      </SettingsDetails>
     </section>
   );
 }

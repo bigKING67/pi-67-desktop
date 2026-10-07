@@ -1,10 +1,11 @@
+/* A borderless Settings card; choices inside it are fills, not nested frames. */
 .discovery {
   display: grid;
   gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--surface-muted) 68%, var(--surface));
+  padding: 16px;
+  border-radius: var(--radius-panel);
+  background: var(--settings-card, var(--surface-muted));
+  --surface-muted: var(--surface-active);
 }
 
 .heading,
@@ -127,16 +128,13 @@
 
 .protocolOption {
   min-height: 64px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
 }
 
-.protocolOption[data-hovered],
-.protocolOption[data-selected] {
-  border-color: var(--border-strong);
-  background: var(--surface-raised);
+.protocolOption[data-hovered] {
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
 }
 
 .groupSelector[data-disabled] {
@@ -279,10 +277,9 @@
 .resultGroup {
   display: grid;
   gap: 6px;
-  padding: 9px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
 }
 
 .groupSelector {

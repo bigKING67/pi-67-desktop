@@ -7,8 +7,6 @@
 .sectionIntro {
   display: grid;
   gap: 2px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
 }
 
 .sectionIntro strong {
@@ -180,10 +178,9 @@
 .effectiveDefault {
   display: grid;
   gap: 4px;
-  padding: 11px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-muted);
+  padding: 12px 16px;
+  border-radius: var(--radius-panel);
+  background: var(--settings-card, var(--surface-muted));
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
 }

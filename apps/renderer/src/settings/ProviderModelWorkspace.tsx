@@ -12,7 +12,9 @@ import { ProviderHeaderMutationEditor } from "./ProviderHeaderMutationEditor.js"
 import {
   SettingsBackAction,
   SettingsCatalog,
-  SettingsCatalogRow
+  SettingsCatalogRow,
+  SettingsCheckbox,
+  SettingsDetails
 } from "./SettingsPrimitives.js";
 import { useProviderConfigurationStore } from "./provider-configuration-store.js";
 import { modelCapabilityView } from "./provider-model-capabilities.js";
@@ -147,17 +149,13 @@ export function ProviderModelWorkspace({
     >
       {!detailOpen ? (
         <div className={styles.modelCatalog}>
-          <header className={styles.sectionHeaderWithAction}>
-            <span>
-              <strong>模型目录</strong>
-              <small>搜索或筛选模型，同一时间只编辑一个模型。</small>
-            </span>
-            {editable ? (
+          {editable ? (
+            <header className={styles.sectionHeaderWithAction}>
               <Button className="secondary-button" onPress={addModel}>
                 <Plus aria-hidden="true" size={14} />添加模型
               </Button>
-            ) : null}
-          </header>
+            </header>
+          ) : null}
           <div className={styles.modelToolbar}>
             <div className={styles.modelSearch}>
               <Search aria-hidden="true" size={15} />
@@ -354,17 +352,17 @@ function ModelDetailEditor({
       </div>
 
       <div className={styles.checkRow}>
-        <label><input checked={model.input?.includes("text") ?? true} disabled type="checkbox" />文本输入</label>
-        <label><input checked={model.input?.includes("image") ?? false} disabled={!editable} onChange={(event) => patch({ input: event.target.checked ? ["text", "image"] : ["text"] })} type="checkbox" />图片输入</label>
-        <label><input checked={model.reasoning ?? false} disabled={!editable} onChange={(event) => patch({ reasoning: event.target.checked })} type="checkbox" />Reasoning</label>
+        <SettingsCheckbox isDisabled isSelected={model.input?.includes("text") ?? true} onChange={() => undefined}>文本输入</SettingsCheckbox>
+        <SettingsCheckbox isDisabled={!editable} isSelected={model.input?.includes("image") ?? false}
+          onChange={(selected) => patch({ input: selected ? ["text", "image"] : ["text"] })}>图片输入</SettingsCheckbox>
+        <SettingsCheckbox isDisabled={!editable} isSelected={model.reasoning ?? false}
+          onChange={(selected) => patch({ reasoning: selected })}>Reasoning</SettingsCheckbox>
       </div>
 
-      <details className={styles.advancedDetails}>
-        <summary>自定义 Headers{existingHeaderNames.length > 0 ? ` · ${existingHeaderNames.length} 项` : ""}</summary>
+      <SettingsDetails summary={existingHeaderNames.length > 0 ? `${existingHeaderNames.length} 项` : ""} title="自定义 Headers">
         <ProviderHeaderMutationEditor existingNames={existingHeaderNames} modelIndex={index} readOnly={!editable} showTitle={false} />
-      </details>
-      <details className={styles.advancedDetails}>
-        <summary>模型高级 JSON{hasAdvancedJson(model.advancedJson) ? " · 已配置" : ""}</summary>
+      </SettingsDetails>
+      <SettingsDetails summary={hasAdvancedJson(model.advancedJson) ? "已配置" : ""} title="模型高级 JSON">
         <TextArea
           aria-label={`模型 ${model.id || index + 1} 高级 JSON`}
           className={styles.codeArea!}
@@ -373,7 +371,7 @@ function ModelDetailEditor({
           value={model.advancedJson ?? "{}"}
           onChange={(event) => patch({ advancedJson: event.target.value })}
         />
-      </details>
+      </SettingsDetails>
     </div>
   );
 }

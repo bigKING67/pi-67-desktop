@@ -344,7 +344,7 @@ export function SettingsNotice({ tone = "info", children, actions, className, te
 }
 
 /** Disclosure state that cannot collapse while dirty or erroneous content requires it open. */
-export function useRequiredOpenDisclosure(requiredOpen: boolean) {
+function useRequiredOpenDisclosure(requiredOpen: boolean) {
   const [expanded, setExpanded] = useState(false);
   return {
     open: requiredOpen || expanded,

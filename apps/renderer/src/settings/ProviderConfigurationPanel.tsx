@@ -201,7 +201,6 @@ function GlobalProviderConfigurationPanel() {
       data-view={providerDetailOpen ? "detail" : "catalog"}
       ref={panelRef}
     >
-      {providerDetailOpen ? statusBar(false) : null}
       {externalConflict ? (
         <SettingsNotice
           tone="warning"
@@ -248,6 +247,7 @@ function GlobalProviderConfigurationPanel() {
               <>
                 <SettingsDetailHeader
                   back={<SettingsBackAction label="返回模型服务列表" onPress={closeProvider}>模型服务</SettingsBackAction>}
+                  status={statusBar(true)}
                   title={selectedProviderId ? (selectedView?.name ?? selectedProviderId) : "新建模型服务"}
                   meta={editable
                     ? "写入当前用户共享的 Pi models.json；Pi TUI 同步使用，API Key 单独保存"
