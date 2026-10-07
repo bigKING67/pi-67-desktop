@@ -289,7 +289,8 @@ test("uses one extension package workbench for third-party installed and discove
   const tabs = page.getByRole("tablist", { name: "扩展管理分类" });
   await expect(tabs.getByRole("tab", { name: "已安装", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("tablist", { name: "Pi 扩展包管理视图" })).toHaveCount(0);
-  await expect(workspace.getByRole("list", { name: "已安装扩展包" }).getByText("第三方扩展包", { exact: true })).toBeVisible();
+  await expect(workspace.getByTestId("extension-package-list-scroll").getByText("第三方扩展包", { exact: true })).toBeVisible();
+  await expect(workspace.getByRole("list", { name: "已安装扩展包" })).toBeVisible();
   await expect(workspace.getByText("随应用提供", { exact: true })).toHaveCount(0);
   await expect(workspace.getByText("已停用", { exact: true }).first()).toBeVisible();
   await expect(workspace.getByText("原生替代", { exact: true })).toBeVisible();
@@ -406,7 +407,7 @@ test("keeps a dense resource-package catalog in the shared document scroll and e
   await expect(workspace.getByText("原生能力替代", { exact: true })).toBeVisible();
   await expect(workspace.getByText("由 Pi-67 原生子代理替代", { exact: true })).toBeVisible();
   await expect(workspace.getByText("Pi extension for delegating tasks", { exact: false })).toHaveCount(0);
-  await expect(workspace.getByText("1.0.0", { exact: true })).toBeVisible();
+  await expect(detail).toContainText("npm · 1.0.0 · 全局");
   await expect(workspace.getByLabel("扩展包提供的资源类型")).toContainText("扩展");
   await expect(workspace.getByTestId("extension-danger-zone")).toBeVisible();
   await workspace.getByRole("button", { name: "返回扩展包列表" }).click();

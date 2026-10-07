@@ -3245,8 +3245,12 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
   back link, one title scale (heading size, semibold), one metadata line (plus an optional
   identifier line such as a path), then `SettingsStatus` and actions. Facts already stated in
   the metadata line are not repeated as rows. Save/discard actions of an existing entry appear
-  only while it has changes; a new entry keeps its save action. Extension and managed skill
-  details keep their own structure but use the same title scale and dot-and-label status.
+  only while it has changes; a new entry keeps its save action. The Extension package detail uses
+  `SettingsDetailHeader` too (meta `source kind · version · scope`, status, then update /
+  restore / confirm-content actions; 2026-10-07), followed by facts and per-resource toggles
+  as card rows; installed list rows show only exception statuses on the right, never a
+  leading state column. Managed skill details keep their own structure but use the same
+  title scale and dot-and-label status.
 - Empty or not-yet-available content uses `SettingsEmpty` inside the card position, not a
   notice; notices are for states that need action.
 - Lists show only what distinguishes an entry or needs attention. The normal state is not

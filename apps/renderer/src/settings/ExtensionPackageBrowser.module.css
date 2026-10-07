@@ -1,35 +1,56 @@
+.groupLabel {
+  display: block;
+  margin: 0 0 8px;
+  color: var(--text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Same borderless card as SettingsCatalog: one luminance step, rows split by an inset hairline. */
+.packageList {
+  display: grid;
+  margin: 0;
+  padding: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-panel);
+  background: var(--settings-card, var(--surface-muted));
+  list-style: none;
+  --surface-muted: var(--surface-active);
+}
+
 .packageRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  min-height: 72px;
-  align-items: stretch;
-  border-bottom: 1px solid var(--border);
-  border-radius: 9px;
-  background: transparent;
+  align-items: center;
+  border-radius: calc(var(--radius-panel) - 4px);
+}
+
+.packageRow + .packageRow {
+  background: linear-gradient(var(--border), var(--border)) no-repeat center top / calc(100% - 24px) 1px;
 }
 
 .packageRow:has(.packageButton[data-hovered]),
 .packageRow:has(.packageUpdateAction[data-hovered]),
 .packageRow:has(.packageButton[data-focus-visible]),
-.packageRow:has(.packageUpdateAction[data-focus-visible]) {
+.packageRow[data-selected] {
   background: var(--surface-hover);
 }
 
-.packageRow:has(.packageButton[data-pressed]),
-.packageRow[data-selected] {
-  background: var(--surface-muted);
+.packageRow:has(.packageButton[data-hovered]) + .packageRow,
+.packageRow[data-selected] + .packageRow {
+  background-image: none;
 }
 
 .packageButton {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto auto;
   width: 100%;
-  min-height: 72px;
+  min-height: 60px;
   align-items: center;
-  gap: 10px;
-  padding: 11px 10px;
+  gap: 12px;
+  padding: 11px 12px;
   border: 0;
-  border-radius: 9px 0 0 9px;
+  border-radius: inherit;
   background: transparent;
   color: var(--text-primary);
   cursor: pointer;
@@ -42,43 +63,66 @@
   outline-offset: -2px;
 }
 
-.packageUpdateAction {
-  display: inline-flex;
-  min-height: 32px;
-  align-items: center;
-  align-self: center;
-  justify-content: center;
-  gap: 5px;
-  margin-right: 10px;
-  padding: 0 9px;
-  border: 1px solid color-mix(in srgb, var(--info) 42%, var(--border));
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--info) 5%, transparent);
-  color: var(--info);
-  cursor: pointer;
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
+.packageIdentity {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.packageIdentity strong {
+  overflow: hidden;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.packageUpdateAction[data-hovered],
-.packageUpdateAction[data-pressed] {
-  border-color: color-mix(in srgb, var(--info) 68%, var(--border));
-  background: color-mix(in srgb, var(--info) 12%, var(--surface));
+.packageIdentity small {
+  display: flex;
+  min-width: 0;
+  gap: 4px;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-support);
+  white-space: nowrap;
 }
 
-.packageUpdateAction[data-focus-visible] {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+.source {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.packageUpdateAction[data-disabled] {
-  opacity: 0.5;
-  cursor: default;
+.chevron {
+  color: var(--text-tertiary);
 }
 
-@media (max-width: 560px) {
-  .packageButton {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.packageUpdateAction {
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.detail {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+}
+
+.description,
+.capabilities {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-interface);
+  line-height: 1.6;
+}
+
+.capabilities {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-support);
+}
+
+.code {
+  font-family: var(--font-code);
+  font-size: var(--font-size-support);
+  font-variant-ligatures: none;
+  overflow-wrap: anywhere;
 }

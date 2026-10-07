@@ -27,9 +27,7 @@
 }
 
 .primaryActions,
-.filters,
-.detailActions,
-.statusLine {
+.filters{
   display: flex;
   align-items: center;
 }
@@ -177,84 +175,10 @@
   background-clip: padding-box;
 }
 
-.packageList{
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.packageList li {
-  display: grid;
-}
-
-.groupLabel {
-  padding: 14px 14px 7px;
-  color: var(--text-tertiary);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-}
-
-.state {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-  white-space: nowrap;
-}
-
-.state[data-state="enabled"],
-.state[data-state="bundled"] {
-  color: var(--success);
-}
-
-.state[data-state="unavailable"] {
-  color: var(--danger);
-}
-
-.state[data-state="partial"] {
-  color: var(--warning);
-}
-
-.packageIdentity,
 .integrityNote span,
 .dangerZone > span {
   display: grid;
   min-width: 0;
-}
-
-.packageIdentity {
-  gap: 3px;
-}
-
-.packageIdentity strong {
-  overflow: hidden;
-  color: var(--text-primary);
-  font-size: var(--font-size-interface);
-  font-weight: var(--font-weight-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.packageIdentity small {
-  display: flex;
-  min-width: 0;
-  gap: 5px;
-  overflow: hidden;
-  color: var(--text-tertiary);
-  font-size: var(--font-size-support);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.packageIdentity small > span {
-  flex: 0 0 auto;
-}
-
-.packageIdentity small > .packageSource {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .listEmpty,
@@ -320,103 +244,12 @@
   outline-offset: -2px;
 }
 
-.detailHeader {
-  display: grid;
-  gap: 7px;
-}
-
-.eyebrow {
-  color: var(--text-tertiary);
-  font-size: var(--font-size-support);
-}
-
-.detailHeader h2{
-  margin: 0;
-}
-
-.detailHeader h2{
-  color: var(--text-primary);
-  font-size: var(--font-size-heading);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.01em;
-}
-
-.detailDescription {
-  max-width: 680px;
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--font-size-interface);
-  line-height: 1.65;
-}
-
-.capabilitySummary,
-.capabilityBadges {
-  display: flex;
-  align-items: center;
-}
-
-.capabilitySummary {
-  flex-wrap: wrap;
-  gap: var(--space-3);
-}
-
-.capabilityLabel {
-  color: var(--text-tertiary);
-  font-size: var(--font-size-support);
-}
-
-.capabilityBadges {
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.capabilityBadges > span {
-  color: var(--text-secondary);
-  font-size: var(--font-size-support);
-}
-
-.capabilityBadges > span + span::before {
-  margin-right: 6px;
-  color: var(--text-tertiary);
-  content: "·";
-}
-
-.statusLine {
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-/* Same language as SettingsStatus: a dot plus a short label. */
-.statusLine > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-secondary);
-  font-size: var(--font-size-support);
-}
-
-.statusLine > span::before {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--text-disabled);
-  content: "";
-}
-
-.statusLine > span[data-state="ready"]::before { background: var(--success); }
-.statusLine > span[data-state="update"]::before,
-.statusLine > span[data-state="warning"]::before { background: var(--warning); }
-.statusLine > span[data-state="danger"] { color: var(--danger); }
-.statusLine > span[data-state="danger"]::before { background: var(--danger); }
-
-.facts,
 .dialogFacts {
   display: grid;
   margin: 0;
   border-top: 1px solid var(--border);
 }
 
-.facts > div,
 .dialogFacts > div {
   display: grid;
   grid-template-columns: 118px minmax(0, 1fr);
@@ -425,13 +258,11 @@
   border-bottom: 1px solid var(--border);
 }
 
-.facts dt,
 .dialogFacts dt {
   color: var(--text-tertiary);
   font-size: var(--font-size-support);
 }
 
-.facts dd,
 .dialogFacts dd {
   min-width: 0;
   margin: 0;
@@ -443,42 +274,6 @@
 .codeValue {
   font-family: var(--font-code);
   font-variant-ligatures: none;
-}
-
-.detailActions {
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.resourceControls {
-  display: grid;
-  border-top: 1px solid var(--border);
-}
-
-.resourceControl {
-  display: flex;
-  min-height: 54px;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: 9px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.resourceControl > span {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.resourceControl strong {
-  color: var(--text-primary);
-  font-size: var(--font-size-interface);
-}
-
-.resourceControl small {
-  color: var(--text-tertiary);
-  font-size: var(--font-size-support);
 }
 
 .integrityNote,
@@ -707,8 +502,7 @@
     width: 100%;
   }
 
-  .facts > div,
-  .dialogFacts > div {
+    .dialogFacts > div {
     grid-template-columns: minmax(0, 1fr);
     gap: 4px;
   }
@@ -766,10 +560,6 @@
   display: none;
 }
 
-.groupLabel {
-  padding: 18px 10px 8px;
-}
-
 .details {
   min-height: 0;
   gap: 24px;
@@ -780,21 +570,6 @@
 
 .detailBackButton {
   display: inline-flex;
-}
-
-.facts {
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-}
-
-.facts > div {
-  padding: 12px 14px;
-}
-
-.capabilityBadges > span {
-  border-color: transparent;
 }
 
 .dangerZone {
@@ -812,9 +587,3 @@
   }
 }
 
-@media (max-width: 560px) {
-  .state {
-    grid-column: 1;
-    justify-self: start;
-  }
-}

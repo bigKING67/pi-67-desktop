@@ -7,9 +7,7 @@ import {
 import {
   ArrowLeft,
   Box,
-  CheckCircle2,
-  CircleAlert,
-  CircleOff,
+  ChevronRight,
   Download,
   RefreshCw,
   Trash2
@@ -29,6 +27,14 @@ import {
   resolveSourceKind,
   sourceKindLabel
 } from "./extension-management-model.js";
+import {
+  SettingsDetailHeader,
+  SettingsNotice,
+  SettingsRow,
+  SettingsRows,
+  SettingsStatus,
+  type SettingsStatusTone
+} from "./SettingsPrimitives.js";
 import packageStyles from "./ExtensionPackageBrowser.module.css";
 import styles from "./ExtensionManagementWorkspace.module.css";
 
@@ -54,39 +60,38 @@ export function PackageList({ rows, selectedKey, loading, updateDisabled, onSele
   }
   return (
     <div className={styles.listPane} data-testid="extension-package-list-scroll">
-      <ul aria-label="已安装扩展包" className={styles.packageList}>
-        <li><span className={styles.groupLabel}>第三方扩展包</span></li>
-        {rows.map((row) => {
-          return (
-            <li className={packageStyles.packageRow} data-selected={selectedKey === row.key || undefined} key={row.key}>
+      <span className={packageStyles.groupLabel}>第三方扩展包</span>
+      <ul aria-label="已安装扩展包" className={packageStyles.packageList}>
+        {rows.map((row) => (
+          <li className={packageStyles.packageRow} data-selected={selectedKey === row.key || undefined} key={row.key}>
+            <Button
+              aria-label={packageRowAccessibleName(row)}
+              aria-pressed={selectedKey === row.key}
+              className={packageStyles.packageButton!}
+              data-package-focus-action="details"
+              data-package-focus-key={row.key}
+              data-selected={selectedKey === row.key || undefined}
+              onPress={() => onSelect(row.key)}
+            >
+              <span className={packageStyles.packageIdentity}>
+                <strong>{packageRowName(row)}</strong>
+                <PackageRowMeta row={row} />
+              </span>
+              <PackageState row={row} />
+              <ChevronRight aria-hidden="true" className={packageStyles.chevron} size={15} />
+            </Button>
+            {row.update ? (
               <Button
-                aria-label={packageRowAccessibleName(row)}
-                aria-pressed={selectedKey === row.key}
-                className={packageStyles.packageButton!}
-                data-package-focus-action="details"
+                aria-label={`更新 ${row.entry.source}`}
+                className={`secondary-button ${packageStyles.packageUpdateAction}`}
+                data-package-focus-action="update"
                 data-package-focus-key={row.key}
-                data-selected={selectedKey === row.key || undefined}
-                onPress={() => onSelect(row.key)}
-              >
-                <PackageState row={row} />
-                <span className={styles.packageIdentity}>
-                  <strong>{packageRowName(row)}</strong>
-                  <PackageRowMeta row={row} />
-                </span>
-              </Button>
-              {row.update ? (
-                <Button
-                  aria-label={`更新 ${row.entry.source}`}
-                  className={packageStyles.packageUpdateAction!}
-                  data-package-focus-action="update"
-                  data-package-focus-key={row.key}
-                  isDisabled={updateDisabled}
-                  onPress={() => onUpdate(row.entry)}
-                ><Download aria-hidden="true" size={13} />更新</Button>
-              ) : null}
-            </li>
-          );
-        })}
+                isDisabled={updateDisabled}
+                onPress={() => onUpdate(row.entry)}
+              ><Download aria-hidden="true" size={13} />更新</Button>
+            ) : null}
+          </li>
+        ))}
       </ul>
     </div>
   );
@@ -113,47 +118,58 @@ export function PackageDetails({ row, workspaceName, updatesChecked, updateDisab
     );
   }
   const resourceTypes = packageResourceTypes(row.entry);
-  const state = packageRowState(row);
   const replacement = nativeCapabilityReplacement(row.entry.source);
-  const status = state === "native-replaced"
-    ? "原生能力替代"
-    : state === "enabled"
-    ? "已启用"
-    : state === "partial"
-      ? "部分启用"
-      : state === "pending-confirmation"
-        ? "待确认"
-        : state === "changed-pending-confirmation"
-          ? "内容已变更，待重新确认"
-          : state === "not-installed" ? "未安装" : "已停用";
-  const statusTone = state === "native-replaced"
-    ? "ready"
-    : state === "enabled"
-    ? "ready"
-    : state === "partial"
-      ? "warning"
-      : state === "pending-confirmation" || state === "changed-pending-confirmation"
-        ? "warning"
-        : state === "not-installed" ? "danger" : "neutral";
+  const status = packageDetailStatus(row);
   const canApprove = row.entry.installed
     && (row.entry.trustState === "unverified" || row.entry.trustState === "drifted");
+  const scopeLabel = row.inherited
+    ? "继承自全局"
+    : row.entry.scope === "global" ? "全局" : `项目 · ${workspaceName ?? "当前项目"}`;
+  const meta = [sourceKindLabel(resolveSourceKind(row.entry)), row.entry.version, scopeLabel]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <section
       aria-label={`${packageRowName(row)} 详情`}
-      className={styles.details}
+      className={`${styles.details} ${packageStyles.detail}`}
       data-testid="extension-package-detail-scroll"
     >
-      <DetailBackButton onBack={onBack} />
-      <header className={styles.detailHeader}>
-        <span className={styles.eyebrow}>外部安装</span>
-        <h2>{packageRowName(row)}</h2>
-        <div className={styles.statusLine}>
-          <span data-state={statusTone}>{status}</span>
-          {row.update ? <span data-state="update">有可用更新</span> : null}
-          {!row.entry.installed ? <span data-state="danger">安装内容缺失</span> : null}
-        </div>
-      </header>
-      <p className={styles.detailDescription}>
+      <SettingsDetailHeader
+        actions={<>
+          {row.update ? (
+            <Button
+              aria-label={`更新 ${row.entry.source}`}
+              className="secondary-button"
+              isDisabled={updateDisabled}
+              onPress={() => onPending({ kind: "update", entry: row.entry })}
+            ><Download aria-hidden="true" size={14} />更新</Button>
+          ) : null}
+          {!row.inherited && row.entry.scope === "project" ? (
+            <Button
+              aria-label={`恢复继承 ${row.entry.source}`}
+              className="secondary-button"
+              onPress={() => onRestore(row.entry)}
+            >恢复全局继承</Button>
+          ) : null}
+          {canApprove ? (
+            <Button
+              aria-label={`${row.entry.trustState === "drifted" ? "重新确认" : "确认"} ${row.entry.source} 当前内容`}
+              className="primary-button"
+              isDisabled={updateDisabled}
+              onPress={() => onApprove(row.entry)}
+            >{row.entry.trustState === "drifted" ? "重新确认当前内容" : "确认当前内容"}</Button>
+          ) : null}
+        </>}
+        back={<DetailBackButton onBack={onBack} />}
+        meta={meta}
+        status={<>
+          {status ? <SettingsStatus tone={status.tone}>{status.label}</SettingsStatus> : null}
+          {row.update ? <SettingsStatus tone="warning">有可用更新</SettingsStatus> : null}
+          {!row.entry.installed ? <SettingsStatus tone="danger">安装内容缺失</SettingsStatus> : null}
+        </>}
+        title={packageRowName(row)}
+      />
+      <p className={packageStyles.description}>
         {messages.settings.extensionPackages.purpose(
           row.entry.source,
           row.entry.displayName,
@@ -161,69 +177,40 @@ export function PackageDetails({ row, workspaceName, updatesChecked, updateDisab
         )}
       </p>
       {replacement ? (
-        <p className={styles.detailDescription}><strong>{nativeCapabilityReplacementLabel(replacement)}</strong>。现有用户配置保持不变，但 Desktop Task 不再加载该扩展。</p>
+        <SettingsNotice><strong>{nativeCapabilityReplacementLabel(replacement)}</strong>。现有用户配置保持不变，但 Desktop Task 不再加载该扩展。</SettingsNotice>
       ) : null}
       <CapabilitySummary resourceTypes={resourceTypes} />
-      <dl className={styles.facts}>
-        <Fact label="来源" value={row.entry.source} code />
-        {row.entry.version ? <Fact label="版本" value={row.entry.version} /> : null}
-        <Fact label="类型" value={sourceKindLabel(resolveSourceKind(row.entry))} />
-        <Fact
-          label="作用域"
-          value={row.inherited
-            ? "继承自全局"
-            : row.entry.scope === "global" ? "全局" : `项目 · ${workspaceName ?? "当前项目"}`}
-        />
-        <Fact label="资源过滤" value={row.entry.filtered ? "仅启用选定资源类型" : "使用包默认资源"} />
-        <Fact label="信任状态" value={packageTrustLabel(row.entry)} />
+      <SettingsRows>
+        <SettingsRow description={<span className={packageStyles.code}>{row.entry.source}</span>} title="来源" />
+        <SettingsRow title="资源过滤" value={row.entry.filtered ? "仅启用选定资源类型" : "使用包默认资源"} />
+        <SettingsRow title="信任状态" value={packageTrustLabel(row.entry)} />
         {packageTrustReasonLabel(row.entry)
-          ? <Fact label="完整性说明" value={packageTrustReasonLabel(row.entry)!} />
+          ? <SettingsRow title="完整性说明" value={packageTrustReasonLabel(row.entry)!} />
           : null}
         {row.entry.trustObservedAt
-          ? <Fact label="最后核对" value={new Date(row.entry.trustObservedAt).toLocaleString("zh-CN")} />
+          ? <SettingsRow title="最后核对" value={new Date(row.entry.trustObservedAt).toLocaleString("zh-CN")} />
           : null}
-        <Fact label="更新" value={row.update ? "发现可用更新" : updatesChecked ? "未发现更新" : "尚未检查"} />
-      </dl>
-      <div className={styles.resourceControls} aria-label="资源启用状态">
-        {resourceTypes.map((resourceType) => {
-          const resourceEnabled = packageResourceEnabled(row.entry, resourceType);
-          return (
-            <div className={styles.resourceControl} key={resourceType}>
-              <span><strong>{resourceTypeLabel(resourceType)}</strong><small>{resourceEnabled ? "当前作用域已启用" : "当前作用域已停用"}</small></span>
-              <Button
-                aria-label={`${resourceEnabled ? "停用" : "启用"} ${resourceTypeLabel(resourceType)} ${row.entry.source}`}
-                className={resourceEnabled ? "secondary-button" : "primary-button"}
-                isDisabled={replacement !== undefined || !packageContentAdmitted(row.entry)}
-                onPress={() => onToggle(row.entry, row.inherited, resourceType)}
-              >{resourceEnabled ? "停用" : "启用"}</Button>
-            </div>
-          );
-        })}
-      </div>
-      <div className={styles.detailActions}>
-        {canApprove ? (
-          <Button
-            aria-label={`${row.entry.trustState === "drifted" ? "重新确认" : "确认"} ${row.entry.source} 当前内容`}
-            className="primary-button"
-            isDisabled={updateDisabled}
-            onPress={() => onApprove(row.entry)}
-          >{row.entry.trustState === "drifted" ? "重新确认当前内容" : "确认当前内容"}</Button>
-        ) : null}
-        {row.update ? (
-          <Button
-            aria-label={`更新 ${row.entry.source}`}
-            className="secondary-button"
-            isDisabled={updateDisabled}
-            onPress={() => onPending({ kind: "update", entry: row.entry })}
-          ><Download aria-hidden="true" size={14} />更新</Button>
-        ) : null}
-        {!row.inherited && row.entry.scope === "project" ? (
-          <Button
-            aria-label={`恢复继承 ${row.entry.source}`}
-            className="secondary-button"
-            onPress={() => onRestore(row.entry)}
-          >恢复全局继承</Button>
-        ) : null}
+        <SettingsRow title="更新" value={row.update ? "发现可用更新" : updatesChecked ? "未发现更新" : "尚未检查"} />
+      </SettingsRows>
+      <div aria-label="资源启用状态" role="group">
+        <SettingsRows>
+          {resourceTypes.map((resourceType) => {
+            const resourceEnabled = packageResourceEnabled(row.entry, resourceType);
+            return (
+              <SettingsRow
+                actions={<Button
+                  aria-label={`${resourceEnabled ? "停用" : "启用"} ${resourceTypeLabel(resourceType)} ${row.entry.source}`}
+                  className="secondary-button"
+                  isDisabled={replacement !== undefined || !packageContentAdmitted(row.entry)}
+                  onPress={() => onToggle(row.entry, row.inherited, resourceType)}
+                >{resourceEnabled ? "停用" : "启用"}</Button>}
+                description={resourceEnabled ? "当前作用域已启用" : "当前作用域已停用"}
+                key={resourceType}
+                title={resourceTypeLabel(resourceType)}
+              />
+            );
+          })}
+        </SettingsRows>
       </div>
       {!row.inherited ? (
         <div className={styles.dangerZone} data-testid="extension-danger-zone">
@@ -242,36 +229,33 @@ export function PackageDetails({ row, workspaceName, updatesChecked, updateDisab
 function PackageRowMeta({ row }: { row: PackageRow }) {
   return (
     <small>
-      <span className={styles.packageSource}>{row.entry.source}</span>
+      <span className={packageStyles.source}>{row.entry.source}</span>
       <span>· {row.inherited ? "继承自全局" : row.entry.scope === "global" ? "全局" : "当前项目"}</span>
     </small>
   );
 }
 
+/** Only exceptions carry a status in the list; an enabled Package shows none. */
 function PackageState({ row }: { row: PackageRow }) {
   const state = packageRowState(row);
-  if (state === "native-replaced") {
-    return <span className={styles.state} data-state="enabled"><CheckCircle2 aria-hidden="true" size={15} /><span>原生替代</span></span>;
-  }
-  if (state === "enabled") {
-    return <span className={styles.state} data-state="enabled"><CheckCircle2 aria-hidden="true" size={15} /><span>已启用</span></span>;
-  }
-  if (state === "disabled") {
-    return <span className={styles.state} data-state="disabled"><CircleOff aria-hidden="true" size={15} /><span>已停用</span></span>;
-  }
-  if (state === "partial") {
-    return <span className={styles.state} data-state="partial"><CircleAlert aria-hidden="true" size={15} /><span>部分启用</span></span>;
-  }
-  if (state === "not-installed") {
-    return <span className={styles.state} data-state="unavailable"><CircleAlert aria-hidden="true" size={15} /><span>未安装</span></span>;
-  }
-  if (state === "pending-confirmation") {
-    return <span className={styles.state} data-state="partial"><CircleAlert aria-hidden="true" size={15} /><span>待确认</span></span>;
-  }
-  if (state === "changed-pending-confirmation") {
-    return <span className={styles.state} data-state="partial"><CircleAlert aria-hidden="true" size={15} /><span>内容已变更</span></span>;
-  }
+  if (state === "native-replaced") return <SettingsStatus tone="neutral">原生替代</SettingsStatus>;
+  if (state === "disabled") return <SettingsStatus tone="neutral">已停用</SettingsStatus>;
+  if (state === "partial") return <SettingsStatus tone="warning">部分启用</SettingsStatus>;
+  if (state === "not-installed") return <SettingsStatus tone="danger">未安装</SettingsStatus>;
+  if (state === "pending-confirmation") return <SettingsStatus tone="warning">待确认</SettingsStatus>;
+  if (state === "changed-pending-confirmation") return <SettingsStatus tone="warning">内容已变更</SettingsStatus>;
   return null;
+}
+
+function packageDetailStatus(row: PackageRow): { label: string; tone: SettingsStatusTone } | undefined {
+  const state = packageRowState(row);
+  if (state === "native-replaced") return { label: "原生能力替代", tone: "neutral" };
+  if (state === "enabled") return { label: "已启用", tone: "success" };
+  if (state === "partial") return { label: "部分启用", tone: "warning" };
+  if (state === "pending-confirmation") return { label: "待确认", tone: "warning" };
+  if (state === "changed-pending-confirmation") return { label: "内容已变更，待重新确认", tone: "warning" };
+  if (state === "not-installed") return { label: "未安装", tone: "danger" };
+  return { label: "已停用", tone: "neutral" };
 }
 
 function DetailBackButton({ onBack }: { onBack: () => void }) {
@@ -289,12 +273,9 @@ function DetailBackButton({ onBack }: { onBack: () => void }) {
 
 function CapabilitySummary({ resourceTypes }: { resourceTypes: readonly string[] }) {
   return (
-    <div className={styles.capabilitySummary} aria-label="扩展包提供的资源类型">
-      <span className={styles.capabilityLabel}>提供能力</span>
-      <span className={styles.capabilityBadges}>
-        {resourceTypes.map((type) => <span key={type}>{resourceTypeLabel(type)}</span>)}
-      </span>
-    </div>
+    <p aria-label="扩展包提供的资源类型" className={packageStyles.capabilities}>
+      提供{resourceTypes.map(resourceTypeLabel).join("、")}
+    </p>
   );
 }
 
@@ -308,6 +289,3 @@ function resourceTypeLabel(type: string): string {
   return type;
 }
 
-function Fact({ label, value, code = false }: { label: string; value: string; code?: boolean }) {
-  return <div><dt>{label}</dt><dd className={code ? styles.codeValue : undefined}>{value}</dd></div>;
-}
