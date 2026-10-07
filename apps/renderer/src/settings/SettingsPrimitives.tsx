@@ -1,17 +1,6 @@
 import { ArrowLeft, Check, ChevronDown, Info } from "lucide-react";
 import { useState, type ReactNode, type SyntheticEvent } from "react";
-import {
-  Button,
-  Checkbox,
-  ListBox,
-  ListBoxItem,
-  Popover,
-  Select,
-  SelectValue,
-  Switch,
-  Tooltip,
-  TooltipTrigger
-} from "react-aria-components";
+import { Button, Checkbox, Header, ListBox, ListBoxItem, ListBoxSection, Popover, Select, SelectValue, Switch, Tooltip, TooltipTrigger } from "react-aria-components";
 import styles from "./SettingsPrimitives.module.css";
 
 /** Page title only: the navigation group already names the page's job, so no summary repeats it. */
@@ -122,6 +111,8 @@ export interface SettingsSelectOption<T extends string> {
   disabled?: boolean;
   /** Decorative mark (e.g. a Provider brand) shown in the list and in the closed trigger. */
   leading?: ReactNode;
+  /** Optional group heading; consecutive options sharing it render as one ListBoxSection. */
+  section?: string;
 }
 
 /** Non-native single choice; the trigger is a button named by `label`, options have role "option". */
@@ -149,16 +140,38 @@ export function SettingsSelect<T extends string>({ label, value, options, onChan
       </Button>
       <Popover className={styles.selectPopover!} offset={4} placement="bottom start" shouldFlip>
         <ListBox aria-label={label} className={styles.selectList!}>
-          {options.map((option) => (
-            <ListBoxItem className={styles.selectOption!} id={option.id} key={option.id} textValue={option.label}>
-              <span className={styles.selectOptionLabel}>{option.leading}<span>{option.label}</span></span>
-              <Check aria-hidden="true" className={styles.selectCheck} size={14} />
-            </ListBoxItem>
-          ))}
+          {groupSelectOptions(options).map((group) => group.section === undefined
+            ? group.options.map(renderSelectOption)
+            : (
+              <ListBoxSection className={styles.selectSection!} id={`section:${group.section}`} key={`section:${group.section}`}>
+                <Header className={styles.selectSectionHeader!}>{group.section}</Header>
+                {group.options.map(renderSelectOption)}
+              </ListBoxSection>
+            ))}
         </ListBox>
       </Popover>
     </Select>
   );
+}
+
+function renderSelectOption<T extends string>(option: SettingsSelectOption<T>) {
+  return (
+    <ListBoxItem className={styles.selectOption!} id={option.id} key={option.id} textValue={option.label}>
+      <span className={styles.selectOptionLabel}>{option.leading}<span>{option.label}</span></span>
+      <Check aria-hidden="true" className={styles.selectCheck} size={14} />
+    </ListBoxItem>
+  );
+}
+
+/** Groups consecutive options by `section`, preserving source order (DESIGN Grouped choice implementation). */
+export function groupSelectOptions<T extends string>(options: readonly SettingsSelectOption<T>[]) {
+  const groups: { section: string | undefined; options: SettingsSelectOption<T>[] }[] = [];
+  for (const option of options) {
+    const last = groups.at(-1);
+    if (last && last.section === option.section) last.options.push(option);
+    else groups.push({ section: option.section, options: [option] });
+  }
+  return groups;
 }
 
 export function SettingsCheckbox({ children, isSelected, onChange, isDisabled = false }: {

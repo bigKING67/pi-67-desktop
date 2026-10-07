@@ -825,3 +825,20 @@
   align-items: center;
   gap: 8px;
 }
+
+/* Grouped choices: a quiet caption heading per group, separated by spacing. */
+.selectSection {
+  display: grid;
+  gap: 2px;
+}
+
+.selectSection + .selectSection {
+  margin-top: var(--space-2);
+}
+
+.selectSectionHeader {
+  padding: 4px 8px 2px;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+}

@@ -129,7 +129,11 @@ test("hands a Work conversation to a teammate as a Work Card without its transcr
   await expect(dialog).toContainText("不会上传对话记录、提示词、代码或私人记忆");
   await expect(dialog.getByLabel("标题")).toHaveValue("登录回跳修复");
   await dialog.getByRole("button", { name: / 发送到$/u }).click();
-  await page.getByRole("option", { name: "王一凡", exact: true }).click();
+  // Teammates and channels are two labelled ListBox sections, not one flat list.
+  const teammates = page.getByRole("group", { name: "同事" });
+  await expect(teammates.getByRole("option", { name: "王一凡", exact: true })).toBeVisible();
+  await expect(page.getByRole("group", { name: "频道" }).getByRole("option", { name: /^#/u }).first()).toBeVisible();
+  await teammates.getByRole("option", { name: "王一凡", exact: true }).click();
   await dialog.getByLabel("目标").fill("三种入口登录后都回到原页面");
   await dialog.getByLabel("PR 或链接（可选，仅 https）").fill("http://insecure.example");
   await expect(dialog.getByRole("button", { name: "发送任务卡" })).toBeDisabled();

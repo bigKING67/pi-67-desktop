@@ -3032,7 +3032,9 @@ loading error where the operation can produce those states
   visible with its exact ID; never silently select its replacement. Draft and
   live Session menus use the same presentation rule, without changing Pi's catalog.
 - Build grouped choices with React Aria `ListBoxSection` and `Header`, not
-  disabled heading options. Derive grouping from authoritative identity,
+  disabled heading options. `SettingsSelect` accepts an optional per-option
+  `section`; consecutive options sharing it render as one labelled section (Team Chat
+  hand-off groups `同事` and `频道` this way). Derive grouping from authoritative identity,
   preserve source order and stable option identity, and test section semantics,
   keyboard traversal, recovery selection, and exactly-once dispatch.
 

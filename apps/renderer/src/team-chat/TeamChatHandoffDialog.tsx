@@ -78,11 +78,11 @@ export function TeamChatHandoffDialog({ source }: { source: TeamChatHandoffSourc
               <p className={styles.formNotice}>{copy.handoffPrivacy}</p>
               <div className={styles.field}>
                 <span>{copy.handoffTarget}</span>
-                {/* Teammates first, then #channels; the "#" prefix keeps the two kinds distinct in one flat list. */}
+                {/* Teammates, then #channels, as two labelled groups. */}
                 <SettingsSelect className={styles.fieldSelect!} label={copy.handoffTarget} onChange={setTarget} value={target}
                   options={[{ id: "", label: "—", disabled: true },
-                    ...teammates.map((member) => ({ id: `dm:${member.userId}`, label: member.displayName })),
-                    ...channels.map((channel) => ({ id: `conversation:${channel.id}`, label: `#${channel.name}` }))]} />
+                    ...teammates.map((member) => ({ id: `dm:${member.userId}`, label: member.displayName, section: copy.teammates })),
+                    ...channels.map((channel) => ({ id: `conversation:${channel.id}`, label: `#${channel.name}`, section: copy.channels }))]} />
                 {teammates.length === 0 && channels.length === 0 ? <small>{copy.handoffNoTargets}</small> : null}
               </div>
               <label className={styles.field}>
