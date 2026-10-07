@@ -157,27 +157,26 @@
   background: color-mix(in srgb, var(--focus) 9%, var(--surface-raised));
 }
 
+/* Same borderless card as SettingsRows; the selected choice is marked by its radio, not a fill. */
 .privacyGroup {
   display: grid;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
+  padding: 4px;
+  border-radius: var(--radius-panel);
+  background: var(--settings-card, var(--surface-muted));
 }
 
 .privacyRow {
   display: flex;
-  min-height: 64px;
+  min-height: 60px;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 10px 12px;
+  border-radius: calc(var(--radius-panel) - 4px);
   cursor: pointer;
 }
 
-.privacyRow:last-child { border-bottom: 0; }
 .privacyRow[data-hovered] { background: var(--surface-hover); }
-.privacyRow[data-selected] { background: var(--surface-muted); }
 .privacyRow[data-disabled] { cursor: default; opacity: 0.55; }
 .privacyRow[data-focus-visible] { outline: 2px solid var(--focus); outline-offset: -2px; }
 

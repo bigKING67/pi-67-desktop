@@ -145,7 +145,8 @@ export function UsageSettings() {
           <Metric label="缓存读 / 写" value={`${formatNumber(report.totals.cacheRead)} / ${formatNumber(report.totals.cacheWrite)}`} />
           <Metric
             label="Pi 记录成本（非账单）"
-            value={report.totals.recordedCost === undefined ? "无可用记录" : `$${report.totals.recordedCost.toFixed(4)}`}
+            value={report.totals.recordedCost === undefined ? "无记录" : `$${report.totals.recordedCost.toFixed(4)}`}
+            empty={report.totals.recordedCost === undefined}
           />
         </div>
 
@@ -191,8 +192,8 @@ export function UsageSettings() {
 
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return <div><span>{label}</span><strong>{value}</strong></div>;
+function Metric({ label, value, empty = false }: { label: string; value: string; empty?: boolean }) {
+  return <div><span>{label}</span><strong data-empty={empty || undefined}>{value}</strong></div>;
 }
 
 function DailyUsageChart({ daily, window }: { daily: DailyUsagePoint[]; window: UsageWindow }) {

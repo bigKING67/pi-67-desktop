@@ -1,15 +1,17 @@
 .actions { display: flex; align-items: center; gap: 8px; }
 .actions > button { display: inline-flex; align-items: center; gap: 5px; }
-.segmented { display: inline-flex; padding: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-muted); }
+.segmented { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--surface-muted); }
 .segmented button { padding: 5px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text-secondary); font-size: var(--font-size-support); }
 .segmented .selected { background: var(--surface); color: var(--text-primary); box-shadow: var(--shadow-control); }
 .loading { display: flex; min-height: 160px; align-items: center; justify-content: center; gap: 8px; color: var(--text-tertiary); }
 .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
-.metrics > div { display: grid; gap: 6px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.metrics > div { display: grid; gap: 6px; padding: 14px 16px; border-radius: var(--radius-panel); background: var(--settings-card, var(--surface-muted)); }
 .metrics span { color: var(--text-secondary); font-size: var(--font-size-support); }
 /* The value is the tile's subject: one large tabular figure, never the same size as its label. */
+/* An absent value is a state, not a figure: it keeps the label's size and tone. */
+.metrics strong[data-empty] { color: var(--text-tertiary); font-size: var(--font-size-interface); font-weight: var(--font-weight-regular); letter-spacing: 0; line-height: 31px; }
 .metrics strong { overflow: hidden; color: var(--text-primary); font-size: var(--font-size-display); font-variant-numeric: tabular-nums; font-weight: var(--font-weight-semibold); letter-spacing: -0.01em; text-overflow: ellipsis; white-space: nowrap; }
-.chartSection, .tableSection { margin-top: 12px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.chartSection, .tableSection { margin-top: 12px; padding: 16px; border-radius: var(--radius-panel); background: var(--settings-card, var(--surface-muted)); }
 .chartSection > header, .tableSection > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .chartSection > header > div { display: flex; align-items: center; gap: 7px; }
 .chartSection header span, .tableSection header span { color: var(--text-tertiary); font-size: var(--font-size-caption); }

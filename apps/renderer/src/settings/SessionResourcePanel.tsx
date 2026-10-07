@@ -39,7 +39,7 @@ export function SessionResourcePanel({
   resourceScope?: ResourceSummary["scope"];
   scope?: "global" | "project";
   title: string;
-  description: string;
+  description?: string;
   info?: ReactNode;
   empty: string;
   excludeIds?: ReadonlySet<string>;
@@ -65,7 +65,7 @@ export function SessionResourcePanel({
     <SettingsSectionBlock
       actions={<SessionResourceReloadButton />}
       title={title}
-      description={description}
+      {...(description ? { description } : {})}
       {...(info ? { info } : {})}
     >
       {resourceCatalog?.truncated

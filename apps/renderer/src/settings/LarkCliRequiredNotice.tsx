@@ -1,7 +1,7 @@
 import { Download, Sparkles } from "lucide-react";
 import { Button } from "react-aria-components";
 import { useSettingsNavigation } from "./SettingsDraftGuard.js";
-import { SettingsNotice } from "./SettingsPrimitives.js";
+import { SettingsInfo, SettingsNotice } from "./SettingsPrimitives.js";
 import styles from "./LarkCliRequiredNotice.module.css";
 
 export function LarkCliRequiredNotice({ canInstall, installing, onInstall }: {
@@ -31,7 +31,9 @@ export function LarkCliRequiredNotice({ canInstall, installing, onInstall }: {
     </span>}
     tone="warning"
   >
-    <strong>需要先安装 Lark CLI</strong><br />
-    安装会同时启用当前用户的 Lark CLI，并将官方办公 Skills 放入 <code>~/.agents/skills</code>，供 Pi TUI、Desktop 与其他兼容 Agent 共享。
+    <strong>需要先安装 Lark CLI</strong> 安装后，官方办公技能会对 Pi TUI、Desktop 和其他兼容 Agent 共享。
+    <SettingsInfo label="Lark CLI 安装位置">
+      安装会启用当前用户的 Lark CLI，并将官方办公 Skills 放入 ~/.agents/skills。
+    </SettingsInfo>
   </SettingsNotice>;
 }

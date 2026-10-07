@@ -139,7 +139,6 @@ export function ManagedGlobalSkillPanel({ selectedPackId, excludedSuiteIds, onSe
       </SettingsSectionBlock> : null}
 
       <SessionResourcePanel
-        description="由你在本机维护，适用于所有项目。"
         info="没有受管上游的技能不会被 Desktop 自动覆盖。"
         empty={managedPacks.length > 0
           ? "其他全局技能均已归入受管技能套件。"

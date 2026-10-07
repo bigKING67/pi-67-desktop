@@ -52,7 +52,6 @@ export function GlobalRuleCatalog({
         {props.error ? <SettingsNotice tone="danger">{props.error}</SettingsNotice> : null}
         <CatalogSection
           actions={<RefreshButton busy={props.busy} onPress={props.onRefresh} />}
-          description="适用于所有项目。"
           info={<RuleBehaviorInfo precedence />}
           items={groups.rules}
           onSelect={props.onSelect}
@@ -206,14 +205,14 @@ function AdvancedDisclosure({
 
 function CatalogSection({ title, description, info, items, actions, onSelect }: {
   title: string;
-  description: string;
+  description?: string;
   info?: ReactNode;
   items: ContextFileSummary[];
   actions?: ReactNode;
   onSelect: (item: ContextFileSummary) => void;
 }) {
   return (
-    <SettingsSectionBlock title={title} description={description} {...(info ? { info } : {})} {...(actions ? { actions } : {})}>
+    <SettingsSectionBlock title={title} {...(description ? { description } : {})} {...(info ? { info } : {})} {...(actions ? { actions } : {})}>
       {items.length === 0 ? <SettingsEmpty>当前没有可显示的 Markdown 文件。</SettingsEmpty> : (
         <SettingsCatalog label={title}>
           {items.map((item) => (

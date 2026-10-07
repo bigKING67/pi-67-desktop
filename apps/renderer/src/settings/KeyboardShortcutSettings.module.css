@@ -1,9 +1,9 @@
 .search { display: flex; min-height: 32px; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); color: var(--text-tertiary); }
 .search:focus-within { border-color: var(--border-strong); }
 .search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--text-primary); font-size: var(--font-size-interface); }
-.list { display: grid; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
-.row { display: grid; grid-template-columns: minmax(0, 1fr) auto 30px; align-items: center; gap: 12px; min-height: 44px; padding: 6px 8px 6px 16px; border-bottom: 1px solid var(--border); }
-.row:last-child { border-bottom: 0; }
+/* Same borderless card as SettingsRows: one luminance step, rows separated by spacing. */
+.list { display: grid; overflow: hidden; padding-block: 4px; border-radius: var(--radius-panel); background: var(--settings-card, var(--surface-muted)); }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto 30px; align-items: center; gap: 12px; min-height: 44px; padding: 6px 8px 6px 16px; }
 .copy { display: flex; min-width: 0; align-items: center; gap: 4px; }
 .copy strong { overflow: hidden; color: var(--text-primary); font-size: var(--font-size-interface); font-weight: var(--font-weight-medium); text-overflow: ellipsis; white-space: nowrap; }
 /* The whole key group is the recorder: press to record, Escape to cancel. */

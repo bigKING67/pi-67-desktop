@@ -4,7 +4,8 @@ import {
   type GitSourceMode,
   type NpmSourceMode,
   type PackageNetworkSettings,
-  type PackageNetworkSnapshot
+  type PackageNetworkSnapshot,
+  type PackageSourceHealth
 } from "@pi67/domain";
 import { RefreshCw, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -26,6 +27,12 @@ import {
 } from "./SettingsPrimitives.js";
 import { SettingsDestructiveActionDialog } from "./SettingsActionDialogs.js";
 import { useSettingsDraftRegistration } from "./SettingsDraftGuard.js";
+
+const SOURCE_ROLE_LABELS: Readonly<Record<PackageSourceHealth["role"], string>> = {
+  "public-mirror": "公共镜像",
+  official: "官方源",
+  custom: "自定义源"
+};
 
 const NPM_MODES: Array<{ id: NpmSourceMode; label: string }> = [
   { id: "automatic", label: "自动：公共镜像优先，官方回退" },
@@ -200,7 +207,7 @@ export function PackageNetworkPanel() {
         <SettingsRows>
           {displayedSnapshot?.sources.map((source) => <SettingsRow
             key={source.id}
-            title={`${source.kind === "npm" ? "npm" : "Git"} · ${source.role}`}
+            title={`${source.kind === "npm" ? "npm" : "Git"} · ${SOURCE_ROLE_LABELS[source.role]}`}
             description={source.url}
             value={<SettingsStatus tone={source.status === "reachable" ? "success" : source.status === "unreachable" ? "danger" : "neutral"}>
               {source.status === "reachable" ? `${source.latencyMs ?? 0} ms` : source.status === "unreachable" ? "不可达" : "尚未检查"}
