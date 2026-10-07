@@ -2431,7 +2431,7 @@ loading error where the operation can produce those states
   press (danger outline and tint, explicit `确认…` label) and run on the second.
 - Plain messages expose `在工作中处理` as a tertiary text action revealed on hover
   or keyboard focus. The hand-off and start-work dialogs open with a muted privacy
-  notice, use labelled native selects, textareas and checkboxes, scroll within a
+  notice, use labelled `SettingsSelect` choices, textareas and checkboxes, scroll within a
   600px dialog, and keep validation inline (an invalid link disables sending).
 
 ### Session navigation

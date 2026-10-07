@@ -169,7 +169,6 @@
 
 .fieldGrid .wide { grid-column: 1 / -1; }
 
-.fieldGrid select,
 .fieldGrid input[type="number"] {
   min-height: 38px;
   padding: 0 10px;
@@ -180,7 +179,6 @@
   font: inherit;
 }
 
-.fieldGrid select:focus-visible,
 .fieldGrid input[type="number"]:focus-visible { border-color: var(--accent); box-shadow: var(--shadow-focus); outline: 0; }
 
 .hostSection {

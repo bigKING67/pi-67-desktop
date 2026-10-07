@@ -11,6 +11,7 @@ import {
   X
 } from "lucide-react";
 import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
+import { SettingsSelect } from "../settings/SettingsPrimitives.js";
 import {
   activateWorkspaceFileTab,
   executeWorkspaceEntryAction,
@@ -99,21 +100,19 @@ export function WorkspaceFileSurface({
           })}
         </div>
         {tabs.length > 5 ? (
-          <select
-            aria-label="所有文件标签"
+          <SettingsSelect
             className="workspace-file-tab-overflow"
+            label="所有文件标签"
             value={activeRelativePath ?? ""}
-            onChange={(event) => {
-              const relativePath = event.target.value;
+            options={[{ id: "", label: "对话" }, ...tabs.map((relativePath) => ({
+              id: relativePath,
+              label: fileWorkspace?.byPath[relativePath]?.name ?? relativePath
+            }))]}
+            onChange={(relativePath) => {
               if (relativePath) void activateWorkspaceFileTab(workspace, relativePath);
               else workspaceFileStore.getState().activateConversation(workspace.id);
             }}
-          >
-            <option value="">对话</option>
-            {tabs.map((relativePath) => (
-              <option key={relativePath} value={relativePath}>{fileWorkspace?.byPath[relativePath]?.name ?? relativePath}</option>
-            ))}
-          </select>
+          />
         ) : null}
       </div>
 

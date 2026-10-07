@@ -250,13 +250,6 @@
   max-width: 280px;
 }
 
-/* Compact like the toolbar around it. */
-.filter select {
-  min-height: 30px;
-  padding: 3px 8px;
-  font-size: var(--font-size-support);
-}
-
 .snippet {
   color: var(--text-secondary);
   font-size: var(--font-size-support);

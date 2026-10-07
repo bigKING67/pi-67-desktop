@@ -103,7 +103,7 @@ test("claims an assigned Work Card and opens a reviewed team-scoped Work draft",
 
   const dialog = page.getByRole("dialog", { name: "在工作中开始" });
   await expect(dialog).toContainText("不会写入私人记忆");
-  await expect(dialog.getByLabel("团队项目")).toHaveValue("project-hk");
+  await expect(dialog.getByRole("button", { name: "港股研究 团队项目", exact: true })).toBeVisible();
   await expect(dialog.getByLabel("起始内容")).toHaveValue(/^任务：港股口径对齐\n\n目标：\n统一三家港股公司的营收口径/u);
   await dialog.getByRole("button", { name: "创建草稿" }).click();
   await expect(dialog).toHaveCount(0);
@@ -128,7 +128,8 @@ test("hands a Work conversation to a teammate as a Work Card without its transcr
   const dialog = page.getByRole("dialog", { name: "交给同事或频道" });
   await expect(dialog).toContainText("不会上传对话记录、提示词、代码或私人记忆");
   await expect(dialog.getByLabel("标题")).toHaveValue("登录回跳修复");
-  await dialog.getByLabel("发送到").selectOption({ label: "王一凡" });
+  await dialog.getByRole("button", { name: / 发送到$/u }).click();
+  await page.getByRole("option", { name: "王一凡", exact: true }).click();
   await dialog.getByLabel("目标").fill("三种入口登录后都回到原页面");
   await dialog.getByLabel("PR 或链接（可选，仅 https）").fill("http://insecure.example");
   await expect(dialog.getByRole("button", { name: "发送任务卡" })).toBeDisabled();

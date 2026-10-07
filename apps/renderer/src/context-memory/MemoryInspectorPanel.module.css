@@ -310,7 +310,6 @@
 .field > small { color: var(--text-tertiary); font-size: var(--font-size-caption); font-weight: var(--font-weight-regular); }
 
 .field input,
-.field select,
 .field textarea {
   width: 100%;
   box-sizing: border-box;
@@ -324,13 +323,15 @@
   font-weight: var(--font-weight-regular);
 }
 
-.field input,
-.field select { height: 30px; padding: 0 8px; }
+.field input { height: 30px; padding: 0 8px; }
 .field textarea { min-height: 64px; resize: vertical; padding: 7px 8px; line-height: 1.5; }
 
 .field input:focus-visible,
-.field select:focus-visible,
 .field textarea:focus-visible { border-color: var(--focus); box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 18%, transparent); }
+
+/* The shared select fills its grid column and keeps the control's regular weight. */
+.fieldSelect { font-weight: var(--font-weight-regular); }
+.fieldSelect > button { min-width: 0; }
 
 .confirmations { display: grid; gap: 6px; }
 

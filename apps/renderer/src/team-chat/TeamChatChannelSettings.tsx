@@ -11,6 +11,7 @@ import {
 } from "@pi67/domain";
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
+import { SettingsSelect } from "../settings/SettingsPrimitives.js";
 import { teamChatErrorMessage } from "./team-chat-controller.js";
 import { memberById } from "./team-chat-model.js";
 import { teamChat } from "./team-chat-instance.js";
@@ -138,13 +139,12 @@ export function TeamChatChannelSettings({ conversation, directory, onClose }: {
                 event.preventDefault();
                 if (addition) void run({ type: "addMembers", userIds: [addition] }).then((added) => { if (added) setAddition(""); });
               }}>
-                <label className={styles.field}>
+                <div className={styles.field}>
                   <span>{copy.channelAddMember}</span>
-                  <select onChange={(event) => setAddition(event.currentTarget.value)} value={addition}>
-                    <option value="">{copy.channelAddMemberPlaceholder}</option>
-                    {addable.map((member) => <option key={member.userId} value={member.userId}>{member.displayName}</option>)}
-                  </select>
-                </label>
+                  <SettingsSelect className={styles.fieldSelect!} label={copy.channelAddMember} onChange={setAddition} value={addition}
+                    options={[{ id: "", label: copy.channelAddMemberPlaceholder },
+                      ...addable.map((member) => ({ id: member.userId, label: member.displayName }))]} />
+                </div>
                 <Button className="secondary-button" isDisabled={busy || !addition} type="submit">{copy.channelAdd}</Button>
               </form>
             )

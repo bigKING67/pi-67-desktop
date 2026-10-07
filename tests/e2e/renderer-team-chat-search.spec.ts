@@ -24,10 +24,12 @@ test("searches messages and Work Cards from the Chat rail and opens a result", a
   await expect(rows.first().locator("mark")).toHaveText("口径");
   await expect(rows.first()).toContainText("任务卡");
 
-  await results.getByLabel("发送人").selectOption({ label: "王一凡" });
+  await results.getByRole("button", { name: / 发送人$/u }).click();
+  await page.getByRole("option", { name: "王一凡", exact: true }).click();
   await expect(results.getByText("在当前筛选下没有找到包含「口径」的消息。")).toBeVisible();
   await expect(results.getByRole("button", { name: "清除筛选" })).toBeVisible();
-  await results.getByLabel("发送人").selectOption({ label: "李若溪" });
+  await results.getByRole("button", { name: / 发送人$/u }).click();
+  await page.getByRole("option", { name: "李若溪", exact: true }).click();
   await expect(rows).toHaveCount(2);
 
   await rows.filter({ hasText: "顺便把港股" }).click();

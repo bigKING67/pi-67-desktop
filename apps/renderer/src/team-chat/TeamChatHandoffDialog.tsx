@@ -3,6 +3,7 @@ import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-compone
 import { TEAM_CHAT_WORK_CARD_LIMITS } from "@pi67/domain";
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
+import { SettingsSelect } from "../settings/SettingsPrimitives.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { useRepositoryEnvironmentStore } from "../worktree/repository-environment-store.js";
 import { teamChatErrorMessage } from "./team-chat-controller.js";
@@ -75,23 +76,15 @@ export function TeamChatHandoffDialog({ source }: { source: TeamChatHandoffSourc
           {!directory ? <p className={styles.formNotice}>{copy.handoffSignedOut}</p> : (
             <form className={styles.channelForm} onSubmit={(event) => { event.preventDefault(); void send(); }}>
               <p className={styles.formNotice}>{copy.handoffPrivacy}</p>
-              <label className={styles.field}>
+              <div className={styles.field}>
                 <span>{copy.handoffTarget}</span>
-                <select onChange={(event) => setTarget(event.currentTarget.value)} required value={target}>
-                  <option disabled value="">—</option>
-                  {teammates.length > 0 ? (
-                    <optgroup label={copy.teammates}>
-                      {teammates.map((member) => <option key={member.userId} value={`dm:${member.userId}`}>{member.displayName}</option>)}
-                    </optgroup>
-                  ) : null}
-                  {channels.length > 0 ? (
-                    <optgroup label={copy.channels}>
-                      {channels.map((channel) => <option key={channel.id} value={`conversation:${channel.id}`}>#{channel.name}</option>)}
-                    </optgroup>
-                  ) : null}
-                </select>
+                {/* Teammates first, then #channels; the "#" prefix keeps the two kinds distinct in one flat list. */}
+                <SettingsSelect className={styles.fieldSelect!} label={copy.handoffTarget} onChange={setTarget} value={target}
+                  options={[{ id: "", label: "—", disabled: true },
+                    ...teammates.map((member) => ({ id: `dm:${member.userId}`, label: member.displayName })),
+                    ...channels.map((channel) => ({ id: `conversation:${channel.id}`, label: `#${channel.name}` }))]} />
                 {teammates.length === 0 && channels.length === 0 ? <small>{copy.handoffNoTargets}</small> : null}
-              </label>
+              </div>
               <label className={styles.field}>
                 <span>{copy.handoffTitleField}</span>
                 <input maxLength={TEAM_CHAT_WORK_CARD_LIMITS.title} onChange={(event) => setTitle(event.currentTarget.value)} required value={title} />

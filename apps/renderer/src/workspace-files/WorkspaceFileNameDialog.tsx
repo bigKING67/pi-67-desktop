@@ -11,6 +11,7 @@ import {
   ModalOverlay,
   TextField
 } from "react-aria-components";
+import { SettingsSelect } from "../settings/SettingsPrimitives.js";
 import {
   detectWorkspaceFileFormat,
   reconcileWorkspaceFileFormat,
@@ -25,6 +26,11 @@ import {
 } from "./workspace-file-name.js";
 
 type SubmitResult = boolean | { ok: boolean; message?: string };
+
+const FORMAT_CHOICES = WORKSPACE_FILE_FORMAT_OPTIONS.map((option) => ({
+  id: option.id,
+  label: `${option.label}${option.extension ? ` (${option.extension})` : ""}`
+}));
 
 export function WorkspaceFileNameDialog({
   title,
@@ -133,27 +139,21 @@ export function WorkspaceFileNameDialog({
             </TextField>
 
             {workspaceFileDialogOwnsFormat(mode) ? (
-              <label className="workspace-file-format-field">
+              <div className="workspace-file-format-field">
                 <span>文件类型</span>
-                <select
-                  aria-label="文件类型"
-                  disabled={pending}
+                <SettingsSelect<WorkspaceFileFormat>
+                  isDisabled={pending}
+                  label="文件类型"
+                  options={FORMAT_CHOICES}
                   value={format}
-                  onChange={(event) => {
-                    const nextFormat = event.target.value as WorkspaceFileFormat;
+                  onChange={(nextFormat) => {
                     setFormat(nextFormat);
                     setName((current) => syncWorkspaceFileNameFormat(current, nextFormat));
                     setRequestError(undefined);
                   }}
-                >
-                  {WORKSPACE_FILE_FORMAT_OPTIONS.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}{option.extension ? ` (${option.extension})` : ""}
-                    </option>
-                  ))}
-                </select>
+                />
                 <small>类型选择只同步扩展名；编辑器仍按最终文件名识别格式。</small>
-              </label>
+              </div>
             ) : null}
 
             <footer className="dialog-actions workspace-file-dialog-actions">

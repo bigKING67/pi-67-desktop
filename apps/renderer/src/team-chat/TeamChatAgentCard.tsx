@@ -11,6 +11,7 @@ import {
 import type { PiProviderConfigurationSnapshot } from "@pi67/protocol";
 import { loadNewSessionRuntimeConfiguration } from "../composer/new-session-runtime-controller.js";
 import { messages } from "../localization/message-catalog.js";
+import { SettingsSelect } from "../settings/SettingsPrimitives.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { teamChatErrorMessage } from "./team-chat-controller.js";
 import { teamChat } from "./team-chat-instance.js";
@@ -133,27 +134,24 @@ export function TeamChatAgentCard({ agent, binding, activity, directory, project
         <p className={agentStyles.disclosure}>{binding?.enabled ? copy.agentHostActive : copy.agentHostNone}</p>
         {projects === "error" || models === "error" ? <p className={styles.formError} role="alert">{copy.agentHostFailed}</p> : null}
         <div className={agentStyles.fieldGrid}>
-          <label className={`${styles.field} ${agentStyles.wide}`}>
+          <div className={`${styles.field} ${agentStyles.wide}`}>
             <span>{copy.agentHostWorkspace}</span>
-            <select onChange={(event) => setWorkspaceId(event.currentTarget.value)} value={workspaceId}>
-              {workspaces.map((workspace) => <option key={workspace!.id} value={workspace!.id}>{workspace!.displayName}</option>)}
-            </select>
-          </label>
-          <label className={styles.field}>
+            <SettingsSelect className={styles.fieldSelect!} label={copy.agentHostWorkspace} onChange={setWorkspaceId} value={workspaceId}
+              options={workspaces.map((workspace) => ({ id: workspace!.id, label: workspace!.displayName }))} />
+          </div>
+          <div className={styles.field}>
             <span>{copy.agentHostProject}</span>
-            <select onChange={(event) => setProjectId(event.currentTarget.value)} value={projectId}>
-              <option value="">{projects === undefined ? copy.agentHostLoading : copy.startWorkProject}</option>
-              {Array.isArray(projects) ? projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>) : null}
-            </select>
-          </label>
-          <label className={styles.field}>
+            <SettingsSelect className={styles.fieldSelect!} label={copy.agentHostProject} onChange={setProjectId} value={projectId}
+              options={[{ id: "", label: projects === undefined ? copy.agentHostLoading : copy.startWorkProject },
+                ...(Array.isArray(projects) ? projects.map((project) => ({ id: project.id, label: project.name })) : [])]} />
+          </div>
+          <div className={styles.field}>
             <span>{copy.agentHostModel}</span>
-            <select onChange={(event) => setModel(event.currentTarget.value)} value={model}>
-              <option value="">{models === "loading" ? copy.agentHostLoading : copy.agentHostModel}</option>
-              {Array.isArray(models) ? models.map((option) => <option key={option.value} value={option.value}>{option.label}</option>) : null}
-            </select>
+            <SettingsSelect className={styles.fieldSelect!} label={copy.agentHostModel} onChange={setModel} value={model}
+              options={[{ id: "", label: models === "loading" ? copy.agentHostLoading : copy.agentHostModel },
+                ...(Array.isArray(models) ? models.map((option) => ({ id: option.value, label: option.label })) : [])]} />
             <small>{copy.agentHostModelHint}</small>
-          </label>
+          </div>
           <label className={`${agentStyles.toggle} ${agentStyles.wide}`}>
             <input checked={enabled} onChange={(event) => setEnabled(event.currentTarget.checked)} type="checkbox" />
             {copy.agentHostEnabled}

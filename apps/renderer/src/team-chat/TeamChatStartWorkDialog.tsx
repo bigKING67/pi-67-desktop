@@ -3,6 +3,7 @@ import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-compone
 import type { EnterpriseProjectSummary } from "@pi67/domain";
 import { loadEnterpriseProjects } from "../context-memory/context-memory-controller.js";
 import { messages } from "../localization/message-catalog.js";
+import { SettingsSelect } from "../settings/SettingsPrimitives.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { useTeamChatDialogStore, type TeamChatStartWorkSource } from "./team-chat-dialog-store.js";
 import { useTeamChat } from "./team-chat-instance.js";
@@ -65,24 +66,22 @@ export function TeamChatStartWorkDialog({ source }: { source: TeamChatStartWorkS
           <form className={styles.channelForm} onSubmit={(event) => { event.preventDefault(); void start(); }}>
             <p className={styles.formNotice}>{copy.startWorkProjectHint}</p>
             {workspaces.length === 0 ? <p className={styles.formError} role="alert">{copy.startWorkNoWorkspace}</p> : (
-              <label className={styles.field}>
+              <div className={styles.field}>
                 <span>{copy.startWorkWorkspace}</span>
-                <select onChange={(event) => setWorkspaceId(event.currentTarget.value)} required value={workspaceId}>
-                  {workspaces.map((workspace) => <option key={workspace!.id} value={workspace!.id}>{workspace!.displayName}</option>)}
-                </select>
-              </label>
+                <SettingsSelect className={styles.fieldSelect!} label={copy.startWorkWorkspace} onChange={setWorkspaceId} value={workspaceId}
+                  options={workspaces.map((workspace) => ({ id: workspace!.id, label: workspace!.displayName }))} />
+              </div>
             )}
-            <label className={styles.field}>
+            <div className={styles.field}>
               <span>{copy.startWorkProject}</span>
               {projectsFailed ? <small className={styles.fieldError}>{copy.startWorkProjectsFailed}</small>
                 : projects === undefined ? <small role="status">{copy.startWorkLoadingProjects}</small>
                   : projects.length === 0 ? <small className={styles.fieldError}>{copy.startWorkNoProject}</small> : (
-                    <select onChange={(event) => setProjectId(event.currentTarget.value)} required value={projectId}>
-                      <option disabled value="">—</option>
-                      {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-                    </select>
+                    <SettingsSelect className={styles.fieldSelect!} label={copy.startWorkProject} onChange={setProjectId} value={projectId}
+                      options={[{ id: "", label: "—", disabled: true },
+                        ...projects.map((project) => ({ id: project.id, label: project.name }))]} />
                   )}
-            </label>
+            </div>
             <TextAreaField label={copy.startWorkText} maxLength={60_000} onChange={setText} rows={8} value={text} />
             {error ? <p className={styles.formError} role="alert">{error}</p> : null}
             <div className={styles.dialogActions}>

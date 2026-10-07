@@ -169,7 +169,8 @@ test("creates, renames, operates on, and trashes Workspace entries with an IME-s
   expect((await recordedCommands(page)).filter((type) => type === "workspace.file.create")).toEqual([]);
 
   await fileName.fill("feature.md");
-  await createDialog.getByRole("combobox", { name: "文件类型" }).selectOption("typescript");
+  await createDialog.getByRole("button", { name: / 文件类型$/u }).click();
+  await page.getByRole("option", { name: "TypeScript (.ts)", exact: true }).click();
   await expect(fileName).toHaveValue("feature.ts");
   await fileName.dispatchEvent("compositionstart");
   await fileName.dispatchEvent("keydown", { key: "Enter", isComposing: true });
@@ -193,7 +194,8 @@ test("creates, renames, operates on, and trashes Workspace entries with an IME-s
   const nestedDialog = page.getByRole("dialog", { name: "新建文件" });
   await expect(nestedDialog.getByText("位置：assets", { exact: true })).toBeVisible();
   await nestedDialog.getByRole("textbox", { name: "文件名称" }).fill("config");
-  await nestedDialog.getByRole("combobox", { name: "文件类型" }).selectOption("json");
+  await nestedDialog.getByRole("button", { name: / 文件类型$/u }).click();
+  await page.getByRole("option", { name: "JSON (.json)", exact: true }).click();
   await nestedDialog.getByRole("button", { name: "创建" }).click();
   await expect(assetsRow).toHaveAttribute("aria-expanded", "true");
   await expect(inspector.getByRole("treeitem", { name: "文件 config.json 0 B", exact: true })).toHaveAttribute("aria-level", "2");

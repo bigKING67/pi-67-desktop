@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { Button } from "react-aria-components";
 import type { TeamChatDirectory, TeamChatSearchHit } from "@pi67/domain";
 import { messages } from "../localization/message-catalog.js";
+import { SettingsSelect } from "../settings/SettingsPrimitives.js";
 import { activityWhere } from "./team-chat-activity-presentation.js";
 import { conversationTitle, memberById, type TeamChatSearchState } from "./team-chat-model.js";
 import { teamChat, useTeamChat } from "./team-chat-instance.js";
@@ -49,20 +50,18 @@ export function TeamChatSearch({ directory }: { directory: TeamChatDirectory }) 
           </span>
           <p>{copy.searchHint}</p>
           <div className={styles.toolbar}>
-            <label className={`${chat.field} ${styles.filter}`}>
+            <div className={`${chat.field} ${styles.filter}`}>
               <span>{copy.searchConversationFilter}</span>
-              <select onChange={(event) => refine({ conversationId: event.currentTarget.value })} value={search.conversationId ?? ""}>
-                <option value="">{copy.searchAllConversations}</option>
-                {conversations.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-              </select>
-            </label>
-            <label className={`${chat.field} ${styles.filter}`}>
+              <SettingsSelect className={chat.fieldSelect!} label={copy.searchConversationFilter}
+                onChange={(conversationId) => refine({ conversationId })} value={search.conversationId ?? ""}
+                options={[{ id: "", label: copy.searchAllConversations }, ...conversations.map((item) => ({ id: item.id, label: item.label }))]} />
+            </div>
+            <div className={`${chat.field} ${styles.filter}`}>
               <span>{copy.searchSenderFilter}</span>
-              <select onChange={(event) => refine({ senderUserId: event.currentTarget.value })} value={search.senderUserId ?? ""}>
-                <option value="">{copy.searchAllSenders}</option>
-                {senders.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-              </select>
-            </label>
+              <SettingsSelect className={chat.fieldSelect!} label={copy.searchSenderFilter}
+                onChange={(senderUserId) => refine({ senderUserId })} value={search.senderUserId ?? ""}
+                options={[{ id: "", label: copy.searchAllSenders }, ...senders.map((item) => ({ id: item.id, label: item.label }))]} />
+            </div>
           </div>
         </header>
         <Results directory={directory} search={search} />

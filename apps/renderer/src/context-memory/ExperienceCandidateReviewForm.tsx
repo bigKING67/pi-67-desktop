@@ -6,6 +6,7 @@ import {
 import type { ExperienceCandidateReview } from "@pi67/protocol";
 import { Check } from "lucide-react";
 import { Button, Checkbox, Input, Label, TextArea, TextField } from "react-aria-components";
+import { SettingsSelect, type SettingsSelectOption } from "../settings/SettingsPrimitives.js";
 import styles from "./MemoryInspectorPanel.module.css";
 
 export interface CandidateReviewDraft {
@@ -28,6 +29,21 @@ export interface CandidateReviewDraft {
   confirmOutcome: boolean;
   confirmRedaction: boolean;
 }
+
+/** The empty result stays selectable: it is the explicit "not yet confirmed" state. */
+const RESULT_OPTIONS: readonly SettingsSelectOption<CandidateReviewDraft["result"]>[] = [
+  { id: "", label: "请选择并确认" },
+  { id: "success", label: "成功" },
+  { id: "partial", label: "部分完成" },
+  { id: "failed", label: "失败" },
+  { id: "rolled-back", label: "已回滚" }
+];
+
+const SENSITIVITY_OPTIONS: readonly SettingsSelectOption<CandidateReviewDraft["sensitivity"]>[] = [
+  { id: "project", label: "仅当前团队项目" },
+  { id: "team", label: "团队" },
+  { id: "company", label: "公司范围" }
+];
 
 export function experienceCandidateNeedsReview(item: ExperienceCandidateSummary): boolean {
   return item.status === "candidate"
@@ -52,24 +68,28 @@ export function ExperienceCandidateReviewForm({ busy, draft, onCancel, onChange,
     <div className={styles.reviewGrid}>
       <ReviewTextField label="任务类型" value={draft.taskType} onChange={(value) => update("taskType", value)} />
       <ReviewTextField label="候选标题" value={draft.title} onChange={(value) => update("title", value)} />
-      <label className={styles.field}>
+      <div className={styles.field}>
         <span>任务结果</span>
-        <select disabled={busy} value={draft.result} onChange={(event) => update("result", event.currentTarget.value as CandidateReviewDraft["result"])}>
-          <option value="">请选择并确认</option>
-          <option value="success">成功</option>
-          <option value="partial">部分完成</option>
-          <option value="failed">失败</option>
-          <option value="rolled-back">已回滚</option>
-        </select>
-      </label>
-      <label className={styles.field}>
+        <SettingsSelect<CandidateReviewDraft["result"]>
+          className={styles.fieldSelect!}
+          isDisabled={busy}
+          label="任务结果"
+          options={RESULT_OPTIONS}
+          value={draft.result}
+          onChange={(value) => update("result", value)}
+        />
+      </div>
+      <div className={styles.field}>
         <span>共享敏感级别</span>
-        <select disabled={busy} value={draft.sensitivity} onChange={(event) => update("sensitivity", event.currentTarget.value as CandidateReviewDraft["sensitivity"])}>
-          <option value="project">仅当前团队项目</option>
-          <option value="team">团队</option>
-          <option value="company">公司范围</option>
-        </select>
-      </label>
+        <SettingsSelect<CandidateReviewDraft["sensitivity"]>
+          className={styles.fieldSelect!}
+          isDisabled={busy}
+          label="共享敏感级别"
+          options={SENSITIVITY_OPTIONS}
+          value={draft.sensitivity}
+          onChange={(value) => update("sensitivity", value)}
+        />
+      </div>
       <ReviewTextField label="置信度（0–1）" type="number" value={draft.confidence} onChange={(value) => update("confidence", value)} />
     </div>
     <ReviewTextArea label="问题与任务背景" value={draft.problem} onChange={(value) => update("problem", value)} />
