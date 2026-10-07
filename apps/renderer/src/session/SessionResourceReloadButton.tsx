@@ -9,7 +9,8 @@ import {
 import { useSessionProjectionStore } from "./session-projection-store.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 
-export function SessionResourceReloadButton({ compact = false }: { compact?: boolean }) {
+/** Reload eligibility for the current Session's Pi resources, shared by every reload control. */
+export function useSessionResourceReload(): { label: string; unavailable: string | undefined; reload: () => void } {
   const connected = useAppStore((state) => state.connected);
   const hostEpoch = useAppStore((state) => state.hostEpoch);
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
@@ -20,15 +21,21 @@ export function SessionResourceReloadButton({ compact = false }: { compact?: boo
     projectionAuthority,
     task
   );
+  return {
+    label: unavailable ? `重新加载不可用：${unavailable}` : "重新加载当前会话的 Pi 资源",
+    unavailable,
+    reload: () => void reloadSessionResources()
+  };
+}
 
+export function SessionResourceReloadButton({ compact = false }: { compact?: boolean }) {
+  const { label, unavailable, reload } = useSessionResourceReload();
   return (
     <Button
-      aria-label={unavailable
-        ? `重新加载不可用：${unavailable}`
-        : "重新加载当前会话的 Pi 资源"}
+      aria-label={label}
       className={compact ? "small-button" : "secondary-button"}
       isDisabled={unavailable !== undefined}
-      onPress={() => void reloadSessionResources()}
+      onPress={reload}
     >
       {compact ? null : <RefreshCw aria-hidden="true" size={14} />}
       重新加载

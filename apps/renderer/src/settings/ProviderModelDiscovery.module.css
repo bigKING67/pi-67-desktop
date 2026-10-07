@@ -204,19 +204,6 @@
   display: none;
 }
 
-.openAiDetails {
-  overflow: hidden;
-  border-top: 1px solid var(--border);
-}
-
-.openAiDetails > summary {
-  padding-top: 10px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-}
-
 .openAiChoices {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

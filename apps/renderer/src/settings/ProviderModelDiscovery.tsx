@@ -20,6 +20,7 @@ import {
   inspectProviderModelDiscovery
 } from "./provider-configuration-controller.js";
 import { useProviderConfigurationStore } from "./provider-configuration-store.js";
+import { SettingsDetails } from "./SettingsPrimitives.js";
 import styles from "./ProviderModelDiscovery.module.css";
 
 const PROTOCOLS: Array<{
@@ -194,8 +195,10 @@ export function ProviderModelDiscovery({
       </CheckboxGroup>
 
       {protocols.includes("openai") ? (
-        <details className={styles.openAiDetails}>
-          <summary>OpenAI 兼容策略 · {openAiApi === "openai-responses" ? "Responses 优先" : "Chat Completions"}</summary>
+        <SettingsDetails
+          summary={openAiApi === "openai-responses" ? "Responses 优先" : "Chat Completions"}
+          title="OpenAI 兼容策略"
+        >
           <RadioGroup
             aria-label="OpenAI 新导入模型协议"
             className={styles.openAiChoices!}
@@ -211,7 +214,7 @@ export function ProviderModelDiscovery({
               <span><strong>OpenAI Chat Completions</strong><small>仅在网关不支持 Responses 时选择</small></span>
             </Radio>
           </RadioGroup>
-        </details>
+        </SettingsDetails>
       ) : null}
 
       {pending ? (

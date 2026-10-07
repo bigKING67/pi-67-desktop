@@ -737,6 +737,11 @@
   font-variant-ligatures: none;
 }
 
+/* The tab bar's own rule already sits above the first disclosure; a second rule would double it. */
+.files > details:first-child {
+  border-top: 0;
+}
+
 .filePath {
   display: block;
   overflow: hidden;

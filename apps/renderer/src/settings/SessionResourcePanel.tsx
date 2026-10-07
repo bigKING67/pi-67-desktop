@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { ResourceSummary } from "@pi67/domain";
 import { useAppStore } from "../app/app-store.js";
-import { SessionResourceReloadButton } from "../session/SessionResourceReloadButton.js";
+import { useSessionResourceReload } from "../session/SessionResourceReloadButton.js";
 import {
   currentSessionResourceTask,
   sessionResourceProjectionMatchesTask
@@ -13,8 +13,10 @@ import {
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import styles from "./SettingsWorkbench.module.css";
+import { RefreshCw } from "lucide-react";
 import {
   SettingsEmpty,
+  SettingsIconAction,
   SettingsInfo,
   SettingsNotice,
   SettingsRow,
@@ -59,11 +61,17 @@ export function SessionResourcePanel({
   );
   const resources = projectionMatches ? projectedResources : undefined;
   const resourceCatalog = projectionMatches ? projectedResourceCatalog : undefined;
+  const reload = useSessionResourceReload();
   const displayed = filterSessionResources(resources ?? [], kind, scope, origin, resourceScope)
     .filter((resource) => !excludeIds?.has(resource.id));
   return (
     <SettingsSectionBlock
-      actions={<SessionResourceReloadButton />}
+      actions={<SettingsIconAction
+        icon={<RefreshCw aria-hidden="true" size={14} />}
+        isDisabled={reload.unavailable !== undefined}
+        label={reload.label}
+        onPress={reload.reload}
+      />}
       title={title}
       {...(description ? { description } : {})}
       {...(info ? { info } : {})}
