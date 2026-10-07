@@ -56,21 +56,20 @@ test("bounds side columns and preserves the shared reading measure", async ({ pa
   await page.getByTestId("inspector-toggle").click();
   await expect(inspector).toHaveCount(0);
   await expect(page.getByTestId("title-inspector-zone")).toHaveCount(0);
-  await expect.poll(async () => (await message.boundingBox())?.width ?? 0).toBe(800);
+  // Closing the Inspector widens the one shared measure from 800px to 920px.
+  await expect.poll(async () => (await message.boundingBox())?.width ?? 0).toBe(920);
   const contextHidden = await measureWorkspace(navigation, undefined, message, composer);
-  expect(contextHidden.messageWidth).toBe(wide.messageWidth);
-  expect(contextHidden.messageWidth).toBe(800);
+  expect(contextHidden.messageWidth).toBe(920);
   expect(Math.abs(contextHidden.messageWidth - contextHidden.composerWidth)).toBeLessThanOrEqual(1);
 
   await page.getByRole("button", { name: "隐藏对话导航" }).click();
   await expect(navigation).not.toBeVisible();
   await expect(page.getByTestId("title-navigation-zone")).toHaveCount(0);
-  await expect.poll(async () => (await message.boundingBox())?.width ?? 0).toBe(800);
+  await expect.poll(async () => (await message.boundingBox())?.width ?? 0).toBe(920);
   const sidesHidden = await measureWorkspace(undefined, undefined, message, composer);
   expect(sidesHidden.workspaceClass).toContain("navigation-hidden");
-  expect(sidesHidden.conversationTrack).toBe("800px");
+  expect(sidesHidden.conversationTrack).toBe("920px");
   expect(sidesHidden.messageWidth).toBe(contextHidden.messageWidth);
-  expect(sidesHidden.messageWidth).toBe(800);
   expect(Math.abs(sidesHidden.messageWidth - sidesHidden.composerWidth)).toBeLessThanOrEqual(1);
   expect(sidesHidden.documentScrollWidth).toBe(sidesHidden.documentClientWidth);
 

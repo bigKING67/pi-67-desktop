@@ -97,7 +97,8 @@
 }
 
 .workspace-grid.context-hidden {
-  --conversation-track-width: 800px;
+  /* Without the Inspector the extra room widens the one shared measure instead of the gutters. */
+  --conversation-track-width: 920px;
 
   grid-template-columns: var(--workspace-side-width) minmax(520px, 1fr);
 }
@@ -107,7 +108,7 @@
 }
 
 .workspace-grid.navigation-hidden.context-hidden {
-  --conversation-track-width: 800px;
+  --conversation-track-width: 920px;
 }
 
 .navigation-rail,

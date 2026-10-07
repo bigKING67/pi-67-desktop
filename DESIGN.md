@@ -302,9 +302,10 @@ Application-level surfaces use a separate wide-window shell:
   permanent application region.
 - Transcript owns remaining width and never drops below 520px on a wide layout.
 - Transcript, execution process, Composer, queue, and Composer-anchored overlays
-  share one conversation measure capped at 800px, regardless of side-column
-  visibility. Closing a side column increases breathing room while keeping
-  ordinary prose and Composer aligned to a stable reading measure.
+  share one conversation measure: 800px with the Inspector open and 920px with it
+  closed (2026-10-07: at 800px a closed Inspector left ~196px gutters that read as
+  empty). Every element on the measure widens together, so prose, code, tables and
+  Composer keep one left edge.
 - At 1320px and below, context defaults closed and becomes an overlay drawer with a
   dismissible scrim, so trust, transcript, and composer actions are never
   covered before the user explicitly opens context.
@@ -3095,8 +3096,8 @@ application bundles, Helpers, executables and installer filenames use New Money.
 ## Workbench polish (2026-09-23)
 
 - Desktop navigation and Inspector defaults are 248px and 320px; title-bar tracks
-  match pane tracks. Conversation/composer reading width is capped at 800px even
-  when side panels close. Tables and code blocks stay on that
+  match pane tracks. Conversation/composer reading width is 800px with the
+  Inspector open and 920px with it closed. Tables and code blocks stay on that
   one left edge too (a 2026-10-07 breakout to 1040px was rejected: three edges in one
   answer read as broken layout). Table cells break between words, never inside an
   identifier such as `disabled_manually`; a table that needs more room scrolls

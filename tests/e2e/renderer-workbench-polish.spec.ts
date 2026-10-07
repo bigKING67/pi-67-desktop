@@ -31,7 +31,8 @@ for (const theme of ["light", "dark"] as const) {
       await expect(page.getByRole("button", { name: "发送", exact: true })).toBeEnabled();
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       const shell = await page.getByTestId("composer-shell").boundingBox();
-      expect(shell!.width).toBeLessThanOrEqual(802);
+      // The Inspector is closed here, so the shared measure is 920px.
+      expect(shell!.width).toBeLessThanOrEqual(922);
       await page.screenshot({ path: `artifacts/visual-review/workbench-polish/${theme}-${width}.png`, animations: "disabled" });
     }
   });
