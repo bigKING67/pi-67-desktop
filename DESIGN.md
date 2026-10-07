@@ -3179,6 +3179,17 @@ application bundles, Helpers, executables and installer filenames use New Money.
 
 Settings follows one quiet-list language (2026-09-28, selected from the settings prototypes):
 
+- Surfaces (2026-10-07, Visual quality bar rule 1): `SettingsRows`, `SettingsCatalog` and
+  `SettingsEmpty` are borderless cards one luminance step above the page (`--settings-card`,
+  the muted surface, in both themes; light mode gains the step instead of a hairline). Rows
+  inside a card are separated by spacing, not dividers. A card redefines the muted fill one
+  step up for its descendants, so selects, segmented controls and notices stay visible on
+  it. Inputs keep their border; `SettingsDetails` keeps its rule above.
+- A page shows only its title. The section summary is navigation and search metadata, never
+  a line under the H1 (2026-10-07).
+- An unavailable primary action recedes to the disabled control fill with disabled text
+  rather than a translucent accent block.
+
 - Row anatomy is title (interface size, medium) plus at most one hint line (support size,
   tertiary), then value/status and actions on the right. Settings rows never carry a leading
   icon; `SettingsRow` has no leading slot. The one exception is identity: a Provider or model
@@ -3215,7 +3226,9 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
   catalog cards whose rows follow the same anatomy (`SettingsCatalogRow` accepts a `leading`
   slot only for a `ProviderBrandIcon`; rows are at least 60px with a body-size title; status
   sits in `trailing` as `SettingsStatus`, metadata is plain text, not pills). Provider rows
-  show `API host · N 个模型 · provenance`, omitting the host when Pi provides none. Extensions
+  are two lines: name, then `ID · API host · N 个模型 · provenance`, omitting the ID when it
+  restates the name and the host when Pi provides none; the Profile-sharing explanation is an
+  ⓘ beside the catalog tabs. Extensions
   keep their detail beside the list; model, skill and rule editors open as a drill-in page.
   Decision (2026-09-28): no side-by-side detail for these three — their catalogs are short
   (a handful of entries) and each detail is a full editor that a narrow pane would cramp.

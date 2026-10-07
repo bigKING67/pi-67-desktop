@@ -9,6 +9,7 @@ import {
 import { ExtensionManagementWorkspace, type ExtensionPackageView } from "./ExtensionManagementWorkspace.js";
 import { SessionResourcePanel } from "./SessionResourcePanel.js";
 import {
+  SettingsIconAction,
   SettingsNotice,
   SettingsRow,
   SettingsRows,
@@ -74,14 +75,12 @@ function BundledExtensionPanel({ capability }: { capability: CapabilityState }) 
     .sort((left, right) => left.displayName.localeCompare(right.displayName, "zh-CN"));
   return (
     <SettingsSectionBlock
-      actions={<Button
-        className="secondary-button"
+      actions={<SettingsIconAction
+        icon={<RefreshCw aria-hidden="true" size={14} />}
         isDisabled={capability.phase === "loading"}
+        label={capability.phase === "loading" ? "刷新中…" : "刷新状态"}
         onPress={() => void capability.refresh()}
-      >
-        <RefreshCw aria-hidden="true" size={14} />
-        {capability.phase === "loading" ? "刷新中…" : "刷新状态"}
-      </Button>}
+      />}
       title="内置扩展"
       description="随 New Money 提供并跟随应用更新；这里显示随附状态，不代表当前会话已经加载。"
     >

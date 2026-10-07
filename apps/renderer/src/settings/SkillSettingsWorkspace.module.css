@@ -189,14 +189,6 @@
   white-space: nowrap;
 }
 
-.spinning {
-  animation: skill-settings-spin 0.9s linear infinite;
-}
-
-@keyframes skill-settings-spin {
-  to { transform: rotate(360deg); }
-}
-
 .suiteFacts {
   margin-bottom: var(--space-3);
 }
@@ -365,12 +357,6 @@
   .detailActions {
     align-items: flex-end;
     flex-direction: column;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .spinning {
-    animation: none;
   }
 }
 

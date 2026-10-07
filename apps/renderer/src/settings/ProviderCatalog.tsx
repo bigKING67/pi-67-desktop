@@ -3,7 +3,7 @@ import { ChevronRight, Plus, Search, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button, Input } from "react-aria-components";
 import { ProviderBrandIcon } from "../provider-brand/ProviderBrandIcon.js";
-import { SettingsCatalog, SettingsCatalogRow, SettingsStatus } from "./SettingsPrimitives.js";
+import { SettingsCatalog, SettingsCatalogRow, SettingsInfo, SettingsStatus } from "./SettingsPrimitives.js";
 import styles from "./ProviderCatalog.module.css";
 
 export type ProviderCatalogView = "configured" | "available" | "custom";
@@ -62,6 +62,9 @@ export function ProviderCatalog({
             </button>
           ))}
         </nav>
+        <SettingsInfo label="关于模型服务配置">
+          Desktop 与 Pi TUI 双向共用当前用户的 Pi Profile，保存的 models.json 定义会同步给 Pi TUI。
+        </SettingsInfo>
         <div className={styles.catalogTools}>
           <div className={styles.providerSearch}>
             <Search aria-hidden="true" size={15} />
@@ -91,13 +94,11 @@ export function ProviderCatalog({
           ) : null}
         </div>
       </div>
-      <p className={styles.catalogIntro}>Desktop 与 Pi TUI 双向共用当前用户的 Pi Profile，保存的 models.json 定义会同步给 Pi TUI。</p>
       <div className={styles.providerList} data-testid="provider-configuration-list">
         {filteredProviders.length > 0 ? (
           <SettingsCatalog label={`${providerCatalogViewLabel(view)}模型服务列表`}>
             {filteredProviders.map((provider) => (
               <SettingsCatalogRow
-                {...(sameIdentity(provider.name, provider.id) ? {} : { description: provider.id })}
                 key={provider.id}
                 leading={<ProviderBrandIcon
                   hints={[provider.id, provider.name, providerHost(provider.baseUrl)]}
@@ -121,11 +122,15 @@ export function ProviderCatalog({
   );
 }
 
-/** Host first because it is what users recognise; provenance stays visible per the Catalog contract. */
+/**
+ * One metadata line keeps rows at two lines: the ID only when it differs from the name, then the
+ * host users recognise, then provenance per the Catalog contract.
+ */
 function providerCatalogMeta(provider: PiProviderConfigurationView): string {
   const host = providerHost(provider.baseUrl);
   const origin = provider.origin === "builtin" ? "Pi 内置" : "Pi models.json";
-  return [host, `${provider.modelCount} 个模型`, origin].filter(Boolean).join(" · ");
+  const id = sameIdentity(provider.name, provider.id) ? undefined : provider.id;
+  return [id, host, `${provider.modelCount} 个模型`, origin].filter(Boolean).join(" · ");
 }
 
 function providerHost(baseUrl: string | undefined): string | undefined {

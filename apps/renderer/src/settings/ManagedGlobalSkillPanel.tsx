@@ -1,5 +1,5 @@
 import type { ResourceSummary, SkillPackEntry } from "@pi67/domain";
-import { ChevronRight, RefreshCw, Search } from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button, Dialog, Modal, ModalOverlay } from "react-aria-components";
 import { selectSessionResources } from "../session/session-projection-selectors.js";
@@ -111,11 +111,6 @@ export function ManagedGlobalSkillPanel({ selectedPackId, excludedSuiteIds, onSe
             isDisabled={!workspaceId || busy}
             onPress={() => void checkSkillPackUpdates(workspaceId)}
           >
-            <RefreshCw
-              aria-hidden="true"
-              className={phase === "checking" ? styles.spinning : undefined}
-              size={14}
-            />
             {phase === "checking" ? "检查中…" : updateCount > 0 ? `待处理 ${updateCount}` : "检查技能更新"}
           </Button>
         </span>}

@@ -5,6 +5,8 @@
   min-height: 0;
   grid-template-columns: 232px minmax(0, 1fr);
   background: var(--surface);
+  /* Settings cards step up from the page by luminance instead of a border (Visual quality bar rule 1). */
+  --settings-card: var(--surface-muted);
 }
 
 .sidebar {

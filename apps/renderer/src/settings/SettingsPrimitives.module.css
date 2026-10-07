@@ -2,6 +2,8 @@
   flex-wrap: wrap;
   display: flex;
   min-width: 0;
+  /* As tall as the scope switch, so pages with and without it start content at one offset. */
+  min-height: 36px;
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
@@ -13,8 +15,7 @@
   gap: 6px;
 }
 
-.pageHeading h1,
-.pageHeading p {
+.pageHeading h1 {
   margin: 0;
 }
 
@@ -29,13 +30,6 @@
 /* Navigation moves focus here for screen readers; a non-interactive heading shows no ring. */
 .pageHeading h1:focus {
   outline: none;
-}
-
-.pageHeading p {
-  max-width: 720px;
-  color: var(--text-secondary);
-  font-size: var(--font-size-interface);
-  line-height: 1.55;
 }
 
 .pageActions {
@@ -106,13 +100,23 @@
   gap: var(--space-2);
 }
 
+/*
+ * Cards separate from the page by one luminance step, rows by spacing; no frame or divider.
+ * Controls inside a card that use the muted fill move one step up so they stay visible.
+ */
+.rows,
+.catalog,
+.empty {
+  border-radius: var(--radius-panel);
+  background: var(--settings-card, var(--surface-muted));
+  --surface-muted: var(--surface-active);
+}
+
 .rows {
   display: grid;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
-  background: var(--surface);
+  padding-block: 4px;
 }
 
 .row {
@@ -123,11 +127,6 @@
   align-items: center;
   gap: 16px;
   padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.row:last-child {
-  border-bottom: 0;
 }
 
 .identity {
@@ -219,9 +218,7 @@
   display: grid;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
-  background: var(--surface);
+  padding: 4px;
 }
 
 .catalogItem {
@@ -229,11 +226,7 @@
   min-width: 0;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: stretch;
-  border-bottom: 1px solid var(--border);
-}
-
-.catalogItem:last-child {
-  border-bottom: 0;
+  border-radius: calc(var(--radius-panel) - 4px);
 }
 
 .catalogRow {
@@ -244,8 +237,10 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 16px;
-  padding: 11px 16px;
+  /* The catalog's 4px inset plus 12px keeps text on the same 16px edge as SettingsRows. */
+  padding: 11px 12px;
   border: 0;
+  border-radius: inherit;
   background: transparent;
   color: var(--text-primary);
   text-align: left;
@@ -317,7 +312,7 @@
 .catalogActions {
   display: flex;
   align-items: center;
-  padding-right: 10px;
+  padding-right: 8px;
 }
 
 .catalogActions > * {
@@ -765,9 +760,6 @@
 
 .empty {
   padding: 20px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
-  background: var(--surface);
   color: var(--text-tertiary);
   font-size: var(--font-size-interface);
   line-height: 1.5;

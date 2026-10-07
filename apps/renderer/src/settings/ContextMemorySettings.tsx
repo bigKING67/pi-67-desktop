@@ -239,13 +239,12 @@ export function ContextMemorySettings() {
   }, [overview, subpage]);
 
   if (!draft || !overview) {
-    return <div className={styles.workspace}><SettingsPageHeader title={messages.settings.sections.contextMemory.label} description={messages.settings.sections.contextMemory.summary} /><SettingsNotice tone={error ? "danger" : "info"} actions={error ? <Button className="secondary-button" isDisabled={busy !== undefined} onPress={() => void refresh()}>重试读取设置</Button> : undefined}>{error ?? "正在读取记忆设置…"}</SettingsNotice></div>;
+    return <div className={styles.workspace}><SettingsPageHeader title={messages.settings.sections.contextMemory.label} /><SettingsNotice tone={error ? "danger" : "info"} actions={error ? <Button className="secondary-button" isDisabled={busy !== undefined} onPress={() => void refresh()}>重试读取设置</Button> : undefined}>{error ?? "正在读取记忆设置…"}</SettingsNotice></div>;
   }
 
   return <div className={styles.workspace} data-testid="context-memory-settings">
     <SettingsPageHeader
       title={messages.settings.sections.contextMemory.label}
-      description={messages.settings.sections.contextMemory.summary}
     />
     {error ? <SettingsNotice tone={error === NEW_MONEY_SIGN_IN_EXPIRED_MESSAGE ? "warning" : "danger"}>{error}</SettingsNotice> : null}
     {overview.status.conflictExtensions.length > 0 ? <SettingsNotice tone="danger">

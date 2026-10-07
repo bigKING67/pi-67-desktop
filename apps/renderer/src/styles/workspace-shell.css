@@ -248,6 +248,14 @@
   opacity: 0.45;
 }
 
+/* A translucent accent fill reads as a grey block; an unavailable primary recedes like a disabled control. */
+.primary-button[data-disabled] {
+  border-color: transparent;
+  background: var(--surface-active);
+  color: var(--text-disabled);
+  opacity: 1;
+}
+
 /* Filled rather than outlined: depth comes from luminance, so it reads on canvas, surface and raised planes. */
 .secondary-button,
 .small-button {

@@ -253,11 +253,6 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
           isDisabled={!workspaceId || busy}
           onPress={() => void checkSkillPackUpdates(workspaceId)}
         >
-          <RefreshCw
-            aria-hidden="true"
-            className={phase === "checking" ? styles.spinning : undefined}
-            size={14}
-          />
           {phase === "checking" ? "检查中…" : updateCount > 0 ? `待处理 ${updateCount}` : "检查技能更新"}
         </Button>
         <SettingsIconAction

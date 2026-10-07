@@ -14,16 +14,15 @@ import {
 } from "react-aria-components";
 import styles from "./SettingsPrimitives.module.css";
 
-export function SettingsPageHeader({ title, description, actions }: {
+/** Page title only: the navigation group already names the page's job, so no summary repeats it. */
+export function SettingsPageHeader({ title, actions }: {
   title: ReactNode;
-  description: ReactNode;
   actions?: ReactNode;
 }) {
   return (
     <header className={styles.pageHeader}>
       <span className={styles.pageHeading}>
         <h1 tabIndex={-1}>{title}</h1>
-        <p>{description}</p>
       </span>
       {actions ? <div className={styles.pageActions}>{actions}</div> : null}
     </header>

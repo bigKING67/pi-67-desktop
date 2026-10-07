@@ -133,7 +133,6 @@ export function PackageNetworkPanel() {
     <div className={styles.page}>
       <SettingsPageHeader
         title={messages.settings.sections.network.label}
-        description={messages.settings.sections.network.summary}
       />
     <div className={styles.stack}>
       <SettingsSectionBlock

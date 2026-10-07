@@ -173,7 +173,6 @@ export function SettingsWorkbench() {
             <div className={styles.pageLayout} data-testid="settings-page-layout">
             {activeSection !== "context-memory" && activeSection !== "network" ? <SettingsPageHeader
               title={currentSection.label}
-              description={currentSection.summary}
               actions={projectScopeAvailable ? <div aria-label="设置作用域" className={styles.scope} role="group">
                 <Button
                   className={scope === "global" ? styles.scopeSelected! : ""}
