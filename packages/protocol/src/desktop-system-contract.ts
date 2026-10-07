@@ -231,6 +231,8 @@ export interface DesktopSystemBridge {
   savePackageNetworkSettings(settings: PackageNetworkSettings): Promise<PackageNetworkSnapshot>;
   resetPackageNetworkSettings(): Promise<PackageNetworkSnapshot>;
   probePackageSources(settings: PackageNetworkSettings): Promise<PackageNetworkSnapshot>;
+  // Renderer validates each value with the parsePackageMarket* functions before use.
+  packageMarket: import("./package-market.js").PackageMarketBridge;
   getDesktopCapabilitySnapshot(): Promise<DesktopCapabilitySnapshot>;
   setupBrowser67(): Promise<DesktopCapabilitySnapshot>;
   doctorBrowser67(): Promise<DesktopCapabilitySnapshot>;

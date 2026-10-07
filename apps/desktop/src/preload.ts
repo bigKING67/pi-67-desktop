@@ -311,6 +311,11 @@ const systemBridge = {
   probePackageSources: (settings: PackageNetworkSettings): Promise<PackageNetworkSnapshot> => (
     ipcRenderer.invoke("pi67:package-network-probe", settings)
   ),
+  packageMarket: {
+    browse: (options) => ipcRenderer.invoke("pi67:package-market-browse", ...(options === undefined ? [] : [options])),
+    search: (request) => ipcRenderer.invoke("pi67:package-market-search", request),
+    detail: (request) => ipcRenderer.invoke("pi67:package-market-detail", request)
+  },
   getDesktopCapabilitySnapshot: (): Promise<DesktopCapabilitySnapshot> => (
     ipcRenderer.invoke("pi67:capability-snapshot")
   ),

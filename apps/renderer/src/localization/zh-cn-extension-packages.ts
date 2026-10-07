@@ -18,6 +18,13 @@ const KNOWN_PACKAGE_PURPOSES: Readonly<Record<string, string>> = Object.freeze({
 const HAN_TEXT = /[\u3400-\u9fff]/u;
 
 export const zhCNExtensionPackageMessages = {
+  /**
+   * Marketplace hint line: reviewed Chinese copy for a known Package, otherwise the author's
+   * own description verbatim (untrusted public text, never machine-translated).
+   */
+  marketDescription(name: string, authorDescription: string): string {
+    return KNOWN_PACKAGE_PURPOSES[name] ?? authorDescription;
+  },
   purpose(source: string, displayName: string | undefined, manifestDescription: string | undefined): string {
     for (const identity of packageIdentityCandidates(source, displayName)) {
       const localized = KNOWN_PACKAGE_PURPOSES[identity];

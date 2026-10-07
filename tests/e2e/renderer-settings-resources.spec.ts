@@ -91,7 +91,7 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   await expect(settings.getByRole("heading", { name: "扩展", exact: true })).toBeVisible();
   const extensionWorkspace = settings.getByTestId("extension-settings-workspace");
   const extensionTabs = extensionWorkspace.getByRole("tablist", { name: "扩展管理分类" });
-  await expect(extensionTabs.getByRole("tab", { name: "扩展包", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(extensionTabs.getByRole("tab", { name: "已安装", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(extensionWorkspace.getByText("pi-rules-loader", { exact: true })).toBeHidden();
 
   await extensionTabs.getByRole("tab", { name: "内置扩展", exact: true }).click();

@@ -4,22 +4,9 @@
   min-height: 0;
 }
 
-.tabs,
 .tabPanel {
   min-width: 0;
   outline: none;
-}
-
-.tabs {
-  display: grid;
-  height: 100%;
-  min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 0;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
-  background: var(--surface);
 }
 
 .tabPanel {
@@ -39,25 +26,6 @@
   display: grid;
 }
 
-/* Keeps the authorization ⓘ beside the view switch it explains. */
-.viewSwitch {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 6px;
-}
-
-.commandBand {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-}
-
-.tabList,
 .primaryActions,
 .filters,
 .detailActions,
@@ -66,46 +34,12 @@
   align-items: center;
 }
 
-.tabList {
-  min-width: 0;
-  gap: 2px;
-  padding: 2px;
-  border-radius: var(--radius-control);
-  background: var(--surface-muted);
-}
-
-.tab {
-  display: inline-flex;
-  min-height: 28px;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: var(--font-size-interface);
-  font-weight: var(--font-weight-regular);
-}
-
-.tab span,
 .filterButton span {
   color: var(--text-tertiary);
   font-size: var(--font-size-support);
   font-variant-numeric: tabular-nums;
 }
 
-.tab[data-hovered] {
-  color: var(--text-primary);
-}
-
-.tab[data-selected] {
-  background: var(--surface-active);
-  color: var(--text-primary);
-  font-weight: var(--font-weight-medium);
-}
-
-.tab[data-focus-visible],
 .filterButton[data-focus-visible] {
   outline: 2px solid var(--focus);
   outline-offset: -2px;
@@ -118,7 +52,7 @@
 
 .installedToolbar {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
   align-items: center;
   gap: var(--space-3);
   padding: 10px 12px;
@@ -243,8 +177,7 @@
   background-clip: padding-box;
 }
 
-.packageList,
-.discoveryList {
+.packageList{
   margin: 0;
   padding: 0;
   list-style: none;
@@ -284,7 +217,6 @@
 }
 
 .packageIdentity,
-.discoveryIdentity,
 .integrityNote span,
 .dangerZone > span {
   display: grid;
@@ -398,17 +330,11 @@
   font-size: var(--font-size-support);
 }
 
-.detailHeader h2,
-.discoverSurface h2,
-.runtimeSurface h2,
-.discoverSurface p,
-.runtimeSurface p {
+.detailHeader h2{
   margin: 0;
 }
 
-.detailHeader h2,
-.discoverSurface h2,
-.runtimeSurface h2 {
+.detailHeader h2{
   color: var(--text-primary);
   font-size: var(--font-size-heading);
   font-weight: var(--font-weight-semibold);
@@ -631,86 +557,6 @@
   margin: 0;
 }
 
-.discoverSurface,
-.runtimeSurface {
-  overflow: hidden;
-  background: var(--surface);
-}
-
-.discoverSurface > header,
-.runtimeSurface > header {
-  display: grid;
-  gap: 6px;
-  padding: 24px 26px var(--space-4);
-  border-bottom: 1px solid var(--border);
-}
-
-.discoverSurface > header p,
-.runtimeSurface > header p {
-  max-width: 680px;
-  color: var(--text-secondary);
-  font-size: var(--font-size-interface);
-  line-height: 1.55;
-}
-
-.discoveryList li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  min-height: 66px;
-  align-items: center;
-  gap: var(--space-4);
-  padding: 10px 26px;
-  border-bottom: 1px solid var(--border);
-}
-
-.discoveryIdentity strong {
-  color: var(--text-primary);
-  font-size: var(--font-size-body);
-}
-
-.discoveryIdentity small {
-  margin-top: 3px;
-  color: var(--text-tertiary);
-  font-family: var(--font-code);
-  font-size: var(--font-size-support);
-  font-variant-ligatures: none;
-}
-
-.recommendedVersion,
-.installedLabel {
-  color: var(--text-secondary);
-  font-size: var(--font-size-support);
-  white-space: nowrap;
-}
-
-.installedLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--success);
-}
-
-.panelEmpty,
-.discoveryFootnote {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--font-size-support);
-  line-height: 1.5;
-}
-
-.panelEmpty {
-  padding: 28px 26px;
-}
-
-.discoveryFootnote {
-  padding: var(--space-3) 26px;
-  background: var(--surface-muted);
-}
-
-.runtimeSurface > section {
-  margin: 0;
-}
-
 .modal {
   width: min(560px, calc(100vw - 32px));
 }
@@ -812,23 +658,13 @@
 }
 
 @media (max-width: 760px) {
-  .workspace,
-  .tabs {
+  .workspace{
     height: auto;
     min-height: 620px;
   }
 
-  .commandBand,
-  .installedToolbar {
+    .installedToolbar {
     align-items: stretch;
-  }
-
-  .commandBand {
-    display: grid;
-  }
-
-  .tabList {
-    overflow-x: auto;
   }
 
   .primaryActions {
@@ -847,8 +683,7 @@
     padding: var(--space-4);
   }
 
-  .dangerZone,
-  .discoveryList li {
+  .dangerZone{
     align-items: flex-start;
   }
 
@@ -860,14 +695,6 @@
     justify-self: start;
   }
 
-  .discoveryList li {
-    grid-template-columns: minmax(0, 1fr) auto;
-    padding-inline: var(--space-4);
-  }
-
-  .recommendedVersion {
-    grid-column: 1;
-  }
 }
 
 @media (max-width: 520px) {
@@ -888,19 +715,9 @@
 }
 
 /* Extension management follows the same catalog-to-detail document flow at every width. */
-.workspace,
-.tabs {
+.workspace{
   height: auto;
   min-height: 0;
-}
-
-.tabs {
-  display: grid;
-  grid-template-rows: auto auto;
-  overflow: visible;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
 }
 
 .tabPanel,
@@ -911,15 +728,6 @@
 
 .installedPanel {
   grid-template-rows: auto auto auto;
-}
-
-.commandBand {
-  padding: 0 0 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.tab[data-selected] {
-  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
 }
 
 .installedToolbar {
@@ -994,30 +802,8 @@
   padding-top: 20px;
 }
 
-.discoverSurface,
-.runtimeSurface {
-  background: transparent;
-}
-
-.discoverSurface > header,
-.runtimeSurface > header {
-  padding: 8px 0 16px;
-}
-
-.discoveryList li {
-  min-height: 72px;
-  padding: 10px 0;
-}
-
-.discoveryFootnote {
-  margin-top: 12px;
-  padding: 12px 14px;
-  border-radius: 8px;
-}
-
 @media (max-width: 760px) {
-  .workspace,
-  .tabs {
+  .workspace{
     min-height: 0;
   }
 

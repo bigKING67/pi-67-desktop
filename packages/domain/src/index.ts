@@ -21,6 +21,7 @@ export * from "./repository-environment.js";
 export * from "./runtime-error.js";
 export * from "./native-notification.js";
 export * from "./native-capability-replacements.js";
+export * from "./package-market.js";
 export * from "./native-subagent.js";
 export * from "./plan-mode.js";
 export * from "./safety-policy.js";

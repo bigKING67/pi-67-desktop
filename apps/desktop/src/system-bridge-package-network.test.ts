@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("electron", () => ({
-  app: { getVersion: vi.fn(() => "0.1.0"), isPackaged: false },
+  app: { getPath: vi.fn(() => "/nonexistent-pi67-user-data"), getVersion: vi.fn(() => "0.1.0"), isPackaged: false },
   clipboard: { writeText: vi.fn() },
   dialog: {
     showMessageBox: mocks.showMessageBox,
@@ -119,6 +119,27 @@ describe("system bridge package network probe", () => {
     expect(mocks.probePackageSources).not.toHaveBeenCalled();
     expect(packageNetworkSettings.load).not.toHaveBeenCalled();
     expect(packageNetworkSettings.save).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed marketplace requests before reading settings or the network", async () => {
+    const packageNetworkSettings = registerFixture();
+
+    await expect(invoke("pi67:package-market-browse", { refresh: "yes" })).rejects.toThrow("options are invalid");
+    await expect(invoke("pi67:package-market-search", { query: "" })).rejects.toThrow("query is invalid");
+    await expect(invoke("pi67:package-market-search", { query: "a".repeat(101) })).rejects.toThrow("query is invalid");
+    await expect(invoke("pi67:package-market-detail", { name: "../etc/passwd" })).rejects.toThrow("name is invalid");
+
+    expect(packageNetworkSettings.load).not.toHaveBeenCalled();
+  });
+
+  it("serves the marketplace from download-source policy without network in offline mode", async () => {
+    const packageNetworkSettings = registerFixture();
+    packageNetworkSettings.load.mockResolvedValue({ npmMode: "offline", gitMode: "offline", gitMirrors: [] });
+
+    await expect(invoke("pi67:package-market-search", { query: "memory" }))
+      .resolves.toEqual({ status: "unavailable", query: "memory", reason: "offline" });
+    await expect(invoke("pi67:package-market-detail", { name: "@a/pi-one" }))
+      .resolves.toEqual({ status: "unavailable", name: "@a/pi-one", reason: "offline" });
   });
 });
 

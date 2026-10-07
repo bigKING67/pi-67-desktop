@@ -1224,8 +1224,9 @@ loading error where the operation can produce those states
   This prevents Settings from becoming a third or fourth application column on
   either common or ultra-wide windows.
 - Pi resources follow the final ResourceLoader classification rather than the
-  Package name or filesystem heuristics. The single `扩展` workspace owns three
-  explicit views: `扩展包`, `内置扩展`, and `本地扩展`. `本地扩展` consumes only
+  Package name or filesystem heuristics. The single `扩展` workspace owns four
+  views in one tab level (2026-10-07, replacing a nested Package switch): `已安装`,
+  `扩展市场`, `内置扩展`, and `本地扩展`. `本地扩展` consumes only
   top-level Extension resources from global or project extension directories and
   explicit `settings.json` paths; Package-attributed Extensions never repeat there.
   `技能` owns two availability views: `全局可用` and `项目专属`. `全局可用`
@@ -1277,7 +1278,7 @@ loading error where the operation can produce those states
   Workspace navigation unless a real, independently actionable Session-settings
   surface is introduced; Settings does not combine Runtime and Session merely
   because their implementation lifecycles are related.
-- The `扩展` workspace's `扩展包` view owns third-party Package installation,
+- The `扩展` workspace's `已安装` and `扩展市场` views own third-party Package installation,
   update, and uninstall exactly once. A
   multi-resource Package appears as one lifecycle row and identifies every
   Extension, Skill, Prompt Template, or Theme it contributes. Per-resource
@@ -1382,8 +1383,9 @@ loading error where the operation can produce those states
   but cannot enable staging or relax independent-update provenance. browser67
   updates only as a complete capability Package; aggregated design tools update by
   their individual sources.
-- Pi Packages use two local views: `已安装` and `发现扩展包`. Tabs,
-  page-level actions, search, and filters sit directly on the document canvas.
+- Pi Packages use the `已安装` and `扩展市场` tabs of that single tab level. Search,
+  filters and actions sit directly on the document canvas in each view's own
+  toolbar: `检查更新`, `安装扩展包` and the authorization ⓘ belong to `已安装` only.
   `已安装` lists configured third-party sources and moves Package metadata and
   destructive operations into the selected drill-down detail rather than
   repeating action clusters on every row. The selected detail leads with a
@@ -1423,7 +1425,26 @@ loading error where the operation can produce those states
   error Extension notifications remain immediately visible.
   Destructive removal stays in an independent danger section below ordinary
   enable/update actions.
-  `发现扩展包` is flat Catalog content, not a card inside a shared frame. Local
+  `扩展市场` is flat Catalog content, not a card inside a shared frame. Its command
+  band holds one search field and one `SettingsSelect` sort (`热门` by monthly
+  downloads, `最近更新`, `名称`; a non-empty query shows `相关度` and clearing it
+  restores the previous sort); an ⓘ states that sorts other than relevance cover the
+  most popular 500 Packages. Two groups follow: `桌面已适配` (the curated
+  recommendations) and `社区扩展`, with `显示更多` revealing 50 more rows at a time.
+  A row is title (Package name) plus one hint line (the author's description, shown
+  verbatim in its original language as plain text, one line, truncated; curated rows
+  use reviewed Chinese copy), then tertiary `N/月 · X前更新` metadata, at most one
+  exception — plain `已安装`, or a `SettingsStatus` `原生能力替代` (neutral),
+  `与记忆服务冲突` (danger) or `长期未更新` (warning, no publish for 12 months) — and a
+  quiet `安装` button (never hover-only) only while the Package is installable; stale
+  Packages keep it, native-replaced and conflicting ones never get it. No row carries a leading icon,
+  type badge or `已适配` label; the group heading says it once. Selecting a row opens a
+  drill-in detail with `SettingsDetailHeader` (version · license · publisher username),
+  the full description, declared resource types when the registry provides them,
+  npm and repository links opened externally, and the install action. Loading uses
+  quiet placeholder rows; a failed browse or search shows a `SettingsNotice` with
+  retry inside the catalog position; offline and mirror-only download sources show
+  the cached index with its age, or `SettingsEmpty` when none exists. Local
   Extension, global/project Skill, Prompt Template, and Context views consume the
   current Session resource projection and never repeat Package update or uninstall
   controls.
@@ -1500,7 +1521,7 @@ loading error where the operation can produce those states
 - Installing another Pi Package starts from one page-level action and opens a focused
   confirmation dialog that identifies npm, Git, or local-directory sources, the
   target scope, and the fact that a Package may load executable Extension code.
-  Recommended Packages prefill the same dialog and never bypass the one-shot
+  Recommended and marketplace Packages prefill the same dialog and never bypass the one-shot
   installation confirmation. Loaded-resource evidence remains separate because
   installed configuration and the current Session projection are different states.
   Recommended Packages remain `user-initiated` and do not include a second npm source

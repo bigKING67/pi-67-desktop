@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import type { DesktopSystemBridge, PackageNetworkSettings } from "@pi67/protocol";
+import type { DesktopSystemBridge, PackageMarketEntry, PackageNetworkSettings } from "@pi67/protocol";
 import {
   createMockDesktopCapabilitySnapshot,
   createMockPackageNetworkSnapshot
@@ -17,6 +17,7 @@ export type MockDesktopCapabilityBridge = Pick<DesktopSystemBridge,
   | "resetPackageNetworkSettings"
   | "probePackageSources"
   | "getDesktopCapabilitySnapshot"
+  | "packageMarket"
   | "setupBrowser67"
   | "doctorBrowser67"
   | "prepareBrowser67Extension"
@@ -43,6 +44,7 @@ export async function installMockDesktopCapabilityBridge(
       : integration);
   }
   const fixture = {
+    marketEntries: createMockPackageMarketEntries(Date.now()),
     capabilityInitializingCalls: options.capabilityInitializingCalls ?? 0,
     capabilitySnapshot,
     packageNetworkSnapshot: createMockPackageNetworkSnapshot()
@@ -59,6 +61,7 @@ export async function installMockDesktopCapabilityBridge(
       packageSaves: [] as PackageNetworkSettings[],
       packageResets: 0,
       packageProbes: [] as PackageNetworkSettings[],
+      marketSearches: [] as string[],
       platformInfoCalls: 0
     };
 
@@ -112,6 +115,35 @@ export async function installMockDesktopCapabilityBridge(
           })),
           managedContext: { rules: "unavailable", agents: "unavailable" }
         };
+      },
+      packageMarket: {
+        browse: async () => ({
+          status: "ready" as const,
+          index: { entries: structuredClone(bridgeFixture.marketEntries), total: 11_415, fetchedAt: new Date().toISOString() },
+          stale: false
+        }),
+        search: async ({ query }: { query: string }) => {
+          settingsActionsTest.marketSearches.push(query);
+          const entries = bridgeFixture.marketEntries.filter((entry) => (
+            entry.name.includes(query) || (entry.description ?? "").toLowerCase().includes(query.toLowerCase())
+          ));
+          return { status: "ready" as const, query, entries: structuredClone(entries), total: entries.length };
+        },
+        detail: async ({ name }: { name: string }) => {
+          const entry = bridgeFixture.marketEntries.find((candidate) => candidate.name === name);
+          if (!entry) return { status: "unavailable" as const, name, reason: "network" as const };
+          return {
+            status: "ready" as const,
+            detail: {
+              name: entry.name,
+              version: entry.version,
+              ...(entry.description ? { description: entry.description } : {}),
+              ...(entry.license ? { license: entry.license } : {}),
+              ...(entry.repositoryUrl ? { repositoryUrl: entry.repositoryUrl } : {}),
+              resourceTypes: ["extension" as const, "skill" as const]
+            }
+          };
+        }
       },
       setupBrowser67: async () => ({
         ...structuredClone(bridgeFixture.capabilitySnapshot),
@@ -186,4 +218,29 @@ export async function installMockDesktopCapabilityBridge(
       value: settingsActionsTest
     });
   }, fixture);
+}
+
+/** Marketplace fixture covering installable, native-replaced, memory-conflict, stale and installed rows. */
+function createMockPackageMarketEntries(now: number): PackageMarketEntry[] {
+  const daysAgo = (days: number) => new Date(now - days * 24 * 60 * 60 * 1_000).toISOString();
+  const entry = (name: string, monthlyDownloads: number, publishedDays: number, description: string): PackageMarketEntry => ({
+    name,
+    version: "1.0.0",
+    description,
+    publishedAt: daysAgo(publishedDays),
+    monthlyDownloads,
+    weeklyDownloads: Math.floor(monthlyDownloads / 4),
+    publisher: "author",
+    license: "MIT",
+    repositoryUrl: `https://github.com/author/${name.replace("@", "").replace("/", "-")}`
+  });
+  return [
+    entry("pi-mcp-adapter", 1_507_084, 1, "MCP (Model Context Protocol) adapter extension for Pi coding agent"),
+    entry("pi-web-access", 603_369, 2, "Web search, URL fetching, GitHub repo cloning, PDF extraction"),
+    entry("@juicesharp/rpiv-ask-user-question", 299_671, 3, "A structured questionnaire the model can put to you"),
+    entry("pi-hy-memory", 40_000, 20, "Hybrid memory for Pi"),
+    entry("pi-disabled", 12_000, 5, "Already installed fixture package"),
+    entry("pi-legacy-theme", 9_000, 500, "An old dark theme that has not been published for a long time"),
+    ...Array.from({ length: 60 }, (_, index) => entry(`pi-tail-${String(index).padStart(2, "0")}`, 5_000 - index, 10 + index, `Tail package ${index}`))
+  ];
 }

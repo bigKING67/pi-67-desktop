@@ -1,4 +1,5 @@
 import { gt, valid } from "semver";
+import { readBoundedResponseText as readBoundedText, ResponseTooLargeError } from "./bounded-response-text.js";
 
 export const UNSIGNED_PREVIEW_CHANNEL = "unsigned-preview" as const;
 const UPDATE_ORIGIN = "https://updates.52671314.xyz";
@@ -171,33 +172,11 @@ export function parseUnsignedPreviewManifest(value: unknown): {
 }
 
 export async function readBoundedResponseText(response: Response): Promise<string> {
-  const declaredLength = response.headers.get("content-length");
-  if (declaredLength !== null) {
-    const bytes = Number(declaredLength);
-    if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > MAX_UPDATE_MANIFEST_BYTES) {
-      throw new Error("Pi-67 update manifest exceeded the 1 MiB limit.");
-    }
-  }
-  if (!response.body) return "";
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let bytesRead = 0;
-  let output = "";
   try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      bytesRead += value.byteLength;
-      if (bytesRead > MAX_UPDATE_MANIFEST_BYTES) {
-        await reader.cancel();
-        throw new Error("Pi-67 update manifest exceeded the 1 MiB limit.");
-      }
-      output += decoder.decode(value, { stream: true });
-    }
-    return output + decoder.decode();
-  } finally {
-    reader.releaseLock();
+    return await readBoundedText(response, MAX_UPDATE_MANIFEST_BYTES);
+  } catch (error) {
+    if (error instanceof ResponseTooLargeError) throw new Error("Pi-67 update manifest exceeded the 1 MiB limit.");
+    throw error;
   }
 }
 

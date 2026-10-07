@@ -32,4 +32,10 @@ describe("Chinese Extension package copy", () => {
     expect(purpose).toContain("暂未收录对应中文文案");
     expect(purpose).not.toContain("without reviewed localized metadata");
   });
+
+  it("uses reviewed copy in the marketplace and otherwise keeps the author's text verbatim", () => {
+    expect(zhCNExtensionPackageMessages.marketDescription("pi-rewind", "Checkpoint extension"))
+      .toBe("为 Pi 提供检查点与回退能力，支持逐工具快照、安全恢复和重做。");
+    expect(zhCNExtensionPackageMessages.marketDescription("pi-unknown", "Original text")).toBe("Original text");
+  });
 });

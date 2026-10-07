@@ -6,6 +6,7 @@ import type { DesktopToolchain } from "./desktop-toolchain.js";
 import type { DesktopCapabilityService } from "./desktop-capability-service.js";
 import type { PackageNetworkSettingsStore } from "./package-network-settings.js";
 import { probePackageSources, unprobedPackageNetworkSnapshot } from "./package-source-probe.js";
+import { registerPackageMarketBridge } from "./package-market-bridge.js";
 import { redact } from "./redaction.js";
 import type { PromptAttachmentStagingService } from "./prompt-attachment-staging.js";
 import {
@@ -339,6 +340,10 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
       settings,
       fetcher: (input, init) => net.fetch(input, init)
     });
+  });
+  registerPackageMarketBridge(handle, () => options.packageNetworkSettings.load(), {
+    getUserData: () => app.getPath("userData"),
+    fetcher: (input, init) => net.fetch(input, init)
   });
   handle("pi67:capability-snapshot", () => options.desktopCapabilities.snapshot());
   handle("pi67:browser67-setup", async () => {

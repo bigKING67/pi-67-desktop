@@ -286,8 +286,9 @@ test("uses one extension package workbench for third-party installed and discove
   ]);
 
   const workspace = page.getByTestId("extension-management-workspace");
-  const tabs = workspace.getByRole("tablist", { name: "Pi 扩展包管理视图" });
-  await expect(tabs.getByRole("tab", { name: /已安装/u })).toHaveAttribute("aria-selected", "true");
+  const tabs = page.getByRole("tablist", { name: "扩展管理分类" });
+  await expect(tabs.getByRole("tab", { name: "已安装", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tablist", { name: "Pi 扩展包管理视图" })).toHaveCount(0);
   await expect(workspace.getByRole("list", { name: "已安装扩展包" }).getByText("第三方扩展包", { exact: true })).toBeVisible();
   await expect(workspace.getByText("随应用提供", { exact: true })).toHaveCount(0);
   await expect(workspace.getByText("已停用", { exact: true }).first()).toBeVisible();
@@ -304,13 +305,64 @@ test("uses one extension package workbench for third-party installed and discove
   await expect(workspace.getByRole("button", { name: "启用 技能 npm:pi-subagents" })).toBeDisabled();
   await workspace.getByRole("button", { name: "返回扩展包列表" }).click();
 
-  await tabs.getByRole("tab", { name: /发现/u }).click();
-  await expect(workspace.getByRole("heading", { name: "推荐扩展包" })).toBeVisible();
-  await expect(workspace.getByText("pi-rewind", { exact: true })).toBeVisible();
-  await expect(workspace.getByText("https://github.com/arpagon/pi-rewind.git", { exact: true })).toBeVisible();
-  await expect(workspace.getByText("npm:pi-subagents", { exact: true })).toHaveCount(0);
+  await tabs.getByRole("tab", { name: "扩展市场" }).click();
+  const market = page.getByTestId("package-market");
+  await expect(market.getByRole("button", { name: /检查更新/u })).toHaveCount(0);
+  await expect(market.getByRole("heading", { name: "桌面已适配" })).toBeVisible();
+  await expect(market.getByTestId("package-market-row-pi-rewind")).toContainText("为 Pi 提供检查点与回退能力");
+  await expect(market.getByTestId("package-market-row-pi-rewind")).toContainText("github.com/arpagon/pi-rewind");
+  await expect(market.getByRole("button", { name: "安装 pi-rewind" })).toBeVisible();
+  await expect(market.getByText("npm:pi-subagents", { exact: true })).toHaveCount(0);
 
   await expect(tabs.getByRole("tab", { name: /当前会话/u })).toHaveCount(0);
+});
+
+test("browses, sorts, searches and installs from the extension marketplace", async ({ page }) => {
+  await openPackageSettings(page, [packageEntry("npm:pi-disabled", "global", false)]);
+  await page.getByRole("tablist", { name: "扩展管理分类" }).getByRole("tab", { name: "扩展市场" }).click();
+  const workspace = page.getByTestId("extension-management-workspace");
+  const market = workspace.getByTestId("package-market");
+  const community = market.getByRole("list", { name: "社区扩展包" });
+
+  await expect(market.getByRole("heading", { name: /社区扩展 · 11,415/u })).toBeVisible();
+  await expect(community.getByRole("listitem").first()).toContainText("pi-mcp-adapter");
+  await expect(market.getByTestId("package-market-row-pi-mcp-adapter")).toContainText("原生能力替代");
+  await expect(market.getByRole("button", { name: "安装 pi-web-access" })).toHaveCount(0);
+  await expect(market.getByTestId("package-market-row-pi-hy-memory")).toContainText("与记忆服务冲突");
+  await expect(market.getByRole("button", { name: "安装 pi-hy-memory" })).toHaveCount(0);
+  await expect(market.getByTestId("package-market-row-pi-disabled")).toContainText("已安装");
+  await expect(market.getByTestId("package-market-row-@juicesharp/rpiv-ask-user-question"))
+    .toContainText("允许 Pi 在需要澄清时展示带类型选项的结构化问卷");
+  await expect(market.getByTestId("package-market-row-pi-tail-00")).toContainText("Tail package 0");
+  await expect(community.getByRole("listitem")).toHaveCount(50);
+  await market.getByRole("button", { name: /显示更多/u }).click();
+  await expect(community.getByRole("listitem")).toHaveCount(66);
+  await expect(market.getByTestId("package-market-row-pi-legacy-theme")).toContainText("长期未更新");
+  await expect(market.getByRole("button", { name: "安装 pi-legacy-theme" })).toBeVisible();
+
+  await market.getByTestId("package-market-sort").click();
+  await page.getByRole("option", { name: "名称" }).click();
+  await expect(community.getByRole("listitem").first()).toContainText("@juicesharp/rpiv-ask-user-question");
+
+  await market.getByRole("searchbox", { name: "搜索扩展市场" }).fill("memory");
+  await expect(market.getByTestId("package-market-sort")).toContainText("相关度");
+  await expect(community.getByRole("listitem")).toHaveCount(1);
+  await expect(community).toContainText("pi-hy-memory");
+  expect(await page.evaluate(() => (window as unknown as { __pi67SettingsTest: { marketSearches: string[] } })
+    .__pi67SettingsTest.marketSearches)).toEqual(["memory"]);
+  await market.getByRole("button", { name: "清除搜索" }).click();
+  await expect(market.getByTestId("package-market-sort")).toContainText("名称");
+
+  await market.getByTestId("package-market-row-pi-legacy-theme").click();
+  const detail = workspace.getByTestId("package-market-detail");
+  await expect(detail.getByRole("heading", { name: "pi-legacy-theme" })).toBeVisible();
+  await expect(detail).toContainText("扩展、技能");
+  await expect(detail).toContainText("npm:pi-legacy-theme");
+  await expect(detail.getByRole("button", { name: "源码仓库" })).toBeVisible();
+  await detail.getByRole("button", { name: "安装", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "安装 Pi 扩展包" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("textbox")).toHaveValue("npm:pi-legacy-theme");
 });
 
 test("keeps a dense resource-package catalog in the shared document scroll and explains the selected package", async ({ page }) => {

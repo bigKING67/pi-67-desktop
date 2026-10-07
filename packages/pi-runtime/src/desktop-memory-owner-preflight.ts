@@ -6,6 +6,7 @@ import {
 } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 import type { PackageSource, SettingsManager } from "@earendil-works/pi-coding-agent";
+import { RETIRED_MEMORY_OWNER_IDS } from "@pi67/domain";
 
 export type DesktopMemoryOwnerPreflightState =
   | "not-configured"
@@ -55,11 +56,6 @@ interface ExtensionSettingsSnapshot {
   packages?: PackageSource[];
   extensions?: string[];
 }
-
-const RETIRED_MEMORY_OWNER_IDS = new Set([
-  "pi-observational-memory",
-  "pi-hy-memory"
-]);
 
 /**
  * Resolve the third-party Context/Memory owners that Pi would attempt to load

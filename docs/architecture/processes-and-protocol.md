@@ -22,6 +22,13 @@ Main 经 `createAuthorizedIpcHandle`（`authorized-ipc.ts`）注册 invoke 通�
 都由 Main 原生对话框确认且默认取消；下载源探测拒绝重定向，避免公网地址把探测转到 loopback 或局域网。更新状态（`pi67:update-*` 结果与 `pi67:update-state-changed`）
 由 `@pi67/protocol` 的 `DesktopUpdateStateSchema` 定义并纳入 protocol revision；Main 按该类型构造，renderer 用
 `parseDesktopUpdateState` 校验后才使用。
+扩展市场（`pi67:package-market-browse/search/detail`）同样由 Main 持有：用 `net.fetch`（跟随系统代理）、
+拒绝重定向、10 秒超时、每次响应最多 2 MiB 读取 npm registry 的公开元数据；搜索只发往官方源或能应答
+`/-/v1/search` 的自定义源（公共镜像不提供搜索），详情按下载源候选顺序读取 `/<name>/latest`。`offline` 不发请求，
+`mirror-only` 不发搜索请求。Main 在 domain `normalizePackageMarket*` 中截断长度、去掉控制字符、丢弃发布者邮箱、
+只保留 npm 包页与 `https:` 仓库链接，热门 500 个包的浏览索引缓存在 `userData/package-manager/market-index.json`
+（6 小时内视为新鲜，可随时删除重建）；renderer 用 `parsePackageMarket*` 校验后才使用。安装仍走
+`extension.package.install` 与 Host package worker，市场不新增安装路径。
 原生通知请求、workspace id、workspace entry 请求、关闭检查点请求/响应以及 `pi67:agent-host-startup`/`pi67:agent-host-failed`
 的形状由 `desktop-bridge-messages.ts` 定义；Main 在形状校验之上保留路径包含等信任策略，renderer 丢弃不合规的 Host 状态事件。
 沙盒 preload 不能加载 protocol 运行时代码，其关闭检查点请求检查按同一 schema 内联。持久化状态（workbench layout、composer 草稿、

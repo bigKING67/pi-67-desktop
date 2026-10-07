@@ -358,6 +358,14 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   Other recommended third-party Packages remain user-initiated. `pi-hy-memory`,
   `@ff-labs/pi-fff`, and `@victor-software-house/pi-curated-themes` are retired from
   the default catalog.
+- The Extension marketplace (2026-10-07) lets users browse and search the public Pi
+  package ecosystem (npm `keywords:pi-package`, the population pi.dev lists) next to
+  the curated `桌面已适配` Packages. Nothing installs automatically; every install goes
+  through the same one-shot confirmation and `待确认` admission as a typed source.
+  Native-replaced Packages and conflicting Context/Memory owners are shown with their
+  reason but offer no install. Ecosystem metadata is untrusted public text: it is shown
+  verbatim (never machine-translated or rendered as HTML), there are no ratings, and
+  only download counts and publish dates order the list.
 - Managed OpenViking upgrades retain old runtime payloads until the same purpose
   succeeds: private startup/scope provisioning, verified team indexing, or a verified
   current team query. Main then retires only signed older same-purpose payloads,

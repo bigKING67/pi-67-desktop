@@ -1,11 +1,12 @@
 import { FileText, RefreshCw } from "lucide-react";
+import { useState } from "react";
 import { Button, Tab, TabList, TabPanel, Tabs } from "react-aria-components";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { useSettingsNavigation } from "./SettingsDraftGuard.js";
 import {
   useDesktopCapabilitySnapshot
 } from "./DesktopCapabilityPanels.js";
-import { ExtensionManagementWorkspace } from "./ExtensionManagementWorkspace.js";
+import { ExtensionManagementWorkspace, type ExtensionPackageView } from "./ExtensionManagementWorkspace.js";
 import { SessionResourcePanel } from "./SessionResourcePanel.js";
 import {
   SettingsNotice,
@@ -18,15 +19,22 @@ import styles from "./ExtensionSettingsWorkspace.module.css";
 import tabStyles from "./SettingsPrimitives.module.css";
 
 type CapabilityState = ReturnType<typeof useDesktopCapabilitySnapshot>;
+type ExtensionSettingsView = ExtensionPackageView | "bundled" | "local";
 
 export function ExtensionSettingsWorkspace() {
   const capability = useDesktopCapabilitySnapshot();
+  const [view, setView] = useState<ExtensionSettingsView>("installed");
+  // One tab level for the page: the two third-party Package views sit beside bundled and local Extensions.
   return (
-    <Tabs className={styles.workspace!} defaultSelectedKey="packages" data-testid="extension-settings-workspace">
+    <Tabs
+      className={styles.workspace!}
+      data-testid="extension-settings-workspace"
+      selectedKey={view}
+      onSelectionChange={(key) => setView(String(key) as ExtensionSettingsView)}
+    >
       <TabList aria-label="扩展管理分类" className={tabStyles.tabList!}>
-        <Tab className={tabStyles.tab!} id="packages">
-          扩展包
-        </Tab>
+        <Tab className={tabStyles.tab!} id="installed">已安装</Tab>
+        <Tab className={tabStyles.tab!} id="market">扩展市场</Tab>
         <Tab className={tabStyles.tab!} id="bundled">
           内置扩展
         </Tab>
@@ -34,9 +42,15 @@ export function ExtensionSettingsWorkspace() {
           本地扩展
         </Tab>
       </TabList>
-      <TabPanel className={`${tabStyles.tabPanel} ${styles.packagePanel}`} id="packages">
-        <ExtensionManagementWorkspace capability={capability} />
-      </TabPanel>
+      {(["installed", "market"] as const).map((packageView) => (
+        <TabPanel className={`${tabStyles.tabPanel} ${styles.packagePanel}`} id={packageView} key={packageView}>
+          <ExtensionManagementWorkspace
+            capability={capability}
+            view={packageView}
+            onShowInstalled={() => setView("installed")}
+          />
+        </TabPanel>
+      ))}
       <TabPanel className={tabStyles.tabPanel!} id="bundled">
         <BundledExtensionPanel capability={capability} />
       </TabPanel>

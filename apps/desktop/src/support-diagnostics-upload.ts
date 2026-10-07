@@ -8,6 +8,7 @@ import {
   type SupportDiagnosticsDocument,
   type SupportDiagnosticsUploadReceipt
 } from "@pi67/support-contract";
+import { readBoundedResponseText as readBoundedText, ResponseTooLargeError } from "./bounded-response-text.js";
 
 const SUPPORT_DIAGNOSTICS_UPLOAD_TIMEOUT_MS = 15_000;
 const MAX_RECEIPT_RESPONSE_BYTES = 8 * 1024;
@@ -116,22 +117,12 @@ function parseReceipt(value: string): SupportDiagnosticsUploadReceipt {
 }
 
 async function readBoundedResponseText(response: Response): Promise<string> {
-  if (!response.body) return "";
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let bytes = 0;
-  let output = "";
-  while (true) {
-    const chunk = await reader.read();
-    if (chunk.done) break;
-    bytes += chunk.value.byteLength;
-    if (bytes > MAX_RECEIPT_RESPONSE_BYTES) {
-      await reader.cancel();
-      throw new Error("诊断上传服务返回了过大的回执，请改用本地导出。");
-    }
-    output += decoder.decode(chunk.value, { stream: true });
+  try {
+    return await readBoundedText(response, MAX_RECEIPT_RESPONSE_BYTES);
+  } catch (error) {
+    if (error instanceof ResponseTooLargeError) throw new Error("诊断上传服务返回了过大的回执，请改用本地导出。");
+    throw error;
   }
-  return output + decoder.decode();
 }
 
 function isAbortError(error: unknown): boolean {

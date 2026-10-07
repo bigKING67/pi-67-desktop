@@ -25,6 +25,13 @@ import {
   RepositorySubmoduleInitializationResultSchema
 } from "./repository-environment-schema.js";
 import { DesktopUpdateStateSchema } from "./desktop-update-state.js";
+import {
+  PackageMarketBrowseResultSchema,
+  PackageMarketDetailRequestSchema,
+  PackageMarketDetailResultSchema,
+  PackageMarketSearchRequestSchema,
+  PackageMarketSearchResultSchema
+} from "./package-market.js";
 import { EVENT_CONTEXT_REQUIREMENTS } from "./event-context.js";
 import { COMMAND_CONTEXT_SCOPE_REQUIREMENTS } from "./protocol-context.js";
 import { REPLAY_SAFE_CONTROL_MUTATION_TYPES, REPLAY_SAFE_OPERATION_ACK_TYPES } from "./replay-safe-commands.js";
@@ -84,6 +91,13 @@ export function canonicalProtocolRevisionMaterial(): string {
     events: EventPayloadSchemas,
     desktop: {
       updateState: DesktopUpdateStateSchema,
+      packageMarket: {
+        browseResult: PackageMarketBrowseResultSchema,
+        searchRequest: PackageMarketSearchRequestSchema,
+        searchResult: PackageMarketSearchResultSchema,
+        detailRequest: PackageMarketDetailRequestSchema,
+        detailResult: PackageMarketDetailResultSchema
+      },
       bridge: {
         workspaceId: WorkspaceIdSchema,
         nativeNotificationRequest: NativeNotificationRequestSchema,

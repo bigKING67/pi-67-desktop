@@ -1,23 +1,14 @@
 import type {
-  DesktopRecommendedPackage,
   ExtensionPackageEntry,
   ExtensionPackageOnboardingState
 } from "@pi67/domain";
 import {
-  CheckCircle2,
-  Download,
   PackagePlus,
   RefreshCw,
   Search
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import {
-  Button,
-  Tab,
-  TabList,
-  TabPanel,
-  Tabs
-} from "react-aria-components";
+import { Button } from "react-aria-components";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { useDesktopCapabilitySnapshot } from "./DesktopCapabilityPanels.js";
 import {
@@ -47,9 +38,10 @@ import {
   packageRowEnabled
 } from "./extension-management-model.js";
 import { SettingsInfo } from "./SettingsPrimitives.js";
+import { PackageMarket } from "./PackageMarket.js";
 import styles from "./ExtensionManagementWorkspace.module.css";
 
-type ExtensionView = "installed" | "discover";
+export type ExtensionPackageView = "installed" | "market";
 type PackageFocusTarget = { action: "details" | "update"; key: string }
   | { action: "detail-back" | "updates-filter" };
 
@@ -60,8 +52,11 @@ const FILTERS: ReadonlyArray<{ id: PackageFilter; label: string }> = [
   { id: "updates", label: "可更新" }
 ];
 
-export function ExtensionManagementWorkspace({ capability }: {
+/** Third-party Package views; the page-level tab list in ExtensionSettingsWorkspace selects `view`. */
+export function ExtensionManagementWorkspace({ capability, view, onShowInstalled }: {
   capability: ReturnType<typeof useDesktopCapabilitySnapshot>;
+  view: ExtensionPackageView;
+  onShowInstalled: () => void;
 }) {
   const scope = useWorkbenchStore((state) => state.settingsScope);
   const workspaceId = useWorkbenchStore((state) => state.settingsWorkspaceId ?? state.currentWorkspaceId);
@@ -72,7 +67,6 @@ export function ExtensionManagementWorkspace({ capability }: {
   const updates = useExtensionPackageStore((state) => state.updates);
   const phase = useExtensionPackageStore((state) => state.phase);
   const packageError = useExtensionPackageStore((state) => state.error);
-  const [view, setView] = useState<ExtensionView>("installed");
   const [filter, setFilter] = useState<PackageFilter>("all");
   const [query, setQuery] = useState("");
   const [selectedKey, setSelectedKey] = useState<string>();
@@ -133,6 +127,10 @@ export function ExtensionManagementWorkspace({ capability }: {
   const enabledCount = rows.filter(packageRowEnabled).length;
   const disabledCount = rows.length - enabledCount;
   const updateCount = rows.filter((row) => row.update !== undefined).length;
+  const installedSources = useMemo(
+    () => items.filter((item) => item.installed).map((item) => item.source),
+    [items]
+  );
 
   useEffect(() => {
     if (!focusTarget || pending) return;
@@ -161,7 +159,7 @@ export function ExtensionManagementWorkspace({ capability }: {
     if (!completed) return;
     setInstallOpen(false);
     setInstallSource("");
-    setView("installed");
+    onShowInstalled();
   };
   const confirmOnboardingInstall = async () => {
     if (!workspaceId || !promptOncePackage) return;
@@ -205,52 +203,10 @@ export function ExtensionManagementWorkspace({ capability }: {
       data-testid="extension-management-workspace"
       ref={workspaceRef}
     >
-      <Tabs
-        className={styles.tabs!}
-        selectedKey={view}
-        onSelectionChange={(key) => {
-          const nextView = String(key) as ExtensionView;
-          setView(nextView);
-          setDetailOpen(false);
-          restoreCatalogScrollRef.current = false;
-        }}
-      >
-        <div className={styles.commandBand}>
-          <div className={styles.viewSwitch}>
-            <TabList aria-label="Pi 扩展包管理视图" className={styles.tabList!}>
-              <Tab className={styles.tab!} id="installed">已安装 <span>{rows.length}</span></Tab>
-              <Tab className={styles.tab!} id="discover">
-                发现扩展包 <span>{capability.snapshot?.recommendedExternal.length ?? 0}</span>
-              </Tab>
-            </TabList>
-            {/* The authorization boundary sits beside the view switch it governs, as an ⓘ. */}
-            <SettingsInfo label="扩展包授权说明">
-              已启用且内容已确认的扩展包，在可信工作区的 AUTO 模式下可直接执行其工具；删除操作仍需确认，未知、重复或内容漂移的来源继续阻止。
-            </SettingsInfo>
-          </div>
-          <div className={styles.primaryActions}>
-            <Button
-              className="secondary-button"
-              isDisabled={!workspaceId || busy}
-              onPress={() => void checkUpdates()}
-            >
-              <RefreshCw aria-hidden="true" size={14} />
-              {phase === "checking" ? "检查中…" : updateCount > 0 ? `更新可用 ${updateCount}` : "检查更新"}
-            </Button>
-            <Button
-              className="primary-button"
-              isDisabled={!workspaceId || busy}
-              onPress={() => openInstall()}
-            >
-              <PackagePlus aria-hidden="true" size={14} />安装扩展包
-            </Button>
-          </div>
-        </div>
-
-        <TabPanel
+      {view === "installed" ? (
+        <div
           className={`${styles.tabPanel} ${styles.installedPanel}`}
           data-detail-open={detailOpen || undefined}
-          id="installed"
         >
           <div className={styles.installedToolbar}>
             <label className={styles.packageSearch}>
@@ -279,6 +235,27 @@ export function ExtensionManagementWorkspace({ capability }: {
                   {item.id === "updates" ? <span>{updateCount}</span> : null}
                 </Button>
               ))}
+            </div>
+            <div className={styles.primaryActions}>
+              {/* The authorization boundary sits beside the actions it governs, as an ⓘ. */}
+              <SettingsInfo label="扩展包授权说明">
+                已启用且内容已确认的扩展包，在可信工作区的 AUTO 模式下可直接执行其工具；删除操作仍需确认，未知、重复或内容漂移的来源继续阻止。
+              </SettingsInfo>
+              <Button
+                className="secondary-button"
+                isDisabled={!workspaceId || busy}
+                onPress={() => void checkUpdates()}
+              >
+                <RefreshCw aria-hidden="true" size={14} />
+                {phase === "checking" ? "检查中…" : updateCount > 0 ? `更新可用 ${updateCount}` : "检查更新"}
+              </Button>
+              <Button
+                className="primary-button"
+                isDisabled={!workspaceId || busy}
+                onPress={() => openInstall()}
+              >
+                <PackagePlus aria-hidden="true" size={14} />安装扩展包
+              </Button>
             </div>
           </div>
 
@@ -317,19 +294,15 @@ export function ExtensionManagementWorkspace({ capability }: {
               updateDisabled={busy}
             />
           </div>
-        </TabPanel>
-
-        <TabPanel className={styles.tabPanel!} id="discover">
-          <DiscoverExtensions
-            entries={capability.snapshot?.recommendedExternal ?? []}
-            error={capability.error}
-            installed={items}
-            loading={capability.phase === "loading"}
-            onInstall={openInstall}
-          />
-        </TabPanel>
-
-      </Tabs>
+        </div>
+      ) : (
+        <PackageMarket
+          curated={capability.snapshot?.recommendedExternal ?? []}
+          installDisabled={!workspaceId || busy}
+          installedSources={installedSources}
+          onInstall={openInstall}
+        />
+      )}
 
       {installOpen ? (
         <InstallExtensionDialog
@@ -362,51 +335,6 @@ export function ExtensionManagementWorkspace({ capability }: {
           onInstall={() => void confirmOnboardingInstall()}
         />
       ) : null}
-    </section>
-  );
-}
-
-function DiscoverExtensions({ entries, installed, loading, error, onInstall }: {
-  entries: DesktopRecommendedPackage[];
-  installed: ExtensionPackageEntry[];
-  loading: boolean;
-  error: string | undefined;
-  onInstall: (source: string) => void;
-}) {
-  return (
-    <section className={styles.discoverSurface}>
-      <header>
-        <span className={styles.eyebrow}>可信来源目录</span>
-        <h2>推荐扩展包</h2>
-        <p>推荐项不会自动安装。安装并确认内容后，AUTO 会授权其已验证工具；安装前仍会确认来源和作用域。</p>
-      </header>
-      {error ? <p className={styles.errorBanner} role="alert">{error}</p> : null}
-      {loading && entries.length === 0 ? <p className={styles.panelEmpty}>正在读取推荐目录…</p> : null}
-      {!loading && entries.length === 0 ? <p className={styles.panelEmpty}>当前目录没有推荐的第三方扩展包。</p> : null}
-      <ul className={styles.discoveryList}>
-        {entries.map((entry) => {
-          const isInstalled = installed.some((item) => item.source === entry.source && item.installed);
-          return (
-            <li key={entry.id}>
-              <span className={styles.discoveryIdentity}>
-                <strong>{entry.id}</strong>
-                <small>{entry.source}</small>
-              </span>
-              <span className={styles.recommendedVersion}>
-                {entry.recommendedVersion ? `推荐 ${entry.recommendedVersion}` : `commit ≥ ${entry.minimumCommit?.slice(0, 10)}`}
-              </span>
-              {isInstalled
-                ? <span className={styles.installedLabel}><CheckCircle2 aria-hidden="true" size={14} />已安装</span>
-                : <Button className="secondary-button" onPress={() => onInstall(entry.source)}>
-                    <Download aria-hidden="true" size={14} />安装
-                  </Button>}
-            </li>
-          );
-        })}
-      </ul>
-      <p className={styles.discoveryFootnote}>
-        npm 与 Git 可使用下载源设置中的公共镜像；包完整性、固定 commit 和最终运行时状态仍独立校验。
-      </p>
     </section>
   );
 }
