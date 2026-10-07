@@ -295,9 +295,9 @@
 .modelRuntimeControl {
   display: grid;
   min-width: 0;
-  /* Room for the brand mark plus a typical model name; it still shrinks before the toolbar wraps. */
+  /* Sized to the mark plus the model name, up to 240px; it still shrinks before the toolbar wraps. */
   max-width: 240px;
-  flex: 1 1 88px;
+  flex: 0 1 auto;
   gap: 3px;
 }
 
