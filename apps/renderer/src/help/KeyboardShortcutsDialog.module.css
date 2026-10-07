@@ -19,8 +19,7 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  padding: 16px 16px 13px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px 16px 8px;
 }
 
 .headingIcon {
@@ -28,7 +27,7 @@
   width: 34px;
   height: 34px;
   place-items: center;
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: var(--surface-muted);
   color: var(--accent-strong);
 }
@@ -55,7 +54,7 @@
   height: 30px;
   place-items: center;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-tertiary);
 }
@@ -77,11 +76,6 @@
   align-items: center;
   gap: 16px;
   min-height: 58px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
-}
-
-.row:last-child {
-  border-bottom: 0;
 }
 
 .row > span {
@@ -93,7 +87,7 @@
 .row strong {
   color: var(--text-primary);
   font-size: var(--font-size-interface);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
 }
 
 .row small {
@@ -107,20 +101,18 @@
 .row kbd {
   min-width: 62px;
   padding: 5px 7px;
-  border: 1px solid var(--border-strong);
-  border-bottom-color: color-mix(in srgb, var(--border-strong) 72%, var(--text-primary));
-  border-radius: 6px;
-  background: var(--surface-muted);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--surface-active);
   color: var(--text-secondary);
-  font-family: var(--font-code);
+  font-family: var(--font-ui);
   font-size: var(--font-size-caption);
   text-align: center;
   white-space: nowrap;
 }
 
 .dialog > footer {
-  padding: 10px 16px 12px;
-  border-top: 1px solid var(--border);
+  padding: 8px 16px 14px;
   color: var(--text-tertiary);
   font-size: var(--font-size-caption);
   line-height: 1.45;

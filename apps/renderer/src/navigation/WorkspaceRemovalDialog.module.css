@@ -25,10 +25,10 @@
 .dialog code {
   padding: 9px 10px;
   overflow: hidden;
-  border: 1px solid var(--border);
   border-radius: var(--radius-control);
   background: var(--surface-muted);
   color: var(--text-secondary);
+  font-family: var(--font-code);
   font-size: var(--font-size-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -40,7 +40,7 @@
   border: 1px solid var(--danger);
   border-radius: var(--radius-control);
   background: var(--danger);
-  color: var(--surface-raised);
+  color: var(--text-on-danger);
   font-size: var(--font-size-support);
   font-weight: var(--font-weight-semibold);
 }

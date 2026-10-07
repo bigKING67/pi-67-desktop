@@ -21,7 +21,7 @@
 }
 .dialog p { color: var(--text-secondary); font-size: var(--font-size-support); line-height: 1.6; }
 .field { display: grid; gap: 6px; }
-.field label { color: var(--text-secondary); font-size: var(--font-size-caption); font-weight: var(--font-weight-semibold); }
+.field label { color: var(--text-secondary); font-size: var(--font-size-caption); font-weight: var(--font-weight-medium); }
 .field input,
 .searchField input {
   min-width: 0;
@@ -38,7 +38,7 @@
 .textButton { padding: 6px 0; border: 0; background: transparent; color: var(--accent-strong); font-size: var(--font-size-support); }
 .archiveHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .archiveHeader > div { display: grid; gap: 4px; }
-.iconButton { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 7px; background: transparent; color: var(--text-secondary); }
+.iconButton { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-secondary); }
 .iconButton:hover,
 .iconButton[data-hovered] {
   background: var(--surface-hover);
@@ -54,9 +54,8 @@
   outline: none;
 }
 .searchField { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-muted); color: var(--text-secondary); }
-.archiveList { display: grid; min-height: 180px; max-height: 480px; overflow-y: auto; border-block: 1px solid var(--border); }
-.archiveRow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 12px 4px; border-bottom: 1px solid var(--border); }
-.archiveRow:last-child { border-bottom: 0; }
+.archiveList { display: grid; min-height: 180px; max-height: 480px; overflow-y: auto; }
+.archiveRow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 12px 4px; }
 .archiveRow > svg { color: var(--text-tertiary); }
 .archiveRow > span { display: grid; min-width: 0; gap: 3px; }
 .archiveRow strong { overflow: hidden; font-size: var(--font-size-interface); text-overflow: ellipsis; white-space: nowrap; }
@@ -66,12 +65,14 @@
   line-height: 1.45;
 }
 .archiveRow > div { display: flex; gap: 6px; }
-.rowButton, .rowPrimaryButton, .loadMore { min-height: 30px; padding: 0 9px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--surface-raised); color: var(--text-primary); font-size: var(--font-size-support); }
+.rowButton, .rowPrimaryButton, .loadMore { min-height: 30px; padding: 0 9px; border: 0; border-radius: var(--radius-control); background: var(--surface-active); color: var(--text-primary); font-size: var(--font-size-support); }
+.rowButton[data-hovered],
+.loadMore[data-hovered] { background: color-mix(in srgb, var(--surface-active) 88%, var(--text-primary)); }
 .rowPrimaryButton {
-  border-color: var(--accent);
   background: var(--accent);
   color: var(--canvas);
 }
+.rowPrimaryButton[data-hovered] { background: var(--accent-strong); }
 
 .rowButton[data-disabled],
 .rowPrimaryButton[data-disabled],
@@ -88,7 +89,7 @@
   border: 1px solid var(--danger);
   border-radius: var(--radius-control);
   background: var(--danger);
-  color: white;
+  color: var(--text-on-danger);
   font: inherit;
   font-size: var(--font-size-support);
   font-weight: var(--font-weight-semibold);

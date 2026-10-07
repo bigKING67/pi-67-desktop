@@ -602,7 +602,7 @@
 .tree-node > button.is-active { background: var(--surface-active); }
 .tree-node > button > span:last-child { display: grid; min-width: 0; }
 .tree-node strong { font-size: var(--font-size-interface); }
-.tree-node small { overflow: hidden; color: var(--text-tertiary); font-family: var(--font-code); font-size: var(--font-size-caption); text-overflow: ellipsis; white-space: nowrap; }
+.tree-node small { overflow: hidden; color: var(--text-tertiary); font-family: var(--font-ui); font-size: var(--font-size-caption); text-overflow: ellipsis; white-space: nowrap; }
 .tree-rail { width: 7px; height: 7px; margin-top: 5px; border: 1px solid var(--border-strong); border-radius: 50%; background: var(--surface); }
 .is-active .tree-rail { border-color: var(--accent); background: var(--accent); }
 .metric-list { display: grid; gap: 1px; margin: 0 0 18px; }
@@ -668,7 +668,7 @@
 .modal-surface textarea {
   width: 100%;
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text-primary);
 }

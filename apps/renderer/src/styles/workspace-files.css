@@ -251,7 +251,7 @@
   height: 38px;
   padding: 0 10px;
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text-primary);
   font-size: var(--font-size-interface);

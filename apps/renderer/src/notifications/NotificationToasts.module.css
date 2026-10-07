@@ -16,8 +16,7 @@
   gap: 10px;
   padding: 11px 10px 11px 12px;
   border: 1px solid var(--border-strong);
-  border-left: 3px solid var(--info);
-  border-radius: 10px;
+  border-radius: var(--radius-overlay);
   background: var(--surface-raised);
   box-shadow: var(--shadow-floating);
   color: var(--text-primary);
@@ -25,9 +24,9 @@
   animation: toast-enter var(--motion-standard) var(--motion-ease-out);
 }
 
-.success { border-left-color: var(--success); }
-.warning { border-left-color: var(--warning); }
-.error { border-left-color: var(--danger); }
+/* Status is a tint plus the icon and its text, never a colored edge; only exceptions tint. */
+.warning { background: color-mix(in srgb, var(--warning) 8%, var(--surface-raised)); }
+.error { background: color-mix(in srgb, var(--danger) 8%, var(--surface-raised)); }
 
 .icon {
   margin-top: 2px;
@@ -85,7 +84,7 @@
   margin: -3px -3px 0 0;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-secondary);
   pointer-events: auto;
