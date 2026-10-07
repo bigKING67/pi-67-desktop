@@ -1,11 +1,10 @@
-/* Reading-first: the process is one quiet line under the request, separated by a hairline.
+/* Reading-first: the process is one quiet line under the request, separated by spacing.
    Expansion rules (open while running or unsuccessful) are unchanged. */
 .group {
   width: min(var(--conversation-track-width, 860px), calc(100% - 48px));
   min-width: 0;
   margin: 0 auto;
   padding: 12px 0;
-  border-top: 1px solid color-mix(in srgb, var(--border) 66%, transparent);
   color: var(--text-tertiary);
 }
 
@@ -101,7 +100,7 @@
 
 .steps {
   display: grid;
-  gap: 9px;
+  gap: 4px;
   margin: 8px 0 0;
   padding: 0 0 2px 25px;
   list-style: none;
@@ -115,7 +114,7 @@
 .step::before {
   position: absolute;
   z-index: 1;
-  top: 11px;
+  top: 10px;
   left: -21px;
   width: 7px;
   height: 7px;
@@ -127,20 +126,22 @@
 
 .step:not(:last-child)::after {
   position: absolute;
-  top: 19px;
-  bottom: -15px;
+  top: 18px;
+  bottom: -10px;
   left: -18px;
   width: 1px;
   background: color-mix(in srgb, var(--border) 60%, transparent);
   content: "";
 }
 
-/* Unlabelled narration starts on its first text line, so its node sits higher than labelled steps. */
-.step[data-process-step="narration"]::before {
+/* Narration and one-line reasoning start on their first text line, so their node sits higher than tool rows. */
+.step[data-process-step="narration"]::before,
+.step[data-process-step="reasoning"]::before {
   top: 6px;
 }
 
-.step[data-process-step="narration"]:not(:last-child)::after {
+.step[data-process-step="narration"]:not(:last-child)::after,
+.step[data-process-step="reasoning"]:not(:last-child)::after {
   top: 14px;
 }
 
@@ -160,13 +161,65 @@
   padding: 1px 0 3px;
 }
 
-.reasoning > span,
 .narration > span {
   display: block;
   margin-bottom: 3px;
   color: var(--text-tertiary);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-medium);
+}
+
+.reasoning > summary {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: baseline;
+  gap: var(--space-2);
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.reasoning > summary::-webkit-details-marker {
+  display: none;
+}
+
+.reasoning > summary:hover {
+  color: var(--text-secondary);
+}
+
+.reasoning > summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.reasoningLabel {
+  flex: none;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+}
+
+.reasoningPreview {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-size-support);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reasoningChevron {
+  flex: none;
+  align-self: center;
+  transition: transform var(--motion-fast) ease;
+}
+
+.reasoning[open] > summary {
+  margin-bottom: 3px;
+}
+
+.reasoning[open] .reasoningChevron {
+  transform: rotate(90deg);
 }
 
 .reasoning > div,
@@ -184,8 +237,8 @@
   width: fit-content;
   max-width: 100%;
   padding: 7px 9px;
-  border-left: 2px solid var(--warning);
-  background: color-mix(in srgb, var(--warning) 6%, transparent);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
   line-height: 1.5;
@@ -202,7 +255,7 @@
 .timelineStatus strong {
   color: var(--text-secondary);
   font-size: var(--font-size-interface);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-regular);
   line-height: 1.45;
 }
 
@@ -261,6 +314,7 @@
 @media (prefers-reduced-motion: reduce) {
   .highlighted,
   .chevron,
+  .reasoningChevron,
   .spinning {
     transition: none;
     animation: none;

@@ -145,9 +145,13 @@ export function ToolCard({
           ) : null}
         </div>
         <span className={styles.status}>
-          <StatusIcon className={effectiveStatus === "running" ? styles.spinning : undefined} size={14} aria-hidden="true" />
-          {/* Success is the expected outcome: its icon alone suffices; every other state stays spelled out. */}
-          {effectiveStatus === "completed" ? <span className="sr-only">{statusLabel}</span> : statusLabel}
+          {/* Success is the expected outcome: screen-reader text only; every other state keeps its icon and label. */}
+          {effectiveStatus === "completed" ? <span className="sr-only">{statusLabel}</span> : (
+            <>
+              <StatusIcon className={effectiveStatus === "running" ? styles.spinning : undefined} size={14} aria-hidden="true" />
+              {statusLabel}
+            </>
+          )}
         </span>
         <ChevronRight aria-hidden="true" className={styles.chevron} size={14} />
       </summary>

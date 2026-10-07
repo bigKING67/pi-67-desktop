@@ -1,5 +1,5 @@
 import type { ToolAuthorizationProjection } from "@pi67/domain";
-import { CheckCircle2, ChevronRight, FileSearch } from "lucide-react";
+import { ChevronRight, FileSearch } from "lucide-react";
 import { messages } from "../localization/message-catalog.js";
 import { ToolCard } from "../tool-cards/index.js";
 import type { ProcessRenderItem } from "./process-exploration.js";
@@ -31,8 +31,7 @@ export function TranscriptExplorationStep({
             <span className={styles.authorization} data-tool-authorization="auto">{autoReasons.join("，")}</span>
           ) : null}
         </span>
-        <CheckCircle2 aria-hidden="true" className={styles.status} size={14} />
-        <span className="sr-only">已完成</span>
+        <span className={styles.status}><span className="sr-only">已完成</span></span>
         <ChevronRight aria-hidden="true" className={styles.chevron} size={14} />
       </summary>
       <ol className={styles.calls}>

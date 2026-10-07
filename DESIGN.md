@@ -489,8 +489,11 @@ loading error where the operation can produce those states
 - Consecutive reasoning Assistant parts, progress narration, Tool Calls, and Tool
   Results form one execution disclosure in the Transcript. A process with Tools
   summarizes by outcome and then appends `N 次工具调用 · duration`; a process without
-  Tools falls back to `N 个步骤 · duration`. Within it, reasoning uses the
-  low-emphasis `分析` label (caption-size UI text, never a monospace uppercase eyebrow),
+  Tools falls back to `N 个步骤 · duration`. Within it, reasoning is its own collapsed
+  disclosure: the low-emphasis `分析` label (caption-size UI text, never a monospace
+  uppercase eyebrow) followed by a one-line, ellipsized preview of its latest sentence,
+  which keeps updating while it streams; opening it shows the full reasoning (2026-10-07,
+  so model thinking no longer pushes Tool steps off screen),
   narration reads as plain text whose `进度` role is screen-reader only, and each Tool Call is paired with its correlated Tool
   Result as one compact logical step; the call and result are never rendered as
   duplicate peer cards. Once the process has settled, two or more consecutive successful
@@ -499,25 +502,31 @@ loading error where the operation can produce those states
   paths) that restores every call in order and shows each distinct AUTO reason. While
   running, every call stays individual so visible steps never regroup; failed, cancelled,
   or unreconciled calls never join a group.
-  A successful step shows only its success icon (the label stays screen-reader text);
-  every other status keeps its visible label. Running calls take the primary text
-  role, AUTO reasons stay visible as regular-weight metadata, and a running process
+  A successful step carries no visible status mark (its label stays screen-reader text,
+  2026-10-07: a column of success checks was noise); every other status keeps its icon
+  and visible label. Tool names use medium weight and steps sit on a compact 32px row. Running calls take the primary text
+  role, AUTO reasons stay visible as regular-weight metadata, transient timeline
+  statuses (`正在准备任务`, `继续处理`) use regular weight, and a running process
   header adds a `m:ss` clock that is excluded from its live-region announcements. An unmatched legacy Tool Result remains one explicitly inspectable
   compatibility step. This includes visible reasoning carried beside final text in
   one Assistant record: the reasoning belongs to the process while the text remains
   the final answer. The current process is expanded while work is running and
   collapses automatically only after the Operation completes with a visible final
   answer. Failure, cancellation, loss, and completion without a final answer remain
-  expanded for diagnosis. Expanding a settled group restores every reasoning part,
-  bounded Tool step, and bounded Tool Result in source order; collapse never removes
+  expanded for diagnosis. Expanding a settled group restores every reasoning
+  disclosure, bounded Tool step, and bounded Tool Result in source order; collapse never removes
   process data. The final Assistant answer remains an ordinary editorial Markdown
   message outside that process surface. Pi JSONL remains the conversation source of
   truth; this hierarchy is a disposable Renderer projection.
 - Reading-first hierarchy: the final Assistant answer is the primary result. It keeps
   editorial Markdown with more vertical room, a quiet secondary author line, and a lead
   paragraph at the section role when the answer opens with a paragraph. The process
-  summary is one support-size, medium-weight line separated from the request by a
-  hairline; this changes emphasis only, never the expansion rules above. The empty
+  summary is one support-size, medium-weight line separated from the request by
+  spacing, not a hairline; this changes emphasis only, never the expansion rules above.
+  Blocking notices, failed-delivery errors and legacy thinking blocks use a rounded tint
+  without a colored edge; message timestamps use the UI face with tabular figures.
+  The plan proposal card is the framed decision card of the Transcript: panel radius,
+  `surface-raised` fill and the composer shadow. The empty
   Transcript is one left-aligned column with a display heading, the existing guidance,
   and flat starter rows separated by hairlines (44px minimum target, trailing arrow).
   The empty Transcript and the New Session Intent surface sit directly on the Composer

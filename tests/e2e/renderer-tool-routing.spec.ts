@@ -165,6 +165,30 @@ test("keeps visible final-answer reasoning in the collapsible execution process"
   await expect(page.getByText("先检查实际源码，再形成结论。", { exact: true })).toBeVisible();
 });
 
+test("collapses reasoning to its latest sentence until it is opened", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page, [{
+    id: "assistant-long-reasoning",
+    role: "assistant",
+    parts: [
+      { type: "thinking", text: "先读 README。\n\n再核对 package.json。最后汇总结构。" },
+      { type: "text", text: "最终回答" }
+    ]
+  }]);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  const process = page.getByTestId("transcript-process-group");
+  await process.locator(":scope > summary").click();
+  const reasoning = process.getByRole("group", { name: "模型推理" });
+  await expect(reasoning).not.toHaveAttribute("open", "");
+  await expect(reasoning.locator("summary")).toHaveText(/分析\s*最后汇总结构。/u);
+  await expect(reasoning.getByText("先读 README。")).toHaveCount(0);
+
+  await reasoning.locator("summary").click();
+  await expect(reasoning.getByText("先读 README。")).toBeVisible();
+  await expect(reasoning.locator("summary")).toHaveText("分析");
+});
+
 test("shows an empty model response as a recoverable error instead of unsupported content", async ({ page }) => {
   await page.goto("/");
   await attachMockAgent(page, [{

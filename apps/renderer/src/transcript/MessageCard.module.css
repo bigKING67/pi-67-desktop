@@ -189,7 +189,7 @@
 .error {
   margin-top: 10px;
   padding: var(--space-2) 10px;
-  border-left: 2px solid var(--danger);
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--danger) 8%, transparent);
   color: var(--danger);
   font-size: var(--font-size-support);
@@ -198,7 +198,8 @@
 .thinking {
   margin: 0 0 var(--space-3);
   padding: var(--space-2) 10px;
-  border-left: 2px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
   color: var(--text-secondary);
   font-size: var(--font-size-support);
 }
@@ -207,8 +208,8 @@
   margin-bottom: 6px;
   color: var(--text-tertiary);
   cursor: default;
-  font-family: var(--font-code);
   font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
 }
 
 .visionEvidence {
@@ -475,7 +476,6 @@
 
 .timestamp {
   padding: 0 6px;
-  font-family: var(--font-code);
   font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

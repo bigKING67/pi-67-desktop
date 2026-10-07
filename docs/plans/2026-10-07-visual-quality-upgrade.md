@@ -29,11 +29,11 @@ pixels or assets. Message actions stay visible at rest rather than hover-only.
 ## Phases
 | Phase | Scope | State |
 | --- | --- | --- |
-| 0 Rules | DESIGN `Visual quality bar`, Color wording, this plan | done (uncommitted) |
+| 0 Rules | DESIGN `Visual quality bar`, Color wording, this plan | committed `72506802` |
 | 1 Quiet chrome | Origin line, turn hairlines, thinking value, context ring, Prompt Stash, palette highlight, unnamed subtitle | committed `f1db0215` |
 | 2 Layout | Inspector closed by default, centered empty entry, centered stopped/resume surface | committed `f7ecf0a4`, `68cf9fb9` |
-| 3 Agent experience | Execution timeline compaction done (`3ea6a086`). Remaining: tool step and expanded-output framing, decision cards (approval, plan confirmation), error/thinking colored edges → tints. Capture a packaged running-state screenshot first, then offer two directions | in progress |
-| 4 Remaining surfaces | Dialogs and context overlays, Team Chat, Inspector panels (Files, Changes, Memory), Composer pickers, remaining Settings editors (Provider configuration, Extension management), light-mode surface step | pending |
+| 3 Agent experience | Timeline compaction (`3ea6a086`). Direction A "quiet timeline" chosen over a pinned progress strip: one-line reasoning preview, no visible success marks, medium tool names, 32px rows, no request hairline, tints instead of colored edges, UI-face timestamps, lifted plan card | done (this commit series) |
+| 4 Remaining surfaces | Approval dialog (proposal first: it carries security copy), dialogs and context overlays, Team Chat, Inspector panels (Files, Changes, Memory), Composer pickers, remaining Settings editors (Provider configuration, Extension management), Tool summary width cap (360px truncates commands), light-mode surface step | in progress |
 
 Settings quiet-list convergence (`1c420581`) already covers the Settings catalogs
 and is re-audited, not redone, in phase 4.
@@ -52,6 +52,8 @@ a surface step or rely on the light-mode hairline allowance.
   framed Transcript element; status tints replace colored edges.
 - Light mode may keep low-contrast hairlines where no surface step exists;
   dark mode separates by luminance.
+- 2026-10-07: AUTO reasons stay on tool rows (PRODUCT security traceability), even
+  though the direction-A mock omitted them.
 
 ## Rollback
 Each phase lands as its own commits; revert that phase's commits. Token value
@@ -61,6 +63,6 @@ changes are confined to one commit per phase so they can be reverted alone.
 - [x] Phase 0 rules and plan
 - [x] Phase 1 quiet chrome
 - [x] Phase 2 layout
-- [ ] Phase 3 running-state screenshot and two directions
-- [ ] Phase 3 implementation and packaged evidence
+- [x] Phase 3 running-state screenshot and two directions (A chosen 2026-10-07)
+- [x] Phase 3 implementation and packaged evidence (macOS dark; light unverified)
 - [ ] Phase 4 surface audit and implementation

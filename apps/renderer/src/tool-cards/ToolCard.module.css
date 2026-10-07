@@ -29,11 +29,11 @@
   display: grid;
   width: 100%;
   max-width: 100%;
-  min-height: 36px;
+  min-height: 32px;
   grid-template-columns: 20px minmax(0, 1fr) auto 14px;
   align-items: center;
   gap: 7px;
-  padding: 6px 8px;
+  padding: 4px 8px;
   border: 1px solid transparent;
   border-radius: var(--radius-control);
   background: transparent;
@@ -92,7 +92,7 @@
 .titleRow strong {
   color: var(--text-secondary);
   font-size: var(--font-size-interface);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
   white-space: nowrap;
 }
 
@@ -133,14 +133,7 @@
   white-space: nowrap;
 }
 
-/* Completion is the normal state: a quiet label with only the check in the success role. */
-.status-completed .status {
-  color: var(--text-tertiary);
-}
-
-.status-completed .status svg {
-  color: var(--success);
-}
+/* Completion is the normal state and carries no visible mark; only exceptions are labelled. */
 
 .status-failed .header {
   background: color-mix(in srgb, var(--danger) 8%, transparent);

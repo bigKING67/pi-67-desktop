@@ -3,8 +3,9 @@
   margin: 10px auto 16px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--surface-raised) 97%, var(--accent) 3%);
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-composer);
 }
 
 .header,

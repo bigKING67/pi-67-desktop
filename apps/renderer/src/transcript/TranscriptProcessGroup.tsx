@@ -24,6 +24,7 @@ import { processItemUnsuccessful } from "./transcript-rows.js";
 import { groupExplorationRuns } from "./process-exploration.js";
 import { TranscriptExplorationStep } from "./TranscriptExplorationStep.js";
 import { ElapsedClock } from "./elapsed-clock.js";
+import { reasoningPreview } from "./reasoning-preview.js";
 import styles from "./TranscriptProcessGroup.module.css";
 
 type ProcessGroupRow = Extract<TranscriptRow, { kind: "process-group" }>;
@@ -262,12 +263,25 @@ function ProcessItem({
   );
 }
 
+// Reasoning is supporting detail: one line with its latest sentence, full text on demand.
 function Reasoning({ text, streaming = false }: { text: string; streaming?: boolean }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div className={styles.reasoning} aria-label="模型推理">
-      <span>分析</span>
-      <TranscriptMarkdownView mode={streaming ? "streaming" : "settled"}>{text}</TranscriptMarkdownView>
-    </div>
+    <details
+      className={styles.reasoning}
+      aria-label="模型推理"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary>
+        <span className={styles.reasoningLabel}>分析</span>
+        {open ? null : <span className={styles.reasoningPreview}>{reasoningPreview(text)}</span>}
+        <ChevronRight className={styles.reasoningChevron} size={12} aria-hidden="true" />
+      </summary>
+      {open ? (
+        <TranscriptMarkdownView mode={streaming ? "streaming" : "settled"}>{text}</TranscriptMarkdownView>
+      ) : null}
+    </details>
   );
 }
 
