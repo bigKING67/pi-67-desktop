@@ -89,9 +89,10 @@ completing a real session without learning terminal UI conventions first.
   recolor, decorate or replace it with a mode icon. Public brand copy expresses
   `用 AI 创造新的价值。`
 - Brand identity and mode identity are separate: Work uses a bull and Chat uses a
-  horse inside the `工作 | 聊天` mode switch (see `Team Chat`). The bull is a
-  Desktop-owned 24px-grid, 2px round-stroke glyph matching Lucide; the horse is
-  Lucide `ChessKnight`. Do not explain private wordplay in product copy or add
+  horse inside the `工作 | 聊天` mode switch (see `Team Chat`), both shown as animals
+  at work (2026-10-07). Work is a Desktop-owned 24px-grid, 2px round-stroke plough ox
+  with long working horns and a nose ring; Chat is the `@lucide/lab` `horseHead` (ISC)
+  wearing a Desktop-drawn bridle (noseband and cheekpiece). Do not explain private wordplay in product copy or add
   financial symbols.
 - Native application assets remain the existing white rotationally symmetric
   glyph on a black rounded square. Technical release identifiers retain
@@ -209,10 +210,12 @@ Application-level surfaces use a separate wide-window shell:
   whitespace, indentation, and restrained current/selected surfaces rather than
   full-width horizontal dividers; hard lines remain reserved for pane boundaries
   or distinct semantic subsections.
-- Workspace group identity uses a 16px rounded-stroke Folder icon in a fixed
-  20px slot, without a separate background, border, or name-derived initial.
-  The full group header owns the rounded hover/current surface using the control
-  radius; the disclosure arrow alone indicates expansion. Light and Dark share
+- Workspace group identity uses a 16px rounded-stroke folder icon in a fixed
+  20px slot, without a separate background, border, or name-derived initial: an
+  open folder (`FolderOpen`) while the group is expanded and a closed `Folder`
+  while collapsed (2026-10-07), echoing the disclosure arrow, which remains the
+  control. The full group header owns the rounded hover/current surface using the
+  control radius. Light and Dark share
   this treatment and use semantic icon and surface colors.
 - The Title Bar contains navigation, the current Workspace/conversation title,
   status, notifications, command actions, and the Inspector toggle. It contains

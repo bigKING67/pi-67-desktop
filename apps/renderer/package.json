@@ -11,6 +11,7 @@
   "dependencies": {
     "@codemirror/language-data": "6.5.2",
     "@lobehub/icons-static-svg": "1.95.1",
+    "@lucide/lab": "0.7.0",
     "@pi67/domain": "workspace:*",
     "@pi67/protocol": "workspace:*",
     "codemirror": "6.0.2",

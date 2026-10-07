@@ -197,6 +197,9 @@ importers:
       '@lobehub/icons-static-svg':
         specifier: 1.95.1
         version: 1.95.1
+      '@lucide/lab':
+        specifier: 0.7.0
+        version: 0.7.0
       '@pi67/domain':
         specifier: workspace:*
         version: link:../../packages/domain
@@ -1115,6 +1118,9 @@ packages:
 
   '@lobehub/icons-static-svg@1.95.1':
     resolution: {integrity: sha512-Hw7EPPgVnC4NZLXBfTNJG6hyQgqECfUPC11VVXodPSr1aebKcFxDZlSpxhWwYNdCc6bhxps/x5TtXoPmfKH2ag==}
+
+  '@lucide/lab@0.7.0':
+    resolution: {integrity: sha512-Cy4z/LUtre/XnnWTIRfgAxSB2+OGF4oqZczgYr05iRa7ecNtDKVDmTbPc4Ak8LkJYj7jGGN+AfkR9MYgXmdRRA==}
 
   '@malept/cross-spawn-promise@2.0.0':
     resolution: {integrity: sha512-1DpKU0Z5ThltBwjNySMC14g0CkbyhCaz9FkhxqNsZI6uAPJXFS8cMXlBKo26FJ8ZuW6S9GCMcR9IO5k2X5/9Fg==}
@@ -5912,6 +5918,8 @@ snapshots:
       '@lezer/lr': 1.4.10
 
   '@lobehub/icons-static-svg@1.95.1': {}
+
+  '@lucide/lab@0.7.0': {}
 
   '@malept/cross-spawn-promise@2.0.0':
     dependencies:
