@@ -718,6 +718,11 @@ loading error where the operation can produce those states
   costs use the UI face with tabular figures, while model and child identifiers keep
   the code face. A resource row keeps its status dot because it is the only visible
   status signal; a completed agent's dot is transparent beside its visible state label.
+- Shared `.section-label` group labels (Inspector context, memory, experience, agents,
+  Extension catalog) use the UI face at support size, medium weight and secondary text,
+  never monospace, uppercase or letter-spacing. Inspector Extension catalog cards are
+  unframed group fills without inner dividers; their count uses tabular figures. The
+  Settings flat catalog keeps its quiet-list rows.
 - The primary order is `文件 / 修改 / 消息 / 代理 / 上下文`; Files is the default. The Files
   root preserves expansion, search, selection, and scroll state while the
   Inspector stays mounted. Directories load in pages of at most 200 entries.
@@ -2139,7 +2144,8 @@ loading error where the operation can produce those states
   model Prompts. `/plan` selects Plan Mode and `/default` restores execute mode.
   Pi-resolved Extension commands, Prompt Templates, and Skills such as
   `/skill:<name>` retain distinct source labels and their normal Runtime or Prompt
-  path. Arrow keys move the active row without mutating the textarea. Click
+  path. The source is shown once as the group heading; each row keeps it as
+  screen-reader text rather than repeating a visible per-row badge. Arrow keys move the active row without mutating the textarea. Click
   and Tab insert. Enter executes an exact command, but completes a partial token;
   Escape dismisses, and IME confirmation never selects, executes, or sends.
   `/name 新标题` uses the same rename Controller as the row menu; bare `/name`

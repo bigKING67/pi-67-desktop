@@ -82,8 +82,9 @@
 }
 
 .slashCommandList button {
+  position: relative;
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto;
+  grid-template-columns: 18px minmax(0, 1fr);
   align-items: center;
   min-height: 42px;
   gap: 8px;
@@ -125,11 +126,12 @@
   font-size: var(--font-size-caption);
 }
 
+/* The group heading already names the source; the per-row label stays for assistive technology only. */
 .slashCommandList em {
-  padding: 2px 5px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-muted);
-  color: var(--text-tertiary);
-  font-size: var(--font-size-caption);
-  font-style: normal;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }

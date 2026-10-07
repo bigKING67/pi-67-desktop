@@ -11,10 +11,9 @@
 }
 
 .heading strong {
-  color: var(--text-secondary);
-  font-family: var(--font-code);
-  font-size: var(--font-size-interface);
-  font-variant-ligatures: none;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-support);
+  font-variant-numeric: tabular-nums;
 }
 
 .list {
@@ -28,10 +27,9 @@
 .item {
   display: grid;
   gap: 6px;
-  padding: 9px;
-  border: 1px solid var(--border);
+  padding: 10px 12px;
   border-radius: var(--radius-control);
-  background: var(--surface);
+  background: var(--inspector-group-surface, var(--surface-muted));
 }
 
 .itemHeading,
@@ -133,7 +131,6 @@
   gap: 2px;
   min-width: 0;
   padding-top: 5px;
-  border-top: 1px solid var(--border);
 }
 
 .surfaces dt,
@@ -182,6 +179,7 @@
 }
 
 .flat .item {
+  background: var(--surface);
   padding: 14px 26px;
   border: 0;
   border-bottom: 1px solid var(--border);
