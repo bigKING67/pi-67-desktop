@@ -110,7 +110,7 @@ export async function provisionManagedBrowser67Mcp(options: {
   if (config.pi67ManagedMcp !== undefined && !metadata) {
     return result("invalid-json");
   }
-  const retiredPair = isRetiredBrowser67ServerPair({
+  const retiredPair = await isRetiredBrowser67ServerPair({
     servers,
     managedReceipts: metadata?.servers,
     agentDir: options.agentDir,

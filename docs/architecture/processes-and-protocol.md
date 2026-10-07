@@ -1866,7 +1866,11 @@ background resubmission, tool replay or recovery journal is introduced.
    `fresh | existing-shared | desktop-managed-upgrade`，再依次处理 Desktop capabilities、managed Packages、
    retired MCP cleanup、browser67 MCP 和核心 Server construction。它不检查系统 `pi` 命令，也不创建第二套
    Profile。`existing-shared` 的无 receipt 资源全部视为用户拥有；Desktop 只写
-   `desktop-capabilities/**`、`rules/pi67-desktop/**` 和带有效 receipt 的精确 MCP 条目。首次在 shared
+   `desktop-capabilities/**`、`rules/pi67-desktop/**` 和带有效 receipt 或可精确识别的退役 MCP 成对条目。
+   旧 `~/Documents/sixseven/codeproject/browser67` 仅在目录 `lstat` 返回 `ENOENT`、两个 Node
+   入口及 legacy env 完全匹配、字段只含 command/args/env 和可选 direct/deferred exposure 时迁移。
+   现存目录、符号链接、非 ENOENT 错误及自定义字段保持用户字节；迁移继续使用原有 CAS 写入和
+   receipt，其他 server/settings 和旧缓存保持不变。首次在 shared
    Profile 写入 capability state 时会持久化 `profileOwnership=shared`，后续升级仍保持 shared 分类。
    Alpha.21 等旧 state 没有该 ownership 字段，同样按 shared 迁移，不能由旧 capability 安装事实推断整个
    Profile 归 Desktop 所有。

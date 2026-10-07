@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -105,6 +105,83 @@ describe("managed browser67 MCP provision", () => {
     expect(await readFile(fixture.cachePath)).toEqual(cacheBytes);
   });
 
+  it("repairs the missing retired development checkout pair with native exposures", async () => {
+    const fixture = await createFixture(true);
+    const homeDirectory = join(fixture.agentDir, "home");
+    const cacheBytes = Buffer.from("retained legacy cache");
+    const unrelatedServer = { url: "https://redacted.invalid/mcp" };
+    await Promise.all([
+      writeFile(fixture.mcpPath, JSON.stringify({
+        settings: { toolPrefix: "server" },
+        mcpServers: { ...retiredDevelopmentServers(homeDirectory), linear: unrelatedServer }
+      })),
+      writeFile(fixture.cachePath, cacheBytes)
+    ]);
+
+    await expect(provisionManagedBrowser67Mcp({ ...fixture, homeDirectory })).resolves.toMatchObject({
+      status: "updated", conflicts: [], migratedLegacyServers: ["tmwd_browser", "js-reverse"]
+    });
+    const config = JSON.parse(await readFile(fixture.mcpPath, "utf8"));
+    expect(config.mcpServers.tmwd_browser).toEqual({ ...serverSpec(fixture, "browser"), exposure: "direct" });
+    expect(config.mcpServers["js-reverse"]).toEqual({ ...serverSpec(fixture, "js-reverse"), exposure: "deferred" });
+    expect(config.mcpServers.linear).toEqual(unrelatedServer);
+    expect(config.settings).toEqual({ toolPrefix: "server" });
+    expect(await readFile(fixture.cachePath)).toEqual(cacheBytes);
+    await expect(provisionManagedBrowser67Mcp({ ...fixture, homeDirectory })).resolves.toMatchObject({
+      status: "unchanged", migratedLegacyServers: []
+    });
+  });
+
+  it.each(["directory", "ancestor-file"])("preserves an existing or inaccessible development checkout: %s", async (kind) => {
+    const fixture = await createFixture();
+    const homeDirectory = join(fixture.agentDir, "home");
+    if (kind === "directory") {
+      await mkdir(join(homeDirectory, "Documents", "sixseven", "codeproject", "browser67"), { recursive: true });
+    } else {
+      await writeFile(homeDirectory, "ancestor is not a directory");
+    }
+    const bytes = JSON.stringify({ mcpServers: retiredDevelopmentServers(homeDirectory) });
+    await writeFile(fixture.mcpPath, bytes);
+    await expect(provisionManagedBrowser67Mcp({ ...fixture, homeDirectory })).resolves.toMatchObject({
+      status: "user-owned-conflict", conflicts: ["tmwd_browser", "js-reverse"], migratedLegacyServers: []
+    });
+    expect(await readFile(fixture.mcpPath, "utf8")).toBe(bytes);
+  });
+
+  it.skipIf(process.platform === "win32")("preserves a dangling development checkout symlink", async () => {
+    const fixture = await createFixture();
+    const homeDirectory = join(fixture.agentDir, "home");
+    const parent = join(homeDirectory, "Documents", "sixseven", "codeproject");
+    await mkdir(parent, { recursive: true });
+    await symlink(join(fixture.agentDir, "absent-target"), join(parent, "browser67"));
+    const bytes = JSON.stringify({ mcpServers: retiredDevelopmentServers(homeDirectory) });
+    await writeFile(fixture.mcpPath, bytes);
+    await expect(provisionManagedBrowser67Mcp({ ...fixture, homeDirectory })).resolves.toMatchObject({
+      status: "user-owned-conflict", migratedLegacyServers: []
+    });
+    expect(await readFile(fixture.mcpPath, "utf8")).toBe(bytes);
+  });
+
+  it.each([
+    { command: "user-node" },
+    { args: ["/different/browser67/src/mcp/browser/server.mjs"] },
+    { env: { BROWSER_STRUCTURED_TMWD_WS_ENDPOINT: "custom endpoint" } },
+    { exposure: "codemode" },
+    { disabled: true }
+  ])("preserves customized retired development pairs: %j", async (customization) => {
+    const fixture = await createFixture();
+    const homeDirectory = join(fixture.agentDir, "home");
+    const servers = retiredDevelopmentServers(homeDirectory);
+    const bytes = JSON.stringify({ mcpServers: {
+      ...servers, tmwd_browser: { ...servers.tmwd_browser, ...customization }
+    } });
+    await writeFile(fixture.mcpPath, bytes);
+    await expect(provisionManagedBrowser67Mcp({ ...fixture, homeDirectory })).resolves.toMatchObject({
+      status: "user-owned-conflict", conflicts: ["tmwd_browser", "js-reverse"], migratedLegacyServers: []
+    });
+    expect(await readFile(fixture.mcpPath, "utf8")).toBe(bytes);
+  });
+
   it("fails closed for user-owned names and invalid JSON", async () => {
     const conflict = await createFixture();
     await writeFile(conflict.mcpPath, JSON.stringify({
@@ -149,6 +226,7 @@ async function createFixture(packagedDirect = false) {
   const mcpPath = join(agentDir, "mcp.json");
   const cachePath = join(agentDir, "mcp-cache.json");
   await Promise.all([
+    mkdir(agentDir, { recursive: true }),
     mkdir(join(browser67Root, "src", "mcp", "browser"), { recursive: true }),
     mkdir(join(browser67Root, "src", "mcp", "js-reverse"), { recursive: true }),
     mkdir(join(root, "toolchain"), { recursive: true })
@@ -183,6 +261,15 @@ function serverSpec(fixture: Awaited<ReturnType<typeof createFixture>>, server: 
   return {
     command: fixture.nodeExecutable,
     args: [join(fixture.browser67Root, "src", "mcp", server, "server.mjs")]
+  };
+}
+
+function retiredDevelopmentServers(homeDirectory: string) {
+  const root = join(homeDirectory, "Documents", "sixseven", "codeproject", "browser67");
+  const env = { BROWSER_STRUCTURED_TMWD_MODE: "tmwd", BROWSER_STRUCTURED_TMWD_TRANSPORT: "auto" };
+  return {
+    tmwd_browser: { command: "node", args: [join(root, "src", "mcp", "browser", "server.mjs")], env, exposure: "deferred" },
+    "js-reverse": { command: "node", args: [join(root, "src", "mcp", "js-reverse", "server.mjs")], env, exposure: "direct" }
   };
 }
 

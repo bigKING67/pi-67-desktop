@@ -1,24 +1,37 @@
 import { createHash } from "node:crypto";
+import { lstat } from "node:fs/promises";
 import { posix, win32 } from "node:path";
 
 const SERVER_NAMES = ["tmwd_browser", "js-reverse"] as const;
 type ServerName = (typeof SERVER_NAMES)[number];
 
-export function isRetiredBrowser67ServerPair(options: {
+export async function isRetiredBrowser67ServerPair(options: {
   servers: Record<string, unknown>;
   managedReceipts: Readonly<Record<string, unknown>> | undefined;
   agentDir: string;
   currentBrowser67Root: string;
   homeDirectory: string;
-}): boolean {
+}): Promise<boolean> {
   if (SERVER_NAMES.some((name) => options.managedReceipts?.[name] !== undefined)) return false;
+  const retiredDevelopmentRoot = portableJoin(
+    options.homeDirectory, "Documents", "sixseven", "codeproject", "browser67"
+  );
   const allowedRoots = [
     portableJoin(options.homeDirectory, ".agents", "packages", "browser67"),
     portableJoin(options.agentDir, "desktop-capabilities", "packages", "browser67"),
-    options.currentBrowser67Root
+    options.currentBrowser67Root,
+    retiredDevelopmentRoot
   ];
   const roots = SERVER_NAMES.map((name) => retiredServerRoot(name, options.servers[name], allowedRoots));
-  return roots.every((root): root is string => root !== undefined) && roots[0] === roots[1];
+  if (!roots.every((root): root is string => root !== undefined) || roots[0] !== roots[1]) return false;
+  if (roots[0] !== portablePathKey(retiredDevelopmentRoot)) return true;
+  // An existing checkout (including a symlink or incomplete directory) stays user-owned.
+  try {
+    await lstat(retiredDevelopmentRoot);
+    return false;
+  } catch (error) {
+    return error instanceof Error && "code" in error && error.code === "ENOENT";
+  }
 }
 
 function retiredServerRoot(
@@ -27,8 +40,11 @@ function retiredServerRoot(
   allowedRoots: string[]
 ): string | undefined {
   if (!isRecord(value)) return undefined;
-  const allowedKeys = new Set(["command", "args", "env"]);
+  const allowedKeys = new Set(["command", "args", "env", "exposure"]);
   if (Object.keys(value).some((key) => !allowedKeys.has(key))) return undefined;
+  if (value.exposure !== undefined && value.exposure !== "direct" && value.exposure !== "deferred") {
+    return undefined;
+  }
   if (!isNodeCommand(value.command)) return undefined;
   if (!Array.isArray(value.args) || value.args.length !== 1 || typeof value.args[0] !== "string") {
     return undefined;

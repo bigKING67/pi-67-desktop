@@ -782,8 +782,12 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   uses native `exposure: direct`; JS-Reverse uses `exposure: deferred` and Pi's
   `tool_search`. Their registered native tools use the normal installed-capability
   identity and AUTO authorization path. Desktop updates only entries carrying a
-  matching Desktop receipt and never runs npm in the packaged client. Exact
-  receipted `directTools` configurations are migrated; same-name user-owned entries,
+  matching Desktop receipt or an exact recognized retired pair and never runs npm
+  in the packaged client. Exact receipted `directTools` configurations are migrated.
+  The retired `~/Documents/sixseven/codeproject/browser67` pair is migrated only
+  when that checkout is absent, both Node entrypoints match, and fields contain
+  only the recognized legacy environment and optional direct/deferred exposures.
+  Existing checkouts, symlinks, customized pairs, same-name user-owned entries,
   invalid JSON and compare-and-swap conflicts preserve user bytes and degrade only
   the browser67 enhancement. Native MCP discovers live tool schemas and never reads
   or writes the retired adapter's `mcp-cache.json`; existing cache bytes are retained.
