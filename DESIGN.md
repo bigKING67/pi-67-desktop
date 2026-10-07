@@ -2001,6 +2001,10 @@ loading error where the operation can produce those states
 
 ### Notifications
 
+- Toasts use `--radius-overlay`; status is carried by the icon and its text, plus a
+  tint on warning and error, never a colored side edge. Notification Center history
+  rows separate through spacing rather than dividers, with medium-weight titles
+  (2026-10-07, Visual quality bar).
 - Settings load, refresh, and update-check operations use the current page's inline
   notice as their single user-visible error owner. A mutation also stays inline when
   that page or dialog already provides the recovery action. Preflight failures with
@@ -2096,8 +2100,9 @@ loading error where the operation can produce those states
   `PLAN_MODE_READ_ONLY` rather than presented as approvable. The control's plan
   state uses a restrained accent fill without a border and remains distinguishable
   by icon, label, and pressed state in both themes. Selected segments in segmented
-  controls (Composer mode, Changes and Inspector detail tabs) use a raised fill plus
-  the small `shadowSegment` lift, which keeps them legible on near-equal dark tracks.
+  controls (Composer mode, Changes and Inspector detail tabs) and the selected item of
+  a muted dialog sidebar (credential provider list) use a raised fill plus the small
+  `shadowSegment` lift, which keeps them legible on near-equal dark tracks.
 - The hidden Plan context requires evidence-grounded, decision-complete output:
   discoverable facts come from applicable instructions, real files, configuration,
   Git, and runtime evidence; `plan_ask` is reserved for materially blocking intent
@@ -2307,11 +2312,12 @@ loading error where the operation can produce those states
 - Dialog context lines (`.dialog-eyebrow`, e.g. `New Money 安全授权`) use caption UI
   text at medium weight, never the code face. The command palette keeps its 2px focus
   outline on the search field; its selected result uses only the hover fill (no inset
-  accent bar), and shortcut hints are flat `surface-active` keycaps in the UI face.
+  accent bar), and shortcut hints are flat `surface-active` keycaps in the UI face; the
+  keyboard-help dialog uses the same keycaps without borders or a 3D edge.
 - Agents (P3a): Agent rows use a 20px accent-soft tile with a bot glyph and an
   8px presence dot (success fill online, disabled fill otherwise) that the row's
   accessible name repeats as text; your own Agents show a tertiary `我的`. Agent
-  senders carry an outlined 10px `Agent` badge. Request states sit under the asking
+  senders carry an outlined caption-size (11px) `Agent` pill badge in medium weight. Request states sit under the asking
   message as tertiary caption lines (secondary text for problems), one per Agent,
   and disappear once the reply arrives. A direct message with an Agent adds an intro
   block (badge, owner and presence, description, disclosure) in caption text. The
@@ -2388,15 +2394,16 @@ loading error where the operation can produce those states
   support text, a tertiary caption (`上传中 N%`, size, or the danger-role error with
   a danger border), a 2px accent progress line, and 28px retry/remove icon buttons.
   Refused files are explained inline above the field, not in a Toast: a support-size
-  notice on the default surface with a 3px warning left rule, `有文件没有添加` in
+  notice on a rounded warning tint without a colored edge, `有文件没有添加` in
   semibold, one secondary line per file, and a `知道了` text action; it clears on the
   next add, send or conversation.
   Dragging files over the composer gives the field a dashed accent border and a
   `松开以添加附件` overlay. Sent images sit under the text in a wrapping row, each
   scaled to fit 320×240 from its stored size (no shift when bytes arrive) with a
   control-radius border on the muted surface; loading shows the hover surface,
-  failure an image-off glyph with `重试`. Other files are 360px cards (file-type
-  glyph, name, tertiary size, a small bordered `保存` button with a download glyph).
+  failure an image-off glyph with `重试`. Other files are 360px unframed cards on the
+  muted surface (file-type glyph, name, tertiary size, a small filled `保存` button
+  with a download glyph).
   The viewer is a 1100×860 maximum overlay: a header with name, size, `保存` and a
   close button over the image contained on the muted surface.
   The timeline ends 12px above the composer so a final bordered card never meets it.
@@ -2577,6 +2584,8 @@ loading error where the operation can produce those states
 
 ### Command Palette
 
+- The search field, result groups and footer are separated by spacing only, without
+  dividers; result titles and group headings use medium weight (2026-10-07).
 - The search field remains the sole keyboard focus owner and exposes the bounded
   result list through the combobox `aria-activedescendant` pattern. Arrow keys
   change the active option without preventing the user from continuing to type.

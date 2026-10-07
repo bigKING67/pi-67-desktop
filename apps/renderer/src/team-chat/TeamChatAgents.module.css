@@ -37,7 +37,7 @@
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-pill);
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-medium);
   line-height: 16px;
 }

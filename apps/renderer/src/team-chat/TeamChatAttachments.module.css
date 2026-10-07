@@ -92,14 +92,14 @@
   gap: 4px;
   min-height: 28px;
   padding: 0 var(--space-2);
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-control);
-  background: var(--surface-raised);
+  background: var(--surface-active);
   color: var(--text-primary);
   font-size: var(--font-size-caption);
 }
 
-.saveButton[data-hovered] { background: var(--surface-hover); }
+.saveButton[data-hovered] { background: color-mix(in srgb, var(--text-primary) 12%, var(--surface-active)); }
 
 .saveButton[data-disabled] {
   background: var(--surface-disabled);
@@ -151,10 +151,8 @@
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--warning);
   border-radius: var(--radius-control);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
   font-size: var(--font-size-support);
 }
 
