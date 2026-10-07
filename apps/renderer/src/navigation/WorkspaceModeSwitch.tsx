@@ -10,7 +10,8 @@ import styles from "./NavigationRail.module.css";
 
 /**
  * Work and Chat mode identity (PRODUCT.md): 牛马, deadpan animals at work. Both wear the same
- * half-lidded "fine, I'll do it" look: Work is a front-facing ox with a broad muzzle; Chat is the
+ * half-lidded "fine, I'll do it" look: Work is a front-facing ox with a broad muzzle (no
+ * nostrils, so the face stays legible at 16px); Chat is the
  * Lucide Lab horse head with a side-eye, flat brow and a slight smirk. Original drawings.
  */
 function OxIcon({ size }: { size: number }) {
@@ -24,13 +25,11 @@ function OxIcon({ size }: { size: number }) {
       <path d="M15.7 5.4c1.5-.4 2.3-1.8 2-3.3" />
       <path d="M7 9.3 4.3 8.7l.9 1.8L7 11.2" />
       <path d="m17 9.3 2.7-.6-.9 1.8-1.8.7" />
-      <path d="M8.9 10.4h2" />
-      <path d="M13.1 10.4h2" />
+      <path d="M8.8 10.4h2.2" />
+      <path d="M13 10.4h2.2" />
       <path d="M9.9 11.2h.01" />
       <path d="M14.1 11.2h.01" />
-      <path d="M10.4 15.6h.01" />
-      <path d="M13.6 15.6h.01" />
-      <path d="M10.2 17.8c1.2.5 2.6.5 3.8-.1" />
+      <path d="M10 17.4c1.3.6 2.7.6 4 0" />
     </svg>
   );
 }
