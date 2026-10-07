@@ -57,9 +57,8 @@
   gap: var(--space-3);
   width: min(360px, 100%);
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  background: var(--surface);
+  background: var(--surface-muted);
 }
 
 .fileIcon,
@@ -114,7 +113,7 @@
   gap: 4px;
   padding: 2px 4px;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--accent-strong);
   font-size: var(--font-size-caption);
@@ -246,7 +245,7 @@
 .trayPreview {
   width: 32px;
   height: 32px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   object-fit: cover;
 }
 
@@ -291,7 +290,6 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-  border-bottom: 1px solid var(--border);
 }
 
 .viewerTitle {

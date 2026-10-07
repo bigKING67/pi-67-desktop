@@ -25,7 +25,7 @@
   margin: 0;
   color: var(--text-tertiary);
   font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
 }
 
 .railSection ul {
@@ -43,7 +43,7 @@
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-tertiary);
 }
@@ -161,7 +161,7 @@
   gap: 2px;
   max-width: 100%;
   padding: 1px 2px 1px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--accent-soft);
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
@@ -181,7 +181,7 @@
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-tertiary);
 }
@@ -234,7 +234,7 @@
 .unread {
   min-width: 18px;
   padding: 1px 5px;
-  border-radius: 5px;
+  border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--canvas);
   font-size: var(--font-size-caption);
@@ -264,7 +264,6 @@
 .banner {
   margin: 0;
   padding: 7px var(--space-4);
-  border-bottom: 1px solid var(--border);
   background: var(--surface-muted);
   color: var(--text-secondary);
   font-size: var(--font-size-support);
@@ -356,14 +355,17 @@
   justify-self: center;
   margin-bottom: var(--space-3);
   padding: 4px 10px;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-control);
-  background: var(--surface);
+  background: var(--surface-active);
   color: var(--text-secondary);
   font-size: var(--font-size-support);
 }
 
-.loadOlder[data-hovered] { background: var(--surface-hover); color: var(--text-primary); }
+.loadOlder[data-hovered] {
+  background: color-mix(in srgb, var(--surface-active) 88%, var(--text-primary));
+  color: var(--text-primary);
+}
 
 /* Shown while a window at older history is open: floats at the bottom of the timeline cell. */
 .jumpLatest {
@@ -452,7 +454,7 @@
   gap: 4px;
   padding: 2px 4px;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--accent-strong);
   font-size: var(--font-size-caption);
@@ -559,9 +561,8 @@
   justify-content: space-between;
   gap: var(--space-4);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border);
   border-radius: var(--radius-panel);
-  background: var(--surface);
+  background: var(--surface-muted);
 }
 
 .joinCard strong { color: var(--text-primary); font-size: var(--font-size-body); }
@@ -607,7 +608,7 @@
   margin-bottom: 6px;
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
 }
 
 .field input {
@@ -747,7 +748,7 @@
 .workCardKind {
   color: var(--text-tertiary);
   font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
 }
 
 .workCardStatus {
@@ -756,7 +757,7 @@
   gap: 5px;
   color: var(--text-secondary);
   font-size: var(--font-size-support);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
 }
 
 .workCardStatus[data-status="in_progress"] { color: var(--info); }
@@ -792,7 +793,7 @@
 .workCardSection strong {
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
 }
 
 .workCardSection p {
@@ -862,9 +863,9 @@
   gap: 2px;
   padding: 1px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--canvas);
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-primary) 8%, transparent);
+  box-shadow: var(--shadow-segment);
   opacity: 0;
   transition: opacity var(--motion-fast) var(--motion-ease-out);
 }
@@ -876,7 +877,7 @@
 .messageAction {
   padding: 1px 4px;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   background: var(--canvas);
   color: var(--text-tertiary);
   font-size: var(--font-size-caption);

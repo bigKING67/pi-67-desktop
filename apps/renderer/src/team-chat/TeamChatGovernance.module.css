@@ -10,7 +10,7 @@
   width: min(280px, 100%);
   padding: 4px;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-panel);
+  border-radius: var(--radius-overlay);
   background: var(--surface-raised);
   box-shadow: var(--shadow-floating);
 }
@@ -73,7 +73,7 @@
 /* A message opened from activity or a notification, briefly. */
 .messageFocused {
   background: var(--accent-soft);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
 }
 
 /* Mentions read as "@N" in the accent outline; unread counts stay solid accent. */
@@ -81,7 +81,7 @@
   min-width: 18px;
   padding: 0 4px;
   border: 1px solid var(--accent);
-  border-radius: 5px;
+  border-radius: var(--radius-pill);
   background: var(--accent-soft);
   color: var(--accent-strong);
   font-size: var(--font-size-caption);
@@ -127,7 +127,7 @@
   margin: 0 0 6px;
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
 }
 
 .roster ul {
@@ -163,7 +163,7 @@
 .ownerChip {
   padding: 1px 6px;
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
 }

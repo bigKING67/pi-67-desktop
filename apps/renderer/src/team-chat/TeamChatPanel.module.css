@@ -53,8 +53,7 @@
   display: flex;
   margin-right: auto;
   padding: 3px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: var(--surface-muted);
 }
 
@@ -62,7 +61,7 @@
   min-height: 26px;
   padding: 0 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-secondary);
   font-size: var(--font-size-support);
@@ -73,7 +72,7 @@
 /* The ring keeps the selected segment visible where raised and muted surfaces are close (dark). */
 .segmented .segmentSelected {
   background: var(--surface-raised);
-  box-shadow: inset 0 0 0 1px var(--border-strong), 0 1px 3px color-mix(in srgb, var(--text-primary) 9%, transparent);
+  box-shadow: inset 0 0 0 1px var(--border-strong), var(--shadow-segment);
   color: var(--text-primary);
 }
 
