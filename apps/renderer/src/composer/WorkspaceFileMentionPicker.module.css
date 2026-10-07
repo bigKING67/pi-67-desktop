@@ -12,9 +12,9 @@
   max-height: min(360px, 42vh);
   overflow: hidden;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-panel);
+  border-radius: var(--radius-overlay);
   background: var(--surface-raised);
-  box-shadow: var(--shadow-overlay);
+  box-shadow: var(--shadow-floating);
 }
 
 .picker header,
@@ -31,11 +31,11 @@
 
 .picker header {
   justify-content: space-between;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0;
 }
 
 .picker header strong { color: var(--text-primary); }
-.picker footer { border-top: 1px solid var(--border); }
+.picker footer { border-top: 0; }
 
 .list {
   max-height: min(290px, 34vh);
@@ -50,7 +50,7 @@
   gap: 9px;
   padding: 7px 8px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-primary);
   text-align: left;
