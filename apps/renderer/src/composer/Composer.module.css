@@ -286,7 +286,7 @@
 
 .runtimeControls {
   min-width: 0;
-  max-width: 303px;
+  max-width: 376px;
   flex: 1 1 176px;
   align-items: flex-start;
   gap: 5px;
@@ -295,7 +295,8 @@
 .modelRuntimeControl {
   display: grid;
   min-width: 0;
-  max-width: 170px;
+  /* Room for the brand mark plus a typical model name; it still shrinks before the toolbar wraps. */
+  max-width: 240px;
   flex: 1 1 88px;
   gap: 3px;
 }

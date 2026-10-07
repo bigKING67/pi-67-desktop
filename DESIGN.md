@@ -3038,6 +3038,8 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
   adjacent text always names the entry. They are never used as status or as section icons.
   The same `provider-brand` mark leads Composer model-picker options and the picker trigger
   for the selected model; the Auto virtual model keeps the generic spark icon.
+  Because the mark costs trigger width, the Composer model control may grow to 240px
+  (runtime group 376px) on wide toolbars and still shrinks before the toolbar wraps.
 - `SettingsStatus` (dot + short label; neutral, success, warning, danger) is the only status
   language. Colored text, pills and bare dots are not used for state.
 - Section titles are body size, medium, primary (2026-10-06: secondary interface-size titles
