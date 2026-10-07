@@ -135,7 +135,17 @@
   content: "";
 }
 
+/* Unlabelled narration starts on its first text line, so its node sits higher than labelled steps. */
+.step[data-process-step="narration"]::before {
+  top: 6px;
+}
+
+.step[data-process-step="narration"]:not(:last-child)::after {
+  top: 14px;
+}
+
 .step[data-process-step="tool"]::before,
+.step[data-process-step="exploration"]::before,
 .step[data-process-step="orphan-tool-result"]::before {
   background: color-mix(in srgb, var(--accent) 40%, var(--border));
 }
@@ -291,4 +301,8 @@
   .group > summary:has(.issueAction) { grid-template-columns: 16px minmax(0, 1fr) 16px; }
   .issueAction { grid-column: 2; grid-row: 2; justify-self: start; }
   .chevron { grid-column: 3; grid-row: 1; }
+}
+
+.elapsed {
+  font-variant-numeric: tabular-nums;
 }

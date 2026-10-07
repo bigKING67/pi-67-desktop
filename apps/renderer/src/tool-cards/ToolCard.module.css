@@ -115,12 +115,12 @@
   font-family: var(--font-code);
 }
 
+/* AUTO reasons stay visible (Runtime-authored evidence) but read as metadata, not as a status. */
 .authorization {
   flex: none;
   color: var(--text-tertiary);
   font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.01em;
+  font-weight: var(--font-weight-regular);
   white-space: nowrap;
 }
 
@@ -177,6 +177,11 @@
 .status-running .status,
 .status-running .kindIcon {
   color: var(--accent);
+}
+
+/* The current step leads the timeline: running calls take the primary text role. */
+.status-running .titleRow strong {
+  color: var(--text-primary);
 }
 
 .chevron {

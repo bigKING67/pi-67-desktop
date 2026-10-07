@@ -38,6 +38,9 @@ test("reopens a Prompt-Stash-restored Session without resyncing its synthetic Ta
   await page.goto("/");
   await attachMockAgent(page);
   await expect(page.getByRole("button", { name: "恢复任务" })).toBeVisible();
+  // The resume surface shares the centered stopped-conversation group.
+  await expect(page.getByTestId("stopped-conversation")).toHaveCSS("text-align", "center");
+  await page.screenshot({ path: "artifacts/visual-review/stopped-task.png" });
   await expect(page.getByText("对话草稿等待恢复", { exact: true })).toBeVisible();
   await clearRecordedCommands(page);
 

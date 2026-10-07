@@ -1,4 +1,4 @@
-import type { WorkspaceChangeView } from "@pi67/domain";
+import type { ToolCallPart, WorkspaceChangeView } from "@pi67/domain";
 import type { ToolPresenter } from "../tool-presentation.js";
 import {
   compactToolDetails,
@@ -124,6 +124,22 @@ function presentWorkspaceChange(change: WorkspaceChangeView) {
         ? ["Pi Session 记录包含 Patch；它不等于当前 Git Diff。"]
         : ["Session 中没有可验证的完整 Edit Patch。"]
   };
+}
+
+const WORKSPACE_READ_NAMES = new Set(["read", "read-file", "read_file"]);
+const WORKSPACE_SEARCH_NAMES = new Set(["grep", "glob", "search", "search-files", "search_files", "find-files", "find_files"]);
+
+/**
+ * Workspace exploration identity for grouping. Unlike presenter matching, only exact Workspace
+ * tool names qualify, so namespaced tools such as `web_search` or `mcp__x__read` never count.
+ * A read's target is its path, letting repeated or paged reads of one file count once.
+ */
+export function workspaceExploration(tool: ToolCallPart): { mode: "read" | "search"; target?: string } | undefined {
+  const name = tool.name.trim().toLowerCase();
+  if (WORKSPACE_SEARCH_NAMES.has(name)) return { mode: "search" };
+  if (!WORKSPACE_READ_NAMES.has(name)) return undefined;
+  const target = readToolSummaryTextField(parseToolSummaryFields(tool.summary), ["path", "file", "filePath", "file_path"]);
+  return target === undefined ? { mode: "read" } : { mode: "read", target };
 }
 
 function readMode(name: string): "read" | "search" | "glob" {

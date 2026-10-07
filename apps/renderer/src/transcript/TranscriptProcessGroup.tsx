@@ -21,6 +21,9 @@ import type {
   TranscriptRow
 } from "./transcript-rows.js";
 import { processItemUnsuccessful } from "./transcript-rows.js";
+import { groupExplorationRuns } from "./process-exploration.js";
+import { TranscriptExplorationStep } from "./TranscriptExplorationStep.js";
+import { ElapsedClock } from "./elapsed-clock.js";
 import styles from "./TranscriptProcessGroup.module.css";
 
 type ProcessGroupRow = Extract<TranscriptRow, { kind: "process-group" }>;
@@ -93,6 +96,7 @@ export function TranscriptProcessGroup({
     : `${Math.max(1, stepCount)} 个步骤`;
 
   const visibleItems = onlyUnsuccessful ? row.items.filter(processItemUnsuccessful) : row.items;
+  const renderItems = useMemo(() => groupExplorationRuns(visibleItems, !running), [running, visibleItems]);
   const visibleTimeline = onlyUnsuccessful
     ? supplementalTimeline.filter((item) => item.kind === "tool" && (isUnsuccessfulToolStatus(item.tool.status) || item.tool.execution?.nestedRecord?.complete === false))
     : supplementalTimeline;
@@ -124,6 +128,10 @@ export function TranscriptProcessGroup({
           <small>
             {!running ? " · " : ""}{countSummary}{duration ? ` · ${duration}` : ""}
           </small>
+          {/* The ticking clock is aria-hidden so the polite live region never announces it. */}
+          {running && timeline ? (
+            <ElapsedClock className={styles.elapsed} key={timeline.startedAt} startedAt={timeline.startedAt} />
+          ) : null}
         </span>
         {!running && unsuccessfulToolCount > 0 ? (
           <button
@@ -147,13 +155,17 @@ export function TranscriptProcessGroup({
       ) : null}
       {hasBody ? (
         <ol className={styles.steps} aria-label="模型执行步骤">
-          {visibleItems.map((item) => (
+          {renderItems.map((entry) => entry.kind === "exploration" ? (
+            <li className={styles.step} data-process-step="exploration" key={entry.key}>
+              <TranscriptExplorationStep authorizations={toolAuthorizations} run={entry} />
+            </li>
+          ) : (
             <ProcessItem
-              {...(item.kind === "tool" && toolAuthorizations.has(item.call.id)
-                ? { authorization: toolAuthorizations.get(item.call.id)! }
+              {...(entry.item.kind === "tool" && toolAuthorizations.has(entry.item.call.id)
+                ? { authorization: toolAuthorizations.get(entry.item.call.id)! }
                 : {})}
-              item={item}
-              key={item.key}
+              item={entry.item}
+              key={entry.item.key}
             />
           ))}
           {supplementalThinking && !onlyUnsuccessful ? (
@@ -210,7 +222,7 @@ function ProcessItem({
     return (
       <li className={styles.step} data-process-step="narration">
         <div className={styles.narration}>
-          <span>进度</span>
+          <span className="sr-only">进度</span>
           {typeof item.content === "string" ? (
             <TranscriptMarkdownView mode="settled">{item.content}</TranscriptMarkdownView>
           ) : (

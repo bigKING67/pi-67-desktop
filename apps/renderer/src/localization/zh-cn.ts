@@ -99,6 +99,10 @@ export const zhCNMessages = {
   },
   transcript: {
     entryHeading: "从一个具体任务开始",
+    explorationSummary: (reads: number, searches: number) => (
+      reads > 0 && searches > 0 ? `搜索 ${searches} 次，浏览了 ${reads} 个文件`
+        : reads > 0 ? `浏览了 ${reads} 个文件` : `搜索了 ${searches} 次`
+    ),
     entryGuidance: "描述目标、相关文件和验收标准。Pi 会使用当前工作区、模型和已加载资源。",
     draftEntryGuidance: "写下目标、相关文件和验收标准。发送后才会创建对话；创建或发送失败时，草稿会继续保留。",
     copyAnswer: "复制回答",

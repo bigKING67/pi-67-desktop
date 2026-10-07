@@ -1,0 +1,86 @@
+/* Shares the ToolCard row geometry so a grouped run aligns with neighbouring single calls. */
+.exploration > summary {
+  display: grid;
+  width: calc(100% + 8px);
+  max-width: calc(100% + 8px);
+  min-height: 36px;
+  grid-template-columns: 20px minmax(0, 1fr) auto 14px;
+  align-items: center;
+  gap: 7px;
+  margin-inline-start: -8px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  list-style: none;
+}
+
+.exploration > summary::-webkit-details-marker {
+  display: none;
+}
+
+.exploration > summary:hover {
+  background: var(--surface-hover);
+}
+
+.exploration > summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.kindIcon {
+  justify-self: center;
+  color: var(--accent);
+}
+
+.identity {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+  overflow: hidden;
+}
+
+/* Matches ToolCard's AUTO metadata role. */
+.authorization {
+  flex: none;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
+.exploration strong {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status {
+  color: var(--success);
+}
+
+.chevron {
+  color: var(--text-tertiary);
+  transition: transform 120ms ease-out;
+}
+
+.exploration[open] .chevron {
+  transform: rotate(90deg);
+}
+
+.calls {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 0 19px;
+  padding: 0;
+  list-style: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}

@@ -146,7 +146,8 @@ export function ToolCard({
         </div>
         <span className={styles.status}>
           <StatusIcon className={effectiveStatus === "running" ? styles.spinning : undefined} size={14} aria-hidden="true" />
-          {statusLabel}
+          {/* Success is the expected outcome: its icon alone suffices; every other state stays spelled out. */}
+          {effectiveStatus === "completed" ? <span className="sr-only">{statusLabel}</span> : statusLabel}
         </span>
         <ChevronRight aria-hidden="true" className={styles.chevron} size={14} />
       </summary>

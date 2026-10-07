@@ -86,6 +86,14 @@
   margin-top: 10px;
 }
 
+.stoppedConversation[data-lost] .stoppedConversationMark {
+  color: var(--warning);
+}
+
+.stoppedConversation small {
+  color: var(--text-tertiary);
+}
+
 .provisionalStatus {
   display: grid;
   justify-items: start;

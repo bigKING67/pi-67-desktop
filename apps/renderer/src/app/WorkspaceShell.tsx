@@ -15,7 +15,7 @@ import {
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { selectSessionFileIdentity, selectSessionGeneration, selectSessionId } from "../session/session-projection-selectors.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
-import { activateRendererTask, resumeRendererTask } from "../workbench/task-activation-controller.js";
+import { activateRendererTask } from "../workbench/task-activation-controller.js";
 import { repairAndOpenRendererWorkspace } from "../workbench/workspace-registration-controller.js";
 import { canRenderLiveTask } from "../workbench/live-task-authority.js";
 import { beginRendererSessionIntentInWorkspace } from "../workspace/workspace-session-controller.js";
@@ -23,7 +23,7 @@ import { useWorkspaceFileStore } from "../workspace-files/workspace-file-store.j
 import { LazySurfaceBoundary } from "./LazySurfaceBoundary.js";
 import styles from "./WorkspaceShell.module.css";
 import { NewSessionIntentBoundary } from "./NewSessionIntentBoundary.js";
-import { StoppedConversationState } from "./StoppedConversationState.js";
+import { StoppedConversationState, StoppedTaskState } from "./StoppedConversationState.js";
 
 const SettingsWorkbench = lazy(() => import("../settings/SettingsWorkbench.js").then((module) => ({
   default: module.SettingsWorkbench
@@ -269,30 +269,6 @@ function TaskRecoveryState({ detail }: { detail: string }) {
         <span className="loading-line" />
         <h2>正在恢复任务</h2>
         <p>{detail}</p>
-      </div>
-    </section>
-  );
-}
-
-function StoppedTaskState({ task, workspace }: {
-  task: RendererWorkbenchTask;
-  workspace: WorkspaceDescriptor;
-}) {
-  return (
-    <section className={styles.emptyWorkspace}>
-      <div>
-        <span className="section-label">{workspace.displayName}</span>
-        <h2>{task.title}</h2>
-        <p>{task.lifecycle === "lost"
-          ? "运行意外中断，未完成的操作不会自动重试。"
-          : "会话已恢复，启动后可继续。"}</p>
-        <button
-          className="primary-button"
-          disabled={!task.sessionPath || workspace.availability !== "available"}
-          onClick={() => void resumeRendererTask(task.id)}
-          type="button"
-        >恢复任务</button>
-        {!task.sessionPath ? <small>缺少会话记录，无法恢复。请从左侧重新打开。</small> : null}
       </div>
     </section>
   );

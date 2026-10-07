@@ -450,10 +450,19 @@ loading error where the operation can produce those states
   Results form one execution disclosure in the Transcript. A process with Tools
   summarizes by outcome and then appends `N 次工具调用 · duration`; a process without
   Tools falls back to `N 个步骤 · duration`. Within it, reasoning uses the
-  low-emphasis `分析` label, narration uses
-  the parallel `进度` label (both caption-size UI text, never a monospace uppercase eyebrow), and each Tool Call is paired with its correlated Tool
+  low-emphasis `分析` label (caption-size UI text, never a monospace uppercase eyebrow),
+  narration reads as plain text whose `进度` role is screen-reader only, and each Tool Call is paired with its correlated Tool
   Result as one compact logical step; the call and result are never rendered as
-  duplicate peer cards. An unmatched legacy Tool Result remains one explicitly inspectable
+  duplicate peer cards. Once the process has settled, two or more consecutive successful
+  Workspace reads/searches (exact Workspace tool names only, never namespaced Web/MCP tools)
+  collapse into one expandable step (`搜索 N 次，浏览了 M 个文件`, counting distinct read
+  paths) that restores every call in order and shows each distinct AUTO reason. While
+  running, every call stays individual so visible steps never regroup; failed, cancelled,
+  or unreconciled calls never join a group.
+  A successful step shows only its success icon (the label stays screen-reader text);
+  every other status keeps its visible label. Running calls take the primary text
+  role, AUTO reasons stay visible as regular-weight metadata, and a running process
+  header adds a `m:ss` clock that is excluded from its live-region announcements. An unmatched legacy Tool Result remains one explicitly inspectable
   compatibility step. This includes visible reasoning carried beside final text in
   one Assistant record: the reasoning belongs to the process while the text remains
   the final answer. The current process is expanded while work is running and
@@ -890,10 +899,10 @@ loading error where the operation can produce those states
   projection merely because its Session ID still matches. Until Pi reacquires
   runtime authority, the center surface shows an explicit `打开对话` or `恢复任务`
   action and does not mount the Transcript, Composer, or Inspector projection.
-  The stopped-conversation surface is one centered group: a quiet conversation mark,
+  The stopped-conversation and `恢复任务` surfaces share one centered group: a quiet conversation mark,
   the Workspace name in the UI face, the conversation title, `N 条消息 · <relative
   time>更新` when Catalog metadata exists, and the single `打开对话` action. It never
-  takes focus on mount.
+  takes focus on mount. A lost Task uses a warning mark and its interruption copy.
 - Once the Session is authoritative and idle, derive unfinished work from its
   current Pi branch. A neutral notice above the Transcript offers `继续当前任务`
   only when the recorded task can continue. It explains that continuation calls
