@@ -7,9 +7,12 @@ import governance from "./TeamChatGovernance.module.css";
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
-export function TeamChatAvatar({ name }: { name: string }) {
+/** `row` fits navigation rows; `message` marks the first message of a sender group. */
+export type TeamChatAvatarSize = "row" | "message";
+
+export function TeamChatAvatar({ name, size = "row" }: { name: string; size?: TeamChatAvatarSize }) {
   const first = graphemes.segment(name.trim()).containing(0)?.segment ?? "?";
-  return <span aria-hidden="true" className={styles.avatar}>{first.toUpperCase()}</span>;
+  return <span aria-hidden="true" className={styles.avatar} data-size={size}>{first.toUpperCase()}</span>;
 }
 
 function UnreadCount({ count, muted }: { count: number; muted?: boolean | undefined }) {
@@ -38,11 +41,14 @@ function MentionCount({ count }: { count: number }) {
 
 /** Agent tile with a presence dot; the label carries the state for assistive tech. */
 /** Without `agent` (for example in the mention list) the tile shows no presence dot. */
-export function TeamChatAgentAvatar({ agent }: { agent?: Pick<TeamChatAgent, "online" | "status"> }) {
+export function TeamChatAgentAvatar({ agent, size = "row" }: {
+  agent?: Pick<TeamChatAgent, "online" | "status">;
+  size?: TeamChatAvatarSize;
+}) {
   const online = agent !== undefined && agent.online && agent.status === "active";
   return (
-    <span aria-hidden="true" className={agentStyles.agentAvatar}>
-      <Bot size={13} />
+    <span aria-hidden="true" className={agentStyles.agentAvatar} data-size={size}>
+      <Bot size={size === "message" ? 17 : 13} />
       {agent ? <span className={`${agentStyles.presence} ${online ? agentStyles.presenceOnline : ""}`} /> : null}
     </span>
   );

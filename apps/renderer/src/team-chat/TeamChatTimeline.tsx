@@ -10,7 +10,7 @@ import { memberById } from "./team-chat-model.js";
 import { teamChat } from "./team-chat-instance.js";
 import { useTeamChatDialogStore } from "./team-chat-dialog-store.js";
 import { formatTeamChatTime, teamChatInvocationText, teamChatMentionSegments, type TeamChatTimelineEntry } from "./team-chat-presentation.js";
-import { TeamChatAgentBadge, TeamChatBotBadge } from "./TeamChatParts.js";
+import { TeamChatAgentAvatar, TeamChatAgentBadge, TeamChatAvatar, TeamChatBotBadge } from "./TeamChatParts.js";
 import agentStyles from "./TeamChatAgents.module.css";
 import { chatMessageWorkBrief } from "./team-chat-work-bridge.js";
 import { TeamChatMessageAttachments } from "./TeamChatAttachments.js";
@@ -138,6 +138,13 @@ function TimelineMessage({ conversation, directory, entry, focused, target }: {
       {entry.dayLabel ? <div className={styles.daySeparator}><span>{entry.dayLabel}</span></div> : null}
       <article className={`${styles.message} ${entry.showHeader ? styles.messageGroupStart : ""} ${entry.pending ? styles.messagePending : ""} ${mentionsSelf ? governance.messageMentionsSelf : ""} ${focused ? governance.messageFocused : ""}`}
         data-focused={focused || undefined}>
+        {/* Sender groups lead with one avatar; follow-up messages keep the gutter so text stays aligned. */}
+        <span className={styles.messageGutter}>
+          {entry.showHeader ? participant?.agent
+            ? <TeamChatAgentAvatar agent={participant.agent} size="message" />
+            : <TeamChatAvatar name={participant?.displayName ?? sender} size="message" /> : null}
+        </span>
+        <div className={styles.messageMain}>
         {entry.showHeader ? (
           <header>
             <strong>{sender}</strong>
@@ -168,6 +175,7 @@ function TimelineMessage({ conversation, directory, entry, focused, target }: {
             <Button className={styles.textAction!} onPress={() => teamChat.discardPending(entry.pending!.clientKey)}>{copy.discard}</Button>
           </div>
         ) : null}
+        </div>
       </article>
     </>
   );

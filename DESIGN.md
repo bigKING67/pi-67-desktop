@@ -2165,6 +2165,11 @@ loading error where the operation can produce those states
   value). The status uses support size. References are single-line
   links opened through the desktop bridge. Actions are compact buttons; the
   primary action is `接手` or `在工作中开始`.
+- Team Chat messages use a 32px avatar column: the first message of a sender group
+  shows a 32px neutral initial tile (9px radius; the reader's own tile uses their
+  display name, not `我`) or the Agent bot tile with its presence dot; follow-up
+  messages keep the empty gutter so text stays aligned. Avatars are decorative;
+  the visible sender name remains the accessible identity.
 - The Team Chat composer shares the Work Composer shape: `--radius-composer` field
   and a 32px round send button whose disabled state is a `surface-active` circle.
 - An Agent DM opens with one `surface-muted` intro block (panel radius): the Agent

@@ -12,6 +12,12 @@
   color: var(--accent-strong);
 }
 
+.agentAvatar[data-size="message"] {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+
 /* Presence reads from the dot's fill and the row's accessible name, never color alone. */
 .presence {
   position: absolute;

@@ -224,6 +224,13 @@
   font-weight: var(--font-weight-semibold);
 }
 
+.avatar[data-size="message"] {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  font-size: var(--font-size-interface);
+}
+
 .unread {
   min-width: 18px;
   padding: 1px 5px;
@@ -384,7 +391,17 @@
   content: "";
 }
 
-.message { position: relative; padding: 1px 0; }
+.message {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  column-gap: 10px;
+  padding: 1px 0;
+}
+
+.messageGutter { padding-top: 2px; }
+
+.messageMain { min-width: 0; }
 
 .messageGroupStart { padding-top: var(--space-3); }
 
