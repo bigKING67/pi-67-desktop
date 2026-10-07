@@ -41,6 +41,7 @@ export function BundledSkillSuiteDetail({ suite, pack, query, busy, onBack, onMu
         back={<SettingsBackAction label="返回全局可用技能" onPress={onBack}>返回全局可用</SettingsBackAction>}
         title={suite.displayName}
         meta={`${pack?.skillIds.length ?? suite.skills.length} 个技能 · ${suiteVersionSummary(suite, pack)}`}
+        detail={suite.description}
         status={<SettingsStatus tone={suiteStatusTone(status, pack)}>{status.label}</SettingsStatus>}
         actions={<>
           {pack?.canInstall ? (

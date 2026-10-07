@@ -217,7 +217,12 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   const ruleTabs = ruleWorkspace.getByRole("tablist", { name: "工作规则范围" });
   await expect(ruleTabs.getByRole("tab", { name: "全局", exact: true }))
     .toHaveAttribute("aria-selected", "true");
-  await expect(ruleWorkspace.getByText("工作规则由 Pi 自动加载，并在会话中持续生效。", { exact: false })).toBeVisible();
+  // How rules load is an ⓘ beside the section title, not a standalone paragraph.
+  await expect(ruleWorkspace.getByText("工作规则由 Pi 自动加载，并在会话中持续生效。", { exact: false })).toHaveCount(0);
+  await ruleWorkspace.getByRole("button", { name: "全局工作规则说明" }).hover();
+  await expect(page.getByRole("tooltip")).toContainText("工作规则由 Pi 自动加载，并在会话中持续生效。");
+  await expect(page.getByRole("tooltip")).toContainText("AGENTS.md 优先于同目录的 CLAUDE.md。");
+  await page.mouse.move(0, 0);
   await expect(ruleWorkspace.getByRole("heading", { name: "全局工作规则", exact: true })).toBeVisible();
   await expect(ruleWorkspace.getByRole("heading", { name: "New Money 内置规则", exact: true })).toHaveCount(0);
   await expect(ruleWorkspace.getByText("New Money 内置规则 · 11 项", { exact: true })).toBeVisible();
@@ -236,9 +241,9 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   }
   await ruleTabs.getByRole("tab", { name: "项目", exact: true }).click();
   await expect(ruleWorkspace.getByRole("heading", { name: "项目工作规则", exact: true })).toBeVisible();
-  await expect(ruleWorkspace.getByText("/Users/test/Projects/pi-demo/AGENTS.md", { exact: true })).toBeVisible();
+  await expect(ruleWorkspace.getByText(/ · \/Users\/test\/Projects\/pi-demo\/AGENTS\.md$/u)).toBeVisible();
   await expect(ruleWorkspace.getByRole("heading", { name: "继承的工作规则", exact: true })).toBeVisible();
-  await expect(ruleWorkspace.getByText("/Users/test/Projects/AGENTS.md", { exact: true })).toBeVisible();
+  await expect(ruleWorkspace.getByText(/ · \/Users\/test\/Projects\/AGENTS\.md$/u)).toBeVisible();
   await expect(ruleWorkspace.getByRole("list", { name: "系统提示词覆盖 · 未配置" })).toHaveCount(0);
   await ruleWorkspace.getByText("高级", { exact: true }).click();
   await expect(ruleWorkspace.getByRole("list", { name: "系统提示词覆盖 · 未配置" }).getByRole("listitem"))

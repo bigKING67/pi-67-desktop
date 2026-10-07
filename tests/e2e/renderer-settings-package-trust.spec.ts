@@ -18,10 +18,13 @@ test("separates content confirmation from resource state and reports ambiguous i
   await openPackageSettings(page, [driftedEntry]);
 
   const workspace = page.getByTestId("extension-management-workspace");
-  await expect(workspace.getByText(
-    "已启用且内容已确认的扩展包，在可信工作区的 AUTO 模式下可直接执行其工具；ASK 仍逐次确认，未知、重复或内容漂移的来源继续阻止。",
-    { exact: true }
-  )).toBeVisible();
+  // The authorization boundary lives in an ⓘ and never names the retired ASK mode.
+  await workspace.getByRole("button", { name: "扩展包授权说明" }).hover();
+  const authorizationTip = page.getByRole("tooltip");
+  await expect(authorizationTip).toContainText("在可信工作区的 AUTO 模式下可直接执行其工具；删除操作仍需确认");
+  await expect(authorizationTip).not.toContainText("ASK");
+  await page.mouse.move(0, 0);
+  await expect(authorizationTip).toHaveCount(0);
   const driftedRow = workspace.getByRole("button", {
     name: /drifted-extension，npm:@example\/drifted-extension · 全局/u
   });

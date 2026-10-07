@@ -144,7 +144,8 @@ export function ManagedGlobalSkillPanel({ selectedPackId, excludedSuiteIds, onSe
       </SettingsSectionBlock> : null}
 
       <SessionResourcePanel
-        description="由用户在本机维护并适用于所有项目；没有受管上游的技能不会被 Desktop 自动覆盖。"
+        description="由你在本机维护，适用于所有项目。"
+        info="没有受管上游的技能不会被 Desktop 自动覆盖。"
         empty={managedPacks.length > 0
           ? "其他全局技能均已归入受管技能套件。"
           : "尚未发现全局技能。可以将技能放入 ~/.agents/skills 或 ~/.pi/agent/skills。"}

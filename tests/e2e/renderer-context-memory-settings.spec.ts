@@ -43,7 +43,9 @@ test("managed memory checks stay separate from legacy health in both themes", as
   await expect(settings.getByRole("button", { name: "正在检测…", exact: true })).toBeDisabled();
   await expect(settings.getByText(/本地进程仍在运行，但本次健康检测未通过/u)).toBeVisible();
   await settings.getByRole("button", { name: "检测本地服务", exact: true }).click();
-  await expect(settings.getByText(/本次检测通过：当前本地服务可以连接/u)).toBeVisible();
+  // A passing check is a one-time confirmation beside the live lifecycle, not a notice.
+  await expect(settings.getByText("本地服务运行中 · 本次检测通过", { exact: true })).toBeVisible();
+  await expect(settings.getByText(/当前本地服务可以连接/u)).toHaveCount(0);
   for (const theme of ["dark", "light"] as const) {
     await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
     await settings.getByRole("button", { name: "检测本地服务", exact: true }).focus();

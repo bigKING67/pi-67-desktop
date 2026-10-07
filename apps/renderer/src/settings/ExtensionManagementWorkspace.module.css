@@ -39,12 +39,12 @@
   display: grid;
 }
 
-/* A standing boundary statement, not an alert: plain support text without a surface. */
-.authorizationNotice {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--font-size-support);
-  line-height: 1.5;
+/* Keeps the authorization ⓘ beside the view switch it explains. */
+.viewSwitch {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
 }
 
 .commandBand {

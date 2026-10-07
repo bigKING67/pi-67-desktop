@@ -49,11 +49,11 @@ export function GlobalRuleCatalog({
   return (
     <div className={styles.catalogSurface}>
       <div className={styles.sections}>
-        <RuleBehaviorNotice />
         {props.error ? <SettingsNotice tone="danger">{props.error}</SettingsNotice> : null}
         <CatalogSection
           actions={<RefreshButton busy={props.busy} onPress={props.onRefresh} />}
-          description="适用于所有项目；AGENTS.md 优先于同目录的 CLAUDE.md。"
+          description="适用于所有项目。"
+          info={<RuleBehaviorInfo precedence />}
           items={groups.rules}
           onSelect={props.onSelect}
           title="全局工作规则"
@@ -110,7 +110,6 @@ export function ProjectRuleCatalog({
   return (
     <div className={styles.catalogSurface}>
       <div className={styles.sections}>
-        <RuleBehaviorNotice />
         {!trusted ? (
           <SettingsNotice tone="warning">
             当前项目尚未受信任。项目文件可以查看，但创建、编辑和加载保持禁用。
@@ -120,6 +119,7 @@ export function ProjectRuleCatalog({
         <CatalogSection
           actions={<RefreshButton busy={props.busy} onPress={props.onRefresh} />}
           description={`仅适用于 ${workspaceName}；受信任项目中的普通 Markdown 文件可编辑。`}
+          info={<RuleBehaviorInfo />}
           items={groups.rules}
           onSelect={props.onSelect}
           title="项目工作规则"
@@ -166,12 +166,11 @@ function configuredCountLabel(count: number): string {
   return count === 0 ? "未配置" : `${count} 项`;
 }
 
-function RuleBehaviorNotice() {
-  return (
-    <p className={styles.behaviorNotice}>
-      工作规则由 Pi 自动加载，并在会话中持续生效。提示词模板只有通过 <code>/名称</code> 调用时才会加入当前消息。
-    </p>
-  );
+function RuleBehaviorInfo({ precedence = false }: { precedence?: boolean }) {
+  return <>
+    工作规则由 Pi 自动加载，并在会话中持续生效。提示词模板只有通过 <code>/名称</code> 调用时才会加入当前消息。
+    {precedence ? " AGENTS.md 优先于同目录的 CLAUDE.md。" : null}
+  </>;
 }
 
 function AdvancedDisclosure({
@@ -205,22 +204,26 @@ function AdvancedDisclosure({
   );
 }
 
-function CatalogSection({ title, description, items, actions, onSelect }: {
+function CatalogSection({ title, description, info, items, actions, onSelect }: {
   title: string;
   description: string;
+  info?: ReactNode;
   items: ContextFileSummary[];
   actions?: ReactNode;
   onSelect: (item: ContextFileSummary) => void;
 }) {
   return (
-    <SettingsSectionBlock title={title} description={description} {...(actions ? { actions } : {})}>
+    <SettingsSectionBlock title={title} description={description} {...(info ? { info } : {})} {...(actions ? { actions } : {})}>
       {items.length === 0 ? <SettingsEmpty>当前没有可显示的 Markdown 文件。</SettingsEmpty> : (
         <SettingsCatalog label={title}>
           {items.map((item) => (
             <SettingsCatalogRow
-              {...(item.scope === "managed" ? {} : { description: <span className={styles.path}>{item.path}</span> })}
               key={item.id}
-              meta={`${contextFileScopeLabel(item.scope)} · ${contextFileAccessLabel(item)}`}
+              // Two lines at most: the path joins the scope/access metadata instead of adding a third.
+              meta={<span className={styles.rowMeta}>
+                {`${contextFileScopeLabel(item.scope)} · ${contextFileAccessLabel(item)}`}
+                {item.scope === "managed" ? null : ` · ${item.path}`}
+              </span>}
               onSelect={() => onSelect(item)}
               testId={`context-file-${item.id}`}
               title={item.name}

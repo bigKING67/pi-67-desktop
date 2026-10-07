@@ -44,7 +44,11 @@ export function SettingsSectionBlock({ title, description, info, actions, childr
     <section className={`${styles.section} ${className ?? ""}`}>
       <header className={styles.sectionHeader}>
         <span>
-          <h2>{title}{info ? <SettingsInfo label={`${title}说明`}>{info}</SettingsInfo> : null}</h2>
+          {/* The ⓘ sits beside, not inside, the heading so the heading's accessible name stays its title. */}
+          <span className={styles.sectionTitle}>
+            <h2>{title}</h2>
+            {info ? <SettingsInfo label={`${title}说明`}>{info}</SettingsInfo> : null}
+          </span>
           {description ? <p>{description}</p> : null}
         </span>
         {actions ? <div className={styles.sectionActions}>{actions}</div> : null}
@@ -287,7 +291,7 @@ export function SettingsDetailHeader({ back, title, meta, detail, status, action
   back: ReactNode;
   title: ReactNode;
   meta?: ReactNode;
-  /** Optional second line for an identifier such as a file path. */
+  /** Optional second line: an identifier such as a file path, or a one-sentence summary. */
   detail?: ReactNode;
   status?: ReactNode;
   actions?: ReactNode;

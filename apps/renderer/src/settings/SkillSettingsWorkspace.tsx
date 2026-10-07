@@ -269,8 +269,11 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
       </span>}
       title="内置技能套件"
       description={suites.length > 0
-        ? `${suites.length} 个技能套件，共 ${skillCount} 个技能；由 Desktop 管理并对所有项目可用，同名技能以 Pi 的资源解析结果为准。`
-        : "随 New Money 提供并对所有项目可用；不通过第三方扩展包重复安装。"}
+        ? `${suites.length} 个技能套件，共 ${skillCount} 个技能，对所有项目可用。`
+        : "随 New Money 提供，对所有项目可用。"}
+      info={suites.length > 0
+        ? "由 Desktop 管理；同名技能以 Pi 的资源解析结果为准。"
+        : "不通过第三方扩展包重复安装。"}
     >
       {capability.error ? <SettingsNotice tone="danger">{capability.error}</SettingsNotice> : null}
       {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
@@ -299,14 +302,18 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
               </Button>
             ) : undefined}
             key={suite.id}
-            description={suite.description}
+            // Two lines: name, then count and version; the summary is a tooltip, screen-reader text, and the detail header.
             meta={`${pack?.skillIds.length ?? suite.skills.length} 个技能 · ${suiteVersionSummary(suite, pack)}`}
             onSelect={() => {
               setQuery("");
               onSelectSuite(suite.id);
             }}
             testId="bundled-skill-suite-row"
-            title={suite.displayName}
+            title={<>
+              <span title={suite.description}>{suite.displayName}</span>
+              {/* Assistive tech keeps the capability summary that the two-line row leaves to the detail page. */}
+              {suite.description ? <span className="sr-only">，{suite.description}</span> : null}
+            </>}
             trailing={<>
               {status.id === "ready"
                 ? <span className={styles.suiteNote}>{status.label}</span>

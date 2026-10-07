@@ -96,16 +96,18 @@ export function LocalMemoryActivationSettings({ disabled = false, onPendingChang
         actions={snapshot && !current ? undefined : <Button className="secondary-button" isDisabled={locked} onPress={() => void change(current?.preference === "disabled")}>
           {busy ? "正在处理…" : current?.preference === "enabled" ? "关闭私人记忆" : current?.preference === "unknown" ? "关闭并保存" : "启用（重启后生效）"}
         </Button>} />
-      {current ? <SettingsRow value={states[current.lifecycle]}
+      {current ? <SettingsRow value={health === "healthy"
+        // A passing check is a one-time confirmation beside the live lifecycle, never a replacement for it.
+        ? `${states[current.lifecycle]} · 本次检测通过`
+        : states[current.lifecycle]}
         title={<>本次运行状态<SettingsInfo label="本次运行状态说明">检测不启动服务、不调用模型，也不读取记忆内容；运行或检测通过不代表已完成记忆学习与召回。</SettingsInfo></>}
         description="由 Desktop 自动管理地址。"
         actions={<Button className="secondary-button" isDisabled={locked || current.lifecycle !== "running" || current.restartRequired}
           onPress={() => void check()}>{checking ? "正在检测…" : "检测本地服务"}</Button>} /> : null}
     </SettingsRows>
-    {health ? <SettingsNotice tone={health === "unavailable" ? "warning" : "info"}>
-      {health === "healthy" ? "本次检测通过：当前本地服务可以连接。未调用模型或验证记忆召回。"
-        : health === "not-running" ? "当前没有可检测的本地服务。启用并重启后，打开允许使用记忆的会话；检测不会代为启动。"
-          : "本地进程仍在运行，但本次健康检测未通过。请稍后重试；不会自动重启或切换服务。"}
+    {health && health !== "healthy" ? <SettingsNotice tone={health === "unavailable" ? "warning" : "info"}>
+      {health === "not-running" ? "当前没有可检测的本地服务。启用并重启后，打开允许使用记忆的会话；检测不会代为启动。"
+        : "本地进程仍在运行，但本次健康检测未通过。请稍后重试；不会自动重启或切换服务。"}
     </SettingsNotice> : null}
     {readError || error || issue ? <SettingsNotice tone="danger">{readError ?? error ?? issue}</SettingsNotice> : null}
     {current?.restartRequired && current.preference === "enabled" ? <SettingsNotice tone="info">启用偏好已保存。请先结束当前工作，再退出并重新打开 New Money；本次不会自动启动服务。</SettingsNotice> : null}

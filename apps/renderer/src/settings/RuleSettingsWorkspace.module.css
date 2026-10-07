@@ -20,18 +20,6 @@
   gap: 32px;
 }
 
-.behaviorNotice {
-  margin: 0;
-  color: var(--text-tertiary);
-  font-size: var(--font-size-support);
-  line-height: 1.5;
-}
-
-.behaviorNotice code {
-  font-family: var(--font-code);
-  font-size: 0.92em;
-}
-
 /* Same look as SettingsDetails: a rule above, title + summary, chevron at the far right. */
 .advancedDetails {
   min-width: 0;
@@ -112,8 +100,12 @@
   padding: 8px 0 16px;
 }
 
-.path {
-  overflow-wrap: anywhere;
+/* A long path truncates on the metadata line so a row never grows past two lines. */
+.rowMeta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 

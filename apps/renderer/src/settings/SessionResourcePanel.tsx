@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { ResourceSummary } from "@pi67/domain";
 import { useAppStore } from "../app/app-store.js";
 import { SessionResourceReloadButton } from "../session/SessionResourceReloadButton.js";
@@ -29,6 +30,7 @@ export function SessionResourcePanel({
   scope: requestedScope,
   title,
   description,
+  info,
   empty,
   excludeIds
 }: {
@@ -38,6 +40,7 @@ export function SessionResourcePanel({
   scope?: "global" | "project";
   title: string;
   description: string;
+  info?: ReactNode;
   empty: string;
   excludeIds?: ReadonlySet<string>;
 }) {
@@ -63,6 +66,7 @@ export function SessionResourcePanel({
       actions={<SessionResourceReloadButton />}
       title={title}
       description={description}
+      {...(info ? { info } : {})}
     >
       {resourceCatalog?.truncated
         ? <SettingsNotice>{resourceCatalogNotice(resourceCatalog)}</SettingsNotice>

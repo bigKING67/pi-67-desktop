@@ -3084,12 +3084,17 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
   were too weak to anchor a group); sections are 32px apart; section descriptions are optional and
   appear only when they change a decision. Boundary, privacy and implementation explanations
   go into `SettingsInfo` (an ⓘ tooltip) or are removed; `SettingsSectionBlock` places such
-  a tip beside its title through `info`. Single-section pages do not repeat the
+  a tip beside (never inside) its `<h2>` through `info`, so the heading's accessible name
+  stays its title. Pages never carry a free-standing explanatory paragraph between tabs and
+  sections: rule loading and extension-package authorization live in ⓘ tips (the latter
+  never names the retired ASK mode). Single-section pages do not repeat the
   page title as a section title.
 - Tabs mark the selection with an underline only; a page has at most one tab level.
 - `SettingsDetails` is the only disclosure: a rule above, title and summary, chevron at the
   far right. Dirty or erroneous details still cannot collapse.
-- `SettingsNotice` is reserved for states that need action; info tone is a neutral muted
+- `SettingsNotice` is reserved for states that need action (a passing check, such as the
+  private-memory local-service probe, appends `· 本次检测通过` as plain text to the live
+  lifecycle value instead of replacing it, never a notice); info tone is a neutral muted
   surface, warning and danger use a light tint without a colored edge.
 - Catalog pages (models, extensions, skills, prompts, rules, usage) use the same 1040px frame as every other category, with
   catalog cards whose rows follow the same anatomy (`SettingsCatalogRow` accepts a `leading`
@@ -3115,7 +3120,10 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
   repeated on every row (all-active rules and providers in the 已配置 or 可配置 view show no
   status; a ready skill suite shows its update channel as plain tertiary text); only
   exceptions carry a `SettingsStatus`. Rows are at most
-  two lines: name, then scope/access or version metadata. Paths stay only where they distinguish entries
+  two lines: name, then scope/access or version metadata. Rule rows join their path to
+  that metadata line; bundled skill suites show count and version, with the capability
+  summary as the name tooltip, screen-reader text in the row, and the detail header's
+  second line. Metadata paths truncate on one line. Paths stay only where they distinguish entries
   (user rule files that share a name); built-in rule paths and IDs that restate the name
   appear in the detail view, not the list. A disclosure summary does not repeat
   its own statuses as a description.

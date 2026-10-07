@@ -46,6 +46,7 @@ import {
   packageResourceEnabled,
   packageRowEnabled
 } from "./extension-management-model.js";
+import { SettingsInfo } from "./SettingsPrimitives.js";
 import styles from "./ExtensionManagementWorkspace.module.css";
 
 type ExtensionView = "installed" | "discover";
@@ -215,12 +216,18 @@ export function ExtensionManagementWorkspace({ capability }: {
         }}
       >
         <div className={styles.commandBand}>
-          <TabList aria-label="Pi 扩展包管理视图" className={styles.tabList!}>
-            <Tab className={styles.tab!} id="installed">已安装 <span>{rows.length}</span></Tab>
-            <Tab className={styles.tab!} id="discover">
-              发现扩展包 <span>{capability.snapshot?.recommendedExternal.length ?? 0}</span>
-            </Tab>
-          </TabList>
+          <div className={styles.viewSwitch}>
+            <TabList aria-label="Pi 扩展包管理视图" className={styles.tabList!}>
+              <Tab className={styles.tab!} id="installed">已安装 <span>{rows.length}</span></Tab>
+              <Tab className={styles.tab!} id="discover">
+                发现扩展包 <span>{capability.snapshot?.recommendedExternal.length ?? 0}</span>
+              </Tab>
+            </TabList>
+            {/* The authorization boundary sits beside the view switch it governs, as an ⓘ. */}
+            <SettingsInfo label="扩展包授权说明">
+              已启用且内容已确认的扩展包，在可信工作区的 AUTO 模式下可直接执行其工具；删除操作仍需确认，未知、重复或内容漂移的来源继续阻止。
+            </SettingsInfo>
+          </div>
           <div className={styles.primaryActions}>
             <Button
               className="secondary-button"
@@ -276,9 +283,6 @@ export function ExtensionManagementWorkspace({ capability }: {
           </div>
 
           <div className={styles.installedFeedback}>
-            <p className={styles.authorizationNotice}>
-              已启用且内容已确认的扩展包，在可信工作区的 AUTO 模式下可直接执行其工具；ASK 仍逐次确认，未知、重复或内容漂移的来源继续阻止。
-            </p>
             {packageError ? <p className={styles.errorBanner} role="alert">{packageError}</p> : null}
             {capability.error ? <p className={styles.errorBanner} role="alert">{capability.error}</p> : null}
           </div>
