@@ -7,6 +7,8 @@
   background: var(--surface);
   /* Settings cards step up from the page by luminance instead of a border (Visual quality bar rule 1). */
   --settings-card: var(--surface-muted);
+  /* Rows inside a card: a faint hairline inset to the text edge, never full-bleed. */
+  --settings-row-divider: linear-gradient(var(--border), var(--border)) no-repeat center top / calc(100% - 32px) 1px;
 }
 
 .sidebar {

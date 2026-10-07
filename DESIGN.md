@@ -120,7 +120,9 @@ Settings › 模型 (2026-10-06). Each rule below is reviewable on any visible c
    render as unframed timeline rows; their expanded output uses a fill, not a
    frame. Status uses a tint, never a colored edge. Bordered cards are not nested
    inside bordered cards. Light mode may use a low-contrast hairline where no
-   surface step exists.
+   surface step exists. Rows listed inside one card may be separated by a faint
+   `border`-colored hairline inset to the text edge (2026-10-07, after the Cursor
+   settings reference); the card itself stays unframed.
 2. **One emphasis per view.** Accent keeps its existing role (selection, primary
    action); a region shows at most one filled primary action. Semantic colors
    appear only for their named state; no decorative hue, gradient or glow.
@@ -3182,7 +3184,8 @@ Settings follows one quiet-list language (2026-09-28, selected from the settings
 - Surfaces (2026-10-07, Visual quality bar rule 1): `SettingsRows`, `SettingsCatalog` and
   `SettingsEmpty` are borderless cards one luminance step above the page (`--settings-card`,
   the muted surface, in both themes; light mode gains the step instead of a hairline). Rows
-  inside a card are separated by spacing, not dividers. A card redefines the muted fill one
+  inside a card are separated by a 1px `border`-colored hairline inset 16px from both card
+  edges (never full-bleed); a hovered catalog row covers the hairlines around it. A card redefines the muted fill one
   step up for its descendants, so selects, segmented controls and notices stay visible on
   it. Inputs keep their border; `SettingsDetails` keeps its rule above. Page-specific groups
   use the same card: usage tiles and panels, the memory-mode choice group (its radio marks

@@ -129,6 +129,10 @@
   padding: 10px 16px;
 }
 
+.row + .row {
+  background: var(--settings-row-divider);
+}
+
 .identity {
   display: grid;
   min-width: 0;
@@ -246,9 +250,19 @@
   text-align: left;
 }
 
+/* The catalog's 4px inset leaves 12px to the text edge on each side. */
+.catalogItem + .catalogItem {
+  background: linear-gradient(var(--border), var(--border)) no-repeat center top / calc(100% - 24px) 1px;
+}
+
 .catalogItem:hover,
 .catalogItem:focus-within {
   background: var(--surface-hover);
+}
+
+.catalogItem:hover + .catalogItem,
+.catalogItem:focus-within + .catalogItem {
+  background-image: none;
 }
 
 .catalogRow[aria-pressed="true"] {

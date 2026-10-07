@@ -4,6 +4,7 @@
 /* Same borderless card as SettingsRows: one luminance step, rows separated by spacing. */
 .list { display: grid; overflow: hidden; padding-block: 4px; border-radius: var(--radius-panel); background: var(--settings-card, var(--surface-muted)); }
 .row { display: grid; grid-template-columns: minmax(0, 1fr) auto 30px; align-items: center; gap: 12px; min-height: 44px; padding: 6px 8px 6px 16px; }
+.row + .row { background: var(--settings-row-divider); }
 .copy { display: flex; min-width: 0; align-items: center; gap: 4px; }
 .copy strong { overflow: hidden; color: var(--text-primary); font-size: var(--font-size-interface); font-weight: var(--font-weight-medium); text-overflow: ellipsis; white-space: nowrap; }
 /* The whole key group is the recorder: press to record, Escape to cancel. */
