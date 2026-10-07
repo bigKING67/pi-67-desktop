@@ -18,12 +18,12 @@ import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { activateRendererTask, resumeRendererTask } from "../workbench/task-activation-controller.js";
 import { repairAndOpenRendererWorkspace } from "../workbench/workspace-registration-controller.js";
 import { canRenderLiveTask } from "../workbench/live-task-authority.js";
-import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import { beginRendererSessionIntentInWorkspace } from "../workspace/workspace-session-controller.js";
 import { useWorkspaceFileStore } from "../workspace-files/workspace-file-store.js";
 import { LazySurfaceBoundary } from "./LazySurfaceBoundary.js";
 import styles from "./WorkspaceShell.module.css";
 import { NewSessionIntentBoundary } from "./NewSessionIntentBoundary.js";
+import { StoppedConversationState } from "./StoppedConversationState.js";
 
 const SettingsWorkbench = lazy(() => import("../settings/SettingsWorkbench.js").then((module) => ({
   default: module.SettingsWorkbench
@@ -121,7 +121,7 @@ export function WorkspaceShell({
     && selectedSurface.conversation.kind === "session"
     && selectedWorkspace ? (
       <StoppedConversationState
-        sessionName={selectedSession?.name}
+        session={selectedSession}
         sessionFileIdentity={selectedSurface.conversation.sessionFileIdentity}
         sessionPath={selectedSurface.conversation.sessionPath}
         workspace={selectedWorkspace}
@@ -224,33 +224,6 @@ export function WorkspaceShell({
         </>
       ) : null}
     </main>
-  );
-}
-
-function StoppedConversationState({ sessionName, sessionFileIdentity, sessionPath, workspace }: {
-  sessionName: string | undefined;
-  sessionFileIdentity: string;
-  sessionPath: string;
-  workspace: WorkspaceDescriptor;
-}) {
-  const open = async () => {
-    if (workspace.availability !== "available") return;
-    await openRendererWorkspaceDescriptor(workspace, sessionPath, sessionFileIdentity);
-  };
-  return (
-    <section className={styles.emptyWorkspace}>
-      <div>
-        <span className="section-label">{workspace.displayName}</span>
-        <h2>{sessionName?.trim() || "未命名对话"}</h2>
-        <p>打开对话，继续之前的工作。</p>
-        <button
-          className="primary-button"
-          disabled={workspace.availability !== "available"}
-          onClick={() => void open()}
-          type="button"
-        >打开对话</button>
-      </div>
-    </section>
   );
 }
 

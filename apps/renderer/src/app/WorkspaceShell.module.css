@@ -53,6 +53,39 @@
   line-height: 1.65;
 }
 
+/* A stopped conversation is one centered resume group: identity, metadata, and its single action. */
+.emptyWorkspace > .stoppedConversation {
+  width: min(560px, 100%);
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.stoppedConversationMark {
+  margin-bottom: 6px;
+  color: var(--text-tertiary);
+}
+
+.stoppedConversationWorkspace {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-medium);
+}
+
+.stoppedConversation h2 {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-display);
+}
+
+.stoppedConversation p {
+  font-size: var(--font-size-support);
+}
+
+.stoppedConversation button {
+  margin-top: 10px;
+}
+
 .provisionalStatus {
   display: grid;
   justify-items: start;

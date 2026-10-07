@@ -890,6 +890,10 @@ loading error where the operation can produce those states
   projection merely because its Session ID still matches. Until Pi reacquires
   runtime authority, the center surface shows an explicit `打开对话` or `恢复任务`
   action and does not mount the Transcript, Composer, or Inspector projection.
+  The stopped-conversation surface is one centered group: a quiet conversation mark,
+  the Workspace name in the UI face, the conversation title, `N 条消息 · <relative
+  time>更新` when Catalog metadata exists, and the single `打开对话` action. It never
+  takes focus on mount.
 - Once the Session is authoritative and idle, derive unfinished work from its
   current Pi branch. A neutral notice above the Transcript offers `继续当前任务`
   only when the recorded task can continue. It explains that continuation calls
