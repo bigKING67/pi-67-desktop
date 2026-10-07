@@ -93,8 +93,7 @@ completing a real session without learning terminal UI conventions first.
   animals at work with a half-lidded "fine, I'll do it" look (2026-10-07; the mood is
   inspired by a film reference, the drawings are original and copy no character).
   Work is a Desktop-owned 24px-grid, 2px round-stroke front-facing ox with short horns,
-  side ears, half-lidded eyes and a broad smirking muzzle without nostrils (interior detail
-  is kept minimal so the face reads at 16px); Chat is the `@lucide/lab`
+  side ears, half-lidded eyes and a broad smirking muzzle; Chat is the `@lucide/lab`
   `horseHead` (ISC) whose dot eye is replaced by a half-lidded side-eye, a flat brow and
   a slight smirk. Both render at 16px. Do not explain private wordplay in product copy or add
   financial symbols.
