@@ -8,9 +8,9 @@
   display: grid;
   gap: 5px;
   padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--surface-raised) 88%, var(--focus) 3%);
+  border: 0;
+  border-radius: var(--radius-panel);
+  background: var(--inspector-group-surface, var(--surface-muted));
 }
 
 .hero strong { color: var(--text-primary); font-size: var(--font-size-body); }
@@ -38,7 +38,7 @@
   gap: 7px;
   padding-left: 9px;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: var(--surface-raised);
   color: var(--text-secondary);
 }
@@ -57,7 +57,6 @@
   align-self: stretch;
   padding: 0 10px;
   border: 0;
-  border-left: 1px solid var(--border);
   background: transparent;
   color: var(--text-secondary);
   font-size: var(--font-size-support);
@@ -70,9 +69,9 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 4px 10px;
   padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--surface-raised);
+  border: 0;
+  border-radius: var(--radius-panel);
+  background: var(--inspector-group-surface, var(--surface-muted));
 }
 
 .row div { display: grid; gap: 2px; }
@@ -91,17 +90,16 @@
 .feedback button {
   min-height: 24px;
   padding: 0 7px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: transparent;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--surface-active);
   color: var(--text-tertiary);
   font: inherit;
   font-size: var(--font-size-support);
 }
 
-.feedback button:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.feedback button:hover { background: color-mix(in srgb, var(--text-primary) 12%, var(--surface-active)); color: var(--text-primary); }
 .feedback button[data-selected] {
-  border-color: color-mix(in srgb, var(--focus) 45%, var(--border));
   background: color-mix(in srgb, var(--focus) 9%, transparent);
   color: var(--focus);
 }
@@ -123,7 +121,7 @@
   display: grid;
   gap: 5px;
   padding: 12px;
-  border-left: 3px solid var(--focus);
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--focus) 5%, transparent);
 }
 
@@ -140,13 +138,13 @@
   width: 26px;
   height: 26px;
   place-items: center;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--surface-raised);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--surface-active);
   color: var(--text-secondary);
 }
 
-.iconButton:hover { background: var(--surface-hover); color: var(--text-primary); }
+.iconButton:hover { background: color-mix(in srgb, var(--text-primary) 12%, var(--surface-active)); color: var(--text-primary); }
 .iconButton[data-disabled] { opacity: 0.45; }
 
 .spinning { animation: experience-spin 900ms linear infinite; }
@@ -156,40 +154,34 @@
   overflow: hidden;
 }
 
-.experienceRow[data-status="candidate"] { border-color: color-mix(in srgb, var(--warning) 32%, var(--border)); }
-.experienceRow[data-status="validated"] { border-color: color-mix(in srgb, var(--success) 32%, var(--border)); }
-
 .candidateHeading { min-width: 0; }
 .candidateHeading strong { overflow-wrap: anywhere; }
 
 .statusPill {
   align-self: start;
   padding: 3px 7px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-muted);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--surface-active);
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
   line-height: 1.2;
   white-space: nowrap;
 }
 
 .statusPill[data-status="candidate"] {
-  border-color: color-mix(in srgb, var(--warning) 36%, var(--border));
   background: color-mix(in srgb, var(--warning) 8%, var(--surface));
   color: var(--warning);
 }
 
 .statusPill[data-status="validated"],
 .statusPill[data-status="shared"] {
-  border-color: color-mix(in srgb, var(--success) 34%, var(--border));
   background: color-mix(in srgb, var(--success) 8%, var(--surface));
   color: var(--success);
 }
 
 .statusPill[data-status="submitted"] {
-  border-color: color-mix(in srgb, var(--focus) 34%, var(--border));
   background: color-mix(in srgb, var(--focus) 8%, var(--surface));
   color: var(--focus);
 }
@@ -208,15 +200,14 @@
   grid-column: 1 / -1;
   gap: 2px;
   padding: 7px 8px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--surface-muted);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--inspector-nested-surface, var(--surface));
 }
 
 .sopReadiness strong { font-size: var(--font-size-interface); }
 .sopReadiness small { color: var(--text-tertiary); font-size: var(--font-size-caption); line-height: 1.45; }
 .sopReadiness[data-ready="true"] {
-  border-color: color-mix(in srgb, var(--success) 30%, var(--border));
   background: color-mix(in srgb, var(--success) 6%, var(--surface));
 }
 
@@ -247,8 +238,8 @@
   align-items: center;
   gap: 6px;
   padding: 7px 8px;
-  border-radius: 7px;
-  background: var(--surface-muted);
+  border-radius: var(--radius-control);
+  background: var(--inspector-nested-surface, var(--surface));
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
   line-height: 1.45;
@@ -262,7 +253,7 @@
 .notice {
   grid-column: 1 / -1;
   padding: 7px 8px;
-  border-left: 2px solid var(--focus);
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--focus) 5%, transparent);
   color: var(--text-secondary) !important;
 }
@@ -273,8 +264,8 @@
   gap: 10px;
   margin: 5px -10px -10px;
   padding: 12px;
-  border-top: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface-muted) 72%, var(--surface));
+  border-top: 0;
+  background: var(--inspector-nested-surface, var(--surface));
 }
 
 .reviewForm > header {
@@ -298,9 +289,9 @@
   display: grid;
   gap: 8px;
   padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--surface-raised) 84%, var(--surface-muted));
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--inspector-group-surface, var(--surface-muted));
 }
 
 .methodFields > header { display: grid; gap: 2px; }
@@ -313,7 +304,7 @@
   gap: 4px;
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
 }
 
 .field > small { color: var(--text-tertiary); font-size: var(--font-size-caption); font-weight: var(--font-weight-regular); }
@@ -324,7 +315,7 @@
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--border-strong);
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   outline: 0;
   background: var(--surface-raised);
   color: var(--text-primary);
@@ -349,9 +340,9 @@
   align-items: start;
   gap: 7px;
   padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--surface-raised);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--inspector-group-surface, var(--surface-muted));
   color: var(--text-primary);
   cursor: pointer;
 }
