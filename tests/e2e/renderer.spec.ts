@@ -44,7 +44,8 @@ test("opens a trusted Pi workspace through the MessagePort contract", async ({ p
   await expect(page.locator(".title-actions button").last()).toHaveAttribute("data-testid", "inspector-toggle");
   const conversationBottom = await page.getByLabel("Pi conversation").evaluate((element) => element.getBoundingClientRect().bottom);
   const composerBottom = await page.getByTestId("composer-region").evaluate((element) => element.getBoundingClientRect().bottom);
-  expect(Math.abs(conversationBottom - composerBottom)).toBeLessThanOrEqual(1);
+  // An empty conversation centers its entry group, so the Composer floats well above the region bottom.
+  expect(conversationBottom - composerBottom).toBeGreaterThan(100);
 
   await page.screenshot({ path: testInfo.outputPath("workspace-after.png"), animations: "disabled" });
 });

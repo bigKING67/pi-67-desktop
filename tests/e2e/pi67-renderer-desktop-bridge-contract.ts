@@ -25,6 +25,11 @@ export interface MockWorkspaceDescriptor {
 }
 
 export interface MockDesktopBridgeOptions {
+  /**
+   * Seeds the remembered docked-Inspector choice. Specs written for the docked layout keep
+   * `"open"` (the default here); `"unset"` exercises the product's closed-by-default start.
+   */
+  inspectorDocked?: "open" | "closed" | "unset";
   previousRunExitStatus?: PreviousRunExitStatus;
   initialWorkspaces?: MockWorkspaceDescriptor[];
   pickerQueue?: MockWorkspaceDescriptor[];

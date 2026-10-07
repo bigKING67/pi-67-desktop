@@ -81,8 +81,7 @@
 }
 
 .loading,
-.error,
-.empty {
+.error {
   grid-area: transcript;
   display: grid;
   min-height: 0;
@@ -109,14 +108,27 @@
   font-size: var(--font-size-support);
 }
 
+/* The welcome and the Composer form one centered entry group; the workspace shell gives the
+   region a balancing track below the Composer, so the welcome sits on the Composer. */
 .empty {
-  height: 100%;
+  grid-area: transcript;
+  display: grid;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 20px 4px;
+  color: var(--text-secondary);
 }
 
-/* Reading-first welcome: one left-aligned column with a calm heading and flat starter rows. */
+/* Reading-first welcome: one left-aligned column sharing the Composer's left edge. */
 .emptyColumn {
-  width: min(560px, 100%);
+  width: min(var(--conversation-track-width, 860px), 100%);
+  margin: 0 auto;
   text-align: left;
+}
+
+.emptyColumn > p,
+.starterPrompts {
+  max-width: 560px;
 }
 
 .empty h2 {

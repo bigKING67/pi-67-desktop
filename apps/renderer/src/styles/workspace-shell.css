@@ -185,6 +185,22 @@
   background: var(--surface);
 }
 
+/* An empty conversation centers its entry group (welcome + Composer) slightly above center
+   between two spacer tracks; the welcome track is content-sized but may shrink and scroll.
+   After the first Turn the spacers disappear and the Composer docks at the bottom. */
+.conversation-region:has(> [data-transcript-empty="true"]) {
+  grid-template-areas:
+    "trust"
+    "origin"
+    "recovery"
+    "."
+    "transcript"
+    "plan"
+    "composer"
+    ".";
+  grid-template-rows: auto auto auto minmax(0, 1fr) minmax(0, max-content) auto auto minmax(0, 1.3fr);
+}
+
 :root[data-theme="dark"] .conversation-region {
   background: var(--canvas);
 }

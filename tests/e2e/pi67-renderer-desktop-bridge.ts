@@ -79,6 +79,16 @@ export async function installMockDesktopBridge(
   await installMockSupportDiagnosticsBridge(page);
   await installMockDesktopUpdateBridge(page, { deferInitialUpdateState: options.deferInitialUpdateState ?? false });
   await installComposerDraftTestControl(page);
+  await page.addInitScript((inspectorDocked) => {
+    if (inspectorDocked === "unset") return;
+    try {
+      if (window.localStorage.getItem("pi67.inspector-docked.v1") === null) {
+        window.localStorage.setItem("pi67.inspector-docked.v1", inspectorDocked);
+      }
+    } catch {
+      // Specs that disable storage exercise the closed default.
+    }
+  }, options.inspectorDocked ?? "open");
   await page.addInitScript((bridgeFixture) => {
     // Dev-mode module graphs can exceed Chromium's default 250-entry buffer.
     performance.setResourceTimingBufferSize(2_048);

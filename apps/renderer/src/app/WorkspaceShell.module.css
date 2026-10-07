@@ -65,17 +65,26 @@
   gap: 8px;
 }
 
+/* Sits on the Composer as one centered entry group and shares its left edge (see workspace-shell.css). */
 .newSessionIntent {
   grid-area: transcript;
   display: grid;
-  width: min(620px, calc(100% - 48px));
+  width: min(var(--conversation-track-width, 860px), calc(100% - 40px));
   max-height: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
-  place-self: center;
+  justify-self: center;
+  padding-bottom: 4px;
   justify-items: start;
   gap: 10px;
   color: var(--text-secondary);
+}
+
+/* The Workspace name is quiet context in the UI face, never a monospace uppercase eyebrow. */
+.newSessionWorkspaceName {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-support);
+  font-weight: var(--font-weight-medium);
 }
 
 .newSessionIntent h2,
@@ -100,7 +109,7 @@
 
 .environmentSelector {
   display: grid;
-  width: 100%;
+  width: min(620px, 100%);
   gap: var(--space-2);
   padding: 0;
   margin: var(--space-2) 0 0;

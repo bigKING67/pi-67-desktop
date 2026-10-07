@@ -6,14 +6,14 @@ describe("shell store", () => {
     useShellStore.setState(useShellStore.getInitialState(), true);
   });
 
-  it("starts with the workspace inspector visible on files", () => {
+  it("starts with the workspace inspector closed on files without a docked preference", () => {
     expect(useShellStore.getState()).toMatchObject({
       navigationVisible: true,
       sessionSearchFocusRevision: 0,
       sessionSearchHandledRevision: 0,
       modelPickerRequestRevision: 0,
       modelPickerHandledRevision: 0,
-      contextVisible: true,
+      contextVisible: false,
       contextTab: "files",
       contextDetailTab: "session",
       sessionTreeDialogOpen: false,
@@ -79,6 +79,7 @@ describe("shell store", () => {
   });
 
   it("updates the context tab without changing visibility or the palette", () => {
+    useShellStore.setState({ contextVisible: true });
     useShellStore.getState().setContextTab("changes");
 
     expect(useShellStore.getState()).toMatchObject({
@@ -102,6 +103,7 @@ describe("shell store", () => {
   });
 
   it("updates the command palette without changing context state", () => {
+    useShellStore.setState({ contextVisible: true });
     useShellStore.getState().setCommandPaletteOpen(true);
 
     expect(useShellStore.getState()).toMatchObject({

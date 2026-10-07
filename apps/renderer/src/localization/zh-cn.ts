@@ -98,6 +98,9 @@ export const zhCNMessages = {
     hoursAgo: (count: number) => `${count} 小时前`
   },
   transcript: {
+    entryHeading: "从一个具体任务开始",
+    entryGuidance: "描述目标、相关文件和验收标准。Pi 会使用当前工作区、模型和已加载资源。",
+    draftEntryGuidance: "写下目标、相关文件和验收标准。发送后才会创建对话；创建或发送失败时，草稿会继续保留。",
     copyAnswer: "复制回答",
     copyMessage: "复制消息",
     copied: "已复制",

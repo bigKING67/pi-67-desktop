@@ -20,6 +20,7 @@ import {
   selectSessionModels,
   selectSessionFileIdentity
 } from "../session/session-projection-selectors.js";
+import { toggleRendererContext } from "../shell/context-panel-controller.js";
 import { useShellStore } from "../shell/shell-store.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { toggleRendererNavigation } from "../app/global-shortcuts.js";
@@ -122,10 +123,7 @@ export function CommandPalette() {
       settings: () => rendererWorkbenchStore.getState().openSettings(),
       "new-session": () => { void runAfterLeavingSettings(beginRendererSessionIntent); },
       "toggle-navigation": toggleRendererNavigation,
-      "toggle-context": () => {
-        const shell = useShellStore.getState();
-        shell.setContextVisible(!shell.contextVisible);
-      },
+      "toggle-context": () => { void toggleRendererContext(); },
       "find-current-conversation": () => requestConversationFind("current"),
       "find-workspace-conversations": () => requestConversationFind("workspace"),
       "find-workspace-content": () => useShellStore.getState().setWorkspaceContentSearchDialogOpen(true),

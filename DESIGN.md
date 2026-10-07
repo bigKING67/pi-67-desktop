@@ -244,7 +244,11 @@ Application-level surfaces use a separate wide-window shell:
   `上下文` opens one compact secondary segmented row for `会话 / 记忆 / 经验`;
   those detail views never compete for primary-strip width, and their last selection
   persists while switching primary Inspector views.
-  At 1320px and below the Inspector defaults closed and becomes the existing
+  The Inspector defaults closed at every width so the conversation owns the window.
+  In work mode, an explicit toggle (TitleBar, shortcut, or Command Palette) that
+  leaves the Inspector docked, including one that widens the window, is remembered
+  across launches; drawer visibility, automatic closes, and on-demand reveals such as
+  `本轮修改的文件` stay transient. At 1320px and below it becomes the existing
   right-side drawer. This preserves a comfortable central work plane instead of
   waiting until the 320px Inspector and 520px Transcript reach their physical
   minimum. Explicitly opening Inspector first asks Electron Main to widen a
@@ -467,6 +471,12 @@ loading error where the operation can produce those states
   hairline; this changes emphasis only, never the expansion rules above. The empty
   Transcript is one left-aligned column with a display heading, the existing guidance,
   and flat starter rows separated by hairlines (44px minimum target, trailing arrow).
+  The empty Transcript and the New Session Intent surface sit directly on the Composer
+  as one entry group, centered slightly above the middle of the conversation region
+  and sharing the Composer's left edge; guidance and starter rows stay within 560px.
+  After the first Turn the Composer docks at the bottom. A trust banner stays at the
+  top. The intent surface shows the Workspace name in the UI face, not a monospace
+  eyebrow.
 - `本轮修改的文件` sits inside the settled answer above its footer as a quiet bordered
   list (panel radius, border role, no fill): a support-size heading with the count and
   an accent-text `在检查器中查看` link, then up to five 44px rows of file icon, file

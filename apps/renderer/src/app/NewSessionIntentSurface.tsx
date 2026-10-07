@@ -34,11 +34,11 @@ export function NewSessionIntentSurface({ task, workspace }: {
   return (
     <section aria-label="准备新对话" className="conversation-region" data-testid="new-session-intent">
       <TrustBanner />
-      <div className={styles.newSessionIntent}>
-        <span className="section-label">{workspace.displayName}</span>
+      <div className={styles.newSessionIntent} data-transcript-empty="true">
+        <span className={styles.newSessionWorkspaceName}>{workspace.displayName}</span>
         <SessionScopePicker key={task.id} task={task} />
-        <h2>准备新对话</h2>
-        <p>先写下第一条消息。只有点击发送后才会创建 Pi JSONL 会话；创建或发送失败时，草稿会继续保留。</p>
+        <h2>{messages.transcript.entryHeading}</h2>
+        <p>{messages.transcript.draftEntryGuidance}</p>
         <fieldset
           aria-describedby={environmentHelpId}
           className={styles.environmentSelector}

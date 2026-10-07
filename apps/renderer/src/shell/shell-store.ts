@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { readInspectorDockedPreference } from "./inspector-preference.js";
 
 type ShellContextTab = "files" | "changes" | "messages" | "agents" | "context";
 type ShellContextDetailTab = "session" | "memory" | "experience";
@@ -62,7 +63,7 @@ export const useShellStore = create<ShellState>((set) => ({
   sessionSearchHandledRevision: 0,
   modelPickerRequestRevision: 0,
   modelPickerHandledRevision: 0,
-  contextVisible: true,
+  contextVisible: readInspectorDockedPreference(),
   contextTab: "files",
   contextDetailTab: "session",
   sessionChangeFocusRequest: undefined,

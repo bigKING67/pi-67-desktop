@@ -132,7 +132,8 @@ test("uses the latest accepted user message as the current in-memory conversatio
     hasText: "重新检查双栏设置的响应式问题"
   });
   await expect(currentRow).toContainText("重新检查双栏设置的响应式问题");
-  await expect(currentRow).toContainText("未命名会话");
+  // The unnamed placeholder is not repeated as a secondary line.
+  await expect(currentRow).not.toContainText("未命名会话");
   await expect(page.locator(".brand-lockup")).toContainText("重新检查双栏设置的响应式问题");
 });
 

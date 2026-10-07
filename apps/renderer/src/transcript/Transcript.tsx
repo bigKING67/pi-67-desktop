@@ -210,10 +210,10 @@ export function Transcript() {
 
   if (transcriptMessages.length === 0 && !pendingUserTurn && !hasLiveTurn && !hasTurnActivity) {
     return (
-      <div className={styles.empty}>
+      <div className={styles.empty} data-transcript-empty="true">
         <div className={styles.emptyColumn}>
-          <h2>从一个具体任务开始</h2>
-          <p>描述目标、相关文件和验收标准。Pi 会使用当前工作区、模型和已加载资源。</p>
+          <h2>{messagesCatalog.transcript.entryHeading}</h2>
+          <p>{messagesCatalog.transcript.entryGuidance}</p>
           <div className={styles.starterPrompts}>
             {STARTER_PROMPTS.map((prompt) => (
               <button key={prompt} type="button" onClick={() => requestComposerPrefill(prompt)}>
