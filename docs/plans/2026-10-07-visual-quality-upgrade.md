@@ -103,7 +103,12 @@ a surface step or rely on the light-mode hairline allowance.
   `renderer-session-origin.spec.ts` samples every frame and fails if a transcript ever
   renders without its origin line or its first message moves (verified by delaying the
   line 1.5s, which the test caught).
-- 2026-10-08: still open: the deferred items listed above.
+- 2026-10-08 deferred-item closeout: message-action and Settings ⓘ tooltips moved to the
+  `shadowComposer` lift DESIGN already required (message tooltips also adopt the label
+  tooltip border, radius, text and weight). The provider subtitle id/count split is
+  covered by the Phase 5 two-line catalog rows. Doctor icons, keyboard-help icon and
+  credential separation were closed earlier. Remaining: Team Chat border mandates,
+  which need user decisions because DESIGN names them explicitly.
 
 ## Rollback
 Each phase lands as its own commits; revert that phase's commits. Token value

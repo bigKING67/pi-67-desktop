@@ -212,7 +212,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
   background: var(--surface-raised);
-  box-shadow: var(--shadow-floating);
+  box-shadow: var(--shadow-composer);
   color: var(--text-secondary);
   font-size: var(--font-size-support);
   line-height: 1.55;
