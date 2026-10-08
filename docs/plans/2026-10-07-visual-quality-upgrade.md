@@ -127,10 +127,12 @@ a surface step or rely on the light-mode hairline allowance.
   The capability and cost boundary stays visible when creating. No protocol change.
 - 2026-10-08 packaged review of an Agent reply: replies used Markdown in the plain-text
   chat and promised to handle a task card itself. The Agent prompt now asks for plain
-  text and states that teammates handle task cards. Deferred to the next release: the
-  Agent intro shows the model as `provider · model-id` because Agent Host builds
-  `modelLabel` from IDs at bind time; showing the display name needs the label in the
-  bind payload (a protocol change that needs user confirmation).
+  text and states that teammates handle task cards. The Agent intro showed the model as
+  `provider · model-id` because Agent Host built `modelLabel` from IDs at bind time; the
+  bind payload now carries an optional display-name `modelLabel` (user confirmed the
+  protocol change; omitted, Agent Host keeps the ID-derived label).
+- 2026-10-08: the message-mentions-reader gutter rail became a 6% accent tint and the
+  muted unread count lost its ring for a `surface-active` fill (rule 1).
 
 ## Rollback
 Each phase lands as its own commits; revert that phase's commits. Token value

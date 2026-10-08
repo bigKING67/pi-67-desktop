@@ -2375,7 +2375,8 @@ loading error where the operation can produce those states
 - Mentions (P2.5): `@name` runs use the accent-soft fill with accent-strong
   semibold text; the reader's own mention uses an 18% accent fill with primary text
   (2026-10-06: the inverted solid chip was the loudest element on screen), and a
-  message that mentions the reader gets a 2px rail at 45% accent in its left gutter. Unread
+  message that mentions the reader gets a 6% accent tint across the message, lighter than a
+  focused message (2026-10-08: the former gutter rail was a colored edge). Unread
   mentions show an `@N` count on the accent-soft tint without an outline (2026-10-08)
   beside the solid unread count, never the warning role. The mention list
   floats above the composer on the raised surface with the floating shadow, at most
@@ -2449,7 +2450,7 @@ loading error where the operation can produce those states
 - Mute: a small `静音通知`/`取消静音` button with a bell-off/bell glyph ends the
   conversation intro (before `频道设置` in channels). Muted rows add an 11px
   tertiary bell-off mark after the name, and their unread count switches from the
-  solid accent to the neutral muted tile with a border ring; `@N` keeps its accent-soft
+  solid accent to a neutral `surface-active` fill without a ring; `@N` keeps its accent-soft
   tint. General settings carries a `团队聊天通知` section above shortcuts:
   `系统通知` (enable checkbox), `提醒这些动态` (four checkboxes in a wrapping row) and
   `消息预览` with its exposure hint; dependent checkboxes disable while off.

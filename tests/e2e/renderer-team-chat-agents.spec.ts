@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { attachMockAgent, installMockDesktopBridge } from "./pi67-renderer-fixture.js";
+import { attachMockAgent, installMockDesktopBridge, recordedCommandDetails } from "./pi67-renderer-fixture.js";
 import { signIn } from "./pi67-team-chat-controls.js";
 import type { MockTeamChatState } from "./pi67-team-chat-command-fixture.js";
 
@@ -32,6 +32,11 @@ test("creates an Agent that runs on this Desktop in one step and stops it from A
   await expect(page.getByTestId("title-context-current")).toHaveText("写作助手");
   const hosted = await page.evaluate(() => (window as unknown as { __pi67MockTeamChat: MockTeamChatState }).__pi67MockTeamChat.agentHost.bindings);
   expect(hosted).toEqual([expect.objectContaining({ projectId: "project-hk", enabled: true })]);
+  // Teammates see the model's display name, not provider and model IDs.
+  const bind = (await recordedCommandDetails(page)).find((command) => command.type === "teamChat.agent.host.bind");
+  const modelLabel = (bind?.payload as { modelLabel?: unknown } | undefined)?.modelLabel;
+  expect(typeof modelLabel).toBe("string");
+  expect(modelLabel).not.toContain(" · ");
 
   await page.getByRole("button", { name: "Agent 设置" }).click();
   const settings = page.getByRole("dialog", { name: "Agent 设置" });

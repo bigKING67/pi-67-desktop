@@ -100,11 +100,12 @@ export class TeamChatAgentHost {
       case "teamChat.agent.host.get":
         return this.state(access.teamId);
       case "teamChat.agent.host.bind": {
-        const { binding } = payload as TeamChatCommandPayloads["teamChat.agent.host.bind"];
+        const { binding, modelLabel } = payload as TeamChatCommandPayloads["teamChat.agent.host.bind"];
         const agent = (await gateway.listAgents(signal)).find((item) => item.userId === binding.agentUserId);
         if (!agent || agent.ownerUserId !== access.userId) throw invalid("Only your own Agents can run on this Desktop.");
         await this.bindings.put(access.teamId, binding).catch(() => { throw invalid("Each Desktop hosts at most five Agents."); });
-        await gateway.updateAgent(agent.userId, { modelLabel: `${binding.model.provider} · ${binding.model.id}`.slice(0, 120) }, signal);
+        const label = modelLabel?.trim() || `${binding.model.provider} · ${binding.model.id}`;
+        await gateway.updateAgent(agent.userId, { modelLabel: label.slice(0, 120) }, signal);
         this.dependencies.refreshHosting();
         return this.#announce();
       }

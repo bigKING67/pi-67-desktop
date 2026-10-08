@@ -63,11 +63,13 @@
   color: var(--text-primary);
 }
 
-/* A message that mentions the reader keeps a quiet rail so it is findable when scrolling. */
+/* A message that mentions the reader keeps a quiet tint (lighter than a focused message) so
+   it is findable when scrolling; the text keeps its column through the negative margin. */
 .messageMentionsSelf {
-  margin-left: -10px;
-  padding-left: 8px;
-  border-left: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  margin-inline: -10px;
+  padding-inline: 10px;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
 /* A message opened from activity or a notification, briefly. */

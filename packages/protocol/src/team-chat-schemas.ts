@@ -287,7 +287,8 @@ export const TeamChatCommandPayloadSchemas: Record<keyof TeamChatCommandPayloads
   "teamChat.agent.setDisabled": strictObject({ agentUserId: IdSchema, disabled: Type.Boolean() }),
   "teamChat.agent.remove": strictObject({ agentUserId: IdSchema }),
   "teamChat.agent.host.get": EmptySchema,
-  "teamChat.agent.host.bind": strictObject({ binding: AgentBindingSchema }),
+  // modelLabel is the model's display name for teammates; omitted, Agent Host derives it from IDs.
+  "teamChat.agent.host.bind": strictObject({ binding: AgentBindingSchema, modelLabel: Type.Optional(Type.String({ minLength: 1, maxLength: 120 })) }),
   "teamChat.agent.host.unbind": strictObject({ agentUserId: IdSchema }),
   "teamChat.webhook.list": strictObject({ conversationId: IdSchema }),
   "teamChat.webhook.create": strictObject({

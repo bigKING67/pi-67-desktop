@@ -49,7 +49,7 @@ export interface TeamChatCommandPayloads {
   "teamChat.agent.setDisabled": { agentUserId: string; disabled: boolean };
   "teamChat.agent.remove": { agentUserId: string };
   "teamChat.agent.host.get": Record<string, never>;
-  "teamChat.agent.host.bind": { binding: TeamChatAgentBinding };
+  "teamChat.agent.host.bind": { binding: TeamChatAgentBinding; modelLabel?: string };
   "teamChat.agent.host.unbind": { agentUserId: string };
   "teamChat.webhook.list": { conversationId: string };
   "teamChat.webhook.create": { conversationId: string; name: string };

@@ -253,13 +253,15 @@ describe("TeamChatCommandRouter", () => {
     const binding = { agentUserId: "agent-1", workspaceId: "w1", projectId: "p1", model: { provider: "anthropic", id: "claude" }, enabled: true };
     await expect(run("teamChat.agent.host.bind", { binding: { ...binding, agentUserId: "agent-2" } })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
     await expect(run("teamChat.agent.host.bind", { binding })).resolves.toEqual({ bindings: [binding], activity: [] });
+    // A display name from the Renderer replaces the ID-derived label teammates see.
+    await run("teamChat.agent.host.bind", { binding, modelLabel: "Claude Sonnet" });
     expect(events.sendFor).toHaveBeenCalledWith({ type: "teamChat.agentHostChanged", payload: { bindings: [binding], activity: [] } }, expect.anything());
     await expect(run("teamChat.agent.host.get", {})).resolves.toEqual({ bindings: [binding], activity: [] });
     await expect(run("teamChat.agent.setDisabled", { agentUserId: "agent-1", disabled: true })).resolves.toMatchObject({ status: "disabled" });
     await expect(run("teamChat.agent.remove", { agentUserId: "agent-1" })).resolves.toEqual({});
     await expect(run("teamChat.agent.host.get", {})).resolves.toEqual({ bindings: [], activity: [] });
     const bodies = calls.filter((call) => call.init.body !== undefined).map((call) => JSON.parse(call.init.body as string));
-    expect(bodies).toEqual([{ name: "研究助手", description: "宏观" }, { modelLabel: "anthropic · claude" }]);
+    expect(bodies).toEqual([{ name: "研究助手", description: "宏观" }, { modelLabel: "anthropic · claude" }, { modelLabel: "Claude Sonnet" }]);
     router.shutdown();
   });
 

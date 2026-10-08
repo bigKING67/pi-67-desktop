@@ -93,12 +93,14 @@ export function sameHostDraft(left: AgentHostDraft, right: AgentHostDraft): bool
  * Workspace, team project and model for running an Agent on this Desktop. Reports whether
  * choices could load, so a dialog can still create the Agent and leave running for later.
  */
-export function AgentHostFields({ draft, onChange, projects, workspaces, onAvailability }: {
+export function AgentHostFields({ draft, onChange, projects, workspaces, onAvailability, onModelLabel }: {
   draft: AgentHostDraft;
   onChange: (draft: AgentHostDraft) => void;
   projects: Loaded<EnterpriseProjectSummary[]>;
   workspaces: readonly { id: string; label: string }[];
   onAvailability?: (available: boolean) => void;
+  /** The selected model's display name, which teammates see in the Agent intro. */
+  onModelLabel?: (label: string | undefined) => void;
 }) {
   const copy = messages.teamChat;
   const models = useModelOptions(draft.workspaceId);
@@ -110,6 +112,8 @@ export function AgentHostFields({ draft, onChange, projects, workspaces, onAvail
     if (!draft.projectId && Array.isArray(projects) && projects.length === 1) onChange({ ...draft, projectId: projects[0]!.id });
   }, [draft, onChange, projects]);
   useEffect(() => { onAvailability?.(available); }, [available, onAvailability]);
+  const modelLabel = Array.isArray(models) ? models.find((option) => option.id === draft.model)?.label : undefined;
+  useEffect(() => { onModelLabel?.(modelLabel); }, [modelLabel, onModelLabel]);
 
   return (
     <div className={agentStyles.fieldGrid}>

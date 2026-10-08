@@ -23,6 +23,7 @@ export function TeamChatNewAgentDialog({ onClose }: { onClose: () => void }) {
   const [description, setDescription] = useState("");
   const [host, setHost] = useState<AgentHostDraft>(() => hostDraftFrom(undefined, workspaces));
   const [hostAvailable, setHostAvailable] = useState(true);
+  const [modelLabel, setModelLabel] = useState<string>();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -47,7 +48,7 @@ export function TeamChatNewAgentDialog({ onClose }: { onClose: () => void }) {
     const binding = runnable ? bindingFrom(agentUserId, host) : undefined;
     if (binding) {
       // The Agent exists now; a hosting failure is reported, and Agent 设置 can retry it.
-      await teamChat.hostAgent(binding).catch((caught: unknown) => publishNotification({
+      await teamChat.hostAgent(binding, modelLabel).catch((caught: unknown) => publishNotification({
         level: "warning", title: copy.agentCreatedNotRunning, message: teamChatErrorMessage(caught)
       }));
     }
@@ -75,7 +76,8 @@ export function TeamChatNewAgentDialog({ onClose }: { onClose: () => void }) {
             </div>
             <section aria-label={copy.agentHostTitle} className={agentStyles.hostSection}>
               <h3>{copy.agentHostTitle}</h3>
-              <AgentHostFields draft={host} onAvailability={setHostAvailable} onChange={setHost} projects={projects} workspaces={workspaces} />
+              <AgentHostFields draft={host} onAvailability={setHostAvailable} onChange={setHost} onModelLabel={setModelLabel}
+                projects={projects} workspaces={workspaces} />
             </section>
             {error ? <p className={styles.formError} role="alert">{error}</p> : null}
             <div className={styles.dialogActions}>

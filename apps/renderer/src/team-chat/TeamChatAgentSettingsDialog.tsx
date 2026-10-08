@@ -33,6 +33,7 @@ export function TeamChatAgentSettingsDialog({ agent, onClose }: { agent: TeamCha
   const [dailyLimit, setDailyLimit] = useState(String(agent.dailyLimit));
   const [runHere, setRunHere] = useState(running);
   const [host, setHost] = useState<AgentHostDraft>(() => hostDraftFrom(binding, workspaces));
+  const [modelLabel, setModelLabel] = useState<string>();
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -64,7 +65,7 @@ export function TeamChatAgentSettingsDialog({ agent, onClose }: { agent: TeamCha
       await teamChat.updateAgent({ agentUserId: agent.userId, name: name.trim(), description: description.trim(), dailyLimit: limit });
     }
     if (hostDirty) {
-      if (runHere && nextBinding) await teamChat.hostAgent(nextBinding);
+      if (runHere && nextBinding) await teamChat.hostAgent(nextBinding, modelLabel);
       else if (!runHere && binding) await teamChat.stopHostingAgent(agent.userId);
     }
     setHostTouched(false);
@@ -104,7 +105,7 @@ export function TeamChatAgentSettingsDialog({ agent, onClose }: { agent: TeamCha
                   onChange={(selected) => { setHostTouched(true); setRunHere(selected); }} />
               </div>
               {runHere
-                ? <AgentHostFields draft={host} onChange={editHost} projects={projects} workspaces={workspaces} />
+                ? <AgentHostFields draft={host} onChange={editHost} onModelLabel={setModelLabel} projects={projects} workspaces={workspaces} />
                 : <p className={agentStyles.disclosure}>{copy.agentHostNone}</p>}
             </section>
             {activity.length > 0 ? (

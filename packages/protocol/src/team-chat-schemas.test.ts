@@ -88,6 +88,8 @@ describe("Team Chat protocol schemas", () => {
     expect(Value.Check(create, { name: "名".repeat(41), description: "" })).toBe(false);
     const binding = { agentUserId: "a1", workspaceId: "w1", projectId: "p1", model: { provider: "anthropic", id: "claude" }, enabled: true };
     expect(Value.Check(CommandPayloadSchemas["teamChat.agent.host.bind"], { binding })).toBe(true);
+    expect(Value.Check(CommandPayloadSchemas["teamChat.agent.host.bind"], { binding, modelLabel: "Claude Sonnet" })).toBe(true);
+    expect(Value.Check(CommandPayloadSchemas["teamChat.agent.host.bind"], { binding, modelLabel: "" })).toBe(false);
     expect(Value.Check(CommandPayloadSchemas["teamChat.agent.host.bind"], { binding: { ...binding, model: { provider: "" , id: "x" } } })).toBe(false);
     const asked = { ...message, agentInvocations: [{ id: "i1", agentUserId: "a1", status: "rejected", reason: "daily_limit" }] };
     expect(Value.Check(CommandResultSchemas["teamChat.message.send"], asked)).toBe(true);

@@ -368,9 +368,9 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
       const host = await port.request("teamChat.agent.host.get", {});
       settle((state) => ({ ...state, agentHost: host }));
     },
-    async hostAgent(binding: TeamChatAgentBinding): Promise<void> {
+    async hostAgent(binding: TeamChatAgentBinding, modelLabel?: string): Promise<void> {
       const settle = since();
-      const host = await port.request("teamChat.agent.host.bind", { binding });
+      const host = await port.request("teamChat.agent.host.bind", { binding, ...(modelLabel ? { modelLabel } : {}) });
       settle((state) => ({ ...state, agentHost: host }));
     },
     async stopHostingAgent(agentUserId: string): Promise<void> {
