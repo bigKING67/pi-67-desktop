@@ -1,6 +1,6 @@
 # Alpha.48 internal candidate preparation
 
-Status: local preparation (not pushed)
+Status: ready for manual Windows testing (not published)
 Owner: Claude
 Started: 2026-10-08
 
@@ -19,7 +19,7 @@ macOS packaged smoke, and matching source/version/runtime byte identities.
 ## Delivery boundary
 
 The user asked to prepare Alpha.48 on 2026-10-08 and to be asked separately before
-push and R2 publication. No push, Feishu upload, R2 upload/manifest, promotion, Tag,
+push and R2 publication. Push was authorized later the same day; no Feishu upload, R2 upload/manifest, promotion, Tag,
 GitHub Release, signing or notarization without separate current authorization.
 Manual Windows/macOS acceptance cannot inherit Alpha.47 receipts.
 
@@ -36,8 +36,20 @@ Manual Windows/macOS acceptance cannot inherit Alpha.47 receipts.
 
 - [x] Local `check:candidate` on the version source passed first time (969 files / 6517
   tests; capability lock still fresh, no bump needed).
-- [ ] Push (needs authorization), CI, Windows candidate certification.
-- [ ] Exact-source macOS preview and readiness record.
+- [x] Source `e5aa8124` pushed (user authorized). CI `37772492277` passed on attempt 2:
+  attempt 1 failed the known team-chat-search viewport flake and a Windows native smoke
+  renderer checkpoint at 751ms against the 750ms budget (no desktop/shutdown change);
+  only the failed jobs were rerun.
+- [x] `check:candidate` re-run on `e5aa8124` (969 files / 6517 tests); dispatch preflight
+  passed against the Alpha.47 baseline (run `37720999046` attempt 1, actions artifact).
+- [x] Windows candidate `37786381569` attempt 1 passed provenance, build and full installer
+  certification. Downloaded EXE and packaged executable match the candidate identity.
+- [x] Exact-source macOS preview (`e5aa8124`, clean tree) packaged and smoke-tested;
+  app.asar `1c6bd479…` matches the pre-commit build.
+- [x] Readiness record `artifacts/validation/alpha48-candidate/readiness-e5aa8124.json`:
+  Windows EXE `abda3902…` (252,249,856 bytes), DMG `ac946966…` (337,105,160),
+  ZIP `f8e56104…` (343,620,766).
+- [ ] Manual Windows test by the user, then R2 publication (separate authorization).
 
 ## Known risks
 
