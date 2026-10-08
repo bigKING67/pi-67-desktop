@@ -58,7 +58,7 @@ acceptance cannot inherit Alpha.46 receipts.
 - Read-only plan, then `release:r2:publish` from tooling `4ba53368` (source `0d2c6c39`):
   three artifacts uploaded and read back, manifest last, public manifest verified as
   Alpha.47; retention kept Alpha.47/46/42 and deleted the three Alpha.41 artifacts.
-  Receipt: `artifacts/r2-release-receipts/2026-10-08T03-56-02.267Z-local-retention-0.1.0-alpha.47.json`.
+  Receipt: `artifacts/r2-release-receipts/2026-10-08T03-55-56.747Z-publish-0.1.0-alpha.47.json (local retention: 2026-10-08T03-56-02.267Z-local-retention-0.1.0-alpha.47.json)`.
 
 ## Remaining
 
