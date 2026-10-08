@@ -1,6 +1,6 @@
 # Alpha.48 internal candidate preparation
 
-Status: ready for manual Windows testing (not published)
+Status: Windows tested by the user; R2 publication deferred
 Owner: Claude
 Started: 2026-10-08
 
@@ -49,7 +49,9 @@ Manual Windows/macOS acceptance cannot inherit Alpha.47 receipts.
 - [x] Readiness record `artifacts/validation/alpha48-candidate/readiness-e5aa8124.json`:
   Windows EXE `abda3902…` (252,249,856 bytes), DMG `ac946966…` (337,105,160),
   ZIP `f8e56104…` (343,620,766).
-- [ ] Manual Windows test by the user, then R2 publication (separate authorization).
+- [x] Manual Windows test: the user reported "测试通过" on 2026-10-08 for the candidate
+  above (run `37786381569` attempt 1, EXE `abda3902…`); the machine count was not stated.
+- [ ] R2 publication: deferred by the user ("暂时不发布R2更新"); needs separate authorization.
 
 ## Known risks
 
