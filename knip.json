@@ -36,6 +36,9 @@
     "packages/domain": {
       "project": ["src/**/*.ts"]
     },
+    "packages/image-engine": {
+      "project": ["src/**/*.ts", "scripts/**/*.mjs"]
+    },
     "packages/pi-runtime": {
       "project": ["src/**/*.ts"]
     },

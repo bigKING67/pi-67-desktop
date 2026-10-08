@@ -1,0 +1,38 @@
+export { SCHEMA, LEGACY_SCHEMAS, LIMITS, validateDocument, validateAsset, validateCanvas } from "./document.js";
+export type { Asset, Canvas, Change, ChangeAuthor, FontBinding, ImageDocument, ImageObject, ObjectBase, RectObject, SceneObject, TextObject } from "./document.js";
+export { fontManifest, fontDirectory, installedFont, checkGlyphs, checkTextWidths } from "./font.js";
+export { sha256, writeOnce, encodeJson } from "./content-store.js";
+export { regularPath, assertOutsideProject, readBytes, importRaster, saveAsset, readAsset } from "./raster.js";
+export type { ImportedRaster } from "./raster.js";
+export { maskBytes, importMask, compositeRaster, validateContext } from "./composite.js";
+export type { CompositeQa, EditContext, MaskData } from "./composite.js";
+export { createProject, createPhotoProject, readProject, editBatch, candidateDocument, encode } from "./project.js";
+export type { ProjectState, PublishedRevision, EditBatch, CreateInput } from "./project.js";
+export { compose } from "./render-compose.js";
+export type { Composition, TextMeasurement } from "./render-compose.js";
+export { renderProject, RenderError, RENDER_SCHEMA } from "./render.js";
+export type { RenderOptions, RenderReceipt } from "./render.js";
+export { renderToDirectory } from "./render-worker.js";
+export type { RenderWorkerData, RenderWorkerReply, RenderWorkerResult } from "./render-worker.js";
+export {
+  CANDIDATE_SCHEMA, LEGACY_CANDIDATE_SCHEMAS, MASK_KEYS, validateCandidate, readCandidateEntry, candidateIds, releaseDecisionLock
+} from "./candidate-store.js";
+export type { Candidate, CandidateEdit, CandidateEntry, CandidateMode, Decision, LockRelease, MaskBinding, MaskKey } from "./candidate-store.js";
+export { stageCandidate, inspectCandidate, listCandidates, acceptCandidate, discardCandidate, unlockCandidate } from "./candidates.js";
+export type { CandidateInspection, CandidateListFailure, CandidateStatus, StagedCandidate } from "./candidates.js";
+export { compareCandidate } from "./candidate-compare.js";
+export type { ComparisonReport } from "./candidate-compare.js";
+export { preparePhotoProject } from "./photo-layout.js";
+export type { EdgeColor, PhotoEdges, PhotoLayout, PreparedPhotoProject, StarterLayout } from "./photo-layout.js";
+export { templateCanvas } from "./photo-templates.js";
+export type { PhotoBrief, TemplateLayout } from "./photo-templates.js";
+export { cropPhoto, CROP_SCHEMA } from "./photo-crop.js";
+export type { CropReceipt, CropRectangle } from "./photo-crop.js";
+export { copyVariants, COPY_VARIANTS_SCHEMA } from "./copy-variants.js";
+export type { VariantManifest, VariantResult, VariantSpec, TextUpdate } from "./copy-variants.js";
+export { PROFILE_MODELS, IMAGE_MODELS, validateExecution, readExecution } from "./provider-store.js";
+export type { ExecutionBinding, ExecutionReceipt } from "./provider-store.js";
+export { ALPHA_ERRORS, inspectAlpha, requireAlpha, verifyAlpha } from "./provider-alpha.js";
+export type { AlphaEvidence } from "./provider-alpha.js";
+export { normalizeImage } from "./provider-normalize.js";
+export type { Normalization, OutputPolicy } from "./provider-normalize.js";

@@ -43,6 +43,19 @@ Copyright 2022 The Maple Mono Project Authors。许可证为 SIL Open Font Licen
 1.1，完整文本位于 `licenses/MapleMono-OFL-1.1.txt`。Reserved Font Name 为
 `Maple Mono`。
 
+## Image engine
+
+`packages/image-engine` 自 craft67 `creative-craft` 图像执行器移植（同一作者，MIT），基线与
+文件映射见 `docs/provenance/image-engine-port.md`。它引入的第三方依赖：
+
+- Satori 0.35.0：MPL-2.0
+- @resvg/resvg-js 2.6.2：MPL-2.0（Node 绑定及其旧核心按自身条款）
+- Sharp 0.35.5：Apache-2.0；libvips 与原生/传递依赖保留各自条款
+- Noto Sans CJK SC Regular（`notofonts/noto-cjk`）：SIL Open Font License 1.1，许可文本位于
+  `packages/image-engine/fonts/OFL.txt`（随字体上游提供，版权声明以上游字体文件内嵌信息为准）。
+  字体二进制不入库，按 `packages/image-engine/fonts/manifest.json` 的来源 commit、字节数与
+  SHA-256 拉取并校验。
+
 ## Electron and web runtime
 
 - Electron：MIT License

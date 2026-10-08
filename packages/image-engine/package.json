@@ -1,0 +1,29 @@
+{
+  "name": "@pi67/image-engine",
+  "version": "0.1.0-alpha.48",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts src/render-worker.ts --format esm --dts --deps.never-bundle sharp --deps.never-bundle satori --deps.never-bundle @resvg/resvg-js",
+    "build:worker": "tsdown src/render-worker.ts --format esm --dts false --deps.never-bundle sharp --deps.never-bundle satori --deps.never-bundle @resvg/resvg-js",
+    "fetch-font": "node scripts/fetch-font.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "2.6.2",
+    "satori": "0.35.0",
+    "sharp": "0.35.5"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "tsdown": "0.22.13",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}

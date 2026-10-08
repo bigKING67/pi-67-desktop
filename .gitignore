@@ -31,3 +31,6 @@ apps/desktop/resources/team-mcp/tavily-bridge.token
 
 # Python bytecode from the bundled worker tests
 __pycache__/
+
+# Pinned image-engine font binary is fetched, verified by manifest and never committed
+packages/image-engine/fonts/*.otf

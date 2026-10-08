@@ -1,6 +1,6 @@
 # Image workbench P1: engine, tools and protocol
 
-Status: proposed
+Status: active
 Owner: Claude
 Started: 2026-10-08
 Last updated: 2026-10-08
@@ -46,7 +46,8 @@ Product model: `docs/architecture/image-workbench-product-model.md`; decisions:
 
 | State | Evidence | Source | Verified at |
 | --- | --- | --- | --- |
-| OBSERVED | Executor: ~2.5k lines ESM, 99 tests, deps satori 0.35.0 / resvg-js 2.6.2 / sharp 0.35.5, bundled Noto Sans CJK SC; MIT | craft67 `integrations/image-production` | 2026-10-08 |
+| OBSERVED | Executor: ~1.8k lines ESM source, 90 `node:test` cases (25 Provider), deps satori 0.35.0 / resvg-js 2.6.2 / sharp 0.35.5, bundled Noto Sans CJK SC; MIT | craft67 `integrations/image-production` at `8e2a37f8` | 2026-10-08 |
+| OBSERVED | Ported engine: typecheck, oxlint, architecture (0 cycles), structure, knip and dependency audit pass; 63/63 vitest tests pass on macOS arm64 Node 24 in 18 s | `corepack pnpm exec vitest run packages/image-engine` | 2026-10-08 |
 | OBSERVED | Adapter currently reads `~/.codex/config.toml` and `auth.json`; Provider contract validation and prompt compilation live in the Python Skill scripts | executor README | 2026-10-08 |
 | OBSERVED | Agent via Bash CLI: 213–285 s, 17–25 tool calls for title edit + reflow + undo | executor `ACCEPTANCE.md` | 2026-10-04 |
 | OBSERVED | First-party Pi extension precedent with `pi.registerTool` | `packages/openviking-pi-extension/tools.ts` | 2026-10-08 |
@@ -83,8 +84,11 @@ Product model: `docs/architecture/image-workbench-product-model.md`; decisions:
 
 ## Checkpoints
 
-- [ ] 1. `packages/image-engine`: port sources and tests; structure/dead-code/
-      license governance pass; fonts fetched and hashed in build; 99/99 tests.
+- [x] 1. `packages/image-engine`: port sources and tests; structure/dead-code/
+      license governance pass; fonts fetched and hashed in build. Done 2026-10-08:
+      63 vitest tests (the executor's 65 non-Provider `node:test` cases minus 3
+      CLI-argument tests plus a legacy-schema test); Provider execution and its 25
+      tests move to checkpoint 2. Baseline and file map: `docs/provenance/image-engine-port.md`.
 - [ ] 2. Node Provider adapter: Pi Provider configuration seam; shared fixtures
       for Image Job v2 / Execution Receipt parity; mock Provider in tests.
 - [ ] 3. `packages/protocol`: `image.*` commands/events with schemas and revision
@@ -133,6 +137,12 @@ are additive. No user directories are rewritten (import is read-only).
 
 - 2026-10-08: plan created after the user confirmed the port-into-New-Money
   direction, Agent Host hosting and the image workbench layout; no code yet.
+- 2026-10-08: checkpoint 1 complete. `packages/image-engine` (TypeScript strict,
+  worker_threads renderer, `newmoney.image-project.v1` with read-only legacy
+  import) registered in `build:packages`, `prepare:image-engine` (font fetch +
+  worker build before vitest), knip and the vitest alias; font binary ignored in
+  Git; THIRD_PARTY_NOTICES and provenance recorded. Next: checkpoint 2 (Node
+  Provider adapter reading Pi Provider configuration).
 
 ## Closeout
 
