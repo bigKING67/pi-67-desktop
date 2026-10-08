@@ -247,7 +247,7 @@ test("mentions channel members, manages the channel and follows the team chat po
 
 test("asks an Agent member, follows its request state and manages own Agents", async ({ page }) => {
   await page.goto("/");
-  await attachMockAgent(page);
+  await attachMockAgent(page, [], {}, { responseResults: { "enterprise.project.list": { items: [], total: 0 } } });
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.getByRole("group", { name: "工作模式" }).getByRole("button", { name: "聊天" }).click();
   await signIn(page);
@@ -280,17 +280,25 @@ test("asks an Agent member, follows its request state and manages own Agents", a
   await expect(log.getByText("宏观助手 正在回复…")).toHaveCount(0);
   await expect(log.getByRole("article").filter({ hasText: "2.9%" }).getByText("Agent", { exact: true })).toBeVisible();
 
-  await page.getByTestId("team-chat-manage-agents").click();
-  const dialog = page.getByRole("dialog", { name: "我的 Agent" });
-  await expect(dialog.getByText("你还没有 Agent。")).toBeVisible();
-  await dialog.getByRole("textbox", { name: "名称" }).fill("写作助手");
-  await dialog.getByRole("button", { name: "新建" }).click();
-  const card = dialog.getByRole("article", { name: "写作助手" });
-  await expect(card).toBeVisible();
-  await expect(card.getByText("未在这台电脑上运行。同事的请求会在 10 分钟后过期。")).toBeVisible();
-  await card.getByRole("button", { name: "停用" }).click();
-  await expect(card.getByText("已停用")).toBeVisible();
-  await dialog.getByRole("button", { name: "关闭" }).click();
+  // Another owner's Agent has no settings entry in its direct message.
+  await expect(page.getByRole("button", { name: "Agent 设置" })).toHaveCount(0);
+
+  // Without team projects the Agent can still be created; running is left for Agent 设置.
+  await page.getByTestId("team-chat-new-agent").click();
+  const create = page.getByRole("dialog", { name: "新建 Agent" });
+  await expect(create.getByText("Agent 只能对话：没有任何工具", { exact: false })).toBeVisible();
+  await create.getByRole("textbox", { name: "名称" }).fill("写作助手");
+  await expect(create.getByRole("button", { name: "新建并运行" })).toHaveCount(0);
+  await create.getByRole("button", { name: "新建", exact: true }).click();
+  await expect(create).toHaveCount(0);
+  await expect(page.getByTestId("title-context-current")).toHaveText("写作助手");
+  await page.getByRole("button", { name: "Agent 设置" }).click();
+  const settings = page.getByRole("dialog", { name: "Agent 设置" });
+  await expect(settings.getByText("未在这台电脑上运行。同事的请求会在 10 分钟后过期。")).toBeVisible();
+  await expect(settings.getByRole("button", { name: "保存" })).toHaveCount(0);
+  await settings.getByRole("button", { name: "停用" }).click();
+  await expect(settings.getByText("已停用")).toBeVisible();
+  await settings.getByRole("button", { name: "关闭" }).click();
   await expect(navigation.getByRole("button", { name: "写作助手，Agent，已停用，我的" })).toBeVisible();
 });
 

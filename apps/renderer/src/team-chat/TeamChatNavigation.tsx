@@ -1,4 +1,4 @@
-import { Bell, BellOff, Hash, Lock, Plus, Settings2 } from "lucide-react";
+import { Bell, BellOff, Hash, Lock, Plus } from "lucide-react";
 import { useState } from "react";
 import { Button } from "react-aria-components";
 import {
@@ -18,7 +18,7 @@ import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { conversationTitle, directMessageWith } from "./team-chat-model.js";
 import { teamChat, useTeamChat } from "./team-chat-instance.js";
 import { agentPresenceLabel, RowCounts, TeamChatAgentAvatar, TeamChatAvatar } from "./TeamChatParts.js";
-import { TeamChatAgentsDialog } from "./TeamChatAgentsDialog.js";
+import { TeamChatNewAgentDialog } from "./TeamChatNewAgentDialog.js";
 import { TeamChatSearchField } from "./TeamChatSearchField.js";
 import agentStyles from "./TeamChatAgents.module.css";
 import styles from "./TeamChat.module.css";
@@ -29,7 +29,7 @@ export function TeamChatNavigation({ onCreateChannel }: { onCreateChannel: () =>
   const directory = useTeamChat((state) => state.directory);
   const directoryStatus = useTeamChat((state) => state.directoryStatus);
   const selectedId = useTeamChat((state) => state.panel ? undefined : state.selectedConversationId);
-  const [agentsOpen, setAgentsOpen] = useState(false);
+  const [newAgentOpen, setNewAgentOpen] = useState(false);
 
   if (connection?.status === "signed-out") {
     return (
@@ -61,7 +61,6 @@ export function TeamChatNavigation({ onCreateChannel }: { onCreateChannel: () =>
       && !directory.agents.some((agent) => agent.userId === peer);
   });
   const canCreateAgent = teamChatCanCreateAgent(directory);
-  const ownsAgents = directory.agents.some((agent) => agent.ownerUserId === directory.selfUserId);
 
   return (
     <nav aria-label={copy.region} className={styles.railLists} data-testid="team-chat-navigation">
@@ -112,10 +111,10 @@ export function TeamChatNavigation({ onCreateChannel }: { onCreateChannel: () =>
       <section aria-labelledby="team-chat-agents" className={styles.railSection}>
         <header>
           <h2 id="team-chat-agents">{copy.agents}</h2>
-          {canCreateAgent || ownsAgents ? (
-            <Button aria-label={copy.manageAgents} className={styles.railIconButton!} data-testid="team-chat-manage-agents"
-              onPress={() => setAgentsOpen(true)}>
-              <Settings2 aria-hidden="true" size={14} />
+          {canCreateAgent ? (
+            <Button aria-label={copy.agentCreateTitle} className={styles.railIconButton!} data-testid="team-chat-new-agent"
+              onPress={() => setNewAgentOpen(true)}>
+              <Plus aria-hidden="true" size={14} />
             </Button>
           ) : null}
         </header>
@@ -135,7 +134,7 @@ export function TeamChatNavigation({ onCreateChannel }: { onCreateChannel: () =>
           </ul>
         )}
       </section>
-      {agentsOpen ? <TeamChatAgentsDialog onClose={() => setAgentsOpen(false)} /> : null}
+      {newAgentOpen ? <TeamChatNewAgentDialog onClose={() => setNewAgentOpen(false)} /> : null}
     </nav>
   );
 }

@@ -119,6 +119,12 @@ a surface step or rely on the light-mode hairline allowance.
   presence and thumbnail rings, day separators, the Work Card, and the one-time Webhook
   URL block (recovery exception). Not yet reviewed: the 2px accent rail on messages that
   mention the reader and the muted unread-count ring.
+- 2026-10-08 Agent management (user approved the proposal): Agents are managed like
+  channels. A `+` beside the Agent section opens `新建 Agent`, which creates and runs the
+  Agent on this Desktop in one step and opens its direct message; `Agent 设置` in the
+  owner's direct message replaces the multi-Agent dialog, with one dirty-only save and a
+  single on/off switch (off unbinds) instead of a checkbox plus a separate stop button.
+  The capability and cost boundary stays visible when creating. No protocol change.
 
 ## Rollback
 Each phase lands as its own commits; revert that phase's commits. Token value

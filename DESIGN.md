@@ -2349,12 +2349,22 @@ loading error where the operation can produce those states
   senders carry a filled (`surface-active`, no outline) caption-size (11px) `Agent` pill badge in medium weight. Request states sit under the asking
   message as tertiary caption lines (secondary text for problems), one per Agent,
   and disappear once the reply arrives. A direct message with an Agent adds an intro
-  block (badge, owner and presence, description, disclosure) in caption text. The
-  `我的 Agent` dialog is at most 640px wide and scrolls inside the viewport: a
-  create row, then one unframed `surface-muted` card per Agent with its fields in a two-column grid
-  (one column under 620px), a `在这台电脑上运行` section set off by spacing and its heading, and the
-  last three runs as caption lines. Removal arms on the first press like channel
-  actions.
+  block (badge, owner and presence, description, disclosure) in caption text.
+  Agents are managed like channels (2026-10-08): the Agent section header carries a `+`
+  (`新建 Agent`) only for roles that may create Agents, and the owner's direct message
+  with an Agent ends its header with `Agent 设置`, the counterpart of `频道设置`; there is
+  no multi-Agent management dialog. Both dialogs use the channel dialog anatomy at
+  600px with fields in a two-column grid (one column under 620px). `新建 Agent` shows the
+  capability and cost boundary as a visible line under the title, then name and
+  description, then a `在这台电脑上运行` section (Workspace with an ⓘ for where reply
+  Sessions are saved, team project prefilled when there is one, and a model select with
+  the Settings model anatomy); its primary action is `新建并运行`, or `新建` when no
+  project or model is available yet, and it opens the new Agent's direct message.
+  `Agent 设置` shows the Agent identity line, the profile fields, a `在这台电脑上运行`
+  section whose heading carries the on/off switch (fields appear only while on; off shows
+  the one-line expiry hint), the last three runs as caption lines, then a footer with
+  `停用`/`启用` and `删除` (arming on the first press) on the left and `关闭` plus a
+  `保存` that appears only while the draft differs on the right.
 - Webhooks (P3c): `频道设置` gains a `集成 · Webhook` section, set off by spacing, for
   managers: an intro, a name field with `创建 Webhook`, then 38px rows (name, last
   use, `重置地址`/`删除` arming like other destructive steps). A newly created or

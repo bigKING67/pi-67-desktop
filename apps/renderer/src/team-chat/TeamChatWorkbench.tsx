@@ -12,6 +12,7 @@ import { TeamChatActivity } from "./TeamChatActivity.js";
 import { TeamChatSearch } from "./TeamChatSearch.js";
 import { agentPresenceLabel, TeamChatAgentAvatar, TeamChatAgentBadge, TeamChatAvatar } from "./TeamChatParts.js";
 import agentStyles from "./TeamChatAgents.module.css";
+import { TeamChatAgentSettingsDialog } from "./TeamChatAgentSettingsDialog.js";
 import { TeamChatChannelSettings } from "./TeamChatChannelSettings.js";
 import { TeamChatComposer } from "./TeamChatComposer.js";
 import { TeamChatTimeline } from "./TeamChatTimeline.js";
@@ -100,6 +101,8 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
   const peerAgent = conversation.kind === "dm"
     ? directory.agents.find((agent) => agent.userId === teamChatDirectPeer(conversation, directory.selfUserId))
     : undefined;
+  // Only the owner manages an Agent; its settings live in its direct message, like 频道设置.
+  const ownAgent = peerAgent?.ownerUserId === directory.selfUserId ? peerAgent : undefined;
   const header = (
     <>
       <header className={styles.conversationIntro}>
@@ -115,7 +118,12 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
             ) : null}</>
           : <>{peerAgent ? <TeamChatAgentAvatar agent={peerAgent} /> : <TeamChatAvatar name={title} />}
             <strong>{title}</strong><span>{copy.directMessages}</span>
-            <MuteButton conversation={conversation} /></>}
+            <MuteButton conversation={conversation} />
+            {ownAgent ? (
+              <Button aria-label={copy.agentSettings} className="small-button" onPress={() => setSettingsOpen(true)}>
+                <Settings2 aria-hidden="true" size={14} />{copy.agentSettings}
+              </Button>
+            ) : null}</>}
       </header>
       <AgentIntro conversation={conversation} directory={directory} />
       {!thread || thread.status === "loading" ? <p className={styles.timelineStatus} role="status">{copy.loadingMessages}</p> : null}
@@ -161,7 +169,9 @@ function ConversationView({ conversation, directory }: { conversation: TeamChatC
       {conversation.joined
         ? <TeamChatComposer conversation={conversation} directory={directory} onSent={() => setScrollRequest((value) => value + 1)} target={target} />
         : <JoinCard conversation={conversation} title={title} />}
-      {settingsOpen ? <TeamChatChannelSettings conversation={conversation} directory={directory} onClose={() => setSettingsOpen(false)} /> : null}
+      {settingsOpen && conversation.kind === "channel"
+        ? <TeamChatChannelSettings conversation={conversation} directory={directory} onClose={() => setSettingsOpen(false)} /> : null}
+      {settingsOpen && ownAgent ? <TeamChatAgentSettingsDialog agent={ownAgent} onClose={() => setSettingsOpen(false)} /> : null}
     </>
   );
 }

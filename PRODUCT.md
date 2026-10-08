@@ -206,11 +206,15 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
     `正在回复…`, or why it did not reply (daily limit, disabled, not set up, model
     unavailable, error, expired). The reply arrives as a message from the Agent
     with an `Agent` badge.
-  - `管理我的 Agent` creates Agents (unless the team restricts it to owners/admins;
-    viewers never), edits name, description and daily limit, disables or deletes
-    them, and chooses how this Desktop runs each one: Workspace (its Sessions are
-    saved there for review), team project, a configured model, and an on/off switch.
-    Agents only converse: no tools, files, commands or network.
+  - `新建 Agent` (the `+` beside the Agent section; never for viewers, and only for
+    owners/admins when the team restricts it) creates an Agent and, in the same step,
+    chooses how this Desktop runs it: Workspace (its Sessions are saved there for
+    review), team project and a configured model. When no project or model is available
+    it creates the Agent without running it. `Agent 设置`, opened from the owner's direct
+    message with the Agent, edits name, description and daily limit, turns running on
+    this Desktop on or off with one switch (off removes this Desktop's run settings),
+    and disables or deletes the Agent. Agents only converse: no tools, files, commands
+    or network.
 - Webhook bots (P3c, contract `docs/adr/0005-team-chat-webhooks.md`): in `频道设置`,
   channel owners and team owners/admins create a webhook bot for the channel and see
   its delivery URL once (copy, rotate, delete). CI, monitoring or scripts post plain
