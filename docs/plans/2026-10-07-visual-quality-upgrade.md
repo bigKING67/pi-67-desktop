@@ -125,6 +125,12 @@ a surface step or rely on the light-mode hairline allowance.
   owner's direct message replaces the multi-Agent dialog, with one dirty-only save and a
   single on/off switch (off unbinds) instead of a checkbox plus a separate stop button.
   The capability and cost boundary stays visible when creating. No protocol change.
+- 2026-10-08 packaged review of an Agent reply: replies used Markdown in the plain-text
+  chat and promised to handle a task card itself. The Agent prompt now asks for plain
+  text and states that teammates handle task cards. Deferred to the next release: the
+  Agent intro shows the model as `provider · model-id` because Agent Host builds
+  `modelLabel` from IDs at bind time; showing the display name needs the label in the
+  bind payload (a protocol change that needs user confirmation).
 
 ## Rollback
 Each phase lands as its own commits; revert that phase's commits. Token value
