@@ -1,6 +1,6 @@
 # Alpha.47 internal candidate preparation
 
-Status: ready for manual testing
+Status: published to the internal R2 update channel (2026-10-08)
 Owner: Claude
 Started: 2026-10-08
 
@@ -46,11 +46,25 @@ acceptance cannot inherit Alpha.46 receipts.
   Windows EXE `7579ab8f…742a` (252,265,706 bytes), DMG `8f25cc74…2e07` (337,107,620),
   ZIP `fc7b93f4…af13` (343,617,104); repository, source, version and Pi runtime match.
 
+## Publication
+
+- The user reported "Windows 测过了，没问题" and authorized R2 publication of Alpha.47 on
+  2026-10-08. The machine count was not stated. The Windows test receipt (actor
+  `bigKING67`) binds that confirmation to run `37720999046` attempt 1 and the exact
+  EXE/executable hashes (candidate identity `27121cd2…d2a0`).
+- Before writing, Alpha.46 (the public version) Main manifest parsing and renderer
+  update-state validation were replayed from `d41922a` sources against the new manifest:
+  accepted for Windows and macOS in available/downloading/installing.
+- Read-only plan, then `release:r2:publish` from tooling `4ba53368` (source `0d2c6c39`):
+  three artifacts uploaded and read back, manifest last, public manifest verified as
+  Alpha.47; retention kept Alpha.47/46/42 and deleted the three Alpha.41 artifacts.
+  Receipt: `artifacts/r2-release-receipts/2026-10-08T03-56-02.267Z-local-retention-0.1.0-alpha.47.json`.
+
 ## Remaining
 
-- Feishu upload, R2 publication: each needs separate authorization.
-- Manual acceptance on Windows x64 (clean and existing Pi profile) and Apple Silicon,
-  bound to the hashes above.
+- In-app `检查更新 -> 下载并安装 -> restart -> version` on Windows x64 and an installed
+  macOS arm64 copy (from Alpha.46).
+- Feishu mirror was not used for this round.
 
 ## Known risks
 
