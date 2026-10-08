@@ -2763,6 +2763,20 @@ gap 后保留旧 Host 或旧 Session 的 Extension 状态。
   UI is a declaration, not live verification, and a sent native request must never
   silently fall back.
 
+## Image workbench commands
+
+ADR 0010。`image.project.list|read|edit|render` 与 `image.candidate.list|accept|discard` 均为
+Workspace-scoped：envelope 的 `workspaceId` 加 payload 的 `projectId` 定位工程，renderer 不发送任何路径；
+`imageProjectRelativePath`（`@pi67/domain`）决定工程在 Workspace 内的位置（创作库在根下，普通 Workspace 在
+`.newmoney/images/`）。renderer 可提交的编辑不含 `add_asset`：导入文件只经 Main 对话框或 Agent 工具。
+Host 把 renderer 发起的修订一律记为 `human`。引擎拒绝以现有错误码返回，具体原因放在
+`details.imageReason`（`imageEngineFailure` 分类，如 `revision_conflict`、`locked`、`text_overflow`）；
+`base_revision` 是 Agent 与人唯一的写冲突规则，过期修订上的编辑不静默重基。事件
+`image.project.changed`、`image.candidate.changed`、`image.job.changed` 同为 Workspace-scoped，renderer 收到
+后重读，不在事件里携带图片字节。协议结构与 domain 类型由编译期检查保持一致，引擎测试另外校验它发布的
+每个修订都满足 `ImageDocumentSchema`。引擎宿主落地前（P1 检查点 5），Host 对全部图像命令返回可恢复的
+`UNSUPPORTED`（`imageReason: engine_unavailable`）。
+
 ## Team Chat transport
 
 ADR 0003 是权威合同。Team Chat 不经过 Pi Runtime、Task Scheduler 或 Session 权限：

@@ -95,9 +95,14 @@ Product model: `docs/architecture/image-workbench-product-model.md`; decisions:
       takes an injected `ProviderCredentials` resolver (the Pi seam itself is
       wired in checkpoint 4 via `ctx.modelRegistry.getApiKeyAndHeaders`); 35
       loopback-HTTP Provider tests; engine total 139 tests.
-- [ ] 3. `packages/protocol`: `image.*` commands/events with schemas and revision
+- [x] 3. `packages/protocol`: `image.*` commands/events with schemas and revision
       bump; `packages/domain`: candidate state machine and conflict policy with
-      tests.
+      tests. Done 2026-10-09: seven Workspace-scoped `image.*` commands and three
+      events; domain image-workbench policy (candidate actions, failure
+      classification, edit submission, project location, task budget, prompt
+      context block); compile-time protocol↔domain type parity and an engine test
+      that every published revision passes `ImageDocumentSchema`; Host routes
+      image commands to a fail-closed `UNSUPPORTED` router until checkpoint 5.
 - [ ] 4. `packages/image-pi-extension`: `image_*` tools, compact results with
       preview paths; build under the Desktop-owned extension boundary; tests.
 - [ ] 5. `apps/agent-host`: engine host, per-project queue, worker pool, cancel,
@@ -151,6 +156,12 @@ are additive. No user directories are rewritten (import is read-only).
   set (21 cases) missed size, prompt, reference and rights rules; expanding it
   to 38 Python-generated cases exposed the gap, which the Node port now covers.
   Next: checkpoint 3 (protocol `image.*` and domain policy).
+- 2026-10-09: checkpoint 3 complete; protocol revision regenerated.
+  The type parity check caught a candidate-status union built with `.map()`
+  that had widened to `string`. Structured message context is a deterministic
+  text block (`formatImagePromptContext`), not a `prompt.submit` wire change.
+  The library index stays a Main concern (checkpoint 6). Next: checkpoint 4
+  (`packages/image-pi-extension`).
 - 2026-10-09 handoff checkpoint (model switch, same session): checkpoint 2 in
   progress, uncommitted and not yet typechecked. Dirty scope, all inside
   `packages/image-engine`: new `src/provider-profiles.ts` (profiles + surfaces

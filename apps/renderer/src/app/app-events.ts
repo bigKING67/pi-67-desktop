@@ -110,6 +110,10 @@ export function handleAgentEvent<TState extends AppEventState>(
     case "teamChat.pushed":
     case "teamChat.connectionChanged":
     case "teamChat.agentHostChanged":
+    // The image workbench subscribes to its Workspace-scoped events directly (ADR 0010).
+    case "image.project.changed":
+    case "image.candidate.changed":
+    case "image.job.changed":
       return true;
     default:
       assertNever(event);

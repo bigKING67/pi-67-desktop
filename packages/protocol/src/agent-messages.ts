@@ -43,14 +43,11 @@ import type {
   NativeSubagentView,
   NativeSubagentWaitResult
 } from "@pi67/domain";
-import type {
-  ConversationOrganizationCommandPayloads,
-  ConversationOrganizationCommandResults,
-  SessionNameMutation
-} from "./conversation-organization-messages.js";
+import type { ConversationOrganizationCommandPayloads, ConversationOrganizationCommandResults, SessionNameMutation } from "./conversation-organization-messages.js";
 import type { LarkCommandPayloads, LarkCommandResults } from "./lark-command-messages.js";
 import type { SessionRecoveryCommandPayloads, SessionRecoveryCommandResults } from "./session-recovery-messages.js";
 import type { TeamChatCommandPayloads, TeamChatCommandResults } from "./team-chat-command-messages.js";
+import type { ImageCommandPayloads, ImageCommandResults } from "./image-command-messages.js";
 import type { ContextMemoryCommandPayloads, ContextMemoryCommandResults } from "./context-memory-messages.js";
 import type {
   PiAutoRoutingSelection, PiCredentialRevealResult, PiModelCatalogRefreshResult,
@@ -194,7 +191,7 @@ export type SessionCatalogPageResult = Omit<SessionCatalogPage, "items"> & {
 
 export interface CommandPayloads extends WorkspaceFileCommandPayloads,
   ConversationOrganizationCommandPayloads, LarkCommandPayloads, ContextMemoryCommandPayloads,
-  TeamChatCommandPayloads, SessionRecoveryCommandPayloads {
+  TeamChatCommandPayloads, SessionRecoveryCommandPayloads, ImageCommandPayloads {
   "runtime.initialize": {
     cwd: string;
     agentDir?: string;
@@ -336,7 +333,7 @@ export interface CommandPayloads extends WorkspaceFileCommandPayloads,
 
 export interface CommandResults extends WorkspaceFileCommandResults,
   ConversationOrganizationCommandResults, LarkCommandResults, ContextMemoryCommandResults,
-  TeamChatCommandResults, SessionRecoveryCommandResults {
+  TeamChatCommandResults, SessionRecoveryCommandResults, ImageCommandResults {
   "runtime.initialize": ProjectionMutationAcknowledgement;
   "runtime.getStatus": RuntimeStatusResult;
   "projection.resync": ProjectionResyncResult;

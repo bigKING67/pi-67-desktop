@@ -17,6 +17,7 @@ import {
 import { HostCommandError } from "./protocol-error.js";
 import { dispatchSessionRecoveryCommand } from "./session-recovery-command.js";
 import type { TeamChatCommandType } from "./team-chat/team-chat-command-router.js";
+import type { ImageCommandType } from "./image/image-command-router.js";
 export { operationSubmissionIdentity } from "./operation-submission-identity.js";
 export type RuntimeLoadedCommand = Exclude<
   AgentCommand,
@@ -106,6 +107,7 @@ export type RuntimeLoadedCommand = Exclude<
       | "lark.auth.login.begin"
       | "lark.app.configuration.save"
       | TeamChatCommandType
+      | ImageCommandType
       | "session.creation.resolve"
       | "session.catalog.contentSearch"
       | "workspace.usage.report"

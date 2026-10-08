@@ -7,6 +7,7 @@ export * from "./context-recall.js";
 export * from "./conversation-title.js";
 export * from "./extension-compatibility.js";
 export * from "./extension-package-management.js";
+export * from "./image-workbench.js";
 export * from "./first-party-provider-policy.js";
 export * from "./lark-auth.js";
 export * from "./message-search.js";

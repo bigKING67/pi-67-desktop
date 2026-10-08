@@ -28,6 +28,8 @@ export * from "./lark-auth-schemas.js";
 export * from "./team-chat-command-messages.js";
 export * from "./team-chat-schemas.js";
 export * from "./team-chat-attachment-validation.js";
+export * from "./image-command-messages.js";
+export * from "./image-schemas.js";
 export * from "./protocol-revision.js";
 export * from "./protocol-revision-contract.js";
 export * from "./repository-environment-contract.js";

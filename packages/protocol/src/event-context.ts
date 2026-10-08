@@ -71,7 +71,10 @@ export const EVENT_CONTEXT_REQUIREMENTS = {
   "enterprise.workspaceBindingChanged": { session: false, operation: false, requiredScope: "workspace" },
   "teamChat.pushed": { session: false, operation: false, requiredScope: "app" },
   "teamChat.connectionChanged": { session: false, operation: false, requiredScope: "app" },
-  "teamChat.agentHostChanged": { session: false, operation: false, requiredScope: "app" }
+  "teamChat.agentHostChanged": { session: false, operation: false, requiredScope: "app" },
+  "image.project.changed": { session: false, operation: false, requiredScope: "workspace" },
+  "image.candidate.changed": { session: false, operation: false, requiredScope: "workspace" },
+  "image.job.changed": { session: false, operation: false, requiredScope: "workspace" }
 } as const satisfies Record<AgentEventType, EventContextRequirement>;
 
 export interface EventContextEnvelope<Type extends AgentEventType = AgentEventType> {

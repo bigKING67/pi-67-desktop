@@ -1,11 +1,6 @@
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
-  isReplaySafeControlMutation,
-  type AgentCommand,
-  type AgentCommandType,
-  type CommandResults,
-  type ReplaySafeControlMutationType,
-  type RequestEnvelope
+  isReplaySafeControlMutation, type AgentCommand, type AgentCommandType, type CommandResults, type ReplaySafeControlMutationType, type RequestEnvelope
 } from "@pi67/protocol";
 import type { HostConnectionContext } from "./connection-context.js";
 import {
@@ -31,6 +26,7 @@ import {
 import { isWorkspaceFileCommand, type WorkspaceFileCommandRouter } from "./workspace-file-command-router.js";
 import { handleWorkspaceReadRequest } from "./workspace-read-request-handler.js";
 import { WorkspaceUsageReportCoordinator } from "./workspace-usage-report-coordinator.js";
+import { handleImageRequest } from "./image/image-request-handler.js";
 
 export interface HostRequestRouterOptions {
   isShuttingDown(): boolean;
@@ -106,6 +102,7 @@ export class HostRequestRouter {
       this.handleWorkspaceConversationCommand(origin, request);
       return;
     }
+    if (handleImageRequest(origin, request)) return;
     if (handleWorkspaceReadRequest(
       origin,
       request,

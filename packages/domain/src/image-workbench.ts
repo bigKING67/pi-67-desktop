@@ -1,0 +1,193 @@
+// Image workbench policy (ADR 0010, docs/architecture/image-workbench-product-model.md).
+// The image engine owns project truth; these types mirror its document and
+// candidate contract for the protocol, and the policies decide what the UI and
+// Agent may do without knowing engine internals.
+
+/** Mirrors `packages/image-engine` LIMITS; an engine test fails if they drift. */
+export const IMAGE_PROJECT_LIMITS = {
+  pixels: 16_777_216,
+  edge: 8192,
+  minCanvasEdge: 64,
+  objects: 100,
+  assets: 64,
+  operations: 100,
+  revisions: 1000,
+  candidates: 64,
+  title: 200,
+  summary: 500,
+  text: 2000
+} as const;
+
+/** Project, object, asset and candidate identifiers share the engine's pattern. */
+export const IMAGE_ID_PATTERN = "^[a-zA-Z][a-zA-Z0-9_-]{0,63}$";
+const IMAGE_ID = new RegExp(IMAGE_ID_PATTERN, "u");
+export const isImageId = (value: unknown): value is string => typeof value === "string" && IMAGE_ID.test(value);
+
+export type ImageChangeAuthor = "human" | "agent" | "system";
+export type ImageRasterFormat = "png" | "jpeg" | "webp";
+export type ImageFit = "contain" | "cover" | "fill";
+export type ImageTextAlign = "left" | "center" | "right";
+
+export interface ImageCanvas { width: number; height: number; background: string }
+export interface ImageAsset {
+  id: string; file: string; sha256: string; format: ImageRasterFormat; width: number; height: number; render_file: string; render_sha256: string;
+}
+interface ImageObjectBase { id: string; locked: boolean; visible: boolean; x: number; y: number; width: number; height: number; opacity: number }
+export interface ImageRasterObject extends ImageObjectBase { kind: "image"; asset_id: string; fit: ImageFit }
+export interface ImageTextObject extends ImageObjectBase {
+  kind: "text"; text: string; font_size: number; color: string; align: ImageTextAlign; line_height: number;
+}
+export interface ImageRectObject extends ImageObjectBase { kind: "rect"; color: string; radius: number }
+export type ImageSceneObject = ImageRasterObject | ImageTextObject | ImageRectObject;
+export interface ImageFontBinding { profile: string; family: string; file: string; sha256: string; weight: number }
+export interface ImageChange { author: ImageChangeAuthor; summary: string; operations: string[]; candidate?: { id: string; sha256: string } }
+export interface ImageDocument {
+  schema: string; project_id: string; title: string; revision: number; parent_sha256: string | null;
+  canvas: ImageCanvas; assets: ImageAsset[]; font: ImageFontBinding; objects: ImageSceneObject[]; change: ImageChange;
+}
+
+/**
+ * Edits a renderer may submit. `add_asset` is deliberately absent: importing a
+ * file needs a path, and paths reach the engine only through Main's dialogs or
+ * the Agent's tools, never from renderer payloads.
+ */
+export type ImageObjectPatch = Partial<Omit<ImageRasterObject, "id" | "kind"> & Omit<ImageTextObject, "id" | "kind"> & Omit<ImageRectObject, "id" | "kind">>;
+export type ImageEditOperation =
+  | { type: "update_object"; id: string; patch: ImageObjectPatch }
+  | { type: "add_object"; object: ImageTextObject | ImageRectObject }
+  | { type: "remove_object"; id: string }
+  | { type: "reorder_objects"; ids: string[] }
+  | { type: "set_canvas"; canvas: ImageCanvas }
+  | { type: "revert_to"; revision: number };
+
+export type ImageCandidateStatus = "ready" | "stale" | "accepted" | "discarded" | "decision_pending";
+export type ImageCandidateListStatus = ImageCandidateStatus | "incomplete" | "unreadable";
+export type ImageCandidateMode = "replace" | "masked";
+
+export interface ImageCandidateActions { accept: boolean; discard: boolean; compare: boolean; restage: boolean; unlock: boolean }
+
+/**
+ * What a person may do with a candidate. Stale candidates are never accepted
+ * in place: their basis changed, so they must be re-staged against the current
+ * revision. Decisions are terminal; an interrupted decision needs an explicit,
+ * audited unlock before anything else.
+ */
+export function imageCandidateActions(status: ImageCandidateListStatus): ImageCandidateActions {
+  switch (status) {
+    case "ready": return { accept: true, discard: true, compare: true, restage: false, unlock: false };
+    case "stale": return { accept: false, discard: true, compare: true, restage: true, unlock: false };
+    case "accepted": case "discarded": return { accept: false, discard: false, compare: true, restage: false, unlock: false };
+    case "decision_pending": return { accept: false, discard: false, compare: true, restage: false, unlock: true };
+    case "incomplete": case "unreadable": return { accept: false, discard: false, compare: false, restage: false, unlock: false };
+  }
+}
+
+/** Typed reasons for engine refusals, carried in protocol error details. */
+export type ImageEngineFailure =
+  | "revision_conflict" | "locked" | "text_overflow" | "missing_glyph" | "limit_exceeded"
+  | "not_found" | "candidate_decided" | "decision_pending" | "invalid";
+
+const FAILURE_PATTERNS: readonly [RegExp, ImageEngineFailure][] = [
+  [/Revision conflict|base revision conflict|Candidate base revision conflict|Revision changed/u, "revision_conflict"],
+  [/Object is locked|locked object|Cannot reorder a locked/u, "locked"],
+  [/Text overflow|narrower than glyph/u, "text_overflow"],
+  [/Missing font glyphs/u, "missing_glyph"],
+  [/limit (?:exceeded|reached)|limit/u, "limit_exceeded"],
+  [/already accepted|already discarded|is discarded/u, "candidate_decided"],
+  [/decision in progress/u, "decision_pending"],
+  [/ENOENT|Unknown object|Incomplete project|not found/u, "not_found"]
+];
+
+/** Classifies an engine error message; anything unrecognised is a plain invalid edit. */
+export function imageEngineFailure(message: string): ImageEngineFailure {
+  for (const [pattern, failure] of FAILURE_PATTERNS) if (pattern.test(message)) return failure;
+  return "invalid";
+}
+
+/** Consecutive direct edits within this window coalesce into one revision. */
+export const IMAGE_EDIT_COALESCE_MS = 300;
+
+/**
+ * Agent and person write the same project; `base_revision` is the only lock.
+ * A UI edit computed against an older revision is never rebased silently: the
+ * user's pending change is kept and the newer revision shown first.
+ */
+export function imageEditSubmission(displayedRevision: number, latestRevision: number): "submit" | "refresh-first" {
+  return displayedRevision === latestRevision ? "submit" : "refresh-first";
+}
+
+export type ImageProjectOwnership = "library" | "workspace";
+
+/**
+ * Where a project lives relative to its Workspace root. The creative library is
+ * itself the Workspace root, so projects sit at its top level where designers
+ * see them; inside an ordinary Workspace they stay in one hidden folder.
+ */
+export function imageProjectRelativePath(ownership: ImageProjectOwnership, projectId: string): string[] {
+  if (!isImageId(projectId)) throw new Error("Invalid image project id");
+  return ownership === "library" ? [projectId] : [".newmoney", "images", projectId];
+}
+
+export type ImageJobKind = "render" | "generate" | "composite" | "variants";
+export type ImageJobState = "queued" | "running" | "completed" | "failed" | "cancelled";
+export const isTerminalImageJobState = (state: ImageJobState): boolean => state === "completed" || state === "failed" || state === "cancelled";
+
+export interface ImageTaskBudget { draftCandidates: number; draftQuality: "low" | "medium"; finals: number; finalQuality: "medium" | "high"; rounds: number }
+export const DEFAULT_IMAGE_TASK_BUDGET: ImageTaskBudget = { draftCandidates: 4, draftQuality: "low", finals: 1, finalQuality: "high", rounds: 3 };
+export interface ImageTaskUsage { draftCandidates: number; finals: number; rounds: number }
+export interface ImageGenerationRequest { stage: "draft" | "final"; count: number; quality: "low" | "medium" | "high" }
+
+/**
+ * Within budget the Agent proceeds unattended; anything beyond it, or above the
+ * budgeted quality, asks the person once. A new round starts only after a
+ * prior round finished, so `rounds` counts completed rounds.
+ */
+export function imageBudgetDecision(budget: ImageTaskBudget, used: ImageTaskUsage, request: ImageGenerationRequest): "proceed" | "ask" {
+  if (!Number.isInteger(request.count) || request.count < 1) return "ask";
+  if (used.rounds >= budget.rounds) return "ask";
+  const rank = { low: 0, medium: 1, high: 2 } as const;
+  if (request.stage === "draft") {
+    return used.draftCandidates + request.count <= budget.draftCandidates && rank[request.quality] <= rank[budget.draftQuality] ? "proceed" : "ask";
+  }
+  return used.finals + request.count <= budget.finals && rank[request.quality] <= rank[budget.finalQuality] ? "proceed" : "ask";
+}
+
+export type ImageReferenceRole = "keep-subject" | "keep-style" | "take-composition";
+export interface ImageMark { id: string; x: number; y: number; width: number; height: number; instruction: string }
+export interface ImagePromptContext {
+  projectId: string;
+  revision: number;
+  selectedObjectIds: string[];
+  marks: ImageMark[];
+  references: { assetId: string; role: ImageReferenceRole }[];
+}
+
+export const IMAGE_PROMPT_CONTEXT_LIMITS = { selected: 32, marks: 16, references: 3, instruction: 500 } as const;
+const ROLE_LABELS: Record<ImageReferenceRole, string> = { "keep-subject": "保留主体", "keep-style": "保留风格", "take-composition": "取构图" };
+
+/**
+ * Renders the project page's structured context as a stable text block the
+ * Agent reads before acting. It is advisory: the Agent still reads the project
+ * and the engine re-validates every batch, so a forged block grants nothing.
+ */
+export function formatImagePromptContext(context: ImagePromptContext): string {
+  if (!isImageId(context.projectId) || !Number.isInteger(context.revision) || context.revision < 1) throw new Error("Invalid image prompt context");
+  const limits = IMAGE_PROMPT_CONTEXT_LIMITS;
+  if (context.selectedObjectIds.length > limits.selected || context.marks.length > limits.marks || context.references.length > limits.references) {
+    throw new Error("Image prompt context exceeds its limits");
+  }
+  const clean = (text: string): string => Array.from(text, (char) => (char.codePointAt(0) ?? 0) < 0x20 || char === "\u007f" ? " " : char).join("")
+    .replace(/\s+/gu, " ").trim().slice(0, limits.instruction);
+  const lines = ["<image-context>", `project: ${context.projectId}`, `revision: ${context.revision}`];
+  const ids = context.selectedObjectIds.filter(isImageId);
+  if (ids.length) lines.push(`selected: ${ids.join(", ")}`);
+  for (const mark of context.marks) {
+    if (!isImageId(mark.id) || ![mark.x, mark.y, mark.width, mark.height].every((value) => Number.isInteger(value) && value >= 0)) continue;
+    lines.push(`mark ${mark.id} [x=${mark.x} y=${mark.y} w=${mark.width} h=${mark.height}]: ${clean(mark.instruction)}`);
+  }
+  for (const reference of context.references) {
+    if (isImageId(reference.assetId)) lines.push(`reference ${reference.assetId}: ${ROLE_LABELS[reference.role]}`);
+  }
+  lines.push("</image-context>");
+  return lines.join("\n");
+}
