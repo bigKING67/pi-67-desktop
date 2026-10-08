@@ -2184,9 +2184,11 @@ loading error where the operation can produce those states
   retained. Restore is allowed only into an empty Composer,
   creates new staging identities, removes the item through the acknowledged flow,
   closes the Popover, and returns focus to the Composer.
-- Context pressure is a compact status beside the Composer: a 14px ring fills with
-  the exact value, and the numeric percent appears only from 50%; below that the
-  value remains in the status name and tooltip. Below 75% is neutral,
+- Context pressure is a compact status beside the Composer that appears only from
+  50% (2026-10-08: a short arc at low usage read as a loading spinner, and low usage
+  needs no attention); the Inspector context panel keeps the exact value at every
+  level. When shown, a 14px ring fills with the exact value beside the numeric
+  percent. Compaction progress shows at any level. Below 75% is neutral,
   75% is `上下文偏高`, and 92% is `上下文接近上限`. Manual compression calls the
   native `session.compact` controller; automatic and manual compaction have distinct
   progress copy, and automatic compaction never exposes a duplicate manual button.

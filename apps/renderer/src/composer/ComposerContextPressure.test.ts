@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ContextPressureValue, contextPressureTone } from "./ComposerContextPressure.js";
+import { ContextPressureValue, contextPressureTone, isContextPressureVisible } from "./ComposerContextPressure.js";
 
 describe("Composer context pressure", () => {
   it("uses fixed product thresholds without a user-facing switch", () => {
@@ -14,15 +14,18 @@ describe("Composer context pressure", () => {
 
   it.each([
     [0, false],
+    [12, false],
     [49.4, false],
     [49.6, true],
     [50, true],
     [80, true]
-  ])("fills the ring and shows the numeric percent only from half the window: %s%%", (percent, numeric) => {
-    const markup = renderToStaticMarkup(createElement(ContextPressureValue, { percent }));
-    // The percent always remains text for the live region; below half it is screen-reader only.
-    expect(markup).toContain(`${percent.toFixed(0)}%</span>`);
-    expect(markup.includes(`<span class="sr-only">${percent.toFixed(0)}%</span>`)).toBe(!numeric);
-    expect(markup.includes("stroke-dasharray")).toBe(percent > 0);
+  ])("appears in the Composer only from half the window: %s%%", (percent, visible) => {
+    expect(isContextPressureVisible(percent)).toBe(visible);
+  });
+
+  it("fills the ring with the exact value beside the visible percent", () => {
+    const markup = renderToStaticMarkup(createElement(ContextPressureValue, { percent: 63 }));
+    expect(markup).toContain("<span>63%</span>");
+    expect(markup).toContain("stroke-dasharray");
   });
 });

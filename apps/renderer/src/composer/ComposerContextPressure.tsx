@@ -31,6 +31,8 @@ export function ComposerContextPressure() {
           ? "上下文偏高"
           : "上下文";
   const showCompact = tone !== "normal" && !automaticCompaction && !manualCompaction;
+  // Below half the window the context needs no attention; the Inspector keeps the exact value.
+  if (!automaticCompaction && !manualCompaction && !compacting && !isContextPressureVisible(boundedPercent)) return null;
 
   return (
     <div
@@ -64,19 +66,21 @@ export function ComposerContextPressure() {
   }
 }
 
-/** Below half, the ring alone carries the value visually; the percent stays as screen-reader text and tooltip. */
-const CONTEXT_PERCENT_VISIBLE_FROM = 50;
+/** The Composer shows context pressure only from half the window, as a ring plus the percent. */
+const CONTEXT_PRESSURE_VISIBLE_FROM = 50;
 const RING_RADIUS = 5.25;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+/** Compares the rounded value so the visible number and the status name never disagree. */
+export function isContextPressureVisible(percent: number): boolean {
+  return Number(percent.toFixed(0)) >= CONTEXT_PRESSURE_VISIBLE_FROM;
+}
 
 export function ContextPressureValue({ percent }: { percent: number }) {
   return (
     <>
       <ContextRing percent={percent} />
-      {/* Compare the rounded value so the visible number and the status name never disagree. */}
-      <span className={Number(percent.toFixed(0)) >= CONTEXT_PERCENT_VISIBLE_FROM ? undefined : "sr-only"}>
-        {percent.toFixed(0)}%
-      </span>
+      <span>{percent.toFixed(0)}%</span>
     </>
   );
 }

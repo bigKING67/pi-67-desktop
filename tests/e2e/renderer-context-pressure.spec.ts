@@ -34,6 +34,21 @@ test("shows warning and critical context pressure and invokes native Session com
     .toMatchObject({ submissionId: expect.stringMatching(/^compaction-/u) });
 });
 
+test("keeps low context usage out of the Composer and shows it from half the window", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  await emitUsage(page, 12);
+  await expect(page.getByRole("status", { name: /^上下文 /u })).toHaveCount(0);
+
+  await emitUsage(page, 63);
+  const neutral = page.getByRole("status", { name: "上下文 63%" });
+  await expect(neutral).toHaveAttribute("data-tone", "normal");
+  await expect(neutral).toContainText("63%");
+  await expect(neutral.getByRole("button", { name: "压缩", exact: true })).toHaveCount(0);
+});
+
 test("distinguishes automatic compaction and respects reduced motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");

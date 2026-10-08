@@ -95,9 +95,10 @@ a surface step or rely on the light-mode hairline allowance.
   expanded Tool detail drifting from DESIGN: nested framed text blocks, the error shown
   twice, `精确工具` repeating the title, a generic presenter disclaimer, a bordered copy
   button and a filter notice restating the summary action. All fixed in phase 6.
-- 2026-10-08: still open: the deferred items listed above. The low-usage context ring
-  can read as a spinner; it is the approved Phase 1 design and stays unless the user
-  asks otherwise.
+- 2026-10-08: the low-usage context ring read as a loading spinner. The Composer now
+  shows context pressure only from 50% (ring plus percent); the Inspector context panel
+  keeps the exact value at every level (user delegated the choice).
+- 2026-10-08: still open: the deferred items listed above.
 
 ## Rollback
 Each phase lands as its own commits; revert that phase's commits. Token value
