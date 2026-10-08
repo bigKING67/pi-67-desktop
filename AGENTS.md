@@ -137,6 +137,13 @@
   authorized; then remove the registered worktree with `git worktree remove`,
   clean up its temporary branch after reachability verification, and confirm
   that only the canonical root checkout remains.
+- Removal is part of finishing the task, not optional housekeeping: do it in the
+  same session as soon as the branch is merged or abandoned, before reporting
+  the task done. A worktree carries its own ignored `node_modules` and
+  `artifacts` (installers, toolchain, capabilities), so a forgotten one costs
+  several GB. Before ending any session that created a worktree, run
+  `git worktree list` and report what remains (2026-10-08: a merged
+  `.claude/worktrees/light-code` was left holding about 3.85 GB).
 
 ## Execution plans and lightweight development workflow
 
