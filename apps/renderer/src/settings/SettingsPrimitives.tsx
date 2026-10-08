@@ -113,6 +113,9 @@ export interface SettingsSelectOption<T extends string> {
   leading?: ReactNode;
   /** Optional group heading; consecutive options sharing it render as one ListBoxSection. */
   section?: string;
+  /** Secondary identity (e.g. the Provider of a sectioned model) shown only in the closed
+   *  trigger, after the label, and only when it fits whole; it never truncates the label. */
+  detail?: string;
 }
 
 /** Non-native single choice; the trigger is a button named by `label`, options have role "option". */
@@ -157,7 +160,10 @@ export function SettingsSelect<T extends string>({ label, value, options, onChan
 function renderSelectOption<T extends string>(option: SettingsSelectOption<T>) {
   return (
     <ListBoxItem className={styles.selectOption!} id={option.id} key={option.id} textValue={option.label}>
-      <span className={styles.selectOptionLabel}>{option.leading}<span>{option.label}</span></span>
+      <span className={styles.selectOptionLabel}>
+        {option.leading}<span>{option.label}</span>
+        {option.detail ? <span className={styles.selectOptionDetail}>{option.detail}</span> : null}
+      </span>
       <Check aria-hidden="true" className={styles.selectCheck} size={14} />
     </ListBoxItem>
   );

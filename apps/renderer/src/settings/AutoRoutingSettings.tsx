@@ -34,7 +34,9 @@ export function AutoRoutingSettings({ snapshot, disabled = false }: { snapshot: 
   const choices = snapshot.providers.filter((provider) => provider.configured).flatMap((provider) => (
     provider.models.filter((model) => model.api !== "pi-virtual" && model.input.includes("text"))
       .map((model) => ({ id: key({ provider: provider.id, model: model.id }),
-        label: `${provider.name ?? provider.id} / ${model.name ?? model.id}`,
+        label: model.name ?? model.id,
+        detail: provider.name ?? provider.id,
+        section: provider.name ?? provider.id,
         leading: <ProviderBrandIcon hints={[model.id, model.name, provider.id, provider.name]}
           label={model.name ?? model.id} size="inline" />,
         selection: { provider: provider.id, model: model.id } }))

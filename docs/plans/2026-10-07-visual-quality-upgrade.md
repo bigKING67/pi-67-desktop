@@ -83,9 +83,16 @@ a surface step or rely on the light-mode hairline allowance.
 - 2026-10-07: AUTO reasons stay on tool rows (PRODUCT security traceability), even
   though the direction-A mock omitted them.
 
-- 2026-10-08: open after the residual audit: the light-mode surface step (canvas and
-  surface are both `#ffffff`; needs a direction decision), Phase 3 light-mode packaged
-  evidence, and the deferred items listed above.
+- 2026-10-08: the light-mode surface step needs no token change. Light mode already
+  separates regions by luminance: the navigation rail and the Inspector pane sit on
+  `surface-muted` against white content, and Settings cards step onto `surface-muted`
+  (Phase 5). Canvas and surface stay `#ffffff` as DESIGN Color specifies; the rail and
+  pane keep their light-mode hairline under the light-mode allowance.
+- 2026-10-08: Auto model selects keep the shared 300px column; the closed trigger leads
+  with the model and shows the Provider as tertiary detail that truncates first, and the
+  list groups models under Provider sections.
+- 2026-10-08: still open: Phase 3 light-mode packaged evidence and the deferred items
+  listed above.
 
 ## Rollback
 Each phase lands as its own commits; revert that phase's commits. Token value

@@ -627,6 +627,27 @@
   white-space: nowrap;
 }
 
+/* The list already names the section, so the detail only appears in the closed trigger.
+   There it is all or nothing: the trigger keeps one line, and a detail that does not fit
+   wraps onto the clipped second line instead of truncating the label. */
+.selectOptionDetail { display: none; }
+.selectValue .selectOptionLabel:has(> .selectOptionDetail) {
+  height: calc(var(--line-height-interface) * 1em);
+  flex-wrap: wrap;
+  align-content: flex-start;
+  row-gap: 0;
+  overflow: hidden;
+}
+/* The label always stays on the first line beside its 16px leading mark and 8px gap. */
+.selectValue .selectOptionLabel:has(> .selectOptionDetail) > span:not(.selectOptionDetail) {
+  max-width: calc(100% - 24px);
+}
+.selectValue .selectOptionDetail {
+  display: block;
+  flex: none;
+  color: var(--text-tertiary);
+}
+
 .selectPopover {
   z-index: 80;
   min-width: var(--trigger-width);

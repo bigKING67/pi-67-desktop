@@ -39,10 +39,13 @@ test("configures opt-in Auto with exact candidates, keeps the default and can di
   const form = settings.getByTestId("auto-routing-settings");
   await expect(form).toBeVisible();
   await expect(form.getByRole("button", { name: "保存 Auto 配置" })).toHaveCount(0);
-  for (const [role, option] of [["判断模型", "OpenAI / GPT Test"], ["常规任务", "OpenAI / GPT Test"], ["复杂任务", "Anthropic / Claude Test"]] as const) {
+  for (const [role, provider, model] of [["判断模型", "OpenAI", "GPT Test"], ["常规任务", "OpenAI", "GPT Test"], ["复杂任务", "Anthropic", "Claude Test"]] as const) {
     await form.getByRole("button", { name: new RegExp(`Auto ${role}$`, "u") }).click();
-    await page.getByRole("listbox", { name: `Auto ${role}` }).getByRole("option", { name: option, exact: true }).click();
+    await page.getByRole("listbox", { name: `Auto ${role}` }).getByRole("group", { name: provider })
+      .getByRole("option", { name: model, exact: true }).click();
   }
+  // The closed trigger leads with the model and keeps the Provider as trailing detail.
+  await expect(form.getByRole("button", { name: /^Claude Test\s*Anthropic Auto 复杂任务$/u })).toBeVisible();
   await clearRecordedCommands(page);
   await form.getByRole("button", { name: "保存 Auto 配置" }).click();
   await expect(form.getByRole("button", { name: "保存 Auto 配置" })).toHaveCount(0);
@@ -78,6 +81,33 @@ test("keeps unavailable saved models explicit and permits turning Auto off", asy
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "关闭 Auto" }).click();
   await expect(page.getByRole("button", { name: "关闭 Auto" })).toHaveCount(0);
+});
+
+test("shows the Provider beside an Auto model only when both names fit whole", async ({ page }) => {
+  const snapshot = createMockProviderConfigurationSnapshot();
+  for (const provider of snapshot.providers) provider.configured = true;
+  const openai = snapshot.providers.find((provider) => provider.id === "openai")!;
+  openai.name = "volcengine-ark";
+  openai.models.find((model) => model.id === "gpt-test")!.name = "Doubao Seed 2.1 Lite（方舟）超长名称";
+  snapshot.autoRouting = { judge: { provider: "openai", model: "gpt-test" }, standard: { provider: "anthropic", model: "claude-test" }, complex: { provider: "anthropic", model: "claude-test" } };
+  await page.goto("/");
+  await attachMockAgent(page, [], {}, { providerConfigurationSnapshot: snapshot });
+  await page.keyboard.press("Control+,");
+  const settings = page.getByLabel("New Money 设置");
+  await settings.getByRole("navigation", { name: "设置分类" }).getByRole("button", { name: "模型", exact: true }).click();
+  const form = settings.getByTestId("auto-routing-settings");
+  const layout = (role: string) => form.getByRole("button", { name: new RegExp(`Auto ${role}$`, "u") }).evaluate((trigger) => {
+    const detail = trigger.querySelector<HTMLElement>("[class*='selectOptionDetail']")!;
+    const label = detail.previousElementSibling as HTMLElement;
+    const row = detail.parentElement!.getBoundingClientRect();
+    const detailBox = detail.getBoundingClientRect();
+    // The label either fills the line beside its 16px mark and 8px gap, or ends before the detail.
+    return { labelFillsLine: Math.round(label.getBoundingClientRect().width) === Math.round(row.width - 24), detailVisible: detailBox.top < row.bottom };
+  });
+  // A long model name keeps the line and hides the Provider instead of halving both names.
+  expect(await layout("判断模型")).toEqual({ labelFillsLine: true, detailVisible: false });
+  // A short model name leaves room for the whole Provider.
+  expect(await layout("常规任务")).toEqual({ labelFillsLine: false, detailVisible: true });
 });
 
 test("shows persisted Auto choices and failure facts without claiming task completion", async ({ page }) => {

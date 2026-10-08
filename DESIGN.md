@@ -1680,7 +1680,10 @@ loading error where the operation can produce those states
 - The global model catalog includes an `自动模型选择` section using existing
   Settings rows/selects. It configures the judge, standard and complex models
   from configured Pi chat models, then explicitly saves or disables Auto. The three rows
-  form one grouped surface with fixed-width (300px) model selects; the judge-request limits
+  form one grouped surface with fixed-width (300px) model selects. Their lists group models
+  under Provider section headings; the closed trigger shows the model name followed by the
+  Provider in tertiary text only when the whole name fits; otherwise the Provider is hidden
+  rather than truncating either name (2026-10-08). The judge-request limits
   sit in one summary line plus a `SettingsInfo` tip. `关闭 Auto` is a section-header action
   shown while Auto is on; `保存 Auto 配置` appears below the rows only while the draft differs
   from saved state. The Auto section sits
