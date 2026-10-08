@@ -54,6 +54,7 @@
     "check": "corepack pnpm run check:protocol-revision && corepack pnpm run typecheck && corepack pnpm run lint && corepack pnpm run check:architecture && corepack pnpm run check:dead-code && corepack pnpm run check:references && corepack pnpm run check:structure && corepack pnpm run check:production-transport && corepack pnpm run check:workflow-powershell && corepack pnpm run check:workflow-actions && corepack pnpm run test:coverage",
     "package:native:unsigned": "corepack pnpm run build && node eng/packaging/package-native-unsigned.mjs",
     "preview:mac:unsigned": "node eng/packaging/preview-macos-unsigned.mjs",
+    "preview:mac:visual": "node eng/packaging/launch-isolated-visual-preview.mjs",
     "prepare:toolchain": "node eng/packaging/prepare-toolchain.mjs",
     "prepare:capabilities": "node eng/capabilities/prepare-capabilities.mjs",
     "prepare:windows-job-controller": "node eng/packaging/prepare-windows-job-controller.mjs",

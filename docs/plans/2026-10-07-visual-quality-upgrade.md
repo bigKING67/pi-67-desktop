@@ -140,8 +140,15 @@ a surface step or rely on the light-mode hairline allowance.
   UI face (the palette showed the browser monospace default), dialog containers never
   draw their own focus ring, the empty Notification Center hides `清空`, and six
   user-visible strings still named `Pi-67`. Kept by contract: per-item disabled reasons
-  in the palette, the keyboard-help Web Search note. Open for a user decision: the
-  Welcome feature notes under a divider, and per-row explanations in keyboard help.
+  in the palette, the keyboard-help Web Search note. Then (user approved): the Welcome
+  feature notes and divider became one tertiary assurance line; keyboard help uses the
+  Settings keycap component (`app/ShortcutKeyCaps`) with plain-language action details.
+- 2026-10-08 visual regression: screenshots stay out of git, so
+  `tests/e2e/renderer-visual-contract.spec.ts` asserts Settings sibling alignment, UI-face
+  keycaps, unringed dialog containers and one-line keycap rows (each mutation-checked);
+  `preview:mac:visual` starts the isolated packaged copy for browser67, and a local
+  baseline lives in `artifacts/visual-baseline/2026-10-08/` (see
+  `docs/testing/visual-review.md`).
 
 ## Rollback
 Each phase lands as its own commits; revert that phase's commits. Token value
