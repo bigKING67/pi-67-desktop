@@ -106,8 +106,10 @@ a surface step or rely on the light-mode hairline allowance.
 - 2026-10-08 deferred-item closeout: message-action and Settings ⓘ tooltips moved to the
   `shadowComposer` lift DESIGN already required (message tooltips also adopt the label
   tooltip border, radius, text and weight). The provider subtitle id/count split is
-  covered by the Phase 5 two-line catalog rows. Doctor icons, keyboard-help icon and
-  credential separation were closed earlier. Remaining: Team Chat border mandates,
+  covered by the Phase 5 two-line catalog rows. Doctor icons and the keyboard-help icon
+  were closed in the light-mode workbench pass. Credential separation needs no change:
+  the credential layout puts the Provider list on `surface-muted` beside a white editor,
+  the same step as the light shell. Remaining: Team Chat border mandates,
   which need user decisions because DESIGN names them explicitly.
 
 ## Rollback
