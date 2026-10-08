@@ -138,7 +138,7 @@ export function sourceKindLabel(kind: PackageSourceKind): string {
 
 export function packageTrustLabel(entry: ExtensionPackageEntry): string {
   if (entry.trustState === "builtin-verified") return "应用内置并已验证";
-  if (entry.trustState === "known-baseline-observed") return "已核对 Pi-67 已知内容基线";
+  if (entry.trustState === "known-baseline-observed") return "已核对 New Money 已知内容基线";
   if (entry.trustState === "user-approved-observed") return "当前内容已由用户确认";
   if (entry.trustState === "user-installed-observed") return "Desktop 安装记录已核对";
   if (entry.trustState === "drifted") return "内容已变更，等待重新确认";

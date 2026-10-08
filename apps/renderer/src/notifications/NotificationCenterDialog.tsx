@@ -46,15 +46,13 @@ export function NotificationCenterDialog({
             <Heading className={styles.heading!} slot="title">通知</Heading>
             <small>仅保留本次运行内的最近记录</small>
           </span>
-          <Button
-            aria-label="清空通知历史"
-            className={styles.clear!}
-            isDisabled={items.length === 0}
-            onPress={clear}
-          >
-            <Trash2 aria-hidden="true" size={14} />
-            清空
-          </Button>
+          {/* A state-specific action appears only in that state (Visual quality bar rule 4). */}
+          {items.length > 0 ? (
+            <Button aria-label="清空通知历史" className={styles.clear!} onPress={clear}>
+              <Trash2 aria-hidden="true" size={14} />
+              清空
+            </Button>
+          ) : null}
         </header>
         {items.length === 0 ? (
           <div className={styles.empty}>

@@ -33,6 +33,17 @@ select {
   font: inherit;
 }
 
+/* Keycaps use the UI face (DESIGN Command Palette), not the browser's monospace default. */
+kbd {
+  font-family: inherit;
+}
+
+/* React Aria focuses a dialog container on open; the focus ring belongs to its controls. */
+[role="dialog"]:focus,
+[role="alertdialog"]:focus {
+  outline: none;
+}
+
 button,
 select {
   -webkit-app-region: no-drag;

@@ -125,7 +125,7 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
   {
     id: "keyboard-shortcuts",
     label: "查看键盘快捷键",
-    detail: "打开 Pi-67 Desktop 快捷键帮助",
+    detail: "查看 New Money 的全部快捷键",
     keywords: "keyboard shortcuts help 键盘 快捷键 帮助",
     requiresWorkspace: false,
     contexts: [

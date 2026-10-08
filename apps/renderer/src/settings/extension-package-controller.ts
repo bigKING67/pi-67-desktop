@@ -214,7 +214,7 @@ async function mutate<T extends MutationType>(
       publishNotification({
         level: "warning",
         title: "扩展包操作结果需要核对",
-        message: "Pi-67 未自动重放这次操作；确认当前内容或重新安装前不会加载该扩展包。"
+        message: "New Money 未自动重放这次操作；确认当前内容或重新安装前不会加载该扩展包。"
       });
       return false;
     }

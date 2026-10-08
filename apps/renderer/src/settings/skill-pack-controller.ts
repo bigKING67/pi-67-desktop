@@ -69,7 +69,7 @@ export async function installSkillPack(id: string, workspaceId?: string): Promis
       level: "success",
       title: "Lark CLI 已安装",
       message: result.changed
-        ? "官方 Lark CLI 与全局办公 Skills 已安装；Pi-67 和其他兼容 Agent 可复用 ~/.agents/skills。"
+        ? "官方 Lark CLI 与全局办公 Skills 已安装；New Money 和其他兼容 Agent 可复用 ~/.agents/skills。"
         : "当前已经存在可用的 Lark CLI。"
     });
     return true;

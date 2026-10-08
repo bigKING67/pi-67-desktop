@@ -188,7 +188,7 @@ export const workspaceFileStore = createStore<WorkspaceFileStoreState>((set) => 
               savedContent: undefined,
               dirty: false,
               conflict: false,
-              reason: result.reason ?? "此文件不能在 Pi-67 中编辑。",
+              reason: result.reason ?? "此文件不能在 New Money 中编辑。",
               documentVersion: current.documentVersion + 1
             }
           }

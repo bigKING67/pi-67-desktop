@@ -133,6 +133,15 @@ a surface step or rely on the light-mode hairline allowance.
   protocol change; omitted, Agent Host keeps the ID-derived label).
 - 2026-10-08: the message-mentions-reader gutter rail became a 6% accent tint and the
   muted unread count lost its ring for a `surface-active` fill (rule 1).
+- 2026-10-08 packaged audit through browser67 `remote_cdp` against an isolated packaged
+  instance (`--user-data-dir`, `PI_CODING_AGENT_DIR`, offline, port 9222): Welcome,
+  Command Palette, keyboard help, Notification Center, and all 16 Settings categories
+  in light (identical h1 316/74, first block 138, width 1040). Fixed: `kbd` inherits the
+  UI face (the palette showed the browser monospace default), dialog containers never
+  draw their own focus ring, the empty Notification Center hides `清空`, and six
+  user-visible strings still named `Pi-67`. Kept by contract: per-item disabled reasons
+  in the palette, the keyboard-help Web Search note. Open for a user decision: the
+  Welcome feature notes under a divider, and per-row explanations in keyboard help.
 
 ## Rollback
 Each phase lands as its own commits; revert that phase's commits. Token value

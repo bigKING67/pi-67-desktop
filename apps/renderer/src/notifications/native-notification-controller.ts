@@ -67,7 +67,7 @@ async function activateNativeNotificationWhenReady(
     publishNotification({
       level: "warning",
       title: "无法打开通知对应的会话",
-      message: "工作台尚未完成恢复，请在 Pi-67 中重新选择对应会话。"
+      message: "工作台尚未完成恢复，请在 New Money 中重新选择对应会话。"
     });
   }
 }
