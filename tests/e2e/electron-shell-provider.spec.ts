@@ -45,7 +45,7 @@ test("boots the real sandboxed Electron shell over app://", async () => {
     await expect(window.getByRole("heading", { name: "开始一个 Pi 对话" })).toBeVisible();
     await expect(window.getByText("选择一个工作区，继续已有对话或开始新对话。")).toBeVisible();
     await expect(window.getByRole("button", { name: "选择工作区" })).toBeEnabled();
-    await expect(window.getByText("数据保存在本机")).toBeVisible();
+    await expect(window.getByText("复用现有 Pi 配置和会话；工作区内容保存在本机，不会作为应用遥测上传。")).toBeVisible();
     await expect(window.locator("html")).toHaveAttribute("data-theme-preference", "system");
 
     const utilityProcessesBefore = await utilityProcessCount(activeApplication);

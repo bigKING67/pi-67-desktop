@@ -18,8 +18,7 @@ test("opens a trusted Pi workspace through the MessagePort contract", async ({ p
   await attachMockAgent(page);
   await expect(page.getByRole("heading", { name: "开始一个 Pi 对话" })).toBeVisible();
   await expect(page.getByText("选择一个工作区，继续已有对话或开始新对话。")).toBeVisible();
-  await expect(page.getByText("复用现有 Pi 配置和会话")).toBeVisible();
-  await expect(page.getByText("数据保存在本机")).toBeVisible();
+  await expect(page.getByText("复用现有 Pi 配置和会话；工作区内容保存在本机，不会作为应用遥测上传。")).toBeVisible();
   await expect(page.getByText(/Pi SDK|Agent Host|内部服务器|agent runtime/u)).toHaveCount(0);
   await expect(page.locator(".brand-lockup")).toHaveCSS("padding-left", "0px");
   expect((await page.locator(".brand-lockup").boundingBox())?.x).toBeGreaterThanOrEqual(78);

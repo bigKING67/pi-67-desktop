@@ -2342,7 +2342,8 @@ loading error where the operation can produce those states
   text at medium weight, never the code face. The command palette keeps its 2px focus
   outline on the search field; its selected result uses only the hover fill (no inset
   accent bar), and shortcut hints are flat `surface-active` keycaps in the UI face; the
-  keyboard-help dialog uses the same keycaps without borders or a 3D edge.
+  keyboard-help dialog uses the same keycaps without borders or a 3D edge, one keycap per key with
+  alternatives joined by `或`, through the component Settings › 快捷键 uses (2026-10-08).
 - Agents (P3a): Agent rows use a 20px accent-soft tile with a bot glyph and an
   8px presence dot (success fill online, disabled fill otherwise) that the row's
   accessible name repeats as text; your own Agents show a tertiary `我的`. Agent
@@ -3001,7 +3002,9 @@ loading error where the operation can produce those states
 - Welcome is a task entry: it shows the product name beside the mark in the UI face
   (interface size, medium), never a monospace eyebrow. It keeps workspace selection available before the
   on-demand Agent Host exists and does not expose SDK/process marketing copy as
-  the primary user message.
+  the primary user message. Below the two actions, reuse of the existing Pi configuration and
+  local-only workspace data read as one tertiary support line, without a divider or
+  ornamental icons (2026-10-08).
 - Loading copy names the operation, such as `正在加载 Pi 资源`.
 - Opening a Catalog-backed conversation advances through truthful bounded stages:
   Provider preparation, installed-extension verification, Pi Extension and work-rule

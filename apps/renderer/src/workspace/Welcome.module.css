@@ -57,41 +57,10 @@
   font-size: var(--font-size-interface);
 }
 
-.facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
-}
-
-.facts > div {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: 9px;
-  color: var(--accent);
-}
-
-.facts span {
-  display: grid;
-  gap: 2px;
-}
-
-.facts strong {
-  color: var(--text-primary);
-  font-size: var(--font-size-interface);
-}
-
-.facts small {
-  color: var(--text-secondary);
+/* Beats `.copy > p`: the assurance is support-size tertiary text, quieter than the description. */
+.copy > .assurance {
+  margin-top: var(--space-5);
+  color: var(--text-tertiary);
   font-size: var(--font-size-support);
-  line-height: 1.45;
 }
 
-@media (max-width: 760px) {
-  .facts {
-    grid-template-columns: 1fr;
-  }
-}

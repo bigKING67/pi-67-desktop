@@ -1,4 +1,4 @@
-import { FolderOpen, HardDrive, History, MessagesSquare } from "lucide-react";
+import { FolderOpen, MessagesSquare } from "lucide-react";
 import piIconUrl from "../assets/pi-icon-64.png";
 import { messages } from "../localization/message-catalog.js";
 import { useShellStore } from "../shell/shell-store.js";
@@ -37,10 +37,8 @@ export function Welcome() {
             {messages.teamChat.openChat}
           </button>
         </div>
-        <div className={styles.facts}>
-          <div><History size={17} /><span><strong>{messages.workspace.existingConfiguration}</strong><small>{messages.workspace.existingConfigurationDetail}</small></span></div>
-          <div><HardDrive size={17} /><span><strong>{messages.workspace.localData}</strong><small>{messages.workspace.localDataDetail}</small></span></div>
-        </div>
+        {/* Reuse and local-only data stay as one quiet assurance, not a feature list. */}
+        <p className={styles.assurance}>{messages.workspace.assurance}</p>
       </section>
     </main>
   );

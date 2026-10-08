@@ -38,7 +38,7 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
   {
     id: "settings",
     label: "打开设置",
-    detail: "管理应用、模型、Pi 与支持选项",
+    detail: "模型、扩展、外观等全部设置",
     keywords: "settings preferences 配置 设置",
     requiresWorkspace: false,
     contexts: [
@@ -55,7 +55,7 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
   {
     id: "command-palette",
     label: "打开命令面板",
-    detail: "搜索对话、Pi 操作和应用命令",
+    detail: "搜索对话和命令",
     keywords: "command palette 命令 面板",
     requiresWorkspace: false,
     contexts: [
@@ -71,7 +71,7 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
   {
     id: "new-session",
     label: "新建对话",
-    detail: "在当前工作区创建一个待发送的对话",
+    detail: "在当前工作区开始新对话",
     keywords: "new session conversation 新建 对话 会话",
     requiresWorkspace: true,
     contexts: ["workspaceOpen", "composerFocus", "fileEditorFocus", "taskRunning", "taskIdle"],
@@ -80,7 +80,7 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
   {
     id: "toggle-navigation",
     label: "显示或隐藏对话导航",
-    detail: "切换左侧工作区与对话列表",
+    detail: "左侧的工作区和对话列表",
     keywords: "navigation sidebar left 侧栏 导航",
     requiresWorkspace: true,
     contexts: ["workspaceOpen", "composerFocus", "fileEditorFocus", "taskRunning", "taskIdle"],
@@ -89,7 +89,7 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
   {
     id: "toggle-context",
     label: "显示或隐藏任务检查器",
-    detail: "切换右侧文件、Changes 与上下文面板",
+    detail: "右侧的文件、改动和上下文",
     keywords: "context inspector right 任务 检查器",
     requiresWorkspace: true,
     contexts: ["workspaceOpen", "composerFocus", "fileEditorFocus", "taskRunning", "taskIdle"],
@@ -98,7 +98,7 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
   {
     id: "find-current-conversation",
     label: "查找当前对话正文",
-    detail: "只查找当前 Pi 会话的可见正文；在聊天中搜索当前对话的消息",
+    detail: "在当前对话中查找；聊天里搜索当前对话的消息",
     keywords: "find search current message 查找 当前 对话 聊天 搜索",
     requiresWorkspace: true,
     contexts: ["workspaceOpen", "composerFocus", "taskRunning", "taskIdle"],
@@ -107,7 +107,7 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
   {
     id: "find-workspace-conversations",
     label: "查找工作区对话正文",
-    detail: "跨当前工作区的 Pi JSONL 会话查找正文；在聊天中搜索全部消息",
+    detail: "在当前工作区的全部对话中查找；聊天里搜索全部消息",
     keywords: "find search workspace messages 查找 工作区 对话 聊天 搜索 消息",
     requiresWorkspace: true,
     contexts: ["workspaceOpen", "composerFocus", "taskRunning", "taskIdle"],
@@ -116,7 +116,7 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
   {
     id: "find-workspace-content",
     label: "在工作区文件中查找",
-    detail: "在可信工作区内有界搜索文本内容并定位到行",
+    detail: "在工作区文件中搜索文本并定位到行",
     keywords: "find search workspace files content 查找 工作区 文件 内容",
     requiresWorkspace: true,
     contexts: ["workspaceOpen", "composerFocus", "fileEditorFocus", "taskRunning", "taskIdle"],

@@ -1,3 +1,4 @@
+import { ShortcutKeyCaps } from "../app/ShortcutKeyCaps.js";
 import { RotateCcw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button, Input, SearchField } from "react-aria-components";
@@ -99,7 +100,7 @@ export function KeyboardShortcutSettings() {
                 setMessage(`已保存“${action.label}”快捷键。`);
               }}
               type="button"
-            >{recording ? "按下新组合键…" : <KeyCaps combos={desktopShortcutKeyParts(action)} />}</button>
+            >{recording ? "按下新组合键…" : <ShortcutKeyCaps combos={desktopShortcutKeyParts(action)} />}</button>
             {customized ? <Button
               aria-label={`恢复${action.label}默认快捷键`}
               className={styles.reset!}
@@ -115,15 +116,6 @@ export function KeyboardShortcutSettings() {
       </div>
     </SettingsSectionBlock>
   );
-}
-
-function KeyCaps({ combos }: { combos: string[][] }) {
-  return <span className={styles.combos}>{combos.map((keys, index) => (
-    <span className={styles.combo} key={keys.join("+")}>
-      {index > 0 ? <span className={styles.or}>或</span> : null}
-      {keys.map((key) => <kbd key={key}>{key}</kbd>)}
-    </span>
-  ))}</span>;
 }
 
 function contextLabel(contexts: readonly DesktopShortcutContext[]): string {

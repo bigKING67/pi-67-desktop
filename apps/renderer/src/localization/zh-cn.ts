@@ -134,10 +134,7 @@ export const zhCNMessages = {
     heading: "开始一个 Pi 对话",
     description: "选择一个工作区，继续已有对话或开始新对话。",
     openAction: "选择工作区",
-    existingConfiguration: "复用现有 Pi 配置和会话",
-    existingConfigurationDetail: "无需迁移已有工作方式",
-    localData: "数据保存在本机",
-    localDataDetail: "工作区内容不会成为应用遥测"
+    assurance: "复用现有 Pi 配置和会话；工作区内容保存在本机，不会作为应用遥测上传。"
   },
   repositoryEnvironment: zhCNRepositoryEnvironmentMessages,
   shell: {

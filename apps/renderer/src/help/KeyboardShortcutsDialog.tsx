@@ -1,8 +1,7 @@
 import { X } from "lucide-react";
 import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
-import {
-  formatDesktopShortcut
-} from "../app/desktop-action-registry.js";
+import { desktopShortcutKeyParts } from "../app/desktop-action-registry.js";
+import { ShortcutKeyCaps } from "../app/ShortcutKeyCaps.js";
 import {
   effectiveDesktopActions,
   useDesktopShortcutRevision
@@ -39,11 +38,11 @@ export function KeyboardShortcutsDialog() {
           <div className={styles.list}>
             {effectiveDesktopActions().map((action) => (
               <div className={styles.row} key={action.id}>
-                <span>
+                <span className={styles.copy}>
                   <strong>{action.label}</strong>
                   <small>{action.detail}</small>
                 </span>
-                <kbd>{formatDesktopShortcut(action)}</kbd>
+                <ShortcutKeyCaps combos={desktopShortcutKeyParts(action)} />
               </div>
             ))}
           </div>

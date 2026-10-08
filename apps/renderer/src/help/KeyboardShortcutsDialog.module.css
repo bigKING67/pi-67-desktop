@@ -68,7 +68,8 @@
   min-height: 58px;
 }
 
-.row > span {
+/* Scoped to the copy column: the shared keycaps are a sibling span. */
+.copy {
   display: grid;
   min-width: 0;
   gap: 2px;
@@ -88,18 +89,6 @@
   white-space: nowrap;
 }
 
-.row kbd {
-  min-width: 62px;
-  padding: 5px 7px;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: var(--surface-active);
-  color: var(--text-secondary);
-  font-family: var(--font-ui);
-  font-size: var(--font-size-caption);
-  text-align: center;
-  white-space: nowrap;
-}
 
 .dialog > footer {
   padding: 8px 16px 14px;
