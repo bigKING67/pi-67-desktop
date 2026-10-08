@@ -98,6 +98,11 @@ a surface step or rely on the light-mode hairline allowance.
 - 2026-10-08: the low-usage context ring read as a loading spinner. The Composer now
   shows context pressure only from 50% (ring plus percent); the Inspector context panel
   keeps the exact value at every level (user delegated the choice).
+- 2026-10-08: the deferred "team origin line shifts the transcript" item does not occur:
+  the origin commits with the session snapshot and the paged transcript arrives later.
+  `renderer-session-origin.spec.ts` samples every frame and fails if a transcript ever
+  renders without its origin line or its first message moves (verified by delaying the
+  line 1.5s, which the test caught).
 - 2026-10-08: still open: the deferred items listed above.
 
 ## Rollback

@@ -56,6 +56,7 @@ export interface MockAgentOptions {
   isolateTaskSnapshots?: boolean;
   providerCatalogProviders?: ProviderSummary[];
   providerConfigurationSnapshot?: PiProviderConfigurationSnapshot;
+  memoryOrigin?: { kind: "private" } | { kind: "team"; teamId: string; projectId: string } | { kind: "unverified" };
   extensionCatalog?: ExtensionCatalogResult;
   contextFiles?: FixtureContextFiles;
   sessionCatalogItems?: FixtureSessionSummary[];

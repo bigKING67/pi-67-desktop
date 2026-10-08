@@ -19,6 +19,7 @@ export function createMockAgentFixtureInput(
 ) {
   const fixtureSnapshot = createMockSessionSnapshot(messages);
   if (options.providerCatalogProviders) fixtureSnapshot.providers = options.providerCatalogProviders;
+  if (options.memoryOrigin) fixtureSnapshot.memoryOrigin = options.memoryOrigin;
   return {
     fixtureMessages: messages,
     fixtureResponseDelays: responseDelays,
