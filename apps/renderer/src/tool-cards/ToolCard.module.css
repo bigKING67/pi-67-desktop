@@ -249,11 +249,14 @@
   margin: 0;
   padding: 8px 9px;
   overflow: auto;
-  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
   border-radius: var(--radius-compact);
   background: color-mix(in srgb, var(--canvas) 82%, var(--surface));
   tab-size: 2;
   white-space: pre;
+}
+
+.result pre.failureDetail {
+  color: var(--danger);
 }
 
 .result .resultExpanded {
@@ -299,16 +302,15 @@
   align-items: center;
   gap: 5px;
   padding: 0 8px;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-compact);
-  background: var(--surface);
+  background: var(--surface-active);
   color: var(--text-secondary);
   font-size: var(--font-size-support);
 }
 
 .copyButton[data-hovered] {
-  border-color: var(--border-strong);
-  background: var(--surface-hover);
+  background: color-mix(in srgb, var(--surface-active) 88%, var(--text-primary));
   color: var(--text-primary);
 }
 

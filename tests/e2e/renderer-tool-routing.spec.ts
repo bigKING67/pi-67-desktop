@@ -48,6 +48,12 @@ test("shows a Claude-style Bash alias as failed and keeps the exact-tool recover
   await expect(toolCard).toContainText("精确工具名是 \"bash\"");
   await expect(toolCard).toContainText("请直接调用 \"web_search\"");
   await expect(page.getByText("Tool execution failed.", { exact: true })).toHaveCount(0);
+  // The result is the error, so it is shown once, and the exact name already is the row title.
+  await expect(toolCard.getByText(/当前 Pi 会话没有注册/u)).toHaveCount(1);
+  await expect(toolCard.locator("pre").last()).toHaveCSS("color", await toolCard.getByText("执行失败").evaluate((node) => getComputedStyle(node).color));
+  await expect(toolCard.getByText(/没有专用呈现器/u)).toHaveCount(0);
+  await expect(toolCard.getByRole("button", { name: "复制详情" })).toHaveCSS("border-top-width", "0px");
+  await expect(toolCard.locator("pre").last()).toHaveCSS("border-top-width", "0px");
 });
 
 for (const theme of ["light", "dark"] as const) {
@@ -107,10 +113,13 @@ test(`inspects recovered Tool failures in ${theme}`, async ({ page }) => {
   await inspect.focus();
   await inspect.press("Enter");
   await expect(process).toHaveAttribute("open", "");
+  await expect(inspect).toHaveAttribute("aria-pressed", "true");
+  await expect(process.getByText("正在查看未成功步骤", { exact: true })).toHaveCount(0);
   await expect(process.locator('[data-tool-status="completed"]')).toHaveCount(0);
   await page.screenshot({ path: `artifacts/visual-review/execution-summary/${theme}.png`, animations: "disabled" });
   await process.getByRole("button", { name: "显示全部步骤" }).click();
   await expect(process.locator('[data-tool-status="completed"]')).toBeVisible();
+  await expect(inspect).toHaveAttribute("aria-pressed", "false");
   await inspect.click();
   await expect(process.locator('[data-tool-status="completed"]')).toHaveCount(0);
   await process.locator(":scope > summary").click();

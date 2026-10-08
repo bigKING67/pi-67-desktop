@@ -20,7 +20,7 @@ export const genericToolPresenter: ToolPresenter = {
         summary ? "已提交参数" : "当前投影未提供工具摘要"
       ),
       details: [],
-      limitations: ["该工具没有专用呈现器；仅显示工具名称、状态和有界摘要。"],
+      limitations: [],
       ...(summary ? { summary } : {})
     };
   }

@@ -74,6 +74,15 @@ describe("ToolCard", () => {
   });
 });
 
+describe("ToolCard detail", () => {
+  it("omits the exact tool row when it repeats the generic row title", () => {
+    const html = renderToStaticMarkup(createElement(ToolCard, { tool: tool({ name: "mcp", status: "failed" }) }));
+    expect(html).toContain("<strong>mcp</strong>");
+    expect(html).not.toContain("精确工具");
+    expect(html).not.toContain("没有专用呈现器");
+  });
+});
+
 function tool(overrides: Partial<ToolCallPart> = {}): ToolCallPart {
   return {
     type: "tool-call",

@@ -94,6 +94,10 @@ export function ToolCard({
   const resultText = result === undefined ? undefined : messageTextForCopy(result);
   const hasLongResult = (resultText?.length ?? 0) > 800;
   const failureMessage = toolFailureMessage(execution?.failure?.message?.text, result?.error, resultText);
+  const failureText = newMoneyErrorMessage(failureMessage ? new Error(failureMessage) : undefined,
+    "该步骤失败，但 Pi 结果中没有可显示的错误详情。");
+  // When the result already is the error, show it once, in the result block, in the danger role.
+  const failureIsResult = effectiveStatus === "failed" && resultText !== undefined && resultText.trim() === failureText.trim();
 
   useEffect(() => {
     if (!previousUnsuccessful.current && unsuccessful) setOpen(true);
@@ -159,10 +163,12 @@ export function ToolCard({
       {open ? (
         <div className={styles.detailBody}>
           <dl className={styles.detailList}>
-            <div>
-              <dt>精确工具</dt>
-              <dd><code>{toolName}</code></dd>
-            </div>
+            {toolName !== presentation.title ? (
+              <div>
+                <dt>精确工具</dt>
+                <dd><code>{toolName}</code></dd>
+              </div>
+            ) : null}
             {parentToolCallId ? <div><dt>上级调用</dt><dd><code>{parentToolCallId}</code></dd></div> : null}
             {presentation.details.map((detail, index) => (
               <div key={`${detail.label}:${index}`}>
@@ -189,10 +195,7 @@ export function ToolCard({
           ) : null}
 
           {effectiveStatus === "failed" ? (
-            <p className={styles.failureDetail}>
-              {newMoneyErrorMessage(failureMessage ? new Error(failureMessage) : undefined,
-                "该步骤失败，但 Pi 结果中没有可显示的错误详情。")}
-            </p>
+            failureIsResult ? null : <p className={styles.failureDetail}>{failureText}</p>
           ) : effectiveStatus === "unreconciled" ? (
             <p className={styles.warningDetail}>该步骤未找到可核对的 Tool Result，结果未能确认。</p>
           ) : effectiveStatus === "interrupted" ? (
@@ -207,7 +210,7 @@ export function ToolCard({
             <div className={styles.result}>
               <span>工具结果</span>
               {resultText ? (
-                <pre className={expanded ? styles.resultExpanded : undefined}>{resultText}</pre>
+                <pre className={`${expanded ? styles.resultExpanded! : ""} ${failureIsResult ? styles.failureDetail! : ""}`}>{resultText}</pre>
               ) : result.error ? (
                 <p className={styles.failureDetail}>{result.error}</p>
               ) : (

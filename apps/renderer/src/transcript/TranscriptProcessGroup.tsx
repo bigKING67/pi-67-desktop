@@ -136,6 +136,7 @@ export function TranscriptProcessGroup({
         </span>
         {!running && unsuccessfulToolCount > 0 ? (
           <button
+            aria-pressed={open && onlyUnsuccessful}
             className={styles.issueAction}
             onClick={(event) => {
               event.preventDefault();
@@ -150,7 +151,7 @@ export function TranscriptProcessGroup({
       </summary>
       {open && onlyUnsuccessful ? (
         <div className={styles.filterNotice}>
-          <span>正在查看未成功步骤</span>
+          {/* The pressed summary action marks the filtered view; this row only offers the way back. */}
           <button onClick={() => setOnlyUnsuccessful(false)} type="button">显示全部步骤</button>
         </div>
       ) : null}

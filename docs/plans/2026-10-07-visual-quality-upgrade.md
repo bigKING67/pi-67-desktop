@@ -91,8 +91,13 @@ a surface step or rely on the light-mode hairline allowance.
 - 2026-10-08: Auto model selects keep the shared 300px column; the closed trigger leads
   with the model and shows the Provider as tertiary detail that truncates first, and the
   list groups models under Provider sections.
-- 2026-10-08: still open: Phase 3 light-mode packaged evidence and the deferred items
-  listed above.
+- 2026-10-08: the light-mode packaged timeline review closed Phase 3 evidence and found
+  expanded Tool detail drifting from DESIGN: nested framed text blocks, the error shown
+  twice, `精确工具` repeating the title, a generic presenter disclaimer, a bordered copy
+  button and a filter notice restating the summary action. All fixed in phase 6.
+- 2026-10-08: still open: the deferred items listed above. The low-usage context ring
+  can read as a spinner; it is the approved Phase 1 design and stays unless the user
+  asks otherwise.
 
 ## Rollback
 Each phase lands as its own commits; revert that phase's commits. Token value
@@ -103,7 +108,7 @@ changes are confined to one commit per phase so they can be reverted alone.
 - [x] Phase 1 quiet chrome
 - [x] Phase 2 layout
 - [x] Phase 3 running-state screenshot and two directions (A chosen 2026-10-07)
-- [x] Phase 3 implementation and packaged evidence (macOS dark; light unverified)
+- [x] Phase 3 implementation and packaged evidence (macOS dark; light confirmed 2026-10-08)
 - [ ] Phase 4 surface audit and implementation
 - [x] Phase 5 Settings convergence (batches A–D and closeout; packaged macOS dark + light)
 - [x] Phase 6 residual audit (labels, status edges, radius roles)

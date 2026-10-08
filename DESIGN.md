@@ -598,7 +598,11 @@ loading error where the operation can produce those states
   (control radius) whose icon aligns with narration text; only hover, failure
   (8% danger fill) or warning (8% warning fill) gives it a surface. `已完成` stays
   tertiary text with only its check in the success role, so failures stand out.
-  Expanded detail is one borderless `surface-muted` block aligned with the step title. Desktop widths keep one truncated row; narrow widths use one deliberate
+  Expanded detail is one borderless `surface-muted` block aligned with the step title;
+  argument, progress and result text inside it step by fill alone, never a nested frame.
+  `精确工具` appears only when the exact tool name differs from the row title, and a
+  failure whose text is the Tool result shows once, as that result in the danger role
+  (2026-10-08). `复制详情` is a borderless filled small button. Desktop widths keep one truncated row; narrow widths use one deliberate
   second metadata row rather than arbitrary wrapping or document overflow.
   Failed or integrity-uncertain rows open by default and show the projected real
   error or a specific missing-result explanation; successful rows remain compact.
@@ -3179,7 +3183,9 @@ application bundles, Helpers, executables and installer filenames use New Money.
 - A settled group with unsuccessful steps exposes `查看未成功步骤` directly in
   its summary. It opens the group filtered by the same status/result-error rule
   used for the unsuccessful count, including orphan results and live supplemental
-  tools. Mark the filtered view without presenting a Tool failure as whole-task failure.
+  tools. Mark the filtered view without presenting a Tool failure as whole-task failure:
+  the summary action stays visible in its pressed state, and one row below offers
+  `显示全部步骤` without restating the filter (2026-10-08).
 - `显示全部步骤` restores source order without discarding data. Closing the group,
   outcome transition, or a highlighted transcript jump resets the filter. Running
   groups do not expose the failure filter, preserving live activity visibility.

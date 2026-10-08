@@ -382,7 +382,6 @@
   margin: 0;
   padding: 9px 10px;
   overflow: auto;
-  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   border-radius: var(--radius-compact);
   background: color-mix(in srgb, var(--canvas) 80%, var(--surface));
   color: var(--text-secondary);
