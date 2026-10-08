@@ -35,6 +35,10 @@
 | image-production/provider-store.mjs | 46a3fc126e75424cd9b0866ba37af0b85b51c127a153600104f32bc3bd3539c1 | provider-store.ts |
 | image-production/provider-alpha.mjs | 0c62c6e93465c8d0ff03708c0ba6ea7ff8cb95eeaf4572e50d223f0744676dce | provider-alpha.ts |
 | image-production/provider-normalize.mjs | 62441943977797a056ea1032f3142ff8c53863902f527e52a9299d53ca2b95b1 | provider-normalize.ts |
+| image-production/provider.mjs | — | provider.ts、provider-prepare.ts、provider-endpoint.ts |
+| image-production/provider-contracts.py + skills/creative-craft/scripts/creative_craft_contracts.py（Image Job v2 / Execution Receipt 部分）+ creative_craft_evaluation.py（`compile_image_markdown`） | — | contracts.ts、provider-profiles.ts |
+| skills/creative-craft/schemas/{image-job-v2,execution-receipt,provider-profile,surface-profile}.schema.json、integrations/image-production/providers/surfaces/openai-image-api.json | — | schemas/、providers/surfaces/ |
+| image-production/tests/provider.test.mjs | — | provider.test.ts、provider-transparency.test.ts |
 | image-production/fixtures.mjs、candidate-fixtures.mjs | 37314d57b3f03268d3814c903d2f82470ac2415107f98938ce14d92dff4be052、ace7535e6d8209d9572617bf77a2fe74381369b433e70bc2f6fbddfcd2932df9 | test-support/fixtures.ts |
 | image-production/alpha-smoke.mjs | 2679e4b6704a1ff12901d5f968e0284a70a1050d0b34561b0be6a3e2741e4527 | test-support/alpha-acceptance.ts |
 | image-production/tests/*.test.mjs（provider.test.mjs 除外） | — | `*.test.ts`（vitest） |
@@ -50,10 +54,15 @@
 - `candidate-compare.ts` 从 candidates 拆出，消除 candidates ↔ render 的循环依赖。
 - 操作名查表改为 `Map`，避免 `constructor` 等原型名命中继承成员。
 - 依赖版本改为从各包入口文件定位 `package.json` 读取（`sharp` 以 `exports` 隐藏了 `package.json`）。
-- 未移植：`cli.mjs`、`provider.mjs`、`provider-config.mjs`、`provider-contracts.py`、
-  `provider-acceptance.mjs`、`provider-smoke.mjs` 与 `tests/provider.test.mjs`（25 个测试）。
-  Provider 执行按 ADR 0010 第 9 条在 P1 检查点 2 以 Node 适配器重做，凭据改从 Pi Provider 配置读取。
-  CLI 参数校验类测试（3 个）随 CLI 一并未移植；Agent 通过 Pi 扩展工具调用引擎。
+- Provider 适配器（P1 检查点 2，2026-10-09）：Python 合同桥换成 `contracts.ts` 的 Node 实现，
+  错误文案与 Python 逐字一致；`test-support/contract-fixtures.json` 的 38 个黄金用例由原版
+  Python 校验器/编译器生成，`contracts.test.ts` 逐条比对结论、错误、警告和编译后的提示词包。
+  凭据不再读 `~/.codex/config.toml` / `auth.json`：宿主注入 `ProviderCredentials` 解析器，
+  引擎只校验 HTTPS 或回环、无内嵌凭据、无 CRLF 头注入；回执 `host` 为 `newmoney.image-engine`。
+  原两个依赖 Python shim 的测试改为注入失败的 `contracts` 和会改工程的凭据解析器，覆盖不变。
+- 未移植：`cli.mjs`、`provider-config.mjs`、`provider-acceptance.mjs`、`provider-smoke.mjs`
+  （craft67 操作员脚本，读写 `~/.codex`）及其测试 1 个、CLI 参数校验测试 3 个。真实网络验收
+  改由 P1 检查点 8 的 Desktop 内真实 Pi 会话承担；Agent 通过 Pi 扩展工具调用引擎。
 
 ## 第三方依赖
 

@@ -1,0 +1,2032 @@
+{
+ "template-draft": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "image-job-tbd",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "draft",
+   "provider_profile": "openai.gpt-image-2.2026-04-21",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "TBD",
+   "asset_refs": [],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "TBD",
+    "subject": "TBD",
+    "action": "",
+    "composition": "TBD",
+    "lighting": "TBD",
+    "materials_style": "TBD",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "UNVERIFIED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "unknown provider_profile: 'openai.gpt-image-2.2026-04-21'",
+   "execution_surface does not support provider_profile"
+  ],
+  "warnings": []
+ },
+ "ready-generate": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": true,
+  "errors": [],
+  "warnings": [],
+  "pack": "# Image execution pack — fixture\n\n- Provider profile: `openai.gpt-image-2.5-sunburst.2026-09-08`\n- Execution surface: `openai.image_api`\n- Task: `generate`\n- Execution mode: `single_turn`\n- Declared status: `ready`\n- Size: `1024x1024`\n- Quality: `low`\n- Format: `png`\n- Compression: `provider default`\n- Background: `opaque`\n- Variants: `1`\n\n## Prompt\n\n```text\n### INTENDED USE AND OUTPUT\nSynthetic fixture\nCreate 1 output variant(s) at 1024x1024, low quality, png format, opaque background.\n\n### BACKGROUND / SCENE\nWarm studio background\n\n### SUBJECT\nGlass bottle\n\n### COMPOSITION / CAMERA / NEGATIVE SPACE\nCentered, negative space top\n\n### LIGHTING\nSoft window light\n\n### MATERIALS / MEDIUM / STYLE\nMatte ceramic\n\n```\n\n## Post-generation inspection\n\n- brief adherence\n- subject and product fidelity\n- text accuracy\n- composition and safe area\n- artifacts and unintended content\n\nRights status: `CLEARED`\n\nThis pack was compiled from declared status `ready`; compilation is not evidence that an image was generated or approved.\n",
+  "fence_count": 2
+ },
+ "ready-flare-transparent": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-flare.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "transparent",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": true,
+  "errors": [],
+  "warnings": [],
+  "pack": "# Image execution pack — fixture\n\n- Provider profile: `openai.gpt-image-2.5-flare.2026-09-08`\n- Execution surface: `openai.image_api`\n- Task: `generate`\n- Execution mode: `single_turn`\n- Declared status: `ready`\n- Size: `1024x1024`\n- Quality: `low`\n- Format: `png`\n- Compression: `provider default`\n- Background: `transparent`\n- Variants: `1`\n\n## Prompt\n\n```text\n### INTENDED USE AND OUTPUT\nSynthetic fixture\nCreate 1 output variant(s) at 1024x1024, low quality, png format, transparent background.\n\n### BACKGROUND / SCENE\nWarm studio background\n\n### SUBJECT\nGlass bottle\n\n### COMPOSITION / CAMERA / NEGATIVE SPACE\nCentered, negative space top\n\n### LIGHTING\nSoft window light\n\n### MATERIALS / MEDIUM / STYLE\nMatte ceramic\n\n```\n\n## Post-generation inspection\n\n- brief adherence\n- subject and product fidelity\n- text accuracy\n- composition and safe area\n- artifacts and unintended content\n\nRights status: `CLEARED`\n\nThis pack was compiled from declared status `ready`; compilation is not evidence that an image was generated or approved.\n",
+  "fence_count": 2
+ },
+ "ready-edit-full": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [
+    "cu-1"
+   ],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "edit",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [
+    "background",
+    "ref-style"
+   ],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "Bottle tilted slightly",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [
+     {
+      "text": "春日焕新",
+      "placement": "top left",
+      "typography": "bold sans"
+     },
+     {
+      "text": "¥129"
+     }
+    ],
+    "references": [
+     {
+      "asset_id": "background",
+      "role": "edit source",
+      "preserve": [
+       "outside selection"
+      ]
+     },
+     {
+      "asset_id": "ref-style",
+      "role": "style only"
+     }
+    ],
+    "change": [
+     "Replace background"
+    ],
+    "preserve": [
+     "Product",
+     "Logo"
+    ],
+    "constraints": [
+     "No people"
+    ],
+    "exclude": [
+     "Watermarks",
+     "Extra text"
+    ]
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": true,
+  "errors": [],
+  "warnings": [],
+  "pack": "# Image execution pack — fixture\n\n- Provider profile: `openai.gpt-image-2.5-sunburst.2026-09-08`\n- Execution surface: `openai.image_api`\n- Task: `edit`\n- Execution mode: `single_turn`\n- Declared status: `ready`\n- Size: `1024x1024`\n- Quality: `low`\n- Format: `png`\n- Compression: `provider default`\n- Background: `opaque`\n- Variants: `1`\n\n## Prompt\n\n```text\n### INTENDED USE AND OUTPUT\nSynthetic fixture\nCreate 1 output variant(s) at 1024x1024, low quality, png format, opaque background.\n\n### BACKGROUND / SCENE\nWarm studio background\n\n### SUBJECT\nGlass bottle\n\n### ACTION / EXPRESSION\nBottle tilted slightly\n\n### COMPOSITION / CAMERA / NEGATIVE SPACE\nCentered, negative space top\n\n### LIGHTING\nSoft window light\n\n### MATERIALS / MEDIUM / STYLE\nMatte ceramic\n\n### EXACT TEXT / TYPOGRAPHY\n- \"春日焕新\" — top left; bold sans\n- \"¥129\"\n- Include no other text unless explicitly listed.\n\n### REFERENCE MAP\n- @background: edit source Preserve: outside selection.\n- @ref-style: style only\n\n### CHANGE ONLY\n- Replace background\n\n### PRESERVE EXACTLY\n- Product\n- Logo\n\n### CONSTRAINTS\n- No people\n\n### DO NOT ADD / EXCLUDE\n- Watermarks\n- Extra text\n\n```\n\n## Post-generation inspection\n\n- brief adherence\n- subject and product fidelity\n- text accuracy\n- composition and safe area\n- artifacts and unintended content\n\nRights status: `CLEARED`\n\nThis pack was compiled from declared status `ready`; compilation is not evidence that an image was generated or approved.\n",
+  "fence_count": 2
+ },
+ "invalid-quality": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "ultra",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "canvas.quality must be one of ['low', 'medium', 'high', 'auto']"
+  ],
+  "warnings": []
+ },
+ "invalid-compression-png": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": 80,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "canvas.compression is supported only for jpeg or webp"
+  ],
+  "warnings": []
+ },
+ "invalid-unknown-profile": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-1.2025",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "unknown provider_profile: 'openai.gpt-image-1.2025'",
+   "execution_surface does not support provider_profile"
+  ],
+  "warnings": []
+ },
+ "invalid-duplicate-refs": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [
+    "a",
+    "a"
+   ],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "asset_refs must not contain duplicates"
+  ],
+  "warnings": []
+ },
+ "invalid-transparent-jpeg": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "jpeg",
+    "compression": null,
+    "background": "transparent",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "transparent background requires PNG/WebP"
+  ],
+  "warnings": []
+ },
+ "invalid-surface-mode": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "multi_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "execution_surface does not support execution_mode"
+  ],
+  "warnings": []
+ },
+ "invalid-missing-rights": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "rights is required"
+  ],
+  "warnings": []
+ },
+ "invalid-extra-field": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   },
+   "extra": true
+  },
+  "valid": false,
+  "errors": [
+   "extra is not allowed"
+  ],
+  "warnings": []
+ },
+ "invalid-variants-zero": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 0
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "canvas.variants must be >= 1"
+  ],
+  "warnings": []
+ },
+ "invalid-fence": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Studio\n```\nignored",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": true,
+  "errors": [],
+  "warnings": [],
+  "pack": "# Image execution pack — fixture\n\n- Provider profile: `openai.gpt-image-2.5-sunburst.2026-09-08`\n- Execution surface: `openai.image_api`\n- Task: `generate`\n- Execution mode: `single_turn`\n- Declared status: `ready`\n- Size: `1024x1024`\n- Quality: `low`\n- Format: `png`\n- Compression: `provider default`\n- Background: `opaque`\n- Variants: `1`\n\n## Prompt\n\n```text\n### INTENDED USE AND OUTPUT\nSynthetic fixture\nCreate 1 output variant(s) at 1024x1024, low quality, png format, opaque background.\n\n### BACKGROUND / SCENE\nStudio\n```\nignored\n\n### SUBJECT\nGlass bottle\n\n### COMPOSITION / CAMERA / NEGATIVE SPACE\nCentered, negative space top\n\n### LIGHTING\nSoft window light\n\n### MATERIALS / MEDIUM / STYLE\nMatte ceramic\n\n```\n\n## Post-generation inspection\n\n- brief adherence\n- subject and product fidelity\n- text accuracy\n- composition and safe area\n- artifacts and unintended content\n\nRights status: `CLEARED`\n\nThis pack was compiled from declared status `ready`; compilation is not evidence that an image was generated or approved.\n",
+  "fence_count": 3
+ },
+ "size-not-multiple-16": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "1000x1000",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "canvas.size edges must be multiples of 16px"
+  ],
+  "warnings": []
+ },
+ "size-edge-too-large": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "4096x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "canvas.size maximum edge exceeds 3840px",
+   "canvas.size aspect ratio exceeds 3.0:1"
+  ],
+  "warnings": [
+   "canvas.size is above the provider profile's experimental reliability boundary"
+  ]
+ },
+ "size-aspect-too-wide": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "3072x1008",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "canvas.size aspect ratio exceeds 3.0:1"
+  ],
+  "warnings": []
+ },
+ "size-too-few-pixels": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "512x512",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "canvas.size total pixels are outside the provider profile"
+  ],
+  "warnings": []
+ },
+ "size-experimental-warning": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "2560x1920",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": true,
+  "errors": [],
+  "warnings": [
+   "canvas.size is above the provider profile's experimental reliability boundary"
+  ],
+  "pack": "# Image execution pack — fixture\n\n- Provider profile: `openai.gpt-image-2.5-sunburst.2026-09-08`\n- Execution surface: `openai.image_api`\n- Task: `generate`\n- Execution mode: `single_turn`\n- Declared status: `ready`\n- Size: `2560x1920`\n- Quality: `low`\n- Format: `png`\n- Compression: `provider default`\n- Background: `opaque`\n- Variants: `1`\n\n## Prompt\n\n```text\n### INTENDED USE AND OUTPUT\nSynthetic fixture\nCreate 1 output variant(s) at 2560x1920, low quality, png format, opaque background.\n\n### BACKGROUND / SCENE\nWarm studio background\n\n### SUBJECT\nGlass bottle\n\n### COMPOSITION / CAMERA / NEGATIVE SPACE\nCentered, negative space top\n\n### LIGHTING\nSoft window light\n\n### MATERIALS / MEDIUM / STYLE\nMatte ceramic\n\n```\n\n## Post-generation inspection\n\n- brief adherence\n- subject and product fidelity\n- text accuracy\n- composition and safe area\n- artifacts and unintended content\n\nRights status: `CLEARED`\n\nThis pack was compiled from declared status `ready`; compilation is not evidence that an image was generated or approved.\n",
+  "fence_count": 2
+ },
+ "size-malformed": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "large",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "canvas.size: size must be auto or WIDTHxHEIGHT"
+  ],
+  "warnings": []
+ },
+ "size-auto": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "auto",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": true,
+  "errors": [],
+  "warnings": [],
+  "pack": "# Image execution pack — fixture\n\n- Provider profile: `openai.gpt-image-2.5-sunburst.2026-09-08`\n- Execution surface: `openai.image_api`\n- Task: `generate`\n- Execution mode: `single_turn`\n- Declared status: `ready`\n- Size: `auto`\n- Quality: `low`\n- Format: `png`\n- Compression: `provider default`\n- Background: `opaque`\n- Variants: `1`\n\n## Prompt\n\n```text\n### INTENDED USE AND OUTPUT\nSynthetic fixture\nCreate 1 output variant(s) at auto, low quality, png format, opaque background.\n\n### BACKGROUND / SCENE\nWarm studio background\n\n### SUBJECT\nGlass bottle\n\n### COMPOSITION / CAMERA / NEGATIVE SPACE\nCentered, negative space top\n\n### LIGHTING\nSoft window light\n\n### MATERIALS / MEDIUM / STYLE\nMatte ceramic\n\n```\n\n## Post-generation inspection\n\n- brief adherence\n- subject and product fidelity\n- text accuracy\n- composition and safe area\n- artifacts and unintended content\n\nRights status: `CLEARED`\n\nThis pack was compiled from declared status `ready`; compilation is not evidence that an image was generated or approved.\n",
+  "fence_count": 2
+ },
+ "prompt-blank-scene": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "   ",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "prompt.scene must be a non-empty string"
+  ],
+  "warnings": []
+ },
+ "prompt-duplicate-reference": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "edit",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [
+    "background"
+   ],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [
+     {
+      "asset_id": "background",
+      "role": "edit source"
+     },
+     {
+      "asset_id": "background",
+      "role": "style"
+     }
+    ],
+    "change": [
+     "x"
+    ],
+    "preserve": [
+     "y"
+    ],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "prompt.references[1] duplicates asset_id background"
+  ],
+  "warnings": []
+ },
+ "prompt-blank-reference-role": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "edit",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [
+    "background"
+   ],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [
+     {
+      "asset_id": "background",
+      "role": " "
+     }
+    ],
+    "change": [
+     "x"
+    ],
+    "preserve": [
+     "y"
+    ],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "prompt.references[0].role is required"
+  ],
+  "warnings": []
+ },
+ "edit-without-change-preserve": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "edit",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [
+    "background"
+   ],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [
+     {
+      "asset_id": "background",
+      "role": "edit source"
+     }
+    ],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": true,
+  "errors": [],
+  "warnings": [
+   "edit job has no explicit change list",
+   "edit job has no explicit preserve list"
+  ],
+  "pack": "# Image execution pack — fixture\n\n- Provider profile: `openai.gpt-image-2.5-sunburst.2026-09-08`\n- Execution surface: `openai.image_api`\n- Task: `edit`\n- Execution mode: `single_turn`\n- Declared status: `ready`\n- Size: `1024x1024`\n- Quality: `low`\n- Format: `png`\n- Compression: `provider default`\n- Background: `opaque`\n- Variants: `1`\n\n## Prompt\n\n```text\n### INTENDED USE AND OUTPUT\nSynthetic fixture\nCreate 1 output variant(s) at 1024x1024, low quality, png format, opaque background.\n\n### BACKGROUND / SCENE\nWarm studio background\n\n### SUBJECT\nGlass bottle\n\n### COMPOSITION / CAMERA / NEGATIVE SPACE\nCentered, negative space top\n\n### LIGHTING\nSoft window light\n\n### MATERIALS / MEDIUM / STYLE\nMatte ceramic\n\n### REFERENCE MAP\n- @background: edit source\n\n```\n\n## Post-generation inspection\n\n- brief adherence\n- subject and product fidelity\n- text accuracy\n- composition and safe area\n- artifacts and unintended content\n\nRights status: `CLEARED`\n\nThis pack was compiled from declared status `ready`; compilation is not evidence that an image was generated or approved.\n",
+  "fence_count": 2
+ },
+ "rights-rejected-still-valid": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "Synthetic fixture",
+   "asset_refs": [],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "REJECTED",
+    "notes": "no license"
+   }
+  },
+  "valid": true,
+  "errors": [],
+  "warnings": [],
+  "pack": "# Image execution pack — fixture\n\n- Provider profile: `openai.gpt-image-2.5-sunburst.2026-09-08`\n- Execution surface: `openai.image_api`\n- Task: `generate`\n- Execution mode: `single_turn`\n- Declared status: `ready`\n- Size: `1024x1024`\n- Quality: `low`\n- Format: `png`\n- Compression: `provider default`\n- Background: `opaque`\n- Variants: `1`\n\n## Prompt\n\n```text\n### INTENDED USE AND OUTPUT\nSynthetic fixture\nCreate 1 output variant(s) at 1024x1024, low quality, png format, opaque background.\n\n### BACKGROUND / SCENE\nWarm studio background\n\n### SUBJECT\nGlass bottle\n\n### COMPOSITION / CAMERA / NEGATIVE SPACE\nCentered, negative space top\n\n### LIGHTING\nSoft window light\n\n### MATERIALS / MEDIUM / STYLE\nMatte ceramic\n\n```\n\n## Post-generation inspection\n\n- brief adherence\n- subject and product fidelity\n- text accuracy\n- composition and safe area\n- artifacts and unintended content\n\nRights status: `REJECTED`\n\nThis pack was compiled from declared status `ready`; compilation is not evidence that an image was generated or approved.\n",
+  "fence_count": 2
+ },
+ "whitespace-intended-use": {
+  "job": {
+   "schema_version": "creative-craft.image-job.v2",
+   "job_id": "fixture",
+   "brief_id": "brief-tbd",
+   "direction_id": "direction-tbd",
+   "selected_route_id": "route-1",
+   "copy_sheet_id": "copy-sheet-tbd",
+   "copy_unit_refs": [],
+   "declared_status": "ready",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "task_type": "generate",
+   "execution_mode": "single_turn",
+   "intended_use": "  ",
+   "asset_refs": [],
+   "canvas": {
+    "size": "1024x1024",
+    "quality": "low",
+    "format": "png",
+    "compression": null,
+    "background": "opaque",
+    "variants": 1
+   },
+   "prompt": {
+    "scene": "Warm studio background",
+    "subject": "Glass bottle",
+    "action": "",
+    "composition": "Centered, negative space top",
+    "lighting": "Soft window light",
+    "materials_style": "Matte ceramic",
+    "exact_text": [],
+    "references": [],
+    "change": [],
+    "preserve": [],
+    "constraints": [],
+    "exclude": []
+   },
+   "inspection": [
+    "brief adherence",
+    "subject and product fidelity",
+    "text accuracy",
+    "composition and safe area",
+    "artifacts and unintended content"
+   ],
+   "rights": {
+    "status": "CLEARED",
+    "notes": ""
+   }
+  },
+  "valid": false,
+  "errors": [
+   "intended_use must be a non-empty string"
+  ],
+  "warnings": []
+ },
+ "receipt-ok": {
+  "receipt": {
+   "schema_version": "creative-craft.execution-receipt.v1",
+   "receipt_id": "receipt-fixture",
+   "job_id": "fixture",
+   "job_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "model": "gpt-image-2.5-sunburst",
+   "snapshot": null,
+   "host": "newmoney.image-engine",
+   "operator": "agent",
+   "started_at": "2026-10-08T00:00:00Z",
+   "completed_at": "2026-10-08T00:00:01Z",
+   "outcome": "succeeded",
+   "request_or_prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "parameters": {
+    "model": "gpt-image-2.5-sunburst"
+   },
+   "provider_execution_id": null,
+   "outputs": [
+    {
+     "asset_id": "generated-fixture",
+     "path": "jobs/fixture/output.png",
+     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+     "mime_type": "image/png",
+     "bytes": 10
+    }
+   ],
+   "provider_errors": [],
+   "moderation_result": null,
+   "limitations": [
+    "x"
+   ]
+  },
+  "valid": true,
+  "errors": [],
+  "warnings": []
+ },
+ "receipt-bad-outcome": {
+  "receipt": {
+   "schema_version": "creative-craft.execution-receipt.v1",
+   "receipt_id": "receipt-fixture",
+   "job_id": "fixture",
+   "job_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "model": "gpt-image-2.5-sunburst",
+   "snapshot": null,
+   "host": "newmoney.image-engine",
+   "operator": "agent",
+   "started_at": "2026-10-08T00:00:00Z",
+   "completed_at": "2026-10-08T00:00:01Z",
+   "outcome": "done",
+   "request_or_prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "parameters": {
+    "model": "gpt-image-2.5-sunburst"
+   },
+   "provider_execution_id": null,
+   "outputs": [
+    {
+     "asset_id": "generated-fixture",
+     "path": "jobs/fixture/output.png",
+     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+     "mime_type": "image/png",
+     "bytes": 10
+    }
+   ],
+   "provider_errors": [],
+   "moderation_result": null,
+   "limitations": [
+    "x"
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "outcome must be one of ['succeeded', 'partial', 'failed', 'cancelled']"
+  ],
+  "warnings": []
+ },
+ "receipt-bad-sha": {
+  "receipt": {
+   "schema_version": "creative-craft.execution-receipt.v1",
+   "receipt_id": "receipt-fixture",
+   "job_id": "fixture",
+   "job_sha256": "zz",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "model": "gpt-image-2.5-sunburst",
+   "snapshot": null,
+   "host": "newmoney.image-engine",
+   "operator": "agent",
+   "started_at": "2026-10-08T00:00:00Z",
+   "completed_at": "2026-10-08T00:00:01Z",
+   "outcome": "succeeded",
+   "request_or_prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "parameters": {
+    "model": "gpt-image-2.5-sunburst"
+   },
+   "provider_execution_id": null,
+   "outputs": [
+    {
+     "asset_id": "generated-fixture",
+     "path": "jobs/fixture/output.png",
+     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+     "mime_type": "image/png",
+     "bytes": 10
+    }
+   ],
+   "provider_errors": [],
+   "moderation_result": null,
+   "limitations": [
+    "x"
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "job_sha256 does not match pattern '^[a-f0-9]{64}$'"
+  ],
+  "warnings": []
+ },
+ "receipt-missing-outputs": {
+  "receipt": {
+   "schema_version": "creative-craft.execution-receipt.v1",
+   "receipt_id": "receipt-fixture",
+   "job_id": "fixture",
+   "job_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "model": "gpt-image-2.5-sunburst",
+   "snapshot": null,
+   "host": "newmoney.image-engine",
+   "operator": "agent",
+   "started_at": "2026-10-08T00:00:00Z",
+   "completed_at": "2026-10-08T00:00:01Z",
+   "outcome": "succeeded",
+   "request_or_prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "parameters": {
+    "model": "gpt-image-2.5-sunburst"
+   },
+   "provider_execution_id": null,
+   "provider_errors": [],
+   "moderation_result": null,
+   "limitations": [
+    "x"
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "outputs is required"
+  ],
+  "warnings": []
+ },
+ "receipt-unknown-model": {
+  "receipt": {
+   "schema_version": "creative-craft.execution-receipt.v1",
+   "receipt_id": "receipt-fixture",
+   "job_id": "fixture",
+   "job_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "model": "dall-e-9",
+   "snapshot": null,
+   "host": "newmoney.image-engine",
+   "operator": "agent",
+   "started_at": "2026-10-08T00:00:00Z",
+   "completed_at": "2026-10-08T00:00:01Z",
+   "outcome": "succeeded",
+   "request_or_prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "parameters": {
+    "model": "gpt-image-2.5-sunburst"
+   },
+   "provider_execution_id": null,
+   "outputs": [
+    {
+     "asset_id": "generated-fixture",
+     "path": "jobs/fixture/output.png",
+     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+     "mime_type": "image/png",
+     "bytes": 10
+    }
+   ],
+   "provider_errors": [],
+   "moderation_result": null,
+   "limitations": [
+    "x"
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "receipt model differs from provider profile"
+  ],
+  "warnings": []
+ },
+ "receipt-failed-with-outputs": {
+  "receipt": {
+   "schema_version": "creative-craft.execution-receipt.v1",
+   "receipt_id": "receipt-fixture",
+   "job_id": "fixture",
+   "job_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "model": "gpt-image-2.5-sunburst",
+   "snapshot": null,
+   "host": "newmoney.image-engine",
+   "operator": "agent",
+   "started_at": "2026-10-08T00:00:00Z",
+   "completed_at": "2026-10-08T00:00:01Z",
+   "outcome": "failed",
+   "request_or_prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "parameters": {
+    "model": "gpt-image-2.5-sunburst"
+   },
+   "provider_execution_id": null,
+   "outputs": [
+    {
+     "asset_id": "generated-fixture",
+     "path": "jobs/fixture/output.png",
+     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+     "mime_type": "image/png",
+     "bytes": 10
+    }
+   ],
+   "provider_errors": [],
+   "moderation_result": null,
+   "limitations": [
+    "x"
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "failed receipt must not claim outputs; use partial"
+  ],
+  "warnings": []
+ },
+ "receipt-extra-output-field": {
+  "receipt": {
+   "schema_version": "creative-craft.execution-receipt.v1",
+   "receipt_id": "receipt-fixture",
+   "job_id": "fixture",
+   "job_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "model": "gpt-image-2.5-sunburst",
+   "snapshot": null,
+   "host": "newmoney.image-engine",
+   "operator": "agent",
+   "started_at": "2026-10-08T00:00:00Z",
+   "completed_at": "2026-10-08T00:00:01Z",
+   "outcome": "succeeded",
+   "request_or_prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "parameters": {
+    "model": "gpt-image-2.5-sunburst"
+   },
+   "provider_execution_id": null,
+   "outputs": [
+    {
+     "asset_id": "generated-fixture",
+     "path": "jobs/fixture/output.png",
+     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+     "mime_type": "image/png",
+     "bytes": 10,
+     "extra": 1
+    }
+   ],
+   "provider_errors": [],
+   "moderation_result": null,
+   "limitations": [
+    "x"
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "outputs.0.extra is not allowed"
+  ],
+  "warnings": []
+ },
+ "receipt-partial-no-outputs": {
+  "receipt": {
+   "schema_version": "creative-craft.execution-receipt.v1",
+   "receipt_id": "receipt-fixture",
+   "job_id": "fixture",
+   "job_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "model": "gpt-image-2.5-sunburst",
+   "snapshot": null,
+   "host": "newmoney.image-engine",
+   "operator": "agent",
+   "started_at": "2026-10-08T00:00:00Z",
+   "completed_at": "2026-10-08T00:00:01Z",
+   "outcome": "partial",
+   "request_or_prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "parameters": {
+    "model": "gpt-image-2.5-sunburst"
+   },
+   "provider_execution_id": null,
+   "outputs": [],
+   "provider_errors": [],
+   "moderation_result": null,
+   "limitations": [
+    "x"
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "partial receipt requires at least one output"
+  ],
+  "warnings": []
+ },
+ "receipt-duplicate-output": {
+  "receipt": {
+   "schema_version": "creative-craft.execution-receipt.v1",
+   "receipt_id": "receipt-fixture",
+   "job_id": "fixture",
+   "job_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "model": "gpt-image-2.5-sunburst",
+   "snapshot": null,
+   "host": "newmoney.image-engine",
+   "operator": "agent",
+   "started_at": "2026-10-08T00:00:00Z",
+   "completed_at": "2026-10-08T00:00:01Z",
+   "outcome": "succeeded",
+   "request_or_prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "parameters": {
+    "model": "gpt-image-2.5-sunburst"
+   },
+   "provider_execution_id": null,
+   "outputs": [
+    {
+     "asset_id": "generated-fixture",
+     "path": "jobs/fixture/output.png",
+     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+     "mime_type": "image/png",
+     "bytes": 10
+    },
+    {
+     "asset_id": "generated-fixture",
+     "path": "jobs/fixture/output.png",
+     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+     "mime_type": "image/png",
+     "bytes": 10
+    }
+   ],
+   "provider_errors": [],
+   "moderation_result": null,
+   "limitations": [
+    "x"
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "outputs[1] duplicates asset_id generated-fixture",
+   "outputs[1] duplicates path jobs/fixture/output.png"
+  ],
+  "warnings": []
+ },
+ "receipt-offset-timezone": {
+  "receipt": {
+   "schema_version": "creative-craft.execution-receipt.v1",
+   "receipt_id": "receipt-fixture",
+   "job_id": "fixture",
+   "job_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "openai.image_api",
+   "model": "gpt-image-2.5-sunburst",
+   "snapshot": null,
+   "host": "newmoney.image-engine",
+   "operator": "agent",
+   "started_at": "2026-10-08T08:00:00+08:00",
+   "completed_at": "2026-10-08T00:00:01Z",
+   "outcome": "succeeded",
+   "request_or_prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "parameters": {
+    "model": "gpt-image-2.5-sunburst"
+   },
+   "provider_execution_id": null,
+   "outputs": [
+    {
+     "asset_id": "generated-fixture",
+     "path": "jobs/fixture/output.png",
+     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+     "mime_type": "image/png",
+     "bytes": 10
+    }
+   ],
+   "provider_errors": [],
+   "moderation_result": null,
+   "limitations": [
+    "x"
+   ]
+  },
+  "valid": true,
+  "errors": [],
+  "warnings": []
+ },
+ "receipt-unknown-surface": {
+  "receipt": {
+   "schema_version": "creative-craft.execution-receipt.v1",
+   "receipt_id": "receipt-fixture",
+   "job_id": "fixture",
+   "job_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "provider_profile": "openai.gpt-image-2.5-sunburst.2026-09-08",
+   "execution_surface": "google.imagen",
+   "model": "gpt-image-2.5-sunburst",
+   "snapshot": null,
+   "host": "newmoney.image-engine",
+   "operator": "agent",
+   "started_at": "2026-10-08T00:00:00Z",
+   "completed_at": "2026-10-08T00:00:01Z",
+   "outcome": "succeeded",
+   "request_or_prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "parameters": {
+    "model": "gpt-image-2.5-sunburst"
+   },
+   "provider_execution_id": null,
+   "outputs": [
+    {
+     "asset_id": "generated-fixture",
+     "path": "jobs/fixture/output.png",
+     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+     "mime_type": "image/png",
+     "bytes": 10
+    }
+   ],
+   "provider_errors": [],
+   "moderation_result": null,
+   "limitations": [
+    "x"
+   ]
+  },
+  "valid": false,
+  "errors": [
+   "unknown execution_surface: 'google.imagen'"
+  ],
+  "warnings": []
+ }
+}

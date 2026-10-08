@@ -1,24 +1,13 @@
-import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { sha256 } from "./content-store.js";
 import { record, id, digest, LIMITS, isRecord, type Asset, type JsonRecord } from "./document.js";
+import { PROFILE_MODELS, IMAGE_MODELS } from "./provider-profiles.js";
 import { readBytes } from "./raster.js";
 import { normalizeImage } from "./provider-normalize.js";
 import { verifyAlpha } from "./provider-alpha.js";
 
 export interface ExecutionBinding { job_id: string; job_sha256: string; receipt_file: string; receipt_sha256: string }
 
-// Single source of truth: the Provider profiles that enable the image adapter.
-// `providers/` sits beside both `src/` and `dist/`.
-const providersUrl = new URL("../providers/", import.meta.url);
-const profiles = readdirSync(providersUrl, { withFileTypes: true })
-  .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-  .map((entry) => JSON.parse(readFileSync(new URL(entry.name, providersUrl), "utf8")) as JsonRecord);
-export const PROFILE_MODELS: ReadonlyMap<string, string> = new Map(profiles
-  .filter((profile) => isRecord(profile.availability) && profile.availability.network_adapter_in_optional_module === true)
-  .map((profile) => [String(profile.profile_id), String(profile.model)] as const)
-  .sort(([a], [b]) => a.localeCompare(b)));
-export const IMAGE_MODELS: readonly string[] = [...new Set(PROFILE_MODELS.values())];
 
 export function validateExecution(binding: unknown): asserts binding is ExecutionBinding {
   record(binding, ["job_id", "job_sha256", "receipt_file", "receipt_sha256"], "execution binding");
