@@ -1,6 +1,6 @@
 # Alpha.47 internal candidate preparation
 
-Status: active
+Status: ready for manual testing
 Owner: Claude
 Started: 2026-10-08
 
@@ -36,10 +36,21 @@ acceptance cannot inherit Alpha.46 receipts.
   (craft67 main 502266e -> 8e2a37f, 17 commits; versions unchanged). Lock moved to
   8e2a37f with catalog 2026.10.08.1, capabilities re-prepared, then `check:candidate`
   passed (969 files / 6514 tests).
-- [ ] Push and CI on the version source.
-- [ ] Windows preflight and `Windows candidate` dispatch.
-- [ ] Exact-source macOS preview packaged and smoke-tested.
-- [ ] Readiness record with the three product identities.
+- [x] Pushed `90e93cab` (capability lock) and `0d2c6c39` (version). CI `37720961544` attempt 1
+  passed every lane, including Windows native smoke and installer lifecycle.
+- [x] Preflight passed (Alpha.46 actions-artifact baseline). Windows candidate `37720999046`
+  attempt 1 passed provenance, build and full installer certification (real-user provider
+  configuration lane included) on the first try.
+- [x] Exact-source macOS preview (`0d2c6c39`) packaged, smoke-tested and opened.
+- [x] Readiness record `artifacts/validation/alpha47-candidate/readiness-0d2c6c39.json`:
+  Windows EXE `7579ab8f…742a` (252,265,706 bytes), DMG `8f25cc74…2e07` (337,107,620),
+  ZIP `fc7b93f4…af13` (343,617,104); repository, source, version and Pi runtime match.
+
+## Remaining
+
+- Feishu upload, R2 publication: each needs separate authorization.
+- Manual acceptance on Windows x64 (clean and existing Pi profile) and Apple Silicon,
+  bound to the hashes above.
 
 ## Known risks
 
