@@ -112,17 +112,30 @@
   display: grid;
   margin: 0;
   padding: 0;
-  border-top: 1px solid var(--border);
   list-style: none;
 }
 
 .row {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-1);
-  border-bottom: 1px solid var(--border);
 }
+
+/* Rows separate by a hairline inset to the text edge (8px padding + 24px tile + 12px gap). */
+.row + .row::before {
+  position: absolute;
+  top: 0;
+  right: 8px;
+  left: 44px;
+  border-top: 1px solid var(--border);
+  content: "";
+}
+
+/* A hovered row covers the hairlines around it, as in Settings catalogs. */
+.row:has(> .rowMain[data-hovered])::before,
+.row:has(> .rowMain[data-hovered]) + .row::before { opacity: 0; }
 
 .rowMain {
   display: grid;

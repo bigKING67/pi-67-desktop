@@ -540,7 +540,7 @@
   height: 32px;
   place-items: center;
   padding: 0;
-  border: 1px solid var(--accent-strong);
+  border: 0;
   border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--canvas);
@@ -550,7 +550,6 @@
 
 /* Matches the Work Composer: a visible neutral circle, since surface-disabled can equal the field. */
 .sendButton[data-disabled] {
-  border-color: transparent;
   background: var(--surface-active);
   color: var(--text-disabled);
 }
@@ -654,13 +653,12 @@
   align-items: start;
   gap: var(--space-2);
   padding: 10px 12px;
-  border: 1px solid var(--border);
   border-radius: var(--radius-control);
+  background: var(--surface-muted);
   cursor: pointer;
 }
 
 .visibility label.visibilitySelected {
-  border-color: var(--accent);
   background: var(--accent-soft);
 }
 

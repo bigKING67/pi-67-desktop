@@ -2346,28 +2346,28 @@ loading error where the operation can produce those states
 - Agents (P3a): Agent rows use a 20px accent-soft tile with a bot glyph and an
   8px presence dot (success fill online, disabled fill otherwise) that the row's
   accessible name repeats as text; your own Agents show a tertiary `我的`. Agent
-  senders carry an outlined caption-size (11px) `Agent` pill badge in medium weight. Request states sit under the asking
+  senders carry a filled (`surface-active`, no outline) caption-size (11px) `Agent` pill badge in medium weight. Request states sit under the asking
   message as tertiary caption lines (secondary text for problems), one per Agent,
   and disappear once the reply arrives. A direct message with an Agent adds an intro
   block (badge, owner and presence, description, disclosure) in caption text. The
   `我的 Agent` dialog is at most 640px wide and scrolls inside the viewport: a
-  create row, then one bordered card per Agent with its fields in a two-column grid
-  (one column under 620px), a hairline-separated `在这台电脑上运行` section, and the
+  create row, then one unframed `surface-muted` card per Agent with its fields in a two-column grid
+  (one column under 620px), a `在这台电脑上运行` section set off by spacing and its heading, and the
   last three runs as caption lines. Removal arms on the first press like channel
   actions.
-- Webhooks (P3c): `频道设置` gains a hairline-separated `集成 · Webhook` section for
+- Webhooks (P3c): `频道设置` gains a `集成 · Webhook` section, set off by spacing, for
   managers: an intro, a name field with `创建 Webhook`, then 38px rows (name, last
   use, `重置地址`/`删除` arming like other destructive steps). A newly created or
   rotated URL appears once in an accent-outlined block with a read-only, selectable
   field and `复制地址`; it disappears when the dialog closes. Bot senders carry the
-  same outlined badge as Agents, reading `Bot`. The channel dialog scrolls within
+  same filled badge as Agents, reading `Bot`. The channel dialog scrolls within
   the viewport.
 - Mentions (P2.5): `@name` runs use the accent-soft fill with accent-strong
   semibold text; the reader's own mention uses an 18% accent fill with primary text
   (2026-10-06: the inverted solid chip was the loudest element on screen), and a
   message that mentions the reader gets a 2px rail at 45% accent in its left gutter. Unread
-  mentions show an `@N` count in the accent outline (accent border, accent-soft
-  fill) beside the solid unread count, never the warning role. The mention list
+  mentions show an `@N` count on the accent-soft tint without an outline (2026-10-08)
+  beside the solid unread count, never the warning role. The mention list
   floats above the composer on the raised surface with the floating shadow, at most
   280px wide and eight 32px rows (avatar tile and name); the active row uses
   accent-soft. Loading and no-match states are one tertiary line.
@@ -2377,7 +2377,7 @@ loading error where the operation can produce those states
   intro line, then a toolbar with a `待处理 | 已处理` segmented control (the General
   settings theme-switch anatomy plus a 1px strong-border ring on the selected segment
   so it reads in dark), `全部已读` (secondary, disabled at zero) and a
-  quiet `通知设置` text button. Items are hairline-separated rows: a 24px muted tile
+  quiet `通知设置` text button. Items are rows separated by hairlines inset to the text edge: a 24px muted tile
   with the kind glyph (@, message, bot, card), an interface-size title line saying
   who did what, a one-line tertiary detail (preview, card title, or the Agent
   failure reason in the warning role), and right-aligned caption meta at most 200px
@@ -2418,10 +2418,10 @@ loading error where the operation can produce those states
   (`你撤回了一条消息`, `X 撤回了一条消息`, `这条消息已被管理员移除`) with no actions.
 - Attachments (ADR 0009): a 32px paperclip ghost button starts the composer field
   (secondary glyph, hover surface, disabled while editing or read-only). Files wait
-  in a tray spanning the field above the text: 240px items on the default surface
-  with a 1px border, a 32px rounded thumbnail or file glyph, the name in medium
+  in a tray spanning the field above the text: 240px unframed items on `surface-muted`
+  (2026-10-08), a 32px rounded thumbnail or file glyph, the name in medium
   support text, a tertiary caption (`上传中 N%`, size, or the danger-role error with
-  a danger border), a 2px accent progress line, and 28px retry/remove icon buttons.
+  a danger tint), a 2px accent progress line, and 28px retry/remove icon buttons.
   Refused files are explained inline above the field, not in a Toast: a support-size
   notice on a rounded warning tint without a colored edge, `有文件没有添加` in
   semibold, one secondary line per file, and a `知道了` text action; it clears on the
@@ -2439,13 +2439,13 @@ loading error where the operation can produce those states
 - Mute: a small `静音通知`/`取消静音` button with a bell-off/bell glyph ends the
   conversation intro (before `频道设置` in channels). Muted rows add an 11px
   tertiary bell-off mark after the name, and their unread count switches from the
-  solid accent to the neutral muted tile with a border ring; `@N` keeps its accent
-  outline. General settings carries a `团队聊天通知` section above shortcuts:
+  solid accent to the neutral muted tile with a border ring; `@N` keeps its accent-soft
+  tint. General settings carries a `团队聊天通知` section above shortcuts:
   `系统通知` (enable checkbox), `提醒这些动态` (four checkboxes in a wrapping row) and
   `消息预览` with its exposure hint; dependent checkboxes disable while off.
 - `频道设置` is a small button at the end of the channel intro. Its dialog reuses the
   new-channel dialog layout: rename field with an inline save, a roster of 38px rows
-  (avatar, name, outlined `负责人` chip, trailing small buttons), an add-member
+  (avatar, name, filled `负责人` pill without an outline, trailing small buttons), an add-member
   select, tertiary hints, then footer actions. Destructive steps arm on the first
   press (danger outline and tint, explicit `确认…` label) and run on the second.
 - Plain messages expose `在工作中处理` as a tertiary text action revealed on hover

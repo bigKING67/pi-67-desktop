@@ -109,8 +109,16 @@ a surface step or rely on the light-mode hairline allowance.
   covered by the Phase 5 two-line catalog rows. Doctor icons and the keyboard-help icon
   were closed in the light-mode workbench pass. Credential separation needs no change:
   the credential layout puts the Provider list on `surface-muted` beside a white editor,
-  the same step as the light shell. Remaining: Team Chat border mandates,
-  which need user decisions because DESIGN names them explicitly.
+  the same step as the light shell.
+- 2026-10-08 Team Chat border review (user approved the recommendations): Agent cards
+  become unframed `surface-muted` cards; the Agent host, closed and Webhook sections
+  separate by spacing; `Agent`/`Bot` badges and the `负责人` chip are filled pills; `@N`
+  keeps the accent-soft tint without an outline; tray items and visibility choices are
+  filled; notification and search rows use inset hairlines; the send button drops its
+  invisible outline. Kept: inputs, overlays (mention picker, viewer, message actions),
+  presence and thumbnail rings, day separators, the Work Card, and the one-time Webhook
+  URL block (recovery exception). Not yet reviewed: the 2px accent rail on messages that
+  mention the reader and the muted unread-count ring.
 
 ## Rollback
 Each phase lands as its own commits; revert that phase's commits. Token value

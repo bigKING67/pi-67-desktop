@@ -76,11 +76,10 @@
   border-radius: var(--radius-control);
 }
 
-/* Mentions read as "@N" in the accent outline; unread counts stay solid accent. */
+/* Mentions read as "@N" on the soft accent tint; unread counts stay solid accent. */
 .mentionBadge {
   min-width: 18px;
-  padding: 0 4px;
-  border: 1px solid var(--accent);
+  padding: 0 5px;
   border-radius: var(--radius-pill);
   background: var(--accent-soft);
   color: var(--accent-strong);
@@ -149,9 +148,9 @@
 }
 
 .ownerChip {
-  padding: 1px 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-active);
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
 }
