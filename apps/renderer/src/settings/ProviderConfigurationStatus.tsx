@@ -1,5 +1,5 @@
 import type { PiProviderConfigurationSnapshot } from "@pi67/protocol";
-import { RefreshCw, RotateCcw } from "lucide-react";
+import { CloudDownload, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 import {
   SettingsDetails,
@@ -63,19 +63,17 @@ export function ProviderConfigurationStatusBar({
 }) {
   return <SettingsToolbar
     className={inline ? styles.statusInline! : styles.statusBar!}
-    status={<SettingsStatus tone={snapshot.syncState === "current" ? "success" : "warning"}>
-      {snapshot.syncState === "current" ? "配置已同步" : "配置需要处理"}
-    </SettingsStatus>}
+    status={snapshot.syncState === "current" ? null : <SettingsStatus tone="warning">配置需要处理</SettingsStatus>}
     actions={<>
       {onRefreshCatalog ? <SettingsIconAction
         label={catalogBusy ? "刷新目录中…" : "刷新模型目录"}
-        icon={<RefreshCw aria-hidden="true" size={14} />}
+        icon={<CloudDownload aria-hidden="true" size={14} />}
         isDisabled={busy || catalogBusy}
         onPress={onRefreshCatalog}
       /> : null}
       <SettingsIconAction
         label="重新加载配置"
-        icon={<RotateCcw aria-hidden="true" size={14} />}
+        icon={<RefreshCw aria-hidden="true" size={14} />}
         isDisabled={busy || catalogBusy}
         onPress={onReload}
       />

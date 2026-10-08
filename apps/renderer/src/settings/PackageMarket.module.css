@@ -66,6 +66,20 @@
   min-width: 56px;
 }
 
+/* One end column for the install button or the status that replaces it. */
+.endSlot {
+  display: inline-flex;
+  width: 112px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Inside the row button the end padding is 12px instead of the action column's 8px. */
+.statusEnd {
+  width: 116px;
+  margin-right: -4px;
+}
+
 .moreButton {
   justify-self: center;
   margin-top: var(--space-2);

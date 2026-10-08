@@ -1824,7 +1824,10 @@ loading error where the operation can produce those states
   retained while switching views and matches both display name and Provider ID.
   The global sync toolbar separates `刷新模型目录` from `重新加载配置`:
   the first forces Pi's official remote directory with an in-button loading label
-  and outcome notification, while the second only reloads shared Pi files.
+  and outcome notification, while the second only reloads shared Pi files. The
+  remote refresh uses a cloud-download icon and the local reload uses the shared
+  refresh icon; the reset arrow stays reserved for `恢复默认`. The sync status
+  appears only as `配置需要处理`; the current state shows nothing.
   Both remain global; `新建模型服务` belongs to the custom view.
   Selecting a row replaces the Catalog with the Provider editor at every width.
   Inside the editor, `基本配置`, `模型`, `默认模型`, and `文件与诊断` are

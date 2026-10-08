@@ -243,15 +243,18 @@ function MarketRow({ row, installDisabled, onInstall, onSelect }: {
   onInstall: (source: string) => void;
   onSelect: () => void;
 }) {
+  const installable = row.availability.kind === "installable";
   return (
     <SettingsCatalogRow
-      actions={row.availability.kind === "installable" ? (
-        <Button
-          aria-label={`安装 ${row.name}`}
-          className={`secondary-button ${styles.installButton}`}
-          isDisabled={installDisabled}
-          onPress={() => onInstall(row.source)}
-        >安装</Button>
+      actions={installable ? (
+        <span className={styles.endSlot}>
+          <Button
+            aria-label={`安装 ${row.name}`}
+            className={`secondary-button ${styles.installButton}`}
+            isDisabled={installDisabled}
+            onPress={() => onInstall(row.source)}
+          >安装</Button>
+        </span>
       ) : undefined}
       description={row.description ? <span lang={descriptionLang(row.description)}>{row.description}</span> : undefined}
       onSelect={onSelect}
@@ -259,8 +262,10 @@ function MarketRow({ row, installDisabled, onInstall, onSelect }: {
       title={row.name}
       trailing={(
         <>
+          {installable ? <RowStatus row={row} /> : null}
           <span className={styles.meta}>{row.meta}</span>
-          <RowStatus row={row} />
+          {/* Without an install button the status takes the button's end slot, so meta stays aligned. */}
+          {installable ? null : <span className={`${styles.endSlot} ${styles.statusEnd}`}><RowStatus row={row} /></span>}
         </>
       )}
     />
