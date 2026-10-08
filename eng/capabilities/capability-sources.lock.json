@@ -1,6 +1,6 @@
 {
   "schema": "pi67.capability-sources-lock.v1",
-  "catalogVersion": "2026.10.06.1",
+  "catalogVersion": "2026.10.08.1",
   "sources": [
     {
       "id": "pi-workspace-resources",
@@ -38,7 +38,7 @@
       "origin": "first-party",
       "repository": "https://github.com/bigKING67/craft67.git",
       "ref": "refs/heads/main",
-      "commit": "502266ef08cde5972efd2948055882cd9e03c1c4",
+      "commit": "8e2a37f85a94a894e296713fddb3900a9c0eafec",
       "localSibling": "../craft67",
       "version": "0.11.4",
       "sourceDirectory": "packages/browser67"
@@ -48,7 +48,7 @@
       "displayName": "design-craft",
       "origin": "first-party",
       "repository": "https://github.com/bigKING67/craft67.git",
-      "commit": "502266ef08cde5972efd2948055882cd9e03c1c4",
+      "commit": "8e2a37f85a94a894e296713fddb3900a9c0eafec",
       "localSibling": "../craft67",
       "version": "0.7.0",
       "ref": "refs/heads/main",
@@ -59,7 +59,7 @@
       "displayName": "commerce-growth-os",
       "origin": "first-party",
       "repository": "https://github.com/bigKING67/craft67.git",
-      "commit": "502266ef08cde5972efd2948055882cd9e03c1c4",
+      "commit": "8e2a37f85a94a894e296713fddb3900a9c0eafec",
       "localSibling": "../craft67",
       "version": "2.2.0",
       "ref": "refs/heads/main",
