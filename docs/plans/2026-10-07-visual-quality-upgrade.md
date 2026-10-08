@@ -3,7 +3,7 @@
 Status: in progress
 Owner: Claude Code
 Started: 2026-10-07
-Last updated: 2026-10-07
+Last updated: 2026-10-08
 
 ## Goal
 Converge every Renderer surface on the DESIGN `Visual quality bar`: restrained,
@@ -35,6 +35,7 @@ pixels or assets. Message actions stay visible at rest rather than hover-only.
 | 3 Agent experience | Timeline compaction (`3ea6a086`). Direction A "quiet timeline" chosen over a pinned progress strip: one-line reasoning preview, no visible success marks, medium tool names, 32px rows, no request hairline, tints instead of colored edges, UI-face timestamps, lifted plan card | done (this commit series) |
 | 4 Remaining surfaces | Approval dialog (done), Inspector panels and Composer pickers (done), dialogs and context overlays (done), Team Chat (done), Inspector explanatory lines → ⓘ (done, reusing SettingsInfo), wide content: breakout rejected after packaged review, cells break between words instead (done), remaining Settings editors (Provider configuration, Extension management), Tool summary width cap (done), light-mode surface step | in progress |
 | 5 Settings convergence | Audit of all 16 categories in both themes (packaged, isolated profile). Batch A shared primitives: borderless luminance cards (light mode gains a real step), title-only page headers with one content offset, quiet disabled primary, one refresh language, two-line Provider rows with the Profile note in ⓘ (`48d27a86`). Batch B page groups: usage tiles/panels, memory-mode choices, shortcut list, one-line Lark notice, Chinese source roles, title-restating descriptions removed (`34d415ee`). Extension marketplace and single extension tab level (`6e5c7104`). Inset row hairlines after the Cursor reference (`02d3a035`). Batch C Extension package list/detail (`08d742b1`); batch D Provider configuration editor (`c323c27a`). Closeout: OpenAI strategy disclosure is a SettingsDetails, no double rule under 文件与诊断, Settings resource reload is an icon action sharing `useSessionResourceReload` with the workbench button | done |
+| 6 Residual audit | 2026-10-08 static sweep after Alpha.47: letter-spacing removed from caption labels, dead monospace rail heading deleted, three colored status edges turned into tints; radius gains `--radius-inline` (4px) and `--radius-compact` (6px) roles (user decision) and every literal radius maps onto a role except chart marks, the 18px user bubble and the 1px progress track | done (packaged macOS; user review pending) |
 
 Settings quiet-list convergence (`1c420581`) already covers the Settings catalogs
 and is re-audited, not redone, in phase 4.
@@ -77,11 +78,14 @@ a surface step or rely on the light-mode hairline allowance.
 - 2026-10-07 light-mode workbench pass (Settings stays with Phase 5): code roles follow
   the UI theme via dual-theme Shiki tokens (user decision), Doctor pass icons hidden in
   place, keyboard-help heading icon removed, tooltips use the softer composer shadow.
-  Pending: replace 8 native `<select>` elements outside Settings (workspace file
-  dialogs, Team Chat dialogs/search/agent card, experience review form) with the shared
-  select component.
+  The 8 native `<select>` elements outside Settings now use the shared select
+  component (`8f0722b6`).
 - 2026-10-07: AUTO reasons stay on tool rows (PRODUCT security traceability), even
   though the direction-A mock omitted them.
+
+- 2026-10-08: open after the residual audit: the light-mode surface step (canvas and
+  surface are both `#ffffff`; needs a direction decision), Phase 3 light-mode packaged
+  evidence, and the deferred items listed above.
 
 ## Rollback
 Each phase lands as its own commits; revert that phase's commits. Token value
@@ -95,3 +99,4 @@ changes are confined to one commit per phase so they can be reverted alone.
 - [x] Phase 3 implementation and packaged evidence (macOS dark; light unverified)
 - [ ] Phase 4 surface audit and implementation
 - [x] Phase 5 Settings convergence (batches A–D and closeout; packaged macOS dark + light)
+- [x] Phase 6 residual audit (labels, status edges, radius roles)

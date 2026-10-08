@@ -42,6 +42,8 @@ spacing:
   section: 24
   region: 32
 radius:
+  inline: 4
+  compact: 6
   control: 8
   panel: 14
   overlay: 14
@@ -409,7 +411,12 @@ token must fail review because it can invalidate an entire CSS shorthand.
 Radius roles are semantic rather than positional: controls use
 `--radius-control`, panels and cards use `--radius-panel`, dialogs and popovers
 use `--radius-overlay`, pills and badges use `--radius-pill`, and true circles
-use `50%`.
+use `50%`. Two small roles (2026-10-08) cover elements too small for the control
+radius: `--radius-compact` (6px) for icon buttons, options and segments nested
+inside a control-radius container, and small avatar tiles; `--radius-inline`
+(4px) for inline code, `kbd`, checkboxes, mentions, highlight marks and inline
+focus rings. Chart marks and the 18px user message bubble keep their own
+geometry.
 
 - Accent marks selection, the primary action, and current navigation only.
 - Secondary and small buttons are filled with `surface-active` and no visible border; hover
@@ -2308,7 +2315,7 @@ loading error where the operation can produce those states
   links opened through the desktop bridge. Actions are compact buttons; the
   primary action is `接手` or `在工作中开始`.
 - Team Chat messages use a 32px avatar column: the first message of a sender group
-  shows a 32px neutral initial tile (9px radius; the reader's own tile uses their
+  shows a 32px neutral initial tile (control radius; the reader's own tile uses their
   display name, not `我`) or the Agent bot tile with its presence dot; follow-up
   messages keep the empty gutter so text stays aligned. Avatars are decorative;
   the visible sender name remains the accessible identity.

@@ -58,7 +58,7 @@
   min-height: 35px;
   padding: 0 34px;
   border: 1px solid var(--border);
-  border-radius: 7px 0 0 7px;
+  border-radius: var(--radius-control) 0 0 var(--radius-control);
   background: var(--surface-muted);
   color: var(--text-primary);
   font-size: var(--font-size-interface);
@@ -69,7 +69,7 @@
   padding: 0;
   border: 1px solid var(--border);
   border-left: 0;
-  border-radius: 0 7px 7px 0;
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
   background: var(--surface-muted);
   color: var(--text-tertiary);
 }
@@ -89,7 +89,7 @@
   max-width: min(520px, calc(100vw - 24px));
   overflow: hidden;
   border: 1px solid var(--border-strong);
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: var(--surface-raised);
   box-shadow: var(--shadow-floating);
 }
@@ -113,7 +113,7 @@
 
 .defaultModelList::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--text-tertiary);
   background-clip: padding-box;
 }
@@ -122,7 +122,7 @@
   display: flex;
   min-width: 0;
   padding: 8px 9px;
-  border-radius: 6px;
+  border-radius: var(--radius-compact);
   color: var(--text-secondary);
   cursor: default;
   outline: none;

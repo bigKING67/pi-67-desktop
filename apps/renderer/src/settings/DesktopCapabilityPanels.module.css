@@ -35,7 +35,7 @@
 .installError {
   padding: 9px 11px;
   border: 1px solid color-mix(in srgb, var(--danger) 34%, var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--danger) 8%, var(--surface));
   color: var(--danger);
   font-size: var(--font-size-caption);
@@ -45,7 +45,7 @@
 .installWarning {
   padding: 9px 11px;
   border: 1px solid color-mix(in srgb, var(--warning) 36%, var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--warning) 9%, var(--surface));
   color: var(--text-secondary);
   font-size: var(--font-size-caption);

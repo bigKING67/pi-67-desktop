@@ -11,14 +11,14 @@
 .scope legend { color: var(--text-primary); font-weight: var(--font-weight-semibold); }
 .scope p { overflow-wrap: anywhere; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.fields { display: grid; gap: 10px; min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.fields { display: grid; gap: 10px; min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); }
 .actions > button,
 .fields > button {
   justify-self: start;
   min-height: 32px;
   padding: 0 var(--space-2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-compact);
   background: var(--surface);
   color: var(--text-secondary);
   font: inherit;

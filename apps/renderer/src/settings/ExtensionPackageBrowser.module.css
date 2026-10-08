@@ -22,7 +22,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  border-radius: calc(var(--radius-panel) - 4px);
+  border-radius: var(--radius-control);
 }
 
 .packageRow + .packageRow {

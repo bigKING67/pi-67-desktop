@@ -12,7 +12,7 @@
   gap: 16px;
   padding: 16px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-panel);
   background: var(--surface-muted);
 }
 
@@ -59,7 +59,7 @@
   min-width: 0;
   padding: 0 10px;
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   outline: 0;
   background: var(--surface);
   color: var(--text-primary);
@@ -99,7 +99,7 @@
   transform: translateY(-50%);
   place-items: center;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-compact);
   background: transparent;
   color: var(--text-secondary);
 }

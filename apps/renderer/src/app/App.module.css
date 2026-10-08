@@ -75,7 +75,7 @@
   min-height: 92px;
   padding: 9px 10px;
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text-secondary);
   font-family: var(--font-code);
@@ -101,7 +101,7 @@
   min-height: 44px;
   padding: 10px 14px;
   border: 1px solid var(--border-strong);
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: var(--surface-raised);
   box-shadow: var(--shadow-floating);
   color: var(--text-secondary);

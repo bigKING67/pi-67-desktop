@@ -360,7 +360,7 @@
   place-items: center;
   margin-top: 1px;
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border-radius: var(--radius-inline);
   background: var(--surface);
   color: transparent;
 }

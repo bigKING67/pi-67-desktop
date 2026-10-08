@@ -83,7 +83,7 @@
   margin: 1em 0;
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
@@ -140,7 +140,7 @@
 
 .tableScroll::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--border-strong);
   background-clip: padding-box;
 }
@@ -148,7 +148,7 @@
 /* A fill alone separates inline code; a border on every fragment made prose look fragmented. */
 .body :not(pre) > code {
   padding: 0.12em 0.38em;
-  border-radius: 5px;
+  border-radius: var(--radius-inline);
   background: var(--surface-active);
   font-family: var(--font-code);
   font-size: 0.88em;
@@ -206,7 +206,7 @@
 }
 
 .blockedImage button:focus-visible {
-  border-radius: 3px;
+  border-radius: var(--radius-inline);
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
@@ -226,7 +226,7 @@
 }
 
 .body :global(.katex-display):focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius-inline);
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
@@ -242,7 +242,7 @@
   margin: var(--space-3) 0;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: var(--code-surface);
 }
 
@@ -261,7 +261,7 @@
 .codeHeader button {
   min-height: 28px;
   padding: 0 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-inline);
   border: 0;
   background: transparent;
   color: inherit;
@@ -274,7 +274,7 @@
 }
 
 .codeHeader button:focus-visible {
-  border-radius: 3px;
+  border-radius: var(--radius-inline);
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }

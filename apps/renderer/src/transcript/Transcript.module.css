@@ -17,7 +17,7 @@
   min-height: 32px;
   padding: 0 11px;
   border: 1px solid var(--border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-raised);
   box-shadow: var(--shadow-floating);
   color: var(--text-secondary);
@@ -55,7 +55,7 @@
 .historicalBanner button {
   padding: 4px 8px;
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-compact);
   background: var(--surface-raised);
   color: var(--text-primary);
   font-size: var(--font-size-support);
@@ -195,7 +195,7 @@
   margin: 10px 14px 0;
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--warning) 7%, var(--surface));
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
@@ -204,7 +204,7 @@
 .compatibilityBanner strong { color: var(--text-primary); font-size: var(--font-size-interface); }
 .compatibilityBanner p { margin: 3px 0 0; line-height: 1.45; }
 .compatibilityActions { display: flex; gap: 6px; }
-.compatibilityActions button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-secondary); white-space: nowrap; }
+.compatibilityActions button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 7px; border: 1px solid var(--border); border-radius: var(--radius-compact); background: var(--surface); color: var(--text-secondary); white-space: nowrap; }
 .compatibilityActions button:hover:not(:disabled) { border-color: var(--border-strong); color: var(--text-primary); }
 .compatibilityActions button:disabled { opacity: 0.45; }
 .spin { animation: transcript-spin 0.8s linear infinite; }

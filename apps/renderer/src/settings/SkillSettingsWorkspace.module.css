@@ -29,7 +29,7 @@
   align-items: stretch;
   gap: 6px;
   border-bottom: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: var(--radius-control);
 }
 
 .packRow:last-child {
@@ -51,7 +51,7 @@
   gap: 12px;
   padding: 12px 10px;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-primary);
   text-align: left;
@@ -106,7 +106,7 @@
 .packStatus::before {
   width: 6px;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--text-disabled);
   content: "";
 }
@@ -161,7 +161,7 @@
 .detailStatus::before {
   width: 6px;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--text-disabled);
   content: "";
 }
@@ -292,7 +292,7 @@
   margin: 0;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--surface-muted);
 }
 
@@ -324,7 +324,7 @@
 .dialogError {
   padding: 9px 11px;
   border: 1px solid color-mix(in srgb, var(--danger) 28%, var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--danger) 8%, transparent);
   color: var(--danger);
   font-size: var(--font-size-support);

@@ -107,7 +107,7 @@
 .placeholderLine {
   display: block;
   height: 10px;
-  border-radius: 5px;
+  border-radius: var(--radius-inline);
   background: var(--surface-muted);
 }
 

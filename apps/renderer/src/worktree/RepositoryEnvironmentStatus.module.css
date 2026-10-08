@@ -6,7 +6,7 @@
   gap: 5px;
   padding: 0 7px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-compact);
   background: transparent;
   font: inherit;
   font-size: var(--font-size-caption);
@@ -71,7 +71,7 @@
   min-height: 24px;
   padding: 0 8px;
   border: 1px solid color-mix(in srgb, var(--warning) 42%, var(--border));
-  border-radius: 6px;
+  border-radius: var(--radius-compact);
   color: var(--text-secondary);
   background: transparent;
   font: inherit;

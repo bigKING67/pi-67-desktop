@@ -10,7 +10,7 @@
   min-height: 34px;
   padding: 4px 5px 4px 9px;
   border: 1px solid var(--border-strong);
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: var(--surface-raised);
   box-shadow: var(--shadow-composer);
   color: var(--text-tertiary);
@@ -43,7 +43,7 @@
   height: 24px;
   place-items: center;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-compact);
   background: transparent;
   color: var(--text-secondary);
 }

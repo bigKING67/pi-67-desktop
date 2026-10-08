@@ -146,7 +146,7 @@
   width: 24px;
   height: 24px;
   place-items: center;
-  border-radius: 6px;
+  border-radius: var(--radius-compact);
   background: var(--surface-muted);
   box-shadow: inset 0 0 0 1px var(--border);
   color: var(--text-tertiary);
@@ -259,7 +259,7 @@
 
 /* The fill alone is too faint on white; the underline carries the match. */
 .snippet mark {
-  border-radius: 3px 3px 0 0;
+  border-radius: var(--radius-inline) var(--radius-inline) 0 0;
   background: var(--accent-soft);
   box-shadow: inset 0 -2px 0 var(--accent);
   color: var(--text-primary);

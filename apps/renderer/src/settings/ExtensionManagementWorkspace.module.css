@@ -163,7 +163,7 @@
 .details::-webkit-scrollbar-thumb,
 .tabPanel::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--text-tertiary) 52%, transparent);
   background-clip: padding-box;
 }

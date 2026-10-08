@@ -33,7 +33,7 @@
   margin: 0;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: var(--surface-muted);
 }
 
