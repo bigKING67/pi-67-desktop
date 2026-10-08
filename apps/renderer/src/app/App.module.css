@@ -43,7 +43,6 @@
   color: var(--danger);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.04em;
 }
 
 .surfaceFailure h2,
