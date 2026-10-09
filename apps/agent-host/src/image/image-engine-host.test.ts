@@ -45,6 +45,16 @@ function host(cwd: string, queue?: ImageWorkQueue, readStagedImage?: (id: string
 const lastState = (events: AgentEvent[]): string | undefined => (events.at(-1)?.payload as { state?: string } | undefined)?.state;
 
 describe("image engine host", { timeout: 120_000 }, () => {
+  it("lists every revision with its author, summary and time for the history tab", async () => {
+    const cwd = await workspace();
+    await project(cwd, "poster");
+    const { run } = host(cwd);
+    await run("image.project.edit", { projectId: "poster", baseRevision: 1, summary: "改标题", operations: [{ type: "update_object", id: "headline", patch: { text: "自在" } }] });
+    const { revisions } = await run("image.project.history", { projectId: "poster" });
+    expect(revisions.map((entry) => [entry.revision, entry.author, entry.summary, entry.operationCount])).toEqual([[1, "system", expect.any(String), expect.any(Number)], [2, "human", "改标题", 1]]);
+    expect(revisions[1]!.writtenAt).toBeGreaterThan(0);
+  });
+
   it("remembers the project's conversation beside the project and returns it with reads", async () => {
     const cwd = await workspace();
     await project(cwd, "poster");

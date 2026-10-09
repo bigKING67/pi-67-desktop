@@ -1,6 +1,6 @@
 import type { ImageDocument, ImageEditOperation } from "@pi67/domain";
 import { ProtocolRequestError } from "@pi67/protocol";
-import type { AgentCommandType, CommandPayloads, CommandResults, ImageCandidateSummary } from "@pi67/protocol";
+import type { AgentCommandType, CommandPayloads, CommandResults, ImageCandidateSummary, ImageRevisionEntry } from "@pi67/protocol";
 import { create } from "zustand";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
@@ -33,12 +33,13 @@ interface ImageProjectState {
   conversation: { sessionPath: string; sessionFileIdentity: string } | undefined;
   /** Set once the project's first read completes, so the dock knows whether a conversation exists. */
   conversationKnown: boolean;
+  history: ImageRevisionEntry[];
   selectedObjectId: string | undefined;
 }
 
 export const useImageProject = create<ImageProjectState>(() => ({
   projectId: undefined, revision: undefined, document: undefined, preview: undefined,
-  candidates: [], candidatePreviews: {}, inspecting: undefined, busy: false, error: undefined, back: [], forward: [], selectedObjectId: undefined, conversation: undefined, conversationKnown: false
+  candidates: [], candidatePreviews: {}, inspecting: undefined, busy: false, error: undefined, back: [], forward: [], selectedObjectId: undefined, conversation: undefined, conversationKnown: false, history: []
 }));
 
 function libraryId(): string {
@@ -54,7 +55,7 @@ function request<T extends AgentCommandType>(type: T, payload: CommandPayloads[T
 /** Opens (or refreshes) a project: document, fitted preview and candidates. */
 export async function loadImageProject(projectId: string): Promise<void> {
   if (useImageProject.getState().projectId !== projectId) {
-    useImageProject.setState({ projectId, revision: undefined, document: undefined, preview: undefined, candidates: [], candidatePreviews: {}, inspecting: undefined, error: undefined, back: [], forward: [], selectedObjectId: undefined, conversation: undefined, conversationKnown: false });
+    useImageProject.setState({ projectId, revision: undefined, document: undefined, preview: undefined, candidates: [], candidatePreviews: {}, inspecting: undefined, error: undefined, back: [], forward: [], selectedObjectId: undefined, conversation: undefined, conversationKnown: false, history: [] });
   }
   try {
     const read = await request("image.project.read", { projectId });
@@ -63,6 +64,8 @@ export async function loadImageProject(projectId: string): Promise<void> {
     useImageProject.setState((state) => ({ revision: read.latestRevision, document: read.document, preview: rendered, error: undefined,
       conversation: read.conversation ?? state.conversation, conversationKnown: true }));
     await loadCandidates(projectId);
+    const { revisions } = await request("image.project.history", { projectId });
+    if (useImageProject.getState().projectId === projectId) useImageProject.setState({ history: revisions });
   } catch (error) {
     if (useImageProject.getState().projectId === projectId) useImageProject.setState({ error: error instanceof Error ? error.message : "项目读取失败" });
   }

@@ -164,6 +164,7 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "image.project.list": "workspace",
   "image.project.createFromPhoto": "workspace",
   "image.project.read": "workspace",
+  "image.project.history": "workspace",
   "image.project.edit": "workspace",
   "image.project.render": "workspace",
   "image.candidate.list": "workspace",

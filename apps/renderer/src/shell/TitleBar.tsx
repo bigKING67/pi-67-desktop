@@ -1,3 +1,5 @@
+import { useImageWorkbench } from "../image-workbench/image-workbench-store.js";
+import { useImageProject } from "../image-workbench/image-project-controller.js";
 import type { OperationView, RuntimeStatus, SessionSummary } from "@pi67/domain";
 import {
   Circle,
@@ -78,6 +80,8 @@ export function TitleBar({
   const settingsSelected = selectedSurface?.kind === "settings";
   const chatTitle = useTeamChatTitle();
   const workMode = chatTitle === undefined;
+  const imageView = useImageWorkbench((state) => (workMode && !settingsSelected ? state.view : undefined));
+  const imageProjectTitle = useImageProject((state) => state.document?.title);
   const selectedConversation = selectedSurface?.kind === "conversation"
     ? selectedSurface.conversation
     : undefined;
@@ -137,10 +141,12 @@ export function TitleBar({
     sessionName,
     sessionId
   });
-  const currentTitle = settingsSelected ? "设置" : chatTitle ?? (activeSessionName || workspaceName || "New Money");
+  // `图像` shows the library or the open project, never the library Workspace or its conversation (product model §5.4).
+  const imageTitle = imageView === undefined ? undefined : imageView.kind === "project" ? imageProjectTitle ?? "图像项目" : "创作库";
+  const currentTitle = settingsSelected ? "设置" : chatTitle ?? imageTitle ?? (activeSessionName || workspaceName || "New Money");
   const navigationDocked = navigationAvailable && navigationVisible && !navigationIsDrawer && !settingsSelected;
   const inspectorDocked = workMode && Boolean(selectedWorkspace) && contextVisible && !contextIsDrawer && !settingsSelected;
-  const contextWorkspaceName = workMode && !settingsSelected && !navigationDocked && activeSessionName && workspaceName
+  const contextWorkspaceName = workMode && !settingsSelected && !imageTitle && !navigationDocked && activeSessionName && workspaceName
     ? workspaceName
     : undefined;
   const fullContextTitle = contextWorkspaceName
@@ -181,7 +187,7 @@ export function TitleBar({
         <Command aria-hidden="true" size={16} />
         <ControlTooltip align="end" id="command-palette-tooltip">{`${messages.shell.commandPalette} · ${formatDesktopShortcut(paletteShortcut)}`}</ControlTooltip>
       </button>
-      {selectedWorkspace && !settingsSelected && workMode ? (
+      {(selectedWorkspace || imageView?.kind === "project") && !settingsSelected && workMode ? (
         <button
           className={`icon-button context-toggle ${styles.iconButton}`}
           aria-controls="task-inspector"

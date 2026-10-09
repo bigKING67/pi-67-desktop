@@ -7,6 +7,7 @@ const IMAGE_COMMANDS: ReadonlySet<string> = new Set<ImageCommandType>([
   "image.project.list",
   "image.project.createFromPhoto",
   "image.project.read",
+  "image.project.history",
   "image.project.edit",
   "image.project.render",
   "image.candidate.list",

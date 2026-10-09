@@ -125,6 +125,7 @@ export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSch
     headline: Type.String({ minLength: 1, maxLength: L.text }), title: Type.Optional(Type.String({ minLength: 1, maxLength: L.title }))
   }),
   "image.project.read": strictObject({ projectId: IdSchema, revision: Type.Optional(RevisionSchema) }),
+  "image.project.history": ProjectRefSchema,
   "image.project.edit": strictObject({
     projectId: IdSchema, baseRevision: RevisionSchema, summary: SummarySchema,
     operations: Type.Array(EditOperationSchema, { minItems: 1, maxItems: L.operations }), dryRun: Type.Optional(Type.Boolean())
@@ -144,6 +145,10 @@ export const ImageCommandResultSchemas: Record<keyof ImageCommandResults, TSchem
   "image.project.read": strictObject({ projectId: IdSchema, revision: RevisionSchema, latestRevision: RevisionSchema, sha256: Sha256Schema, document: DocumentSchema,
     conversation: Type.Optional(ConversationSchema) }),
   "image.project.createFromPhoto": RevisionResultSchema,
+  "image.project.history": strictObject({ projectId: IdSchema, revisions: Type.Array(strictObject({
+    revision: RevisionSchema, author: AuthorSchema, summary: Type.String({ maxLength: 500 }), operationCount: Type.Integer({ minimum: 0, maximum: L.operations }),
+    candidateId: Type.Optional(IdSchema), writtenAt: TimestampSchema
+  }), { maxItems: L.revisions }) }),
   "image.project.edit": RevisionResultSchema,
   "image.project.render": strictObject({
     projectId: IdSchema, revision: RevisionSchema, candidateId: Type.Optional(IdSchema), pngSha256: Sha256Schema,

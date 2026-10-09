@@ -17,6 +17,7 @@ export interface ImageCommandPayloads {
   /** A new project from one staged image attachment (the renderer never sends its path). */
   "image.project.createFromPhoto": { projectId: string; attachmentId: string; headline: string; title?: string };
   "image.project.read": { projectId: string; revision?: number };
+  "image.project.history": { projectId: string };
   "image.project.edit": { projectId: string; baseRevision: number; summary: string; operations: ImageEditOperation[]; dryRun?: boolean };
   "image.project.render": { projectId: string; revision?: number; candidateId?: string; previewMax?: number };
   "image.candidate.list": { projectId: string };
@@ -25,6 +26,9 @@ export interface ImageCommandPayloads {
   /** Records which Pi conversation belongs to the project (the image page's dock). */
   "image.project.conversation.set": { projectId: string; conversation: ImageProjectConversation };
 }
+
+/** One published revision as the 历史 tab lists it (newest last). */
+export interface ImageRevisionEntry { revision: number; author: ImageChangeAuthor; summary: string; operationCount: number; candidateId?: string; writtenAt: number }
 
 export interface ImageProjectConversation { sessionPath: string; sessionFileIdentity: string }
 
@@ -59,6 +63,7 @@ export interface ImageCommandResults {
   "image.project.list": { projects: ImageProjectSummary[] };
   "image.project.createFromPhoto": ImageRevisionResult;
   "image.project.read": { projectId: string; revision: number; latestRevision: number; sha256: string; document: ImageDocument; conversation?: ImageProjectConversation };
+  "image.project.history": { projectId: string; revisions: ImageRevisionEntry[] };
   "image.project.edit": ImageRevisionResult;
   "image.project.render": ImageRenderResult;
   "image.candidate.list": { projectId: string; candidates: ImageCandidateSummary[] };

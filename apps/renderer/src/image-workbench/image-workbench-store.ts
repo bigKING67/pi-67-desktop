@@ -1,6 +1,7 @@
 import type { ImageProjectSummary } from "@pi67/protocol";
 import { create } from "zustand";
 
+export type ImageInspectorTab = "layers" | "properties" | "candidates" | "history" | "export";
 type ImageWorkbenchView = { kind: "library" } | { kind: "project"; projectId: string };
 interface ImageThumbnail { pngSha256: string; width: number; height: number; revision: number }
 
@@ -11,6 +12,8 @@ interface ImageWorkbenchState {
   error: string | undefined;
   projects: ImageProjectSummary[];
   thumbnails: Record<string, ImageThumbnail>;
+  inspectorTab: ImageInspectorTab;
+  setInspectorTab: (tab: ImageInspectorTab) => void;
   openLibrary: () => void;
   openProject: (projectId: string) => void;
   close: () => void;
@@ -26,6 +29,8 @@ export const useImageWorkbench = create<ImageWorkbenchState>((set) => ({
   error: undefined,
   projects: [],
   thumbnails: {},
+  inspectorTab: "layers",
+  setInspectorTab(inspectorTab) { set({ inspectorTab }); },
   openLibrary() { set({ view: { kind: "library" } }); },
   openProject(projectId) { set({ view: { kind: "project", projectId } }); },
   close() { set({ view: undefined }); },

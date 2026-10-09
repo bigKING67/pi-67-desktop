@@ -37,6 +37,7 @@ import { closeKeyboardShortcutsDialog } from "../help/keyboard-shortcuts-dialog-
 import { CONTEXT_DRAWER_MEDIA_QUERY } from "../shell/context-panel-controller.js";
 
 const WorkspaceShell = lazy(() => import("./WorkspaceShell.js").then((module) => ({ default: module.WorkspaceShell })));
+const ImageInspector = lazy(() => import("../image-workbench/ImageInspector.js").then((module) => ({ default: module.ImageInspector })));
 const ImageWorkbench = lazy(() => import("../image-workbench/ImageWorkbench.js").then((module) => ({ default: module.ImageWorkbench })));
 const TeamChatWorkbench = lazy(() => import("../team-chat/TeamChatWorkbench.js").then((module) => ({ default: module.TeamChatWorkbench })));
 const ApprovalDialog = lazy(() => import("../approval/ApprovalDialog.js").then((module) => ({ default: module.ApprovalDialog })));
@@ -85,6 +86,7 @@ export function App() {
   }, []);
   useEffect(() => { if (chatMode) teamChat.activate(); }, [chatMode]);
   const imageView = useImageWorkbench((state) => state.view !== undefined) && !chatMode && selectedSurface?.kind !== "settings";
+  const imageProjectOpen = useImageWorkbench((state) => state.view?.kind === "project") && imageView;
   // Choosing any conversation, Workspace or Settings leaves `图像`; it is layout state like Work/Chat.
   // The image page's own conversation lives in the library Workspace and keeps `图像` open.
   useEffect(() => rendererWorkbenchStore.subscribe((state, previous) => {
@@ -267,7 +269,8 @@ export function App() {
           <Suspense fallback={<WorkspaceShellFallback />}>
             <WorkspaceShell
               {...(chatMode ? { centralOverride: <TeamChatWorkbench /> } : imageView ? { centralOverride: <ImageWorkbench /> } : {})}
-              contextVisible={contextVisible && !chatMode && !imageView}
+              {...(imageProjectOpen ? { inspectorOverride: <ImageInspector /> } : {})}
+              contextVisible={contextVisible && !chatMode && (!imageView || imageProjectOpen)}
               navigationIsDrawer={navigationIsDrawer}
               navigationVisible={navigationVisible}
               onCloseContextDrawer={closeContextDrawer}

@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { IMAGE_WORK_DIRECTORY, isImageId, type ImageCandidateListStatus } from "@pi67/domain";
+import { IMAGE_WORK_DIRECTORY, isImageId, type ImageCandidateListStatus, type ImageChangeAuthor } from "@pi67/domain";
 type ImageEngine = typeof import("@pi67/image-engine");
 import type { AgentCommand, AgentEvent, CommandPayloads, CommandResults, ImageCandidateSummary, ImageEventPayloads, ImageProjectSummary } from "@pi67/protocol";
 import { HostCommandError } from "../protocol-error.js";
@@ -105,6 +105,12 @@ export class ImageEngineHost {
         const candidates = (await listCandidates(projectRoot(cwd, projectId))).map((item) => candidateSummary(item));
         for (const candidate of candidates) this.watcher.noteCandidate(workspaceId, projectId, candidate.candidateId, candidate.status);
         return { projectId, candidates };
+      }
+      case "image.project.history": {
+        const { projectId } = (command as Command<"image.project.history">).payload;
+        const revisions = await engine.projectHistory(projectRoot(cwd, projectId));
+        return { projectId, revisions: revisions.map((entry) => ({ revision: entry.revision, author: entry.author as ImageChangeAuthor, summary: entry.summary,
+          operationCount: entry.operations.length, ...(entry.candidate_id ? { candidateId: entry.candidate_id } : {}), writtenAt: entry.written_at })) };
       }
       case "image.project.conversation.set": {
         const { projectId, conversation } = (command as Command<"image.project.conversation.set">).payload;

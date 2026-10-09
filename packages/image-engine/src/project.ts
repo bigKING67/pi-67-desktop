@@ -116,6 +116,22 @@ export async function readProject(root: string, { revision }: { revision?: numbe
   return { root: resolved, document: selected, sha256: sha256(selectedBytes), latest_revision: latest, font, candidate_decisions: Object.fromEntries(candidateDecisions) };
 }
 
+export interface RevisionEntry { revision: number; author: string; summary: string; operations: string[]; candidate_id?: string; written_at: number }
+
+/** Every revision's change record, after the whole chain validated (newest last). */
+export async function projectHistory(root: string): Promise<RevisionEntry[]> {
+  const project = await readProject(root);
+  const entries: RevisionEntry[] = [];
+  for (let current = 1; current <= project.latest_revision; current++) {
+    const file = path.join(project.root, revisionName(current));
+    const [bytes, stat] = await Promise.all([readBytes(file, 1_000_000), fs.stat(file)]);
+    const { change } = validateDocument(JSON.parse(bytes.toString("utf8")));
+    entries.push({ revision: current, author: change.author, summary: change.summary, operations: [...change.operations],
+      ...(change.candidate ? { candidate_id: change.candidate.id } : {}), written_at: Math.round(stat.mtimeMs) });
+  }
+  return entries;
+}
+
 function objectAt(doc: ImageDocument, objectId: unknown): number {
   id(objectId, "object id");
   const index = doc.objects.findIndex((object) => object.id === objectId);

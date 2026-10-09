@@ -38,6 +38,8 @@ const WorkspaceFileSurface = lazy(() => import("../workspace-files/WorkspaceFile
 interface WorkspaceShellProps {
   /** Replaces the Work surface (Team Chat mode) while keeping navigation and drawers. */
   centralOverride?: ReactNode;
+  /** Replaces the Work Inspector contents (the image Inspector) in the same pane. */
+  inspectorOverride?: ReactNode;
   contextVisible: boolean;
   navigationIsDrawer: boolean;
   navigationVisible: boolean;
@@ -47,6 +49,7 @@ interface WorkspaceShellProps {
 
 export function WorkspaceShell({
   centralOverride,
+  inspectorOverride,
   contextVisible,
   navigationIsDrawer,
   navigationVisible,
@@ -92,7 +95,7 @@ export function WorkspaceShell({
     && sessionTransitionPending
     && liveRuntime.phase === "recovering"
   );
-  const effectiveContextVisible = Boolean(selectedWorkspace) && !settingsSelected && !taskRecoveryPending && contextVisible;
+  const effectiveContextVisible = (Boolean(selectedWorkspace) || inspectorOverride !== undefined) && !settingsSelected && !taskRecoveryPending && contextVisible;
   const centralSurface = centralOverride ?? (taskRecoveryPending ? (
     <TaskRecoveryState detail={liveRuntime.detail} />
   ) : liveTaskSelected ? (
@@ -220,7 +223,7 @@ export function WorkspaceShell({
             onClick={onCloseContextDrawer}
             type="button"
           />
-          <ContextPane />
+          {inspectorOverride ?? <ContextPane />}
         </>
       ) : null}
     </main>

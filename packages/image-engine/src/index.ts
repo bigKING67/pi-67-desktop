@@ -6,8 +6,8 @@ export { regularPath, assertOutsideProject, readBytes, importRaster, saveAsset, 
 export type { ImportedRaster } from "./raster.js";
 export { maskBytes, importMask, compositeRaster, validateContext } from "./composite.js";
 export type { CompositeQa, EditContext, MaskData } from "./composite.js";
-export { createProject, createPhotoProject, readProject, editBatch, candidateDocument, encode } from "./project.js";
-export type { ProjectState, PublishedRevision, EditBatch, CreateInput } from "./project.js";
+export { createProject, createPhotoProject, readProject, editBatch, candidateDocument, encode, projectHistory } from "./project.js";
+export type { ProjectState, PublishedRevision, EditBatch, CreateInput, RevisionEntry } from "./project.js";
 export { compose } from "./render-compose.js";
 export type { Composition, TextMeasurement } from "./render-compose.js";
 export { renderProject, RenderError, RENDER_SCHEMA } from "./render.js";
