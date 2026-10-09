@@ -7,6 +7,14 @@
   padding-bottom: 20px;
 }
 
+.empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
 .emptyText {
   color: var(--text-secondary);
 }

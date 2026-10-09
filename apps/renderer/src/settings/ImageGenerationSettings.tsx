@@ -59,6 +59,7 @@ export function ImageGenerationSettings() {
       action={<Button className="secondary-button" onPress={() => void loadProviderConfiguration()}>重试</Button>} />;
   }
   const sources = snapshot.imageGeneration.sources;
+  const providerLabel = (id: string): string => snapshot.providers.find((provider) => provider.id === id)?.name ?? id;
 
   const save = async (draft: ImageSourceDraft) => {
     setSaving(true);
@@ -104,8 +105,10 @@ export function ImageGenerationSettings() {
       >
         {sources.length === 0 ? (
           <SettingsEmpty>
-            <span className={styles.emptyText}>还没有图像来源。添加一个后，Agent 才能在图像工作台里生成图片。</span>
-            {add}
+            <span className={styles.empty}>
+              <span className={styles.emptyText}>还没有图像来源。添加一个后，Agent 才能在图像工作台里生成图片。</span>
+              {add}
+            </span>
           </SettingsEmpty>
         ) : (
           <SettingsRows>
@@ -116,7 +119,7 @@ export function ImageGenerationSettings() {
                   <ProviderBrandIcon hints={[...source.models, source.provider, source.endpoint]} label={source.name} size="inline" />
                   <span>{source.name}</span>
                 </>}
-                description={[IMAGE_API_LABELS[source.api], source.provider ? `沿用 ${source.provider}` : hostOf(source.endpoint), `${source.models.length} 个模型`].filter(Boolean).join(" · ")}
+                description={[IMAGE_API_LABELS[source.api], source.provider ? `沿用 ${providerLabel(source.provider)}` : hostOf(source.endpoint), `${source.models.length} 个模型`].filter(Boolean).join(" · ")}
                 value={<SourceStatus source={source} />}
                 actions={<>
                   <SettingsIconAction icon={<Pencil aria-hidden="true" size={14} />} isDisabled={saving} label={`编辑 ${source.name}`}
