@@ -1,0 +1,54 @@
+/* The canvas well: one step deeper than the surface, never pure black. */
+.stage {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--surface-muted);
+}
+
+.image {
+  position: absolute;
+  inset: 20px;
+  width: calc(100% - 40px);
+  height: calc(100% - 40px);
+  object-fit: contain;
+  filter: drop-shadow(0 8px 24px rgb(0 0 0 / 0.18));
+  pointer-events: none;
+}
+
+.overlay {
+  position: absolute;
+}
+
+/* Boxes are invisible handles until hovered or selected; the pixels are the engine's. */
+.box {
+  position: absolute;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: move;
+  touch-action: none;
+}
+
+.box:hover {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.box:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.selected,
+.selected:hover {
+  border-color: var(--accent);
+}
+
+.locked {
+  cursor: default;
+}
+
+.locked.selected {
+  border-style: dashed;
+}
