@@ -34,7 +34,7 @@ Volcengine Ark Seedream 5.0. Decision: ADR 0010 decision 14.
 ## Checkpoints
 
 - [x] 1. Engine: profiles for `gpt-image-2.5`, Seedream 5.0 (pro, flash, lite ids), generic `openai-images` and `ark-images` profiles and the Ark surface; `model: "*"` accepted by contracts; model→profile resolution; provenance.
-- [ ] 2. pi-runtime: shared image HTTP rules (URL results, rejected parameter; done) and the `ark-images` Pi image API.
+- [x] 2. pi-runtime: shared image HTTP rules (URL results, rejected parameter) and the `ark-images` Pi image API.
 - [ ] 3. Settings storage and protocol: `pi67Desktop.imageGeneration` parse/write, snapshot field, App-scope replay-safe command, Host routing, protocol revision.
 - [ ] 4. Registration: one Pi Provider per source with reuse key resolution; refresh on change; `image_generate` takes a `model` and fills the job's profile and surface.
 - [ ] 5. Renderer: Settings section 图像生成 (design-craft, browser67, packaged preview); DESIGN/PRODUCT authority.
