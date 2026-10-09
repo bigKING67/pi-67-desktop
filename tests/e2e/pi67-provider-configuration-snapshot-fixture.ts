@@ -64,6 +64,7 @@ export function createMockProviderConfigurationSnapshot(): PiProviderConfigurati
       disabledByProject: false,
       projectTrusted: true
     },
+    imageGeneration: { sources: [] },
     files: [
       { kind: "models", path: "/Users/test/.pi/agent/models.json", exists: false, valid: true },
       { kind: "auth", path: "/Users/test/.pi/agent/auth.json", exists: true, valid: true },

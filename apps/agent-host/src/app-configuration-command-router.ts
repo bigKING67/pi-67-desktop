@@ -13,6 +13,7 @@ export type AppConfigurationCommandType =
   | "provider.credential.remove"
   | "model.default.set"
   | "vision.assistant.global.set"
+  | "image.generation.sources.set"
   | "model.routing.global.set"
   | "provider.configuration.reload"
   | "provider.modelCatalog.refresh"
@@ -206,6 +207,8 @@ export class AppConfigurationCommandRouter {
           provider === undefined || model === undefined ? undefined : { provider, model }
         );
       }
+      case "image.generation.sources.set":
+        return this.configuration.setGlobalImageGenerationSources(command.payload.expectedRevision, command.payload.sources);
       case "model.routing.global.set":
         return this.configuration.setGlobalAutoRouting(
           command.payload.expectedRevision,
@@ -231,6 +234,7 @@ export function isAppConfigurationCommand(type: AgentCommandType): type is AppCo
     || type === "provider.credential.remove"
     || type === "model.default.set"
     || type === "vision.assistant.global.set"
+    || type === "image.generation.sources.set"
     || type === "model.routing.global.set"
     || type === "provider.configuration.reload"
     || type === "provider.modelCatalog.refresh"

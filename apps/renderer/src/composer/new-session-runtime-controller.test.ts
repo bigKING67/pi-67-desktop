@@ -79,7 +79,7 @@ function snapshot(): PiProviderConfigurationSnapshot {
     providers: [],
     credentials: [],
     defaults: { projectTrusted: true },
-    vision: { disabledByProject: false, projectTrusted: true },
+    vision: { disabledByProject: false, projectTrusted: true }, imageGeneration: { sources: [] },
     files: [],
     diagnostics: []
   };

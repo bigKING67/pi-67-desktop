@@ -289,6 +289,8 @@ describe.each([
         disabledByProject: false,
         projectTrusted: true
       },
+      imageGeneration: { sources: [{ id: "gateway", name: "本机代理", api: "openai-images" as const, provider: "codex", models: ["gpt-image-2.5"],
+        piProvider: "newmoney-images-gateway", endpoint: "http://127.0.0.1:8317/v1", credential: "reused" as const }] },
       files: [
         { kind: "models" as const, path: "/fixture/models.json", exists: true, valid: true },
         { kind: "auth" as const, path: "/fixture/auth.json", exists: true, valid: true },

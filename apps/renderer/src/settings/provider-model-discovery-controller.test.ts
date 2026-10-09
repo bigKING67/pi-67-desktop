@@ -108,7 +108,7 @@ function snapshot(
     }],
     credentials,
     defaults: { projectTrusted: true },
-    vision: { disabledByProject: false, projectTrusted: true },
+    vision: { disabledByProject: false, projectTrusted: true }, imageGeneration: { sources: [] },
     files: ["models", "auth", "global-settings", "project-settings"].map((kind) => ({
       kind: kind as PiProviderConfigurationSnapshot["files"][number]["kind"],
       path: `/fixture/${kind}.json`,

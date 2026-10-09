@@ -35,7 +35,8 @@ describe("image protocol mirrors domain types", () => {
 
 describe("image protocol schemas", () => {
   it("binds every command and event to the Workspace scope", () => {
-    const commands = Object.keys(CommandPayloadSchemas).filter((type) => type.startsWith("image."));
+    // Image source settings (`image.generation.*`) are App-scope configuration, not project commands.
+    const commands = Object.keys(CommandPayloadSchemas).filter((type) => type.startsWith("image.") && !type.startsWith("image.generation."));
     expect(commands.sort()).toEqual(["image.candidate.accept", "image.candidate.discard", "image.candidate.list", "image.project.edit", "image.project.list", "image.project.read", "image.project.render"]);
     for (const type of commands) expect(COMMAND_CONTEXT_SCOPE_REQUIREMENTS[type as keyof ImageCommandPayloads], type).toBe("workspace");
     for (const type of ["image.project.changed", "image.candidate.changed", "image.job.changed"] as (keyof ImageEventPayloads)[]) {

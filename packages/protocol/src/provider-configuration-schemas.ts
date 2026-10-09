@@ -1,8 +1,6 @@
 import { Type, type TProperties } from "./typebox-schema.js";
-import {
-  PiAutoRoutingSelectionSchema,
-  type PiAutoRoutingSelection
-} from "./auto-routing-configuration-schema.js";
+import { PiAutoRoutingSelectionSchema, type PiAutoRoutingSelection } from "./auto-routing-configuration-schema.js";
+import { PiImageGenerationConfigurationSchema, type PiImageGenerationConfiguration } from "./image-generation-settings.js";
 import {
   PiConfigurationIdentifierSchema as IdentifierSchema,
   PiDefaultModelSelectionSchema,
@@ -116,6 +114,7 @@ export interface PiProviderConfigurationSnapshot {
   credentials: PiCredentialSummary[];
   defaults: PiDefaultModelConfiguration;
   vision: PiVisionAssistantConfiguration;
+  imageGeneration: PiImageGenerationConfiguration;
   /** Absent when Pi Auto routing is disabled. */
   autoRouting?: PiAutoRoutingSelection;
   files: PiConfigurationFileStatus[];
@@ -384,6 +383,7 @@ export const PiProviderConfigurationSnapshotSchema = strictObject({
   credentials: Type.Array(PiCredentialSummarySchema, { maxItems: 512 }),
   defaults: PiDefaultModelConfigurationSchema,
   vision: PiVisionAssistantConfigurationSchema,
+  imageGeneration: PiImageGenerationConfigurationSchema,
   autoRouting: Type.Optional(PiAutoRoutingSelectionSchema),
   files: Type.Array(PiConfigurationFileStatusSchema, { minItems: 4, maxItems: 4 }),
   diagnostics: Type.Array(PiConfigurationDiagnosticSchema, { maxItems: 64 })

@@ -403,7 +403,7 @@ function snapshot(
     }],
     credentials,
     defaults: { projectTrusted: true },
-    vision: { disabledByProject: false, projectTrusted: true },
+    vision: { disabledByProject: false, projectTrusted: true }, imageGeneration: { sources: [] },
     files: [
       file("models"),
       file("auth"),

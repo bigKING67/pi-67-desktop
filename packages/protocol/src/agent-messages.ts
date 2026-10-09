@@ -48,6 +48,7 @@ import type { LarkCommandPayloads, LarkCommandResults } from "./lark-command-mes
 import type { SessionRecoveryCommandPayloads, SessionRecoveryCommandResults } from "./session-recovery-messages.js";
 import type { TeamChatCommandPayloads, TeamChatCommandResults } from "./team-chat-command-messages.js";
 import type { ImageCommandPayloads, ImageCommandResults } from "./image-command-messages.js";
+import type { ImageGenerationCommandPayloads } from "./image-generation-settings.js";
 import type { ContextMemoryCommandPayloads, ContextMemoryCommandResults } from "./context-memory-messages.js";
 import type {
   PiAutoRoutingSelection, PiCredentialRevealResult, PiModelCatalogRefreshResult,
@@ -191,7 +192,7 @@ export type SessionCatalogPageResult = Omit<SessionCatalogPage, "items"> & {
 
 export interface CommandPayloads extends WorkspaceFileCommandPayloads,
   ConversationOrganizationCommandPayloads, LarkCommandPayloads, ContextMemoryCommandPayloads,
-  TeamChatCommandPayloads, SessionRecoveryCommandPayloads, ImageCommandPayloads {
+  TeamChatCommandPayloads, SessionRecoveryCommandPayloads, ImageCommandPayloads, ImageGenerationCommandPayloads {
   "runtime.initialize": {
     cwd: string;
     agentDir?: string;
@@ -394,6 +395,7 @@ export interface CommandResults extends WorkspaceFileCommandResults,
   "provider.projectConfiguration.reload": PiProviderConfigurationSnapshot;
   "model.projectDefault.set": PiProviderConfigurationSnapshot;
   "vision.assistant.global.set": PiProviderConfigurationSnapshot;
+  "image.generation.sources.set": PiProviderConfigurationSnapshot;
   "vision.assistant.project.set": PiProviderConfigurationSnapshot;
   "model.routing.global.set": PiProviderConfigurationSnapshot;
   "thinking.set": SessionControlResult;

@@ -197,7 +197,7 @@ function snapshot(revisionCharacter: string, name: string): PiProviderConfigurat
     providers: [providerView(name)],
     credentials: [],
     defaults: { projectTrusted: true },
-    vision: { disabledByProject: false, projectTrusted: true },
+    vision: { disabledByProject: false, projectTrusted: true }, imageGeneration: { sources: [] },
     files: [
       file("models"),
       file("auth"),

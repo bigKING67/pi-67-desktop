@@ -49,3 +49,10 @@ export function resolveProfileModel(profileId: unknown, requested?: unknown): st
 export function profileSurface(profileId: string): string | undefined {
   return [...surfaceProfiles.values()].find((surface) => Array.isArray(surface.provider_profiles) && surface.provider_profiles.includes(profileId))?.surface_id as string | undefined;
 }
+
+/** The profile a source's model runs under on `surfaceId`: its exact profile, else the surface's generic one. */
+export function profileForModel(surfaceId: string, model: string): string | undefined {
+  const surface = surfaceProfiles.get(surfaceId);
+  const listed = Array.isArray(surface?.provider_profiles) ? surface.provider_profiles.filter((id): id is string => typeof id === "string") : [];
+  return listed.find((id) => PROFILE_MODELS.get(id) === model) ?? listed.find((id) => PROFILE_MODELS.get(id) === ANY_MODEL && profileAllowsModel(id, model));
+}

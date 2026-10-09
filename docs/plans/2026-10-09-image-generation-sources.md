@@ -35,8 +35,8 @@ Volcengine Ark Seedream 5.0. Decision: ADR 0010 decision 14.
 
 - [x] 1. Engine: profiles for `gpt-image-2.5`, Seedream 5.0 (pro, flash, lite ids), generic `openai-images` and `ark-images` profiles and the Ark surface; `model: "*"` accepted by contracts; model→profile resolution; provenance.
 - [x] 2. pi-runtime: shared image HTTP rules (URL results, rejected parameter) and the `ark-images` Pi image API.
-- [ ] 3. Settings storage and protocol: `pi67Desktop.imageGeneration` parse/write, snapshot field, App-scope replay-safe command, Host routing, protocol revision.
-- [ ] 4. Registration: one Pi Provider per source with reuse key resolution; refresh on change; `image_generate` takes a `model` and fills the job's profile and surface.
+- [x] 3. Settings storage and protocol: `pi67Desktop.imageGeneration` parse/write, snapshot field, App-scope replay-safe command, Host routing, protocol revision.
+- [x] 4. Registration: one Pi Provider per source with reuse key resolution; refresh on change; `image_generate` takes a `model` and fills the job's profile and surface.
 - [ ] 5. Renderer: Settings section 图像生成 (design-craft, browser67, packaged preview); DESIGN/PRODUCT authority.
 - [ ] 6. Real request (P1 checkpoint 8).
 
@@ -47,3 +47,11 @@ Volcengine Ark Seedream 5.0. Decision: ADR 0010 decision 14.
   caller `apiKey`; registered Providers survive `refresh()` and re-registering
   merges (unregister first); Seedream's watermark defaults to on, it has no mask
   API, and image URLs expire after 24 h.
+- 2026-10-09: checkpoints 3-4 complete. Found while wiring: a settings-only save
+  reuses the validated runtime (models/auth unchanged), which was built before the
+  new sources, so saving now re-syncs the image source Providers on it. A reused
+  Provider's key is passed literally (`$$` / `$!` escapes), because Pi would
+  otherwise run a key starting with `!` as a command. Real-SDK test: a reused
+  source is available at once; an own endpoint gets Pi's API-key login and its
+  key in `auth.json`. `check` passed. Next: checkpoint 5 (Settings UI).
+

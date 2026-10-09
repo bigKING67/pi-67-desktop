@@ -17,7 +17,7 @@ async function workspace(): Promise<string> {
   return directory;
 }
 const job = { provider_profile: "openai.gpt-image-2.5-sunburst.2026-09-08", prompt: { scene: "secret campaign copy" } };
-const generate = (extra: Record<string, unknown> = {}) => ({ project_id: "poster", candidate_id: "warm", target_id: "background", base_revision: 1, job, ...extra });
+const generate = (extra: Record<string, unknown> = {}) => ({ project_id: "poster", candidate_id: "warm", target_id: "background", base_revision: 1, model: "newmoney-images-gateway/gpt-image-2.5-sunburst", job, ...extra });
 
 describe("image workbench tool safety", () => {
   it("recognises exactly the seven workbench tools", () => {
@@ -47,9 +47,9 @@ describe("image workbench tool safety", () => {
   it("submits generation to the image Provider and reports files from outside the Workspace", async () => {
     const cwd = await workspace();
     const intent = (input: Record<string, unknown>) => classifyImageWorkbenchToolIntent("image_generate", input, cwd, LABEL, []);
-    expect(await intent(generate())).toEqual({ toolName: "image_generate", category: "external-submit", target: "newmoney-images/openai.gpt-image-2.5-sunburst.2026-09-08", targetKind: "tool", sourceLabel: LABEL });
+    expect(await intent(generate())).toEqual({ toolName: "image_generate", category: "external-submit", target: "newmoney-images-gateway/gpt-image-2.5-sunburst", targetKind: "tool", sourceLabel: LABEL });
     const edit = { context: { x: 0, y: 0, width: 8, height: 8 }, generation_mask: "masks/g.png", protection_mask: "masks/p.png", blend_mask: path.join(os.tmpdir(), "blend.png") };
-    expect((await intent(generate({ references: [{ asset_id: "style", source: path.join(os.tmpdir(), "ref.png") }], edit }))).target).toBe("newmoney-images/openai.gpt-image-2.5-sunburst.2026-09-08 · 含 2 个工作区外文件");
+    expect((await intent(generate({ references: [{ asset_id: "style", source: path.join(os.tmpdir(), "ref.png") }], edit }))).target).toBe("newmoney-images-gateway/gpt-image-2.5-sunburst · 含 2 个工作区外文件");
     expect((await intent(generate({ references: [{ asset_id: "key", source: path.join(os.homedir(), ".aws", "credentials") }] }))).category).toBe("credential-or-auth");
   });
 
@@ -57,7 +57,7 @@ describe("image workbench tool safety", () => {
     const cwd = await workspace();
     for (const [toolName, input] of [
       ["image_project_read", {}], ["image_project_read", { project_id: 7 }], ["image_project_edit", { project_id: "poster", base_revision: 1, summary: "x", operations: [] }],
-      ["image_render", { project_id: "poster", mode: "print" }], ["image_generate", generate({ base_revision: "1" })], ["image_unknown", { project_id: "poster" }]
+      ["image_render", { project_id: "poster", mode: "print" }], ["image_generate", generate({ base_revision: "1" })], ["image_generate", generate({ model: undefined })], ["image_unknown", { project_id: "poster" }]
     ] as const) {
       expect(await classifyImageWorkbenchToolIntent(toolName, input, cwd, LABEL, []), toolName).toMatchObject({ category: "unverified-tool", nonApprovableReason: expect.any(String) });
     }

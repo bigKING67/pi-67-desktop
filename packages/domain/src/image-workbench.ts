@@ -130,9 +130,23 @@ export function imagePreviewRelativePath(projectId: string, pngSha256: string): 
   return [...IMAGE_WORK_DIRECTORY, projectId, "previews", `${pngSha256}.png`];
 }
 
-/** The Pi Provider whose image models the workbench registers (ADR 0010 decision 9). */
+/** Prefix of the Pi Providers the workbench registers, one per image source (ADR 0010 decision 14). */
 export const IMAGE_PROVIDER_ID = "newmoney-images";
-export const IMAGE_PROVIDER_API = "openai-images";
+/** The image APIs Desktop implements for Pi: OpenAI-compatible Images, and Volcengine Ark Seedream. */
+export const IMAGE_SOURCE_APIS = ["openai-images", "ark-images"] as const;
+export type ImageSourceApi = (typeof IMAGE_SOURCE_APIS)[number];
+export const IMAGE_SOURCE_LIMITS = Object.freeze({ sources: 8, modelsPerSource: 32, nameChars: 64, baseUrlBytes: 2048 });
+const IMAGE_SOURCE_ID = /^[a-z][a-z0-9-]{0,23}$/u;
+const IMAGE_MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u;
+
+export const isImageSourceId = (value: unknown): value is string => typeof value === "string" && IMAGE_SOURCE_ID.test(value);
+export const isImageSourceModelId = (value: unknown): value is string => typeof value === "string" && IMAGE_MODEL_ID.test(value);
+
+/** The Pi Provider id of one image source. */
+export function imageSourceProviderId(sourceId: string): string {
+  if (!isImageSourceId(sourceId)) throw new Error("Invalid image source id");
+  return `${IMAGE_PROVIDER_ID}-${sourceId}`;
+}
 
 /**
  * Where a project lives relative to its Workspace root. The creative library is

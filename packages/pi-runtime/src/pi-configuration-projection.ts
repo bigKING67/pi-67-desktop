@@ -1,3 +1,4 @@
+import { projectImageGeneration } from "./image-generation-settings.js";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { RuntimeError } from "@pi67/domain";
@@ -211,11 +212,12 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
       const effectiveVision = projectVision?.mode === "model"
         ? projectVision
         : projectVision?.mode === "disabled" ? undefined : globalVision;
+      const providers = projectProviderConfigurations(modelsDocument, runtimeProviders, runtimeModels);
       state.snapshot = {
         revision: bundle.revision,
         syncState: "current",
         updatedAt: Date.now(),
-        providers: projectProviderConfigurations(modelsDocument, runtimeProviders, runtimeModels),
+        providers,
         credentials,
         defaults: {
           ...(globalSettings.selection ? { global: globalSettings.selection } : {}),
@@ -232,6 +234,7 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
           disabledByProject: projectVision?.mode === "disabled",
           projectTrusted: state.projectTrusted
         },
+        imageGeneration: projectImageGeneration(globalSettings.imageGeneration, providers, credentials),
         ...(globalSettings.autoRouting ? { autoRouting: globalSettings.autoRouting } : {}),
         files,
         diagnostics: []
@@ -249,6 +252,7 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
           disabledByProject: false,
           projectTrusted: state.projectTrusted
         },
+        imageGeneration: previous?.imageGeneration ?? { sources: [] },
         ...(previous?.autoRouting ? { autoRouting: previous.autoRouting } : {}),
         files,
         diagnostics

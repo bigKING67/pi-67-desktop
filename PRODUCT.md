@@ -1200,8 +1200,9 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   `image_generate`) are first-party customTools with the same exact SDK identity
   check. Project reads are Workspace reads; edits, renders and candidate decisions
   are Workspace writes; a photo outside the Workspace needs path approval;
-  `image_generate` is an external submission to the user's `newmoney-images` Pi
-  Provider (registered only when `models.json` configures it), approved per call in
+  `image_generate` is an external submission to a model from the user's image
+  sources (Settings → 图像生成; one `newmoney-images-<source>` Pi Provider each,
+  never edited as JSON, ADR 0010 decision 14), approved per call in
   AUTO without showing the prompt, unavailable in PLAN. Credential and system
   configuration paths are refused as photos, references or masks. The engine loads
   on the first image call, never at startup (ADR 0010).

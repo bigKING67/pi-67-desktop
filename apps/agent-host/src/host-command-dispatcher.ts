@@ -50,7 +50,7 @@ export type RuntimeLoadedCommand = Exclude<
       | "provider.modelDiscovery.inspect"
       | "provider.modelDiscovery.cancel"
       | "provider.projectConfiguration.get" | "provider.projectConfiguration.reload"
-      | "model.projectDefault.set" | "vision.assistant.global.set" | "vision.assistant.project.set"
+      | "model.projectDefault.set" | "vision.assistant.global.set" | "vision.assistant.project.set" | "image.generation.sources.set"
       | "model.routing.global.set"
       | "context.file.list"
       | "context.file.read"

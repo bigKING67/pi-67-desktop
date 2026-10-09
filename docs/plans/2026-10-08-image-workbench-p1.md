@@ -127,9 +127,11 @@ Product model: `docs/architecture/image-workbench-product-model.md`; decisions:
       and Pi TUI changes reach the renderer as events. Changed from the plan
       with reasons in ADR 0010 decision 10: no separate library index (the
       disk is the index) and the watcher lives in Agent Host, not Main.
-- [ ] 7. Packaged previews on macOS arm64 and Windows x64 load native modules and
+- [x] 7. Packaged previews on macOS arm64 and Windows x64 load native modules and
       the font, render a fixture; evidence directory with receipts. macOS arm64 done
-      2026-10-09 (`18f9d63f`); Windows x64 pending real-machine or CI evidence.
+      2026-10-09 (`18f9d63f`); Windows x64 done 2026-10-09 in CI run 37918872288
+      (packaged probe `{"status":"rendered"}`, same bytes as macOS) after the
+      `C:\C:` path fix (`0560cc27`).
 - [ ] 8. Real Pi session through Desktop meets the Agent-path criteria; tool-call
       count and wall clock recorded.
 
@@ -242,6 +244,14 @@ are additive. No user directories are rewritten (import is read-only).
   grew from 199.6 MB to 224.0 MB (font 16 MB) plus 21 MB unpacked native modules.
   Not yet verified: Windows x64 packaged load; the engine running inside the
   packaged Agent Host utility process during a real session (checkpoint 8).
+- 2026-10-09: checkpoint 7 Windows half complete. The first CI run caught a
+  Windows-only bug in the ported `regularPath` (the drive letter was treated as
+  the first directory, so every packaged render looked up `C:\C:`); fixed with a
+  cross-platform test. The same runs exposed macOS FSEvents replaying creation
+  events after a watch starts; the watcher now baselines on-disk state when it
+  starts. CI run 37918872288 passed every job. Next: checkpoint 8, after the
+  image sources plan (`docs/plans/2026-10-09-image-generation-sources.md`) gives
+  users a Settings path instead of `models.json`.
 
 ## Closeout
 

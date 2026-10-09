@@ -1,6 +1,6 @@
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { GROLAND_CLAUDE_MODEL_IDS, GROLAND_GPT_MODEL_IDS, IMAGE_PROVIDER_ID } from "@pi67/domain";
-import { imageProviderBaseUrl, imageProviderRegistration } from "./image-workbench-provider.js";
+import { imageSourceRegistrations, readImageGenerationSources } from "./image-workbench-provider.js";
 
 export const GROLAND_PROVIDER_ID = "groland";
 export const GROLAND_ANTHROPIC_BASE_URL = "https://api.sciencetoken.ai/proxy/anthropic";
@@ -41,18 +41,20 @@ export const GROLAND_PROVIDER_REGISTRATION: ProviderRegistration = Object.freeze
 });
 
 /**
- * Registers Groland and, when the user's `models.json` in `agentDirectory`
- * configures `newmoney-images`, the image workbench Provider (ADR 0010
- * decision 13). Credentials stay in Pi's configuration.
+ * Registers Groland and then one image Provider per image source in the
+ * user's `settings.json` under `agentDirectory` (ADR 0010 decisions 13-14).
+ * Image sources are read after Groland so a reused Provider's key resolves.
  */
 export function installFirstPartyModelProviders(runtime: ModelRuntime, agentDirectory?: string): Promise<void> {
   const existing = PROVIDER_INSTALLATIONS.get(runtime);
   if (existing) return existing;
 
-  const imageBaseUrl = agentDirectory === undefined ? undefined : imageProviderBaseUrl(agentDirectory);
-  const registrations: [string, ProviderRegistration][] = [[GROLAND_PROVIDER_ID, GROLAND_PROVIDER_REGISTRATION]];
-  if (imageBaseUrl) registrations.push([IMAGE_PROVIDER_ID, imageProviderRegistration(imageBaseUrl) as ProviderRegistration]);
-  const installation = registerProvidersAndAwaitRefresh(runtime, registrations).catch((error: unknown) => {
+  const installation = (async () => {
+    await registerProvidersAndAwaitRefresh(runtime, [[GROLAND_PROVIDER_ID, GROLAND_PROVIDER_REGISTRATION]]);
+    if (agentDirectory === undefined) return;
+    const images = await imageSourceRegistrations(runtime, await readImageGenerationSources(agentDirectory));
+    if (images.length) await registerProvidersAndAwaitRefresh(runtime, images);
+  })().catch((error: unknown) => {
     if (PROVIDER_INSTALLATIONS.get(runtime) === installation) {
       PROVIDER_INSTALLATIONS.delete(runtime);
     }
@@ -60,6 +62,19 @@ export function installFirstPartyModelProviders(runtime: ModelRuntime, agentDire
   });
   PROVIDER_INSTALLATIONS.set(runtime, installation);
   return installation;
+}
+
+/**
+ * Replaces this runtime's image source Providers with the ones `settings.json`
+ * lists now. A settings-only change keeps the validated runtime, so Desktop
+ * re-syncs it instead of waiting for the next runtime to be built.
+ */
+export async function syncImageSourceProviders(runtime: ModelRuntime, agentDirectory: string): Promise<void> {
+  for (const provider of new Set(runtime.getModels().map((model) => model.provider))) {
+    if (provider.startsWith(`${IMAGE_PROVIDER_ID}-`)) runtime.unregisterProvider(provider);
+  }
+  const images = await imageSourceRegistrations(runtime, await readImageGenerationSources(agentDirectory));
+  if (images.length) await registerProvidersAndAwaitRefresh(runtime, images);
 }
 
 async function registerProvidersAndAwaitRefresh(

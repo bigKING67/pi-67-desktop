@@ -17,8 +17,10 @@ import type {
   PiModelConfigurationView,
   PiProviderConfigurationInput,
   PiProviderConfigurationView,
+  PiImageGenerationSource,
   PiVisionAssistantOverride
 } from "@pi67/protocol";
+import { isImageSourceProvider, parseImageGenerationSources } from "./image-generation-settings.js";
 
 type JsonObject = Record<string, unknown>;
 
@@ -32,6 +34,7 @@ export interface ParsedSettingsDocument {
   selection?: PiDefaultModelSelection;
   visionAssistant?: PiVisionAssistantOverride;
   autoRouting?: PiAutoRoutingSelection;
+  imageGeneration: PiImageGenerationSource[];
 }
 
 export interface RuntimeModelConfigurationProjection {
@@ -80,6 +83,7 @@ export function parseSettingsDocument(content: string | undefined): ParsedSettin
   const autoRouting = parseAutoRoutingSelection(pi67Desktop?.autoRouting);
   return {
     root: parsed,
+    imageGeneration: parseImageGenerationSources(pi67Desktop?.imageGeneration),
     ...(provider && model ? { selection: { provider, model } } : {}),
     ...(visionAssistant ? { visionAssistant } : {}),
     ...(autoRouting ? { autoRouting } : {})
@@ -98,7 +102,8 @@ export function projectProviderConfigurations(
     models.push(model);
     runtimeModelsByProvider.set(model.provider, models);
   }
-  const providerIds = new Set([...Object.keys(document.providers), ...runtimeById.keys()]);
+  // Image source Providers (ADR 0010 decision 14) are listed in their own Settings section.
+  const providerIds = new Set([...Object.keys(document.providers), ...runtimeById.keys()].filter((id) => !isImageSourceProvider(id)));
   return [...providerIds]
     .sort((left, right) => left.localeCompare(right))
     .map((providerId) => projectProvider(
@@ -169,23 +174,17 @@ export function setDefaultModelDocument(
   return next;
 }
 
-export function setVisionAssistantDocument(
-  content: string | undefined,
-  value: PiVisionAssistantOverride | undefined
-): string {
+function setDesktopSettingDocument(content: string | undefined, key: string, value: unknown): string {
   const source = content ?? "{}\n";
   parseSettingsDocument(source);
-  return editJsonc(source, ["pi67Desktop", "visionAssistant"], value);
+  return editJsonc(source, ["pi67Desktop", key], value);
 }
-
-export function setAutoRoutingDocument(
-  content: string | undefined,
-  selection: PiAutoRoutingSelection | undefined
-): string {
-  const source = content ?? "{}\n";
-  parseSettingsDocument(source);
-  return editJsonc(source, ["pi67Desktop", "autoRouting"], selection);
-}
+export const setVisionAssistantDocument = (content: string | undefined, value: PiVisionAssistantOverride | undefined): string =>
+  setDesktopSettingDocument(content, "visionAssistant", value);
+export const setAutoRoutingDocument = (content: string | undefined, selection: PiAutoRoutingSelection | undefined): string =>
+  setDesktopSettingDocument(content, "autoRouting", selection);
+export const setImageGenerationDocument = (content: string | undefined, sources: readonly PiImageGenerationSource[]): string =>
+  setDesktopSettingDocument(content, "imageGeneration", sources.length ? { sources } : undefined);
 
 function projectProvider(
   providerId: string,

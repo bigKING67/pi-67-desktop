@@ -6,6 +6,7 @@ import type {
   PiAutoRoutingSelection,
   PiCredentialRevealResult,
   PiDefaultModelSelection,
+  PiImageGenerationSource,
   PiProviderConfigurationInput,
   PiProviderConfigurationSnapshot,
   PiVisionAssistantOverride
@@ -16,8 +17,11 @@ import {
   saveProviderDocument,
   setAutoRoutingDocument,
   setDefaultModelDocument,
+  setImageGenerationDocument,
   setVisionAssistantDocument
 } from "./pi-configuration-documents.js";
+import { parseImageGenerationSources } from "./image-generation-settings.js";
+import { syncImageSourceProviders } from "./first-party-model-providers.js";
 import {
   authContentRevision,
   revealStoredApiKey,
@@ -203,6 +207,24 @@ export class PiConfigurationMutations {
           if (error) throw error.error;
         }
       );
+    });
+  }
+
+  /** Image generation sources (ADR 0010 decision 14); a reused Provider must be configured in Pi. */
+  setGlobalImageGenerationSources(expectedRevision: string, sources: readonly PiImageGenerationSource[]): Promise<PiProviderConfigurationSnapshot> {
+    return this.host.serial(async () => {
+      let valid: PiImageGenerationSource[];
+      try { valid = parseImageGenerationSources({ sources }); }
+      catch (error) { throw new RuntimeError("INVALID_PAYLOAD", error instanceof Error ? error.message : "Invalid image generation sources.", { recoverable: false }); }
+      const runtime = await this.host.requireModelRuntime();
+      const missing = valid.find((source) => source.provider !== undefined && !runtime.getProvider(source.provider));
+      if (missing) {
+        throw new RuntimeError("RESOURCE_NOT_FOUND", "The image source reuses a Pi Provider that is not configured.", {
+          recoverable: false, details: { provider: missing.provider ?? "" }
+        });
+      }
+      return this.mutateDocumentLocked(this.host.globalState, expectedRevision, "global-settings",
+        (content) => setImageGenerationDocument(content, valid), () => syncImageSourceProviders(runtime, this.host.agentDir));
     });
   }
 

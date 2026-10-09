@@ -11,6 +11,7 @@ type ToolContext = Parameters<ToolDefinition["execute"]>[4];
 type ToolResult = Awaited<ReturnType<ToolDefinition["execute"]>>;
 type Params = Record<string, unknown>;
 
+const isObject = (value: unknown): value is Params => typeof value === "object" && value !== null && !Array.isArray(value);
 const text = (value: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(value) }], details: value as never });
 const str = (params: Params, key: string): string => { const value = params[key]; if (typeof value !== "string" || !value) throw new Error(`${key} is required`); return value; };
 const int = (params: Params, key: string): number => { const value = params[key]; if (!Number.isInteger(value)) throw new Error(`${key} must be an integer`); return value as number; };
@@ -34,13 +35,22 @@ function documentSummary(doc: ImageDocument, latestRevision: number): Record<str
   };
 }
 
-/** Resolves the Pi image model for an Image Job's Provider profile, if the user configured one. */
-async function piGenerator(engine: Engine, ctx: Pick<ToolContext, "modelRegistry">, providerProfile: unknown): Promise<ImageGenerator | undefined> {
-  const modelId = typeof providerProfile === "string" ? engine.PROFILE_MODELS.get(providerProfile) : undefined;
-  if (!modelId) return undefined;
-  const available = await ctx.modelRegistry.getAvailableOfType("image", IMAGE_PROVIDER_ID);
-  const model = available.find((candidate) => candidate.id === modelId);
-  return model ? createPiImageGenerator(ctx.modelRegistry as unknown as ImageRegistry, model) : undefined;
+const SURFACES: Readonly<Record<string, string>> = { "openai-images": "openai.image_api", "ark-images": "volcengine.ark_image_api" };
+
+/**
+ * Resolves `newmoney-images-<source>/<model>` to an authenticated Pi image model
+ * from the user's image sources (ADR 0010 decision 14) and the job profile and
+ * execution surface it runs under. Nothing is written before this succeeds.
+ */
+async function sourceModel(engine: Engine, ctx: Pick<ToolContext, "modelRegistry">, value: string): Promise<{ generator: ImageGenerator; modelId: string; profile: string; surface: string }> {
+  const slash = value.indexOf("/"), provider = value.slice(0, slash), modelId = value.slice(slash + 1);
+  if (slash < 1 || !provider.startsWith(`${IMAGE_PROVIDER_ID}-`)) throw new Error("model must be <provider>/<model> of an image source listed by image_models (Providers named newmoney-images-…)");
+  const model = (await ctx.modelRegistry.getAvailableOfType("image", provider)).find((candidate) => candidate.id === modelId);
+  if (!model) throw new Error("IMAGE_MODEL_UNAVAILABLE: that image source model is not configured or has no key; add it in Settings → 图像生成.");
+  const surface = SURFACES[model.api];
+  const profile = surface === undefined ? undefined : engine.profileForModel(surface, modelId);
+  if (surface === undefined || profile === undefined) throw new Error("IMAGE_MODEL_UNSUPPORTED: this image API is not supported by the image engine.");
+  return { generator: createPiImageGenerator(ctx.modelRegistry as unknown as ImageRegistry, model), modelId, profile, surface };
 }
 
 const projectId = Type.String({ description: "Image project id (letters, digits, - and _; starts with a letter)." });
@@ -155,7 +165,7 @@ export function imageTools(): ToolDefinition[] {
     },
     {
       name: "image_generate", label: "Generate image candidate",
-      description: "Run one Image Job v2 through the user's configured Pi image model and stage the result as a candidate for one image object. Nothing is accepted automatically; masked edits keep protected pixels byte-identical.",
+      description: "Run one Image Job v2 on a model from the user's image sources and stage the result as a candidate for one image object. Nothing is accepted automatically; masked edits keep protected pixels byte-identical. The job's provider_profile and execution_surface are filled from the model.",
       promptSnippet: "Generate or edit one image layer through the configured Pi image model",
       promptGuidelines: [
         "Use this for an image project's layer; for a one-off image in conversation with no project, use generate_image.",
@@ -164,6 +174,7 @@ export function imageTools(): ToolDefinition[] {
       ],
       parameters: Type.Object({
         project_id: projectId, candidate_id: Type.String(), target_id: Type.String(), base_revision: Type.Integer({ minimum: 1 }),
+        model: Type.String({ minLength: 3, maxLength: 200, description: "<provider>/<model> from image_models, Provider named newmoney-images-<source>." }),
         job: Type.Any({ description: "creative-craft.image-job.v2 object (declared_status ready, single_turn, one PNG)." }),
         references: optional(Type.Array(Type.Object({ asset_id: Type.String(), source: Type.String() }), { maxItems: 3 })),
         edit: optional(Type.Object({
@@ -173,14 +184,15 @@ export function imageTools(): ToolDefinition[] {
         output_policy: optional(Type.Union([Type.Literal("strict"), Type.Literal("resize_to_target")]))
       }),
       async execute(_id, raw, signal, _update, ctx) {
-        const params = raw as Params, id = str(params, "project_id"), job = params.job as Params | undefined, engine = await loadEngine();
-        const generator = await piGenerator(engine, ctx, job?.provider_profile);
+        const params = raw as Params, id = str(params, "project_id"), engine = await loadEngine();
+        const { generator, modelId, profile, surface } = await sourceModel(engine, ctx, str(params, "model"));
+        const job = isObject(params.job) ? { ...params.job, provider_profile: profile, execution_surface: surface } : params.job;
         const directory = await engine.workDirectory(ctx.cwd, id, "job");
         await fs.mkdir(directory);
         const jobPath = path.join(directory, "job.json");
         await fs.writeFile(jobPath, JSON.stringify(job ?? null), { flag: "wx" });
         const spec: Params = { job: jobPath, candidate_id: str(params, "candidate_id"), target_id: str(params, "target_id"),
-          base_revision: int(params, "base_revision"),
+          base_revision: int(params, "base_revision"), model: modelId,
           references: Array.isArray(params.references) ? params.references.map((ref: Params) => ({ ...ref, source: local(ctx.cwd, ref.source) })) : params.references ?? [] };
         if (params.edit !== undefined) {
           const edit = params.edit as Params;

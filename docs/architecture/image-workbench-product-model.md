@@ -264,7 +264,7 @@ Agent 不再通过 Bash 调 CLI；工具结果包含可被视觉模型读取的�
 `sdk/<sdk:name>/temporary/top-level` 来源的第一方 customTools，同名的其他来源一律拒绝。安全分类：
 读取项目与候选为工作区读取；编辑、渲染、候选决定与从工作区内照片建项目为工作区写入；工作区外的照片
 按工作区外路径确认；`image_generate` 为对外提交，AUTO 下每次确认且不在确认里显示提示词，目标为
-`newmoney-images/<Provider 档位>` 并注明工作区外文件数；凭据与系统配置路径不能作为照片、参考图或蒙版。
+所选模型 `newmoney-images-<来源>/<模型>` 并注明工作区外文件数；凭据与系统配置路径不能作为照片、参考图或蒙版。
 相对路径一律相对当前工作区解析，与安全检查一致。
 
 ### 9.2 结构化上下文
@@ -305,22 +305,26 @@ Provider 请求只允许 HTTPS 或 loopback，拒绝带凭据的 URL；凭据只
 
 ## 11. 模型与 Provider
 
-- 图像模型是 Pi 配置（`models.json`）里的 `type: "image"` 模型；每次生成都经 Pi 的
+- 图像模型来自用户在「设置 → 图像生成」里配置的图像来源，注册为 Pi 的 `type: "image"` 模型；每次生成都经 Pi 的
   `modelRegistry.generateImages()`，由 Pi 解析凭据（key、环境变量、OAuth），引擎自己不调用任何模型接口
   （ADR 0010 第 9 条，2026-10-09 修订）。pi-runtime 通过 Pi 的 `ProviderConfigInput.images`
-  注册 `openai-images` 图像 API 实现；蒙版、尺寸、质量、背景放在 `ImagesOptions.metadata` 里传递。
+  注册 `openai-images` 与 `ark-images`（火山方舟 Seedream）两个图像 API 实现；蒙版、尺寸、质量、背景放在
+  `ImagesOptions.metadata` 里传递。
   引擎接收注入的生成函数，保留任务认领、部分回执、离线恢复和保护区合成。
-- 配置方式（2026-10-09 用真实 Pi 1.0 SDK 验证）：Pi 1.0 的 `models.json` 只能声明对话模型，图像模型
-  只能由 Provider 注册提供；扩展层一旦带 `models` 会整体替换该 Provider 的模型列表，所以图像模型挂在独立的
-  `newmoney-images` Provider 上，不碰用户已有的对话 Provider。用户在 `models.json` 写
-  `"newmoney-images": { "baseUrl": "...", "apiKey": "..." }`（key 也可放 `auth.json` 或 `$ENV` 插值）；
-  扩展只读取其中的 `baseUrl` 并注册图像模型，key 由 Pi 在每次请求时解析。未配置时编辑类工具照常可用，
-  生成在发出任何请求之前就报「未配置」。
+- 配置方式（ADR 0010 第 14 条，2026-10-09）：用户不编辑 JSON。全局 `settings.json`
+  `pi67Desktop.imageGeneration.sources[]` 记录图像来源：图像 API、选用的模型 ID，以及「沿用已配置的 Pi
+  Provider」（默认；地址与 Key 跟随该 Provider，Key 只在运行时内存里）或「单独地址」（HTTPS 或 loopback，
+  Key 经现有凭据流程存入 `auth.json`）。每个来源注册为一个 Pi Provider `newmoney-images-<来源>`，不出现在
+  对话 Provider 列表里。Pi 1.0 的 `models.json` 不能声明图像模型，扩展层带 `models` 会整体替换 Provider
+  的模型列表，所以图像来源一律独立注册，不碰用户已有的对话 Provider。未配置时编辑类工具照常可用，
+  `image_generate` 在写入任何文件前就报「未配置」。网关返回图片 URL 时按同一地址策略下载、不带 Key；
+  网关拒绝参数时只报参数名（如 `quality`）。火山方舟请求固定 `watermark: false`。
 - Provider profile 声明能力：生成 / 编辑 / 蒙版 / 参考图上限 / 透明 / 尺寸约束 / 质量档 / 价格表。
   任务 Composer 的模型选择器只列出用户已配置且 profile 可用的 Provider；没有默认推荐。
 - 合同校验为 Node 实现；与 creative-craft canonical Image Job v2 / Execution Receipt 的语义通过
-  共享样例保持一致（video harness 的双实现先例）。接入其他图像模型（如 Seedream）是在 Pi 里再注册一个
-  图像 API 实现，引擎不变。
+  共享样例保持一致（video harness 的双实现先例）。能力档案覆盖 GPT Image 2.5（sunburst / flare / 2.5）
+  与 Seedream 5.0（pro / flash / lite）；其他模型走所属图像 API 的通用档案（`model: "*"`，保守尺寸），
+  所以用户选的任何模型都能用。
 - 缓存：以 brief、参数、参考哈希为键缓存生成结果，避免重复请求；离线跑批可选 Batch API（后续）。
 
 ## 12. 数据模型与存储

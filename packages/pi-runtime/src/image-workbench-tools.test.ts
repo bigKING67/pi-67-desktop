@@ -10,7 +10,7 @@ import type { GenerateImages } from "./image-workbench-openai-images.js";
 
 type Tool = ReturnType<typeof imageTools>[number];
 type Model = Parameters<GenerateImages>[0];
-const imageModel = (id: string) => ({ id, provider: "newmoney-images", api: "openai-images", baseUrl: "https://images.example/v1" }) as Model;
+const imageModel = (id: string, api = "openai-images") => ({ id, provider: "newmoney-images-gateway", api, baseUrl: "https://images.example/v1" }) as Model;
 
 async function workspace(): Promise<string> {
   const directory = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "image-tools-")));
@@ -20,7 +20,7 @@ async function workspace(): Promise<string> {
 function harness(cwd: string, options: { available?: Model[]; image?: Buffer } = {}) {
   const generated: unknown[] = [];
   const modelRegistry = {
-    getAvailableOfType: () => Promise.resolve(options.available ?? []),
+    getAvailableOfType: (_type: string, provider: string) => Promise.resolve((options.available ?? []).filter((model) => model.provider === provider)),
     generateImages: (...args: unknown[]) => {
       generated.push(args);
       return Promise.resolve({ api: "openai-images", provider: "newmoney-images", model: "gpt-image-2.5-sunburst", stopReason: "stop", timestamp: 1,
@@ -83,7 +83,9 @@ describe("image workbench tools", { timeout: 120_000 }, () => {
     expect((exported.png as { width: number }).width).toBe(1280); expect(exported.visual_quality).toBe("UNVERIFIED");
     expect(String(exported.output).startsWith(path.join(cwd, ".newmoney/image-work/poster/export-"))).toBe(true);
 
-    const generated = await t.json("image_generate", { project_id: "poster", candidate_id: "warm", target_id: "photo", base_revision: 3, job: job() });
+    // The job names another profile; the chosen source model decides the profile and surface.
+    const generated = await t.json("image_generate", { project_id: "poster", candidate_id: "warm", target_id: "photo", base_revision: 3,
+      model: "newmoney-images-gateway/gpt-image-2.5-sunburst", job: job({ provider_profile: "openai.gpt-image-2.5-flare.2026-09-08" }) });
     expect(generated).toMatchObject({ candidate_id: "warm", status: "ready", outcome: "succeeded", model: "gpt-image-2.5-sunburst" });
     expect(t.generated).toHaveLength(1);
     expect((await readProject(projectRoot(cwd, "poster"))).document.revision).toBe(3);
@@ -98,16 +100,19 @@ describe("image workbench tools", { timeout: 120_000 }, () => {
     expect(history.document.change).toMatchObject({ author: "agent", operations: ["accept_candidate"] });
   });
 
-  it("refuses generation before any request when no Pi image model is available", async () => {
+  it("refuses generation before writing anything when the source model is unknown, unavailable or not an image source", async () => {
     const cwd = await workspace();
     const photo = path.join(cwd, "photo.png");
     await sharp({ create: { width: 1024, height: 1024, channels: 3, background: "#d8c8b0" } }).png().toFile(photo);
     const t = harness(cwd, { available: [imageModel("gpt-image-2.5-flare")] });
     await t.json("image_project_create_from_photo", { project_id: "poster", source: photo, headline: "春日" });
     await t.json("image_project_edit", { project_id: "poster", base_revision: 1, summary: "解锁", operations: [{ type: "update_object", id: "photo", patch: { locked: false } }] });
-    await expect(t.call("image_generate", { project_id: "poster", candidate_id: "warm", target_id: "photo", base_revision: 2, job: job() })).rejects.toThrow(/no Pi image model is configured/);
-    await expect(t.call("image_generate", { project_id: "poster", candidate_id: "warm", target_id: "photo", base_revision: 2, job: job({ provider_profile: "unknown" }) })).rejects.toThrow();
+    const generate = (model: string) => t.call("image_generate", { project_id: "poster", candidate_id: "warm", target_id: "photo", base_revision: 2, model, job: job() });
+    await expect(generate("newmoney-images-gateway/gpt-image-2.5-sunburst")).rejects.toThrow(/IMAGE_MODEL_UNAVAILABLE/);
+    await expect(generate("openrouter-images/flux")).rejects.toThrow(/image source/);
+    await expect(generate("gpt-image-2.5-flare")).rejects.toThrow(/image source/);
     expect(t.generated).toHaveLength(0);
+    await expect(fs.readdir(path.join(cwd, ".newmoney/image-work/poster"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("discards candidates and rejects missing required parameters", async () => {

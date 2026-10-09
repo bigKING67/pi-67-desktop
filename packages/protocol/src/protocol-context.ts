@@ -66,6 +66,7 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "provider.projectConfiguration.reload": "workspace",
   "model.projectDefault.set": "workspace",
   "vision.assistant.global.set": "app",
+  "image.generation.sources.set": "app",
   "model.routing.global.set": "app",
   "vision.assistant.project.set": "workspace",
   "context.file.list": "workspace",

@@ -276,6 +276,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "provider.projectConfiguration.reload": PiProviderConfigurationSnapshotSchema,
   "model.projectDefault.set": PiProviderConfigurationSnapshotSchema,
   "vision.assistant.global.set": PiProviderConfigurationSnapshotSchema,
+  "image.generation.sources.set": PiProviderConfigurationSnapshotSchema,
   "vision.assistant.project.set": PiProviderConfigurationSnapshotSchema,
   "model.routing.global.set": PiProviderConfigurationSnapshotSchema,
   "thinking.set": SessionControlResultSchema,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { executeProvider, type ProviderReceipt } from "./provider.js";
 import { canonicalContracts } from "./contracts.js";
-import { ANY_MODEL, PROFILE_MODELS, profileAllowsModel, profileSurface, resolveProfileModel } from "./provider-profiles.js";
+import { ANY_MODEL, PROFILE_MODELS, profileAllowsModel, profileForModel, profileSurface, resolveProfileModel } from "./provider-profiles.js";
 import { providerFixture } from "./test-support/provider-fixture.js";
 
 const GENERIC_OPENAI = "newmoney.openai-images.generic";
@@ -20,6 +20,12 @@ describe("image source profiles", { timeout: 120_000 }, () => {
     expect(resolveProfileModel(GENERIC_OPENAI, "gpt-image-2")).toBe("gpt-image-2");
     for (const bad of ["", "-x", "a b", "x".repeat(129), 7]) expect(profileAllowsModel(GENERIC_OPENAI, bad), String(bad)).toBe(false);
     expect(resolveProfileModel("unknown.profile", "gpt-image-2")).toBeUndefined();
+    expect(profileForModel("openai.image_api", "gpt-image-2.5-flare")).toBe("openai.gpt-image-2.5-flare.2026-09-08");
+    expect(profileForModel("openai.image_api", "gpt-image-1.5")).toBe(GENERIC_OPENAI);
+    expect(profileForModel("volcengine.ark_image_api", "doubao-seedream-5-0-260128")).toBe("volcengine.seedream-5.0-lite.260128");
+    expect(profileForModel("volcengine.ark_image_api", "doubao-seedream-6-0")).toBe("newmoney.ark-images.generic");
+    expect(profileForModel("volcengine.ark_image_api", "gpt-image-2.5-flare")).toBe("newmoney.ark-images.generic");
+    expect(profileForModel("unknown.surface", "x")).toBeUndefined();
   });
 
   it("runs any model the source names on a generic profile and records it in a valid receipt", async () => {

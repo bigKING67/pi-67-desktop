@@ -1,4 +1,4 @@
-import { IMAGE_PROVIDER_ID, type RiskCategory } from "@pi67/domain";
+import type { RiskCategory } from "@pi67/domain";
 import { imageTools } from "./image-workbench-tools.js";
 import { Check } from "typebox/value";
 import { classifyPathToolIntent, classifySensitivePathTarget } from "./path-tool-safety.js";
@@ -54,10 +54,8 @@ export async function classifyImageWorkbenchToolIntent(
       if (sensitive) return { toolName, category: sensitive, target: read.target, targetKind: "path", sourceLabel };
       if (read.category !== "workspace-read") outside += 1;
     }
-    const job = input.job as Record<string, unknown> | undefined;
-    const profile = typeof job?.provider_profile === "string" ? job.provider_profile : "unknown";
     return { toolName, category: "external-submit", sourceLabel, targetKind: "tool",
-      target: `${IMAGE_PROVIDER_ID}/${profile}${outside ? ` · 含 ${outside} 个工作区外文件` : ""}` };
+      target: `${stringField(input, "model") ?? "unknown"}${outside ? ` · 含 ${outside} 个工作区外文件` : ""}` };
   }
   return { toolName, category: READ_TOOLS.has(toolName) ? "workspace-read" : "workspace-write", target: project, targetKind: "tool", sourceLabel };
 }

@@ -23,6 +23,7 @@ import {
 import { LarkAppConfigurationInputSchema } from "./lark-auth-schemas.js";
 import { TeamChatCommandPayloadSchemas } from "./team-chat-schemas.js";
 import { ImageCommandPayloadSchemas } from "./image-schemas.js";
+import { ImageGenerationCommandPayloadSchemas } from "./image-generation-settings.js";
 import { SessionCatalogQuerySchema } from "./session-catalog-schemas.js";
 import { SessionCreationIdSchema } from "./session-creation-schemas.js";
 import { SkillPackTargetSchema } from "./skill-pack-schemas.js";
@@ -301,6 +302,7 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   ...ContextMemoryCommandPayloadSchemas,
   ...TeamChatCommandPayloadSchemas,
   ...ImageCommandPayloadSchemas,
+  ...ImageGenerationCommandPayloadSchemas,
   "extension.ui.respond": strictObject({
     requestId: Type.String({ minLength: 1, maxLength: 512 }),
     sessionId: Type.String({ minLength: 1, maxLength: 512 }),

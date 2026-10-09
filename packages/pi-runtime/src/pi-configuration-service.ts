@@ -3,7 +3,7 @@ import { ModelRuntime, SettingsManager, type SettingsManager as PiSettingsManage
 import { RuntimeError } from "@pi67/domain";
 import type {
   PiConfigurationChangeSource, PiConfigurationReloadState,
-  PiAutoRoutingSelection, PiCredentialRevealResult, PiDefaultModelSelection,
+  PiAutoRoutingSelection, PiCredentialRevealResult, PiDefaultModelSelection, PiImageGenerationSource,
   PiModelCatalogRefreshResult, PiProviderConfigurationChanged,
   PiProviderConfigurationInput, PiProviderConfigurationSnapshot,
   PiProviderModelDiscoveryInput, PiVisionAssistantOverride
@@ -254,6 +254,8 @@ export class PiConfigurationService {
     return this.mutations.setGlobalVisionAssistant(expectedRevision, selection); }
   setGlobalAutoRouting(expectedRevision: string, selection?: PiAutoRoutingSelection): Promise<PiProviderConfigurationSnapshot> {
     return this.mutations.setGlobalAutoRouting(expectedRevision, selection); }
+  setGlobalImageGenerationSources(expectedRevision: string, sources: readonly PiImageGenerationSource[]): Promise<PiProviderConfigurationSnapshot> {
+    return this.mutations.setGlobalImageGenerationSources(expectedRevision, sources); }
   setProjectVisionAssistant(cwd: string, expectedRevision: string,
     override?: PiVisionAssistantOverride): Promise<PiProviderConfigurationSnapshot> {
     return this.mutations.setProjectVisionAssistant(cwd, expectedRevision, override); }

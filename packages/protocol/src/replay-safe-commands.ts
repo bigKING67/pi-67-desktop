@@ -30,6 +30,7 @@ export const REPLAY_SAFE_CONTROL_MUTATION_TYPES = [
   "model.default.set",
   "model.projectDefault.set",
   "vision.assistant.global.set",
+  "image.generation.sources.set",
   "model.routing.global.set",
   "vision.assistant.project.set",
   "thinking.set",
