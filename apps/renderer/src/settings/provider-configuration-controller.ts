@@ -1,4 +1,4 @@
-import { ProtocolRequestError, type AgentCommandType, type CommandPayloads, type CommandResults, type PiCredentialRevealResult, type PiModelCatalogRefreshResult, type PiProviderConfigurationChanged, type PiProviderConfigurationSnapshot, type PiProviderModelDiscoveryInput, type PiProviderModelDiscoveryResult } from "@pi67/protocol";
+import { ProtocolRequestError, type AgentCommandType, type CommandPayloads, type CommandResults, type PiCredentialRevealResult, type PiImageGenerationSource, type PiModelCatalogRefreshResult, type PiProviderConfigurationChanged, type PiProviderConfigurationSnapshot, type PiProviderModelDiscoveryInput, type PiProviderModelDiscoveryResult } from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
 import { publishNotification } from "../notifications/notification-store.js";
@@ -216,6 +216,14 @@ export async function setGlobalVisionAssistantConfiguration(
   }, selection ? "全局视觉辅助模型已更新" : "全局视觉辅助已关闭");
 }
 
+/** Saves the whole image generation source list (ADR 0010 decision 14). */
+export async function setImageGenerationSources(sources: PiImageGenerationSource[], successTitle: string): Promise<boolean> {
+  const state = useProviderConfigurationStore.getState();
+  const revision = state.baselineRevision;
+  if (state.workspaceId !== GLOBAL_PROVIDER_CONFIGURATION_KEY || !revision) return false;
+  return mutateGlobal("image.generation.sources.set", { expectedRevision: revision, sources }, successTitle);
+}
+
 export async function setProjectVisionAssistantConfiguration(
   workspaceId: string,
   override:
@@ -383,7 +391,8 @@ type GlobalConfigurationMutationType = Extract<AgentCommandType,
   | "provider.credential.remove"
   | "model.default.set"
   | "model.routing.global.set"
-  | "vision.assistant.global.set">;
+  | "vision.assistant.global.set"
+  | "image.generation.sources.set">;
 type ProjectConfigurationMutationType = Extract<AgentCommandType,
   | "model.projectDefault.set"
   | "vision.assistant.project.set">;

@@ -25,6 +25,7 @@ describe("settings navigation", () => {
         items: [
           { id: "providers", label: "模型" },
           { id: "vision", label: "视觉辅助" },
+          { id: "image-generation", label: "图像生成" },
           { id: "context-memory", label: "上下文与记忆" }
         ]
       },
@@ -58,7 +59,7 @@ describe("settings navigation", () => {
   });
 
   it("keeps every category in the shared Settings document flow", () => {
-    expect(SETTINGS_SECTIONS).toHaveLength(16);
+    expect(SETTINGS_SECTIONS).toHaveLength(17);
     expect(SETTINGS_SECTIONS.every((item) => !("layout" in item))).toBe(true);
   });
 
@@ -76,6 +77,10 @@ describe("settings navigation", () => {
     const contextMemory = items.find((item) => item.id === "context-memory");
 
     expect(provider && matchesSettingsQuery(provider, "provider")).toBe(true);
+    const imageGeneration = items.find((item) => item.id === "image-generation");
+    expect(imageGeneration && matchesSettingsQuery(imageGeneration, "seedream")).toBe(true);
+    expect(imageGeneration && matchesSettingsQuery(imageGeneration, "生图")).toBe(true);
+    expect(sectionSupportsProjectScope("image-generation")).toBe(false);
     expect(provider && matchesSettingsQuery(provider, "模型服务")).toBe(true);
     expect(extension && matchesSettingsQuery(extension, "extension")).toBe(true);
     expect(extension && matchesSettingsQuery(extension, "扩展包")).toBe(true);

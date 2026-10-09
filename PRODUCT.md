@@ -1468,6 +1468,13 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   If helper configuration or execution fails, the main model is not invoked; the
   failed pending Turn and its Task-scoped claimed attachment set remain available
   for an explicit retry with a new submission identity.
+- Image generation sources are configured in Settings → `图像生成`, never by editing
+  JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
+  key (the default) or names its own HTTPS/loopback address whose key goes to Pi
+  `auth.json`; it lists the image models the user picked, including models without a
+  dedicated capability profile. Desktop registers one `newmoney-images-<source>` Pi
+  Provider per source after Groland; these never appear in the Provider Catalog.
+  Removing a source deletes only a key it stored itself.
 - Desktop registers one built-in `Groland` Provider with one Pi credential and
   seven image-capable reasoning models. `claude-opus-4-6`, `claude-opus-4-7`,
   `claude-opus-4-8`, `claude-sonnet-4-6`, and `claude-sonnet-5` use Anthropic

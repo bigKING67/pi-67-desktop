@@ -84,6 +84,7 @@ export const WORKBENCH_SETTINGS_SECTIONS = [
   "rules",
   "lark",
   "vision",
+  "image-generation",
   "integrations",
   "runtime",
   "usage",

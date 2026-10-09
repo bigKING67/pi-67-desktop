@@ -43,6 +43,7 @@ import { KeyboardShortcutSettings } from "./KeyboardShortcutSettings.js";
 import { LarkOfficeSettings } from "./LarkOfficeSettings.js";
 import { UsageSettings } from "./UsageSettings.js";
 import { VisionAssistantSettings } from "./VisionAssistantSettings.js";
+import { ImageGenerationSettings } from "./ImageGenerationSettings.js";
 import { ContextMemorySettings } from "./ContextMemorySettings.js";
 import { NewMoneyAccountSettings } from "./NewMoneyAccountSettings.js";
 import {
@@ -213,6 +214,7 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
   if (section === "rules") return <RuleSettingsWorkspace />;
   if (section === "lark") return <LarkOfficeSettings />;
   if (section === "vision") return <VisionAssistantSettings />;
+  if (section === "image-generation") return <ImageGenerationSettings />;
   if (section === "integrations") return <Browser67IntegrationPanel />;
   if (section === "runtime") return <RuntimeSettings />;
   if (section === "usage") return <UsageSettings />;

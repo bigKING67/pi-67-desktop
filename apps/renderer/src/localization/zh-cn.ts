@@ -63,6 +63,10 @@ export const zhCNMessages = {
         label: "视觉辅助",
         summary: "为不支持图片输入的文本模型配置可回放的视觉识别辅助。"
       },
+      imageGeneration: {
+        label: "图像生成",
+        summary: "选择图像工作台生成和修改图片时使用的模型来源。"
+      },
       integrations: {
         label: "浏览器集成",
         summary: "连接浏览器，管理扩展与运行状态。"

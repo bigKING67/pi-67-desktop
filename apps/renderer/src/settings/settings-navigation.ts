@@ -9,6 +9,7 @@ import {
   Eye,
   FileText,
   Globe,
+  ImagePlus,
   Info,
   Network,
   RefreshCw,
@@ -72,6 +73,12 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
           "image"
         ],
         icon: Eye
+      },
+      {
+        id: "image-generation",
+        ...messages.settings.sections.imageGeneration,
+        searchTerms: ["生图", "图像模型", "图片生成", "图像工作台", "gpt-image", "Seedream", "火山方舟", "image generation"],
+        icon: ImagePlus
       },
       {
         id: "context-memory",

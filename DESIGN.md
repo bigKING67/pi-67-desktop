@@ -1059,8 +1059,8 @@ loading error where the operation can produce those states
   Settings document. The document begins with one category title and one bounded
   summary; global-only sections do not repeat a redundant `全局设置` label, while
   project-aware sections retain the explicit scope switch in the same header row.
-- Settings keeps 16 stable category identities in five task-oriented groups:
-  `通用`: `外观与通知`, `账户与数据`; `模型与记忆`: `模型`, `视觉辅助`, `上下文与记忆`;
+- Settings keeps 17 stable category identities in five task-oriented groups:
+  `通用`: `外观与通知`, `账户与数据`; `模型与记忆`: `模型`, `视觉辅助`, `图像生成`, `上下文与记忆`;
   `能力与指令`: `扩展`, `技能`, `提示词模板`, `工作规则`;
   `连接与集成`: `飞书`, `浏览器集成`; `系统与支持`: `运行服务`,
   `用量分析`, `下载源与网络`, `更新与诊断`, `关于`.
@@ -1730,6 +1730,22 @@ loading error where the operation can produce those states
   editor with editable Endpoint, protocol, and model fields; it never saves,
   requests a credential, or selects the helper until the user performs those
   existing explicit actions.
+- `图像生成` (2026-10-09, ADR 0010 decision 14) is a global-only Settings document
+  under `模型与记忆` listing image sources in one `图像来源` grouped section: each row
+  leads with the inline brand mark and name, one hint line (`接口类型 · 沿用 <Provider>`
+  or host `· N 个模型`), a `SettingsStatus` value (`可用`, `缺少 API Key`, `缺少地址`) and
+  icon actions to edit or remove. The section header carries the shared sync status and
+  `添加来源`; when empty, a bounded `SettingsEmpty` explains that only generating or
+  changing image content needs a source and offers the same action. Adding or editing
+  drills into a detail view (`SettingsDetailHeader` back to `图像来源`) with two grouped
+  sections: `连接` (name, `接入方式` = reuse a configured Provider with an address and key,
+  or an own HTTPS/loopback address with a write-only API Key field; `接口类型` = OpenAI
+  兼容图像接口 or 火山方舟 Seedream, inferred from the address) and `模型` (checkbox rows
+  in monospace ids, `读取模型列表` pre-selects likely image models, plus a manual id row).
+  Inputs and selects share the 300px column. `SettingsSaveBar` saves; a stored key is
+  never shown, and an empty key field keeps it. Removal uses the shared destructive
+  dialog and deletes only the source's own stored key, never a reused Provider's.
+  Image source Providers never appear in the `模型` Provider Catalog.
 - Built-in Pi Providers and models remain visible for credential and default
   selection but are read-only. Creating or editing a custom Provider writes only
   its `models.json` entry; Desktop never copies built-in definitions into that
