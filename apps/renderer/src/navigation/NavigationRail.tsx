@@ -1,3 +1,5 @@
+import { ImageDestinationRow } from "../image-workbench/ImageDestinationRow.js";
+import { useVisibleWorkspaceOrder } from "../workbench/visible-workspaces.js";
 import {
   FolderPlus,
   MessageSquarePlus,
@@ -63,7 +65,7 @@ export function NavigationRail({
   const connected = useAppStore((state) => state.connected);
   const accountLabel = newMoneyAccountLabel(useNewMoneyAccount());
   const workspaces = useWorkbenchStore((state) => state.workspaces);
-  const workspaceOrder = useWorkbenchStore((state) => state.workspaceOrder);
+  const workspaceOrder = useVisibleWorkspaceOrder();
   const expandedWorkspaceIds = useWorkbenchStore((state) => state.expandedWorkspaceIds);
   const searchableWorkspaceIds = useMemo(() => workspaceOrder.filter((workspaceId) => (
     workspaces[workspaceId]?.availability === "available"
@@ -132,6 +134,7 @@ export function NavigationRail({
       {chatMode ? <TeamChatNavigation onCreateChannel={() => setChannelDialogOpen(true)} /> : (
         <>
           <div className={styles.actions}>
+            <ImageDestinationRow />
             <SessionCatalogSearch
               focusRevision={sessionSearchFocusRevision}
               handledRevision={sessionSearchHandledRevision}

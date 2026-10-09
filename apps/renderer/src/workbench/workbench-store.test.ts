@@ -10,6 +10,7 @@ import {
   createRendererWorkbenchStore,
   type RendererWorkbenchTask
 } from "./workbench-store.js";
+import { fullWorkspaceOrder, visibleWorkspaceOrder } from "./visible-workspaces.js";
 
 describe("renderer workbench store", () => {
   it("keeps a cross-workspace Runtime registry and selects conversations", () => {
@@ -247,6 +248,24 @@ describe("renderer workbench store", () => {
       settingsReturnSurface: undefined,
       settingsSection: "runtime"
     });
+  });
+
+  it("keeps the creative library registered but never current, expanded or visible", () => {
+    const store = createRendererWorkbenchStore();
+    store.getState().registerWorkspace(workspace("a", "/work/a"));
+    store.getState().registerImageLibrary(workspace("lib", "/Volumes/D/library"));
+    expect(store.getState()).toMatchObject({ imageLibraryWorkspaceId: "lib", currentWorkspaceId: "a", workspaceOrder: ["a", "lib"], expandedWorkspaceIds: ["a"] });
+    expect(visibleWorkspaceOrder(store.getState())).toEqual(["a"]);
+    expect(fullWorkspaceOrder(["a"], "lib")).toEqual(["a", "lib"]);
+
+    const hydrated = createRendererWorkbenchStore();
+    hydrated.getState().hydrate({
+      version: 5, workspaces: [workspace("lib", "/Volumes/D/library"), workspace("b", "/work/b")], workspaceOrder: ["lib", "b"],
+      expandedWorkspaceIds: [], runtimeRecovery: [], sessionCreationRecovery: [], workspaceEnvironments: [], environmentMutations: [],
+      settings: { section: "general", scope: "global" }, cleanExit: true, imageLibraryWorkspaceId: "lib"
+    });
+    expect(hydrated.getState()).toMatchObject({ imageLibraryWorkspaceId: "lib", currentWorkspaceId: "b" });
+    expect(visibleWorkspaceOrder(hydrated.getState())).toEqual(["b"]);
   });
 });
 

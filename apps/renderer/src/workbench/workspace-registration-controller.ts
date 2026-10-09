@@ -1,3 +1,4 @@
+import { fullWorkspaceOrder, visibleWorkspaceOrder } from "./visible-workspaces.js";
 import { ProtocolRequestError } from "@pi67/protocol";
 import { useAppStore } from "../app/app-store.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
@@ -90,11 +91,12 @@ export async function moveRendererWorkspace(
   direction: "up" | "down"
 ): Promise<boolean> {
   const workbench = rendererWorkbenchStore.getState();
-  const index = workbench.workspaceOrder.indexOf(workspaceId);
+  const visible = [...visibleWorkspaceOrder(workbench)];
+  const index = visible.indexOf(workspaceId);
   const target = direction === "up" ? index - 1 : index + 1;
-  if (index < 0 || target < 0 || target >= workbench.workspaceOrder.length) return false;
-  const workspaceOrder = [...workbench.workspaceOrder];
-  [workspaceOrder[index], workspaceOrder[target]] = [workspaceOrder[target]!, workspaceOrder[index]!];
+  if (index < 0 || target < 0 || target >= visible.length) return false;
+  [visible[index], visible[target]] = [visible[target]!, visible[index]!];
+  const workspaceOrder = fullWorkspaceOrder(visible, workbench.imageLibraryWorkspaceId);
   await window.pi67.system.reorderWorkspaces(workspaceOrder);
   return rendererWorkbenchStore.getState().reorderWorkspaces(workspaceOrder);
 }

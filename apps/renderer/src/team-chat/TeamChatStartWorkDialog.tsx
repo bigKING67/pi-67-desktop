@@ -1,3 +1,4 @@
+import { useVisibleWorkspaceOrder } from "../workbench/visible-workspaces.js";
 import { useEffect, useMemo, useState } from "react";
 import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
 import type { EnterpriseProjectSummary } from "@pi67/domain";
@@ -16,7 +17,7 @@ export function TeamChatStartWorkDialog({ source }: { source: TeamChatStartWorkS
   const copy = messages.teamChat;
   const close = useTeamChatDialogStore((state) => state.close);
   const teamId = useTeamChat((state) => state.directory?.teamId);
-  const workspaceOrder = useWorkbenchStore((state) => state.workspaceOrder);
+  const workspaceOrder = useVisibleWorkspaceOrder();
   const workspaceRecords = useWorkbenchStore((state) => state.workspaces);
   // Derive outside the selector: a fresh array per selection would re-render forever.
   const workspaces = useMemo(() => workspaceOrder

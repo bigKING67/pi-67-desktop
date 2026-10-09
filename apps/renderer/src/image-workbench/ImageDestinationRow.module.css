@@ -1,0 +1,37 @@
+/* A rail destination (like Team Chat's 动态): selecting it replaces the center surface. */
+.row {
+  display: grid;
+  width: 100%;
+  min-height: 32px;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 9px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.row[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.row[data-focus-visible] {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.selected,
+.selected[data-hovered] {
+  background: var(--surface-active);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.icon {
+  justify-self: center;
+  color: var(--text-tertiary);
+}

@@ -1,3 +1,6 @@
+import { useImageWorkbench } from "../image-workbench/image-workbench-store.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import { useVisibleWorkspaceOrder } from "../workbench/visible-workspaces.js";
 import { isDesktopAgentHostFailureState, isDesktopAgentHostStartupState } from "@pi67/protocol";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { teamChat } from "../team-chat/team-chat-instance.js";
@@ -34,6 +37,7 @@ import { closeKeyboardShortcutsDialog } from "../help/keyboard-shortcuts-dialog-
 import { CONTEXT_DRAWER_MEDIA_QUERY } from "../shell/context-panel-controller.js";
 
 const WorkspaceShell = lazy(() => import("./WorkspaceShell.js").then((module) => ({ default: module.WorkspaceShell })));
+const ImageWorkbench = lazy(() => import("../image-workbench/ImageWorkbench.js").then((module) => ({ default: module.ImageWorkbench })));
 const TeamChatWorkbench = lazy(() => import("../team-chat/TeamChatWorkbench.js").then((module) => ({ default: module.TeamChatWorkbench })));
 const ApprovalDialog = lazy(() => import("../approval/ApprovalDialog.js").then((module) => ({ default: module.ApprovalDialog })));
 const CommandPalette = lazy(() => import("../command-palette/CommandPalette.js").then((module) => ({ default: module.CommandPalette })));
@@ -80,7 +84,12 @@ export function App() {
     return initializeTeamChatNotifications();
   }, []);
   useEffect(() => { if (chatMode) teamChat.activate(); }, [chatMode]);
-  const workbenchWorkspaceCount = useWorkbenchStore((state) => state.workspaceOrder.length);
+  const imageView = useImageWorkbench((state) => state.view !== undefined) && !chatMode && selectedSurface?.kind !== "settings";
+  // Choosing any conversation, Workspace or Settings leaves `图像`; it is layout state like Work/Chat.
+  useEffect(() => rendererWorkbenchStore.subscribe((state, previous) => {
+    if (state.selectedSurface !== previous.selectedSurface) useImageWorkbench.getState().close();
+  }), []);
+  const workbenchWorkspaceCount = useVisibleWorkspaceOrder().length;
   const [navigationIsDrawer, setNavigationIsDrawer] = useState(() => window.matchMedia("(max-width: 760px)").matches);
   const [contextIsDrawer, setContextIsDrawer] = useState(() => window.matchMedia(CONTEXT_DRAWER_MEDIA_QUERY).matches);
   const freshnessInstallationRef = useRef<ReturnType<typeof createOperationFreshnessInstallation> | undefined>(undefined);
@@ -237,12 +246,12 @@ export function App() {
       <WorkbenchProjectionBridge />
       <TitleBar
         contextIsDrawer={contextIsDrawer}
-        navigationAvailable={Boolean(workspace) || workbenchWorkspaceCount > 0 || chatMode}
+        navigationAvailable={Boolean(workspace) || workbenchWorkspaceCount > 0 || chatMode || imageView}
         navigationIsDrawer={navigationIsDrawer}
         navigationVisible={navigationVisible}
         onToggleNavigation={toggleNavigation}
       />
-      {!workspace && workbenchWorkspaceCount === 0 && selectedSurface?.kind !== "settings" && !chatMode ? (
+      {!workspace && workbenchWorkspaceCount === 0 && selectedSurface?.kind !== "settings" && !chatMode && !imageView ? (
         <Welcome />
       ) : (
         <LazySurfaceBoundary
@@ -253,8 +262,8 @@ export function App() {
         >
           <Suspense fallback={<WorkspaceShellFallback />}>
             <WorkspaceShell
-              {...(chatMode ? { centralOverride: <TeamChatWorkbench /> } : {})}
-              contextVisible={contextVisible && !chatMode}
+              {...(chatMode ? { centralOverride: <TeamChatWorkbench /> } : imageView ? { centralOverride: <ImageWorkbench /> } : {})}
+              contextVisible={contextVisible && !chatMode && !imageView}
               navigationIsDrawer={navigationIsDrawer}
               navigationVisible={navigationVisible}
               onCloseContextDrawer={closeContextDrawer}

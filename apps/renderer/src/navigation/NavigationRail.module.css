@@ -1,5 +1,6 @@
 .actions {
   display: grid;
+  gap: 4px;
   padding: var(--space-2) 10px;
 }
 

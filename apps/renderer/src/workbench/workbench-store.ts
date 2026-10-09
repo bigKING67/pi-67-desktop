@@ -44,14 +44,16 @@ export function createRendererWorkbenchStore() {
         ...state.expandedWorkspaceIds,
         ...(selectedWorkspaceId ? [selectedWorkspaceId] : [])
       ], workspaces);
+      const library = state.imageLibraryWorkspaceId && workspaces[state.imageLibraryWorkspaceId] ? state.imageLibraryWorkspaceId : undefined;
       set({
         workspaces,
+        imageLibraryWorkspaceId: library,
         conversationDefaults: state.conversationDefaults ?? [],
         workspaceOrder: state.workspaceOrder.filter((id) => workspaces[id] !== undefined),
         expandedWorkspaceIds,
-        currentWorkspaceId: state.currentWorkspaceId && workspaces[state.currentWorkspaceId]
+        currentWorkspaceId: state.currentWorkspaceId && workspaces[state.currentWorkspaceId] && state.currentWorkspaceId !== library
           ? state.currentWorkspaceId
-          : state.workspaceOrder.find((id) => workspaces[id] !== undefined),
+          : state.workspaceOrder.find((id) => workspaces[id] !== undefined && id !== library),
         tasks,
         runtimeTaskOrder,
         selectedSurface,
@@ -118,6 +120,10 @@ export function createRendererWorkbenchStore() {
           : {})
       });
       return true;
+    },
+    registerImageLibrary(workspace) {
+      set((current) => ({ workspaces: { ...current.workspaces, [workspace.id]: workspace }, imageLibraryWorkspaceId: workspace.id,
+        workspaceOrder: current.workspaces[workspace.id] ? current.workspaceOrder : [...current.workspaceOrder, workspace.id] }));
     },
     reorderWorkspaces(workspaceIds) {
       const current = get();
@@ -384,6 +390,7 @@ function emptyWorkbenchState() {
     conversationDefaults: [],
     workspaces: {},
     workspaceOrder: [],
+    imageLibraryWorkspaceId: undefined,
     expandedWorkspaceIds: [],
     currentWorkspaceId: undefined,
     tasks: {},

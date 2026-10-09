@@ -1,3 +1,4 @@
+import { useVisibleWorkspaceOrder } from "../workbench/visible-workspaces.js";
 import {
   taskConsumesRunSlot,
   type WorkspaceDescriptor
@@ -65,7 +66,7 @@ export function WorkspaceConversationList({
   onRequestRemoval: (workspaceId: string) => void;
 }) {
   const workspaces = useWorkbenchStore((state) => state.workspaces);
-  const workspaceOrder = useWorkbenchStore((state) => state.workspaceOrder);
+  const workspaceOrder = useVisibleWorkspaceOrder();
   const expandedWorkspaceIds = useWorkbenchStore((state) => state.expandedWorkspaceIds);
   const currentWorkspaceId = useWorkbenchStore((state) => state.currentWorkspaceId);
   const tasks = useWorkbenchStore((state) => state.tasks);

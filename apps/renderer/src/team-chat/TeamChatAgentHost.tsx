@@ -1,3 +1,4 @@
+import { useVisibleWorkspaceOrder } from "../workbench/visible-workspaces.js";
 import { useEffect, useMemo, useState } from "react";
 import type { EnterpriseProjectSummary, TeamChatAgentBinding } from "@pi67/domain";
 import type { PiProviderConfigurationSnapshot } from "@pi67/protocol";
@@ -38,7 +39,7 @@ export function useTeamProjects(teamId: string | undefined): Loaded<EnterprisePr
 
 /** Workspaces this Desktop can run an Agent in. */
 export function useHostWorkspaces() {
-  const workspaceOrder = useWorkbenchStore((state) => state.workspaceOrder);
+  const workspaceOrder = useVisibleWorkspaceOrder();
   const workspaceRecords = useWorkbenchStore((state) => state.workspaces);
   return useMemo(() => workspaceOrder.map((id) => workspaceRecords[id])
     .filter((workspace) => workspace?.availability === "available")

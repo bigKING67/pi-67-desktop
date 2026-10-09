@@ -1,4 +1,5 @@
-import { FolderOpen, MessagesSquare } from "lucide-react";
+import { FolderOpen, Image as ImageIcon, MessagesSquare } from "lucide-react";
+import { useImageWorkbench } from "../image-workbench/image-workbench-store.js";
 import piIconUrl from "../assets/pi-icon-64.png";
 import { messages } from "../localization/message-catalog.js";
 import { useShellStore } from "../shell/shell-store.js";
@@ -35,6 +36,15 @@ export function Welcome() {
           >
             <MessagesSquare size={17} />
             {messages.teamChat.openChat}
+          </button>
+          <button
+            className={`secondary-button ${styles.action}`}
+            data-testid="image-workbench-open-action"
+            onClick={() => useImageWorkbench.getState().openLibrary()}
+            type="button"
+          >
+            <ImageIcon size={17} />
+            打开图像
           </button>
         </div>
         {/* Reuse and local-only data stay as one quiet assurance, not a feature list. */}

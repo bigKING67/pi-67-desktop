@@ -59,6 +59,8 @@ export interface RendererWorkbenchState {
   conversationDefaults?: import("@pi67/domain").WorkspaceConversationDefault[];
   workspaces: Record<WorkspaceId, WorkspaceDescriptor>;
   workspaceOrder: WorkspaceId[];
+  /** The creative library Workspace (ADR 0010): registered and trusted, never listed in the tree. */
+  imageLibraryWorkspaceId: WorkspaceId | undefined;
   expandedWorkspaceIds: WorkspaceId[];
   currentWorkspaceId: WorkspaceId | undefined;
   tasks: Record<TaskId, RendererWorkbenchTask>;
@@ -71,6 +73,7 @@ export interface RendererWorkbenchState {
   settingsWorkspaceId: WorkspaceId | undefined;
   hydrate: (state: WorkbenchStateV5) => void;
   registerWorkspace: (workspace: WorkspaceDescriptor) => void;
+  registerImageLibrary: (workspace: WorkspaceDescriptor) => void;
   unregisterWorkspace: (workspaceId: WorkspaceId) => boolean;
   reorderWorkspaces: (workspaceIds: WorkspaceId[]) => boolean;
   selectWorkspace: (workspaceId: WorkspaceId) => boolean;
