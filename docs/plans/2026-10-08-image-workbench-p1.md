@@ -128,7 +128,8 @@ Product model: `docs/architecture/image-workbench-product-model.md`; decisions:
       with reasons in ADR 0010 decision 10: no separate library index (the
       disk is the index) and the watcher lives in Agent Host, not Main.
 - [ ] 7. Packaged previews on macOS arm64 and Windows x64 load native modules and
-      the font, render a fixture; evidence directory with receipts.
+      the font, render a fixture; evidence directory with receipts. macOS arm64 done
+      2026-10-09 (`18f9d63f`); Windows x64 pending real-machine or CI evidence.
 - [ ] 8. Real Pi session through Desktop meets the Agent-path criteria; tool-call
       count and wall clock recorded.
 
@@ -226,6 +227,21 @@ are additive. No user directories are rewritten (import is read-only).
   `contracts.test.ts` (fixture parity) and `provider*.test.ts` (loopback HTTP
   server, 25 source cases minus the two Python-shim cases), export from
   `src/index.ts`, then typecheck/lint/architecture/knip/vitest and commit.
+- 2026-10-09: checkpoint 7, macOS arm64 half complete (`18f9d63f`). The user
+  approved first-party Desktop customTools over a capability snapshot (ADR 0010
+  decision 13). The extension package was folded into `packages/pi-runtime`
+  (`image-workbench-*`), because keeping it made pnpm report a workspace cycle
+  (its SDK types come from pi-runtime, which now imports its tools). Two
+  findings fixed: tool paths had resolved against the Agent Host process
+  directory instead of the Workspace, and the path policy only hard-stops
+  credential paths for writes, so image tools refuse them explicitly (a photo,
+  reference or mask is uploaded or copied). `check` passed (6734 passed, 24
+  skipped). `preview:mac:unsigned` packaged smoke passed; it now asserts the
+  engine dist, worker, font and unpacked Sharp/libvips/resvg, and renders a CJK
+  text project with the packaged executable (`{"status":"rendered"}`). app.asar
+  grew from 199.6 MB to 224.0 MB (font 16 MB) plus 21 MB unpacked native modules.
+  Not yet verified: Windows x64 packaged load; the engine running inside the
+  packaged Agent Host utility process during a real session (checkpoint 8).
 
 ## Closeout
 
