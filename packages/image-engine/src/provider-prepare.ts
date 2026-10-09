@@ -5,10 +5,11 @@ import { readProject, type ProjectState } from "./project.js";
 import { readBytes, importRaster } from "./raster.js";
 import { assertCandidateSlot } from "./candidate-store.js";
 import { maskBytes, validateContext, type EditContext, type MaskData } from "./composite.js";
-import { PROFILE_MODELS } from "./provider-profiles.js";
+import { resolveProfileModel } from "./provider-profiles.js";
 import type { ImageContracts } from "./contracts.js";
 import type { OutputPolicy } from "./provider-normalize.js";
 
+const ADAPTER_SURFACES = new Set(["openai.image_api", "volcengine.ark_image_api"]);
 export const MASK_KEYS = ["generation_mask", "protection_mask", "blend_mask"] as const;
 type MaskKey = typeof MASK_KEYS[number];
 
@@ -17,6 +18,8 @@ export interface ProviderSpec {
   references: { asset_id: string; source: string }[];
   edit?: { context: EditContext } & Record<MaskKey, string>;
   output_policy?: OutputPolicy;
+  /** The image source's model id; required by a generic profile, otherwise equal to the profile's model. */
+  model?: string;
 }
 export interface ProviderRequestRecord {
   endpoint: "images/edits" | "images/generations"; parameters: RequestParameters; output_policy: OutputPolicy; prompt_sha256: string;
@@ -38,7 +41,7 @@ export function compileJob(contracts: ImageContracts, job: unknown): { pack: str
 }
 
 export async function prepareRequest(root: string, value: unknown, contracts: ImageContracts): Promise<PreparedRequest> {
-  record(value, ["job", "candidate_id", "base_revision", "target_id", "references", "edit", "output_policy"], "Provider input");
+  record(value, ["job", "candidate_id", "base_revision", "target_id", "references", "edit", "output_policy", "model"], "Provider input");
   if (value.output_policy !== undefined && !["strict", "resize_to_target"].includes(value.output_policy as string)) throw new Error("Unsupported output policy");
   id(value.candidate_id, "candidate id"); id(value.target_id, "target id");
   const spec = value as unknown as ProviderSpec;
@@ -47,9 +50,11 @@ export async function prepareRequest(root: string, value: unknown, contracts: Im
   id(job.job_id, "job id");
   const compiled = compileJob(contracts, job);
   const canvas = isRecord(job.canvas) ? job.canvas : {};
-  const model = PROFILE_MODELS.get(String(job.provider_profile));
-  if (!model || job.schema_version !== "creative-craft.image-job.v2" || job.execution_surface !== "openai.image_api" ||
-      job.execution_mode !== "single_turn" || job.declared_status !== "ready" || canvas.format !== "png" || canvas.variants !== 1) throw new Error("Adapter requires a ready single-turn GPT Image 2.5 job with one PNG output");
+  // Contracts already bind the surface to the profile; a generic profile takes the source's model.
+  const model = resolveProfileModel(job.provider_profile, spec.model);
+  if (!model) throw new Error("Provider model does not match the job's provider profile");
+  if (job.schema_version !== "creative-craft.image-job.v2" || !ADAPTER_SURFACES.has(String(job.execution_surface)) ||
+      job.execution_mode !== "single_turn" || job.declared_status !== "ready" || canvas.format !== "png" || canvas.variants !== 1) throw new Error("Adapter requires a ready single-turn image job with one PNG output");
   if (isRecord(job.rights) && job.rights.status === "REJECTED") throw new Error("Rejected asset rights");
   const project = await readProject(root);
   if (project.document.revision !== spec.base_revision) throw new Error("Provider base revision conflict");

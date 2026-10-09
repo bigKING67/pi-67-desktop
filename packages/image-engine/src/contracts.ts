@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { isRecord, type JsonRecord } from "./document.js";
-import { providerProfiles, surfaceProfiles } from "./provider-profiles.js";
+import { ANY_MODEL, profileAllowsModel, providerProfiles, surfaceProfiles } from "./provider-profiles.js";
 
 // Node port of the creative-craft canonical contracts for Image Job v2 and
 // Execution Receipt v1. Error messages mirror the Python validator so the shared
@@ -215,7 +215,7 @@ function validateReceiptSemantics(data: JsonRecord): Result {
   r.require(profile !== undefined, `unknown provider_profile: ${repr(profileId)}`);
   r.require(surface !== undefined, `unknown execution_surface: ${repr(surfaceId)}`);
   if (profile) {
-    r.require(data.model === profile.model, "receipt model differs from provider profile");
+    r.require(data.model === profile.model || (profile.model === ANY_MODEL && profileAllowsModel(profileId, data.model)), "receipt model differs from provider profile");
     if (profile.snapshot !== undefined && profile.snapshot !== null) r.require(data.snapshot === profile.snapshot, "receipt snapshot differs from provider profile");
   }
   if (surface) r.require(Array.isArray(surface.provider_profiles) && surface.provider_profiles.includes(profileId), "execution_surface does not support provider_profile");

@@ -1,0 +1,23 @@
+{
+  "schema_version": "creative-craft.surface.v1",
+  "surface_id": "volcengine.ark_image_api",
+  "provider": "Volcengine Ark",
+  "label": "Ark Seedream image generation through a configured image source",
+  "available": true,
+  "verified_at": "2026-10-09",
+  "provider_profiles": [
+    "volcengine.seedream-5.0-pro.260628",
+    "volcengine.seedream-5.0-flash.260915",
+    "volcengine.seedream-5.0-lite.260128",
+    "newmoney.ark-images.generic"
+  ],
+  "modes": [
+    "single_turn",
+    "generate",
+    "edit"
+  ],
+  "notes": [
+    "POST {baseUrl}/images/generations; references travel as data URIs; watermark is always false.",
+    "Availability still requires an actual authorized request."
+  ]
+}

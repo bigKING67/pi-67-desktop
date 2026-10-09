@@ -2,12 +2,14 @@
   "schema_version": "creative-craft.surface.v1",
   "surface_id": "openai.image_api",
   "provider": "OpenAI",
-  "label": "Image API through configured Codex gateway",
+  "label": "OpenAI-compatible Image API through a configured image source",
   "available": true,
-  "verified_at": "2026-10-04",
+  "verified_at": "2026-10-09",
   "provider_profiles": [
     "openai.gpt-image-2.5-sunburst.2026-09-08",
-    "openai.gpt-image-2.5-flare.2026-09-08"
+    "openai.gpt-image-2.5-flare.2026-09-08",
+    "openai.gpt-image-2.5.2026-10-09",
+    "newmoney.openai-images.generic"
   ],
   "modes": [
     "single_turn",

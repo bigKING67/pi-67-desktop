@@ -66,6 +66,10 @@
 - 未移植：`cli.mjs`、`provider-config.mjs`、`provider-acceptance.mjs`、`provider-smoke.mjs`
   （craft67 操作员脚本，读写 `~/.codex`）及其测试 1 个、CLI 参数校验测试 3 个。真实网络验收
   改由 P1 检查点 8 的 Desktop 内真实 Pi 会话承担；Agent 通过 Desktop 第一方 `image_*` 工具调用引擎。
+- 2026-10-09 按 ADR 0010 第 14 条扩展（偏离 creative-craft 规范）：新增 `gpt-image-2.5`、Seedream 5.0
+  pro / flash / lite 能力档案与 `volcengine.ark_image_api` 执行面；每个图像 API 各一个通用档案
+  （`model: "*"`，保守尺寸），由图像来源给出实际模型 ID，回执校验与恢复都经 `profileAllowsModel`；
+  适配器不再只认 `openai.image_api`。原有两份档案与 38 个规范样例不变。
 
 ## 第三方依赖
 

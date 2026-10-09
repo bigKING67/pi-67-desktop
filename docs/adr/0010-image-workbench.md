@@ -145,6 +145,24 @@ Evidence that shaped the decisions:
     `image_generate` (a staged, protected-pixel candidate for a project) both
     remain, with descriptions that say which to use.
 
+14. **Image generation sources in the Models settings.** (Added 2026-10-09,
+    user-approved; supersedes the hand-written `models.json` entry of decision
+    9.) Users manage image generation in Settings, never in JSON. Global
+    `settings.json` `pi67Desktop.imageGeneration.sources[]` lists sources; each
+    has an image API (`openai-images` or `ark-images`), the chosen model ids,
+    and either a configured Pi Provider to reuse (address and key follow that
+    Provider) or its own HTTPS/loopback address with a key in Pi `auth.json`.
+    Every source becomes one Pi image Provider `newmoney-images-<source>`;
+    a reused Provider's key is resolved by Pi when the runtime is built and is
+    held only in that runtime's memory. The `ark-images` API speaks Volcengine
+    Ark Seedream and always sends `watermark: false` (decision 5). The engine
+    adds capability profiles for `gpt-image-2.5` and the Seedream 5.0 models,
+    plus one generic profile per image API (`model: "*"`, conservative sizes)
+    so any model the user picks can run; known models keep their exact
+    profile. Gateways may answer with an image URL, which is downloaded under
+    the same endpoint policy without the key; a refused parameter is reported
+    by name only.
+
 ## Consequences
 
 - Satori, resvg-js, Sharp and the CJK font become Desktop dependencies; native

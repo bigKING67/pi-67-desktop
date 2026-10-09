@@ -27,7 +27,8 @@ export type ImageGenerationFailure = "http_error" | "response_size_limit" | "inv
  * claim is released instead of recording a paid attempt.
  */
 export class ImageGenerationError extends Error {
-  constructor(readonly code: ImageGenerationFailure, readonly httpStatus?: number, readonly sent = true) { super(code); }
+  /** `rejectedParameter`: the request field a gateway named when refusing it (a bounded token, never response text). */
+  constructor(readonly code: ImageGenerationFailure, readonly httpStatus?: number, readonly sent = true, readonly rejectedParameter?: string) { super(code); }
 }
 
 const USAGE_KEYS = new Set(["input_tokens", "output_tokens", "total_tokens", "input_tokens_details", "output_tokens_details", "text_tokens", "image_tokens", "cached_tokens"]);

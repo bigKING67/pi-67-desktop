@@ -1,7 +1,7 @@
 import path from "node:path";
 import { sha256 } from "./content-store.js";
 import { record, id, digest, LIMITS, isRecord, type Asset, type JsonRecord } from "./document.js";
-import { PROFILE_MODELS, IMAGE_MODELS } from "./provider-profiles.js";
+import { profileAllowsModel } from "./provider-profiles.js";
 import { readBytes } from "./raster.js";
 import { normalizeImage } from "./provider-normalize.js";
 import { verifyAlpha } from "./provider-alpha.js";
@@ -31,7 +31,7 @@ export async function readExecution(root: string, binding: unknown, source: Asse
   if (job.schema_version !== "creative-craft.image-job.v2" || job.job_id !== binding.job_id || receipt.job_id !== job.job_id || receipt.job_sha256 !== binding.job_sha256 ||
       receipt.schema_version !== "creative-craft.execution-receipt.v1" || receipt.outcome !== "succeeded" ||
       receipt.provider_profile !== job.provider_profile || receipt.execution_surface !== job.execution_surface ||
-      !IMAGE_MODELS.includes(receipt.model) || PROFILE_MODELS.get(String(job.provider_profile)) !== receipt.model ||
+      !profileAllowsModel(job.provider_profile, receipt.model) ||
       !Array.isArray(receipt.outputs) || ![1, 2].includes(receipt.outputs.length)) throw new Error("Execution receipt does not bind a successful image job");
   const jobId = String(job.job_id);
   const output = receipt.outputs.find((item) => item.path === `jobs/${jobId}/output.png`);

@@ -31,7 +31,7 @@ export type { CropReceipt, CropRectangle } from "./photo-crop.js";
 export { copyVariants, COPY_VARIANTS_SCHEMA } from "./copy-variants.js";
 export { projectRoot, projectsDirectory, workspaceOwnership, previewCachePath, workDirectory, ensureProjectParent } from "./project-location.js";
 export type { VariantManifest, VariantResult, VariantSpec, TextUpdate } from "./copy-variants.js";
-export { PROFILE_MODELS, IMAGE_MODELS, providerProfiles, surfaceProfiles } from "./provider-profiles.js";
+export { ANY_MODEL, PROFILE_MODELS, profileAllowsModel, profileSurface, providerProfiles, resolveProfileModel, surfaceProfiles } from "./provider-profiles.js";
 export { validateExecution, readExecution } from "./provider-store.js";
 export { validateImageJob, validateExecutionReceipt, compileImageJob, canonicalContracts } from "./contracts.js";
 export type { CompiledImageJob, ContractResult, ImageContracts } from "./contracts.js";

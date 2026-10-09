@@ -1,5 +1,5 @@
 import type { ImageGenerationCall, ImageGenerator } from "@pi67/image-engine";
-import { METADATA_KEY, type GenerateImages, type NewMoneyImageRequest } from "./image-workbench-openai-images.js";
+import { HTTP_ERROR, METADATA_KEY, type GenerateImages, type NewMoneyImageRequest } from "./image-workbench-openai-images.js";
 
 type ImageModel = Parameters<GenerateImages>[0];
 type AssistantImages = Awaited<ReturnType<GenerateImages>>;
@@ -24,8 +24,8 @@ export function createPiImageGenerator(registry: ImageRegistry, model: ImageMode
     if (result.stopReason === "aborted" || signal.aborted) throw signal.reason instanceof Error ? signal.reason : new Error("Image generation aborted");
     if (result.stopReason === "error") {
       const message = result.errorMessage ?? "";
-      const status = /^http_error:(\d{3})$/u.exec(message);
-      if (status) throw new ImageGenerationError("http_error", Number(status[1]));
+      const status = HTTP_ERROR.exec(message);
+      if (status) throw new ImageGenerationError("http_error", Number(status[1]), true, status[2]);
       if (UNSENT.some((pattern) => pattern.test(message))) throw new ImageGenerationError("provider_unavailable", undefined, false);
       if (message === "response_size_limit" || message === "invalid_image_response") throw new ImageGenerationError(message);
       throw new ImageGenerationError("transport_or_response_error");

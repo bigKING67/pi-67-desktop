@@ -1,6 +1,7 @@
 import http from "node:http";
 import { describe, expect, it, onTestFinished } from "vitest";
-import { endpointUrl, generateOpenAIImages, readImageRequest, METADATA_KEY, type GenerateImages } from "./image-workbench-openai-images.js";
+import { endpointUrl } from "./image-workbench-http.js";
+import { generateOpenAIImages, readImageRequest, METADATA_KEY, type GenerateImages } from "./image-workbench-openai-images.js";
 
 type Model = Parameters<GenerateImages>[0];
 interface Recorded { url: string; headers: http.IncomingHttpHeaders; body: Buffer }
@@ -58,6 +59,9 @@ describe("openai-images Pi image API", () => {
     const failed = await generateOpenAIImages(model, { input: [{ type: "text", text: "x" }] }, { apiKey: key, metadata: { [METADATA_KEY]: request } });
     expect(failed).toMatchObject({ stopReason: "error", errorMessage: "http_error:503", output: [] });
     expect(JSON.stringify(failed)).not.toContain(key);
+    const refused = await gateway((_call, res) => { res.statusCode = 400; res.end(JSON.stringify({ error: { message: `${key} only low`, param: "quality" } })); });
+    const rejected = await generateOpenAIImages(refused.model, { input: [{ type: "text", text: "x" }] }, { apiKey: key, metadata: { [METADATA_KEY]: request } });
+    expect(rejected.errorMessage).toBe("http_error:400:quality"); expect(JSON.stringify(rejected)).not.toContain(key);
     const unsent: [Parameters<GenerateImages>[2], Model, string][] = [
       [{ metadata: { [METADATA_KEY]: request } }, model, "missing_api_key"],
       [{ apiKey: "a\nb", metadata: { [METADATA_KEY]: request } }, model, "missing_api_key"],
@@ -78,7 +82,7 @@ describe("openai-images Pi image API", () => {
   });
 
   for (const [name, body, code] of [
-    ["no images", { data: [] }, "invalid_image_response"], ["url instead of base64", { data: [{ url: "https://x/y.png" }] }, "invalid_image_response"],
+    ["no images", { data: [] }, "invalid_image_response"], ["an insecure image URL", { data: [{ url: "http://example.com/y.png" }] }, "invalid_image_response"],
     ["malformed base64", { data: [{ b64_json: "!!not" }] }, "invalid_image_response"], ["not json", "<html>", "invalid_image_response"]
   ] as const) {
     it(`rejects ${name}`, async () => {

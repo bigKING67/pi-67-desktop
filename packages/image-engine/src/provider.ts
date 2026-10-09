@@ -8,7 +8,7 @@ import { readProject } from "./project.js";
 import { readBytes } from "./raster.js";
 import { ensureDirectory, assertCandidateSlot } from "./candidate-store.js";
 import { stageCandidate, type StagedCandidate } from "./candidates.js";
-import { IMAGE_MODELS } from "./provider-profiles.js";
+import { profileAllowsModel } from "./provider-profiles.js";
 import { normalizeImage, type OutputPolicy } from "./provider-normalize.js";
 import { canonicalContracts, type ImageContracts } from "./contracts.js";
 import { ImageGenerationError, numericUsage, type ImageGenerationCall, type ImageGenerator } from "./provider-generator.js";
@@ -68,6 +68,7 @@ export async function executeProvider(root: string, spec: unknown, options: Prov
     limitations: ["Requested alias does not verify the actual upstream snapshot.", "Gateway billing and internal retries are unverified.",
       "Provider masks guide generation; deterministic composition protects pixels.", "This receipt is execution evidence, not visual approval."] };
   const canvas = isRecord(prepared.job.canvas) ? prepared.job.canvas : {};
+  let rejected: string | undefined;
   try {
     combined.throwIfAborted();
     // A price/human edit during preparation must not be charged against an old basis.
@@ -111,6 +112,7 @@ export async function executeProvider(root: string, spec: unknown, options: Prov
     receipt.outcome = receipt.outputs.length ? "partial" : signal?.aborted ? "cancelled" : "failed";
     if (error instanceof ImageGenerationError) {
       if (error.httpStatus !== undefined) parameters.http_status = error.httpStatus;
+      rejected = error.rejectedParameter;
       if (!error.sent) parameters.client_post_attempts = 0;
     }
     const message = errorMessage(error);
@@ -131,7 +133,10 @@ export async function executeProvider(root: string, spec: unknown, options: Prov
     throw new ProviderError("Provider receipt validation failed; unvalidated receipt and any received output retained. Use provider recovery; do not repeat generation.", receipt, directory);
   }
   await save("receipt.json", receiptBytes);
-  if (receipt.outcome !== "succeeded") throw new ProviderError("Provider execution failed or cancelled; see bound receipt. No automatic retry.", receipt, directory);
+  if (receipt.outcome !== "succeeded") {
+    const hint = rejected ? ` The image service rejected the request parameter \`${rejected}\`; change it before trying again.` : "";
+    throw new ProviderError(`Provider execution failed or cancelled; see bound receipt. No automatic retry.${hint}`, receipt, directory);
+  }
   const candidate = await publishProviderCandidate(root, directory, { candidateId: prepared.spec.candidate_id, request: prepared.request, receipt, receiptBytes,
     receiptFile: "receipt.json", job: prepared.job, jobBytes: prepared.jobBytes });
   return { status: "candidate", job: directory, receipt, candidate };
@@ -187,7 +192,7 @@ export async function recoverProvider(root: string, input: unknown, options: { c
   compileJob(contracts, job);
   const requestBytes = await readBytes(path.join(directory, "request.json"), 1_000_000), request = JSON.parse(requestBytes.toString("utf8")) as ProviderRequestRecord;
   if (old.job_sha256 !== sha256(jobBytes) || old.job_id !== jobId || job.job_id !== jobId ||
-      old.request_or_prompt_sha256 !== sha256(requestBytes) || !IMAGE_MODELS.includes(old.model) || old.model !== request.parameters.model ||
+      old.request_or_prompt_sha256 !== sha256(requestBytes) || !profileAllowsModel(job.provider_profile, old.model) || old.model !== request.parameters.model ||
       old.provider_profile !== job.provider_profile || old.execution_surface !== job.execution_surface) throw new Error("Recovery receipt binding mismatch");
   if (old.outcome === "succeeded") {
     // A complete output whose receipt was only just promoted (or whose publication was interrupted).

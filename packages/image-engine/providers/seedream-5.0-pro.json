@@ -1,0 +1,53 @@
+{
+  "schema_version": "creative-craft.provider.v1",
+  "profile_id": "volcengine.seedream-5.0-pro.260628",
+  "provider": "Volcengine Ark",
+  "model": "doubao-seedream-5-0-pro-260628",
+  "verified_at": "2026-10-09",
+  "authority": "official",
+  "sources": [
+    "https://www.volcengine.com/docs/82379/1541523",
+    "https://www.volcengine.com/docs/82379/1824121"
+  ],
+  "availability": {
+    "image_api_generation": true,
+    "image_api_edit": true,
+    "network_adapter_in_optional_module": true
+  },
+  "capabilities": {
+    "size": {
+      "max_edge_px": 8192,
+      "edge_multiple_px": 16,
+      "max_aspect_ratio": 16.0,
+      "min_total_pixels": 921600,
+      "max_total_pixels": 4624220,
+      "experimental_above_total_pixels": 4624220
+    },
+    "official_quality": [
+      "auto"
+    ],
+    "official_background": [
+      "opaque"
+    ],
+    "adapter_quality": [
+      "auto",
+      "low",
+      "medium",
+      "high"
+    ],
+    "adapter_background": [
+      "auto",
+      "opaque"
+    ],
+    "transparent_background": false
+  },
+  "workflow_guidance": {
+    "role": "highest-quality Seedream generation and reference-guided editing"
+  },
+  "known_limitations": [
+    "No mask API: edits send the current raster as a reference with the instruction; deterministic composite enforces protected pixels.",
+    "Quality has no Ark equivalent and is not sent.",
+    "The adapter always disables Ark's default watermark.",
+    "Result URLs expire after 24 hours; the adapter requests base64."
+  ]
+}

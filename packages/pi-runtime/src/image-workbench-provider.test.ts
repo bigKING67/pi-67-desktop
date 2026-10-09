@@ -35,6 +35,6 @@ describe("image Provider configuration", () => {
       ["gpt-image-2.5-flare", "image", "openai-images"], ["gpt-image-2.5-sunburst", "image", "openai-images"]
     ]);
     expect(Object.keys(registration.images)).toEqual(["openai-images"]);
-    expect(new Set(registration.models.map((model) => model.id))).toEqual(new Set(PROFILE_MODELS.values()));
+    for (const model of registration.models) expect([...PROFILE_MODELS.values()]).toContain(model.id);
   });
 });

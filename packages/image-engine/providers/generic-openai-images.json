@@ -1,0 +1,55 @@
+{
+  "schema_version": "creative-craft.provider.v1",
+  "profile_id": "newmoney.openai-images.generic",
+  "provider": "OpenAI-compatible",
+  "model": "*",
+  "verified_at": "2026-10-09",
+  "authority": "conservative-default",
+  "sources": [
+    "https://developers.openai.com/api/docs/guides/image-generation"
+  ],
+  "availability": {
+    "image_api_generation": true,
+    "image_api_edit": true,
+    "network_adapter_in_optional_module": true
+  },
+  "capabilities": {
+    "size": {
+      "max_edge_px": 1536,
+      "edge_multiple_px": 16,
+      "max_aspect_ratio": 1.5,
+      "min_total_pixels": 1048576,
+      "max_total_pixels": 1572864,
+      "experimental_above_total_pixels": 1572864
+    },
+    "official_quality": [
+      "auto",
+      "low",
+      "medium",
+      "high"
+    ],
+    "official_background": [
+      "auto",
+      "opaque"
+    ],
+    "adapter_quality": [
+      "auto",
+      "low",
+      "medium",
+      "high"
+    ],
+    "adapter_background": [
+      "auto",
+      "opaque"
+    ],
+    "transparent_background": false
+  },
+  "workflow_guidance": {
+    "role": "any model the user picked on an OpenAI-compatible image API, without a dedicated profile"
+  },
+  "known_limitations": [
+    "Model id comes from the user's image source; capabilities are the conservative 1024x1024 / 1536x1024 / 1024x1536 family.",
+    "Transparent output is not assumed.",
+    "Mask is guidance; deterministic composite enforces protected pixels."
+  ]
+}

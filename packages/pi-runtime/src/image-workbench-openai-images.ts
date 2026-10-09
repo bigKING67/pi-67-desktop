@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { endpointUrl, isRecord, rejectedParameter, responseImages, responseJSON } from "./image-workbench-http.js";
 
 // The `openai-images` image API for Pi (ADR 0010 decision 9): Pi resolves the
 // Provider's key and calls this through `modelRegistry.generateImages`, so no
@@ -21,9 +22,6 @@ export interface NewMoneyImageRequest {
   mask?: string;
 }
 
-const RESPONSE_LIMIT = 30_000_000;
-const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/u;
 
 export function readImageRequest(metadata: unknown): NewMoneyImageRequest {
@@ -35,26 +33,6 @@ export function readImageRequest(metadata: unknown): NewMoneyImageRequest {
   return { endpoint, size, quality, background, output_format, n, ...(typeof mask === "string" ? { mask } : {}) };
 }
 
-export function endpointUrl(baseUrl: string, endpoint: string): string {
-  let url: URL;
-  try { url = new URL(baseUrl); } catch { throw new Error("invalid_endpoint"); }
-  if (url.username || url.password || url.search || url.hash || !["http:", "https:"].includes(url.protocol) ||
-      (url.protocol === "http:" && !LOOPBACK.has(url.hostname))) throw new Error("invalid_endpoint");
-  return `${url.href.replace(/\/$/, "")}/${endpoint}`;
-}
-
-async function responseJSON(response: Response): Promise<unknown> {
-  if (Number(response.headers.get("content-length")) > RESPONSE_LIMIT) throw new Error("response_size_limit");
-  if (!response.body) throw new Error("invalid_image_response");
-  const chunks: Uint8Array[] = []; let length = 0;
-  for await (const chunk of response.body) {
-    length += chunk.length;
-    if (length > RESPONSE_LIMIT) { await response.body.cancel().catch(() => undefined); throw new Error("response_size_limit"); }
-    chunks.push(chunk);
-  }
-  try { return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown; } catch { throw new Error("invalid_image_response"); }
-}
-
 function usageOf(value: unknown): AssistantImages["usage"] {
   if (!isRecord(value)) return undefined;
   const count = (key: string): number => Number.isSafeInteger(value[key]) && (value[key] as number) >= 0 ? value[key] as number : 0;
@@ -63,6 +41,7 @@ function usageOf(value: unknown): AssistantImages["usage"] {
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } as AssistantImages["usage"];
 }
 
+export const HTTP_ERROR = /^http_error:(\d{3})(?::([A-Za-z][A-Za-z0-9_.[\]]{0,47}))?$/u;
 const KNOWN_FAILURES = new Set(["invalid_request", "invalid_endpoint", "missing_api_key", "response_size_limit", "invalid_image_response"]);
 
 /**
@@ -95,25 +74,22 @@ export const generateOpenAIImages: GenerateImages = async (model: ImageModel, co
     if (typeof body === "string") headers["Content-Type"] = "application/json";
     const response = await (options?.fetch ?? fetch)(url, { method: "POST", headers, body, redirect: "error", ...(options?.signal ? { signal: options.signal } : {}) });
     await options?.onResponse?.({ status: response.status, headers: Object.fromEntries(response.headers.entries()) }, model);
-    if (!response.ok) { await response.body?.cancel(); throw new Error(`http_error:${response.status}`); }
+    if (!response.ok) {
+      const parameter = response.status === 400 ? await rejectedParameter(response) : (await response.body?.cancel(), undefined);
+      throw new Error(`http_error:${response.status}${parameter ? `:${parameter}` : ""}`);
+    }
     const data = await responseJSON(response);
     const requestId = response.headers.get("x-request-id");
     if (requestId) result.responseId = requestId;
     const usage = usageOf(isRecord(data) ? data.usage : undefined);
     if (usage) result.usage = usage;
-    const rows = isRecord(data) && Array.isArray(data.data) ? data.data : [];
-    for (const row of rows) {
-      const encoded = isRecord(row) ? row.b64_json : undefined;
-      if (typeof encoded !== "string" || !encoded.length || encoded.length % 4 || !BASE64.test(encoded)) throw new Error("invalid_image_response");
-      result.output.push({ type: "image", mimeType: "image/png", data: encoded });
-    }
-    if (!result.output.length) throw new Error("invalid_image_response");
+    result.output = await responseImages(isRecord(data) ? data.data : undefined, options?.fetch ?? fetch, options?.signal);
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     result.output = [];
     result.stopReason = options?.signal?.aborted ? "aborted" : "error";
-    result.errorMessage = KNOWN_FAILURES.has(message) || /^http_error:\d{3}$/u.test(message) ? message : "transport_or_response_error";
+    result.errorMessage = KNOWN_FAILURES.has(message) || HTTP_ERROR.test(message) ? message : "transport_or_response_error";
     return result;
   }
 };

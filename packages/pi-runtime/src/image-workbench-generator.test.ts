@@ -35,6 +35,7 @@ describe("Pi image generator adapter", () => {
   it("maps Pi failures to engine failures, marking unsent ones", async () => {
     const cases: [string, Partial<ImageGenerationError>][] = [
       ["http_error:429", { code: "http_error", httpStatus: 429, sent: true }],
+      ["http_error:400:quality", { code: "http_error", httpStatus: 400, sent: true, rejectedParameter: "quality" }],
       ["Provider is not configured: newmoney-images", { code: "provider_unavailable", sent: false }],
       ["No API key for provider: newmoney-images", { code: "provider_unavailable", sent: false }],
       ["missing_api_key", { code: "provider_unavailable", sent: false }], ["invalid_endpoint", { code: "provider_unavailable", sent: false }],
