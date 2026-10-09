@@ -45,12 +45,12 @@ decisions in ADR 0010.
 - [x] 3. Renderer `图像` entry and library view: card grid (thumbnail, title,
       size, revisions, pending candidates, updated), sort by recent, empty state
       with `新建图像项目` and `从图片开始`.
-- [ ] 4. Project page: read-only canvas from content-addressed previews, fit and
+- [x] 4. Project page: read-only canvas from content-addressed previews, fit and
       zoom, selection highlight; bottom dock with the candidate strip and the
       project conversation carrying the structured image context.
 - [x] 5. Direct edits: text and position edits as revision batches (300 ms
       coalescing), undo/redo as `revert_to`, conflict draft handling.
-- [ ] 6. Candidates and export: preview, accept, discard, stale handling;
+- [x] 6. Candidates and export: preview, accept, discard, stale handling;
       export original size with the receipt listed.
 - [ ] 7. Authority docs (PRODUCT, DESIGN), packaged visual verification, flow A
       end to end with a real request, Windows packaged smoke.
@@ -90,4 +90,13 @@ it in the tree, and no project content is ever deleted by Desktop.
   canvas. Open decision: the app renders one live conversation (the selected task), so a
   dock conversation means making the project's library conversation the selected task
   while the image page is open; proposed to the user before implementing.
+- 2026-10-09: checkpoints 4 and 6 complete after the user chose the embedded
+  conversation. Opening a project selects its library conversation (a draft until the
+  first message; the Host then remembers it in the work folder), and the dock renders
+  the ordinary transcript and composer; prompts carry `<image-context>`, hidden again in
+  the transcript. Verified in the packaged app: the draft conversation and composer
+  appear in the dock and `图像` stays open. Not verified: a real message from the dock
+  (offline preview has no model); the TitleBar still shows the conversation title, not
+  the project (product model §5.4, left for P3). Next: checkpoint 7 with the user's
+  real models (flow A end to end, also P1 checkpoint 8) and Windows packaged smoke.
 
