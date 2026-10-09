@@ -209,6 +209,21 @@ Application-level surfaces use a separate wide-window shell:
 +----------------------+-----------------------------------------------------+
 ```
 
+- Image workbench (ADR 0010, P2, 2026-10-09): in Work mode an `图像` rail row (image
+  glyph, 32px, rail-row anatomy like `动态`) sits above `搜索对话`; selecting it
+  replaces the center with the creative library and hides the Inspector, and choosing
+  any conversation, Workspace or Settings leaves it. The library uses the Settings
+  frame (`min(1040px, 100%)`): title `创作库` with the folder name as one tertiary line,
+  `从图片开始` as the primary action, and a card grid (auto-fill, 210px minimum) whose
+  thumbnails share one 4:5 well on the muted surface with the image contained, then
+  title and one tertiary meta line (`宽×高 · 修订 N · N 个候选待选 · 时间`). The library
+  Workspace never appears in the folder tree, counts or pickers. A project page has a
+  header (back to `创作库`, title, meta, undo/redo icon actions, `导出 PNG`), the fitted
+  canvas on the muted well with invisible object handles that show the accent border on
+  hover or selection (dashed when locked), a selection bar (text field + `应用`, or a
+  locked/move hint), and a dock: candidates (4:5 tiles, status text, accept/discard)
+  beside the project conversation. Previewing a candidate shows a floating
+  `正在预览候选，项目尚未改变` badge and never changes the revision.
 - The navigation rail is the only Workspace and conversation switcher. Each
   Workspace is a collapsible group containing active tasks, waiting tasks,
   provisional drafts, and Catalog-backed recent Sessions. Workspace groups use

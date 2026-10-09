@@ -1468,6 +1468,15 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   If helper configuration or execution fails, the main model is not invoked; the
   failed pending Turn and its Task-scoped claimed attachment set remain available
   for an explicit retry with a new submission identity.
+- Image workbench P2 (ADR 0010): `图像` opens the creative library, a directory the user
+  picks once (Windows prefills the first non-system drive) and Desktop registers as a
+  trusted Workspace hidden from the folder tree. `从图片开始` stages one PNG/JPEG/WebP photo
+  through the attachment pipeline (the renderer never sends a path) and creates a project
+  whose canvas fits the photo plus a 320px title band. On a project page a person moves
+  unlocked objects (drag or arrow keys, one revision each), edits text, undoes and redoes
+  (`revert_to`, never rewriting history), previews, accepts or discards candidates (stale
+  ones cannot be accepted), and exports the current revision as a full-size PNG that Main
+  re-verifies before saving. A revision conflict refreshes the canvas and keeps the draft.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

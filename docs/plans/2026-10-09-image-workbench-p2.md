@@ -42,13 +42,13 @@ decisions in ADR 0010.
       attachment (the renderer never sends a path); export is a full-size
       `image.project.render` plus Main's digest-verified `pi67:image-save`, so no
       second render command; protocol revision.
-- [ ] 3. Renderer `图像` entry and library view: card grid (thumbnail, title,
+- [x] 3. Renderer `图像` entry and library view: card grid (thumbnail, title,
       size, revisions, pending candidates, updated), sort by recent, empty state
       with `新建图像项目` and `从图片开始`.
 - [ ] 4. Project page: read-only canvas from content-addressed previews, fit and
       zoom, selection highlight; bottom dock with the candidate strip and the
       project conversation carrying the structured image context.
-- [ ] 5. Direct edits: text and position edits as revision batches (300 ms
+- [x] 5. Direct edits: text and position edits as revision batches (300 ms
       coalescing), undo/redo as `revert_to`, conflict draft handling.
 - [ ] 6. Candidates and export: preview, accept, discard, stale handling;
       export original size with the receipt listed.
@@ -81,4 +81,13 @@ it in the tree, and no project content is ever deleted by Desktop.
   set it and removing the Workspace clears it. Registering never makes the
   library the current or an expanded Workspace. Windows prefills the first
   non-system drive. Next: checkpoint 3 (renderer entry, tree filtering, library).
+- 2026-10-09: checkpoints 3 and 5 complete; 4 and 6 partly (canvas, candidate strip,
+  accept/discard and export done; the dock conversation is not). Verified in the packaged
+  app through an isolated preview seeded with a library and two projects: library cards,
+  project page, a text edit (revision 3, author `human`), stale candidate handling and
+  undo (revision 4 restores the headline). Found while verifying: create-photo refused
+  most real photos (fixed by fitting the canvas), uneven card widths, an overflowing
+  canvas. Open decision: the app renders one live conversation (the selected task), so a
+  dock conversation means making the project's library conversation the selected task
+  while the image page is open; proposed to the user before implementing.
 
