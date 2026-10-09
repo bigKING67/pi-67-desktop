@@ -1,4 +1,5 @@
 import { existsSync, watch, type FSWatcher } from "node:fs";
+import { readdir } from "node:fs/promises";
 import { isImageId, type ImageCandidateListStatus } from "@pi67/domain";
 import type { AgentEvent, ImageEventPayloads } from "@pi67/protocol";
 
@@ -28,6 +29,7 @@ export class ImageProjectWatcher {
   private readonly revisions = new Map<string, number>();
   private readonly candidates = new Map<string, ImageCandidateListStatus>();
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly baselines = new Map<string, Promise<void>>();
   private disposed = false;
 
   constructor(private readonly options: ImageProjectWatcherOptions) {}
@@ -40,6 +42,7 @@ export class ImageProjectWatcher {
       const watcher = (this.options.watch ?? defaultWatch)(directory, (_type, filename) => this.changed(workspaceId, cwd, engine, filename));
       watcher.on("error", () => this.stop(workspaceId));
       this.watchers.set(workspaceId, watcher);
+      this.baselines.set(workspaceId, this.baseline(workspaceId, cwd, engine, directory));
     } catch { /* Unsupported or vanished folder: explicit refreshes still work. */ }
   }
 
@@ -62,6 +65,23 @@ export class ImageProjectWatcher {
   private stop(workspaceId: string): void {
     this.watchers.get(workspaceId)?.close();
     this.watchers.delete(workspaceId);
+    this.baselines.delete(workspaceId);
+  }
+
+  // macOS may deliver file events from before the watch started. Recording what is on disk
+  // when watching begins keeps those from being announced as changes; a change landing
+  // during this read is reflected by the list the renderer loads anyway.
+  private async baseline(workspaceId: string, cwd: string, engine: ImageEngine, directory: string): Promise<void> {
+    let entries: string[];
+    try { entries = (await readdir(directory, { withFileTypes: true })).filter((entry) => entry.isDirectory() && isImageId(entry.name)).map((entry) => entry.name); }
+    catch { return; }
+    for (const projectId of entries) {
+      try {
+        const root = engine.projectRoot(cwd, projectId);
+        this.noteRevision(workspaceId, projectId, (await engine.readProject(root)).document.revision);
+        for (const item of await engine.listCandidates(root)) this.noteCandidate(workspaceId, projectId, "candidate" in item ? item.candidate.id : item.candidate_id, item.status);
+      } catch { /* An unreadable project is announced once it reads cleanly. */ }
+    }
   }
 
   private changed(workspaceId: string, cwd: string, engine: ImageEngine, filename: string | null): void {
@@ -79,6 +99,7 @@ export class ImageProjectWatcher {
   private async announce(workspaceId: string, cwd: string, engine: ImageEngine, projectId: string): Promise<void> {
     const root = engine.projectRoot(cwd, projectId), key = projectKey(workspaceId, projectId);
     try {
+      await this.baselines.get(workspaceId);
       const project = await engine.readProject(root);
       if (this.disposed) return;
       if ((this.revisions.get(key) ?? 0) < project.document.revision) {

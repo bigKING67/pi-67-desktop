@@ -20,6 +20,11 @@ async function workspaceWithProject(): Promise<{ cwd: string; root: string }> {
     objects: [{ id: "background", kind: "image", locked: false, visible: true, x: 0, y: 0, width: 128, height: 128, opacity: 1, asset_id: "background", fit: "cover" }] });
   return { cwd, root };
 }
+async function emptyDirectory(): Promise<string> {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "image-watch-empty-"));
+  onTestFinished(() => fs.rm(directory, { recursive: true, force: true }));
+  return directory;
+}
 const projectEvents = (events: AgentEvent[]) => events.filter((item) => item.type === "image.project.changed").map((item) => item.payload);
 
 describe("image project watcher", { timeout: 60_000 }, () => {
@@ -58,14 +63,30 @@ describe("image project watcher", { timeout: 60_000 }, () => {
     expect(events).toEqual([]);
   });
 
+  it("baselines what is on disk when watching starts, so replayed creation events stay quiet", async () => {
+    const { cwd, root } = await workspaceWithProject();
+    let listener: ((type: string, name: string | null) => void) | undefined;
+    const emit = vi.fn();
+    const watcher = new ImageProjectWatcher({ emit, debounceMs: 10, watch: (_dir, next) => { listener = next; return { close: vi.fn(), on: vi.fn() }; } });
+    onTestFinished(() => watcher.dispose());
+    watcher.ensure("w1", cwd, engine);
+    listener?.("rename", "poster/revisions/000001.json");
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(emit).not.toHaveBeenCalled();
+    await engine.editBatch(root, { base_revision: 1, author: "agent", summary: "改", operations: [{ type: "update_object", id: "background", patch: { x: 0 } }] });
+    listener?.("rename", "poster/revisions/000002.json");
+    await vi.waitFor(() => expect(emit).toHaveBeenCalledWith("w1", expect.objectContaining({ type: "image.project.changed", payload: expect.objectContaining({ revision: 2, author: "agent" }) })));
+  });
+
   it("debounces bursts, ignores unrelated paths and survives unreadable projects", async () => {
+    const empty = await emptyDirectory();
     vi.useFakeTimers(); onTestFinished(() => { vi.useRealTimers(); });
     let listener: ((type: string, name: string | null) => void) | undefined;
     const fake = { close: vi.fn(), on: vi.fn() };
     const emit = vi.fn();
     const watcher = new ImageProjectWatcher({ emit, debounceMs: 50, watch: (_dir, next) => { listener = next; return fake; } });
     const readProject = vi.fn(() => Promise.resolve({ document: { revision: 4, change: { author: "agent" } }, sha256: "s" }));
-    const fakeEngine = { projectsDirectory: () => os.tmpdir(), projectRoot: (_cwd: string, id: string) => `/p/${id}`, readProject, listCandidates: () => Promise.resolve([]) } as unknown as typeof engine;
+    const fakeEngine = { projectsDirectory: () => empty, projectRoot: (_cwd: string, id: string) => `/p/${id}`, readProject, listCandidates: () => Promise.resolve([]) } as unknown as typeof engine;
     watcher.ensure("w1", "/cwd", fakeEngine);
     watcher.ensure("w1", "/cwd", fakeEngine);
     for (const name of ["poster/revisions/000004.json", "poster\\revisions\\000004.json", "poster/candidates/x/candidate.json"]) listener?.("rename", name);
@@ -84,7 +105,8 @@ describe("image project watcher", { timeout: 60_000 }, () => {
     expect(readProject).toHaveBeenCalledTimes(2);
   });
 
-  it("skips missing folders, respects the workspace cap and stops on watcher errors", () => {
+  it("skips missing folders, respects the workspace cap and stops on watcher errors", async () => {
+    const empty = await emptyDirectory();
     const handlers: Record<string, () => void> = {};
     const close = vi.fn();
     const fake = { close, on: (name: string, handler: () => void) => { handlers[name] = handler; return fake; } } as unknown as Pick<FSWatcher, "close" | "on">;
@@ -93,14 +115,14 @@ describe("image project watcher", { timeout: 60_000 }, () => {
     const at = (dir: string) => ({ projectsDirectory: () => dir }) as unknown as typeof engine;
     watcher.ensure("missing", "/cwd", at("/definitely/missing/image-folder"));
     expect(watch).not.toHaveBeenCalled();
-    watcher.ensure("w1", "/cwd", at(os.tmpdir()));
-    watcher.ensure("w2", "/cwd", at(os.tmpdir()));
+    watcher.ensure("w1", "/cwd", at(empty));
+    watcher.ensure("w2", "/cwd", at(empty));
     expect(watch).toHaveBeenCalledTimes(1);
     handlers.error?.();
     expect(close).toHaveBeenCalledTimes(1);
-    watcher.ensure("w2", "/cwd", at(os.tmpdir()));
+    watcher.ensure("w2", "/cwd", at(empty));
     expect(watch).toHaveBeenCalledTimes(2);
     const throwing = new ImageProjectWatcher({ emit: vi.fn(), watch: () => { throw new Error("unsupported"); } });
-    expect(() => throwing.ensure("w1", "/cwd", at(os.tmpdir()))).not.toThrow();
+    expect(() => throwing.ensure("w1", "/cwd", at(empty))).not.toThrow();
   });
 });
