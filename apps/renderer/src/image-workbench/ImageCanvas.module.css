@@ -54,3 +54,58 @@
 .locked.selected {
   border-style: dashed;
 }
+
+/* Resize handles sit above every box; only the squares take the pointer. */
+.handles {
+  position: absolute;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.handle {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  margin: -5px 0 0 -5px;
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  background: var(--surface);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+/* A 9px square with a 24px hit area. */
+.handle::after {
+  position: absolute;
+  inset: -8px;
+  content: "";
+}
+
+.handle[data-handle="nw"] { top: 0; left: 0; cursor: nwse-resize; }
+.handle[data-handle="n"] { top: 0; left: 50%; cursor: ns-resize; }
+.handle[data-handle="ne"] { top: 0; left: 100%; cursor: nesw-resize; }
+.handle[data-handle="e"] { top: 50%; left: 100%; cursor: ew-resize; }
+.handle[data-handle="se"] { top: 100%; left: 100%; cursor: nwse-resize; }
+.handle[data-handle="s"] { top: 100%; left: 50%; cursor: ns-resize; }
+.handle[data-handle="sw"] { top: 100%; left: 0; cursor: nesw-resize; }
+.handle[data-handle="w"] { top: 50%; left: 0; cursor: ew-resize; }
+
+/* Snap guides: one accent hairline across the whole canvas while the gesture lasts. */
+.guide {
+  position: absolute;
+  z-index: 10001;
+  background: var(--focus);
+  pointer-events: none;
+}
+
+.guide[data-axis="x"] {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+.guide[data-axis="y"] {
+  right: 0;
+  left: 0;
+  height: 1px;
+}

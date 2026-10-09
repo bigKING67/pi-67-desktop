@@ -42,7 +42,7 @@ export function bindImageProjectConversation(projectId: string): () => void {
     const task = selectedWorkbenchTask(state);
     const project = useImageProject.getState();
     if (!task || task.workspaceId !== state.imageLibraryWorkspaceId || project.projectId !== projectId || project.revision === undefined) return undefined;
-    return formatImagePromptContext({ projectId, revision: project.revision, selectedObjectIds: project.selectedObjectId ? [project.selectedObjectId] : [], marks: [], references: [] });
+    return formatImagePromptContext({ projectId, revision: project.revision, selectedObjectIds: project.selectedObjectIds, marks: [], references: [] });
   });
   const unsubscribe = rendererWorkbenchStore.subscribe((state) => {
     const task = selectedWorkbenchTask(state);

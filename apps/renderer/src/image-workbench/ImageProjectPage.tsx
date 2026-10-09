@@ -9,7 +9,7 @@ import {
   discardCandidate,
   exportImageProject,
   inspectCandidate,
-  editImageProject,
+  editImageProjectWithNotice,
   loadImageProject,
   redoImageEdit,
   selectImageObject,
@@ -23,6 +23,8 @@ import { ImageProjectConversationDock } from "./ImageProjectConversationDock.js"
 import { imagePreviewUrl } from "./image-workbench-controller.js";
 import { useImageWorkbench } from "./image-workbench-store.js";
 import styles from "./ImageProjectPage.module.css";
+
+const NO_SELECTION: readonly string[] = [];
 
 const STATUS_LABELS: Record<ImageCandidateListStatus, string> = {
   ready: "待选", stale: "已过期", accepted: "已接受", discarded: "已丢弃", decision_pending: "待恢复", incomplete: "未完成", unreadable: "无法读取"
@@ -40,7 +42,7 @@ export function ImageProjectPage({ projectId }: { projectId: string }) {
   const inspecting = useImageProject((state) => state.inspecting);
   const error = useImageProject((state) => state.error);
   const busy = useImageProject((state) => state.busy);
-  const selectedId = useImageProject((state) => state.selectedObjectId);
+  const selectedIds = useImageProject((state) => state.selectedObjectIds);
   const canUndo = useImageProject((state) => state.back.length > 0 || (state.revision ?? 0) > 1);
   const canRedo = useImageProject((state) => state.forward.length > 0);
 
@@ -82,16 +84,17 @@ export function ImageProjectPage({ projectId }: { projectId: string }) {
             alt={inspecting ? "候选预览" : `${document?.title ?? "图像"} 修订 ${revision}`}
             document={document}
             editable={!inspecting && !busy}
-            selectedId={inspecting ? undefined : selectedId}
+            selectedIds={inspecting ? NO_SELECTION : selectedIds}
             src={shown && libraryId ? imagePreviewUrl(libraryId, projectId, shown.pngSha256) : undefined}
-            onMove={(objectId, x, y) => void editImageProject("移动", [{ type: "update_object", id: objectId, patch: { x, y } }])}
+            onEdit={(summary, operations) => void editImageProjectWithNotice(summary, operations)}
             onSelect={selectImageObject}
           />
         )}
         {!error && !shown ? <p className={styles.stageStatus} role="status">正在渲染…</p> : null}
         {inspecting ? <span className={styles.inspectingBadge}>正在预览候选，项目尚未改变</span> : null}
       </div>
-      <ImageSelectionBar busy={busy} object={inspecting ? undefined : document?.objects.find((object) => object.id === selectedId)} />
+      <ImageSelectionBar busy={busy} count={inspecting ? 0 : selectedIds.length}
+        object={inspecting || selectedIds.length !== 1 ? undefined : document?.objects.find((object) => object.id === selectedIds[0])} />
       <div className={styles.dock}>
         <section aria-label="候选" className={styles.candidates}>
           <h2>候选</h2>

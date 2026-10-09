@@ -69,6 +69,7 @@
 
 .layerName[data-focus-visible],
 .layerAction[data-focus-visible],
+.alignAction[data-focus-visible],
 .historyAction[data-focus-visible],
 .segment[data-focus-visible] {
   outline: none;
@@ -175,6 +176,74 @@
   background: var(--surface);
   color: var(--text-primary);
   box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+.objectHead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  margin-right: -4px;
+}
+
+.objectHead .sectionLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice {
+  margin: 0;
+  color: var(--warning);
+  font-size: var(--font-size-caption);
+  line-height: 1.5;
+}
+
+.alignTools {
+  display: grid;
+  gap: 6px;
+}
+
+.alignGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+
+.alignCaption {
+  min-width: 56px;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+}
+
+.alignAction {
+  display: inline-grid;
+  width: 32px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.alignAction[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.alignAction[data-disabled] {
+  opacity: 0.4;
+}
+
+.tooltip {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-composer);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
 }
 
 /* 历史 and 候选 */

@@ -36,7 +36,7 @@ export presets and user fonts. Product model §6–§8 and §17 (P3 row).
 ## Checkpoints
 
 - [x] 1. Image Inspector shell with 图层, 属性 and 历史; TitleBar shows `创作库` / project.
-- [ ] 2. Transform handles, snapping and multi-select alignment.
+- [x] 2. Transform handles, snapping and multi-select alignment.
 - [ ] 3. Inline text editing on the canvas.
 - [ ] 4. Marks (mark-and-rework) and reference slots in the structured context.
 - [ ] 5. 候选 and 导出 tabs: candidate receipts, comparison, multi-size export presets.
@@ -62,3 +62,13 @@ the image Inspector returns the P2 page; no project content is rewritten.
   visible: the 图层 selector returned a fresh `[]` before the document loaded. Fixed
   with a stable empty list and a regression test; the reopen path is verified in the
   packaged preview.
+- 2026-10-09: checkpoint 2 done. Pure geometry (`image-canvas-geometry.ts`: clamp,
+  snap, resize with aspect, align, distribute) with unit tests; multi-select state
+  (`selectedObjectIds`), resize handles, snap guides, align/distribute in 属性 and
+  canvas size/background fields. Fixed on the way: drags could leave objects partly
+  off-canvas (the engine refuses those, silently before); object boxes stacked in
+  reverse paint order so the photo took clicks meant for text; property ranges now
+  match the engine (字号 8–500, 行高 1–2); refusals read as product copy. Packaged
+  preview, driven over CDP: centre snap (guide at x=540, lands at 410), Shift resize
+  260×120 → 303×140, three-object 左对齐 as one revision, ⌘Z, canvas background
+  change and a refused canvas width that keeps the field with the reason.

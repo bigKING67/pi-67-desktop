@@ -9,18 +9,19 @@ import styles from "./ImageProjectPage.module.css";
  * What the selected object allows in P2: text objects change their words
  * directly; locked objects (the photo) say so. A conflict keeps the draft.
  */
-export function ImageSelectionBar({ object, busy }: { object: ImageSceneObject | undefined; busy: boolean }) {
+export function ImageSelectionBar({ object, count, busy }: { object: ImageSceneObject | undefined; count: number; busy: boolean }) {
   const [draft, setDraft] = useState("");
   const [notice, setNotice] = useState<string>();
   const [saving, setSaving] = useState(false);
   const objectText = object?.kind === "text" ? object.text : undefined;
   useEffect(() => { setDraft(objectText ?? ""); setNotice(undefined); }, [object?.id, objectText]);
 
-  if (!object) return <p className={styles.selectionHint}>点选画布上的文字可以直接改字，拖动可以移动；照片层默认锁定。</p>;
+  if (count > 1) return <p className={styles.selectionHint}>已选 {count} 个对象：一起拖动或用方向键移动，在属性里对齐。</p>;
+  if (!object) return <p className={styles.selectionHint}>点选画布上的文字可以直接改字，拖动可以移动，按住 Shift 多选；照片层默认锁定。</p>;
   if (object.kind !== "text") {
     return (
       <p className={styles.selectionHint}>
-        {object.locked ? <><Lock aria-hidden="true" size={12} /> {object.kind === "image" ? "照片" : "形状"}已锁定，保持原样</> : "拖动或用方向键移动（Shift 每次 10px）"}
+        {object.locked ? <><Lock aria-hidden="true" size={12} /> {object.kind === "image" ? "照片" : "形状"}已锁定，保持原样</> : "拖动或用方向键移动（Shift 每次 10px），拖角上的手柄调整大小"}
       </p>
     );
   }

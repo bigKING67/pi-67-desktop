@@ -1479,7 +1479,11 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   re-verifies before saving. A revision conflict refreshes the canvas and keeps the draft.
   P3 adds the image Inspector: layers (visibility, lock, order), properties (position,
   size, opacity, text and shape fields, each change one revision), candidates, history
-  with `回到此修订` (`revert_to`), and export.
+  with `回到此修订` (`revert_to`), and export. On the canvas a person multi-selects with
+  Shift, resizes from handles (Shift keeps the ratio), and moves with snapping to the
+  canvas and other objects; 属性 aligns or distributes the selection and edits the
+  canvas size and background. Every result stays wholly on the canvas, as the engine
+  requires, and an engine refusal is shown in product words instead of being dropped.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

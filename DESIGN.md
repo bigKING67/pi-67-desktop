@@ -235,6 +235,20 @@ Application-level surfaces use a separate wide-window shell:
   and background. `历史` lists revisions newest first (author glyph, `修订 N`, `人 /
   Agent / 系统 · time`, summary, `回到此修订` or `当前`). Canvas selection uses a
   two-tone outline (accent line, surface halo) so it reads on any pixels.
+- Image canvas manipulation (P3, 2026-10-09): Shift-click on the canvas or in `图层`
+  builds a selection (the last is primary). One unlocked selected object shows eight
+  9px handles (surface fill, accent border, 24px hit area); dragging a handle resizes
+  with the opposite edge fixed, and Shift keeps the ratio on corners. Moves and
+  resizes snap within 6 screen px to the canvas edges and centre and to other
+  objects' edges and centres, drawing 1px `--focus` guides across the canvas; ⌘/Ctrl
+  places freely. Every result stays wholly on the canvas, and each gesture is one
+  revision. Arrows move the selection (Shift ×10), Alt + arrows resize the focused
+  object, Escape clears. `属性` shows the canvas (宽, 高, 背景) when nothing is
+  selected, `已选 N 个对象` with an `对齐` row (six 32×30 icon actions with tooltips)
+  and a `分布` row (enabled from three movable objects) for several, and `对齐画布`
+  under one object's fields. Locked objects stay put. A refused change keeps the
+  field with the danger border and one warning-coloured line naming the reason in
+  product words; canvas gestures report refusals as a warning notice.
 - The navigation rail is the only Workspace and conversation switcher. Each
   Workspace is a collapsible group containing active tasks, waiting tasks,
   provisional drafts, and Catalog-backed recent Sessions. Workspace groups use
