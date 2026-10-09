@@ -147,15 +147,25 @@ describe("photo projects", { timeout: 180_000 }, () => {
     }
   });
 
-  it("minimal brief uses the default canvas; EXIF orientation keeps native size and original encoded bytes", async () => {
+  it("fits a large phone photo at native size without a canvas, and still refuses an explicit canvas it does not fit", async () => {
+    const { directory } = await fixture();
+    const large = path.join(directory, "phone.jpg");
+    await sharp({ create: { width: 3024, height: 4032, channels: 3, background: "#b8a990" } }).jpeg().toFile(large);
+    const created = await createPhotoProject(path.join(directory, "phone"), { project_id: "phone", source: large, headline: "春日" });
+    expect(created.document.canvas).toMatchObject({ width: 3024, height: 4352 });
+    expect(objectById(created.document, "photo")).toMatchObject({ x: 0, y: 320, width: 3024, height: 4032, locked: true });
+    await expect(createPhotoProject(path.join(directory, "small"), { project_id: "small", source: large, headline: "x", canvas: { width: 1280, height: 1600 } })).rejects.toThrow(/does not fit below the 320px header/);
+  });
+
+  it("minimal brief fits the canvas to the photo plus the header; EXIF orientation keeps native size and original encoded bytes", async () => {
     const { directory, root, source } = await fixture();
     const rotated = path.join(directory, "oriented.jpg");
     await sharp(source).jpeg().withMetadata({ orientation: 6 }).toFile(rotated);
     const created = await createPhotoProject(root, { project_id: "minimal", source: rotated, headline: "光", title: "照片起稿" });
-    expect(created.document.canvas).toEqual({ width: 1280, height: 1600, background: "#ffffff" });
+    expect(created.document.canvas).toEqual({ width: 640, height: 416, background: "#ffffff" });
     expect(created.document.objects).toHaveLength(2);
     const photo = photoOf(created.document);
-    expect([photo.width, photo.height, photo.x, photo.y]).toEqual([64, 96, 608, 912]);
+    expect([photo.width, photo.height, photo.x, photo.y]).toEqual([64, 96, 288, 320]);
     expect(await fs.readFile(path.join(root, created.document.assets[0]?.file ?? ""))).toEqual(await fs.readFile(rotated));
     await renderProject(root, path.join(directory, "render"));
     const expected = await sharp(rotated).rotate().toColourspace("srgb").ensureAlpha().raw().toBuffer();

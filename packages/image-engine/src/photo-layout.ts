@@ -29,13 +29,15 @@ export async function preparePhotoProject(value: unknown): Promise<PreparedPhoto
   const template = Object.hasOwn(value, "template") ? templateCanvas(value.template) : undefined;
   // Explicit null is malformed, not a request for the default.
   if (Object.hasOwn(value, "canvas")) record(value.canvas, ["width", "height"], "photo canvas");
-  const canvas = (brief.canvas ?? template ?? { width: 1280, height: 1600 }) as { width: number; height: number };
-  number(canvas.width, "photo canvas.width", 640, 8192, true);
-  number(canvas.height, "photo canvas.height", 384, 8192, true);
-  if (canvas.width * canvas.height > LIMITS.pixels) throw new Error("Canvas pixel limit exceeded");
   const imported = await importRaster({ id: "photo", source: brief.source });
   const { width, height } = imported.asset;
   const header = 320;
+  // Without an explicit canvas the canvas fits the photo plus the header (New Money: the
+  // creative-craft default of 1280x1600 refused most real photos). The photo is never scaled.
+  const canvas = (brief.canvas ?? template ?? { width: Math.max(640, width), height: Math.max(384, height + header) }) as { width: number; height: number };
+  number(canvas.width, "photo canvas.width", 640, 8192, true);
+  number(canvas.height, "photo canvas.height", 384, 8192, true);
+  if (canvas.width * canvas.height > LIMITS.pixels) throw new Error("Canvas pixel limit exceeded");
   if (!template && (width > canvas.width || height > canvas.height - header)) {
     throw new Error(`Photo ${width}x${height} does not fit below the ${header}px header; supply canvas.width >= ${Math.max(640, width)} and canvas.height >= ${Math.max(384, height + header)}. No automatic resize or crop.`);
   }

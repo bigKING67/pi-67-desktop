@@ -39,7 +39,7 @@ export function ImageLibrary() {
       <header className={styles.libraryHeader}>
         <span className={styles.libraryHeading}>
           <h1 id="image-library-title">创作库</h1>
-          {library ? <span className={styles.libraryPath} title={library.identity.canonicalPath}>{library.identity.canonicalPath}</span> : null}
+          {library ? <span className={styles.libraryPath} title={library.identity.canonicalPath}>{library.identity.canonicalPath.split(/[\\/]/u).filter(Boolean).at(-1)}</span> : null}
         </span>
         {library && projects.length > 0 ? fromPhoto : null}
       </header>
@@ -88,7 +88,7 @@ function ProjectCard({ libraryId, project }: { libraryId: string; project: Image
   return (
     <li>
       <Button aria-label={`打开 ${project.title}`} className={styles.card!} onPress={() => openProject(project.projectId)}>
-        <span className={styles.cardMedia} style={{ aspectRatio: `${width} / ${height}` }}>
+        <span className={styles.cardMedia}>
           {thumbnail ? <img alt="" decoding="async" loading="lazy" src={imagePreviewUrl(libraryId, project.projectId, thumbnail.pngSha256)} /> : null}
         </span>
         <span className={styles.cardTitle}>{project.title}</span>
