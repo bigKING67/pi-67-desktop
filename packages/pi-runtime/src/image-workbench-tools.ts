@@ -2,13 +2,9 @@ import * as fs from "node:fs/promises";
 import path from "node:path";
 import { Type, type TSchema } from "typebox";
 import { IMAGE_PROVIDER_ID, imageCandidateActions } from "@pi67/domain";
-import {
-  acceptCandidate, createPhotoProject, discardCandidate, editBatch, ensureProjectParent, executeProvider, listCandidates, PROFILE_MODELS, projectRoot, readProject,
-  renderProject, workDirectory,
-  type ImageDocument, type ImageGenerator
-} from "@pi67/image-engine";
-import type { ExtensionAPI } from "@pi67/pi-runtime/pi-sdk-types";
-import { createPiImageGenerator, type ImageRegistry } from "./pi-image-generator.js";
+import type { ImageDocument, ImageGenerator } from "@pi67/image-engine";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createPiImageGenerator, type ImageRegistry } from "./image-workbench-generator.js";
 
 type ToolDefinition = Parameters<ExtensionAPI["registerTool"]>[0];
 type ToolContext = Parameters<ToolDefinition["execute"]>[4];
@@ -18,6 +14,11 @@ type Params = Record<string, unknown>;
 const text = (value: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(value) }], details: value as never });
 const str = (params: Params, key: string): string => { const value = params[key]; if (typeof value !== "string" || !value) throw new Error(`${key} is required`); return value; };
 const int = (params: Params, key: string): number => { const value = params[key]; if (!Number.isInteger(value)) throw new Error(`${key} must be an integer`); return value as number; };
+// Sharp, resvg and the font load on the first image call, never with the session.
+const loadEngine = () => import("@pi67/image-engine");
+type Engine = Awaited<ReturnType<typeof loadEngine>>;
+/** Local files the tools read resolve against the session's Workspace, as the safety policy does. */
+const local = (cwd: string, value: unknown): unknown => typeof value === "string" ? path.resolve(cwd, value) : value;
 
 /** A compact view the model can reason about without re-reading revision files. */
 function documentSummary(doc: ImageDocument, latestRevision: number): Record<string, unknown> {
@@ -34,8 +35,8 @@ function documentSummary(doc: ImageDocument, latestRevision: number): Record<str
 }
 
 /** Resolves the Pi image model for an Image Job's Provider profile, if the user configured one. */
-async function piGenerator(ctx: Pick<ToolContext, "modelRegistry">, providerProfile: unknown): Promise<ImageGenerator | undefined> {
-  const modelId = typeof providerProfile === "string" ? PROFILE_MODELS.get(providerProfile) : undefined;
+async function piGenerator(engine: Engine, ctx: Pick<ToolContext, "modelRegistry">, providerProfile: unknown): Promise<ImageGenerator | undefined> {
+  const modelId = typeof providerProfile === "string" ? engine.PROFILE_MODELS.get(providerProfile) : undefined;
   if (!modelId) return undefined;
   const available = await ctx.modelRegistry.getAvailableOfType("image", IMAGE_PROVIDER_ID);
   const model = available.find((candidate) => candidate.id === modelId);
@@ -52,18 +53,18 @@ export function imageTools(): ToolDefinition[] {
       description: "Create an editable image project from one local product photo. The photo stays locked at native size; headline, brand and caption become editable text objects.",
       promptSnippet: "Create an editable image project from a local photo",
       parameters: Type.Object({
-        project_id: projectId, source: Type.String({ description: "Absolute path of an opaque PNG, JPEG or WebP photo." }),
+        project_id: projectId, source: Type.String({ description: "Path of an opaque PNG, JPEG or WebP photo, absolute or relative to the Workspace." }),
         headline: Type.String(), brand: optional(Type.String()), caption: optional(Type.String()), title: optional(Type.String()),
         template: optional(Type.Union([Type.Literal("brand-detail"), Type.Literal("xiaohongshu-cover")])),
         background: optional(Type.String({ description: "#RRGGBB canvas background." })), dry_run: optional(Type.Boolean())
       }),
       async execute(_id, raw, _signal, _update, ctx) {
-        const params = raw as Params, id = str(params, "project_id"), root = projectRoot(ctx.cwd, id);
-        const brief: Params = { project_id: id, source: str(params, "source"), headline: str(params, "headline") };
+        const params = raw as Params, id = str(params, "project_id"), engine = await loadEngine(), root = engine.projectRoot(ctx.cwd, id);
+        const brief: Params = { project_id: id, source: local(ctx.cwd, str(params, "source")), headline: str(params, "headline") };
         for (const key of ["brand", "caption", "title", "template", "background"]) if (params[key] !== undefined) brief[key] = params[key];
         // The engine needs the container folder even for a dry run; only that empty folder is created.
-        await ensureProjectParent(root);
-        const created = await createPhotoProject(root, brief, { dryRun: params.dry_run === true });
+        await engine.ensureProjectParent(root);
+        const created = await engine.createPhotoProject(root, brief, { dryRun: params.dry_run === true });
         return text({ ...documentSummary(created.document, created.document.revision), sha256: created.sha256, dry_run: created.dry_run === true, layout: created.layout });
       }
     },
@@ -74,8 +75,8 @@ export function imageTools(): ToolDefinition[] {
       promptGuidelines: ["Read the project before editing; submit edits against the revision you read."],
       parameters: Type.Object({ project_id: projectId, revision: optional(Type.Integer({ minimum: 1 })) }),
       async execute(_id, raw, _signal, _update, ctx) {
-        const params = raw as Params;
-        const project = await readProject(projectRoot(ctx.cwd, str(params, "project_id")), { revision: params.revision as number | undefined });
+        const params = raw as Params, engine = await loadEngine();
+        const project = await engine.readProject(engine.projectRoot(ctx.cwd, str(params, "project_id")), { revision: params.revision as number | undefined });
         return text({ ...documentSummary(project.document, project.latest_revision), sha256: project.sha256 });
       }
     },
@@ -93,8 +94,8 @@ export function imageTools(): ToolDefinition[] {
         operations: Type.Array(Type.Any(), { minItems: 1, maxItems: 100 }), dry_run: optional(Type.Boolean())
       }),
       async execute(_id, raw, _signal, _update, ctx) {
-        const params = raw as Params;
-        const result = await editBatch(projectRoot(ctx.cwd, str(params, "project_id")), {
+        const params = raw as Params, engine = await loadEngine();
+        const result = await engine.editBatch(engine.projectRoot(ctx.cwd, str(params, "project_id")), {
           base_revision: int(params, "base_revision"), author: "agent", summary: str(params, "summary"), operations: params.operations
         }, { dryRun: params.dry_run === true });
         return text({ revision: result.document.revision, sha256: result.sha256, dry_run: result.dry_run === true });
@@ -110,9 +111,9 @@ export function imageTools(): ToolDefinition[] {
         revision: optional(Type.Integer({ minimum: 1 })), candidate_id: optional(Type.String())
       }),
       async execute(_id, raw, signal, _update, ctx) {
-        const params = raw as Params, id = str(params, "project_id"), mode = params.mode === "export" ? "export" : "preview";
-        const output = await workDirectory(ctx.cwd, id, mode);
-        const { receipt } = await renderProject(projectRoot(ctx.cwd, id), output, {
+        const params = raw as Params, id = str(params, "project_id"), mode = params.mode === "export" ? "export" : "preview", engine = await loadEngine();
+        const output = await engine.workDirectory(ctx.cwd, id, mode);
+        const { receipt } = await engine.renderProject(engine.projectRoot(ctx.cwd, id), output, {
           revision: params.revision as number | undefined, candidateId: params.candidate_id as string | undefined, previewMax: mode === "preview" ? 640 : 0, signal
         });
         const summary = { output, revision: receipt.revision, png: receipt.outputs?.png, visual_quality: receipt.visual_quality };
@@ -127,7 +128,8 @@ export function imageTools(): ToolDefinition[] {
       promptSnippet: "List an image project's staged candidates",
       parameters: Type.Object({ project_id: projectId }),
       async execute(_id, raw, _signal, _update, ctx) {
-        const candidates = await listCandidates(projectRoot(ctx.cwd, str(raw as Params, "project_id")));
+        const engine = await loadEngine();
+        const candidates = await engine.listCandidates(engine.projectRoot(ctx.cwd, str(raw as Params, "project_id")));
         return text(candidates.map((item) => "candidate" in item
           ? { candidate_id: item.candidate.id, status: item.status, target_id: item.candidate.target_id, mode: item.candidate.mode, base_revision: item.candidate.base_revision,
             summary: item.candidate.summary, protected_changed_pixels: item.candidate.qa?.protected_changed_pixels ?? null, actions: imageCandidateActions(item.status) }
@@ -144,10 +146,10 @@ export function imageTools(): ToolDefinition[] {
         summary: Type.String({ minLength: 1, maxLength: 500 }), base_revision: optional(Type.Integer({ minimum: 1 }))
       }),
       async execute(_id, raw, _signal, _update, ctx) {
-        const params = raw as Params, root = projectRoot(ctx.cwd, str(params, "project_id"));
+        const params = raw as Params, engine = await loadEngine(), root = engine.projectRoot(ctx.cwd, str(params, "project_id"));
         const input = { candidate_id: str(params, "candidate_id"), author: "agent", summary: str(params, "summary") };
-        if (params.decision === "discard") return text(await discardCandidate(root, input));
-        const result = await acceptCandidate(root, { ...input, base_revision: int(params, "base_revision") });
+        if (params.decision === "discard") return text(await engine.discardCandidate(root, input));
+        const result = await engine.acceptCandidate(root, { ...input, base_revision: int(params, "base_revision") });
         return text({ status: "accepted", revision: result.document.revision, sha256: result.sha256 });
       }
     },
@@ -156,6 +158,7 @@ export function imageTools(): ToolDefinition[] {
       description: "Run one Image Job v2 through the user's configured Pi image model and stage the result as a candidate for one image object. Nothing is accepted automatically; masked edits keep protected pixels byte-identical.",
       promptSnippet: "Generate or edit one image layer through the configured Pi image model",
       promptGuidelines: [
+        "Use this for an image project's layer; for a one-off image in conversation with no project, use generate_image.",
         "Each call is one paid request and is never retried automatically; inspect the candidate before generating again.",
         "Edits need a change list and a preserve list; reference images need an explicit role."
       ],
@@ -170,17 +173,21 @@ export function imageTools(): ToolDefinition[] {
         output_policy: optional(Type.Union([Type.Literal("strict"), Type.Literal("resize_to_target")]))
       }),
       async execute(_id, raw, signal, _update, ctx) {
-        const params = raw as Params, id = str(params, "project_id"), job = params.job as Params | undefined;
-        const generator = await piGenerator(ctx, job?.provider_profile);
-        const directory = await workDirectory(ctx.cwd, id, "job");
+        const params = raw as Params, id = str(params, "project_id"), job = params.job as Params | undefined, engine = await loadEngine();
+        const generator = await piGenerator(engine, ctx, job?.provider_profile);
+        const directory = await engine.workDirectory(ctx.cwd, id, "job");
         await fs.mkdir(directory);
         const jobPath = path.join(directory, "job.json");
         await fs.writeFile(jobPath, JSON.stringify(job ?? null), { flag: "wx" });
         const spec: Params = { job: jobPath, candidate_id: str(params, "candidate_id"), target_id: str(params, "target_id"),
-          base_revision: int(params, "base_revision"), references: params.references ?? [] };
-        if (params.edit !== undefined) spec.edit = params.edit;
+          base_revision: int(params, "base_revision"),
+          references: Array.isArray(params.references) ? params.references.map((ref: Params) => ({ ...ref, source: local(ctx.cwd, ref.source) })) : params.references ?? [] };
+        if (params.edit !== undefined) {
+          const edit = params.edit as Params;
+          spec.edit = { ...edit, generation_mask: local(ctx.cwd, edit.generation_mask), protection_mask: local(ctx.cwd, edit.protection_mask), blend_mask: local(ctx.cwd, edit.blend_mask) };
+        }
         if (params.output_policy !== undefined) spec.output_policy = params.output_policy;
-        const result = await executeProvider(projectRoot(ctx.cwd, id), spec, { generator, signal, operator: "agent" });
+        const result = await engine.executeProvider(engine.projectRoot(ctx.cwd, id), spec, { generator, signal, operator: "agent" });
         if (result.status === "dry_run") return text(result);
         return text({ candidate_id: result.candidate.candidate.id, status: result.candidate.status, outcome: result.receipt.outcome,
           model: result.receipt.model, protected_changed_pixels: result.candidate.candidate.qa?.protected_changed_pixels ?? null, job: result.job });

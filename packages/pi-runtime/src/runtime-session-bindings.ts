@@ -15,11 +15,7 @@ import {
 import type { AgentEvent } from "@pi67/protocol";
 import type { RuntimeProjectionController } from "./runtime-projection-controller.js";
 import type { RuntimeCredentialOverrideStore } from "./runtime-credential-overrides.js";
-import type {
-  DesktopApprovalRequester,
-  DesktopToolAuthorizationRecorder,
-  SafetyPolicyState
-} from "./safety-extension.js";
+import type { DesktopApprovalRequester, DesktopToolAuthorizationRecorder, SafetyPolicyState } from "./safety-extension.js";
 import { createDesktopSessionServices } from "./session-services.js";
 import type { SessionExternalChangeGuard } from "./session-external-change-guard.js";
 import type { PiWorkspaceRuntimeServices } from "./workspace-runtime-services.js";
@@ -33,6 +29,7 @@ import type { PromptAttachmentAccess } from "./prompt-attachment.js";
 import { resolveExistingSessionFileIdentity } from "./session-path-identity.js";
 import { createFirstPartyWebTools } from "./first-party-web-tools.js";
 import { createNativeImageTools } from "./native-image-tools.js";
+import { imageTools } from "./image-workbench-tools.js";
 import { PlanModeController } from "./plan-mode-controller.js";
 import {
   NativeSubagentCoordinator,
@@ -147,7 +144,7 @@ export class RuntimeSessionBindings {
       const toolAliases = createDesktopToolAliasBinding();
       let sharedManager = sessionManager;
       const customTools = [
-        ...createFirstPartyWebTools(), ...createNativeImageTools(),
+        ...createFirstPartyWebTools(), ...createNativeImageTools(), ...imageTools(),
         ...createSessionSharedKnowledgeTools(this.options.sharedExperienceAccess, this.options.sharedSopAccess, () => sharedManager, this.options.teamKnowledgeAccess),
         ...this.planMode.createTools(),
         ...createNativeSubagentTools(this.options.subagents),
@@ -246,7 +243,7 @@ export class RuntimeSessionBindings {
       const services = await this.createServices(cwd);
       const toolAliases = createDesktopToolAliasBinding();
       const customTools = [
-        ...createFirstPartyWebTools(), ...createNativeImageTools(),
+        ...createFirstPartyWebTools(), ...createNativeImageTools(), ...imageTools(),
         ...createSessionSharedKnowledgeTools(this.options.sharedExperienceAccess, this.options.sharedSopAccess, () => sessionManager, this.options.teamKnowledgeAccess),
         ...this.planMode.createTools(),
         ...createNativeSubagentTools(this.options.subagents),
@@ -335,7 +332,7 @@ export class RuntimeSessionBindings {
     }
     const toolAliases = createDesktopToolAliasBinding();
     const customTools = [
-      ...createFirstPartyWebTools(), ...createNativeImageTools(),
+      ...createFirstPartyWebTools(), ...createNativeImageTools(), ...imageTools(),
       ...createSessionSharedKnowledgeTools(this.options.sharedExperienceAccess, this.options.sharedSopAccess, () => input.sessionManager, this.options.teamKnowledgeAccess),
       ...createNativeSubagentTools(this.options.subagents, {
         parentChildId: input.lineage.childId,

@@ -128,9 +128,29 @@ export function resolvePackagedArtifact(platform = process.platform, arch = proc
   };
 }
 
+// The image engine loads lazily in Agent Host (ADR 0010 decision 13); its worker,
+// font and native addons must ship even though startup never touches them.
+const IMAGE_ENGINE_ASAR_PATHS = [
+  "node_modules/@pi67/image-engine/dist/index.mjs",
+  "node_modules/@pi67/image-engine/dist/render-worker.mjs",
+  "node_modules/@pi67/image-engine/fonts/NotoSansCJKsc-Regular.otf"
+];
+const IMAGE_ENGINE_NATIVE_MODULE_PATHS = {
+  darwin: [
+    "@img/sharp-darwin-arm64/lib/sharp-darwin-arm64-0.35.5.node",
+    "@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.18.7.dylib",
+    "@resvg/resvg-js-darwin-arm64/resvgjs.darwin-arm64.node"
+  ],
+  win32: [
+    "@img/sharp-win32-x64/lib/sharp-win32-x64-0.35.5.node",
+    "@img/sharp-win32-x64/lib/libvips-42.dll",
+    "@resvg/resvg-js-win32-x64-msvc/resvgjs.win32-x64-msvc.node"
+  ]
+};
+
 export async function assertPackagedRuntimeAssets(artifact, {
   clipboardNativeModulePaths = PI_TUI_NATIVE_MODULE_PATHS,
-  requiredAsarPaths = [...packagedAttachmentRequiredAsarPaths, "packages/pi-runtime/dist/session-content-index-worker.mjs"],
+  requiredAsarPaths = [...packagedAttachmentRequiredAsarPaths, "packages/pi-runtime/dist/session-content-index-worker.mjs", ...IMAGE_ENGINE_ASAR_PATHS],
   requiredCapabilityPaths = ["packages/pi-workspace-resources/package.json"],
   requireWindowsPackageWorkerJob = true
 } = {}) {
@@ -143,6 +163,7 @@ export async function assertPackagedRuntimeAssets(artifact, {
     ? "@napi-rs/canvas-darwin-arm64/skia.darwin-arm64.node"
     : "@napi-rs/canvas-win32-x64-msvc/skia.win32-x64-msvc.node";
   await Promise.all([
+    ...(IMAGE_ENGINE_NATIVE_MODULE_PATHS[artifact.platform] ?? []).map((path) => access(join(unpackedModules, path))),
     access(artifact.executablePath),
     access(join(unpackedModules, clipboardModule)),
     access(join(unpackedModules, "@silvia-odwyer/photon-node/photon_rs_bg.wasm")),
@@ -161,6 +182,24 @@ export async function assertPackagedRuntimeAssets(artifact, {
       : []),
     assertPackagedAsarContract(artifact, requiredAsarPaths)
   ]);
+  await assertPackagedImageEngineRenders(artifact);
+}
+
+function assertPackagedImageEngineRenders(artifact) {
+  const probe = fileURLToPath(new URL("./packaged-image-engine-probe.mjs", import.meta.url));
+  const entry = join(artifact.resourcesPath, "app.asar/node_modules/@pi67/image-engine/dist/index.mjs");
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(artifact.executablePath, [probe, entry], {
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+      stdio: "inherit"
+    });
+    child.once("error", reject);
+    child.once("exit", (code, signal) => {
+      if (signal) reject(new Error(`Packaged image engine probe terminated by ${signal}.`));
+      else if (code !== 0) reject(new Error(`Packaged image engine probe exited ${code ?? 1}.`));
+      else resolvePromise();
+    });
+  });
 }
 
 function assertPackagedAsarContract(artifact, requiredAsarPaths) {

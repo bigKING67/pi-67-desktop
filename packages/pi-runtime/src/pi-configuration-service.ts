@@ -338,7 +338,7 @@ export class PiConfigurationService {
       allowModelNetwork: false,
       ...(signal ? { signal } : {})
     });
-    await installFirstPartyModelProviders(runtime);
+    await installFirstPartyModelProviders(runtime, this.agentDir);
     return runtime;
   }
 

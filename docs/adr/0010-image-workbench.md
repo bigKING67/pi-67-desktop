@@ -53,16 +53,16 @@ Evidence that shaped the decisions:
    baseline commit is recorded under `docs/provenance`.
 2. **One engine in Agent Host.** The engine runs inside the Agent Host utility
    process with rendering and compositing in a `worker_threads` pool (60 s
-   timeout, AbortSignal, per-project serial queue, ≤2 projects in parallel). A
-   Desktop-owned Pi extension `packages/image-pi-extension` registers `image_*`
-   tools so the Agent calls the engine directly instead of through Bash. The
+   timeout, AbortSignal, per-project serial queue, ≤2 projects in parallel).
+   `packages/pi-runtime` defines the `image_*` tools so the Agent calls the
+   engine directly instead of through Bash (delivery: decision 13). The
    renderer reaches the same engine through `image.*` protocol commands on the
    Agent port. There is one writer process; `base_revision` remains the
    conflict rule between a person's and the Agent's batches.
 3. **Artifact truth.** The project directory (`newmoney.image-project.v1`:
    revisions, assets, fonts, masks, candidates, jobs, exports) is the artifact
-   source of truth, as Pi JSONL is the conversation truth. Main keeps a
-   discardable library index and thumbnails; project content never enters
+   source of truth, as Pi JSONL is the conversation truth. The disk is the
+   project index (decision 10); project content never enters
    Workbench persistence, logs, diagnostics, telemetry or private memory.
 4. **Two channels, one project.** Deterministic edits (text, price, move,
    scale, reorder, aspect reflow, lock, undo, candidate accept/discard) are
@@ -97,7 +97,7 @@ Evidence that shaped the decisions:
    user's Pi configuration (`models.json`), and every generation goes through
    Pi's `modelRegistry.generateImages()`, so Pi resolves credentials (keys,
    environment, OAuth) and the engine never calls a model API itself.
-   `packages/image-pi-extension` registers an `openai-images` image API
+   `packages/pi-runtime` registers an `openai-images` image API
    implementation through Pi's supported `ProviderConfigInput.images` seam;
    mask, size, quality and background travel in `ImagesOptions.metadata`.
    The engine receives an injected generator and keeps job claims, partial
@@ -124,6 +124,26 @@ Evidence that shaped the decisions:
     groups, per-layer masks, blend modes, non-destructive rotation and basic
     adjustments. Pixel brushes, vector pens, RAW, video, cloud sync and plugin
     SDKs are out of scope for v1.
+
+13. **Delivery: first-party Desktop tools.** (Added 2026-10-09.) Desktop's
+    first-party tools (`web_search`, `fetch_content`, `image_models`,
+    `generate_image`) are Pi SDK `customTools`, and its first-party Provider
+    (Groland) is registered with `ModelRuntime.registerProvider`. The image
+    workbench follows the same pattern: `pi-runtime` defines the `image_*` tools,
+    injects them into initial, switched and native child sessions, and registers
+    the `newmoney-images` Provider beside Groland when the user's `models.json`
+    configures it. The Desktop safety policy verifies the exact SDK tool
+    identity. The engine, its native modules (Sharp, resvg) and the bundled font
+    ship once inside the app and load lazily on first image call. The capability
+    snapshot pipeline is not used: it bundles owned extensions into Node-builtin-
+    only entries, which cannot carry native image modules without a second
+    per-platform copy. A separate extension package is not kept either: it would
+    need Pi SDK types from `pi-runtime` while `pi-runtime` imports its tools, a
+    workspace cycle. Known limitation: Pi TUI does not get these tools yet; a
+    later TUI delivery packages the same definitions as an extension.
+    The SDK-native `generate_image` (free-form chat images, not saved) and
+    `image_generate` (a staged, protected-pixel candidate for a project) both
+    remain, with descriptions that say which to use.
 
 ## Consequences
 

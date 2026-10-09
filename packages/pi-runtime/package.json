@@ -24,6 +24,7 @@
     "@earendil-works/pi-coding-agent": "1.0.0",
     "@pi67/domain": "workspace:*",
     "@pi67/extension-compat": "workspace:*",
+    "@pi67/image-engine": "workspace:*",
     "@pi67/protocol": "workspace:*",
     "jsonc-parser": "3.3.1",
     "proper-lockfile": "4.1.2",
@@ -33,6 +34,7 @@
   "devDependencies": {
     "@types/node": "24.10.1",
     "@types/proper-lockfile": "4.1.4",
+    "sharp": "0.35.5",
     "tsdown": "0.22.13",
     "typescript": "7.0.2",
     "vitest": "4.1.10"

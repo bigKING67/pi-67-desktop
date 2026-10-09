@@ -44,7 +44,7 @@ export function createPiWorkspaceProviderCatalog(
       settingsManager: options.settingsManager
     }).then(async (services) => {
       if (disposed) throw disposedError();
-      await installFirstPartyModelProviders(services.modelRuntime);
+      await installFirstPartyModelProviders(services.modelRuntime, options.agentDir);
       unsubscribe = runtimeCredentialOverrides.subscribe((provider, apiKey) => (
         services.modelRuntime.setRuntimeApiKey(provider, apiKey)
       ));

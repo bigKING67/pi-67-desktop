@@ -1,5 +1,5 @@
-import { ImageGenerationError, type ImageGenerationCall, type ImageGenerator } from "@pi67/image-engine";
-import { METADATA_KEY, type GenerateImages, type NewMoneyImageRequest } from "./openai-images.js";
+import type { ImageGenerationCall, ImageGenerator } from "@pi67/image-engine";
+import { METADATA_KEY, type GenerateImages, type NewMoneyImageRequest } from "./image-workbench-openai-images.js";
 
 type ImageModel = Parameters<GenerateImages>[0];
 type AssistantImages = Awaited<ReturnType<GenerateImages>>;
@@ -14,6 +14,7 @@ const UNSENT = [/^Provider is not configured/u, /^No API key/u, /^missing_api_ke
 /** Adapts the engine's generator contract onto Pi's `generateImages`. */
 export function createPiImageGenerator(registry: ImageRegistry, model: ImageModel): ImageGenerator {
   return async (call: ImageGenerationCall, signal: AbortSignal) => {
+    const { ImageGenerationError } = await import("@pi67/image-engine");
     const request: NewMoneyImageRequest = { endpoint: call.endpoint, size: call.parameters.size, quality: call.parameters.quality,
       background: call.parameters.background, output_format: call.parameters.output_format, n: call.parameters.n,
       ...(call.mask ? { mask: call.mask.toString("base64") } : {}) };

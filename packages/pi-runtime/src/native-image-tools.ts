@@ -54,7 +54,8 @@ export function createNativeImageTools(): ToolDefinition[] {
     promptGuidelines: [
       "Use image_models to find an authenticated image model; never invent a model or reuse a chat-only model.",
       "State the selected provider/model before generating. Use only referencePaths explicitly selected for this image task.",
-      "Do not retry a failed generation through another provider or model; report the failure. Images appear in the tool result and are not implicitly saved to the Workspace."
+      "Do not retry a failed generation through another provider or model; report the failure. Images appear in the tool result and are not implicitly saved to the Workspace.",
+      "For a layer of an image project, use image_generate instead so the result is staged as a candidate in that project."
     ],
     parameters: GENERATE_IMAGE_INPUT,
     executionMode: "sequential",

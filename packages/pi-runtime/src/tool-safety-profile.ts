@@ -5,6 +5,7 @@ import type {
   ConfiguredCapabilityCatalog
 } from "./configured-capability-catalog.js";
 
+import { isImageWorkbenchToolName } from "./image-workbench-tool-safety.js";
 import { isNativeMcpSource, isNativeToolSearchSource, type NativeMcpCapability } from "./native-mcp-catalog.js";
 
 const PI_WEB_ACCESS_VERSION = "0.17.0";
@@ -33,6 +34,7 @@ export type ToolSafetyProfile =
   | { kind: "builtin"; toolName: string; sourceLabel: "Pi 内置" }
   | { kind: "pi67-web"; toolName: string; sourceLabel: "Pi-67 原生搜索" }
   | { kind: "pi67-images"; toolName: string; sourceLabel: "Pi SDK 原生生图" }
+  | { kind: "pi67-image-workbench"; toolName: string; sourceLabel: "New Money 图像工作台" }
   | { kind: "pi67-plan"; toolName: string; sourceLabel: "Pi-67 原生计划" }
   | { kind: "pi67-context"; toolName: string; sourceLabel: "Pi-67 企业知识" }
   | { kind: "pi-web-access"; toolName: string; sourceLabel: "pi-web-access@0.17.0" }
@@ -100,6 +102,11 @@ export function createToolSafetyProfileResolver(catalog?: ConfiguredCapabilityCa
       return isFirstPartySdkIdentity(toolName, source)
         ? { kind: "pi67-images", toolName, sourceLabel: "Pi SDK 原生生图" }
         : reservedIdentityMismatch(toolName, "Pi SDK 原生生图");
+    }
+    if (isImageWorkbenchToolName(toolName)) {
+      return isFirstPartySdkIdentity(toolName, source)
+        ? { kind: "pi67-image-workbench", toolName, sourceLabel: "New Money 图像工作台" }
+        : reservedIdentityMismatch(toolName, "New Money 图像工作台");
     }
     if (PI67_PLAN_TOOLS.has(toolName) && isFirstPartySdkIdentity(toolName, source)) {
       return { kind: "pi67-plan", toolName, sourceLabel: "Pi-67 原生计划" };

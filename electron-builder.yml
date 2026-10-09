@@ -31,6 +31,10 @@ files:
   - package.json
 asarUnpack:
   - node_modules/@silvia-odwyer/photon-node/**
+  # The image engine's native modules: Sharp's addon loads libvips from its
+  # sibling @img package by relative rpath, so both must sit on disk together.
+  - node_modules/@img/**
+  - node_modules/@resvg/**
 extraResources:
   - from: THIRD_PARTY_NOTICES.md
     to: THIRD_PARTY_NOTICES.md

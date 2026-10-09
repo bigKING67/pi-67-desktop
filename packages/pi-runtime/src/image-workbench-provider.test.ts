@@ -1,9 +1,9 @@
 import * as fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it, onTestFinished, vi } from "vitest";
-import { imageProviderBaseUrl, imageProviderRegistration, piAgentDirectory } from "./image-provider.js";
-import initializeImageWorkbench from "./index.js";
+import { describe, expect, it, onTestFinished } from "vitest";
+import { PROFILE_MODELS } from "@pi67/image-engine";
+import { imageProviderBaseUrl, imageProviderRegistration } from "./image-workbench-provider.js";
 
 async function agentDir(models?: string): Promise<string> {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "image-pi-extension-"));
@@ -13,12 +13,6 @@ async function agentDir(models?: string): Promise<string> {
 }
 
 describe("image Provider configuration", () => {
-  it("resolves Pi's agent directory like Pi does", () => {
-    expect(piAgentDirectory({ PI_CODING_AGENT_DIR: "/srv/pi" })).toBe("/srv/pi");
-    expect(piAgentDirectory({ PI_CODING_AGENT_DIR: "~/pi" })).toBe(path.join(os.homedir(), "pi"));
-    expect(piAgentDirectory({})).toBe(path.join(os.homedir(), ".pi", "agent"));
-  });
-
   it("reads only the base URL of the newmoney-images entry from models.json (JSONC allowed)", async () => {
     const dir = await agentDir(`{
       // user comment
@@ -41,13 +35,6 @@ describe("image Provider configuration", () => {
       ["gpt-image-2.5-flare", "image", "openai-images"], ["gpt-image-2.5-sunburst", "image", "openai-images"]
     ]);
     expect(Object.keys(registration.images)).toEqual(["openai-images"]);
-  });
-
-  it("always registers the tools and registers the Provider only when configured", async () => {
-    const pi = { registerTool: vi.fn(), registerProvider: vi.fn() };
-    initializeImageWorkbench(pi as never, await agentDir());
-    expect(pi.registerTool).toHaveBeenCalledTimes(7); expect(pi.registerProvider).not.toHaveBeenCalled();
-    initializeImageWorkbench(pi as never, await agentDir('{"providers":{"newmoney-images":{"baseUrl":"https://images.example/v1"}}}'));
-    expect(pi.registerProvider).toHaveBeenCalledWith("newmoney-images", expect.objectContaining({ baseUrl: "https://images.example/v1" }));
+    expect(new Set(registration.models.map((model) => model.id))).toEqual(new Set(PROFILE_MODELS.values()));
   });
 });

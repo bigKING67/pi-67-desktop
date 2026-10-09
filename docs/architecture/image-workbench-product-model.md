@@ -19,7 +19,7 @@ New Money 把 craft67 `creative-craft` 的图像执行器**移植**为自有的�
 ```text
 creative-craft Skill（方法：brief → 路线 → 导演 → 制作 → 评估）   固定快照，不改
 + New Money image-engine（工程、修订、候选、合成、渲染、Provider） 移植后自有演进
-+ image-pi-extension（把引擎注册为 Pi 工具，Agent 直接调用）
++ 图像工具（pi-runtime 定义 Agent 直接调用的 image_* 工具，以 Desktop 第一方 customTools 注入）
 + 图像工作台（侧栏入口、创作库、画布、图像 Inspector、对话同屏）
 + 代码强制的质量闸门（保护区像素、确定性文字、规格检查）
 + 任务级预算、用户自选模型、无标识
@@ -247,7 +247,7 @@ browser67 在打包预览上取证。
 
 ## 9. Agent 协作合同
 
-### 9.1 工具（由 `image-pi-extension` 注册）
+### 9.1 工具（由 pi-runtime 定义并作为 Desktop 第一方 `customTools` 注入；Pi TUI 暂不提供）
 
 | 工具 | 作用 | 备注 |
 | --- | --- | --- |
@@ -260,8 +260,12 @@ browser67 在打包预览上取证。
 | `image_copy_variants` | 一次改文案同步多个版式 | 派生工程 |
 | `image_process` | 无工程的文件处理 | 转换、缩放、压缩、裁切 |
 
-Agent 不再通过 Bash 调 CLI；工具结果包含可被视觉模型读取的预览文件路径。Pi ResourceLoader
-仍是唯一扩展加载器，扩展按 Desktop-owned extension build boundary 编译与登记。
+Agent 不再通过 Bash 调 CLI；工具结果包含可被视觉模型读取的预览文件路径。工具是 exact
+`sdk/<sdk:name>/temporary/top-level` 来源的第一方 customTools，同名的其他来源一律拒绝。安全分类：
+读取项目与候选为工作区读取；编辑、渲染、候选决定与从工作区内照片建项目为工作区写入；工作区外的照片
+按工作区外路径确认；`image_generate` 为对外提交，AUTO 下每次确认且不在确认里显示提示词，目标为
+`newmoney-images/<Provider 档位>` 并注明工作区外文件数；凭据与系统配置路径不能作为照片、参考图或蒙版。
+相对路径一律相对当前工作区解析，与安全检查一致。
 
 ### 9.2 结构化上下文
 
@@ -303,7 +307,7 @@ Provider 请求只允许 HTTPS 或 loopback，拒绝带凭据的 URL；凭据只
 
 - 图像模型是 Pi 配置（`models.json`）里的 `type: "image"` 模型；每次生成都经 Pi 的
   `modelRegistry.generateImages()`，由 Pi 解析凭据（key、环境变量、OAuth），引擎自己不调用任何模型接口
-  （ADR 0010 第 9 条，2026-10-09 修订）。`image-pi-extension` 通过 Pi 的 `ProviderConfigInput.images`
+  （ADR 0010 第 9 条，2026-10-09 修订）。pi-runtime 通过 Pi 的 `ProviderConfigInput.images`
   注册 `openai-images` 图像 API 实现；蒙版、尺寸、质量、背景放在 `ImagesOptions.metadata` 里传递。
   引擎接收注入的生成函数，保留任务认领、部分回执、离线恢复和保护区合成。
 - 配置方式（2026-10-09 用真实 Pi 1.0 SDK 验证）：Pi 1.0 的 `models.json` 只能声明对话模型，图像模型
@@ -371,7 +375,7 @@ Electron Main
   |- 创作库索引、目录监听、导出到文件系统的对话框
   `- utilityProcess: Agent Host
         |- PiSdkRuntime
-        |     `- image-pi-extension（registerTool → image_*）
+        |     `- 第一方 customTools image_*，newmoney-images Provider
         `- image-engine
               |- 项目队列（每项目串行，跨项目并行 ≤ 2）
               `- worker_threads 池（渲染 / 合成；60s 超时；AbortSignal）
@@ -386,7 +390,7 @@ Electron Main
 | 包 | 内容 |
 | --- | --- |
 | `packages/image-engine` | 移植的 document / project / render / candidates / composite / photo / provider；schema；共享样例；测试 |
-| `packages/image-pi-extension` | Pi 扩展：工具注册、结果格式、预览路径策略（先例：`packages/openviking-pi-extension`） |
+| `packages/pi-runtime`（`image-workbench-*`） | 工具定义、安全分类、`openai-images` 图像 API 与 Provider 注册；以第一方 `customTools` 注入（先例：`first-party-web-tools`、`native-image-tools`） |
 | `packages/protocol` | `image.*` 命令与事件 schema，纳入 protocol revision |
 | `packages/domain` | 归属、预算、候选状态机、冲突策略（无依赖） |
 | `apps/agent-host` | 引擎宿主、队列、worker 池、任务状态事件 |
@@ -442,7 +446,7 @@ Windows ARM64 / macOS Intel。
 
 | 阶段 | 范围 | 验收证据 |
 | --- | --- | --- |
-| **P1 引擎与协议** | 移植 image-engine 与测试；Node Provider 适配器改读 Pi Provider 配置；image-pi-extension 注册工具；protocol `image.*`；Agent Host 队列与 worker 池；双平台原生包与字体加载 | 引擎测试全绿；真实 Pi 会话通过工具完成「换背景 + 改标题 + 撤销」，记录工具调用数与耗时；Windows x64 与 macOS arm64 打包 smoke 加载 Sharp / resvg / 字体 |
+| **P1 引擎与协议** | 移植 image-engine 与测试；Node Provider 适配器改读 Pi Provider 配置；pi-runtime 注入第一方图像工具；protocol `image.*`；Agent Host 队列与 worker 池；双平台原生包与字体加载 | 引擎测试全绿；真实 Pi 会话通过工具完成「换背景 + 改标题 + 撤销」，记录工具调用数与耗时；Windows x64 与 macOS arm64 打包 smoke 加载 Sharp / resvg / 字体 |
 | **P2 基础工作台** | `图像` 入口、创作库、项目页（画布只读 + 底部坞 + 对话）、结构化上下文、直接改字 / 移动、候选接受 / 丢弃、导出原尺寸 | 打包预览截图（路径 / 尺寸 / sha256）；流程 A 端到端 ≤ 5 分钟；保护区 0 像素改变；`base_revision` 冲突被正确呈现 |
 | **P3 专业面板** | 图像 Inspector 五标签；变换手柄与吸附；行内文字编辑；多选对齐；参考槽位；多处标记返工；用户字体；多尺寸导出预设 | 流程 B / D / E / F 的 e2e；可访问性检查；响应式三档截图 |
 | **P4 引擎进阶** | 图层组、逐层蒙版、混合模式、旋转翻转、渐变与形状、基础调整；OCR 关键文本闸门；VLM 去偏与 golden eval | schema 共享样例；渲染回归对比；评测报告 |

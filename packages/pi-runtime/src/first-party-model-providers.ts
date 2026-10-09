@@ -1,5 +1,6 @@
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import { GROLAND_CLAUDE_MODEL_IDS, GROLAND_GPT_MODEL_IDS } from "@pi67/domain";
+import { GROLAND_CLAUDE_MODEL_IDS, GROLAND_GPT_MODEL_IDS, IMAGE_PROVIDER_ID } from "@pi67/domain";
+import { imageProviderBaseUrl, imageProviderRegistration } from "./image-workbench-provider.js";
 
 export const GROLAND_PROVIDER_ID = "groland";
 export const GROLAND_ANTHROPIC_BASE_URL = "https://api.sciencetoken.ai/proxy/anthropic";
@@ -39,11 +40,19 @@ export const GROLAND_PROVIDER_REGISTRATION: ProviderRegistration = Object.freeze
   ]
 });
 
-export function installFirstPartyModelProviders(runtime: ModelRuntime): Promise<void> {
+/**
+ * Registers Groland and, when the user's `models.json` in `agentDirectory`
+ * configures `newmoney-images`, the image workbench Provider (ADR 0010
+ * decision 13). Credentials stay in Pi's configuration.
+ */
+export function installFirstPartyModelProviders(runtime: ModelRuntime, agentDirectory?: string): Promise<void> {
   const existing = PROVIDER_INSTALLATIONS.get(runtime);
   if (existing) return existing;
 
-  const installation = registerProviderAndAwaitRefresh(runtime).catch((error: unknown) => {
+  const imageBaseUrl = agentDirectory === undefined ? undefined : imageProviderBaseUrl(agentDirectory);
+  const registrations: [string, ProviderRegistration][] = [[GROLAND_PROVIDER_ID, GROLAND_PROVIDER_REGISTRATION]];
+  if (imageBaseUrl) registrations.push([IMAGE_PROVIDER_ID, imageProviderRegistration(imageBaseUrl) as ProviderRegistration]);
+  const installation = registerProvidersAndAwaitRefresh(runtime, registrations).catch((error: unknown) => {
     if (PROVIDER_INSTALLATIONS.get(runtime) === installation) {
       PROVIDER_INSTALLATIONS.delete(runtime);
     }
@@ -53,13 +62,16 @@ export function installFirstPartyModelProviders(runtime: ModelRuntime): Promise<
   return installation;
 }
 
-async function registerProviderAndAwaitRefresh(runtime: ModelRuntime): Promise<void> {
+async function registerProvidersAndAwaitRefresh(
+  runtime: ModelRuntime,
+  registrations: readonly [string, ProviderRegistration][]
+): Promise<void> {
   const ownRefresh = Object.getOwnPropertyDescriptor(runtime, "refresh");
   const originalRefresh = runtime.refresh.bind(runtime);
-  let registrationRefresh: ReturnType<ModelRuntimeRefresh> | undefined;
+  const registrationRefreshes: ReturnType<ModelRuntimeRefresh>[] = [];
   const captureRefresh: ModelRuntimeRefresh = function captureRefresh(options) {
     const pending = originalRefresh(options);
-    registrationRefresh ??= pending;
+    registrationRefreshes.push(pending);
     return pending;
   };
 
@@ -71,14 +83,14 @@ async function registerProviderAndAwaitRefresh(runtime: ModelRuntime): Promise<v
     value: captureRefresh
   });
   try {
-    runtime.registerProvider(GROLAND_PROVIDER_ID, GROLAND_PROVIDER_REGISTRATION);
+    for (const [id, registration] of registrations) runtime.registerProvider(id, registration);
   } finally {
     if (ownRefresh) Object.defineProperty(runtime, "refresh", ownRefresh);
     else Reflect.deleteProperty(runtime, "refresh");
   }
 
-  if (!registrationRefresh) {
-    throw new Error("Groland Provider registration did not start the required offline refresh.");
+  if (registrationRefreshes.length < registrations.length) {
+    throw new Error("First-party Provider registration did not start the required offline refresh.");
   }
-  await registrationRefresh;
+  await Promise.all(registrationRefreshes);
 }

@@ -25,6 +25,7 @@ import {
 import { boundUtf8 } from "./utf8-boundary.js";
 import { isVerifiedDesktopAttachmentTool } from "./prompt-attachment-extension.js";
 import { hasNativeImageToolInput } from "./native-image-tools.js";
+import { classifyImageWorkbenchToolIntent } from "./image-workbench-tool-safety.js";
 import type { LoadedResourceReadAccess } from "./loaded-resource-read-access.js";
 import type { ConfiguredCapabilityCatalog } from "./configured-capability-catalog.js";
 import { classifyConfiguredToolIntent } from "./configured-tool-safety.js";
@@ -294,6 +295,9 @@ async function classifyToolIntent(
       target: toolName === "image_models" ? toolName : `${stringField(record, "provider")}/${stringField(record, "model")}`,
       targetKind: "tool", sourceLabel: profile.sourceLabel
     };
+  }
+  if (profile.kind === "pi67-image-workbench") {
+    return classifyImageWorkbenchToolIntent(toolName, record, workspace, profile.sourceLabel, taskTrustedRoots);
   }
   if (profile.kind === "pi67-plan" && hasPi67PlanToolContract(toolName, record)) {
     return {

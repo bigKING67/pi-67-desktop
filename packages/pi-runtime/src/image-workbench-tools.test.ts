@@ -5,8 +5,8 @@ import sharp from "sharp";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { IMAGE_LIBRARY_MARKER } from "@pi67/domain";
 import { projectRoot, readProject } from "@pi67/image-engine";
-import { imageTools } from "./tools.js";
-import type { GenerateImages } from "./openai-images.js";
+import { imageTools } from "./image-workbench-tools.js";
+import type { GenerateImages } from "./image-workbench-openai-images.js";
 
 type Tool = ReturnType<typeof imageTools>[number];
 type Model = Parameters<GenerateImages>[0];

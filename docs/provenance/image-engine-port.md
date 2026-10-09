@@ -60,12 +60,12 @@
   凭据不再读 `~/.codex/config.toml` / `auth.json`。回执 `host` 为 `newmoney.image-engine`。
 - 2026-10-09 按 ADR 0010 第 9 条修订：引擎不再发 HTTP 请求，`executeProvider` 接收注入的
   `ImageGenerator`；原 `provider.mjs` 的 HTTP 部分（JSON/multipart、地址策略、响应大小、base64
-  校验、请求 ID）移入 `packages/image-pi-extension/src/openai-images.ts`，作为 Pi 的 `openai-images`
+  校验、请求 ID）移入 `packages/pi-runtime/src/image-workbench-openai-images.ts`，作为 Pi 的 `openai-images`
   图像 API 实现，经 `modelRegistry.generateImages` 调用，由 Pi 解析凭据。「准备与预检之间人工编辑」
   的测试原本靠凭据解析阶段注入，重构后没有可确定注入的点，已删除；该分支暂无直接测试。
 - 未移植：`cli.mjs`、`provider-config.mjs`、`provider-acceptance.mjs`、`provider-smoke.mjs`
   （craft67 操作员脚本，读写 `~/.codex`）及其测试 1 个、CLI 参数校验测试 3 个。真实网络验收
-  改由 P1 检查点 8 的 Desktop 内真实 Pi 会话承担；Agent 通过 Pi 扩展工具调用引擎。
+  改由 P1 检查点 8 的 Desktop 内真实 Pi 会话承担；Agent 通过 Desktop 第一方 `image_*` 工具调用引擎。
 
 ## 第三方依赖
 

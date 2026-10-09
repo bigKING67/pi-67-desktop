@@ -2641,6 +2641,11 @@ Notification history 已迁移到独立 `notificationStore`，App Store 不再�
   `ExtensionToolContext.executeTool("read")` 形成真实 nested call 并保留原权限。
   SDK usage 随原生 Tool Result 进入 Pi JSONL，标准 image content 经现有 asset
   投影，不增加 IPC schema、raw-payload store 或 Renderer 网络访问。
+- 图像工作台 `image_*` 七个工具同为 exact SDK 来源的第一方 customTools，三类 Session 统一注册；
+  分类见 `image-workbench-tool-safety.ts`（工作区读 / 写、工作区外照片按路径确认、`image_generate`
+  为 `external-submit`，凭据与系统配置路径直接拒绝）。`newmoney-images` Provider 与 Groland
+  一起经 `ModelRuntime.registerProvider` 安装，仅当 `models.json` 配置了 `baseUrl`；凭据仍由 Pi
+  解析。引擎在首次图像调用时动态加载（ADR 0010 第 13 条）。
 - ToolExecutionView 的可选 `parentToolCallId` 随现有事件/快照传输；根的
   `nestedRecord.complete` 表达有界记录完整性。live receipt 仅补 identity/status/timing，
   不保存原始子输入/输出。冷恢复解析 Pi 原生 `toolResult.nestedCalls`，最多 256 calls，

@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@pi67/pi-runtime/pi-sdk-types";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 // The `openai-images` image API for Pi (ADR 0010 decision 9): Pi resolves the
 // Provider's key and calls this through `modelRegistry.generateImages`, so no

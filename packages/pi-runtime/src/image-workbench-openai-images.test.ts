@@ -1,6 +1,6 @@
 import http from "node:http";
 import { describe, expect, it, onTestFinished } from "vitest";
-import { endpointUrl, generateOpenAIImages, readImageRequest, METADATA_KEY, type GenerateImages } from "./openai-images.js";
+import { endpointUrl, generateOpenAIImages, readImageRequest, METADATA_KEY, type GenerateImages } from "./image-workbench-openai-images.js";
 
 type Model = Parameters<GenerateImages>[0];
 interface Recorded { url: string; headers: http.IncomingHttpHeaders; body: Buffer }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ImageGenerationError, type ImageGenerationCall } from "@pi67/image-engine";
-import { createPiImageGenerator, type ImageRegistry } from "./pi-image-generator.js";
-import { METADATA_KEY, type GenerateImages } from "./openai-images.js";
+import { createPiImageGenerator, type ImageRegistry } from "./image-workbench-generator.js";
+import { METADATA_KEY, type GenerateImages } from "./image-workbench-openai-images.js";
 
 type Model = Parameters<GenerateImages>[0];
 type Result = Awaited<ReturnType<GenerateImages>>;

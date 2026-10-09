@@ -9,7 +9,7 @@ Last updated: 2026-10-08
 
 Bring the image engine into New Money and make it reachable by both the Agent and
 the renderer: port the creative-craft image executor as `packages/image-engine`,
-register it as Pi tools through `packages/image-pi-extension`, define the
+register it as first-party Pi tools in `packages/pi-runtime`, define the
 `image.*` protocol, host it in Agent Host with a worker pool and queue, and prove
 native modules and the font load from packaged trees on macOS arm64 and Windows
 x64. No visible UI ships in P1 beyond what tests need; P2 adds the workbench.
@@ -58,7 +58,7 @@ Product model: `docs/architecture/image-workbench-product-model.md`; decisions:
 
 ## Affected boundaries
 
-- Modules/processes: new `packages/image-engine`, `packages/image-pi-extension`;
+- Modules/processes: new `packages/image-engine`; `packages/pi-runtime` (image tools, safety, Provider);
   `packages/protocol` (`image.*`), `packages/domain` (candidate state machine,
   conflict/budget policy); `apps/agent-host` (engine host, queue, worker pool,
   task events); `apps/desktop` (library index skeleton, `app://` preview route);
@@ -104,7 +104,7 @@ Product model: `docs/architecture/image-workbench-product-model.md`; decisions:
       context block); compile-time protocol↔domain type parity and an engine test
       that every published revision passes `ImageDocumentSchema`; Host routes
       image commands to a fail-closed `UNSUPPORTED` router until checkpoint 5.
-- [x] 4. `packages/image-pi-extension`: `image_*` tools, compact results with
+- [x] 4. Image Pi tools (first written as `packages/image-pi-extension`, folded into `packages/pi-runtime` at checkpoint 7): `image_*` tools, compact results with
       preview paths; tests. Done 2026-10-09: seven tools (create from photo, read,
       edit, render with inline preview image, candidates, decide, generate); the
       `openai-images` Pi image API on a dedicated `newmoney-images` Provider; the
@@ -144,9 +144,9 @@ Product model: `docs/architecture/image-workbench-product-model.md`; decisions:
 
 ## Rollback
 
-Each checkpoint is additive and revertible on its own. The Pi extension is
-registered only when the engine host starts successfully; a failed start leaves
-Pi without `image_*` tools and the rest of Desktop unchanged. Protocol additions
+Each checkpoint is additive and revertible on its own. The `image_*` tools are
+always registered but load the engine only on their first call, so a missing
+native image runtime fails that call and leaves the rest of Desktop unchanged. Protocol additions
 are additive. No user directories are rewritten (import is read-only).
 
 ## Risks and unknowns

@@ -168,7 +168,7 @@ export async function createDesktopSessionServices(
       .map((extension) => extension.resolvedPath)
       .filter((path): path is string => typeof path === "string")
   );
-  await installFirstPartyModelProviders(services.modelRuntime);
+  await installFirstPartyModelProviders(services.modelRuntime, options.agentDir);
   if (!agentTurn) registerDesktopAutoCatalog(services.modelRuntime, settingsManager);
   configuredCapabilities.useSettingsManager(services.settingsManager);
   await Promise.all([
