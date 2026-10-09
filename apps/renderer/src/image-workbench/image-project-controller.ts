@@ -13,7 +13,7 @@ import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 const CANVAS_EDGE = 1600;
 const CANDIDATE_EDGE = 360;
 
-export interface ImagePreview { pngSha256: string; width: number; height: number }
+interface ImagePreview { pngSha256: string; width: number; height: number }
 
 interface ImageProjectState {
   projectId: string | undefined;
