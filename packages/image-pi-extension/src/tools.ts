@@ -3,12 +3,12 @@ import path from "node:path";
 import { Type, type TSchema } from "typebox";
 import { IMAGE_PROVIDER_ID, imageCandidateActions } from "@pi67/domain";
 import {
-  acceptCandidate, createPhotoProject, discardCandidate, editBatch, executeProvider, listCandidates, PROFILE_MODELS, readProject, renderProject,
+  acceptCandidate, createPhotoProject, discardCandidate, editBatch, ensureProjectParent, executeProvider, listCandidates, PROFILE_MODELS, projectRoot, readProject,
+  renderProject, workDirectory,
   type ImageDocument, type ImageGenerator
 } from "@pi67/image-engine";
 import type { ExtensionAPI } from "@pi67/pi-runtime/pi-sdk-types";
 import { createPiImageGenerator, type ImageRegistry } from "./pi-image-generator.js";
-import { ensureProjectParent, projectRoot, workDirectory } from "./project-location.js";
 
 type ToolDefinition = Parameters<ExtensionAPI["registerTool"]>[0];
 type ToolContext = Parameters<ToolDefinition["execute"]>[4];

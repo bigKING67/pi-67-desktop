@@ -2774,8 +2774,14 @@ Host 把 renderer 发起的修订一律记为 `human`。引擎拒绝以现有错
 `base_revision` 是 Agent 与人唯一的写冲突规则，过期修订上的编辑不静默重基。事件
 `image.project.changed`、`image.candidate.changed`、`image.job.changed` 同为 Workspace-scoped，renderer 收到
 后重读，不在事件里携带图片字节。协议结构与 domain 类型由编译期检查保持一致，引擎测试另外校验它发布的
-每个修订都满足 `ImageDocumentSchema`。引擎宿主落地前（P1 检查点 5），Host 对全部图像命令返回可恢复的
-`UNSUPPORTED`（`imageReason: engine_unavailable`）。
+每个修订都满足 `ImageDocumentSchema`。Agent Host 的 `ImageEngineHost` 执行这些命令：要求 Workspace 已信任（否则
+`WORKSPACE_NOT_TRUSTED`）；同一工程的写操作（编辑、决定、渲染）按顺序串行，不同工程并行，单工程最多 32 个、
+全局最多 256 个待处理操作，全局同时最多 2 个渲染，超出返回 `RESOURCE_LIMIT_EXCEEDED`（`queue_full`）；请求取消
+会传给渲染 worker。渲染输出先写到工程外的临时目录，PNG 再按 SHA-256 放进
+`.newmoney/image-work/<projectId>/previews/<sha>.png`，Main 按摘要读取，临时目录随即删除；渲染期间发
+`image.job.changed` 的 queued → running → completed/failed/cancelled。引擎和它的原生图像模块在第一条图像命令时
+才加载，不在 Host 启动时加载：加载失败只让图像命令返回可恢复的 `UNSUPPORTED`（`engine_unavailable`），下一条命令
+会重试，对话不受影响。Agent 经 Pi 工具做的修改目前不产生这些事件，由 Main 的目录监听在检查点 6 补上。
 
 ## Team Chat transport
 

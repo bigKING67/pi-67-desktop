@@ -5,6 +5,7 @@ import { forkSessionFromTask } from "./cross-task-session-fork.js";
 import { commandRequiresRunAdmission, isSettledRunAdmissionResult } from "./global-run-admission.js";
 import { dispatchHostCommand, type RuntimeLoadedCommand } from "./host-command-dispatcher.js";
 import { dispatchHostAppCommand } from "./host-app-command-dispatcher.js";
+import { createImageEngineHost } from "./image/create-image-engine-host.js";
 import { HostEventChannel } from "./host-event-channel.js";
 import { HostDiagnosticEvidence } from "./host-diagnostic-evidence.js";
 import { HostRequestRouter } from "./host-request-router.js";
@@ -196,6 +197,7 @@ export class AgentHostServer {
         loadRuntime: (state) => this.taskLifecycle.loadRuntime(state),
         closeTask: (state, mode) => this.taskLifecycle.closeTask(state, mode),
         dispatchTask: (command, state, fingerprint) => this.dispatch(command, state, fingerprint),
+        imageCommands: createImageEngineHost(this.workspaces, this.events),
         shutdownResources: async (deadlineMs) => {
           const results = await Promise.allSettled([
             resourceManagement.shutdown(deadlineMs),

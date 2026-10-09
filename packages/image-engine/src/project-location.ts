@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { IMAGE_LIBRARY_MARKER, IMAGE_WORK_DIRECTORY, imageProjectRelativePath, isImageId } from "@pi67/domain";
+import { IMAGE_LIBRARY_MARKER, IMAGE_WORK_DIRECTORY, imageProjectRelativePath, isImageId, type ImageProjectOwnership } from "@pi67/domain";
 
 /**
  * Projects resolve from the session's Workspace and a project id only; tools
@@ -11,8 +11,23 @@ import { IMAGE_LIBRARY_MARKER, IMAGE_WORK_DIRECTORY, imageProjectRelativePath, i
  */
 export function projectRoot(cwd: string, projectId: string): string {
   if (!isImageId(projectId)) throw new Error("Invalid image project id");
-  const ownership = existsSync(path.join(cwd, IMAGE_LIBRARY_MARKER)) ? "library" : "workspace";
-  return path.join(cwd, ...imageProjectRelativePath(ownership, projectId));
+  return path.join(cwd, ...imageProjectRelativePath(workspaceOwnership(cwd), projectId));
+}
+
+/** The creative library carries a marker at its root; every other Workspace is ordinary. */
+export function workspaceOwnership(cwd: string): ImageProjectOwnership {
+  return existsSync(path.join(cwd, IMAGE_LIBRARY_MARKER)) ? "library" : "workspace";
+}
+
+/** The folder that holds a Workspace's image projects. */
+export function projectsDirectory(cwd: string): string {
+  return workspaceOwnership(cwd) === "library" ? cwd : path.join(cwd, ".newmoney", "images");
+}
+
+/** Content-addressed previews the renderer reads through Main by digest. */
+export function previewCachePath(cwd: string, projectId: string, pngSha256: string): string {
+  if (!isImageId(projectId) || !/^[a-f0-9]{64}$/u.test(pngSha256)) throw new Error("Invalid image preview reference");
+  return path.join(cwd, ...IMAGE_WORK_DIRECTORY, projectId, "previews", `${pngSha256}.png`);
 }
 
 /** A fresh directory for one render or job input, outside every project. */

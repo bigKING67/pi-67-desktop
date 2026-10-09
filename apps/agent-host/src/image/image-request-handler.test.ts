@@ -2,11 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { RequestEnvelope } from "@pi67/protocol";
 import type { HostConnectionContext } from "../connection-context.js";
 import { handleImageRequest } from "./image-request-handler.js";
-import { ImageCommandRouter } from "./image-command-router.js";
+import { UnavailableImageCommands } from "./image-command-router.js";
 
+const requestSignal = new AbortController().signal;
 function origin() {
-  const sendError = vi.fn(), sendSuccess = vi.fn();
-  return { origin: { sendError, sendSuccess } as unknown as HostConnectionContext, sendError, sendSuccess };
+  const sendError = vi.fn(), sendSuccess = vi.fn(), signalForRequest = vi.fn(() => requestSignal);
+  return { origin: { sendError, sendSuccess, signalForRequest } as unknown as HostConnectionContext, sendError, sendSuccess };
 }
 const request = (type: string, context: RequestEnvelope["context"]): RequestEnvelope =>
   ({ requestId: "r1", type, payload: {}, context }) as unknown as RequestEnvelope;
@@ -27,17 +28,17 @@ describe("image request handler", () => {
 
   it("passes Workspace-scoped commands to the router and reports its refusal", async () => {
     const { origin: o, sendError, sendSuccess } = origin();
-    const router = new ImageCommandRouter();
+    const router = new UnavailableImageCommands();
     const execute = vi.spyOn(router, "execute");
     expect(handleImageRequest(o, request("image.project.read", workspace), router)).toBe(true);
-    expect(execute).toHaveBeenCalledWith("w1", { type: "image.project.read", payload: {} });
+    expect(execute).toHaveBeenCalledWith("w1", { type: "image.project.read", payload: {} }, requestSignal);
     await vi.waitFor(() => expect(sendError).toHaveBeenCalledWith("r1", "image.project.read", expect.objectContaining({ code: "UNSUPPORTED", details: expect.objectContaining({ imageReason: "engine_unavailable" }) })));
     expect(sendSuccess).not.toHaveBeenCalled();
   });
 
   it("returns router results as success", async () => {
     const { origin: o, sendSuccess } = origin();
-    const router = new ImageCommandRouter();
+    const router = new UnavailableImageCommands();
     vi.spyOn(router, "execute").mockResolvedValue({ projects: [] } as never);
     handleImageRequest(o, request("image.project.list", workspace), router);
     await vi.waitFor(() => expect(sendSuccess).toHaveBeenCalledWith("r1", "image.project.list", { projects: [] }));

@@ -93,6 +93,9 @@ importers:
       '@pi67/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@pi67/image-engine':
+        specifier: workspace:*
+        version: link:../../packages/image-engine
       '@pi67/pi-runtime':
         specifier: workspace:*
         version: link:../../packages/pi-runtime
@@ -148,6 +151,9 @@ importers:
       electron:
         specifier: 43.7.3
         version: 43.7.3(supports-color@8.1.1)
+      sharp:
+        specifier: 0.35.5
+        version: 0.35.5(@types/node@24.10.1)
       tsdown:
         specifier: 0.22.13
         version: 0.22.13(oxc-resolver@11.24.2)(typescript@7.0.2)
@@ -335,6 +341,9 @@ importers:
 
   packages/image-engine:
     dependencies:
+      '@pi67/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@resvg/resvg-js':
         specifier: 2.6.2
         version: 2.6.2
@@ -345,9 +354,6 @@ importers:
         specifier: 0.35.5
         version: 0.35.5(@types/node@24.10.1)
     devDependencies:
-      '@pi67/domain':
-        specifier: workspace:*
-        version: link:../domain
       '@pi67/protocol':
         specifier: workspace:*
         version: link:../protocol

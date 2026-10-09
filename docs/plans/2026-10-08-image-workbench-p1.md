@@ -112,8 +112,15 @@ Product model: `docs/architecture/image-workbench-product-model.md`; decisions:
       capability build/packaging of this extension moves to checkpoint 7: owned
       extensions are bundled to Node-builtin-only entries, but this one needs the
       engine's native modules (Sharp, resvg) in its tree.
-- [ ] 5. `apps/agent-host`: engine host, per-project queue, worker pool, cancel,
-      restart marks running → failed, task events; tests.
+- [x] 5. `apps/agent-host`: engine host, per-project queue, worker pool, cancel,
+      task events; tests. Done 2026-10-09: `ImageEngineHost` runs the seven
+      commands (trust-gated, renderer changes recorded as `human`), per-project
+      serial queue with bounds, two host-wide render slots, request cancellation,
+      content-addressed preview cache, change/candidate/job events, typed error
+      mapping. The engine loads lazily on the first image command so a missing
+      native image runtime cannot stop the Host. "Restart marks running as
+      failed" does not apply: Host renders keep no durable state, and Agent
+      Provider jobs already report an interrupted `started` as unproven.
 - [ ] 6. `apps/desktop`: library index skeleton and `app://pi67/image/...`
       read-only route scoped to indexed projects; tests.
 - [ ] 7. Packaged previews on macOS arm64 and Windows x64 load native modules and
@@ -180,6 +187,14 @@ are additive. No user directories are rewritten (import is read-only).
   without credentials Pi refuses before calling the implementation. Not yet
   verified: a real image request through Pi (checkpoint 8). Next: checkpoint 5
   (Agent Host engine host replacing the `UNSUPPORTED` router).
+- 2026-10-09: checkpoint 5 complete. Found while wiring: a static engine import
+  in `host-server.ts` would load Sharp at Host startup, so a packaging or
+  native-module failure would have broken conversations too; the engine is now
+  a dynamic import and Agent Host's build keeps `@pi67/image-engine` external.
+  The image Pi extension still imports the engine statically; checkpoint 7
+  must confirm Pi isolates an extension load failure or make it lazy too. Agent
+  changes made through Pi tools emit no `image.*` events yet (checkpoint 6
+  watcher). Next: checkpoint 6 (Main library index and `app://` preview route).
 - 2026-10-09 handoff checkpoint (model switch, same session): checkpoint 2 in
   progress, uncommitted and not yet typechecked. Dirty scope, all inside
   `packages/image-engine`: new `src/provider-profiles.ts` (profiles + surfaces

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ImageCommandPayloadSchemas, type AgentCommand } from "@pi67/protocol";
-import { ImageCommandRouter, isImageCommand } from "./image-command-router.js";
+import { UnavailableImageCommands, isImageCommand } from "./image-command-router.js";
 import { HostCommandError } from "../protocol-error.js";
 
 describe("image command router", () => {
@@ -13,7 +13,7 @@ describe("image command router", () => {
 
   it("fails closed with a typed recoverable refusal until the engine host lands", async () => {
     const command = { type: "image.project.list", payload: {} } as AgentCommand<"image.project.list">;
-    const failure = await new ImageCommandRouter().execute("workspace-1", command).catch((error: unknown) => error);
+    const failure = await new UnavailableImageCommands().execute("workspace-1", command).catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(HostCommandError);
     expect(failure).toMatchObject({ code: "UNSUPPORTED", recoverable: true, details: { imageReason: "engine_unavailable", command: "image.project.list" } });
   });

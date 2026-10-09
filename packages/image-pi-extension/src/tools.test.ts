@@ -4,9 +4,8 @@ import path from "node:path";
 import sharp from "sharp";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { IMAGE_LIBRARY_MARKER } from "@pi67/domain";
-import { readProject } from "@pi67/image-engine";
+import { projectRoot, readProject } from "@pi67/image-engine";
 import { imageTools } from "./tools.js";
-import { projectRoot } from "./project-location.js";
 import type { GenerateImages } from "./openai-images.js";
 
 type Tool = ReturnType<typeof imageTools>[number];

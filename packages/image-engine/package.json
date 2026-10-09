@@ -16,12 +16,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@pi67/domain": "workspace:*",
     "@resvg/resvg-js": "2.6.2",
     "satori": "0.35.0",
     "sharp": "0.35.5"
   },
   "devDependencies": {
-    "@pi67/domain": "workspace:*",
     "@pi67/protocol": "workspace:*",
     "@types/node": "24.10.1",
     "tsdown": "0.22.13",

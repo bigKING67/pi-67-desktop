@@ -27,6 +27,7 @@ import { isWorkspaceFileCommand, type WorkspaceFileCommandRouter } from "./works
 import { handleWorkspaceReadRequest } from "./workspace-read-request-handler.js";
 import { WorkspaceUsageReportCoordinator } from "./workspace-usage-report-coordinator.js";
 import { handleImageRequest } from "./image/image-request-handler.js";
+import type { ImageCommandExecutor } from "./image/image-command-router.js";
 
 export interface HostRequestRouterOptions {
   isShuttingDown(): boolean;
@@ -45,6 +46,7 @@ export interface HostRequestRouterOptions {
     submissionFingerprint?: string
   ): Promise<CommandResults[AgentCommandType]>;
   shutdownResources(deadlineMs?: number): Promise<void>;
+  imageCommands?: ImageCommandExecutor;
 }
 export class HostRequestRouter {
   private readonly sessionCreationResolutions: SessionCreationResolutionCoordinator;
@@ -102,7 +104,7 @@ export class HostRequestRouter {
       this.handleWorkspaceConversationCommand(origin, request);
       return;
     }
-    if (handleImageRequest(origin, request)) return;
+    if (handleImageRequest(origin, request, this.options.imageCommands)) return;
     if (handleWorkspaceReadRequest(
       origin,
       request,

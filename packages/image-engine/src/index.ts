@@ -29,6 +29,7 @@ export type { PhotoBrief, TemplateLayout } from "./photo-templates.js";
 export { cropPhoto, CROP_SCHEMA } from "./photo-crop.js";
 export type { CropReceipt, CropRectangle } from "./photo-crop.js";
 export { copyVariants, COPY_VARIANTS_SCHEMA } from "./copy-variants.js";
+export { projectRoot, projectsDirectory, workspaceOwnership, previewCachePath, workDirectory, ensureProjectParent } from "./project-location.js";
 export type { VariantManifest, VariantResult, VariantSpec, TextUpdate } from "./copy-variants.js";
 export { PROFILE_MODELS, IMAGE_MODELS, providerProfiles, surfaceProfiles } from "./provider-profiles.js";
 export { validateExecution, readExecution } from "./provider-store.js";
