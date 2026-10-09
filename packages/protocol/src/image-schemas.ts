@@ -155,6 +155,9 @@ export const ImageEventPayloadSchemas: Record<keyof ImageEventPayloads, TSchema>
   })
 };
 
+/** Preview naming shared by Host (writer) and Main (reader); Main reaches domain policy only through protocol. */
+export { imagePreviewRelativePath, isImageId, IMAGE_PROJECT_LIMITS } from "@pi67/domain";
+
 /** Structural check of an engine document before it crosses the Agent port. */
 export const isImageDocument = (value: unknown): boolean => Value.Check(DocumentSchema, value);
 

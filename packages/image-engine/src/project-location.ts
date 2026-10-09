@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { IMAGE_LIBRARY_MARKER, IMAGE_WORK_DIRECTORY, imageProjectRelativePath, isImageId, type ImageProjectOwnership } from "@pi67/domain";
+import { IMAGE_LIBRARY_MARKER, IMAGE_WORK_DIRECTORY, imagePreviewRelativePath, imageProjectRelativePath, isImageId, type ImageProjectOwnership } from "@pi67/domain";
 
 /**
  * Projects resolve from the session's Workspace and a project id only; tools
@@ -26,8 +26,7 @@ export function projectsDirectory(cwd: string): string {
 
 /** Content-addressed previews the renderer reads through Main by digest. */
 export function previewCachePath(cwd: string, projectId: string, pngSha256: string): string {
-  if (!isImageId(projectId) || !/^[a-f0-9]{64}$/u.test(pngSha256)) throw new Error("Invalid image preview reference");
-  return path.join(cwd, ...IMAGE_WORK_DIRECTORY, projectId, "previews", `${pngSha256}.png`);
+  return path.join(cwd, ...imagePreviewRelativePath(projectId, pngSha256));
 }
 
 /** A fresh directory for one render or job input, outside every project. */

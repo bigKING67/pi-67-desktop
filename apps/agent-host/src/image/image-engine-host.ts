@@ -8,6 +8,7 @@ import { HostCommandError } from "../protocol-error.js";
 import type { ImageCommandType } from "./image-command-router.js";
 import { imageEngineError } from "./image-engine-errors.js";
 import { ImageWorkQueue } from "./image-work-queue.js";
+import { ImageProjectWatcher } from "./image-project-watcher.js";
 
 export interface ImageEngineHostDependencies {
   /** Host-local realpath of a registered, trusted Workspace. */
@@ -15,6 +16,7 @@ export interface ImageEngineHostDependencies {
   emit(workspaceId: string, event: AgentEvent): void;
   queue?: ImageWorkQueue;
   loadEngine?: () => Promise<ImageEngine>;
+  watcher?: ImageProjectWatcher;
 }
 
 type Command<T extends ImageCommandType> = AgentCommand<T>;
@@ -27,10 +29,22 @@ const event = <T extends keyof ImageEventPayloads>(type: T, payload: ImageEventP
  */
 export class ImageEngineHost {
   private readonly queue: ImageWorkQueue;
+  private readonly watcher: ImageProjectWatcher;
   private engine: Promise<ImageEngine> | undefined;
 
   constructor(private readonly dependencies: ImageEngineHostDependencies) {
     this.queue = dependencies.queue ?? new ImageWorkQueue();
+    this.watcher = dependencies.watcher ?? new ImageProjectWatcher({ emit: (workspaceId, item) => dependencies.emit(workspaceId, item) });
+  }
+
+  /** Stops watching project folders; image commands after this still run. */
+  dispose(): void { this.watcher.dispose(); }
+
+  // Announces a change this Host made and records it so the watcher stays quiet about it.
+  private announce(workspaceId: string, announced: AgentEvent): void {
+    if (announced.type === "image.project.changed") this.watcher.noteRevision(workspaceId, announced.payload.projectId, announced.payload.revision);
+    if (announced.type === "image.candidate.changed") this.watcher.noteCandidate(workspaceId, announced.payload.projectId, announced.payload.candidateId, announced.payload.status);
+    this.dependencies.emit(workspaceId, announced);
   }
 
   // The engine (and its native image modules) loads on the first image command,
@@ -47,6 +61,7 @@ export class ImageEngineHost {
   async execute<T extends ImageCommandType>(workspaceId: string, command: Command<T>, signal?: AbortSignal): Promise<CommandResults[T]> {
     const cwd = this.dependencies.workspaceRoot(workspaceId);
     const engine = await this.load();
+    this.watcher.ensure(workspaceId, cwd, engine);
     try {
       return await this.dispatch(engine, workspaceId, cwd, command as Command<ImageCommandType>, signal) as CommandResults[T];
     } catch (error) {
@@ -68,7 +83,7 @@ export class ImageEngineHost {
         const { projectId, baseRevision, summary, operations, dryRun = false } = (command as Command<"image.project.edit">).payload;
         return this.queue.serial(key(workspaceId, projectId), async () => {
           const result = await editBatch(projectRoot(cwd, projectId), { base_revision: baseRevision, author: "human", summary, operations }, { dryRun });
-          if (!dryRun) this.dependencies.emit(workspaceId, event("image.project.changed", { projectId, revision: result.document.revision, sha256: result.sha256, author: "human" }));
+          if (!dryRun) this.announce(workspaceId, event("image.project.changed", { projectId, revision: result.document.revision, sha256: result.sha256, author: "human" }));
           return { projectId, revision: result.document.revision, sha256: result.sha256, dryRun };
         });
       }
@@ -82,8 +97,8 @@ export class ImageEngineHost {
         const { projectId, candidateId, baseRevision, summary } = (command as Command<"image.candidate.accept">).payload;
         return this.queue.serial(key(workspaceId, projectId), async () => {
           const result = await acceptCandidate(projectRoot(cwd, projectId), { candidate_id: candidateId, base_revision: baseRevision, author: "human", summary });
-          this.dependencies.emit(workspaceId, event("image.project.changed", { projectId, revision: result.document.revision, sha256: result.sha256, author: "human" }));
-          this.dependencies.emit(workspaceId, event("image.candidate.changed", { projectId, candidateId, status: "accepted" }));
+          this.announce(workspaceId, event("image.project.changed", { projectId, revision: result.document.revision, sha256: result.sha256, author: "human" }));
+          this.announce(workspaceId, event("image.candidate.changed", { projectId, candidateId, status: "accepted" }));
           return { projectId, revision: result.document.revision, sha256: result.sha256, dryRun: false };
         });
       }
@@ -91,7 +106,7 @@ export class ImageEngineHost {
         const { projectId, candidateId, summary } = (command as Command<"image.candidate.discard">).payload;
         return this.queue.serial(key(workspaceId, projectId), async () => {
           await discardCandidate(projectRoot(cwd, projectId), { candidate_id: candidateId, author: "human", summary });
-          this.dependencies.emit(workspaceId, event("image.candidate.changed", { projectId, candidateId, status: "discarded" }));
+          this.announce(workspaceId, event("image.candidate.changed", { projectId, candidateId, status: "discarded" }));
           return { projectId, candidateId, status: "discarded" as const };
         });
       }

@@ -121,8 +121,12 @@ Product model: `docs/architecture/image-workbench-product-model.md`; decisions:
       native image runtime cannot stop the Host. "Restart marks running as
       failed" does not apply: Host renders keep no durable state, and Agent
       Provider jobs already report an interrupted `started` as unproven.
-- [ ] 6. `apps/desktop`: library index skeleton and `app://pi67/image/...`
-      read-only route scoped to indexed projects; tests.
+- [x] 6. `apps/desktop`: `app://pi67/image/...` read-only route; tests. Done
+      2026-10-09: Main serves content-addressed previews for trusted Workspaces
+      with digest re-verification; Agent Host watches project folders so Agent
+      and Pi TUI changes reach the renderer as events. Changed from the plan
+      with reasons in ADR 0010 decision 10: no separate library index (the
+      disk is the index) and the watcher lives in Agent Host, not Main.
 - [ ] 7. Packaged previews on macOS arm64 and Windows x64 load native modules and
       the font, render a fixture; evidence directory with receipts.
 - [ ] 8. Real Pi session through Desktop meets the Agent-path criteria; tool-call
@@ -195,6 +199,13 @@ are additive. No user directories are rewritten (import is read-only).
   must confirm Pi isolates an extension load failure or make it lazy too. Agent
   changes made through Pi tools emit no `image.*` events yet (checkpoint 6
   watcher). Next: checkpoint 6 (Main library index and `app://` preview route).
+- 2026-10-09: checkpoint 6 complete. Main may not depend on `@pi67/domain`
+  (architecture rule), so protocol re-exports the preview naming helpers.
+  Not covered: a first project created by the Agent in a Workspace whose image
+  folder did not exist yet is not watched until the next image command
+  restarts the watcher; the renderer's own refresh covers it. Runtime check
+  still pending: the protocol handler and the lazily loaded engine have not run
+  inside Electron yet (checkpoint 7 packaged preview). Next: checkpoint 7.
 - 2026-10-09 handoff checkpoint (model switch, same session): checkpoint 2 in
   progress, uncommitted and not yet typechecked. Dirty scope, all inside
   `packages/image-engine`: new `src/provider-profiles.ts` (profiles + surfaces

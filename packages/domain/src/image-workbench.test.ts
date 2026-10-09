@@ -6,6 +6,7 @@ import {
   imageCandidateActions,
   imageEditSubmission,
   imageEngineFailure,
+  imagePreviewRelativePath,
   imageProjectRelativePath,
   isImageId,
   isTerminalImageJobState,
@@ -58,6 +59,13 @@ describe("image workbench policy", () => {
     expect(imageProjectRelativePath("library", "poster")).toEqual(["poster"]);
     expect(imageProjectRelativePath("workspace", "poster")).toEqual([".newmoney", "images", "poster"]);
     expect(() => imageProjectRelativePath("library", "../escape")).toThrow(/Invalid image project id/);
+  });
+
+  it("names previews by project and digest only", () => {
+    expect(imagePreviewRelativePath("poster", "a".repeat(64))).toEqual([".newmoney", "image-work", "poster", "previews", `${"a".repeat(64)}.png`]);
+    for (const [project, sha] of [["../x", "a".repeat(64)], ["poster", "A".repeat(64)], ["poster", "a".repeat(63)], ["poster", "../../etc"]]) {
+      expect(() => imagePreviewRelativePath(project ?? "", sha ?? "")).toThrow(/Invalid image preview reference/);
+    }
   });
 
   it("recognises terminal job states", () => {

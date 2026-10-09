@@ -107,11 +107,16 @@ Evidence that shaped the decisions:
    Seedream) are added as further Pi image API implementations, not engine
    changes. The first draft let the engine call the Images API directly with
    Pi-sourced credentials; that was a non-Pi Provider adapter and is rejected.
-10. **Preview transport.** Main serves thumbnails and previews through a
-    read-only `app://pi67/image/<projectId>/<kind>/<sha>` route scoped to indexed
-    projects; the renderer re-reads on `image.project.revision` /
-    `image.candidate.changed` events. No image bytes cross the Agent port; no
-    localhost server or local WebSocket.
+10. **Preview transport.** (Revised 2026-10-09.) Agent Host renders previews
+    into a content-addressed cache inside the Workspace; Main serves them through
+    the read-only `app://pi67/image/<workspaceId>/<projectId>/<sha256>.png`
+    route for persisted, available, trusted Workspaces only, rejecting symlinks,
+    escapes and any file whose bytes do not hash to its name. The renderer
+    re-reads on `image.project.changed` / `image.candidate.changed`. Agent Host,
+    not Main, watches project folders, because the Agent's changes happen in
+    the Host process where the event channel lives; the disk is the project
+    index, so neither process keeps a second one. No image bytes cross the
+    Agent port; no localhost server or local WebSocket.
 11. **No labeling.** No visible or metadata AI-content marks. Receipts and
     embedded parameters serve reproducibility and undo only.
 12. **Capability scope.** Both audiences share one engine: L1 objects and

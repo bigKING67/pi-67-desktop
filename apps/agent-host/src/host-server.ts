@@ -62,6 +62,7 @@ export class AgentHostServer {
   private shutdownPromise: Promise<AgentHostShutdownResult> | undefined;
   private readonly sdkVersions: HostSdkVersionLoader;
   private readonly events: HostEventChannel;
+  private readonly images: ReturnType<typeof createImageEngineHost>;
   private readonly runtimeLoader: AgentRuntimeLoader;
   private readonly usesCompatibilityRuntime: boolean;
   private readonly diagnosticEvidence = new HostDiagnosticEvidence();
@@ -139,6 +140,7 @@ export class AgentHostServer {
       getRuntime: () => this.tasks.activeState()?.record.runtime ?? this.compatibilityRuntime,
       getProtocolContext: () => this.tasks.eventProtocolContext()
     });
+    this.images = createImageEngineHost(this.workspaces, this.events);
     this.contextMemory = createHostContextMemory(agentDir, this.workspaces, this.events, this.taskRuntimes, options);
     this.teamKnowledge = createHostTeamKnowledge({ configuration, settings: options.teamIndexSettings, workers: options.teamWorkers,
       admission: this.teamModelPorts, owner: this.contextMemory.teamKnowledge, isAvailable: () => !this.shuttingDown });
@@ -197,17 +199,15 @@ export class AgentHostServer {
         loadRuntime: (state) => this.taskLifecycle.loadRuntime(state),
         closeTask: (state, mode) => this.taskLifecycle.closeTask(state, mode),
         dispatchTask: (command, state, fingerprint) => this.dispatch(command, state, fingerprint),
-        imageCommands: createImageEngineHost(this.workspaces, this.events),
+        imageCommands: this.images,
         shutdownResources: async (deadlineMs) => {
           const results = await Promise.allSettled([
             resourceManagement.shutdown(deadlineMs),
             this.larkAuth.shutdown(),
             this.contextMemory.shutdown(),
-            this.appConfiguration.shutdown()
+            this.appConfiguration.shutdown(), Promise.resolve(this.images.dispose())
           ]);
-          const rejected = results.find(
-            (result): result is PromiseRejectedResult => result.status === "rejected"
-          );
+          const rejected = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
           if (rejected) throw rejected.reason;
         }
       }

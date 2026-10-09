@@ -122,6 +122,14 @@ export type ImageProjectOwnership = "library" | "workspace";
 export const IMAGE_LIBRARY_MARKER = ".newmoney-library.json";
 /** Renders and Agent job inputs live outside every project, under the Workspace. */
 export const IMAGE_WORK_DIRECTORY = [".newmoney", "image-work"] as const;
+const SHA256 = /^[a-f0-9]{64}$/u;
+
+/** Workspace-relative path of a content-addressed preview; Host writes it, Main serves it by digest. */
+export function imagePreviewRelativePath(projectId: string, pngSha256: string): string[] {
+  if (!isImageId(projectId) || !SHA256.test(pngSha256)) throw new Error("Invalid image preview reference");
+  return [...IMAGE_WORK_DIRECTORY, projectId, "previews", `${pngSha256}.png`];
+}
+
 /** The Pi Provider whose image models the workbench registers (ADR 0010 decision 9). */
 export const IMAGE_PROVIDER_ID = "newmoney-images";
 export const IMAGE_PROVIDER_API = "openai-images";

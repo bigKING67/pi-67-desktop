@@ -6,6 +6,7 @@ import { AgentHostSupervisor } from "./agent-host-supervisor.js";
 import { createAgentHostStoragePaths } from "./agent-host-storage.js";
 import { createApplicationShutdownController } from "./application-shutdown.js";
 import { registerApplicationProtocol, registerAppSchemePrivileges } from "./app-protocol.js";
+import { trustedWorkspaceRoot } from "./app-protocol-image.js";
 import { createMainWindow } from "./main-window.js";
 import { observeStartupStage } from "./startup-stage-observer.js";
 import {
@@ -209,7 +210,7 @@ if (hasSingleInstanceLock) {
         { role: "windowMenu" }
       ]));
     }
-    registerApplicationProtocol(rendererDirectory);
+    registerApplicationProtocol(rendererDirectory, trustedWorkspaceRoot(() => workbenchState));
     workbenchState = new WorkbenchStateStore(app.getPath("userData"));
     packageNetworkSettings = new PackageNetworkSettingsStore(app.getPath("userData"));
     const retiredTokenCleanup = await observeStartupStage("profile-retired-token", () => (

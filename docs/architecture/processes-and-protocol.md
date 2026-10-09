@@ -2781,7 +2781,12 @@ Host 把 renderer 发起的修订一律记为 `human`。引擎拒绝以现有错
 `.newmoney/image-work/<projectId>/previews/<sha>.png`，Main 按摘要读取，临时目录随即删除；渲染期间发
 `image.job.changed` 的 queued → running → completed/failed/cancelled。引擎和它的原生图像模块在第一条图像命令时
 才加载，不在 Host 启动时加载：加载失败只让图像命令返回可恢复的 `UNSUPPORTED`（`engine_unavailable`），下一条命令
-会重试，对话不受影响。Agent 经 Pi 工具做的修改目前不产生这些事件，由 Main 的目录监听在检查点 6 补上。
+会重试，对话不受影响。Host 在首条图像命令后递归监听该工作区的图像文件夹（最多 16 个工作区，防抖 200ms），把 Agent 的 Pi 工具或
+其他进程写入的新修订、候选状态变化转成同样的事件，作者取自修订记录；Host 自己发出过的修订号和候选状态会被
+记下，不重复发送。文件夹尚不存在或监听出错时不报错，以显式刷新为准。Main 的
+`app://pi67/image/<workspaceId>/<projectId>/<sha256>.png` 只为已持久化、可用且已信任的 Workspace 提供预览：
+拒绝符号链接、路径逃逸和超过上限的文件，并重新计算 SHA-256，与文件名不符即 404；响应为 `image/png`、
+`nosniff`、按内容寻址的长期缓存。Main 经 `@pi67/protocol` 取得预览命名规则，不直接依赖 domain。
 
 ## Team Chat transport
 

@@ -347,10 +347,13 @@ Provider 请求只允许 HTTPS 或 loopback，拒绝带凭据的 URL；凭据只
   之后可在 `设置 › 图像` 更改（更改只迁移索引，不迁移文件）。预填建议：macOS 为 `~/Documents/New Money/图像`；
   Windows 优先预填第一个非系统盘的固定磁盘（如 `D:\New Money\图像`），没有非系统盘才退回 `Documents`。
   素材、工程、导出件都在创作库内，不放系统盘 `userData`。创建时由 App 注册为受信任 Workspace，并在设置页显示路径。
-- Main 维护 `userData/image-library/index.json`（项目 ID、路径、归属、标题、最新修订摘要、缩略图哈希），
-  启动时与磁盘对账，缺失项目标为 `missing` 而非删除记录。`userData` 内只有这份索引与缩略图缓存，
-  体积小且可随时删除重建；用户素材从不进入 `userData`。
-- 缩略图按修订渲染摘要寻址存于 `userData/image-library/thumbs/<sha>.png`，可随时删除重建。
+- 磁盘就是工程索引（2026-10-09 修订）：Agent Host 的 `image.project.list` 直接列出工作区图像文件夹里可读的
+  工程，不另建 `index.json`，也就没有索引与磁盘不一致的问题。Main 只保存创作库位置（P2）。
+- 预览按 PNG 摘要寻址存于工作区内 `.newmoney/image-work/<projectId>/previews/<sha>.png`，由 Host 写入、
+  Main 经 `app://pi67/image/...` 读取，可随时删除重建；不进入 `userData`。
+- Agent Host 在首条图像命令后递归监听该工作区的图像文件夹，把 Agent（Pi 工具）、Pi TUI 或其他进程造成的
+  修订和候选变化转成事件；Host 自己发出的事件会被记下，不会重复。监听是尽力而为：文件夹尚不存在或监听
+  出错时，以显式刷新为准。
 
 ### 12.3 隐私
 
