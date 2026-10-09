@@ -34,10 +34,11 @@ export { PROFILE_MODELS, IMAGE_MODELS, providerProfiles, surfaceProfiles } from 
 export { validateExecution, readExecution } from "./provider-store.js";
 export { validateImageJob, validateExecutionReceipt, compileImageJob, canonicalContracts } from "./contracts.js";
 export type { CompiledImageJob, ContractResult, ImageContracts } from "./contracts.js";
-export { checkProvider, executeProvider, recoverProvider, ProviderError } from "./provider.js";
+export { executeProvider, recoverProvider, ProviderError } from "./provider.js";
 export type { ProviderOptions, ProviderReceipt, ReceiptOutput, ProviderSpec, ProviderRequestRecord } from "./provider.js";
 export type { RequestParameters } from "./provider-prepare.js";
-export type { ProviderCredentials, ProviderEndpoint } from "./provider-endpoint.js";
+export { ImageGenerationError, numericUsage } from "./provider-generator.js";
+export type { ImageGenerationCall, ImageGenerationFailure, ImageGenerationOutcome, ImageGenerator } from "./provider-generator.js";
 export type { ExecutionBinding, ExecutionReceipt } from "./provider-store.js";
 export { ALPHA_ERRORS, inspectAlpha, requireAlpha, verifyAlpha } from "./provider-alpha.js";
 export type { AlphaEvidence } from "./provider-alpha.js";

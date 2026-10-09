@@ -11,7 +11,7 @@ import { stageCandidate, type StagedCandidate } from "./candidates.js";
 import { IMAGE_MODELS } from "./provider-profiles.js";
 import { normalizeImage, type OutputPolicy } from "./provider-normalize.js";
 import { canonicalContracts, type ImageContracts } from "./contracts.js";
-import { resolveEndpoint, responseJSON, numericUsage, type ProviderCredentials } from "./provider-endpoint.js";
+import { ImageGenerationError, numericUsage, type ImageGenerationCall, type ImageGenerator } from "./provider-generator.js";
 import { prepareRequest, compileJob, MASK_KEYS, type PreparedRequest, type ProviderRequestRecord, type ProviderSpec } from "./provider-prepare.js";
 
 export interface ReceiptOutput { asset_id: string; path: string; sha256: string; mime_type: string; bytes: number }
@@ -22,37 +22,25 @@ export interface ProviderReceipt extends JsonRecord {
   provider_execution_id: string | null; outputs: ReceiptOutput[]; provider_errors: JsonRecord[]; moderation_result: null; limitations: string[];
 }
 export interface ProviderOptions {
-  credentials?: ProviderCredentials | undefined; contracts?: ImageContracts | undefined; signal?: AbortSignal | undefined;
-  timeoutMs?: number; dryRun?: boolean; operator?: string; fetch?: typeof fetch;
+  /** Routes the request through Pi; absent when no Pi image model is configured. */
+  generator?: ImageGenerator | undefined; contracts?: ImageContracts | undefined; signal?: AbortSignal | undefined;
+  timeoutMs?: number; dryRun?: boolean; operator?: string;
 }
 export class ProviderError extends Error {
   constructor(message: string, readonly receipt?: ProviderReceipt, readonly output?: string) { super(message); }
 }
 
 const HOST = "newmoney.image-engine";
-const KNOWN_ERRORS = new Set(["preflight_revision_conflict", "http_error", "response_size_limit", "invalid_image_response", "invalid_image_size", "output_dimensions_or_format_mismatch", ...ALPHA_ERRORS]);
-
-export async function checkProvider({ credentials, signal, fetch: fetchImpl = fetch }: ProviderOptions = {}): Promise<JsonRecord> {
-  const endpoint = await resolveEndpoint(credentials, signal);
-  const timeout = AbortSignal.timeout(20_000);
-  let response: Response;
-  try { response = await fetchImpl(`${endpoint.baseUrl}/models`, { headers: { ...endpoint.headers, Authorization: `Bearer ${endpoint.apiKey}` }, redirect: "error", signal: signal ? AbortSignal.any([signal, timeout]) : timeout }); }
-  catch { throw new Error("Provider model listing failed"); }
-  if (!response.ok) throw new Error(`Provider model listing HTTP ${response.status}`);
-  const data = await responseJSON(response);
-  const rows = isRecord(data) && Array.isArray(data.data) ? data.data : [];
-  return { adapter_endpoint: "Image API", credential_source: endpoint.source, generation_verified: false,
-    models: IMAGE_MODELS.map((model) => ({ model, advertised: rows.some((row) => isRecord(row) && row.id === model) })) };
-}
+const KNOWN_ERRORS = new Set(["preflight_revision_conflict", "provider_unavailable", "http_error", "response_size_limit", "invalid_image_response", "invalid_image_size", "output_dimensions_or_format_mismatch", ...ALPHA_ERRORS]);
 
 export async function executeProvider(root: string, spec: unknown, options: ProviderOptions = {}): Promise<{ status: "candidate"; job: string; receipt: ProviderReceipt; candidate: StagedCandidate } | { status: "dry_run"; request: ProviderRequestRecord; network_requests: 0 }> {
-  const { signal, timeoutMs = 180_000, dryRun = false, operator = "agent", fetch: fetchImpl = fetch } = options;
+  const { signal, timeoutMs = 180_000, dryRun = false, operator = "agent", generator } = options;
   const contracts = options.contracts ?? canonicalContracts;
   number(timeoutMs, "Provider timeout", 1, 300_000, true);
   const prepared = await prepareRequest(root, spec, contracts);
   if (dryRun) return { status: "dry_run", request: prepared.request, network_requests: 0 };
   signal?.throwIfAborted();
-  const endpoint = await resolveEndpoint(options.credentials, signal);
+  if (!generator) throw new ProviderError("Image generation unavailable: no Pi image model is configured");
   const jobs = path.join(root, "jobs"); await ensureDirectory(jobs);
   const directory = path.join(jobs, prepared.job.job_id);
   await fs.mkdir(directory); // Exclusive durable claim: same job is never retried automatically.
@@ -67,15 +55,8 @@ export async function executeProvider(root: string, spec: unknown, options: Prov
     for (const key of MASK_KEYS) await save(`${key}.png`, prepared.masks[key].bytes);
   }
   await save("started.json", encodeJson({ started_at: started, status: "prepared", client_post_limit: 1 }));
-  const fields = { ...prepared.parameters, prompt: prepared.compiled.prompt };
-  let body: string | FormData;
-  if (prepared.job.task_type === "generate") body = JSON.stringify(fields);
-  else {
-    body = new FormData();
-    for (const [key, value] of Object.entries(fields)) body.set(key, String(value));
-    for (const ref of prepared.refs) body.append("image[]", new Blob([new Uint8Array(ref.bytes)], { type: "image/png" }), `${ref.id}.png`);
-    if (prepared.providerMask) body.set("mask", new Blob([new Uint8Array(prepared.providerMask)], { type: "image/png" }), "mask.png");
-  }
+  const call: ImageGenerationCall = { endpoint: prepared.request.endpoint, parameters: prepared.parameters, prompt: prepared.compiled.prompt,
+    references: prepared.refs.map((ref) => ({ id: ref.id, bytes: ref.bytes })), mask: prepared.providerMask };
   const timeout = AbortSignal.timeout(timeoutMs), combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
   const parameters: JsonRecord = { ...prepared.parameters, endpoint: prepared.request.endpoint, context: prepared.spec.edit?.context ?? null,
     client_post_attempts: 0, usage: null, billing: { state: "UNVERIFIED", actual_cost: null, currency: null } };
@@ -92,21 +73,13 @@ export async function executeProvider(root: string, spec: unknown, options: Prov
     // A price/human edit during preparation must not be charged against an old basis.
     if ((await readProject(root)).sha256 !== prepared.project.sha256) throw new Error("preflight_revision_conflict");
     parameters.client_post_attempts = 1;
-    const response = await fetchImpl(`${endpoint.baseUrl}/${prepared.request.endpoint}`, {
-      method: "POST", headers: { ...endpoint.headers, Authorization: `Bearer ${endpoint.apiKey}`, ...(typeof body === "string" ? { "Content-Type": "application/json" } : {}) },
-      body, redirect: "error", signal: combined
-    });
-    parameters.http_status = response.status;
-    if (!response.ok) { await response.body?.cancel(); throw new Error("http_error"); }
-    const data = await responseJSON(response);
-    parameters.usage = numericUsage(isRecord(data) ? data.usage : undefined);
-    const requestId = response.headers.get("x-request-id");
-    if (requestId && /^[a-zA-Z0-9_-]{1,200}$/.test(requestId) && !requestId.includes(endpoint.apiKey)) receipt.provider_execution_id = requestId;
-    const rows = isRecord(data) && Array.isArray(data.data) ? data.data : [];
-    const encoded = rows.length === 1 && isRecord(rows[0]) ? rows[0].b64_json : undefined;
-    if (typeof encoded !== "string" || encoded.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) throw new Error("invalid_image_response");
-    let output: Buffer = Buffer.from(encoded, "base64");
-    if (!output.length || output.length > LIMITS.sourceBytes || output.toString("base64") !== encoded) throw new Error("invalid_image_size");
+    const outcome = await generator(call, combined);
+    if (outcome.httpStatus !== undefined) parameters.http_status = outcome.httpStatus;
+    parameters.usage = numericUsage(outcome.usage);
+    if (outcome.requestId && /^[a-zA-Z0-9_-]{1,200}$/.test(outcome.requestId)) receipt.provider_execution_id = outcome.requestId;
+    if (outcome.images.length !== 1) throw new Error("invalid_image_response");
+    let output: Buffer = outcome.images[0] as Buffer;
+    if (!output.length || output.length > LIMITS.sourceBytes) throw new Error("invalid_image_size");
     const { info } = await sharp(output, { limitInputPixels: LIMITS.pixels, failOn: "warning" }).raw().toBuffer({ resolveWithObject: true });
     const meta = await sharp(output).metadata();
     parameters.returned_image = { format: meta.format, width: info.width, height: info.height, depth: meta.depth, pages: meta.pages ?? 1 };
@@ -136,6 +109,10 @@ export async function executeProvider(root: string, spec: unknown, options: Prov
     receipt.outcome = "succeeded";
   } catch (error) {
     receipt.outcome = receipt.outputs.length ? "partial" : signal?.aborted ? "cancelled" : "failed";
+    if (error instanceof ImageGenerationError) {
+      if (error.httpStatus !== undefined) parameters.http_status = error.httpStatus;
+      if (!error.sent) parameters.client_post_attempts = 0;
+    }
     const message = errorMessage(error);
     // A specific local verdict outranks an abort that fired while it was being computed.
     receipt.provider_errors = [{ code: KNOWN_ERRORS.has(message) ? message : timeout.aborted ? "timeout" : signal?.aborted ? "cancelled" : "transport_or_response_error",

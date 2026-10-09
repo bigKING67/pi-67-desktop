@@ -92,11 +92,21 @@ Evidence that shaped the decisions:
    Agent runs unattended within it and asks once when exceeding it. Accepting or
    discarding candidates, touching locked objects or protected regions, deleting
    or exporting outside the project always need the user.
-9. **Model choice is the user's.** Image Providers, credentials and base URLs
-   come from Pi Provider configuration through supported runtime seams; the
-   ported adapter stops reading `~/.codex/config.toml` / `auth.json`. The task
-   composer lists configured image-capable Providers; Desktop recommends none,
-   routes nothing and keeps no second credential store. The adapter is Node only.
+9. **Model choice is the user's; Pi is the only model route.** (Revised
+   2026-10-09.) Image models are Pi `type: "image"` models declared in the
+   user's Pi configuration (`models.json`), and every generation goes through
+   Pi's `modelRegistry.generateImages()`, so Pi resolves credentials (keys,
+   environment, OAuth) and the engine never calls a model API itself.
+   `packages/image-pi-extension` registers an `openai-images` image API
+   implementation through Pi's supported `ProviderConfigInput.images` seam;
+   mask, size, quality and background travel in `ImagesOptions.metadata`.
+   The engine receives an injected generator and keeps job claims, partial
+   receipts, offline recovery and protected-pixel composition. The task
+   composer lists the Pi image models the user configured; Desktop recommends
+   none and keeps no second credential store. Other image APIs (for example
+   Seedream) are added as further Pi image API implementations, not engine
+   changes. The first draft let the engine call the Images API directly with
+   Pi-sourced credentials; that was a non-Pi Provider adapter and is rejected.
 10. **Preview transport.** Main serves thumbnails and previews through a
     read-only `app://pi67/image/<projectId>/<kind>/<sha>` route scoped to indexed
     projects; the renderer re-reads on `image.project.revision` /

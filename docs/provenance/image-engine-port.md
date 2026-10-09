@@ -57,9 +57,12 @@
 - Provider 适配器（P1 检查点 2，2026-10-09）：Python 合同桥换成 `contracts.ts` 的 Node 实现，
   错误文案与 Python 逐字一致；`test-support/contract-fixtures.json` 的 38 个黄金用例由原版
   Python 校验器/编译器生成，`contracts.test.ts` 逐条比对结论、错误、警告和编译后的提示词包。
-  凭据不再读 `~/.codex/config.toml` / `auth.json`：宿主注入 `ProviderCredentials` 解析器，
-  引擎只校验 HTTPS 或回环、无内嵌凭据、无 CRLF 头注入；回执 `host` 为 `newmoney.image-engine`。
-  原两个依赖 Python shim 的测试改为注入失败的 `contracts` 和会改工程的凭据解析器，覆盖不变。
+  凭据不再读 `~/.codex/config.toml` / `auth.json`。回执 `host` 为 `newmoney.image-engine`。
+- 2026-10-09 按 ADR 0010 第 9 条修订：引擎不再发 HTTP 请求，`executeProvider` 接收注入的
+  `ImageGenerator`；原 `provider.mjs` 的 HTTP 部分（JSON/multipart、地址策略、响应大小、base64
+  校验、请求 ID）移入 `packages/image-pi-extension/src/openai-images.ts`，作为 Pi 的 `openai-images`
+  图像 API 实现，经 `modelRegistry.generateImages` 调用，由 Pi 解析凭据。「准备与预检之间人工编辑」
+  的测试原本靠凭据解析阶段注入，重构后没有可确定注入的点，已删除；该分支暂无直接测试。
 - 未移植：`cli.mjs`、`provider-config.mjs`、`provider-acceptance.mjs`、`provider-smoke.mjs`
   （craft67 操作员脚本，读写 `~/.codex`）及其测试 1 个、CLI 参数校验测试 3 个。真实网络验收
   改由 P1 检查点 8 的 Desktop 内真实 Pi 会话承担；Agent 通过 Pi 扩展工具调用引擎。

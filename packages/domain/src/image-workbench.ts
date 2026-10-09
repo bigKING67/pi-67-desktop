@@ -118,6 +118,14 @@ export function imageEditSubmission(displayedRevision: number, latestRevision: n
 
 export type ImageProjectOwnership = "library" | "workspace";
 
+/** Present at the creative library root; marks a Workspace whose projects sit at its top level. */
+export const IMAGE_LIBRARY_MARKER = ".newmoney-library.json";
+/** Renders and Agent job inputs live outside every project, under the Workspace. */
+export const IMAGE_WORK_DIRECTORY = [".newmoney", "image-work"] as const;
+/** The Pi Provider whose image models the workbench registers (ADR 0010 decision 9). */
+export const IMAGE_PROVIDER_ID = "newmoney-images";
+export const IMAGE_PROVIDER_API = "openai-images";
+
 /**
  * Where a project lives relative to its Workspace root. The creative library is
  * itself the Workspace root, so projects sit at its top level where designers

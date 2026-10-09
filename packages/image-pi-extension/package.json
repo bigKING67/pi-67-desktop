@@ -1,0 +1,27 @@
+{
+  "name": "@pi67/image-pi-extension",
+  "version": "0.1.0-alpha.48",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@pi67/domain": "workspace:*",
+    "@pi67/image-engine": "workspace:*",
+    "jsonc-parser": "3.3.1",
+    "typebox": "1.3.7"
+  },
+  "devDependencies": {
+    "@pi67/pi-runtime": "workspace:*",
+    "@types/node": "24.10.1",
+    "sharp": "0.35.5",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  }
+}

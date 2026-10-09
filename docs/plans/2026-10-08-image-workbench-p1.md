@@ -54,6 +54,7 @@ Product model: `docs/architecture/image-workbench-product-model.md`; decisions:
 | OBSERVED | Desktop ships private Node; craft67 Skills ship as pinned snapshots; Desktop-owned extension build boundary exists | `PRODUCT.md`, `docs/architecture/processes-and-protocol.md` | 2026-10-08 |
 | ASSUMED | Sharp/resvg prebuilt binaries load from the packaged tree on Windows x64 | none yet | — |
 | ASSUMED | Agent Host responsiveness holds with 2 render workers | none yet | — |
+| OBSERVED | Pi 1.0 `models.json` loads `type: "image"` entries as chat models; an extension layer with `models` replaces the Provider's list; a dedicated Provider with extension `baseUrl` receives the key from `models.json` or `auth.json`; without credentials `generateImages` returns "Provider is not configured" without calling the implementation | temporary real-SDK probe, no network | 2026-10-09 |
 
 ## Affected boundaries
 
@@ -103,8 +104,14 @@ Product model: `docs/architecture/image-workbench-product-model.md`; decisions:
       context block); compile-time protocol↔domain type parity and an engine test
       that every published revision passes `ImageDocumentSchema`; Host routes
       image commands to a fail-closed `UNSUPPORTED` router until checkpoint 5.
-- [ ] 4. `packages/image-pi-extension`: `image_*` tools, compact results with
-      preview paths; build under the Desktop-owned extension boundary; tests.
+- [x] 4. `packages/image-pi-extension`: `image_*` tools, compact results with
+      preview paths; tests. Done 2026-10-09: seven tools (create from photo, read,
+      edit, render with inline preview image, candidates, decide, generate); the
+      `openai-images` Pi image API on a dedicated `newmoney-images` Provider; the
+      engine takes an injected generator routed through Pi `generateImages`. The
+      capability build/packaging of this extension moves to checkpoint 7: owned
+      extensions are bundled to Node-builtin-only entries, but this one needs the
+      engine's native modules (Sharp, resvg) in its tree.
 - [ ] 5. `apps/agent-host`: engine host, per-project queue, worker pool, cancel,
       restart marks running → failed, task events; tests.
 - [ ] 6. `apps/desktop`: library index skeleton and `app://pi67/image/...`
@@ -162,6 +169,17 @@ are additive. No user directories are rewritten (import is read-only).
   text block (`formatImagePromptContext`), not a `prompt.submit` wire change.
   The library index stays a Main concern (checkpoint 6). Next: checkpoint 4
   (`packages/image-pi-extension`).
+- 2026-10-09: checkpoint 4 complete after an architecture correction the user
+  approved: Pi 1.0 has first-class image models and `generateImages`, so the
+  engine's direct Images API call was a non-Pi Provider adapter. ADR 0010
+  decision 9 revised; the engine now takes an injected generator. A real-SDK
+  probe (temporary directory, no network) showed `models.json` cannot declare
+  image models and an extension `models` layer replaces a Provider's model
+  list, so image models live on a dedicated `newmoney-images` Provider whose
+  base URL and key come from the user's `models.json` entry (or `auth.json`);
+  without credentials Pi refuses before calling the implementation. Not yet
+  verified: a real image request through Pi (checkpoint 8). Next: checkpoint 5
+  (Agent Host engine host replacing the `UNSUPPORTED` router).
 - 2026-10-09 handoff checkpoint (model switch, same session): checkpoint 2 in
   progress, uncommitted and not yet typechecked. Dirty scope, all inside
   `packages/image-engine`: new `src/provider-profiles.ts` (profiles + surfaces

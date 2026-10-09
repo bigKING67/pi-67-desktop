@@ -8,7 +8,6 @@ import { inspectCandidate, acceptCandidate } from "./candidates.js";
 import { inspectAlpha, requireAlpha, type AlphaEvidence } from "./provider-alpha.js";
 import { readExecution, type ExecutionBinding } from "./provider-store.js";
 import { sha256 } from "./content-store.js";
-import type { JsonRecord } from "./document.js";
 import { providerFixture, respondImage, transparentPNG, writeMasks } from "./test-support/provider-fixture.js";
 import { readJson } from "./test-support/harness.js";
 
@@ -28,9 +27,9 @@ describe("transparent Provider outputs", { timeout: 120_000 }, () => {
       f.job.provider_profile = `openai.gpt-image-2.5-${model}.2026-09-08`; f.job.canvas.background = "transparent"; await f.saveJob();
       const dry = await executeProvider(f.root, f.spec, { dryRun: true });
       expect(dry.status === "dry_run" && dry.request.parameters.background).toBe("transparent"); expect(f.calls).toHaveLength(0);
-      const result = await run(f.root, f.spec, { credentials: f.credentials });
+      const result = await run(f.root, f.spec, { generator: f.generator });
       const checks = transparency(result.receipt);
-      expect((JSON.parse(f.calls[0]?.body.toString() ?? "{}") as JsonRecord).background).toBe("transparent");
+      expect(f.calls[0]?.parameters.background).toBe("transparent");
       expect(checks.received.zero_pixels).toBe(512 * 1024); expect(checks.received.partial_pixels).toBe(1024);
       expect(checks.output).toEqual(checks.received); expect(checks.output.sha256).toBe(sha256(image));
       expect((await inspectCandidate(f.root, f.spec.candidate_id)).status).toBe("ready");
@@ -46,14 +45,14 @@ describe("transparent Provider outputs", { timeout: 120_000 }, () => {
       const image = await sharp({ create: { width: 1024, height: 1024, channels, background: color } }).png().toBuffer();
       const f = await providerFixture(respondImage(image));
       f.job.canvas.background = "transparent"; await f.saveJob();
-      const error = await failure(executeProvider(f.root, f.spec, { credentials: f.credentials }));
+      const error = await failure(executeProvider(f.root, f.spec, { generator: f.generator }));
       expect(error.receipt.outcome).toBe("partial"); expect(error.receipt.provider_errors[0]?.code).toBe(code);
       expect(transparency(error.receipt).received.sha256).toBe(sha256(image));
       expect(await fs.readFile(path.join(error.output ?? "", "received-output.png"))).toEqual(image);
       await expect(fs.stat(path.join(error.output ?? "", "output.png"))).rejects.toMatchObject({ code: "ENOENT" });
       await expect(inspectCandidate(f.root, f.spec.candidate_id)).rejects.toMatchObject({ code: "ENOENT" });
       await expect(recoverProvider(f.root, { job_id: "background-job", candidate_id: "invalid-recovery", output_policy: "resize_to_target" })).rejects.toThrow(/partial size-mismatch/);
-      await expect(executeProvider(f.root, f.spec, { credentials: f.credentials })).rejects.toThrow(/EEXIST/);
+      await expect(executeProvider(f.root, f.spec, { generator: f.generator })).rejects.toThrow(/EEXIST/);
       expect(f.calls).toHaveLength(1); expect((await readProject(f.root)).sha256).toBe(f.created.sha256);
     });
   }
@@ -61,7 +60,7 @@ describe("transparent Provider outputs", { timeout: 120_000 }, () => {
   for (const background of ["opaque", "auto"]) {
     it(`ordinary ${background} receipts reopen without alpha evidence`, async () => {
       const f = await providerFixture(); f.job.canvas.background = background; await f.saveJob();
-      const result = await run(f.root, f.spec, { credentials: f.credentials });
+      const result = await run(f.root, f.spec, { generator: f.generator });
       expect(result.receipt.parameters.transparency).toBeUndefined();
       await acceptCandidate(f.root, { candidate_id: f.spec.candidate_id, base_revision: 1, author: "agent", summary: "Ordinary compatibility" });
       expect((await inspectCandidate(f.root, f.spec.candidate_id)).status).toBe("accepted");
@@ -83,19 +82,17 @@ describe("transparent Provider outputs", { timeout: 120_000 }, () => {
       await writeMasks(f.directory, f.spec, { generation_mask: full, protection_mask: protection, blend_mask: full });
       if (hideAllClearPixels) {
         if (hideAllClearPixels === "recovery") {
-          await expect(executeProvider(f.root, f.spec, { credentials: f.credentials })).rejects.toThrow(/see bound receipt/);
+          await expect(executeProvider(f.root, f.spec, { generator: f.generator })).rejects.toThrow(/see bound receipt/);
           const error = await failure(recoverProvider(f.root, { job_id: "background-job", candidate_id: f.spec.candidate_id, output_policy: "resize_to_target" }));
           expect(error.message).toMatch(/candidate staging failed/); expect(error.receipt.outcome).toBe("succeeded");
           expect(await fs.stat(path.join(error.output ?? "", "output.png"))).toBeTruthy();
-        } else await expect(executeProvider(f.root, f.spec, { credentials: f.credentials })).rejects.toThrow(/candidate staging failed/);
+        } else await expect(executeProvider(f.root, f.spec, { generator: f.generator })).rejects.toThrow(/candidate staging failed/);
         const status = await readJson(path.join(f.root, "jobs/background-job/result.json"));
         expect(status.reason_code).toBe("output_no_clear_background"); expect(status.provider_outcome).toBe("succeeded");
         await expect(inspectCandidate(f.root, f.spec.candidate_id)).rejects.toMatchObject({ code: "ENOENT" });
       } else {
-        const result = await run(f.root, f.spec, { credentials: f.credentials });
-        const call = f.calls[0];
-        const form = await new Request("http://localhost/", { method: "POST", headers: { "content-type": String(call?.headers["content-type"]) }, body: new Uint8Array(call?.body ?? Buffer.alloc(0)) }).formData();
-        expect(form.get("background")).toBe("transparent");
+        const result = await run(f.root, f.spec, { generator: f.generator });
+        expect(f.calls[0]?.parameters.background).toBe("transparent"); expect(f.calls[0]?.endpoint).toBe("images/edits");
         expect(result.candidate.candidate.qa?.protected_pixels).toBe(64); expect(result.candidate.candidate.qa?.protected_changed_pixels).toBe(0);
         expect(requireAlpha(await inspectAlpha(await fs.readFile(path.join(f.root, result.candidate.candidate.output.file)))).zero_pixels).toBeGreaterThan(0);
         await acceptCandidate(f.root, { candidate_id: f.spec.candidate_id, base_revision: 1, author: "agent", summary: "Technical protected alpha fixture" });
@@ -108,7 +105,7 @@ describe("transparent Provider outputs", { timeout: 120_000 }, () => {
   it("transparent size recovery binds raw and normalized alpha without another POST", async () => {
     const f = await providerFixture(respondImage(await transparentPNG(1254)));
     f.job.canvas.background = "transparent"; await f.saveJob();
-    await expect(executeProvider(f.root, f.spec, { credentials: f.credentials })).rejects.toThrow(/see bound receipt/);
+    await expect(executeProvider(f.root, f.spec, { generator: f.generator })).rejects.toThrow(/see bound receipt/);
     const old = await fs.readFile(path.join(f.root, "jobs/background-job/receipt.json"));
     const recovered = await recoverProvider(f.root, { job_id: "background-job", candidate_id: "transparent-recovery", output_policy: "resize_to_target" });
     const checks = transparency(recovered.receipt);
@@ -121,7 +118,7 @@ describe("transparent Provider outputs", { timeout: 120_000 }, () => {
   it("transparent readback rejects fabricated or missing alpha evidence even with updated receipt digest", async () => {
     const f = await providerFixture(respondImage(await transparentPNG()));
     f.job.canvas.background = "transparent"; await f.saveJob();
-    const result = await run(f.root, f.spec, { credentials: f.credentials });
+    const result = await run(f.root, f.spec, { generator: f.generator });
     const candidate = result.candidate.candidate, binding = { ...candidate.execution } as ExecutionBinding;
     for (const mutation of ["wrong-count", "missing", "wrong-background"]) {
       const receipt = structuredClone(result.receipt);
@@ -146,11 +143,11 @@ describe("transparent Provider outputs", { timeout: 120_000 }, () => {
       f.job.canvas.background = "transparent"; await f.saveJob();
       const spec = { ...f.spec, output_policy: "resize_to_target" };
       if (clearRegion === "half") {
-        const result = await run(f.root, spec, { credentials: f.credentials });
+        const result = await run(f.root, spec, { generator: f.generator });
         expect(transparency(result.receipt).output.width).toBe(1024); expect(result.receipt.outputs).toHaveLength(2);
         await inspectCandidate(f.root, f.spec.candidate_id);
       } else {
-        const error = await failure(executeProvider(f.root, spec, { credentials: f.credentials }));
+        const error = await failure(executeProvider(f.root, spec, { generator: f.generator }));
         expect(error.receipt.outcome).toBe("partial"); expect(error.receipt.provider_errors[0]?.code).toBe("output_no_clear_background");
         expect(transparency(error.receipt).received.zero_pixels).toBe(1); expect(transparency(error.receipt).output.zero_pixels).toBe(0);
         expect((await readProject(f.root)).sha256).toBe(f.created.sha256);

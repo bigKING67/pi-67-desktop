@@ -36,6 +36,10 @@
     "packages/domain": {
       "project": ["src/**/*.ts"]
     },
+    "packages/image-pi-extension": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
+    },
     "packages/image-engine": {
       "project": ["src/**/*.ts", "scripts/**/*.mjs"]
     },
