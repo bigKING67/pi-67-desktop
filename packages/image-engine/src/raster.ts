@@ -13,7 +13,7 @@ export interface ImportedRaster { asset: Asset; original: Buffer; rendered: Buff
 export async function regularPath(file: string, { directory = false }: { directory?: boolean } = {}): Promise<string> {
   let absolute = path.resolve(file);
   const root = path.parse(absolute).root;
-  const top = path.join(root, absolute.split(path.sep).filter(Boolean)[0] ?? "");
+  const top = topLevelEntry(absolute);
   if (top !== root && (await fs.lstat(top)).isSymbolicLink()) absolute = path.join(await fs.realpath(top), path.relative(top, absolute));
   const parts = path.relative(path.parse(absolute).root, absolute).split(path.sep).filter(Boolean);
   let current = path.parse(absolute).root;
@@ -25,6 +25,12 @@ export async function regularPath(file: string, { directory = false }: { directo
     else if (!stat.isFile()) fail("Expected a regular file");
   }
   return absolute;
+}
+
+/** The first entry below the filesystem root (`/tmp`, `C:\Users`), or the root itself. */
+export function topLevelEntry(absolute: string, paths: path.PlatformPath = path): string {
+  const root = paths.parse(absolute).root;
+  return paths.join(root, paths.relative(root, absolute).split(paths.sep).filter(Boolean)[0] ?? "");
 }
 
 // Compare directory identity rather than path text, so case-insensitive or

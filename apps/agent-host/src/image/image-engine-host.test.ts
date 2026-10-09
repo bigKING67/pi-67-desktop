@@ -7,6 +7,7 @@ import { IMAGE_LIBRARY_MARKER } from "@pi67/domain";
 import { createProject, previewCachePath, projectRoot, readProject, sha256, stageCandidate } from "@pi67/image-engine";
 import type { AgentCommand, AgentEvent } from "@pi67/protocol";
 import { ImageEngineHost } from "./image-engine-host.js";
+import { ImageProjectWatcher } from "./image-project-watcher.js";
 import { ImageWorkQueue } from "./image-work-queue.js";
 import { imageEngineError } from "./image-engine-errors.js";
 import { HostCommandError } from "../protocol-error.js";
@@ -32,7 +33,10 @@ async function project(cwd: string, projectId = "poster"): Promise<string> {
 }
 function host(cwd: string, queue?: ImageWorkQueue) {
   const events: AgentEvent[] = [];
-  const engine = new ImageEngineHost({ workspaceRoot: () => cwd, emit: (workspaceId, event) => { expect(workspaceId).toBe("w1"); events.push(event); }, ...(queue ? { queue } : {}) });
+  // macOS may replay file events from just before a watch starts; these tests cover the
+  // Host's own events, so its watcher never watches (image-project-watcher.test.ts covers it).
+  const watcher = new ImageProjectWatcher({ emit: () => undefined, maxWorkspaces: 0 });
+  const engine = new ImageEngineHost({ workspaceRoot: () => cwd, emit: (workspaceId, event) => { expect(workspaceId).toBe("w1"); events.push(event); }, watcher, ...(queue ? { queue } : {}) });
   const run = <T extends ImageCommandType>(type: T, payload: AgentCommand<T>["payload"], signal?: AbortSignal) =>
     engine.execute("w1", { type, payload } as AgentCommand<T>, signal);
   return { run, events };
