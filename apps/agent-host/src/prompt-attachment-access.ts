@@ -38,6 +38,8 @@ import { PromptAttachmentWorkerPool } from "./prompt-attachment-worker-client.js
 
 export interface PromptAttachmentAccessOwner {
   forTask(taskKey: string): PromptAttachmentAccess;
+  /** One verified staged image, for flows that consume it outside a prompt (image workbench). */
+  readStagedImage(id: string): Promise<{ name: string; mimeType: string; bytes: Buffer }>;
   releaseTask(taskKey: string): Promise<void>;
   dispose(): Promise<void>;
 }
@@ -65,6 +67,13 @@ class AgentHostPromptAttachmentAccess implements PromptAttachmentAccessOwner {
       readImages: (setId) => this.readImages(taskKey, setId),
       read: (request, signal) => this.read(taskKey, request, signal)
     };
+  }
+
+  async readStagedImage(id: string): Promise<{ name: string; mimeType: string; bytes: Buffer }> {
+    const sourceId = assertOpaqueId(id);
+    const { manifest, bytes } = await readVerifiedStagedAttachmentBytes(this.draftRoot, join(this.draftRoot, sourceId), sourceId);
+    if (manifest.kind !== "image") throw new Error("Staged attachment is not an image.");
+    return { name: manifest.name, mimeType: manifest.mimeType, bytes };
   }
 
   async releaseTask(taskKey: string): Promise<void> {

@@ -337,6 +337,7 @@ function removeWorkspaceRegistrationState(
     workspaceEnvironments: state.workspaceEnvironments.filter((binding) => binding.workspaceId !== workspaceId),
     environmentMutations: [...environmentMutations],
     ...(state.conversationDefaults ? { conversationDefaults: state.conversationDefaults.filter(item => item.workspaceId !== workspaceId) } : {}),
+    ...(state.imageLibraryWorkspaceId && state.imageLibraryWorkspaceId !== workspaceId ? { imageLibraryWorkspaceId: state.imageLibraryWorkspaceId } : {}),
     settings,
     cleanExit: state.cleanExit
   };
@@ -362,6 +363,7 @@ export function replaceWorkbenchLayout(state: WorkbenchStateV5, value: unknown):
     workspaceOrder: state.workspaceOrder,
     workspaceEnvironments: state.workspaceEnvironments,
     environmentMutations: state.environmentMutations,
+    ...(state.imageLibraryWorkspaceId ? { imageLibraryWorkspaceId: state.imageLibraryWorkspaceId } : {}),
     ...layout,
     cleanExit: state.cleanExit
   };

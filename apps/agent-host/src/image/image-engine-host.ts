@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { isImageId, type ImageCandidateListStatus } from "@pi67/domain";
 type ImageEngine = typeof import("@pi67/image-engine");
-import type { AgentCommand, AgentEvent, CommandResults, ImageCandidateSummary, ImageEventPayloads, ImageProjectSummary } from "@pi67/protocol";
+import type { AgentCommand, AgentEvent, CommandPayloads, CommandResults, ImageCandidateSummary, ImageEventPayloads, ImageProjectSummary } from "@pi67/protocol";
 import { HostCommandError } from "../protocol-error.js";
 import type { ImageCommandType } from "./image-command-router.js";
 import { imageEngineError } from "./image-engine-errors.js";
@@ -17,6 +17,8 @@ export interface ImageEngineHostDependencies {
   queue?: ImageWorkQueue;
   loadEngine?: () => Promise<ImageEngine>;
   watcher?: ImageProjectWatcher;
+  /** A verified staged image attachment; absent when the Host has no attachment store. */
+  readStagedImage?(id: string): Promise<{ mimeType: string; bytes: Buffer }>;
 }
 
 type Command<T extends ImageCommandType> = AgentCommand<T>;
@@ -79,6 +81,8 @@ export class ImageEngineHost {
         for (const project of projects) this.watcher.noteRevision(workspaceId, project.projectId, project.revision);
         return { projects };
       }
+      case "image.project.createFromPhoto":
+        return this.createFromPhoto(engine, workspaceId, cwd, (command as Command<"image.project.createFromPhoto">).payload);
       case "image.project.read": {
         const { projectId, revision } = (command as Command<"image.project.read">).payload;
         const project = await readProject(projectRoot(cwd, projectId), { revision });
@@ -121,6 +125,30 @@ export class ImageEngineHost {
     }
   }
 
+  // The photo arrives as a staged attachment (never a renderer path) and is copied into a work
+  // folder outside the project; the engine imports it and the work folder is removed.
+  private async createFromPhoto(engine: ImageEngine, workspaceId: string, cwd: string,
+    { projectId, attachmentId, headline, title }: CommandPayloads["image.project.createFromPhoto"]): Promise<CommandResults["image.project.createFromPhoto"]> {
+    if (!this.dependencies.readStagedImage) throw new HostCommandError("UNSUPPORTED", "此设备上不能导入图片附件。", false);
+    const staged = await this.dependencies.readStagedImage(attachmentId);
+    const extension = PHOTO_EXTENSIONS[staged.mimeType];
+    if (!extension) throw new HostCommandError("INVALID_PAYLOAD", "只支持 PNG、JPEG 或 WebP 照片。", false);
+    return this.queue.serial(key(workspaceId, projectId), async () => {
+      const root = engine.projectRoot(cwd, projectId), work = await engine.workDirectory(cwd, projectId, "import");
+      await fs.mkdir(work);
+      try {
+        const source = path.join(work, `photo.${extension}`);
+        await fs.writeFile(source, staged.bytes, { flag: "wx" });
+        await engine.ensureProjectParent(root);
+        const created = await engine.createPhotoProject(root, { project_id: projectId, source, headline, ...(title ? { title } : {}) });
+        this.announce(workspaceId, event("image.project.changed", { projectId, revision: created.document.revision, sha256: created.sha256, author: "human" }));
+        return { projectId, revision: created.document.revision, sha256: created.sha256, dryRun: false };
+      } finally {
+        await fs.rm(work, { recursive: true, force: true });
+      }
+    });
+  }
+
   // Renders go to a fresh work folder outside the project, then the PNG moves
   // into the content-addressed preview cache that Main serves by digest.
   private render(engine: ImageEngine, workspaceId: string, cwd: string, command: Command<"image.project.render">, signal: AbortSignal | undefined): Promise<CommandResults["image.project.render"]> {
@@ -154,6 +182,7 @@ export class ImageEngineHost {
   }
 }
 
+const PHOTO_EXTENSIONS: Readonly<Record<string, string>> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
 const key = (workspaceId: string, projectId: string): string => `${workspaceId}\u0000${projectId}`;
 
 function candidateSummary(item: Awaited<ReturnType<ImageEngine["listCandidates"]>>[number]): ImageCandidateSummary {

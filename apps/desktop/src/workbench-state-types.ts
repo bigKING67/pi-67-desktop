@@ -83,6 +83,8 @@ export interface WorkbenchStateV4 {
 
 export interface WorkbenchStateV5 extends Omit<WorkbenchStateV4, "version"> {
   conversationDefaults?: import("@pi67/protocol").WorkspaceConversationDefault[];
+  /** The creative library (ADR 0010): a registered Workspace the folder tree never lists. Main-owned. */
+  imageLibraryWorkspaceId?: string;
   version: typeof WORKBENCH_STATE_VERSION;
   workspaceEnvironments: WorkspaceEnvironmentBinding[];
   environmentMutations: EnvironmentMutationRecoveryRecord[];

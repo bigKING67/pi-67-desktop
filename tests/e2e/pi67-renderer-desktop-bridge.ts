@@ -244,6 +244,8 @@ export async function installMockDesktopBridge(
             workbenchState = { ...workbenchState, ...structuredClone(layout) } as FixtureWorkbenchState;
             return structuredClone(workbenchState);
           },
+          chooseImageLibrary: async () => undefined,
+          saveImage: async () => false,
           pickAndAddWorkspace: async () => {
             const workspace = bridgeFixture.pickerQueue[
               Math.min(pickerIndex, Math.max(bridgeFixture.pickerQueue.length - 1, 0))

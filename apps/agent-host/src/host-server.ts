@@ -140,7 +140,7 @@ export class AgentHostServer {
       getRuntime: () => this.tasks.activeState()?.record.runtime ?? this.compatibilityRuntime,
       getProtocolContext: () => this.tasks.eventProtocolContext()
     });
-    this.images = createImageEngineHost(this.workspaces, this.events);
+    this.images = createImageEngineHost(this.workspaces, this.events, this.options.promptAttachments);
     this.contextMemory = createHostContextMemory(agentDir, this.workspaces, this.events, this.taskRuntimes, options);
     this.teamKnowledge = createHostTeamKnowledge({ configuration, settings: options.teamIndexSettings, workers: options.teamWorkers,
       admission: this.teamModelPorts, owner: this.contextMemory.teamKnowledge, isAvailable: () => !this.shuttingDown });

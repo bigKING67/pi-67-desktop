@@ -31,12 +31,12 @@ async function project(cwd: string, projectId = "poster"): Promise<string> {
     ] });
   return root;
 }
-function host(cwd: string, queue?: ImageWorkQueue) {
+function host(cwd: string, queue?: ImageWorkQueue, readStagedImage?: (id: string) => Promise<{ mimeType: string; bytes: Buffer }>) {
   const events: AgentEvent[] = [];
   // macOS may replay file events from just before a watch starts; these tests cover the
   // Host's own events, so its watcher never watches (image-project-watcher.test.ts covers it).
   const watcher = new ImageProjectWatcher({ emit: () => undefined, maxWorkspaces: 0 });
-  const engine = new ImageEngineHost({ workspaceRoot: () => cwd, emit: (workspaceId, event) => { expect(workspaceId).toBe("w1"); events.push(event); }, watcher, ...(queue ? { queue } : {}) });
+  const engine = new ImageEngineHost({ workspaceRoot: () => cwd, emit: (workspaceId, event) => { expect(workspaceId).toBe("w1"); events.push(event); }, watcher, ...(queue ? { queue } : {}), ...(readStagedImage ? { readStagedImage } : {}) });
   const run = <T extends ImageCommandType>(type: T, payload: AgentCommand<T>["payload"], signal?: AbortSignal) =>
     engine.execute("w1", { type, payload } as AgentCommand<T>, signal);
   return { run, events };
@@ -45,6 +45,23 @@ function host(cwd: string, queue?: ImageWorkQueue) {
 const lastState = (events: AgentEvent[]): string | undefined => (events.at(-1)?.payload as { state?: string } | undefined)?.state;
 
 describe("image engine host", { timeout: 120_000 }, () => {
+  it("creates a project from a staged photo and leaves no work folder", async () => {
+    const cwd = await workspace();
+    const photo = await sharp({ create: { width: 1024, height: 1024, channels: 3, background: "#d8c8b0" } }).jpeg().toBuffer();
+    const staged = new Map([["photo-1", { mimeType: "image/jpeg", bytes: photo }], ["doc-1", { mimeType: "application/pdf", bytes: Buffer.from("%PDF") }]]);
+    const { run, events } = host(cwd, undefined, (id) => { const item = staged.get(id); return item ? Promise.resolve(item) : Promise.reject(new Error("missing")); });
+    const created = await run("image.project.createFromPhoto", { projectId: "spring", attachmentId: "photo-1", headline: "春日新品", title: "春日海报" });
+    expect(created).toMatchObject({ projectId: "spring", revision: 1, dryRun: false });
+    expect(events).toEqual([{ type: "image.project.changed", payload: { projectId: "spring", revision: 1, sha256: created.sha256, author: "human" } }]);
+    const read = await readProject(projectRoot(cwd, "spring"));
+    expect(read.document.title).toBe("春日海报");
+    expect(read.document.objects.some((object) => object.kind === "text" && object.text === "春日新品")).toBe(true);
+    expect(await fs.readdir(path.join(cwd, ".newmoney/image-work/spring"))).toEqual([]);
+    await expect(run("image.project.createFromPhoto", { projectId: "doc", attachmentId: "doc-1", headline: "x" })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    await expect(run("image.project.createFromPhoto", { projectId: "spring", attachmentId: "photo-1", headline: "x" })).rejects.toThrow();
+    await expect(host(cwd).run("image.project.createFromPhoto", { projectId: "other", attachmentId: "photo-1", headline: "x" })).rejects.toMatchObject({ code: "UNSUPPORTED" });
+  });
+
   it("lists, reads and edits workspace projects as human revisions with change events", async () => {
     const cwd = await workspace();
     await project(cwd, "poster"); await project(cwd, "banner");

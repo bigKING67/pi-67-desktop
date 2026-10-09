@@ -41,6 +41,7 @@ import {
 import type { AgentHostSupervisorDiagnostics } from "./agent-host-supervisor.js";
 import { registerSupportDiagnosticsBridge } from "./support-diagnostics.js";
 import { registerTeamChatAttachmentSaveBridge } from "./team-chat-attachment-save.js";
+import { registerImageLibraryBridge } from "./image-library-bridge.js";
 import {
   registerRepositoryEnvironmentBridge,
   type RepositoryEnvironmentInspectionBridge,
@@ -159,6 +160,7 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     recoverySnapshot
   });
   registerTeamChatAttachmentSaveBridge(handle, options.getMainWindow);
+  registerImageLibraryBridge(handle, options.getMainWindow, workbenchState);
   handle("pi67:platform-info", () => ({
     platform: process.platform,
     architecture: process.arch,

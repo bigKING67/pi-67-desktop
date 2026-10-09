@@ -30,7 +30,7 @@ export function previewCachePath(cwd: string, projectId: string, pngSha256: stri
 }
 
 /** A fresh directory for one render or job input, outside every project. */
-export async function workDirectory(cwd: string, projectId: string, kind: "preview" | "export" | "job" | "compare"): Promise<string> {
+export async function workDirectory(cwd: string, projectId: string, kind: "preview" | "export" | "job" | "compare" | "import"): Promise<string> {
   if (!isImageId(projectId)) throw new Error("Invalid image project id");
   const parent = path.join(cwd, ...IMAGE_WORK_DIRECTORY, projectId);
   await fs.mkdir(parent, { recursive: true });

@@ -232,6 +232,8 @@ const systemBridge = {
   pickAndAddWorkspace: (): Promise<WorkspaceDescriptor | undefined> => (
     ipcRenderer.invoke("pi67:workspace-pick-and-add")
   ),
+  chooseImageLibrary: (): Promise<WorkspaceDescriptor | undefined> => ipcRenderer.invoke("pi67:image-library-choose"),
+  saveImage: (request: { workspaceId: string; projectId: string; pngSha256: string; fileName: string }): Promise<boolean> => ipcRenderer.invoke("pi67:image-save", request),
   repairWorkspace: (workspaceId: string): Promise<WorkspaceDescriptor | undefined> => (
     ipcRenderer.invoke("pi67:workspace-repair", workspaceId)
   ),

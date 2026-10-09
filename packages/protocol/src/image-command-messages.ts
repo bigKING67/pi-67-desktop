@@ -14,6 +14,8 @@ import type {
 // The Host records every renderer-originated change with author `human`.
 export interface ImageCommandPayloads {
   "image.project.list": Record<string, never>;
+  /** A new project from one staged image attachment (the renderer never sends its path). */
+  "image.project.createFromPhoto": { projectId: string; attachmentId: string; headline: string; title?: string };
   "image.project.read": { projectId: string; revision?: number };
   "image.project.edit": { projectId: string; baseRevision: number; summary: string; operations: ImageEditOperation[]; dryRun?: boolean };
   "image.project.render": { projectId: string; revision?: number; candidateId?: string; previewMax?: number };
@@ -51,6 +53,7 @@ export interface ImageRenderResult { projectId: string; revision: number; candid
 
 export interface ImageCommandResults {
   "image.project.list": { projects: ImageProjectSummary[] };
+  "image.project.createFromPhoto": ImageRevisionResult;
   "image.project.read": { projectId: string; revision: number; latestRevision: number; sha256: string; document: ImageDocument };
   "image.project.edit": ImageRevisionResult;
   "image.project.render": ImageRenderResult;

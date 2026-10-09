@@ -34,6 +34,19 @@ describe("Agent Host prompt attachment access", () => {
     expect(JSON.parse(listing.text)).toEqual(first!.attachments);
   });
 
+  it("reads one verified staged image without claiming it, and refuses non-images and tampered payloads", async () => {
+    const fixture = await createFixture();
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    await stageFixture(fixture.root, "photo_a", "bottle.png", png, "image/png", "image");
+    await stageFixture(fixture.root, "notes_a", "notes.txt", "hello", "text/plain", "document");
+    expect(await fixture.owner.readStagedImage("photo_a")).toEqual({ name: "bottle.png", mimeType: "image/png", bytes: png });
+    await expect(access(join(fixture.root, "draft", "photo_a"))).resolves.toBeUndefined();
+    await expect(fixture.owner.readStagedImage("notes_a")).rejects.toThrow(/not an image/);
+    await expect(fixture.owner.readStagedImage("../photo_a")).rejects.toThrow(/invalid/);
+    await writeFile(join(fixture.root, "draft", "photo_a", "payload.bin"), Buffer.from("tampered"));
+    await expect(fixture.owner.readStagedImage("photo_a")).rejects.toThrow();
+  });
+
   it("reuses the verified Task-scoped set when a failed Prompt retries with a new submission id", async () => {
     const fixture = await createFixture();
     await stageFixture(

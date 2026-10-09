@@ -199,6 +199,10 @@ export interface DesktopSystemBridge {
   updateWorkbenchLayout(layout: WorkbenchLayoutV5): Promise<WorkbenchStateV5>;
   completeShutdownCheckpoint(response: ShutdownCheckpointResponse): Promise<boolean>;
   pickAndAddWorkspace(): Promise<WorkspaceDescriptor | undefined>;
+  /** Picks the creative library directory once and registers it as the hidden library Workspace (ADR 0010). */
+  chooseImageLibrary(): Promise<WorkspaceDescriptor | undefined>;
+  /** Saves a rendered image PNG the user is viewing, after Main re-verifies its digest. */
+  saveImage(request: { workspaceId: string; projectId: string; pngSha256: string; fileName: string }): Promise<boolean>;
   repairWorkspace(workspaceId: string): Promise<WorkspaceDescriptor | undefined>;
   removeWorkspace(workspaceId: string): Promise<WorkbenchStateV5>;
   reorderWorkspaces(workspaceIds: string[]): Promise<WorkbenchStateV5>;

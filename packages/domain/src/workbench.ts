@@ -153,6 +153,8 @@ export interface SessionCreationRecoveryRecord {
 
 export interface WorkbenchStateV5 {
   conversationDefaults?: import("./conversation-default.js").WorkspaceConversationDefault[];
+  /** The creative library (ADR 0010): a registered Workspace the folder tree never lists. */
+  imageLibraryWorkspaceId?: WorkspaceId;
   version: 5;
   workspaces: WorkspaceDescriptor[];
   workspaceOrder: WorkspaceId[];

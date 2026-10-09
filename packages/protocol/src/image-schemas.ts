@@ -116,6 +116,10 @@ const ProjectRefSchema = strictObject({ projectId: IdSchema });
 
 export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSchema> = {
   "image.project.list": strictObject({}),
+  "image.project.createFromPhoto": strictObject({
+    projectId: IdSchema, attachmentId: Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" }),
+    headline: Type.String({ minLength: 1, maxLength: L.text }), title: Type.Optional(Type.String({ minLength: 1, maxLength: L.title }))
+  }),
   "image.project.read": strictObject({ projectId: IdSchema, revision: Type.Optional(RevisionSchema) }),
   "image.project.edit": strictObject({
     projectId: IdSchema, baseRevision: RevisionSchema, summary: SummarySchema,
@@ -133,6 +137,7 @@ export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSch
 export const ImageCommandResultSchemas: Record<keyof ImageCommandResults, TSchema> = {
   "image.project.list": strictObject({ projects: Type.Array(ProjectSummarySchema, { maxItems: 10_000 }) }),
   "image.project.read": strictObject({ projectId: IdSchema, revision: RevisionSchema, latestRevision: RevisionSchema, sha256: Sha256Schema, document: DocumentSchema }),
+  "image.project.createFromPhoto": RevisionResultSchema,
   "image.project.edit": RevisionResultSchema,
   "image.project.render": strictObject({
     projectId: IdSchema, revision: RevisionSchema, candidateId: Type.Optional(IdSchema), pngSha256: Sha256Schema,

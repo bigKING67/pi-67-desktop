@@ -195,6 +195,7 @@ export function parseWorkbenchStateV5(value: unknown): WorkbenchStateV5 | undefi
     value,
     [
       "conversationDefaults",
+      "imageLibraryWorkspaceId",
       "version",
       "workspaces",
       "workspaceOrder",
@@ -222,6 +223,7 @@ export function parseWorkbenchStateV5(value: unknown): WorkbenchStateV5 | undefi
   ) || value.version !== WORKBENCH_STATE_VERSION) return undefined;
   const {
     conversationDefaults: defaultsValue,
+    imageLibraryWorkspaceId: libraryValue,
     workspaceEnvironments: workspaceEnvironmentsValue,
     environmentMutations: environmentMutationsValue,
     ...legacyValue
@@ -231,6 +233,7 @@ export function parseWorkbenchStateV5(value: unknown): WorkbenchStateV5 | undefi
   const workspaceIds = new Set(legacy.workspaces.map((workspace) => workspace.id));
   const defaults = defaultsValue === undefined ? undefined : parseWorkspaceConversationDefaults(defaultsValue, workspaceIds);
   if (defaultsValue !== undefined && !defaults) return undefined;
+  if (libraryValue !== undefined && (typeof libraryValue !== "string" || !workspaceIds.has(libraryValue))) return undefined;
   const workspaceEnvironments = parseWorkspaceEnvironmentBindings(
     workspaceEnvironmentsValue,
     workspaceIds,
@@ -245,6 +248,7 @@ export function parseWorkbenchStateV5(value: unknown): WorkbenchStateV5 | undefi
   return {
     ...legacy,
     ...(defaults ? { conversationDefaults: defaults } : {}),
+    ...(typeof libraryValue === "string" ? { imageLibraryWorkspaceId: libraryValue } : {}),
     version: WORKBENCH_STATE_VERSION,
     workspaceEnvironments,
     environmentMutations

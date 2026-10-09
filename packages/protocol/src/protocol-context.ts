@@ -162,6 +162,7 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "teamChat.attachment.discard": "app",
   "teamChat.attachment.read": "app",
   "image.project.list": "workspace",
+  "image.project.createFromPhoto": "workspace",
   "image.project.read": "workspace",
   "image.project.edit": "workspace",
   "image.project.render": "workspace",

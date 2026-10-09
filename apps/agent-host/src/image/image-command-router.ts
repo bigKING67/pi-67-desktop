@@ -5,6 +5,7 @@ export type ImageCommandType = keyof ImageCommandPayloads;
 
 const IMAGE_COMMANDS: ReadonlySet<string> = new Set<ImageCommandType>([
   "image.project.list",
+  "image.project.createFromPhoto",
   "image.project.read",
   "image.project.edit",
   "image.project.render",

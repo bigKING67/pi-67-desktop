@@ -1,0 +1,84 @@
+# Image workbench P2: basic workbench
+
+Status: active
+Owner: Claude
+Started: 2026-10-09
+Last updated: 2026-10-09
+
+## Goal
+
+Give users a visible image product: the `图像` rail entry, the creative library,
+and a project page with a read-only canvas, a bottom dock (candidates and the
+project conversation), direct text and position edits, candidate accept or
+discard, and original-size export. Product model §5–§7 and §17 (P2 row);
+decisions in ADR 0010.
+
+## Non-goals
+
+- Transform handles, snapping, inline text editing, multi-select, reference
+  slots, mark-and-rework, user fonts, multi-size export (P3).
+- The five-tab image Inspector (P3); P2 keeps the existing Inspector shell.
+- Image processing without a project (flow G), Work Card handoff (P5).
+
+## Acceptance criteria
+
+| Criterion | Target |
+| --- | --- |
+| Entry | `图像` sits above `搜索对话` in Work mode only; selecting it opens the creative library |
+| Library location | chosen once on first open; Windows prefills a non-system drive; the library is a trusted Workspace hidden from the folder tree |
+| Flow A | from `从图片开始` to an accepted candidate and an exported PNG in ≤ 5 minutes on the local gateway |
+| Direct edit | a title text change and a drag move each commit one revision; ⌘Z is `revert_to` |
+| Conflict | a stale `baseRevision` refreshes the canvas and keeps the user's change as a resubmittable draft |
+| Protected pixels | 0 bytes changed in protected regions across accepted candidates (engine QA) |
+| States | empty, loading, error and long-data states for library, canvas and candidates |
+| Evidence | packaged preview screenshots (path / size / sha256) light and dark; Windows packaged smoke |
+
+## Checkpoints
+
+- [x] 1. Creative library location: Main persists the library path, first-open
+      picker with a non-system-drive prefill on Windows, library registered as a
+      trusted Workspace that the folder tree never lists.
+- [x] 2. Protocol and Host: `image.project.createFromPhoto` from a staged image
+      attachment (the renderer never sends a path); export is a full-size
+      `image.project.render` plus Main's digest-verified `pi67:image-save`, so no
+      second render command; protocol revision.
+- [ ] 3. Renderer `图像` entry and library view: card grid (thumbnail, title,
+      size, revisions, pending candidates, updated), sort by recent, empty state
+      with `新建图像项目` and `从图片开始`.
+- [ ] 4. Project page: read-only canvas from content-addressed previews, fit and
+      zoom, selection highlight; bottom dock with the candidate strip and the
+      project conversation carrying the structured image context.
+- [ ] 5. Direct edits: text and position edits as revision batches (300 ms
+      coalescing), undo/redo as `revert_to`, conflict draft handling.
+- [ ] 6. Candidates and export: preview, accept, discard, stale handling;
+      export original size with the receipt listed.
+- [ ] 7. Authority docs (PRODUCT, DESIGN), packaged visual verification, flow A
+      end to end with a real request, Windows packaged smoke.
+
+## Rollback
+
+Each checkpoint is additive. The `图像` entry is a renderer surface over existing
+commands; removing it leaves conversations, Workspaces and image tools intact.
+The library Workspace is an ordinary Workspace marked hidden; unmarking it shows
+it in the tree, and no project content is ever deleted by Desktop.
+
+## Risks and unknowns
+
+- Hiding a Workspace from the tree touches Workbench persistence and the folder
+  tree; it must not change behaviour for existing Workspaces.
+- Canvas preview latency on 2K canvases (target ≤ 300 ms edit to refresh).
+- The project conversation needs the library Workspace's Pi session; session
+  identity across project switches must stay stable.
+
+## Progress log
+
+- 2026-10-09: plan created after P1 checkpoints 1–7 and the image sources plan;
+  P1 checkpoint 8 (real request) is waiting on the user's local gateway source.
+- 2026-10-09: checkpoints 1-2 complete. No hidden-Workspace precedent existed
+  (chat mode is layout only), so the library is an ordinary registered Workspace
+  named by the optional Main-owned `imageLibraryWorkspaceId` (the
+  `conversationDefaults` pattern, no state version bump); layout updates cannot
+  set it and removing the Workspace clears it. Registering never makes the
+  library the current or an expanded Workspace. Windows prefills the first
+  non-system drive. Next: checkpoint 3 (renderer entry, tree filtering, library).
+

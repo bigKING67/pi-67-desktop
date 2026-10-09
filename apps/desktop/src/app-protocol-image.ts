@@ -39,22 +39,28 @@ const notFound = (): Response => new Response("Not found", { status: 404 });
 
 export async function readImagePreview(requestUrl: string, workspaceRoot: TrustedWorkspaceRoot): Promise<Response> {
   const reference = parseImagePreviewUrl(requestUrl);
-  if (!reference) return notFound();
+  const bytes = reference ? await readVerifiedImagePreview(reference, workspaceRoot) : undefined;
+  if (!bytes) return notFound();
+  return new Response(new Uint8Array(bytes), { status: 200, headers: {
+    "Content-Type": "image/png", "Cache-Control": "private, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff"
+  } });
+}
+
+/** The preview's bytes, only from a trusted Workspace, never through a symlink, and only when they hash to the digest. */
+export async function readVerifiedImagePreview(reference: ImagePreviewReference, workspaceRoot: TrustedWorkspaceRoot): Promise<Buffer | undefined> {
+  if (!WORKSPACE_ID.test(reference.workspaceId) || !isImageId(reference.projectId) || !/^[a-f0-9]{64}$/u.test(reference.pngSha256)) return undefined;
   try {
     const root = await workspaceRoot(reference.workspaceId);
-    if (!root) return notFound();
+    if (!root) return undefined;
     const candidate = resolve(root, ...imagePreviewRelativePath(reference.projectId, reference.pngSha256));
     const metadata = await lstat(candidate);
-    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > MAX_PREVIEW_BYTES) return notFound();
+    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > MAX_PREVIEW_BYTES) return undefined;
     const [physicalRoot, physicalPath] = await Promise.all([realpath(root), realpath(candidate)]);
-    if (!contained(physicalRoot, physicalPath)) return notFound();
+    if (!contained(physicalRoot, physicalPath)) return undefined;
     const bytes = await readFile(physicalPath);
-    if (createHash("sha256").update(bytes).digest("hex") !== reference.pngSha256) return notFound();
-    return new Response(new Uint8Array(bytes), { status: 200, headers: {
-      "Content-Type": "image/png", "Cache-Control": "private, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff"
-    } });
+    return createHash("sha256").update(bytes).digest("hex") === reference.pngSha256 ? bytes : undefined;
   } catch {
-    return notFound();
+    return undefined;
   }
 }
 
