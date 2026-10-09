@@ -41,6 +41,8 @@ export class ImageEngineHost {
   dispose(): void { this.watcher.dispose(); }
 
   // Announces a change this Host made and records it so the watcher stays quiet about it.
+  // State the Host returns from list/read is recorded the same way: macOS may replay file
+  // events from just before a watch starts, and those must not re-announce known state.
   private announce(workspaceId: string, announced: AgentEvent): void {
     if (announced.type === "image.project.changed") this.watcher.noteRevision(workspaceId, announced.payload.projectId, announced.payload.revision);
     if (announced.type === "image.candidate.changed") this.watcher.noteCandidate(workspaceId, announced.payload.projectId, announced.payload.candidateId, announced.payload.status);
@@ -72,11 +74,15 @@ export class ImageEngineHost {
   private async dispatch(engine: ImageEngine, workspaceId: string, cwd: string, command: Command<ImageCommandType>, signal: AbortSignal | undefined): Promise<CommandResults[ImageCommandType]> {
     const { acceptCandidate, discardCandidate, editBatch, listCandidates, projectRoot, readProject } = engine;
     switch (command.type) {
-      case "image.project.list":
-        return { projects: await listProjects(engine, cwd) };
+      case "image.project.list": {
+        const projects = await listProjects(engine, cwd);
+        for (const project of projects) this.watcher.noteRevision(workspaceId, project.projectId, project.revision);
+        return { projects };
+      }
       case "image.project.read": {
         const { projectId, revision } = (command as Command<"image.project.read">).payload;
         const project = await readProject(projectRoot(cwd, projectId), { revision });
+        this.watcher.noteRevision(workspaceId, projectId, project.latest_revision);
         return { projectId, revision: project.document.revision, latestRevision: project.latest_revision, sha256: project.sha256, document: project.document };
       }
       case "image.project.edit": {
@@ -91,7 +97,9 @@ export class ImageEngineHost {
         return this.render(engine, workspaceId, cwd, command as Command<"image.project.render">, signal);
       case "image.candidate.list": {
         const { projectId } = (command as Command<"image.candidate.list">).payload;
-        return { projectId, candidates: (await listCandidates(projectRoot(cwd, projectId))).map((item) => candidateSummary(item)) };
+        const candidates = (await listCandidates(projectRoot(cwd, projectId))).map((item) => candidateSummary(item));
+        for (const candidate of candidates) this.watcher.noteCandidate(workspaceId, projectId, candidate.candidateId, candidate.status);
+        return { projectId, candidates };
       }
       case "image.candidate.accept": {
         const { projectId, candidateId, baseRevision, summary } = (command as Command<"image.candidate.accept">).payload;

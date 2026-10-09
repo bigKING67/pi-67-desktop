@@ -40,6 +40,24 @@ describe("image project watcher", { timeout: 60_000 }, () => {
     await vi.waitFor(() => expect(events).toContainEqual({ type: "image.candidate.changed", payload: { projectId: "poster", candidateId: "warm", status: "ready" } }), { timeout: 5000 });
   });
 
+  it("does not re-announce state the Host already returned when old file events are replayed", async () => {
+    const { cwd, root } = await workspaceWithProject();
+    let listener: ((type: string, name: string | null) => void) | undefined;
+    const events: AgentEvent[] = [];
+    const watcher = new ImageProjectWatcher({ emit: (_id, item) => events.push(item), debounceMs: 10, watch: (_dir, next) => { listener = next; return { close: vi.fn(), on: vi.fn() }; } });
+    const host = new ImageEngineHost({ workspaceRoot: () => cwd, emit: (_id, item) => events.push(item), watcher });
+    onTestFinished(() => host.dispose());
+    const candidate = path.join(cwd, "warm.png");
+    await sharp({ create: { width: 128, height: 128, channels: 3, background: "#edd9ce" } }).png().toFile(candidate);
+    await engine.stageCandidate(root, { id: "warm", base_revision: 1, target_id: "background", source: candidate, mode: "replace", summary: "暖色" });
+    await host.execute("w1", { type: "image.project.list", payload: {} } as AgentCommand<"image.project.list">);
+    await host.execute("w1", { type: "image.candidate.list", payload: { projectId: "poster" } } as AgentCommand<"image.candidate.list">);
+    // macOS FSEvents can deliver the project's creation after the watch starts.
+    listener?.("rename", "poster/revisions/000001.json"); listener?.("rename", "poster/candidates/warm/candidate.json");
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(events).toEqual([]);
+  });
+
   it("debounces bursts, ignores unrelated paths and survives unreadable projects", async () => {
     vi.useFakeTimers(); onTestFinished(() => { vi.useRealTimers(); });
     let listener: ((type: string, name: string | null) => void) | undefined;
