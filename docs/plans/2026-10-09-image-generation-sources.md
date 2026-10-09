@@ -37,7 +37,7 @@ Volcengine Ark Seedream 5.0. Decision: ADR 0010 decision 14.
 - [x] 2. pi-runtime: shared image HTTP rules (URL results, rejected parameter) and the `ark-images` Pi image API.
 - [x] 3. Settings storage and protocol: `pi67Desktop.imageGeneration` parse/write, snapshot field, App-scope replay-safe command, Host routing, protocol revision.
 - [x] 4. Registration: one Pi Provider per source with reuse key resolution; refresh on change; `image_generate` takes a `model` and fills the job's profile and surface.
-- [ ] 5. Renderer: Settings section 图像生成 (design-craft, browser67, packaged preview); DESIGN/PRODUCT authority.
+- [x] 5. Renderer: Settings section 图像生成 (design-craft, browser67, packaged preview); DESIGN/PRODUCT authority.
 - [ ] 6. Real request (P1 checkpoint 8).
 
 ## Progress log
@@ -54,4 +54,13 @@ Volcengine Ark Seedream 5.0. Decision: ADR 0010 decision 14.
   otherwise run a key starting with `!` as a command. Real-SDK test: a reused
   source is available at once; an own endpoint gets Pi's API-key login and its
   key in `auth.json`. `check` passed. Next: checkpoint 5 (Settings UI).
+- 2026-10-09: checkpoint 5 complete (`140c1b7c`, `fix` follow-up). Settings →
+  图像生成 verified in the packaged app through an isolated offline preview
+  (browser67 `remote_cdp`, 1440x874 at DPR 2): empty state, add flow reusing a
+  fixture Provider (saved `settings.json` has the source and no key), external
+  `settings.json` edits reflected live with `可用` / `缺少 API Key`, light and
+  dark themes, and the 模型 Provider Catalog without image source Providers.
+  Visual review fixed the empty-state spacing and showed the reused Provider's
+  name instead of its id. Next: checkpoint 6, which needs the user to add the
+  local gateway source in their own Desktop and approve each paid request.
 
