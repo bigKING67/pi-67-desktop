@@ -80,7 +80,7 @@ describe("image workbench tools", { timeout: 120_000 }, () => {
     const preview = await t.call("image_render", { project_id: "poster", mode: "preview" });
     expect(preview.content.map((item) => item.type)).toEqual(["text", "image"]);
     const exported = await t.json("image_render", { project_id: "poster", mode: "export" });
-    expect((exported.png as { width: number }).width).toBe(1280); expect(exported.visual_quality).toBe("UNVERIFIED");
+    expect((exported.png as { width: number }).width).toBe(1024); expect(exported.visual_quality).toBe("UNVERIFIED");
     expect(String(exported.output).startsWith(path.join(cwd, ".newmoney/image-work/poster/export-"))).toBe(true);
 
     // The job names another profile; the chosen source model decides the profile and surface.

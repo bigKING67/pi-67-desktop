@@ -100,7 +100,7 @@ export function ImageCanvas({ document, src, alt, selectedId, editable, onSelect
   );
 }
 
-export function objectLabel(object: SceneObject): string {
+function objectLabel(object: SceneObject): string {
   if (object.kind === "text") return `文字：${object.text.slice(0, 24)}`;
   return object.kind === "image" ? `图片：${object.id}` : `形状：${object.id}`;
 }
