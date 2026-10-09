@@ -211,7 +211,7 @@ Application-level surfaces use a separate wide-window shell:
 
 - Image workbench (ADR 0010, P2, 2026-10-09): in Work mode an `图像` rail row (image
   glyph, 32px, rail-row anatomy like `动态`) sits above `搜索对话`; selecting it
-  replaces the center with the creative library and hides the Inspector, and choosing
+  replaces the center with the creative library (no Inspector there), and choosing
   any conversation, Workspace or Settings leaves it. The library uses the Settings
   frame (`min(1040px, 100%)`): title `创作库` with the folder name as one tertiary line,
   `从图片开始` as the primary action, and a card grid (auto-fill, 210px minimum) whose
@@ -224,6 +224,17 @@ Application-level surfaces use a separate wide-window shell:
   locked/move hint), and a dock: candidates (4:5 tiles, status text, accept/discard)
   beside the project conversation. Previewing a candidate shows a floating
   `正在预览候选，项目尚未改变` badge and never changes the revision.
+- Image Inspector (P3, 2026-10-09): an open project replaces the context Inspector with
+  five equal-width tabs (`图层`, `属性`, `候选`, `历史`, `导出`), toggled by the same
+  TitleBar action. `图层` lists objects top-down (kind glyph, name, then eye, lock and
+  up/down icon actions, 26px; selected row on the active surface). `属性` shows a
+  `文字 · id` caption over a two-column grid of labelled 30px fields (X, Y, 宽, 高,
+  不透明度; text adds 字号, 行高, 颜色 and a 左/中/右 segmented control; rect adds 颜色,
+  圆角); a field commits on Enter or blur, Escape restores it, and a refused value stays
+  in the field with the danger border; with nothing selected it reads the canvas size
+  and background. `历史` lists revisions newest first (author glyph, `修订 N`, `人 /
+  Agent / 系统 · time`, summary, `回到此修订` or `当前`). Canvas selection uses a
+  two-tone outline (accent line, surface halo) so it reads on any pixels.
 - The navigation rail is the only Workspace and conversation switcher. Each
   Workspace is a collapsible group containing active tasks, waiting tasks,
   provisional drafts, and Catalog-backed recent Sessions. Workspace groups use

@@ -1,14 +1,17 @@
 import type { ImageSceneObject } from "@pi67/domain";
 import { ArrowDown, ArrowUp, Eye, EyeOff, Image as ImageIcon, Lock, LockOpen, Square, Type } from "lucide-react";
 import { Button } from "react-aria-components";
-import { editImageProject, selectImageObject, useImageProject } from "./image-project-controller.js";
+import { editImageProject, type ImageProjectState, selectImageObject, useImageProject } from "./image-project-controller.js";
 import styles from "./ImageInspector.module.css";
 
 const KIND_ICONS = { image: ImageIcon, text: Type, rect: Square } as const;
+/** A stable empty list: a fresh `[]` per snapshot loops the store subscription before the document loads. */
+const NO_OBJECTS: readonly ImageSceneObject[] = [];
+export const selectImageObjects = (state: Pick<ImageProjectState, "document">): readonly ImageSceneObject[] => state.document?.objects ?? NO_OBJECTS;
 
 /** 图层: top-down list (the last object paints on top), visibility, lock and order, synced with the canvas. */
 export function ImageLayersPanel() {
-  const objects = useImageProject((state) => state.document?.objects ?? []);
+  const objects = useImageProject(selectImageObjects);
   const selectedId = useImageProject((state) => state.selectedObjectId);
   const busy = useImageProject((state) => state.busy);
   const topDown = [...objects].reverse();

@@ -40,9 +40,11 @@
   box-shadow: var(--shadow-focus);
 }
 
+/* Two-tone so the outline reads on any pixels, whatever the theme. */
 .selected,
 .selected:hover {
   border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--surface);
 }
 
 .locked {

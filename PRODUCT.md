@@ -1477,6 +1477,9 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   (`revert_to`, never rewriting history), previews, accepts or discards candidates (stale
   ones cannot be accepted), and exports the current revision as a full-size PNG that Main
   re-verifies before saving. A revision conflict refreshes the canvas and keeps the draft.
+  P3 adds the image Inspector: layers (visibility, lock, order), properties (position,
+  size, opacity, text and shape fields, each change one revision), candidates, history
+  with `回到此修订` (`revert_to`), and export.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

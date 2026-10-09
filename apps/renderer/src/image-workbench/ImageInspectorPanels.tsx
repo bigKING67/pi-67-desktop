@@ -1,10 +1,19 @@
 import { imageCandidateActions } from "@pi67/domain";
-import { Bot, Download, RotateCcw, User } from "lucide-react";
+import { Bot, Download, FilePlus, RotateCcw, User } from "lucide-react";
 import { Button } from "react-aria-components";
 import { acceptCandidate, discardCandidate, editImageProject, exportImageProject, inspectCandidate, useImageProject } from "./image-project-controller.js";
 import styles from "./ImageInspector.module.css";
 
-const AUTHORS = { human: "人", agent: "Agent", system: "创建" } as const;
+const AUTHORS = { human: "人", agent: "Agent", system: "系统" } as const;
+const AUTHOR_ICONS = { human: User, agent: Bot, system: FilePlus } as const;
+const SNAPSHOT = /^Snapshot of source revision (\d+)$/u;
+
+/** The engine writes system summaries in English; show them as product copy. */
+export function historySummary(entry: { author: keyof typeof AUTHORS; summary: string }): string {
+  if (entry.author !== "system") return entry.summary;
+  const snapshot = SNAPSHOT.exec(entry.summary);
+  return snapshot ? `复制自修订 ${snapshot[1]}` : "创建项目";
+}
 
 /** 历史: every revision newest first; returning to one publishes a new `revert_to` revision. */
 export function ImageHistoryPanel() {
@@ -14,14 +23,16 @@ export function ImageHistoryPanel() {
   if (history.length === 0) return <p className={styles.empty}>正在读取历史…</p>;
   return (
     <ol aria-label="修订历史" className={styles.history}>
-      {[...history].reverse().map((entry) => (
+      {[...history].reverse().map((entry) => {
+        const Icon = AUTHOR_ICONS[entry.author];
+        return (
         <li key={entry.revision} className={`${styles.historyItem} ${entry.revision === revision ? styles.historyCurrent : ""}`}>
           <span className={styles.historyHead}>
-            {entry.author === "agent" ? <Bot aria-hidden="true" size={13} /> : <User aria-hidden="true" size={13} />}
+            <Icon aria-hidden="true" size={13} />
             <strong>修订 {entry.revision}</strong>
             <span className={styles.historyMeta}>{AUTHORS[entry.author]} · {timeLabel(entry.writtenAt)}</span>
           </span>
-          <span className={styles.historySummary}>{entry.summary}{entry.candidateId ? " · 接受候选" : ""}</span>
+          <span className={styles.historySummary}>{historySummary(entry)}{entry.candidateId ? " · 接受候选" : ""}</span>
           {entry.revision !== revision ? (
             <Button className={styles.historyAction!} isDisabled={busy}
               onPress={() => void editImageProject(`回到修订 ${entry.revision}`, [{ type: "revert_to", revision: entry.revision }])}>
@@ -29,7 +40,8 @@ export function ImageHistoryPanel() {
             </Button>
           ) : <span className={styles.historyMeta}>当前</span>}
         </li>
-      ))}
+        );
+      })}
     </ol>
   );
 }

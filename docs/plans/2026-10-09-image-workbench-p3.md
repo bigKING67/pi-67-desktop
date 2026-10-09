@@ -35,7 +35,7 @@ export presets and user fonts. Product model §6–§8 and §17 (P3 row).
 
 ## Checkpoints
 
-- [ ] 1. Image Inspector shell with 图层, 属性 and 历史; TitleBar shows `创作库` / project.
+- [x] 1. Image Inspector shell with 图层, 属性 and 历史; TitleBar shows `创作库` / project.
 - [ ] 2. Transform handles, snapping and multi-select alignment.
 - [ ] 3. Inline text editing on the canvas.
 - [ ] 4. Marks (mark-and-rework) and reference slots in the structured context.
@@ -52,3 +52,13 @@ the image Inspector returns the P2 page; no project content is rewritten.
 
 - 2026-10-09: plan created after P2 checkpoints 1–6; P2 checkpoint 7 and P1
   checkpoint 8 wait for the user's real end-to-end run.
+- 2026-10-09: checkpoint 1 done. Inspector with 图层 / 属性 / 候选 / 历史 / 导出
+  committed; packaged-preview screenshots of 图层, 属性 and 历史 (dark) and 属性
+  (light) reviewed. Fixes from review: system revisions read `系统 · 创建项目` instead
+  of the engine's English summary; canvas selection uses a two-tone outline (the
+  monochrome accent vanished on white pixels in dark theme). Canvas size/background
+  editing in 属性 moves to checkpoint 2 with the transform work. The packaged recheck
+  found a crash (React #185) when the project opened with the Inspector already
+  visible: the 图层 selector returned a fresh `[]` before the document loaded. Fixed
+  with a stable empty list and a regression test; the reopen path is verified in the
+  packaged preview.

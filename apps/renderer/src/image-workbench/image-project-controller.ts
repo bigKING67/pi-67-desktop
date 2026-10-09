@@ -15,7 +15,7 @@ const CANDIDATE_EDGE = 360;
 
 interface ImagePreview { pngSha256: string; width: number; height: number }
 
-interface ImageProjectState {
+export interface ImageProjectState {
   projectId: string | undefined;
   revision: number | undefined;
   document: ImageDocument | undefined;
