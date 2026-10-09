@@ -241,6 +241,9 @@ function persistedSelectedSurface(
   if (surface.kind === "settings") {
     return persistedSelectedSurface(state.settingsReturnSurface, state);
   }
+  // Library conversations belong to `图像`, which always starts closed; never restore them as Work selection.
+  const surfaceWorkspace = surface.kind === "workspace" ? surface.workspaceId : surface.conversation.workspaceId;
+  if (surfaceWorkspace === state.imageLibraryWorkspaceId) return undefined;
   if (surface.kind === "workspace") {
     return surface.workspaceId === state.currentWorkspaceId ? surface : undefined;
   }

@@ -8,6 +8,8 @@ import {
   type PromptSubmissionResult
 } from "./prompt-submission-controller.js";
 import { promptTextValidationMessage } from "./prompt-text-validation.js";
+import { composerPromptContext } from "./composer-prompt-context.js";
+import { withImagePromptContext } from "@pi67/domain";
 
 export function submitComposerDraft(input: {
   taskId: string;
@@ -19,6 +21,7 @@ export function submitComposerDraft(input: {
   activeStreaming: boolean;
   streamBehavior: "steer" | "followUp";
 }): Promise<PromptSubmissionResult> {
+  input = { ...input, text: withImagePromptContext(input.text, composerPromptContext()) };
   const validationError = promptTextValidationMessage(input.text);
   if (validationError) return Promise.resolve({ accepted: false, error: validationError });
   return input.provisional || useTaskDraftStore.getState().drafts[input.taskId]?.startupConfigurationPending

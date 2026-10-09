@@ -11,7 +11,8 @@ const IMAGE_COMMANDS: ReadonlySet<string> = new Set<ImageCommandType>([
   "image.project.render",
   "image.candidate.list",
   "image.candidate.accept",
-  "image.candidate.discard"
+  "image.candidate.discard",
+  "image.project.conversation.set"
 ]);
 
 export function isImageCommand(type: string): type is ImageCommandType {

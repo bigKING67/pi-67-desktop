@@ -29,12 +29,16 @@ interface ImageProjectState {
   /** Content to return to on undo / redo, newest last (revision numbers; each step is a new `revert_to`). */
   back: number[];
   forward: number[];
+  /** The dock conversation the Host remembers for this project, once one exists. */
+  conversation: { sessionPath: string; sessionFileIdentity: string } | undefined;
+  /** Set once the project's first read completes, so the dock knows whether a conversation exists. */
+  conversationKnown: boolean;
   selectedObjectId: string | undefined;
 }
 
 export const useImageProject = create<ImageProjectState>(() => ({
   projectId: undefined, revision: undefined, document: undefined, preview: undefined,
-  candidates: [], candidatePreviews: {}, inspecting: undefined, busy: false, error: undefined, back: [], forward: [], selectedObjectId: undefined
+  candidates: [], candidatePreviews: {}, inspecting: undefined, busy: false, error: undefined, back: [], forward: [], selectedObjectId: undefined, conversation: undefined, conversationKnown: false
 }));
 
 function libraryId(): string {
@@ -50,13 +54,14 @@ function request<T extends AgentCommandType>(type: T, payload: CommandPayloads[T
 /** Opens (or refreshes) a project: document, fitted preview and candidates. */
 export async function loadImageProject(projectId: string): Promise<void> {
   if (useImageProject.getState().projectId !== projectId) {
-    useImageProject.setState({ projectId, revision: undefined, document: undefined, preview: undefined, candidates: [], candidatePreviews: {}, inspecting: undefined, error: undefined, back: [], forward: [], selectedObjectId: undefined });
+    useImageProject.setState({ projectId, revision: undefined, document: undefined, preview: undefined, candidates: [], candidatePreviews: {}, inspecting: undefined, error: undefined, back: [], forward: [], selectedObjectId: undefined, conversation: undefined, conversationKnown: false });
   }
   try {
     const read = await request("image.project.read", { projectId });
     const rendered = await request("image.project.render", { projectId, revision: read.latestRevision, previewMax: CANVAS_EDGE });
     if (useImageProject.getState().projectId !== projectId) return;
-    useImageProject.setState({ revision: read.latestRevision, document: read.document, preview: rendered, error: undefined });
+    useImageProject.setState((state) => ({ revision: read.latestRevision, document: read.document, preview: rendered, error: undefined,
+      conversation: read.conversation ?? state.conversation, conversationKnown: true }));
     await loadCandidates(projectId);
   } catch (error) {
     if (useImageProject.getState().projectId === projectId) useImageProject.setState({ error: error instanceof Error ? error.message : "项目读取失败" });

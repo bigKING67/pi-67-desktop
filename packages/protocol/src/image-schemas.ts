@@ -113,6 +113,10 @@ const ProjectSummarySchema = strictObject({
 });
 const RevisionResultSchema = strictObject({ projectId: IdSchema, revision: RevisionSchema, sha256: Sha256Schema, dryRun: Type.Boolean() });
 const ProjectRefSchema = strictObject({ projectId: IdSchema });
+const ConversationSchema = strictObject({
+  sessionPath: Type.String({ minLength: 1, maxLength: 4096 }),
+  sessionFileIdentity: Type.String({ minLength: 1, maxLength: 512 })
+});
 
 export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSchema> = {
   "image.project.list": strictObject({}),
@@ -131,12 +135,14 @@ export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSch
   }),
   "image.candidate.list": ProjectRefSchema,
   "image.candidate.accept": strictObject({ projectId: IdSchema, candidateId: IdSchema, baseRevision: RevisionSchema, summary: SummarySchema }),
-  "image.candidate.discard": strictObject({ projectId: IdSchema, candidateId: IdSchema, summary: SummarySchema })
+  "image.candidate.discard": strictObject({ projectId: IdSchema, candidateId: IdSchema, summary: SummarySchema }),
+  "image.project.conversation.set": strictObject({ projectId: IdSchema, conversation: ConversationSchema })
 };
 
 export const ImageCommandResultSchemas: Record<keyof ImageCommandResults, TSchema> = {
   "image.project.list": strictObject({ projects: Type.Array(ProjectSummarySchema, { maxItems: 10_000 }) }),
-  "image.project.read": strictObject({ projectId: IdSchema, revision: RevisionSchema, latestRevision: RevisionSchema, sha256: Sha256Schema, document: DocumentSchema }),
+  "image.project.read": strictObject({ projectId: IdSchema, revision: RevisionSchema, latestRevision: RevisionSchema, sha256: Sha256Schema, document: DocumentSchema,
+    conversation: Type.Optional(ConversationSchema) }),
   "image.project.createFromPhoto": RevisionResultSchema,
   "image.project.edit": RevisionResultSchema,
   "image.project.render": strictObject({
@@ -145,7 +151,8 @@ export const ImageCommandResultSchemas: Record<keyof ImageCommandResults, TSchem
   }),
   "image.candidate.list": strictObject({ projectId: IdSchema, candidates: Type.Array(CandidateSummarySchema, { maxItems: L.candidates }) }),
   "image.candidate.accept": RevisionResultSchema,
-  "image.candidate.discard": strictObject({ projectId: IdSchema, candidateId: IdSchema, status: Type.Literal("discarded") })
+  "image.candidate.discard": strictObject({ projectId: IdSchema, candidateId: IdSchema, status: Type.Literal("discarded") }),
+  "image.project.conversation.set": ProjectRefSchema
 };
 
 export const ImageEventPayloadSchemas: Record<keyof ImageEventPayloads, TSchema> = {

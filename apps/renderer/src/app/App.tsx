@@ -86,8 +86,12 @@ export function App() {
   useEffect(() => { if (chatMode) teamChat.activate(); }, [chatMode]);
   const imageView = useImageWorkbench((state) => state.view !== undefined) && !chatMode && selectedSurface?.kind !== "settings";
   // Choosing any conversation, Workspace or Settings leaves `图像`; it is layout state like Work/Chat.
+  // The image page's own conversation lives in the library Workspace and keeps `图像` open.
   useEffect(() => rendererWorkbenchStore.subscribe((state, previous) => {
-    if (state.selectedSurface !== previous.selectedSurface) useImageWorkbench.getState().close();
+    if (state.selectedSurface === previous.selectedSurface) return;
+    const surface = state.selectedSurface;
+    const workspaceId = surface?.kind === "conversation" ? surface.conversation.workspaceId : surface?.kind === "workspace" ? surface.workspaceId : undefined;
+    if (workspaceId === undefined || workspaceId !== state.imageLibraryWorkspaceId) useImageWorkbench.getState().close();
   }), []);
   const workbenchWorkspaceCount = useVisibleWorkspaceOrder().length;
   const [navigationIsDrawer, setNavigationIsDrawer] = useState(() => window.matchMedia("(max-width: 760px)").matches);

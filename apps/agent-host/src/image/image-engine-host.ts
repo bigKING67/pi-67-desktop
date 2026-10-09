@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { isImageId, type ImageCandidateListStatus } from "@pi67/domain";
+import { IMAGE_WORK_DIRECTORY, isImageId, type ImageCandidateListStatus } from "@pi67/domain";
 type ImageEngine = typeof import("@pi67/image-engine");
 import type { AgentCommand, AgentEvent, CommandPayloads, CommandResults, ImageCandidateSummary, ImageEventPayloads, ImageProjectSummary } from "@pi67/protocol";
 import { HostCommandError } from "../protocol-error.js";
@@ -87,7 +87,8 @@ export class ImageEngineHost {
         const { projectId, revision } = (command as Command<"image.project.read">).payload;
         const project = await readProject(projectRoot(cwd, projectId), { revision });
         this.watcher.noteRevision(workspaceId, projectId, project.latest_revision);
-        return { projectId, revision: project.document.revision, latestRevision: project.latest_revision, sha256: project.sha256, document: project.document };
+        const conversation = await readConversation(cwd, projectId);
+        return { ...(conversation ? { conversation } : {}), projectId, revision: project.document.revision, latestRevision: project.latest_revision, sha256: project.sha256, document: project.document };
       }
       case "image.project.edit": {
         const { projectId, baseRevision, summary, operations, dryRun = false } = (command as Command<"image.project.edit">).payload;
@@ -104,6 +105,16 @@ export class ImageEngineHost {
         const candidates = (await listCandidates(projectRoot(cwd, projectId))).map((item) => candidateSummary(item));
         for (const candidate of candidates) this.watcher.noteCandidate(workspaceId, projectId, candidate.candidateId, candidate.status);
         return { projectId, candidates };
+      }
+      case "image.project.conversation.set": {
+        const { projectId, conversation } = (command as Command<"image.project.conversation.set">).payload;
+        await readProject(projectRoot(cwd, projectId));
+        const file = conversationFile(cwd, projectId);
+        await fs.mkdir(path.dirname(file), { recursive: true });
+        const temporary = `${file}.${randomUUID().slice(0, 8)}.tmp`;
+        await fs.writeFile(temporary, `${JSON.stringify(conversation)}\n`, { flag: "wx" });
+        await fs.rename(temporary, file);
+        return { projectId };
       }
       case "image.candidate.accept": {
         const { projectId, candidateId, baseRevision, summary } = (command as Command<"image.candidate.accept">).payload;
@@ -180,6 +191,18 @@ export class ImageEngineHost {
       throw error;
     }));
   }
+}
+
+// The project's dock conversation lives beside, not inside, the project (the work folder is disposable state).
+const conversationFile = (cwd: string, projectId: string): string => path.join(cwd, ...IMAGE_WORK_DIRECTORY, projectId, "conversation.json");
+
+async function readConversation(cwd: string, projectId: string): Promise<{ sessionPath: string; sessionFileIdentity: string } | undefined> {
+  try {
+    const value: unknown = JSON.parse(await fs.readFile(conversationFile(cwd, projectId), "utf8"));
+    const record = typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
+    return typeof record.sessionPath === "string" && typeof record.sessionFileIdentity === "string" && record.sessionPath.length <= 4096 && record.sessionFileIdentity.length <= 512
+      ? { sessionPath: record.sessionPath, sessionFileIdentity: record.sessionFileIdentity } : undefined;
+  } catch { return undefined; }
 }
 
 const PHOTO_EXTENSIONS: Readonly<Record<string, string>> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };

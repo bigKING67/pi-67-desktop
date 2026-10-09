@@ -1,3 +1,4 @@
+import { withoutImagePromptContext } from "@pi67/domain";
 import type { SessionMessageView } from "@pi67/domain";
 import {
   Bot,
@@ -123,7 +124,7 @@ export function MessageCard({
               </details>
             );
           }
-          if (part.type === "text") return <TranscriptMarkdownView key={`${message.id}-text-${index}`} mode={streaming ? "streaming" : "settled"}>{part.text}</TranscriptMarkdownView>;
+          if (part.type === "text") return <TranscriptMarkdownView key={`${message.id}-text-${index}`} mode={streaming ? "streaming" : "settled"}>{isUser ? withoutImagePromptContext(part.text) : part.text}</TranscriptMarkdownView>;
           if (part.type === "image") {
             return (
               <AssetImage

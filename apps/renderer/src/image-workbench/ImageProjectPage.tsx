@@ -1,7 +1,7 @@
 import { imageCandidateActions, type ImageCandidateListStatus } from "@pi67/domain";
 import type { ImageCandidateSummary } from "@pi67/protocol";
 import { ArrowLeft, Check, Download, Redo2, Undo2, X } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { useEffect } from "react";
 import { Button } from "react-aria-components";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import {
@@ -19,6 +19,7 @@ import {
 } from "./image-project-controller.js";
 import { ImageCanvas } from "./ImageCanvas.js";
 import { ImageSelectionBar } from "./ImageSelectionBar.js";
+import { ImageProjectConversationDock } from "./ImageProjectConversationDock.js";
 import { imagePreviewUrl } from "./image-workbench-controller.js";
 import { useImageWorkbench } from "./image-workbench-store.js";
 import styles from "./ImageProjectPage.module.css";
@@ -28,7 +29,7 @@ const STATUS_LABELS: Record<ImageCandidateListStatus, string> = {
 };
 
 /** One image project: the fitted canvas above, the candidate strip and the project conversation below. */
-export function ImageProjectPage({ projectId, conversation }: { projectId: string; conversation?: ReactNode }) {
+export function ImageProjectPage({ projectId }: { projectId: string }) {
   const libraryId = useWorkbenchStore((state) => state.imageLibraryWorkspaceId);
   const openLibrary = useImageWorkbench((state) => state.openLibrary);
   const document = useImageProject((state) => state.document);
@@ -103,7 +104,7 @@ export function ImageProjectPage({ projectId, conversation }: { projectId: strin
             </ul>
           )}
         </section>
-        <section aria-label="项目对话" className={styles.conversation}>{conversation}</section>
+        <section aria-label="项目对话" className={styles.conversation}><ImageProjectConversationDock projectId={projectId} /></section>
       </div>
     </section>
   );

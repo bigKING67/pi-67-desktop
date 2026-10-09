@@ -22,7 +22,11 @@ export interface ImageCommandPayloads {
   "image.candidate.list": { projectId: string };
   "image.candidate.accept": { projectId: string; candidateId: string; baseRevision: number; summary: string };
   "image.candidate.discard": { projectId: string; candidateId: string; summary: string };
+  /** Records which Pi conversation belongs to the project (the image page's dock). */
+  "image.project.conversation.set": { projectId: string; conversation: ImageProjectConversation };
 }
+
+export interface ImageProjectConversation { sessionPath: string; sessionFileIdentity: string }
 
 export interface ImageProjectSummary {
   projectId: string;
@@ -54,12 +58,13 @@ export interface ImageRenderResult { projectId: string; revision: number; candid
 export interface ImageCommandResults {
   "image.project.list": { projects: ImageProjectSummary[] };
   "image.project.createFromPhoto": ImageRevisionResult;
-  "image.project.read": { projectId: string; revision: number; latestRevision: number; sha256: string; document: ImageDocument };
+  "image.project.read": { projectId: string; revision: number; latestRevision: number; sha256: string; document: ImageDocument; conversation?: ImageProjectConversation };
   "image.project.edit": ImageRevisionResult;
   "image.project.render": ImageRenderResult;
   "image.candidate.list": { projectId: string; candidates: ImageCandidateSummary[] };
   "image.candidate.accept": ImageRevisionResult;
   "image.candidate.discard": { projectId: string; candidateId: string; status: "discarded" };
+  "image.project.conversation.set": { projectId: string };
 }
 
 export interface ImageEventPayloads {

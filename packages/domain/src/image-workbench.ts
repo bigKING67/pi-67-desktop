@@ -221,3 +221,15 @@ export function formatImagePromptContext(context: ImagePromptContext): string {
   lines.push("</image-context>");
   return lines.join("\n");
 }
+
+const IMAGE_CONTEXT_BLOCK = /\n*<image-context>\n[\s\S]*?\n<\/image-context>\s*$/u;
+
+/** The prompt as sent: the person's words, then the context block the image page attaches. */
+export function withImagePromptContext(text: string, block: string | undefined): string {
+  return block ? `${text.replace(IMAGE_CONTEXT_BLOCK, "")}\n\n${block}` : text;
+}
+
+/** The person's words as the transcript shows them; the attached block stays in Pi's history only. */
+export function withoutImagePromptContext(text: string): string {
+  return text.replace(IMAGE_CONTEXT_BLOCK, "");
+}

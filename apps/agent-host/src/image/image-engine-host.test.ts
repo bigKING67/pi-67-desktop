@@ -45,6 +45,21 @@ function host(cwd: string, queue?: ImageWorkQueue, readStagedImage?: (id: string
 const lastState = (events: AgentEvent[]): string | undefined => (events.at(-1)?.payload as { state?: string } | undefined)?.state;
 
 describe("image engine host", { timeout: 120_000 }, () => {
+  it("remembers the project's conversation beside the project and returns it with reads", async () => {
+    const cwd = await workspace();
+    await project(cwd, "poster");
+    const { run } = host(cwd);
+    expect((await run("image.project.read", { projectId: "poster" })).conversation).toBeUndefined();
+    const conversation = { sessionPath: "/pi/sessions/a.jsonl", sessionFileIdentity: "id-1" };
+    await run("image.project.conversation.set", { projectId: "poster", conversation });
+    expect((await run("image.project.read", { projectId: "poster" })).conversation).toEqual(conversation);
+    await run("image.project.conversation.set", { projectId: "poster", conversation: { ...conversation, sessionFileIdentity: "id-2" } });
+    expect((await run("image.project.read", { projectId: "poster" })).conversation?.sessionFileIdentity).toBe("id-2");
+    await expect(run("image.project.conversation.set", { projectId: "missing", conversation })).rejects.toThrow();
+    await fs.writeFile(path.join(cwd, ".newmoney/image-work/poster/conversation.json"), "not json");
+    expect((await run("image.project.read", { projectId: "poster" })).conversation).toBeUndefined();
+  });
+
   it("creates a project from a staged photo and leaves no work folder", async () => {
     const cwd = await workspace();
     const photo = await sharp({ create: { width: 1024, height: 1024, channels: 3, background: "#d8c8b0" } }).jpeg().toBuffer();

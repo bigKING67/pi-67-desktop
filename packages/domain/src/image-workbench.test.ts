@@ -11,7 +11,9 @@ import {
   isImageId,
   isTerminalImageJobState,
   type ImageCandidateListStatus,
-  type ImagePromptContext
+  type ImagePromptContext,
+  withImagePromptContext,
+  withoutImagePromptContext
 } from "./image-workbench.js";
 
 describe("image workbench policy", () => {
@@ -119,5 +121,15 @@ describe("image workbench policy", () => {
       expect(() => formatImagePromptContext({ ...base, marks: Array.from({ length: 17 }, (_, i) => ({ id: `m${i}`, x: 0, y: 0, width: 1, height: 1, instruction: "x" })) })).toThrow(/limits/);
       expect(() => formatImagePromptContext({ ...base, references: Array.from({ length: 4 }, () => ({ assetId: "a", role: "keep-style" as const })) })).toThrow(/limits/);
     });
+  });
+
+  it("attaches one context block after the words and hides it again for display", () => {
+    const block = formatImagePromptContext({ projectId: "poster", revision: 3, selectedObjectIds: ["headline"], marks: [], references: [] });
+    const sent = withImagePromptContext("把背景换成暖色", block);
+    expect(sent).toBe(`把背景换成暖色\n\n${block}`);
+    expect(withImagePromptContext(sent, block)).toBe(sent);
+    expect(withoutImagePromptContext(sent)).toBe("把背景换成暖色");
+    expect(withImagePromptContext("普通消息", undefined)).toBe("普通消息");
+    expect(withoutImagePromptContext("引用 <image-context> 不是结尾的块")).toBe("引用 <image-context> 不是结尾的块");
   });
 });
