@@ -92,11 +92,13 @@ describe("image project watcher", { timeout: 60_000 }, () => {
     for (const name of ["poster/revisions/000004.json", "poster\\revisions\\000004.json", "poster/candidates/x/candidate.json"]) listener?.("rename", name);
     for (const name of [null, "poster/assets/a.png", "../poster/revisions/1.json", "renders/x"]) listener?.("change", name);
     await vi.advanceTimersByTimeAsync(60);
-    expect(readProject).toHaveBeenCalledTimes(1);
+    // The announcement waits for the real-disk baseline, which fake time does not flush.
+    await vi.waitFor(() => { expect(readProject).toHaveBeenCalledTimes(1); });
     expect(emit).toHaveBeenCalledWith("w1", { type: "image.project.changed", payload: { projectId: "poster", revision: 4, sha256: "s", author: "agent" } });
     readProject.mockRejectedValueOnce(new Error("half written"));
     listener?.("rename", "banner/revisions/000001.json");
     await vi.advanceTimersByTimeAsync(60);
+    await vi.waitFor(() => { expect(readProject).toHaveBeenCalledTimes(2); });
     expect(emit).toHaveBeenCalledTimes(1);
     watcher.dispose();
     expect(fake.close).toHaveBeenCalledTimes(1);
