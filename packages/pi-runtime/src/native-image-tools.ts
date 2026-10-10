@@ -27,20 +27,27 @@ export function createNativeImageTools(): ToolDefinition[] {
   const discover = defineTool({
     name: "image_models",
     label: "可用生图模型",
-    description: "List authenticated image-generation models from the current Pi SDK registry. Returns model identities and modalities only, never credentials or endpoints.",
-    promptSnippet: "Discover configured SDK-native image models before generating an image.",
+    description: "List authenticated image-generation models from the current Pi SDK registry. Omit provider to list every source; pass provider only with an id this tool already returned, never a guessed one. Returns model identities and modalities only, never credentials or endpoints.",
+    promptSnippet: "Discover configured SDK-native image models (call with no provider) before generating an image.",
     parameters: IMAGE_MODELS_INPUT,
     executionMode: "parallel",
     async execute(_id, input, signal, _onUpdate, ctx) {
       signal?.throwIfAborted();
-      const models = await ctx.modelRegistry.getAvailableOfType("image", input.provider, signal ? { signal } : {});
+      const options = signal ? { signal } : {};
+      let models = await ctx.modelRegistry.getAvailableOfType("image", input.provider, options);
+      // A guessed or stale Provider id must not read as "nothing configured" when other sources exist.
+      let note: string | undefined;
+      if (models.length === 0 && input.provider !== undefined) {
+        models = await ctx.modelRegistry.getAvailableOfType("image", undefined, options);
+        if (models.length) note = `No image model for provider "${input.provider}"; these are the configured ones.`;
+      }
       signal?.throwIfAborted();
       const entries = models.slice(0, 64).map((model) => ({
         provider: model.provider, model: model.id, name: model.name, input: model.input, output: model.output
       }));
       return {
         content: [{ type: "text" as const, text: entries.length
-          ? JSON.stringify({ models: entries, truncated: models.length > entries.length })
+          ? JSON.stringify({ ...(note ? { note } : {}), models: entries, truncated: models.length > entries.length })
           : "NATIVE_IMAGE_MODEL_UNAVAILABLE: No authenticated SDK image model is configured. Configure a Pi-supported image provider; chat/vision models and legacy image-gen configuration are not image-generation credentials." }],
         details: { models: entries, truncated: models.length > entries.length }
       };

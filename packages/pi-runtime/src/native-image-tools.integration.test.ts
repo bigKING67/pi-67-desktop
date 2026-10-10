@@ -25,6 +25,11 @@ describe("SDK-native image generation", () => {
       expect(JSON.stringify(models)).toContain("image-fixture");
       expect(JSON.stringify(models)).not.toContain("synthetic-credential");
       expect(JSON.stringify(models)).not.toContain("baseUrl");
+      // A guessed Provider id still surfaces the configured sources instead of "nothing configured".
+      const guessed = JSON.stringify(await f.run("image_models", { provider: "newmoney-images-auto" }));
+      expect(guessed).toContain("image-fixture");
+      expect(guessed).toContain("No image model for provider");
+      expect(guessed).not.toContain("NATIVE_IMAGE_MODEL_UNAVAILABLE");
       const before = f.session.model;
       const result = await f.run("generate_image", input);
       expect(result).toMatchObject({ isError: false, usage, content: expect.arrayContaining([image]) });
