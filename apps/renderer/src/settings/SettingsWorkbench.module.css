@@ -234,7 +234,10 @@
   color: var(--text-primary);
 }
 
+/* The containing block for visually hidden React Aria inputs: without it they sit outside this
+   scroller, so focusing a checkbox far down the page scrolls the window instead and blanks the app. */
 .scrollRegion {
+  position: relative;
   height: 100%;
   min-width: 0;
   min-height: 0;

@@ -151,3 +151,64 @@ test("discovers mixed-protocol models from one URL and lets users exclude a fami
     payload: expect.objectContaining({ provider: "mixed-gateway", apiKey: "[redacted]" })
   }));
 });
+
+test("selecting a model far down a long discovery list never scrolls the window", async ({ page }) => {
+  const model = (protocol: "openai" | "anthropic" | "gemini", api: string, index: number) => ({
+    id: `${protocol}-model-${index}`,
+    name: `${protocol} model ${index}`,
+    protocol,
+    api,
+    discoveredBy: ["openai", "anthropic", "gemini"],
+    verification: "catalog"
+  });
+  const models = [
+    ...Array.from({ length: 16 }, (_, index) => model("openai", "openai-responses", index)),
+    ...Array.from({ length: 6 }, (_, index) => model("anthropic", "anthropic-messages", index)),
+    ...Array.from({ length: 11 }, (_, index) => model("gemini", "google-generative-ai", index))
+  ];
+  await page.goto("/");
+  await attachMockAgent(page, [], {}, {
+    providerConfigurationSnapshot: createMockProviderConfigurationSnapshot(),
+    responseResults: {
+      "provider.modelDiscovery.inspect": {
+        status: "current",
+        models,
+        families: [
+          { protocol: "openai", status: "current", modelCount: 16 },
+          { protocol: "anthropic", status: "shared", modelCount: 6 },
+          { protocol: "gemini", status: "shared", modelCount: 11 }
+        ],
+        conflicts: [],
+        truncated: false
+      }
+    }
+  });
+  await page.keyboard.press("Control+,");
+
+  const settings = page.getByLabel("New Money 设置");
+  await settings.getByRole("navigation", { name: "设置分类" })
+    .getByRole("button", { name: "模型", exact: true }).click();
+  const panel = settings.getByTestId("provider-configuration-panel");
+  await panel.getByRole("tab", { name: "自定义 0" }).click();
+  await panel.getByRole("button", { name: "新建模型服务" }).click();
+  await panel.getByLabel("Provider ID").fill("long-gateway");
+  await panel.getByLabel("Base URL").fill("https://gateway.example.invalid/v1");
+  const discovery = panel.getByTestId("provider-model-discovery");
+  await discovery.getByRole("textbox", { name: "API Key" }).fill("fixture-long-gateway-secret");
+  await discovery.getByRole("button", { name: "检测并加载模型" }).click();
+
+  const results = discovery.getByRole("region", { name: "发现结果" });
+  const lastGemini = results.getByRole("checkbox", { name: /gemini model 10/u });
+  // Newly discovered models start selected; pressing the row toggles its hidden input.
+  await expect(lastGemini).toBeChecked();
+  await results.getByText("gemini model 10", { exact: true }).click();
+  await expect(lastGemini).not.toBeChecked();
+
+  // A visually hidden input outside the settings scroller would scroll the viewport and blank the app.
+  expect(await page.evaluate(() => ({
+    window: window.scrollY,
+    root: document.scrollingElement?.scrollTop ?? 0,
+    body: document.body.scrollTop
+  }))).toEqual({ window: 0, root: 0, body: 0 });
+  await expect(settings.getByRole("button", { name: "返回工作台" })).toBeInViewport();
+});
