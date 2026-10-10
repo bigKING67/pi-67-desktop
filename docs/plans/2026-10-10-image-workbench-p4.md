@@ -30,7 +30,7 @@ with shared samples first, then protocol, then UI (product model §8).
 
 ## Checkpoints
 
-- [ ] 1. Spike: a capability matrix for rotation/flip, each blend mode, opacity and
+- [x] 1. Spike: a capability matrix for rotation/flip, each blend mode, opacity and
   alpha masks, linear/radial gradients, ellipse/line, and the four adjustments through
   satori, resvg and Sharp, with render-regression fixtures; pick a path per feature and
   record it here. Nothing user-visible.
@@ -50,6 +50,28 @@ with shared samples first, then protocol, then UI (product model §8).
 - [ ] 9. Authority docs, packaged macOS verification, Windows CI evidence, Agent tool
   schema and descriptions for each new operation.
 
+## Spike results (checkpoint 1, 2026-10-10)
+
+Measured by rendering each case through satori 0.35 → resvg and sampling pixels.
+
+| Feature | satori | resvg (hand SVG) | Sharp (per layer) | Path |
+| --- | --- | --- | --- | --- |
+| Rotation (any angle), flip | `transform` works, text and images | — | works | satori style |
+| Linear / radial gradients | `backgroundImage` works | — | — | satori style |
+| Ellipse | `borderRadius: 50%` works | — | — | satori style |
+| Brightness, contrast, saturation, grayscale, blur | `filter` emitted as SVG filters, rendered | — | works | satori style |
+| Gradient opacity mask | `maskImage: linear-gradient` works | — | — | satori style |
+| Blend modes | **ignored** (top layer only) | `mix-blend-mode` correct (multiply, screen, overlay, difference, color, luminosity) | composite blends | assembly |
+| Image (bitmap) mask | **`maskImage: url()` blanks the layer** | `<mask><image>` correct | `dest-in` | assembly |
+
+Decision: keep satori for each object's layout and pixels (text stays vector, measurement
+unchanged) but render objects as separate layers and **assemble one SVG**, wrapping a layer in
+`<g style="mix-blend-mode:…" mask="url(#…)">` where it uses those. Verified: a multiply-blended,
+bitmap-masked layer over a base composites correctly and text stays paths. Assembly must
+namespace each layer's ids — satori reuses the same ids in every render (7 ids, 3 distinct in
+the probe), which would cross-wire gradients, clips and masks. Objects without blend or mask
+can share one satori pass, so the common case keeps today's cost.
+
 ## Rollback
 
 Each feature is additive and written only when used, so hiding its UI returns the P3
@@ -58,3 +80,7 @@ page and earlier releases still open projects that do not use it.
 ## Progress log
 
 - 2026-10-10: proposal drafted after P3 checkpoints 1–6 and the macOS part of 7.
+- 2026-10-10: checkpoint 1 done (spike in a scratch directory, nothing in the product). See
+  "Spike results": everything but blend modes and bitmap masks works in satori; those two go
+  through per-layer SVG assembly, which resvg composites correctly.
+
