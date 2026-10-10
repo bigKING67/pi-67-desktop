@@ -404,3 +404,69 @@
   gap: 6px;
   margin-bottom: 8px;
 }
+
+/* 调整: a label and value over a thin track; the fill grows from the neutral point. */
+.adjust {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  row-gap: 4px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.adjust output {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.adjust[data-disabled] {
+  opacity: 0.55;
+}
+
+.adjustTrack {
+  position: relative;
+  height: 18px;
+  grid-column: 1 / -1;
+}
+
+.adjustTrack::before {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  content: "";
+  transform: translateY(-50%);
+}
+
+.adjustFill {
+  position: absolute;
+  top: 50%;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: translateY(-50%);
+}
+
+.adjustThumb {
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow-segment);
+}
+
+.adjustThumb[data-dragging],
+.adjustThumb[data-hovered] {
+  border-color: var(--accent);
+}
+
+.adjustThumb[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}

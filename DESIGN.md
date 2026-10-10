@@ -304,6 +304,12 @@ Application-level surfaces use a separate wide-window shell:
   select: 无, then every project image by the layer showing it or its asset id, size as
   detail), a `反相` segment shown while a mask is set and a `添加蒙版图片…` text action with a
   plus glyph, then one tertiary line explaining luminance masks.
+- Adjustments (P4, 2026-10-10): 属性 for an image layer adds `调整`: four full-width sliders
+  (亮度, 对比度, 饱和度, 模糊), each a caption label with its tabular value on the right
+  (`+20`, `-65`, `4 px`) over a 3px `--border` track, an `--accent` fill growing from the
+  neutral point (the middle, or the left end for blur) and a 14px round `--surface` thumb
+  with `--border-strong` (accent while hovered or dragged, `--focus` ring); then a
+  `还原调整` text action while any is set. Disabled sliders dim to 0.55 like other controls.
 - Text fonts (P3, 2026-10-10): 属性 for text adds a `字体` section — the shared Settings
   select at full panel width (`Noto Sans CJK SC · 内置`, then each added font's family with
   `TTF`/`OTF` as detail), a `添加字体…` text action with a plus glyph (disabled at 8 fonts or

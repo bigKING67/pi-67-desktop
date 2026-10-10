@@ -121,6 +121,12 @@ describe("image workbench tools", { timeout: 120_000 }, () => {
     expect((await t.json("image_project_edit", { project_id: "poster", base_revision: 3, summary: "加圆", operations: [{ type: "add_object", object: ring }] })).revision).toBe(4);
     expect(((await t.json("image_project_read", { project_id: "poster" })).objects as { id: string }[]).find((object) => object.id === "ring"))
       .toMatchObject({ kind: "ellipse", color: "#ff0000", gradient: { type: "linear", angle: 0 } });
+    // And adjust the (unlocked) photo, which reads back with its adjustments.
+    const photo = ((await t.json("image_project_read", { project_id: "poster" })).objects as { id: string; kind: string }[]).find((object) => object.kind === "image")!;
+    await t.json("image_project_edit", { project_id: "poster", base_revision: 4, summary: "解锁", operations: [{ type: "update_object", id: photo.id, patch: { locked: false } }] });
+    expect((await t.json("image_project_edit", { project_id: "poster", base_revision: 5, summary: "调暗", operations: [{ type: "update_object", id: photo.id, patch: { adjust: { brightness: 0.8, blur: 2 } } }] })).revision).toBe(6);
+    expect(((await t.json("image_project_read", { project_id: "poster" })).objects as { id: string }[]).find((object) => object.id === photo.id))
+      .toMatchObject({ adjust: { brightness: 0.8, blur: 2 } });
   });
 
   it("resolves an imported asset against the Workspace, not the Host's own directory", async () => {

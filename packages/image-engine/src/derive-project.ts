@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { errorCode, sha256, writeOnce } from "./content-store.js";
-import { digest, id, LIMITS, number, record, textObjects, validateCanvas, validateDocument, type Canvas, type ImageDocument, type SceneObject } from "./document.js";
+import { digest, documentSchema, id, LIMITS, number, record, textObjects, validateCanvas, validateDocument, type Canvas, type ImageDocument, type SceneObject } from "./document.js";
 import { encode, readProject } from "./project.js";
 import { regularPath } from "./raster.js";
 import { compose } from "./render-compose.js";
@@ -37,7 +37,8 @@ export function presetCanvas(source: Canvas, preset: DerivePreset): Canvas {
 export function relayoutObjects(objects: readonly SceneObject[], from: Canvas, canvas: Canvas): SceneObject[] {
   const sx = canvas.width / from.width, sy = canvas.height / from.height, s = Math.min(sx, sy);
   const turns = Math.sign(from.width - from.height) * Math.sign(canvas.width - canvas.height) < 0;
-  return objects.map((object) => {
+  return objects.map((object) => withScaledBlur(laidOut(object), s));
+  function laidOut(object: SceneObject): SceneObject {
     // A masked object scales as one piece: stretching a band would slide its mask off the pixels it shapes.
     if (object.kind !== "text" && !object.mask && object.width >= from.width * BAND_SHARE) {
       const x = Math.round(object.x * sx), y = Math.round(object.y * sy);
@@ -51,7 +52,17 @@ export function relayoutObjects(objects: readonly SceneObject[], from: Canvas, c
     if (object.kind === "text") return { ...object, x, y, width, height, font_size: Math.min(500, Math.max(8, Math.round(object.font_size * s))) };
     if (object.kind === "rect") return { ...object, x, y, width, height, radius: Math.min(Math.round(object.radius * s), Math.floor(Math.min(width, height) / 2)) };
     return { ...object, x, y, width, height };
-  });
+  }
+}
+
+/** A blur is in canvas pixels, so it scales with the layout to look the same at the new size. */
+function withScaledBlur(object: SceneObject, scale: number): SceneObject {
+  if (object.kind !== "image" || object.adjust?.blur === undefined) return object;
+  const scaled = Math.min(100, Math.round(object.adjust.blur * scale * 10) / 10);
+  const next: SceneObject = { ...object, adjust: { ...object.adjust, blur: scaled } };
+  if (scaled === 0) delete next.adjust!.blur;
+  if (!Object.keys(next.adjust!).length) delete next.adjust;
+  return next;
 }
 
 const clamp = (value: number, max: number): number => Math.min(Math.max(0, max), Math.max(0, value));
@@ -85,7 +96,8 @@ export async function deriveProject(sourceRoot: string, target: string, input: u
 
   const laid = relayoutObjects(source.document.objects, source.document.canvas, canvas);
   const proportional = new Map(textObjects(laid).map((object) => [object.id, object.font_size]));
-  const document: ImageDocument = { ...structuredClone(source.document), project_id: projectId, title, revision: 1, parent_sha256: null, canvas, objects: laid,
+  // Relayout can drop a v3 field (a blur that scales to nothing), so the schema is worked out again.
+  const document: ImageDocument = { ...structuredClone(source.document), schema: documentSchema({ ...source.document, objects: laid }), project_id: projectId, title, revision: 1, parent_sha256: null, canvas, objects: laid,
     change: { author: "system", summary: `Derived from ${source.document.project_id} revision ${revision} for ${imageSizePresetLabel(preset)}`, operations: ["create"] } };
   const shrunk = new Set<string>();
   for (;;) {

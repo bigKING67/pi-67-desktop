@@ -43,7 +43,7 @@ with shared samples first, then protocol, then UI (product model §8).
 - [x] 4. Shapes and gradients: ellipse and line, gradient fills in 属性.
 - [x] 5. Blend modes and opacity masks, including how candidates' protected regions
   interact with masked layers.
-- [ ] 6. Adjustments on image layers (non-destructive, rendered per layer).
+- [x] 6. Adjustments on image layers (non-destructive, rendered per layer).
 - [ ] 7. Layer groups: 图层 tree, move/lock/hide a group, selection and alignment.
 - [ ] 8. OCR gate for key text in generated candidates, and the VLM debias / golden
   eval with a report (separate design; may move to its own plan).
@@ -164,3 +164,21 @@ page and earlier releases still open projects that do not use it.
   (`IMAGE_ASSET_LIMIT` in domain); "no mask" is an empty value no asset id can take; mask
   labels fall back to the asset id when a layer name would repeat another; one Host helper
   writes staged bytes into the import work folder for photos, images and fonts.
+- 2026-10-10: checkpoint 6 done. Engine: image `adjust` {brightness, contrast, saturation as
+  factors 0–2; blur 0–100 canvas px} (limits in domain), v3; neutral values and an empty
+  adjust are refused in documents and dropped from patches; rendered as satori CSS filters
+  (verified by pixel probes: brightness, contrast, saturate, blur all render through resvg;
+  blur stays inside the box); derive scales the blur with the layout. Protocol, Agent edit
+  schema and read output carry it. 属性 `调整`: four sliders (−100…+100 around unchanged, blur
+  in px) committing one revision on release, and 还原调整. Tests: pixel tests per adjustment,
+  neutral normalisation and refusals, derive scaling, protocol, Agent, renderer and e2e.
+- 2026-10-10: `/code-review high` on checkpoint 6, all fixed: a derived size whose blur scaled to
+  nothing kept the v3 schema and failed validation (derive works the schema out again); quick
+  key presses on a slider sent overlapping edits from one base revision (each slider now
+  waits for its write and sends only the last waiting value, over the adjustments as they
+  are now); a refused or overtaken write left the thumb at an unwritten value (it returns);
+  a neutral `adjust` on a non-image object was tidied away instead of refused; the same
+  adjustments in another key order published an empty revision (one key order); a slider
+  could not clear an Agent factor that rounds to 0 (compared with the written value);
+  protocol and Agent ranges come from `IMAGE_ADJUST_LIMITS`; the engine's `Adjust` is the
+  domain type.

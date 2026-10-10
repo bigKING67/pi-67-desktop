@@ -2,6 +2,7 @@ import { IMAGE_ASSET_LIMIT, IMAGE_BLEND_MODES, IMAGE_PROMPT_CONTEXT_LIMITS, IMAG
 import { Eye, EyeOff, Lock, LockOpen, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button, Input, Label, TextField } from "react-aria-components";
+import { ImageAdjustments } from "./ImageAdjustments.js";
 import { ImageAlignToolbar } from "./ImageAlignToolbar.js";
 import { IMAGE_OBJECT_KIND_LABELS } from "./image-object-kinds.js";
 import { SettingsSelect } from "../settings/SettingsPrimitives.js";
@@ -117,6 +118,7 @@ export function ImagePropertiesPanel() {
           ))}
         </div>
       ) : null}
+      {object.kind === "image" ? <ImageAdjustments busy={busy} object={object} onResult={report} /> : null}
       {object.kind === "image" ? <ReferenceRole objectId={object.id} /> : null}
       {object.kind === "rect" || object.kind === "ellipse" ? <FillChoice busy={busy} object={object} onResult={report} /> : null}
       {status}

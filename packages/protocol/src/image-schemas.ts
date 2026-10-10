@@ -1,4 +1,4 @@
-import { IMAGE_ID_PATTERN, IMAGE_PROJECT_LIMITS, IMAGE_SIZE_PRESETS, IMAGE_USER_FONT_LIMIT } from "@pi67/domain";
+import { IMAGE_ADJUST_LIMITS, IMAGE_ID_PATTERN, IMAGE_PROJECT_LIMITS, IMAGE_SIZE_PRESETS, IMAGE_USER_FONT_LIMIT } from "@pi67/domain";
 import { strictObject, Type, Value, type TSchema } from "./typebox-schema.js";
 import type { ImageCommandPayloads, ImageCommandResults, ImageEventPayloads } from "./image-command-messages.js";
 
@@ -42,7 +42,10 @@ const common = {
   rotation: Type.Optional(RotationSchema), flip_x: Type.Optional(Type.Literal(true)), flip_y: Type.Optional(Type.Literal(true)),
   blend: Type.Optional(BlendSchema), mask: Type.Optional(MaskSchema)
 };
-const RasterObjectSchema = strictObject({ ...common, kind: Type.Literal("image"), asset_id: IdSchema, fit: FitSchema });
+// The engine also refuses neutral values (1, or a 0 blur) and an empty object.
+const adjustRange = (key: keyof typeof IMAGE_ADJUST_LIMITS) => Type.Optional(Type.Number({ minimum: IMAGE_ADJUST_LIMITS[key][0], maximum: IMAGE_ADJUST_LIMITS[key][1] }));
+const AdjustSchema = strictObject({ brightness: adjustRange("brightness"), contrast: adjustRange("contrast"), saturation: adjustRange("saturation"), blur: adjustRange("blur") });
+const RasterObjectSchema = strictObject({ ...common, kind: Type.Literal("image"), asset_id: IdSchema, fit: FitSchema, adjust: Type.Optional(AdjustSchema) });
 const TextObjectSchema = strictObject({
   ...common, kind: Type.Literal("text"), text: TextSchema, font_size: FontSizeSchema, color: ColorSchema, align: AlignSchema, line_height: LineHeightSchema,
   font_id: Type.Optional(IdSchema)
@@ -104,7 +107,8 @@ const PatchSchema = Type.Object({
   rotation: Type.Optional(Type.Union([RotationSchema, Type.Null()])),
   flip_x: Type.Optional(Type.Union([Type.Boolean(), Type.Null()])), flip_y: Type.Optional(Type.Union([Type.Boolean(), Type.Null()])),
   gradient: Type.Optional(Type.Union([GradientSchema, Type.Null()])),
-  blend: Type.Optional(Type.Union([BlendSchema, Type.Null()])), mask: Type.Optional(Type.Union([MaskSchema, Type.Null()]))
+  blend: Type.Optional(Type.Union([BlendSchema, Type.Null()])), mask: Type.Optional(Type.Union([MaskSchema, Type.Null()])),
+  adjust: Type.Optional(Type.Union([AdjustSchema, Type.Null()]))
 }, { additionalProperties: false, minProperties: 1 });
 const EditOperationSchema = Type.Union([
   strictObject({ type: Type.Literal("update_object"), id: IdSchema, patch: PatchSchema }),

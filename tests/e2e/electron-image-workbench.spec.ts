@@ -153,6 +153,24 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     await inspector.locator("input[type=file][accept*='.png']").setInputFiles(photo);
     await expectRevision(page, 14);
     await expect(inspector.getByRole("button", { name: "蒙版" }).first()).toContainText("mask-1");
+    // P4: unlock the photo and brighten it with the keyboard on the 亮度 slider; 还原调整 drops it again.
+    await tab("图层");
+    await inspector.getByRole("button", { name: "选择图层 photo" }).click();
+    await tab("属性");
+    await inspector.getByRole("button", { name: "解锁" }).click();
+    await expectRevision(page, 15);
+    await inspector.getByRole("slider", { name: "亮度" }).focus();
+    // Quick presses never overlap: the last waiting value is written after the first, without a conflict.
+    for (let press = 0; press < 3; press += 1) await page.keyboard.press("ArrowRight");
+    await expect.poll(async () => (await revisionOf(page)) >= 16).toBe(true);
+    await tab("图层");
+    await tab("属性");
+    await expect(inspector.locator("output").first()).toHaveText("+3");
+    await expect(page.getByText("项目刚被更新")).toHaveCount(0);
+    const adjusted = await revisionOf(page);
+    await inspector.getByRole("button", { name: "还原调整" }).click();
+    await expectRevision(page, adjusted + 1);
+    await expect(inspector.getByRole("button", { name: "还原调整" })).toHaveCount(0);
 
     // F. A derived 4:5 size and one export set with a receipt.
     await tab("导出");

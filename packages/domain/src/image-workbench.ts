@@ -46,7 +46,11 @@ export const IMAGE_BLEND_MODES = ["multiply", "screen", "overlay", "darken", "li
   "difference", "exclusion", "hue", "saturation", "color", "luminosity"] as const;
 export type ImageBlendMode = typeof IMAGE_BLEND_MODES[number];
 export interface ImageObjectMask { asset_id: string; invert?: true }
-export interface ImageRasterObject extends ImageObjectBase { kind: "image"; asset_id: string; fit: ImageFit }
+export interface ImageRasterObject extends ImageObjectBase { kind: "image"; asset_id: string; fit: ImageFit; adjust?: ImageAdjust }
+/** Factors (1 = unchanged, never written) and a blur in canvas pixels (0 = none), drawn over the image's own pixels (P4, v3). */
+export interface ImageAdjust { brightness?: number; contrast?: number; saturation?: number; blur?: number }
+/** Inclusive range of each adjustment. */
+export const IMAGE_ADJUST_LIMITS: Readonly<Record<keyof ImageAdjust, readonly [number, number]>> = { brightness: [0, 2], contrast: [0, 2], saturation: [0, 2], blur: [0, 100] };
 export interface ImageTextObject extends ImageObjectBase {
   kind: "text"; text: string; font_size: number; color: string; align: ImageTextAlign; line_height: number;
   /** A user font from the document's `fonts`; absent means the built-in font. */
@@ -77,12 +81,13 @@ export interface ImageDocument {
  * file needs a path, and paths reach the engine only through Main's dialogs or
  * the Agent's tools, never from renderer payloads.
  */
-type Optional = "font_id" | "rotation" | "flip_x" | "flip_y" | "gradient" | "blend" | "mask";
+type Optional = "font_id" | "rotation" | "flip_x" | "flip_y" | "gradient" | "blend" | "mask" | "adjust";
 type PatchFields = Partial<Omit<ImageRasterObject, "id" | "kind" | Optional> & Omit<ImageTextObject, "id" | "kind" | Optional> & Omit<ImageRectObject, "id" | "kind" | Optional>>
   & {
     /** Rect and ellipse: a gradient fill, or `null` for the solid colour. */ gradient?: ImageGradient | null;
     /** `null` returns to normal blending. */ blend?: ImageBlendMode | null;
     /** `null` removes the mask. */ mask?: ImageObjectMask | null;
+    /** Image only: replaces every adjustment; unchanged values are dropped, `null` removes them all. */ adjust?: ImageAdjust | null;
     /** Text only: a bound user font, or `null` for the built-in font. */ font_id?: string | null;
     /** `null` or 0 removes the rotation. */ rotation?: number | null;
     /** `null` or false removes the flip. */ flip_x?: boolean | null; flip_y?: boolean | null;

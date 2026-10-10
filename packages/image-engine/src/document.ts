@@ -1,4 +1,4 @@
-import { IMAGE_ASSET_LIMIT, IMAGE_BLEND_MODES, IMAGE_USER_FONT_LIMIT, type ImageBlendMode } from "@pi67/domain";
+import { IMAGE_ADJUST_LIMITS, IMAGE_ASSET_LIMIT, IMAGE_BLEND_MODES, IMAGE_USER_FONT_LIMIT, type ImageAdjust, type ImageBlendMode } from "@pi67/domain";
 import { fail } from "./content-store.js";
 import { fontManifest } from "./font.js";
 
@@ -52,12 +52,19 @@ const OPTIONAL_COMMON = ["rotation", "flip_x", "flip_y", "blend", "mask"] as con
  * is declared once here.
  */
 export const OPTIONAL_FIELDS: Readonly<Record<SceneObject["kind"], readonly string[]>> = {
-  image: [...OPTIONAL_COMMON], text: [...OPTIONAL_COMMON, "font_id"], rect: [...OPTIONAL_COMMON, "gradient"], ellipse: [...OPTIONAL_COMMON, "gradient"]
+  image: [...OPTIONAL_COMMON, "adjust"], text: [...OPTIONAL_COMMON, "font_id"], rect: [...OPTIONAL_COMMON, "gradient"], ellipse: [...OPTIONAL_COMMON, "gradient"]
 };
-const V3_FIELDS: ReadonlySet<string> = new Set([...OPTIONAL_COMMON, "gradient"]);
+const V3_FIELDS: ReadonlySet<string> = new Set([...OPTIONAL_COMMON, "gradient", "adjust"]);
 /** Kinds that exist only from v3. */
 const V3_KINDS: ReadonlySet<SceneObject["kind"]> = new Set(["ellipse"]);
-export interface ImageObject extends ObjectBase { kind: "image"; asset_id: string; fit: "contain" | "cover" | "fill" }
+export interface ImageObject extends ObjectBase { kind: "image"; asset_id: string; fit: "contain" | "cover" | "fill"; adjust?: Adjust }
+/**
+ * Non-destructive adjustments drawn over the image's own pixels: brightness, contrast and
+ * saturation as factors (1 = unchanged, never written) and blur in canvas pixels (0 = none).
+ */
+export type Adjust = ImageAdjust;
+/** The value each adjustment has when absent. */
+export const ADJUST_NEUTRAL: Readonly<Required<Adjust>> = { brightness: 1, contrast: 1, saturation: 1, blur: 0 };
 export interface TextObject extends ObjectBase {
   kind: "text"; text: string; font_size: number; color: string; align: "left" | "center" | "right"; line_height: number;
   /** A user font from `fonts`; absent means the pinned font. Missing glyphs fall back to the pinned font. */
@@ -149,7 +156,7 @@ function hasControlCharacter(text: string): boolean {
 
 const COMMON = ["id", "kind", "locked", "visible", "x", "y", "width", "height", "opacity", ...OPTIONAL_COMMON] as const;
 const EXTRA = {
-  image: ["asset_id", "fit"], text: ["text", "font_size", "color", "align", "line_height", "font_id"], rect: ["color", "radius", "gradient"], ellipse: ["color", "gradient"]
+  image: ["asset_id", "fit", "adjust"], text: ["text", "font_size", "color", "align", "line_height", "font_id"], rect: ["color", "radius", "gradient"], ellipse: ["color", "gradient"]
 } as const satisfies Record<SceneObject["kind"], readonly string[]>;
 
 function validateObject(value: unknown, canvas: Canvas, assets: ReadonlySet<string>, fonts: ReadonlySet<string>): SceneObject {
@@ -173,6 +180,7 @@ function validateObject(value: unknown, canvas: Canvas, assets: ReadonlySet<stri
   if (kind === "image") {
     if (typeof value.asset_id !== "string" || !assets.has(value.asset_id)) fail(`Missing asset for ${value.id}`);
     oneOf(value.fit, ["contain", "cover", "fill"] as const, "Invalid image fit");
+    if (value.adjust !== undefined) validateAdjust(value.adjust);
   } else if (kind === "text") {
     string(value.text, "text");
     if (hasControlCharacter(value.text)) fail("Unsupported text control character");
@@ -231,8 +239,18 @@ export function validateDocument(value: unknown): ImageDocument {
   const needed = documentSchema(document);
   if (value.schema === SCHEMA_V2 && needed !== SCHEMA_V2) fail("A v2 document must bind or use a user font and nothing newer");
   if (value.schema === SCHEMA_V3 && needed !== SCHEMA_V3) fail("A v3 document must use an engine extension");
-  if (needed === SCHEMA_V3 && value.schema !== SCHEMA_V3) fail("Rotation, flips, ellipses, gradients, blend modes and masks need the v3 document schema");
+  if (needed === SCHEMA_V3 && value.schema !== SCHEMA_V3) fail("Rotation, flips, ellipses, gradients, blend modes, masks and adjustments need the v3 document schema");
   return document;
+}
+
+function validateAdjust(value: unknown): void {
+  record(value, Object.keys(ADJUST_NEUTRAL), "adjust");
+  if (!Object.keys(value).length) fail("Write no adjust instead of an empty one");
+  for (const [key, given] of Object.entries(value)) {
+    const name = key as keyof Adjust, [minimum, maximum] = IMAGE_ADJUST_LIMITS[name];
+    number(given, `adjust.${name}`, minimum, maximum);
+    if (given === ADJUST_NEUTRAL[name]) fail(`Write no adjust.${name} instead of ${ADJUST_NEUTRAL[name]}`);
+  }
 }
 
 function validateGradient(value: unknown): Gradient {

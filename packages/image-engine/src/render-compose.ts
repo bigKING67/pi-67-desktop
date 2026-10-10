@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import path from "node:path";
 import satori from "satori";
 import sharp from "sharp";
-import { textObjects, type Gradient, type ImageDocument, type SceneObject } from "./document.js";
+import { textObjects, type Adjust, type Gradient, type ImageDocument, type SceneObject } from "./document.js";
 import { checkTextWidths } from "./font.js";
 import { fail } from "./content-store.js";
 
@@ -79,9 +79,19 @@ export async function compose(project: ComposeInput): Promise<Composition> {
   return { svg, text_measurements: Object.fromEntries(measurements) };
 }
 
+/** Adjustments as a CSS filter, which satori emits as SVG filters for resvg (P4 spike); blur stays inside the box. */
+function filterOf(adjust: Adjust | undefined): { filter?: string } {
+  if (!adjust) return {};
+  const parts = [
+    adjust.brightness === undefined ? "" : `brightness(${adjust.brightness})`, adjust.contrast === undefined ? "" : `contrast(${adjust.contrast})`,
+    adjust.saturation === undefined ? "" : `saturate(${adjust.saturation})`, adjust.blur === undefined ? "" : `blur(${adjust.blur}px)`
+  ].filter(Boolean);
+  return parts.length ? { filter: parts.join(" ") } : {};
+}
+
 function nodeOf(object: SceneObject, doc: ImageDocument, images: ReadonlyMap<string, string>): SatoriNode {
   const style = { display: "flex", position: "absolute", left: object.x, top: object.y, width: object.width, height: object.height, opacity: object.opacity, ...transformOf(object) };
-  if (object.kind === "image") return { type: "img", props: { src: images.get(object.asset_id), style: { ...style, objectFit: object.fit } } };
+  if (object.kind === "image") return { type: "img", props: { src: images.get(object.asset_id), style: { ...style, objectFit: object.fit, ...filterOf(object.adjust) } } };
   if (object.kind === "rect" || object.kind === "ellipse") {
     const fill = object.gradient ? { backgroundImage: gradientCss(object.gradient) } : { backgroundColor: object.color };
     return { type: "div", props: { style: { ...style, ...fill, borderRadius: object.kind === "ellipse" ? "50%" : object.radius } } };

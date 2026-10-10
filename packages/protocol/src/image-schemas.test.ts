@@ -128,6 +128,16 @@ describe("image protocol schemas", () => {
     expect([patch({ rotation: -181 }), patch({ flip_x: "yes" })]).toEqual([false, false]);
   });
 
+  it("carries image adjustments and lets a patch set or drop them", () => {
+    const photo = { id: "photo", kind: "image", locked: false, visible: true, x: 0, y: 0, width: 100, height: 60, opacity: 1, asset_id: "a", fit: "cover" };
+    const v3 = { ...document, schema: "newmoney.image-project.v3" };
+    expect(check(ImageDocumentSchema, { ...v3, objects: [{ ...photo, adjust: { brightness: 1.2, blur: 4 } }] })).toBe(true);
+    expect(check(ImageDocumentSchema, { ...v3, objects: [{ ...photo, adjust: { brightness: 2.5 } }] })).toBe(false);
+    expect(check(ImageDocumentSchema, { ...v3, objects: [{ ...text, adjust: { blur: 2 } }] })).toBe(false);
+    const patch = (value: Record<string, unknown>) => check(ImageEditOperationSchema, { type: "update_object", id: "photo", patch: value });
+    expect([patch({ adjust: { saturation: 0 } }), patch({ adjust: null }), patch({ adjust: { blur: 101 } }), patch({ adjust: { sharpen: 1 } })]).toEqual([true, true, false, false]);
+  });
+
   it("carries ellipses and gradient fills, and lets a patch set or drop a gradient", () => {
     const ellipse = { id: "ring", kind: "ellipse", locked: false, visible: true, x: 0, y: 0, width: 100, height: 60, opacity: 1, color: "#ff0000",
       gradient: { type: "radial", stops: [{ offset: 0, color: "#000000" }, { offset: 1, color: "#ffffff" }] } };

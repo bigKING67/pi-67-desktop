@@ -1552,6 +1552,11 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   Candidates' protected regions are unchanged (they compare the target layer's own raster).
   A document without blend or masks renders exactly as before; with them, those objects
   render as their own layers composited by resvg. The Agent may set `blend` and `mask`.
+  Image layers take 调整: 亮度, 对比度 and 饱和度 (−100…+100 around unchanged, stored as factors
+  0–2) and 模糊 (0–100 canvas pixels, kept inside the box), drawn over the image without
+  changing it; each slider writes one revision when let go, and 还原调整 drops them all.
+  Unchanged values are never written; derived sizes scale the blur with the layout. The
+  Agent may set or drop `adjust`.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

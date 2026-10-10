@@ -3,7 +3,7 @@ import path from "node:path";
 import { regularPath, readBytes, importRaster, saveAsset, readAsset, type ImportedRaster } from "./raster.js";
 import { readCandidateEntry, verifyCandidateAgainst, readDiscard, decisionPending, withDecisionLock, type CandidateEntry } from "./candidate-store.js";
 import { encodeJson, errorCode, fail, sha256, writeOnce } from "./content-store.js";
-import { SCHEMA, LIMITS, OPTIONAL_FIELDS, USER_FONT_LIMIT, documentSchema, validateDocument, validateCanvas, record, id, number, isRecord, textObjects, type ImageDocument, type JsonRecord, type SceneObject, type ChangeAuthor, type AcceptedCandidate, type UserFont } from "./document.js";
+import { SCHEMA, LIMITS, ADJUST_NEUTRAL, OPTIONAL_FIELDS, USER_FONT_LIMIT, documentSchema, validateDocument, validateCanvas, record, id, number, isRecord, textObjects, type ImageDocument, type JsonRecord, type SceneObject, type ChangeAuthor, type AcceptedCandidate, type UserFont } from "./document.js";
 import { fontManifest, installedFont, checkGlyphs, checkTextGlyphs, inspectUserFont, userFontSample } from "./font.js";
 import { USER_FONT_MAX_BYTES } from "./font-parse.js";
 import { preparePhotoProject, type PhotoLayout } from "./photo-layout.js";
@@ -200,6 +200,14 @@ export async function projectHistory(root: string): Promise<RevisionEntry[]> {
 /** Drops optional fields written as null, 0 or false, so a document never stores a no-op value. */
 function withoutNoOps(object: JsonRecord, optional: readonly string[]): JsonRecord {
   for (const key of optional) if (object[key] === null || object[key] === 0 || object[key] === false) delete object[key];
+  // Adjustments left at their neutral value are not written, and none at all is no adjust.
+  // Kept in one key order, so the same adjustments sent in another order are no change.
+  if (optional.includes("adjust") && isRecord(object.adjust)) {
+    const given = object.adjust, adjust: JsonRecord = {};
+    for (const key of Object.keys(given)) if (!Object.hasOwn(ADJUST_NEUTRAL, key)) adjust[key] = given[key];   // left for validation to refuse
+    for (const [key, neutral] of Object.entries(ADJUST_NEUTRAL)) if (given[key] !== undefined && given[key] !== neutral) adjust[key] = given[key];
+    if (Object.keys(adjust).length) object.adjust = adjust; else delete object.adjust;
+  }
   return object;
 }
 

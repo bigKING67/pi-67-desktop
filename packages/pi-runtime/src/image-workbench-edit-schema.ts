@@ -1,5 +1,5 @@
 import { Type } from "typebox";
-import { IMAGE_BLEND_MODES } from "@pi67/domain";
+import { IMAGE_ADJUST_LIMITS, IMAGE_BLEND_MODES } from "@pi67/domain";
 import { IMAGE_ID_PATTERN } from "./image-workbench-job.js";
 
 // The operations `image_project_edit` accepts, mirroring the engine's exact field
@@ -16,6 +16,11 @@ const gradient = Type.Union([
   Type.Object({ type: Type.Literal("linear"), angle: Type.Optional(Type.Number({ minimum: 0, maximum: 360, description: "CSS degrees; 90 runs left to right." })), stops }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("radial"), stops }, { additionalProperties: false })
 ], { description: "Replaces the solid color of a rect or ellipse." });
+const range = (key: keyof typeof IMAGE_ADJUST_LIMITS, description: string) =>
+  Type.Optional(Type.Number({ minimum: IMAGE_ADJUST_LIMITS[key][0], maximum: IMAGE_ADJUST_LIMITS[key][1], description }));
+const adjust = Type.Object({ brightness: range("brightness", "Brightness factor; 1 is unchanged."), contrast: range("contrast", "Contrast factor; 1 is unchanged."),
+  saturation: range("saturation", "Saturation factor; 1 is unchanged, 0 is greyscale."), blur: range("blur", "Gaussian blur in canvas pixels, kept inside the box.") },
+{ additionalProperties: false, description: "Image only: non-destructive adjustments; replaces all of them, unchanged values may be omitted." });
 const box = { x: int(0), y: int(0), width: int(1), height: int(1) };
 const rotation = Type.Number({ minimum: -180, maximum: 180, description: "Degrees clockwise about the box centre; the unrotated box must stay on the canvas." });
 const blend = Type.Union(IMAGE_BLEND_MODES.map((mode) => Type.Literal(mode)), { description: "How the object composites onto what is below it; omit for normal." });
@@ -32,6 +37,7 @@ const patch = Type.Partial(Type.Object({
   gradient: Type.Union([gradient, Type.Null()], { description: "Rect or ellipse: a gradient fill; null returns to the solid color." }),
   blend: Type.Union([blend, Type.Null()], { description: "null returns to normal blending." }),
   mask: Type.Union([mask, Type.Null()], { description: "A luminance mask over the box (add the image first with add_asset); null removes it." }),
+  adjust: Type.Union([adjust, Type.Null()], { description: "Image only: brightness, contrast, saturation and blur; null removes them all." }),
   flip_x: Type.Union([Type.Boolean(), Type.Null()], { description: "Mirror left-right; false or null removes it." }),
   flip_y: Type.Union([Type.Boolean(), Type.Null()], { description: "Mirror top-bottom; false or null removes it." }),
   radius: int(0), fit: Type.Union([Type.Literal("contain"), Type.Literal("cover"), Type.Literal("fill")])
