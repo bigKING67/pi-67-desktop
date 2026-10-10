@@ -1,4 +1,5 @@
 import type { WorkbenchSurface, WorkspaceId } from "@pi67/domain";
+import { visibleWorkspaceOrder } from "../workbench/visible-workspaces.js";
 import { suspendRendererWorkbenchPersistence } from "../workbench/workbench-persistence-suspension.js";
 import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
 import {
@@ -109,5 +110,6 @@ function workspaceIdForRestoredSelection(
 ): WorkspaceId | undefined {
   if (surface?.kind === "workspace") return surface.workspaceId;
   if (surface?.kind === "conversation") return surface.conversation.workspaceId;
-  return fallback && workbench.workspaces[fallback] ? fallback : workbench.workspaceOrder[0];
+  // The hidden creative library is never a fallback current Workspace.
+  return fallback && workbench.workspaces[fallback] ? fallback : visibleWorkspaceOrder(workbench)[0];
 }
