@@ -132,8 +132,9 @@ Product model: `docs/architecture/image-workbench-product-model.md`; decisions:
       2026-10-09 (`18f9d63f`); Windows x64 done 2026-10-09 in CI run 37918872288
       (packaged probe `{"status":"rendered"}`, same bytes as macOS) after the
       `C:\C:` path fix (`0560cc27`).
-- [ ] 8. Real Pi session through Desktop meets the Agent-path criteria; tool-call
-      count and wall clock recorded.
+- [x] 8. Real Pi session through Desktop meets the Agent-path criteria; tool-call
+      count and wall clock recorded. Done 2026-10-10: final run 4 tool calls, 52 s
+      (generation 28 s); see the progress log.
 
 ## Validation matrix
 
@@ -261,3 +262,17 @@ are additive. No user directories are rewritten (import is read-only).
 - Validation not completed:
 - Remaining risks:
 - Commit/push/release state:
+- 2026-10-10: real end-to-end run in the packaged macOS preview (isolated profile reusing the
+  user's local gateway Provider through an `!command` key; no key copied). Settings → 图像生成
+  added `newmoney-images-codex/gpt-image-2.5-sunburst`; the project-page conversation (GPT-5.5)
+  read the project, listed the source, unlocked the photo as its own revision, generated an
+  edit candidate in 28 s (one approval), the person previewed and accepted it (revision 22,
+  `accept_candidate`) and exported a verified 1080×1670 PNG. The run found and fixed, in order:
+  `image_models` treating a guessed Provider as "nothing configured"; `image_generate` needing a
+  hand-authored Image Job v2 (now an intent, ADR 0010 decision 15); photos off the model's 16px
+  grid being unusable (exact-ratio request + resample); a 0.04% gateway size drift failing the
+  run (0.5% tolerance); an opaque failure message; the creative library leaking into the
+  TitleBar after restart (recovery fallback); the preview badge outliving an accepted candidate.
+  Deferred: `image_project_edit` has no operation schema, so the Agent guessed six shapes before
+  the `TARGET_LOCKED` hint showed the right one; Provider model discovery reads keys only from
+  auth.json, so a Provider whose key lives in models.json cannot list models.

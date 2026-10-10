@@ -38,7 +38,7 @@ Volcengine Ark Seedream 5.0. Decision: ADR 0010 decision 14.
 - [x] 3. Settings storage and protocol: `pi67Desktop.imageGeneration` parse/write, snapshot field, App-scope replay-safe command, Host routing, protocol revision.
 - [x] 4. Registration: one Pi Provider per source with reuse key resolution; refresh on change; `image_generate` takes a `model` and fills the job's profile and surface.
 - [x] 5. Renderer: Settings section 图像生成 (design-craft, browser67, packaged preview); DESIGN/PRODUCT authority.
-- [ ] 6. Real request (P1 checkpoint 8).
+- [x] 6. Real request (P1 checkpoint 8). Done 2026-10-10 through the local gateway.
 
 ## Progress log
 
@@ -63,4 +63,17 @@ Volcengine Ark Seedream 5.0. Decision: ADR 0010 decision 14.
   Visual review fixed the empty-state spacing and showed the reused Provider's
   name instead of its id. Next: checkpoint 6, which needs the user to add the
   local gateway source in their own Desktop and approve each paid request.
-
+- 2026-10-10: real end-to-end run in the packaged macOS preview (isolated profile reusing the
+  user's local gateway Provider through an `!command` key; no key copied). Settings → 图像生成
+  added `newmoney-images-codex/gpt-image-2.5-sunburst`; the project-page conversation (GPT-5.5)
+  read the project, listed the source, unlocked the photo as its own revision, generated an
+  edit candidate in 28 s (one approval), the person previewed and accepted it (revision 22,
+  `accept_candidate`) and exported a verified 1080×1670 PNG. The run found and fixed, in order:
+  `image_models` treating a guessed Provider as "nothing configured"; `image_generate` needing a
+  hand-authored Image Job v2 (now an intent, ADR 0010 decision 15); photos off the model's 16px
+  grid being unusable (exact-ratio request + resample); a 0.04% gateway size drift failing the
+  run (0.5% tolerance); an opaque failure message; the creative library leaking into the
+  TitleBar after restart (recovery fallback); the preview badge outliving an accepted candidate.
+  Deferred: `image_project_edit` has no operation schema, so the Agent guessed six shapes before
+  the `TARGET_LOCKED` hint showed the right one; Provider model discovery reads keys only from
+  auth.json, so a Provider whose key lives in models.json cannot list models.

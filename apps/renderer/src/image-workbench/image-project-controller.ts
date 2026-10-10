@@ -206,14 +206,18 @@ export function acceptCandidate(candidateId: string): Promise<boolean> {
   if (!projectId || revision === undefined) return Promise.resolve(false);
   return mutate(async () => {
     await request("image.candidate.accept", { projectId, candidateId, baseRevision: revision, summary: "接受候选" });
-    useImageProject.setState((state) => ({ back: [...state.back, revision], forward: [] }));
+    // The accepted pixels are now the revision; the canvas returns to it.
+    useImageProject.setState((state) => ({ back: [...state.back, revision], forward: [], inspecting: undefined }));
   }, "没能接受候选");
 }
 
 export function discardCandidate(candidateId: string): Promise<boolean> {
   const { projectId } = useImageProject.getState();
   if (!projectId) return Promise.resolve(false);
-  return mutate(() => request("image.candidate.discard", { projectId, candidateId, summary: "丢弃候选" }), "没能丢弃候选");
+  return mutate(async () => {
+    await request("image.candidate.discard", { projectId, candidateId, summary: "丢弃候选" });
+    if (useImageProject.getState().inspecting === candidateId) useImageProject.setState({ inspecting: undefined });
+  }, "没能丢弃候选");
 }
 
 /** Renders the current revision at full size and asks Main to save the verified PNG. */

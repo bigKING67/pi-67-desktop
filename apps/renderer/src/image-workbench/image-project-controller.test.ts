@@ -27,6 +27,9 @@ vi.mock("../connection/AgentConnectionController.js", () => ({
         host.revision += 1;
         return Promise.resolve({ projectId: "p", revision: host.revision, sha256: "s", dryRun: false });
       }
+      if (type === "image.candidate.accept") { host.revision += 1; return Promise.resolve({ projectId: "p", revision: host.revision, sha256: "s" }); }
+      if (type === "image.candidate.discard") return Promise.resolve({ projectId: "p", candidateId: payload.candidateId, status: "discarded" });
+      if (type === "image.project.history") return Promise.resolve({ projectId: "p", revisions: [] });
       return Promise.reject(new Error(`unexpected ${type}`));
     }
   }
@@ -35,6 +38,9 @@ vi.mock("../notifications/notification-store.js", () => ({ publishNotification: 
 
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import {
+  acceptCandidate,
+  discardCandidate,
+  inspectCandidate,
   editImageProject,
   editImageProjectWithNotice,
   loadImageProject,
@@ -112,5 +118,16 @@ describe("image object selection", () => {
     expect(useImageProject.getState().selectedObjectIds).toEqual(["t"]);
     selectImageObject(undefined);
     expect(useImageProject.getState().selectedObjectIds).toEqual([]);
+  });
+
+  it("returns the canvas to the revision once the previewed candidate is accepted or discarded", async () => {
+    inspectCandidate("warm");
+    expect(await acceptCandidate("warm")).toBe(true);
+    expect(useImageProject.getState()).toMatchObject({ inspecting: undefined, revision: 2 });
+    inspectCandidate("cool");
+    expect(await discardCandidate("other")).toBe(true);
+    expect(useImageProject.getState().inspecting).toBe("cool");
+    expect(await discardCandidate("cool")).toBe(true);
+    expect(useImageProject.getState().inspecting).toBeUndefined();
   });
 });
