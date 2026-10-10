@@ -3,13 +3,16 @@ import path from "node:path";
 import { regularPath, readBytes, importRaster, saveAsset, readAsset, type ImportedRaster } from "./raster.js";
 import { readCandidateEntry, verifyCandidateAgainst, readDiscard, decisionPending, withDecisionLock, type CandidateEntry } from "./candidate-store.js";
 import { encodeJson, errorCode, fail, sha256, writeOnce } from "./content-store.js";
-import { SCHEMA, LIMITS, validateDocument, validateCanvas, record, id, number, isRecord, textObjects, type ImageDocument, type JsonRecord, type SceneObject, type ChangeAuthor, type AcceptedCandidate } from "./document.js";
-import { fontManifest, installedFont, checkGlyphs } from "./font.js";
+import { SCHEMA, LIMITS, USER_FONT_LIMIT, documentSchema, validateDocument, validateCanvas, record, id, number, isRecord, textObjects, type ImageDocument, type JsonRecord, type SceneObject, type ChangeAuthor, type AcceptedCandidate, type UserFont } from "./document.js";
+import { fontManifest, installedFont, checkGlyphs, checkTextGlyphs, inspectUserFont, userFontSample } from "./font.js";
+import { USER_FONT_MAX_BYTES } from "./font-parse.js";
 import { preparePhotoProject, type PhotoLayout } from "./photo-layout.js";
 import { compose } from "./render-compose.js";
 
 export interface ProjectState {
   root: string; document: ImageDocument; sha256: string; latest_revision: number; font: Buffer;
+  /** The bound user fonts by id, digest-verified and parsed once. */
+  fonts: Map<string, Buffer>;
   candidate_decisions: Record<string, { sha256: string; revision: number }>;
 }
 export interface PublishedRevision { root: string; document: ImageDocument; sha256: string; dry_run?: true }
@@ -20,18 +23,80 @@ export { regularPath, importRaster } from "./raster.js";
 export const encode = encodeJson;
 const revisionName = (revision: number): string => `revisions/${String(revision).padStart(6, "0")}.json`;
 
-async function verifyBindings(root: string, doc: ImageDocument): Promise<Buffer> {
+async function verifyBindings(root: string, doc: ImageDocument): Promise<{ font: Buffer; fonts: Map<string, Buffer> }> {
   const font = await readBytes(path.join(root, doc.font.file), fontManifest.bytes);
-  checkGlyphs(font, textObjects(doc.objects).map((object) => object.text));
+  const fonts = await loadUserFonts(root, doc, new Map());
+  checkTextGlyphs(font, textObjects(doc.objects), fonts);
   for (const asset of doc.assets) await readAsset(root, asset);
-  return font;
+  return { font, fonts };
 }
 
-async function checkTextLayout(root: string, doc: ImageDocument, font: Buffer): Promise<void> {
+/**
+ * Loads (reads, hashes, parses) only the user fonts text actually uses; the rest are
+ * checked for presence and size. A project with several large fonts stays cheap to
+ * list and watch, and copying still verifies every digest (project-copy.ts).
+ */
+async function loadUserFonts(root: string, doc: ImageDocument, loaded: ReadonlyMap<string, Buffer>): Promise<Map<string, Buffer>> {
+  const used = new Set(textObjects(doc.objects).flatMap((object) => object.font_id ? [object.font_id] : []));
+  const fonts = new Map(loaded);
+  for (const user of doc.fonts ?? []) {
+    if (fonts.has(user.id)) continue;
+    const file = path.join(root, user.file);
+    if (!used.has(user.id)) {
+      const stat = await fs.lstat(file).catch(() => undefined);
+      if (!stat?.isFile() || stat.size !== user.bytes) fail(`User font changed: ${user.id}`);
+      continue;
+    }
+    const bytes = await readBytes(file, USER_FONT_MAX_BYTES);
+    if (bytes.length !== user.bytes || sha256(bytes) !== user.sha256) fail(`User font changed: ${user.id}`);
+    inspectUserFont(bytes);
+    fonts.set(user.id, bytes);
+  }
+  return fonts;
+}
+
+async function checkTextLayout(root: string, doc: ImageDocument, font: Buffer, fonts: ReadonlyMap<string, Buffer>): Promise<void> {
   const objects = textObjects(doc.objects).filter((object) => object.visible);
   if (!objects.length) return;
   // Measure with the export engine without reading or writing temporary assets.
-  await compose({ root, font, document: { ...doc, assets: [], objects } });
+  await compose({ root, font, fonts, document: { ...doc, assets: [], objects } });
+}
+
+/**
+ * Reads a font file the person chose (through the Host, never the Agent) and
+ * binds it under `id`; the bytes are written with the revision.
+ */
+async function importUserFont(input: unknown, doc: ImageDocument): Promise<{ font: UserFont; bytes: Buffer }> {
+  record(input, ["id", "source"], "font input");
+  // Without an id the engine takes the next free `font-N`, so callers need not read the project first.
+  const taken = new Set((doc.fonts ?? []).map((font) => font.id));
+  let fontId = typeof input.id === "string" ? input.id : "font-1";
+  for (let index = 2; input.id === undefined && taken.has(fontId); index += 1) fontId = `font-${index}`;
+  id(fontId, "font id");
+  if (typeof input.source !== "string") fail("Invalid font source");
+  const bytes = await readBytes(await regularPath(input.source), USER_FONT_MAX_BYTES);
+  const { format, family } = inspectUserFont(bytes);
+  const digest = sha256(bytes), fonts = doc.fonts ?? [];
+  if (fonts.length >= USER_FONT_LIMIT) fail(`A project holds at most ${USER_FONT_LIMIT} fonts`);
+  if (taken.has(fontId)) fail(`Duplicate font id: ${fontId}`);
+  const same = fonts.find((font) => font.sha256 === digest);
+  if (same) fail(`Font already added as ${same.id}`);
+  return { font: { id: fontId, family, file: `fonts/user-${digest}.${format}`, sha256: digest, bytes: bytes.length, format }, bytes };
+}
+
+/**
+ * Our parser screens a font; the renderer must load it too. A short sample in the
+ * font is composed before it is bound, so a font the renderer cannot use is refused
+ * now instead of being stuck in the project, failing every later use.
+ */
+async function probeUserFont(root: string, doc: ImageDocument, font: Buffer, imported: { font: UserFont; bytes: Buffer }): Promise<void> {
+  const sample = userFontSample(imported.bytes) ?? fail("Unsupported font file: it has no letters, digits or common CJK characters");
+  try {
+    await compose({ root, font, fonts: new Map([[imported.font.id, imported.bytes]]), document: { ...doc, canvas: { width: 1024, height: 256, background: "#ffffff" }, assets: [],
+      objects: [{ id: "probe", kind: "text", locked: false, visible: true, x: 0, y: 0, width: 1024, height: 256, opacity: 1, text: sample, font_size: 48, color: "#000000", align: "left", line_height: 1.2, font_id: imported.font.id }] } });
+  } catch {
+    fail("Unsupported font file: the renderer could not load it");
+  }
 }
 
 // Fail before decoding any asset; mkdir remains the exclusive claim.
@@ -70,7 +135,7 @@ async function createPreparedProject(root: string, input: CreateInput, imports: 
     font: { profile: fontManifest.profile, family: fontManifest.family, file: `fonts/${fontManifest.sha256}.otf`, sha256: fontManifest.sha256, weight: fontManifest.weight },
     objects: structuredClone(input.objects), change: { author: "system", summary: "Create local image project", operations: ["create"] } });
   checkGlyphs(font, textObjects(doc.objects).map((object) => object.text));
-  if (checkText) await checkTextLayout(root, doc, font);
+  if (checkText) await checkTextLayout(root, doc, font, new Map());
   if (dryRun) return { root, document: doc, sha256: sha256(encode(doc)), dry_run: true };
   // Only remove a directory this invocation created, never a user's project.
   await fs.mkdir(root);
@@ -112,8 +177,8 @@ export async function readProject(root: string, { revision }: { revision?: numbe
     parent = sha256(bytes); selected = doc; selectedBytes = bytes;
   }
   if (!selected || !selectedBytes) fail("Broken revision sequence");
-  const font = await verifyBindings(resolved, selected);
-  return { root: resolved, document: selected, sha256: sha256(selectedBytes), latest_revision: latest, font, candidate_decisions: Object.fromEntries(candidateDecisions) };
+  const { font, fonts } = await verifyBindings(resolved, selected);
+  return { root: resolved, document: selected, sha256: sha256(selectedBytes), latest_revision: latest, font, fonts, candidate_decisions: Object.fromEntries(candidateDecisions) };
 }
 
 export interface RevisionEntry { revision: number; author: string; summary: string; operations: string[]; candidate_id?: string; written_at: number }
@@ -173,7 +238,7 @@ export async function candidateDocument(root: string, project: ProjectState, can
 
 // A Map keeps prototype names such as "constructor" from resolving to inherited members.
 const OPERATION_FIELDS: ReadonlyMap<string, readonly string[]> = new Map([
-  ["add_asset", ["asset"]], ["add_object", ["object"]], ["update_object", ["id", "patch"]], ["remove_object", ["id"]], ["reorder_objects", ["ids"]],
+  ["add_asset", ["asset"]], ["add_font", ["font"]], ["add_object", ["object"]], ["update_object", ["id", "patch"]], ["remove_object", ["id"]], ["reorder_objects", ["ids"]],
   ["set_canvas", ["canvas"]], ["revert_to", ["revision"]], ["accept_candidate", ["candidate_id"]]
 ]);
 
@@ -183,6 +248,7 @@ async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: 
   if (current.document.revision >= LIMITS.revisions) fail(`Revision limit reached (${LIMITS.revisions}); create a new project from the current document to continue editing`);
   let doc: ImageDocument = structuredClone(current.document);
   const imports: ImportedRaster[] = [];
+  const fontImports: { font: UserFont; bytes: Buffer }[] = [];
   let candidateChange: AcceptedCandidate | undefined;
   // Revert and lock changes are isolated so a batch cannot unlock, alter, then
   // relock an object while disguising the change as a protected edit.
@@ -209,14 +275,23 @@ async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: 
         break;
       }
       case "add_asset": { const imported = await importRaster(op.asset); doc.assets.push(imported.asset); imports.push(imported); break; }
+      case "add_font": {
+        const imported = await importUserFont(op.font, doc);
+        doc.fonts = [...(doc.fonts ?? []), imported.font]; fontImports.push(imported); break;
+      }
       case "add_object": doc.objects.push(structuredClone(op.object) as SceneObject); break;
       case "update_object": {
         const index = objectAt(doc, op.id), object = doc.objects[index] as SceneObject;
-        const mutable = Object.keys(object).filter((key) => !["id", "kind"].includes(key));
+        // Text may also take a user font, or drop it with `font_id: null`.
+        const mutable = [...Object.keys(object).filter((key) => !["id", "kind"].includes(key)), ...(object.kind === "text" ? ["font_id"] : [])];
         record(op.patch, mutable, "object patch");
         if (!Object.keys(op.patch).length) fail("Empty object patch");
         if (object.locked && !Object.hasOwn(op.patch, "locked")) fail(`Object is locked: ${object.id}`);
-        doc.objects[index] = { ...object, ...structuredClone(op.patch) } as SceneObject; break;
+        const { font_id: fontId, ...rest } = structuredClone(op.patch) as JsonRecord;
+        const next = { ...object, ...rest } as SceneObject & { font_id?: string };
+        if (fontId === null) delete next.font_id;
+        else if (fontId !== undefined) next.font_id = fontId as string;
+        doc.objects[index] = next; break;
       }
       case "remove_object": {
         const index = objectAt(doc, op.id); if (doc.objects[index]?.locked) fail(`Object is locked: ${String(op.id)}`);
@@ -243,6 +318,8 @@ async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: 
           if (previous.objects[index]?.id !== locked.id) fail(`Revert would reorder locked object: ${locked.id}`);
         }
         doc.canvas = structuredClone(previous.canvas); doc.assets = structuredClone(previous.assets); doc.objects = structuredClone(previous.objects);
+        // Fonts bound later stay bound (their bytes are already in the project); objects revert to their own font choice.
+        if (previous.fonts) doc.fonts = [...structuredClone(previous.fonts), ...(doc.fonts ?? []).filter((font) => !previous.fonts?.some((item) => item.id === font.id))];
         // Lock state is an explicit current policy, not an undo side effect.
         for (const object of doc.objects) {
           const now = current.document.objects.find((value) => value.id === object.id);
@@ -253,20 +330,28 @@ async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: 
       default: fail(`Unsupported operation: ${type}`);
     }
   }
-  doc.schema = SCHEMA;
+  if (doc.fonts && !doc.fonts.length) delete doc.fonts;
+  doc.schema = documentSchema(doc);
   doc.revision++; doc.parent_sha256 = current.sha256;
   doc.change = { author: batch.author, summary: batch.summary, operations: batch.operations.map((op) => opType(op) ?? "") };
   if (candidateChange) doc.change.candidate = candidateChange;
   doc = validateDocument(doc);
-  checkGlyphs(current.font, textObjects(doc.objects).map((object) => object.text));
+  const fonts = new Map(current.fonts);
+  for (const imported of fontImports) {
+    await probeUserFont(current.root, doc, current.font, imported);
+    fonts.set(imported.font.id, imported.bytes);
+  }
+  const used = await loadUserFonts(current.root, doc, fonts);
+  checkTextGlyphs(current.font, textObjects(doc.objects), used);
   // Unlocking changes no pixels and must remain possible to repair a locked
   // legacy layout. Isolation and patch validation above prohibit other changes.
   const only = batch.operations.length === 1 ? batch.operations[0] : undefined;
   const unlockOnly = opType(only) === "update_object" && isRecord(only?.patch) && only.patch.locked === false;
-  if (!unlockOnly) await checkTextLayout(current.root, doc, current.font);
+  if (!unlockOnly) await checkTextLayout(current.root, doc, current.font, used);
   if (dryRun) return { root: current.root, dry_run: true, document: doc, sha256: sha256(encode(doc)) };
   await regularPath(path.join(root, "assets"), { directory: true });
   for (const imported of imports) await saveAsset(root, imported);
+  for (const imported of fontImports) await writeOnce(path.join(current.root, imported.font.file), { bytes: imported.bytes }, { expected: imported.font.sha256 });
   const bytes = encode(doc);
   // Immutable exclusive publication makes concurrent edits on the same base
   // have one winner. No mutable HEAD pointer or user-file replacement.

@@ -59,7 +59,8 @@ Evidence that shaped the decisions:
    renderer reaches the same engine through `image.*` protocol commands on the
    Agent port. There is one writer process; `base_revision` remains the
    conflict rule between a person's and the Agent's batches.
-3. **Artifact truth.** The project directory (`newmoney.image-project.v1`:
+3. **Artifact truth.** The project directory (`newmoney.image-project.v1`, or `.v2`
+   only while user fonts are bound or used, so earlier releases still read the rest:
    revisions, assets, fonts, masks, candidates, jobs, exports) is the artifact
    source of truth, as Pi JSONL is the conversation truth. The disk is the
    project index (decision 10); project content never enters

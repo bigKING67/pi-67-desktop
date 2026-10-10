@@ -13,6 +13,7 @@ import {
   MAX_PROMPT_ATTACHMENT_COUNT,
   MAX_PROMPT_INLINE_IMAGE_TOTAL_BYTES,
   MAX_PROMPT_ATTACHMENT_TOTAL_BYTES,
+  type PromptAttachmentKind,
   type PromptAttachmentRef
 } from "@pi67/protocol";
 import {
@@ -40,6 +41,8 @@ export interface PromptAttachmentAccessOwner {
   forTask(taskKey: string): PromptAttachmentAccess;
   /** One verified staged image, for flows that consume it outside a prompt (image workbench). */
   readStagedImage(id: string): Promise<{ name: string; mimeType: string; bytes: Buffer }>;
+  /** One verified staged attachment of kind `file` (a font for the image workbench). */
+  readStagedFile(id: string): Promise<{ name: string; bytes: Buffer }>;
   releaseTask(taskKey: string): Promise<void>;
   dispose(): Promise<void>;
 }
@@ -70,10 +73,21 @@ class AgentHostPromptAttachmentAccess implements PromptAttachmentAccessOwner {
   }
 
   async readStagedImage(id: string): Promise<{ name: string; mimeType: string; bytes: Buffer }> {
-    const sourceId = assertOpaqueId(id);
-    const { manifest, bytes } = await readVerifiedStagedAttachmentBytes(this.draftRoot, join(this.draftRoot, sourceId), sourceId);
-    if (manifest.kind !== "image") throw new Error("Staged attachment is not an image.");
+    const { manifest, bytes } = await this.readStaged(id, "image", "Staged attachment is not an image.");
     return { name: manifest.name, mimeType: manifest.mimeType, bytes };
+  }
+
+  async readStagedFile(id: string): Promise<{ name: string; bytes: Buffer }> {
+    const { manifest, bytes } = await this.readStaged(id, "file", "Staged attachment is not a plain file.");
+    return { name: manifest.name, bytes };
+  }
+
+  /** One verified staged attachment of `kind`, read without claiming it. */
+  private async readStaged(id: string, kind: PromptAttachmentKind, wrongKind: string) {
+    const sourceId = assertOpaqueId(id);
+    const read = await readVerifiedStagedAttachmentBytes(this.draftRoot, join(this.draftRoot, sourceId), sourceId);
+    if (read.manifest.kind !== kind) throw new Error(wrongKind);
+    return read;
   }
 
   async releaseTask(taskKey: string): Promise<void> {

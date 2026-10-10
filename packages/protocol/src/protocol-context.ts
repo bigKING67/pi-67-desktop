@@ -172,6 +172,7 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "image.candidate.discard": "workspace",
   "image.project.conversation.set": "workspace",
   "image.project.derive": "workspace",
+  "image.project.addFont": "workspace",
   "context.session.get": "workspace",
   "context.session.commit": "workspace",
   "context.recall.list": "workspace",

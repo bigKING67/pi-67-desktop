@@ -3,7 +3,7 @@ import path from "node:path";
 import { errorCode, sha256, writeOnce } from "./content-store.js";
 import { digest, id, LIMITS, number, record, textObjects, validateCanvas, validateDocument, type Canvas, type ImageDocument, type SceneObject } from "./document.js";
 import { encode, readProject } from "./project.js";
-import { readBytes, regularPath } from "./raster.js";
+import { regularPath } from "./raster.js";
 import { compose } from "./render-compose.js";
 import { IMAGE_SIZE_PRESETS, imageSizePresetFits, imageSizePresetLabel, imageSizePresetSize, type ImageSizePreset } from "@pi67/domain";
 import { copyProjectFiles } from "./project-copy.js";
@@ -79,8 +79,7 @@ export async function deriveProject(sourceRoot: string, target: string, input: u
     return { status: "refused", preset, reason: `${width}×${height} 超出画布上限（单边 8192、总计 1677 万像素）` };
   }
   const canvas = presetCanvas(source.document.canvas, preset);
-  const font = await readBytes(path.join(root, source.document.font.file), LIMITS.renderBytes);
-  if (sha256(font) !== source.document.font.sha256) throw new Error("Source font changed");
+  const { font, fonts } = source;
 
   const laid = relayoutObjects(source.document.objects, source.document.canvas, canvas);
   const proportional = new Map(textObjects(laid).map((object) => [object.id, object.font_size]));
@@ -89,7 +88,7 @@ export async function deriveProject(sourceRoot: string, target: string, input: u
   const shrunk = new Set<string>();
   for (;;) {
     try {
-      await compose({ root, font, document: { ...document, assets: [], objects: textObjects(document.objects).filter((object) => object.visible) } });
+      await compose({ root, font, fonts, document: { ...document, assets: [], objects: textObjects(document.objects).filter((object) => object.visible) } });
       break;
     } catch (error) {
       const overflow = /^Text (?:overflow|box narrower than glyph): (.+)$/u.exec(error instanceof Error ? error.message : "");

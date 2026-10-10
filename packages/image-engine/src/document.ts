@@ -1,7 +1,15 @@
+import { IMAGE_USER_FONT_LIMIT } from "@pi67/domain";
 import { fail } from "./content-store.js";
 import { fontManifest } from "./font.js";
 
 export const SCHEMA = "newmoney.image-project.v1";
+/**
+ * Documents that bind user fonts (P3, 2026-10-10). A document is written as v2
+ * only while it uses them, so projects without user fonts stay readable by
+ * earlier releases after a rollback.
+ */
+export const SCHEMA_V2 = "newmoney.image-project.v2";
+export const USER_FONT_LIMIT = IMAGE_USER_FONT_LIMIT;
 // Projects written by the creative-craft source executor open read-only and
 // upgrade to the current schema on their next published revision.
 export const LEGACY_SCHEMAS: readonly string[] = ["creative-craft.local-image.v1"];
@@ -21,15 +29,24 @@ export interface ObjectBase { id: string; locked: boolean; visible: boolean; x: 
 export interface ImageObject extends ObjectBase { kind: "image"; asset_id: string; fit: "contain" | "cover" | "fill" }
 export interface TextObject extends ObjectBase {
   kind: "text"; text: string; font_size: number; color: string; align: "left" | "center" | "right"; line_height: number;
+  /** A user font from `fonts`; absent means the pinned font. Missing glyphs fall back to the pinned font. */
+  font_id?: string;
 }
 export interface RectObject extends ObjectBase { kind: "rect"; color: string; radius: number }
 export type SceneObject = ImageObject | TextObject | RectObject;
 export interface FontBinding { profile: string; family: string; file: string; sha256: string; weight: number }
+/** A font file the person added to the project; bound by digest like an asset. */
+export interface UserFont { id: string; family: string; file: string; sha256: string; bytes: number; format: "ttf" | "otf" }
 export interface AcceptedCandidate { id: string; sha256: string }
 export interface Change { author: ChangeAuthor; summary: string; operations: string[]; candidate?: AcceptedCandidate }
 export interface ImageDocument {
   schema: string; project_id: string; title: string; revision: number; parent_sha256: string | null;
-  canvas: Canvas; assets: Asset[]; font: FontBinding; objects: SceneObject[]; change: Change;
+  canvas: Canvas; assets: Asset[]; font: FontBinding; fonts?: UserFont[]; objects: SceneObject[]; change: Change;
+}
+
+/** v2 while any user font is bound or used, v1 otherwise. */
+export function documentSchema(document: Pick<ImageDocument, "fonts" | "objects">): string {
+  return document.fonts?.length || document.objects.some((object) => object.kind === "text" && object.font_id !== undefined) ? SCHEMA_V2 : SCHEMA;
 }
 
 export const isRecord = (value: unknown): value is JsonRecord =>
@@ -93,10 +110,10 @@ function hasControlCharacter(text: string): boolean {
 
 const COMMON = ["id", "kind", "locked", "visible", "x", "y", "width", "height", "opacity"] as const;
 const EXTRA = {
-  image: ["asset_id", "fit"], text: ["text", "font_size", "color", "align", "line_height"], rect: ["color", "radius"]
+  image: ["asset_id", "fit"], text: ["text", "font_size", "color", "align", "line_height", "font_id"], rect: ["color", "radius"]
 } as const satisfies Record<SceneObject["kind"], readonly string[]>;
 
-function validateObject(value: unknown, canvas: Canvas, assets: ReadonlySet<string>): SceneObject {
+function validateObject(value: unknown, canvas: Canvas, assets: ReadonlySet<string>, fonts: ReadonlySet<string>): SceneObject {
   if (!isRecord(value)) fail("object must be an object");
   const kind = value.kind;
   if (kind !== "image" && kind !== "text" && kind !== "rect") fail("Unsupported object kind");
@@ -114,13 +131,15 @@ function validateObject(value: unknown, canvas: Canvas, assets: ReadonlySet<stri
     if (hasControlCharacter(value.text)) fail("Unsupported text control character");
     number(value.font_size, "font_size", 8, 500); number(value.line_height, "line_height", 1, 2);
     color(value.color); oneOf(value.align, ["left", "center", "right"] as const, "Invalid text alignment");
+    if (value.font_id !== undefined && (typeof value.font_id !== "string" || !fonts.has(value.font_id))) fail(`Missing font for ${value.id}`);
   } else { color(value.color); number(value.radius, "radius", 0, Math.min(value.width, value.height) / 2); }
   return value as unknown as SceneObject;
 }
 
 export function validateDocument(value: unknown): ImageDocument {
-  record(value, ["schema", "project_id", "title", "revision", "parent_sha256", "canvas", "assets", "font", "objects", "change"], "document");
-  if (value.schema !== SCHEMA && !LEGACY_SCHEMAS.includes(value.schema as string)) fail("Unsupported image document schema");
+  record(value, ["schema", "project_id", "title", "revision", "parent_sha256", "canvas", "assets", "font", "fonts", "objects", "change"], "document");
+  if (value.schema !== SCHEMA && value.schema !== SCHEMA_V2 && !LEGACY_SCHEMAS.includes(value.schema as string)) fail("Unsupported image document schema");
+  if (value.schema !== SCHEMA_V2 && value.fonts !== undefined) fail("User fonts need the v2 document schema");
   id(value.project_id, "project_id"); string(value.title, "title", 200);
   number(value.revision, "revision", 1, LIMITS.revisions, true);
   if (value.revision === 1) { if (value.parent_sha256 !== null) fail("Initial revision must have null parent"); }
@@ -137,10 +156,12 @@ export function validateDocument(value: unknown): ImageDocument {
     if (assetIds.has(valid.id)) fail("Duplicate asset id"); assetIds.add(valid.id);
     return valid;
   });
+  const fonts = value.fonts === undefined ? undefined : validateUserFonts(value.fonts);
+  const fontIds = new Set(fonts?.map((item) => item.id));
   if (!Array.isArray(value.objects) || !value.objects.length || value.objects.length > LIMITS.objects) fail("Invalid objects list");
   const ids = new Set<string>();
   const objects = value.objects.map((object) => {
-    const valid = validateObject(object, canvas, assetIds);
+    const valid = validateObject(object, canvas, assetIds, fontIds);
     if (ids.has(valid.id)) fail("Duplicate object id"); ids.add(valid.id);
     return valid;
   });
@@ -154,7 +175,23 @@ export function validateDocument(value: unknown): ImageDocument {
     record(change.candidate, ["id", "sha256"], "accepted candidate"); id(change.candidate.id, "candidate id"); digest(change.candidate.sha256);
     if (operations.length !== 1 || operations[0] !== "accept_candidate") fail("Candidate acceptance must be isolated");
   } else if (operations.includes("accept_candidate")) fail("Candidate acceptance needs a bound candidate");
-  return { ...(value as unknown as ImageDocument), canvas, assets, objects };
+  const document = { ...(value as unknown as ImageDocument), canvas, assets, objects, ...(fonts ? { fonts } : {}) };
+  if (value.schema === SCHEMA_V2 && documentSchema(document) !== SCHEMA_V2) fail("A v2 document must bind or use a user font");
+  return document;
+}
+
+function validateUserFonts(value: unknown): UserFont[] {
+  if (!Array.isArray(value) || !value.length || value.length > USER_FONT_LIMIT) fail("Invalid user fonts list");
+  const ids = new Set<string>(), digests = new Set<string>();
+  return value.map((item) => {
+    record(item, ["id", "family", "file", "sha256", "bytes", "format"], "user font");
+    id(item.id, "font id"); string(item.family, "font family", 64); digest(item.sha256);
+    number(item.bytes, "font bytes", 1, 20_000_000, true);
+    const format = oneOf(item.format, ["ttf", "otf"] as const, "Invalid font format");
+    if (item.file !== `fonts/user-${item.sha256}.${format}`) fail("Invalid user font path");
+    if (ids.has(item.id) || digests.has(item.sha256)) fail("Duplicate user font"); ids.add(item.id); digests.add(item.sha256);
+    return item as unknown as UserFont;
+  });
 }
 
 export const textObjects = (objects: readonly SceneObject[]): TextObject[] => objects.filter((object): object is TextObject => object.kind === "text");

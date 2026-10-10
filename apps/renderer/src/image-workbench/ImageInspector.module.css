@@ -375,3 +375,18 @@
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
+
+/* 字体: the select spans the panel; the add action and the fallback hint sit beneath. */
+.fontRow {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.fontSelect {
+  width: 100%;
+}
+
+.fileInput {
+  display: none;
+}

@@ -47,6 +47,15 @@ describe("Agent Host prompt attachment access", () => {
     await expect(fixture.owner.readStagedImage("photo_a")).rejects.toThrow();
   });
 
+  it("reads one verified staged plain file (a font) and refuses other kinds", async () => {
+    const fixture = await createFixture();
+    const font = Buffer.from([0x00, 0x01, 0x00, 0x00, 0x00, 0x0a]);
+    await stageFixture(fixture.root, "font_a", "Brand.ttf", font, "font/ttf", "file");
+    await stageFixture(fixture.root, "notes_a", "notes.txt", "hello", "text/plain", "document");
+    expect(await fixture.owner.readStagedFile("font_a")).toEqual({ name: "Brand.ttf", bytes: font });
+    await expect(fixture.owner.readStagedFile("notes_a")).rejects.toThrow(/not a plain file/);
+  });
+
   it("reuses the verified Task-scoped set when a failed Prompt retries with a new submission id", async () => {
     const fixture = await createFixture();
     await stageFixture(

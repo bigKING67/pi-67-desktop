@@ -29,11 +29,14 @@ function documentSummary(doc: ImageDocument, latestRevision: number): Record<str
     project_id: doc.project_id, title: doc.title, revision: doc.revision, latest_revision: latestRevision, canvas: doc.canvas,
     objects: doc.objects.map((object) => ({
       id: object.id, kind: object.kind, locked: object.locked, visible: object.visible, box: [object.x, object.y, object.width, object.height], opacity: object.opacity,
-      ...(object.kind === "text" ? { text: object.text, font_size: object.font_size, color: object.color, align: object.align, line_height: object.line_height } : {}),
+      ...(object.kind === "text" ? { text: object.text, font_size: object.font_size, color: object.color, align: object.align, line_height: object.line_height,
+        ...(object.font_id ? { font_id: object.font_id } : {}) } : {}),
       ...(object.kind === "image" ? { asset_id: object.asset_id, fit: object.fit } : {}),
       ...(object.kind === "rect" ? { color: object.color, radius: object.radius } : {})
     })),
-    assets: doc.assets.map((asset) => ({ id: asset.id, width: asset.width, height: asset.height }))
+    assets: doc.assets.map((asset) => ({ id: asset.id, width: asset.width, height: asset.height })),
+    // Fonts the person added; text uses one with font_id (missing glyphs fall back to the built-in font).
+    fonts: (doc.fonts ?? []).map((font) => ({ id: font.id, family: font.family }))
   };
 }
 
@@ -82,7 +85,7 @@ export function imageTools(): ToolDefinition[] {
     },
     {
       name: "image_project_read", label: "Read image project",
-      description: "Read an image project's current or historical revision: canvas, objects (id, kind, box, text) and assets.",
+      description: "Read an image project's current or historical revision: canvas, objects (id, kind, box, text), assets and the fonts the person added.",
       promptSnippet: "Read an image project's objects and revision",
       promptGuidelines: ["Read the project before editing; submit edits against the revision you read."],
       parameters: Type.Object({ project_id: projectId, revision: optional(Type.Integer({ minimum: 1 })) }),
@@ -106,7 +109,12 @@ export function imageTools(): ToolDefinition[] {
         operations: Type.Array(IMAGE_EDIT_OPERATION, { minItems: 1, maxItems: 100 }), dry_run: optional(Type.Boolean())
       }),
       async execute(_id, raw, _signal, _update, ctx) {
-        const params = raw as Params, engine = await loadEngine();
+        const params = raw as Params;
+        // The schema has no add_font; this holds even if a caller skips schema validation.
+        if (Array.isArray(params.operations) && params.operations.some((op: Params) => op?.type === "add_font")) {
+          throw new Error("FONTS_ARE_ADDED_BY_THE_PERSON: fonts are added on the image page; use font_id with a font from image_project_read.");
+        }
+        const engine = await loadEngine();
         const result = await engine.editBatch(engine.projectRoot(ctx.cwd, str(params, "project_id")), {
           base_revision: int(params, "base_revision"), author: "agent", summary: str(params, "summary"),
           operations: resolveEditAssetSources(params.operations, (source) => path.resolve(ctx.cwd, source))

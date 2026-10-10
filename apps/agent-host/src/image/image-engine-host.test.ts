@@ -31,12 +31,12 @@ async function project(cwd: string, projectId = "poster"): Promise<string> {
     ] });
   return root;
 }
-function host(cwd: string, queue?: ImageWorkQueue, readStagedImage?: (id: string) => Promise<{ mimeType: string; bytes: Buffer }>) {
+function host(cwd: string, queue?: ImageWorkQueue, readStagedImage?: (id: string) => Promise<{ mimeType: string; bytes: Buffer }>, readStagedFile?: (id: string) => Promise<{ name: string; bytes: Buffer }>) {
   const events: AgentEvent[] = [];
   // macOS may replay file events from just before a watch starts; these tests cover the
   // Host's own events, so its watcher never watches (image-project-watcher.test.ts covers it).
   const watcher = new ImageProjectWatcher({ emit: () => undefined, maxWorkspaces: 0 });
-  const engine = new ImageEngineHost({ workspaceRoot: () => cwd, emit: (workspaceId, event) => { expect(workspaceId).toBe("w1"); events.push(event); }, watcher, ...(queue ? { queue } : {}), ...(readStagedImage ? { readStagedImage } : {}) });
+  const engine = new ImageEngineHost({ workspaceRoot: () => cwd, emit: (workspaceId, event) => { expect(workspaceId).toBe("w1"); events.push(event); }, watcher, ...(queue ? { queue } : {}), ...(readStagedImage ? { readStagedImage } : {}), ...(readStagedFile ? { readStagedFile } : {}) });
   const run = <T extends ImageCommandType>(type: T, payload: AgentCommand<T>["payload"], signal?: AbortSignal) =>
     engine.execute("w1", { type, payload } as AgentCommand<T>, signal);
   return { run, events };
@@ -239,6 +239,20 @@ describe("image engine host", { timeout: 120_000 }, () => {
     const { results } = await run("image.project.derive", { projectId: "big", revision: 1, presets: ["16x9", "1x1"] });
     expect(results.map((item) => [item.preset, item.status])).toEqual([["16x9", "refused"], ["1x1", "derived"]]);
     expect(results[0]).toMatchObject({ reason: expect.stringContaining("超出画布上限") });
+  });
+
+  it("binds a staged font file as the next font id and refuses anything but TTF/OTF", async () => {
+    const cwd = await workspace(true);
+    await project(cwd);
+    const fontBytes = await fs.readFile(new URL("../../../../packages/image-engine/src/test-support/fonts/KaTeX_SansSerif-Regular.ttf", import.meta.url));
+    const staged: Record<string, { name: string; bytes: Buffer }> = { brand: { name: "Brand.TTF", bytes: fontBytes }, sheet: { name: "brand.woff2", bytes: fontBytes } };
+    const { run, events } = host(cwd, undefined, undefined, (id) => Promise.resolve(staged[id]!));
+    const added = await run("image.project.addFont", { projectId: "poster", baseRevision: 1, attachmentId: "brand" });
+    expect(added).toMatchObject({ projectId: "poster", revision: 2, fontId: "font-1", family: "KaTeX_SansSerif" });
+    expect(events.at(-1)).toMatchObject({ type: "image.project.changed", payload: { projectId: "poster", revision: 2, author: "human" } });
+    await expect(run("image.project.addFont", { projectId: "poster", baseRevision: 2, attachmentId: "sheet" })).rejects.toThrow(/只支持 TTF 或 OTF/u);
+    await expect(run("image.project.addFont", { projectId: "poster", baseRevision: 2, attachmentId: "brand" })).rejects.toThrow(/already added/u);
+    await expect(fs.readdir(path.join(cwd, ".newmoney", "image-work", "poster")).catch(() => [])).resolves.toEqual([]);
   });
 });
 

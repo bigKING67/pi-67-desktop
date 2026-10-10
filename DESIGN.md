@@ -287,6 +287,11 @@ Application-level surfaces use a separate wide-window shell:
   段文字`, `打开「title」` text action; a refused preset reads `未生成` with its reason in
   the warning line), and the primary `导出全部尺寸（N 张）` with a folder glyph. The
   full-size `导出 PNG` becomes secondary so the tab has one primary action.
+- Text fonts (P3, 2026-10-10): 属性 for text adds a `字体` section — the shared Settings
+  select at full panel width (`Noto Sans CJK SC · 内置`, then each added font's family with
+  `TTF`/`OTF` as detail), a `添加字体…` text action with a plus glyph (disabled at 8 fonts or
+  when locked), and one tertiary hint covering where the font lives, its licence and the
+  fallback to the built-in font. Refusals arrive as an error notice in product words.
 - The navigation rail is the only Workspace and conversation switcher. Each
   Workspace is a collapsible group containing active tasks, waiting tasks,
   provisional drafts, and Catalog-backed recent Sessions. Workspace groups use

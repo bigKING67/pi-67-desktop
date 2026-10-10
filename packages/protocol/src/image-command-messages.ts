@@ -26,6 +26,8 @@ export interface ImageCommandPayloads {
   "image.candidate.discard": { projectId: string; candidateId: string; summary: string };
   /** Records which Pi conversation belongs to the project (the image page's dock). */
   "image.project.conversation.set": { projectId: string; conversation: ImageProjectConversation };
+  /** Binds a font file the person chose (staged by Main) to the project; never sent by the Agent. */
+  "image.project.addFont": { projectId: string; baseRevision: number; attachmentId: string };
   /** Derived projects for size presets, each re-laid out from one revision of the source. */
   "image.project.derive": { projectId: string; revision: number; presets: ImageSizePreset[] };
 }
@@ -83,6 +85,7 @@ export interface ImageCommandResults {
   "image.candidate.discard": { projectId: string; candidateId: string; status: "discarded" };
   "image.project.conversation.set": { projectId: string };
   "image.project.derive": { projectId: string; revision: number; results: ImageDeriveOutcome[] };
+  "image.project.addFont": ImageRevisionResult & { fontId: string; family: string };
 }
 
 export interface ImageEventPayloads {

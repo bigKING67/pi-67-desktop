@@ -1521,6 +1521,14 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   is written. `导出全部尺寸` renders this revision and every size derived in the session
   at full size into a new folder under a place the person picks, never over existing
   files, with `receipt.json` binding each file to its project, revision, digest and size.
+  属性 for text adds `字体`: the built-in Noto Sans CJK SC or a font added to the project
+  with `添加字体…` (a TTF or OTF file the person picks, staged like a photo; at most 8,
+  each up to 20 MB; collections and WOFF/WOFF2 are refused in product words). The font is
+  copied into the project and bound by digest; characters it lacks render in the built-in
+  font, and a character neither has is refused. The hint reminds the person the font's
+  licence is theirs to hold. The Agent sees the fonts in `image_project_read` and may set
+  `font_id`, but cannot add fonts. A project document becomes schema v2 only while it
+  binds or uses user fonts, so projects without them stay readable by earlier releases.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

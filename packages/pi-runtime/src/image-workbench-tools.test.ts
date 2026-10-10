@@ -73,6 +73,11 @@ describe("image workbench tools", { timeout: 120_000 }, () => {
     expect(read.latest_revision).toBe(1);
 
     expect((await t.json("image_project_edit", { project_id: "poster", base_revision: 1, summary: "改标题", operations: [{ type: "update_object", id: "headline", patch: { text: "自在新生" } }] })).revision).toBe(2);
+    // Fonts are the person's to add: the Agent's schema has no add_font, and read lists none yet.
+    const font = new URL("../../image-engine/src/test-support/fonts/KaTeX_SansSerif-Regular.ttf", import.meta.url).pathname;
+    await expect(t.call("image_project_edit", { project_id: "poster", base_revision: 2, summary: "加字体", operations: [{ type: "add_font", font: { id: "brand", source: font } }] }))
+      .rejects.toThrow(/FONTS_ARE_ADDED_BY_THE_PERSON/u);
+    expect((await t.json("image_project_read", { project_id: "poster" })).fonts).toEqual([]);
     await expect(t.call("image_project_edit", { project_id: "poster", base_revision: 1, summary: "过期", operations: [{ type: "update_object", id: "headline", patch: { text: "x" } }] }))
       .rejects.toThrow(/Revision conflict/);
     expect((await t.json("image_project_edit", { project_id: "poster", base_revision: 2, summary: "解锁照片", operations: [{ type: "update_object", id: "photo", patch: { locked: false } }] })).revision).toBe(3);

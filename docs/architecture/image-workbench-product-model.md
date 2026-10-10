@@ -342,7 +342,8 @@ Provider 请求只允许 HTTPS 或 loopback，拒绝带凭据的 URL；凭据只
 ├─ project.json              身份、标题、归属、格式版本、创建信息
 ├─ revisions/000001.json …   不可替换修订（父摘要、变更、作者来源 人/Agent）
 ├─ assets/<sha>.<ext>        原始素材；assets/<sha>.png 归正后的渲染素材
-├─ fonts/<sha>.otf           工程绑定字体（内置 CJK + 用户添加）
+├─ fonts/<sha>.otf           内置 CJK 字体
+├─ fonts/user-<sha>.<ttf|otf> 用户添加的字体（文档 schema v2，仅在使用用户字体时写 v2）
 ├─ masks/<sha>.png           保护 / 生成 / 羽化蒙版
 ├─ candidates/<id>/          不可变候选、回执、决定
 ├─ jobs/<job_id>/            Provider 任务：Job、编译包、请求摘要、输出、回执
@@ -473,12 +474,13 @@ Windows ARM64 / macOS Intel。
 | worker 池内存（8192px 画布解码约 268 MB RGBA） | 并发上限 2，超限任务排队；超出画布上限直接拒绝 |
 | Agent 即便工具化仍需多次调用 | 结构化上下文 + 工具返回预览路径；目标 ≤ 8 次，实测后调整 |
 | 模型行为漂移（尺寸不符、比例改变） | 规格检查、resize_to_target 显式策略、保护区校验、候选机制 |
-| 用户字体许可 | 字体由用户添加，工程只记录哈希与文件名；许可责任在用户，界面提示 |
+| 用户字体许可 | 字体由用户添加，工程只记录哈希与文件名；许可责任在用户，界面提示（`属性` 字体说明） |
 | creative-craft 上游后续改进不再自动同步 | 在 `docs/provenance` 登记移植基线 commit；需要时按需手工吸收 |
 | 创作库作为 Workspace 的信任与恢复语义外溢到 UI | 创作库不进文件夹树；Workspace 相关控件在创作库项目上隐藏或改语义 |
 
 ## 19. 已决开放问题（2026-10-08）
 
 1. 创作库位置：首次打开 `图像` 时由用户确认一次，Windows 预填非系统盘，见 12.2。
-2. 用户字体：P3 只支持显式添加字体文件，不枚举系统字体。
+2. 用户字体：P3 只支持在项目页显式添加 TTF / OTF 文件（不支持 TTC、WOFF、WOFF2，不枚举系统字体，每项目最多 8 个、单个 ≤20MB）；
+   Agent 只能选用已添加的字体（`font_id`），不能添加；缺字回落到内置 Noto Sans CJK SC。
 3. 工作区归属项目的目录固定为工作区内 `.newmoney/images/<id>/`。

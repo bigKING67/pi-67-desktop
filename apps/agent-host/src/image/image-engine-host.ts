@@ -19,6 +19,8 @@ export interface ImageEngineHostDependencies {
   watcher?: ImageProjectWatcher;
   /** A verified staged image attachment; absent when the Host has no attachment store. */
   readStagedImage?(id: string): Promise<{ mimeType: string; bytes: Buffer }>;
+  /** A verified staged plain file (a font); absent when the Host has no attachment store. */
+  readStagedFile?(id: string): Promise<{ name: string; bytes: Buffer }>;
 }
 
 type Command<T extends ImageCommandType> = AgentCommand<T>;
@@ -83,6 +85,8 @@ export class ImageEngineHost {
       }
       case "image.project.createFromPhoto":
         return this.createFromPhoto(engine, workspaceId, cwd, (command as Command<"image.project.createFromPhoto">).payload);
+      case "image.project.addFont":
+        return this.addFont(engine, workspaceId, cwd, (command as Command<"image.project.addFont">).payload);
       case "image.project.derive":
         return this.derive(engine, workspaceId, cwd, (command as Command<"image.project.derive">).payload);
       case "image.project.read": {
@@ -162,6 +166,32 @@ export class ImageEngineHost {
         const created = await engine.createPhotoProject(root, { project_id: projectId, source, headline, ...(title ? { title } : {}) });
         this.announce(workspaceId, event("image.project.changed", { projectId, revision: created.document.revision, sha256: created.sha256, author: "human" }));
         return { projectId, revision: created.document.revision, sha256: created.sha256, dryRun: false };
+      } finally {
+        await fs.rm(work, { recursive: true, force: true });
+      }
+    });
+  }
+
+  // A font the person chose in the image page (never the Agent): staged by Main,
+  // copied into a work folder, then bound by the engine, which refuses anything it
+  // cannot parse before the revision is written.
+  private async addFont(engine: ImageEngine, workspaceId: string, cwd: string,
+    { projectId, baseRevision, attachmentId }: CommandPayloads["image.project.addFont"]): Promise<CommandResults["image.project.addFont"]> {
+    if (!this.dependencies.readStagedFile) throw new HostCommandError("UNSUPPORTED", "此设备上不能导入字体文件。", false);
+    const staged = await this.dependencies.readStagedFile(attachmentId);
+    const extension = /\.(ttf|otf)$/iu.exec(staged.name)?.[1]?.toLowerCase();
+    if (!extension) throw new HostCommandError("INVALID_PAYLOAD", "只支持 TTF 或 OTF 字体文件。", false);
+    return this.queue.serial(key(workspaceId, projectId), async () => {
+      const root = engine.projectRoot(cwd, projectId), work = await engine.workDirectory(cwd, projectId, "import");
+      await fs.mkdir(work);
+      try {
+        const source = path.join(work, `font.${extension}`);
+        await fs.writeFile(source, staged.bytes, { flag: "wx" });
+        // The engine names the font (`font-N`); it is the last one bound.
+        const result = await engine.editBatch(root, { base_revision: baseRevision, author: "human", summary: "添加字体", operations: [{ type: "add_font", font: { source } }] });
+        this.announce(workspaceId, event("image.project.changed", { projectId, revision: result.document.revision, sha256: result.sha256, author: "human" }));
+        const added = result.document.fonts?.at(-1) ?? fail("The font was not bound");
+        return { projectId, revision: result.document.revision, sha256: result.sha256, dryRun: false, fontId: added.id, family: added.family };
       } finally {
         await fs.rm(work, { recursive: true, force: true });
       }
@@ -257,6 +287,8 @@ async function freeProjectId(engine: ImageEngine, cwd: string, base: string): Pr
   }
   throw new HostCommandError("INVALID_PAYLOAD", "这个尺寸已经派生过太多次，请先整理创作库。", false);
 }
+
+const fail = (message: string): never => { throw new Error(message); };
 
 const PHOTO_EXTENSIONS: Readonly<Record<string, string>> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
 const key = (workspaceId: string, projectId: string): string => `${workspaceId}\u0000${projectId}`;

@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { errorCode, sha256 } from "./content-store.js";
+import { errorCode, fail, sha256 } from "./content-store.js";
 import type { TextObject } from "./document.js";
+import { parseFont, type FontFormat, type ParsedFont } from "./font-parse.js";
 
 export interface FontManifest {
   profile: string; family: string; file: string; sha256: string; bytes: number; weight: number;
@@ -36,59 +37,70 @@ export async function installedFont(): Promise<Buffer> {
   }
 }
 
-function tableOffsets(bytes: Buffer): Map<string, number> {
-  const tables = new Map<string, number>();
-  for (let i = 0; i < bytes.readUInt16BE(4); i++) {
-    const at = 12 + i * 16;
-    tables.set(bytes.toString("ascii", at, at + 4), bytes.readUInt32BE(at + 8));
-  }
-  return tables;
+const parsed = new WeakMap<Buffer, ParsedFont>();
+/** Parses a font buffer once; the pinned font is digest-verified first. */
+function fontOf(bytes: Buffer, pinned: boolean): ParsedFont {
+  if (pinned) verifyFont(bytes);
+  let font = parsed.get(bytes);
+  if (!font) { font = parseFont(bytes); parsed.set(bytes, font); }
+  return font;
 }
 
-// This parser is used only after the exact, fixed OTF digest is verified.
-// Its format-12 cmap covers the font's BMP and supplementary characters.
-export function checkGlyphs(bytes: Buffer, texts: readonly string[]): Map<number, number> {
-  verifyFont(bytes);
-  const cmap = tableOffsets(bytes).get("cmap");
-  if (cmap === undefined) throw new Error("Pinned font cmap profile changed");
-  let table: number | undefined;
-  for (let i = 0; i < bytes.readUInt16BE(cmap + 2); i++) {
-    const at = cmap + 4 + i * 8;
-    const offset = cmap + bytes.readUInt32BE(at + 4);
-    if (bytes.readUInt16BE(offset) === 12) table = offset;
-  }
-  if (table === undefined) throw new Error("Pinned font cmap profile changed");
-  const groups = bytes.readUInt32BE(table + 12);
-  const missing = new Set<string>();
-  const glyphs = new Map<number, number>();
-  for (const char of texts.join("")) {
+/** A user font's format and family name, refusing anything the engine will not render. */
+export function inspectUserFont(bytes: Buffer): { format: FontFormat; family: string } {
+  const { format, family } = fontOf(bytes, false);
+  return { format, family };
+}
+
+const SAMPLE = ["A", "a", "0", "字", "あ", "가"];
+
+/** A few characters the user font draws itself, to try it in the renderer before binding it. */
+export function userFontSample(bytes: Buffer): string | undefined {
+  const font = fontOf(bytes, false);
+  const sample = SAMPLE.filter((char) => font.glyph(char.codePointAt(0) ?? 0) !== 0).join("");
+  return sample || undefined;
+}
+
+/** Every character must have a glyph in the pinned font. */
+export function checkGlyphs(bytes: Buffer, texts: readonly string[]): void {
+  checkTextGlyphs(bytes, texts.map((text, index) => ({ id: `t${index}`, text })), new Map());
+}
+
+/**
+ * Each object's characters resolve to a glyph in its own font (a user font named
+ * by `font_id`) or, failing that, in the pinned font — the same order the
+ * renderer falls back in. Returns each character's advance in em units.
+ */
+function resolveGlyphs(bytes: Buffer, object: Pick<TextObject, "id" | "text" | "font_id">, userFonts: ReadonlyMap<string, Buffer>, missing: Set<string>): number[] {
+  const faces = [...(object.font_id ? [fontOf(userFonts.get(object.font_id) ?? fail(`Missing font for ${object.id}`), false)] : []), fontOf(bytes, true)];
+  const advances: number[] = [];
+  for (const char of object.text) {
     if (char === "\n") continue;
     const cp = char.codePointAt(0) ?? 0;
-    let low = 0, high = groups - 1, found = false;
-    while (low <= high) {
-      const mid = (low + high) >>> 1, at = table + 16 + mid * 12;
-      const start = bytes.readUInt32BE(at), end = bytes.readUInt32BE(at + 4);
-      if (cp < start) high = mid - 1;
-      else if (cp > end) low = mid + 1;
-      else { const glyph = bytes.readUInt32BE(at + 8) + cp - start; found = glyph !== 0; glyphs.set(cp, glyph); break; }
+    let advance: number | undefined;
+    for (const face of faces) {
+      const glyph = face.glyph(cp);
+      if (glyph !== 0) { advance = face.advance(glyph); break; }
     }
-    if (!found) missing.add(`U+${cp.toString(16).toUpperCase()}`);
+    if (advance === undefined) missing.add(`U+${cp.toString(16).toUpperCase()}`);
+    else advances.push(advance);
   }
-  if (missing.size) throw new Error(`Missing font glyphs: ${[...missing].join(", ")}`);
-  return glyphs;
+  return advances;
 }
 
-export function checkTextWidths(bytes: Buffer, objects: readonly TextObject[]): void {
-  const glyphs = checkGlyphs(bytes, objects.map((object) => object.text));
-  const tables = tableOffsets(bytes);
-  const head = tables.get("head"), hhea = tables.get("hhea"), hmtx = tables.get("hmtx");
-  if (head === undefined || hhea === undefined || hmtx === undefined) throw new Error("Pinned font metric tables changed");
-  const units = bytes.readUInt16BE(head + 18);
-  const count = bytes.readUInt16BE(hhea + 34);
-  for (const object of objects) for (const char of object.text) {
-    if (char === "\n") continue;
-    const glyph = glyphs.get(char.codePointAt(0) ?? 0) ?? 0;
-    const advance = bytes.readUInt16BE(hmtx + Math.min(glyph, count - 1) * 4);
-    if (advance / units * object.font_size > object.width + 0.1) throw new Error(`Text box narrower than glyph: ${object.id}`);
+export function checkTextGlyphs(bytes: Buffer, objects: readonly Pick<TextObject, "id" | "text" | "font_id">[], userFonts: ReadonlyMap<string, Buffer>): void {
+  const missing = new Set<string>();
+  for (const object of objects) resolveGlyphs(bytes, object, userFonts, missing);
+  if (missing.size) throw new Error(`Missing font glyphs: ${[...missing].join(", ")}`);
+}
+
+/** No single glyph may be wider than its text box (wrapping cannot help it). */
+export function checkTextWidths(bytes: Buffer, objects: readonly TextObject[], userFonts: ReadonlyMap<string, Buffer> = new Map()): void {
+  const missing = new Set<string>();
+  for (const object of objects) {
+    for (const advance of resolveGlyphs(bytes, object, userFonts, missing)) {
+      if (advance * object.font_size > object.width + 0.1) throw new Error(`Text box narrower than glyph: ${object.id}`);
+    }
   }
+  if (missing.size) throw new Error(`Missing font glyphs: ${[...missing].join(", ")}`);
 }

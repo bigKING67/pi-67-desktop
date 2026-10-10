@@ -31,6 +31,11 @@ vi.mock("../connection/AgentConnectionController.js", () => ({
       if (type === "image.candidate.accept") { host.revision += 1; return Promise.resolve({ projectId: "p", revision: host.revision, sha256: "s" }); }
       if (type === "image.candidate.discard") return Promise.resolve({ projectId: "p", candidateId: payload.candidateId, status: "discarded" });
       if (type === "image.project.history") return Promise.resolve({ projectId: "p", revisions: [] });
+      if (type === "image.project.addFont") {
+        if (payload.attachmentId === "bad") return Promise.reject(new ProtocolRequestError({ code: "INVALID_PAYLOAD", message: "Unsupported font file: not TrueType or OpenType", recoverable: true }));
+        host.revision += 1;
+        return Promise.resolve({ projectId: "p", revision: host.revision, sha256: "s", dryRun: false, fontId: "font-1", family: "Brand Sans" });
+      }
       if (type === "image.project.derive") return Promise.resolve({ projectId: "p", revision: host.revision, results: (payload.presets as string[]).map((preset) => preset === "16x9"
         ? { preset, status: "refused", reason: "文字「春日」在 178×100 里放不下" }
         : { preset, status: "derived", projectId: `p-${preset}`, title: `海报 · ${preset}`, canvas: { width: 100, height: 100, background: "#fff" }, shrunkText: 0 }) });
@@ -43,6 +48,7 @@ vi.mock("../notifications/notification-store.js", () => ({ publishNotification: 
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   acceptCandidate,
+  addImageFont,
   checkImageEdit,
   deriveImageSizes,
   discardCandidate,
@@ -184,6 +190,34 @@ describe("image object selection", () => {
     host.calls = [];
     await exportImageSizes();
     expect(host.calls.filter((call) => call.type === "image.project.render").map((call) => call.payload.projectId)).toEqual(["p"]);
+    vi.unstubAllGlobals();
+  });
+
+  it("adds a staged font, sets it on the text as a second revision, and explains refusals in product words", async () => {
+    const released: string[][] = [];
+    let next = "good";
+    vi.stubGlobal("window", { pi67: { system: {
+      stagePromptAttachments: () => Promise.resolve([{ id: next, kind: "file" }]),
+      releasePromptAttachments: (ids: string[]) => { released.push(ids); return Promise.resolve(); }
+    } } });
+    host.calls = [];
+    expect(await addImageFont(new File([new Uint8Array(4)], "Brand.ttf"), "t")).toBe(true);
+    expect(host.calls.find((call) => call.type === "image.project.addFont")?.payload).toEqual({ projectId: "p", baseRevision: 1, attachmentId: "good" });
+    expect(edits().at(-1)).toMatchObject({ baseRevision: 2, summary: "使用字体 Brand Sans", operations: [{ type: "update_object", id: "t", patch: { font_id: "font-1" } }] });
+    next = "bad";
+    expect(await addImageFont(new File([new Uint8Array(4)], "Brand.ttf"))).toBe(false);
+    expect(notices.at(-1)).toMatchObject({ title: "没能添加字体", message: expect.stringContaining("不是可用的 TTF 或 OTF") });
+    // Refused by name before anything is staged.
+    expect(await addImageFont(new File([new Uint8Array(4)], "Brand.woff2"))).toBe(false);
+    expect(notices.at(-1)?.message).toBe("请选择 TTF 或 OTF 字体文件。");
+    expect(released).toEqual([["good"], ["bad"]]);
+    // Bound, but using it on the text fails: say so, and refresh to the bound revision.
+    next = "good";
+    host.refuseNext = { message: "Text overflow: t", imageReason: "text_overflow" };
+    expect(await addImageFont(new File([new Uint8Array(4)], "Brand.ttf"), "t")).toBe(false);
+    expect(notices.at(-1)).toMatchObject({ level: "warning", title: "已添加字体 Brand Sans", message: expect.stringContaining("但没能用在这段文字上") });
+    expect(useImageProject.getState().revision).toBe(host.revision);
+    expect(useImageProject.getState().busy).toBe(false);
     vi.unstubAllGlobals();
   });
 

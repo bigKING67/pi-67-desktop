@@ -14,8 +14,10 @@ const box = { x: int(0), y: int(0), width: int(1), height: int(1) };
 const common = { id: id("New object id."), locked: Type.Boolean(), visible: Type.Boolean(), ...box, opacity: Type.Number({ minimum: 0, maximum: 1 }) };
 const text = { text: Type.String({ maxLength: 2000 }), font_size: Type.Integer({ minimum: 8, maximum: 500 }), color, align, line_height: Type.Number({ minimum: 1, maximum: 2 }) };
 
+// Fonts are added by the person only (add_font is not an Agent operation); text may use a bound one.
+const fontId = Type.Union([id("A font id from image_project_read fonts."), Type.Null()], { description: "A bound user font id, or null for the built-in font." });
 const patch = Type.Partial(Type.Object({
-  ...box, opacity: common.opacity, visible: Type.Boolean(), locked: Type.Boolean(), ...text,
+  ...box, opacity: common.opacity, visible: Type.Boolean(), locked: Type.Boolean(), ...text, font_id: fontId,
   radius: int(0), fit: Type.Union([Type.Literal("contain"), Type.Literal("cover"), Type.Literal("fill")])
 }, { additionalProperties: false }), { additionalProperties: false, minProperties: 1,
   description: "Only the fields to change. A lock change ({locked}) must be the only field and the only operation in its batch." });
@@ -23,7 +25,7 @@ const patch = Type.Partial(Type.Object({
 export const IMAGE_EDIT_OPERATION = Type.Union([
   Type.Object({ type: Type.Literal("update_object"), id: id("Existing object id."), patch }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("add_object"), object: Type.Union([
-    Type.Object({ ...common, kind: Type.Literal("text"), ...text }, { additionalProperties: false }),
+    Type.Object({ ...common, kind: Type.Literal("text"), ...text, font_id: Type.Optional(id("A font id from image_project_read fonts.")) }, { additionalProperties: false }),
     Type.Object({ ...common, kind: Type.Literal("rect"), color, radius: int(0) }, { additionalProperties: false })
   ]) }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("add_asset"), asset: Type.Object({ id: id("New asset id."), source: Type.String({ minLength: 1, maxLength: 4096, description: "Local PNG/JPEG/WebP path, absolute or relative to the Workspace." }) }, { additionalProperties: false }) }, { additionalProperties: false }),

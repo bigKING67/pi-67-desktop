@@ -1,4 +1,4 @@
-import { IMAGE_ID_PATTERN, IMAGE_PROJECT_LIMITS, IMAGE_SIZE_PRESETS } from "@pi67/domain";
+import { IMAGE_ID_PATTERN, IMAGE_PROJECT_LIMITS, IMAGE_SIZE_PRESETS, IMAGE_USER_FONT_LIMIT } from "@pi67/domain";
 import { strictObject, Type, Value, type TSchema } from "./typebox-schema.js";
 import type { ImageCommandPayloads, ImageCommandResults, ImageEventPayloads } from "./image-command-messages.js";
 
@@ -34,7 +34,8 @@ const common = {
 };
 const RasterObjectSchema = strictObject({ ...common, kind: Type.Literal("image"), asset_id: IdSchema, fit: FitSchema });
 const TextObjectSchema = strictObject({
-  ...common, kind: Type.Literal("text"), text: TextSchema, font_size: FontSizeSchema, color: ColorSchema, align: AlignSchema, line_height: LineHeightSchema
+  ...common, kind: Type.Literal("text"), text: TextSchema, font_size: FontSizeSchema, color: ColorSchema, align: AlignSchema, line_height: LineHeightSchema,
+  font_id: Type.Optional(IdSchema)
 });
 const RectObjectSchema = strictObject({ ...common, kind: Type.Literal("rect"), color: ColorSchema, radius: RadiusSchema });
 const SceneObjectSchema = Type.Union([RasterObjectSchema, TextObjectSchema, RectObjectSchema]);
@@ -63,6 +64,10 @@ const DocumentSchema = strictObject({
     sha256: Sha256Schema,
     weight: Type.Integer({ minimum: 1, maximum: 1000 })
   }),
+  fonts: Type.Optional(Type.Array(strictObject({
+    id: IdSchema, family: Type.String({ minLength: 1, maxLength: 64 }), file: Type.String({ minLength: 1, maxLength: 160 }),
+    sha256: Sha256Schema, bytes: Type.Integer({ minimum: 1, maximum: 20_000_000 }), format: Type.Union([Type.Literal("ttf"), Type.Literal("otf")])
+  }), { minItems: 1, maxItems: IMAGE_USER_FONT_LIMIT })),
   objects: Type.Array(SceneObjectSchema, { minItems: 1, maxItems: L.objects }),
   change: strictObject({
     author: AuthorSchema,
@@ -77,7 +82,8 @@ const PatchSchema = Type.Object({
   x: Type.Optional(CoordinateSchema), y: Type.Optional(CoordinateSchema), width: Type.Optional(SizeSchema), height: Type.Optional(SizeSchema),
   opacity: Type.Optional(OpacitySchema), asset_id: Type.Optional(IdSchema), fit: Type.Optional(FitSchema),
   text: Type.Optional(TextSchema), font_size: Type.Optional(FontSizeSchema), color: Type.Optional(ColorSchema),
-  align: Type.Optional(AlignSchema), line_height: Type.Optional(LineHeightSchema), radius: Type.Optional(RadiusSchema)
+  align: Type.Optional(AlignSchema), line_height: Type.Optional(LineHeightSchema), radius: Type.Optional(RadiusSchema),
+  font_id: Type.Optional(Type.Union([IdSchema, Type.Null()]))
 }, { additionalProperties: false, minProperties: 1 });
 const EditOperationSchema = Type.Union([
   strictObject({ type: Type.Literal("update_object"), id: IdSchema, patch: PatchSchema }),
@@ -149,6 +155,8 @@ export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSch
   "image.candidate.accept": strictObject({ projectId: IdSchema, candidateId: IdSchema, baseRevision: RevisionSchema, summary: SummarySchema }),
   "image.candidate.discard": strictObject({ projectId: IdSchema, candidateId: IdSchema, summary: SummarySchema }),
   "image.project.conversation.set": strictObject({ projectId: IdSchema, conversation: ConversationSchema }),
+  "image.project.addFont": strictObject({ projectId: IdSchema, baseRevision: RevisionSchema,
+    attachmentId: Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" }) }),
   "image.project.derive": strictObject({ projectId: IdSchema, revision: RevisionSchema,
     presets: Type.Array(SizePresetSchema, { minItems: 1, maxItems: IMAGE_SIZE_PRESETS.length, uniqueItems: true }) })
 };
@@ -171,6 +179,8 @@ export const ImageCommandResultSchemas: Record<keyof ImageCommandResults, TSchem
   "image.candidate.accept": RevisionResultSchema,
   "image.candidate.discard": strictObject({ projectId: IdSchema, candidateId: IdSchema, status: Type.Literal("discarded") }),
   "image.project.conversation.set": ProjectRefSchema,
+  "image.project.addFont": strictObject({ projectId: IdSchema, revision: RevisionSchema, sha256: Sha256Schema, dryRun: Type.Boolean(),
+    fontId: IdSchema, family: Type.String({ minLength: 1, maxLength: 64 }) }),
   "image.project.derive": strictObject({ projectId: IdSchema, revision: RevisionSchema, results: Type.Array(Type.Union([
     strictObject({ preset: SizePresetSchema, status: Type.Literal("derived"), projectId: IdSchema, title: Type.String({ minLength: 1, maxLength: L.title }), canvas: CanvasSchema,
       shrunkText: Type.Integer({ minimum: 0, maximum: L.objects }) }),

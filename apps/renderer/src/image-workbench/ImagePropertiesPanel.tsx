@@ -1,9 +1,11 @@
-import { IMAGE_PROMPT_CONTEXT_LIMITS, IMAGE_REFERENCE_ROLE_LABELS, IMAGE_REFERENCE_ROLES, type ImageCanvas, type ImageObjectPatch, type ImageSceneObject } from "@pi67/domain";
-import { Eye, EyeOff, Lock, LockOpen } from "lucide-react";
-import { useEffect, useState } from "react";
+import { IMAGE_PROMPT_CONTEXT_LIMITS, IMAGE_REFERENCE_ROLE_LABELS, IMAGE_REFERENCE_ROLES, IMAGE_USER_FONT_LIMIT, type ImageCanvas, type ImageObjectPatch, type ImageSceneObject, type ImageTextObject, type ImageUserFont } from "@pi67/domain";
+import { Eye, EyeOff, Lock, LockOpen, Plus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Input, Label, TextField } from "react-aria-components";
 import { ImageAlignToolbar } from "./ImageAlignToolbar.js";
+import { SettingsSelect } from "../settings/SettingsPrimitives.js";
 import {
+  addImageFont,
   editImageProject,
   type ImageEditOutcome,
   toggleImageObjectLock,
@@ -90,6 +92,7 @@ export function ImagePropertiesPanel() {
             onCommit={async (value) => { const result = await editImageProject(`修改${spec.label}`, [{ type: "update_object", id: object.id, patch: { [spec.key]: value } as ImageObjectPatch }]); report(result); return result; }} />
         ))}
       </div>
+      {object.kind === "text" ? <FontChoice busy={busy} fonts={document.fonts ?? []} object={object} onResult={report} /> : null}
       {object.kind === "text" ? (
         <div className={styles.alignRow} role="group" aria-label="文字对齐">
           {(["left", "center", "right"] as const).map((align) => (
@@ -103,6 +106,31 @@ export function ImagePropertiesPanel() {
       {object.kind === "image" ? <ReferenceRole objectId={object.id} /> : null}
       {status}
       {object.locked ? null : <ImageAlignToolbar busy={busy} canvas={document.canvas} objects={selected} />}
+    </div>
+  );
+}
+
+const BUILT_IN = "built-in";
+
+/**
+ * 字体 for text: the built-in Noto Sans CJK SC or a font added to the project.
+ * Characters a user font lacks fall back to the built-in one, which the hint says.
+ */
+function FontChoice({ object, fonts, busy, onResult }: { object: ImageTextObject; fonts: readonly ImageUserFont[]; busy: boolean; onResult: (result: ImageEditOutcome) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const current = object.font_id ?? BUILT_IN;
+  return (
+    <div className={styles.fontRow}>
+      <p className={styles.sectionLabel}>字体</p>
+      <SettingsSelect className={styles.fontSelect ?? ""} isDisabled={busy || object.locked} label="字体" value={current}
+        options={[{ id: BUILT_IN, label: "Noto Sans CJK SC", detail: "内置" }, ...fonts.map((font) => ({ id: font.id, label: font.family, detail: font.format.toUpperCase() }))]}
+        onChange={(value) => { if (value !== current) void editImageProject("更换字体", [{ type: "update_object", id: object.id, patch: { font_id: value === BUILT_IN ? null : value } }]).then(onResult); }} />
+      <Button className={styles.historyAction!} isDisabled={busy || object.locked || fonts.length >= IMAGE_USER_FONT_LIMIT} onPress={() => input.current?.click()}>
+        <Plus aria-hidden="true" size={12} />添加字体…
+      </Button>
+      <input ref={input} accept=".ttf,.otf,font/ttf,font/otf" className={styles.fileInput} tabIndex={-1} type="file"
+        onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void addImageFont(file, object.id); }} />
+      <p className={styles.empty}>{fonts.length >= IMAGE_USER_FONT_LIMIT ? `一个项目最多 ${IMAGE_USER_FONT_LIMIT} 个字体。` : ""}添加的 TTF / OTF 只保存在这个项目里，请确认你有使用它的授权；字体里没有的字（比如英文字体里的中文）用内置字体显示。</p>
     </div>
   );
 }

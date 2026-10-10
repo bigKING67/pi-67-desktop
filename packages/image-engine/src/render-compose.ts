@@ -3,8 +3,11 @@ import path from "node:path";
 import satori from "satori";
 import { textObjects, type ImageDocument } from "./document.js";
 import { checkTextWidths } from "./font.js";
+import { fail } from "./content-store.js";
 
-export interface ComposeInput { root: string; font: Buffer; document: ImageDocument }
+export interface ComposeInput { root: string; font: Buffer; fonts?: ReadonlyMap<string, Buffer>; document: ImageDocument }
+/** Satori family names for user fonts, kept apart from any name a font file declares. */
+const userFamily = (fontId: string): string => `pi67-user-${fontId}`;
 export interface TextMeasurement { width: number; height: number }
 export interface Composition { svg: string; text_measurements: Record<string, TextMeasurement> }
 
@@ -12,8 +15,9 @@ type SatoriNode = { type: string; props: Record<string, unknown> };
 const JUSTIFY = { left: "flex-start", center: "center", right: "flex-end" } as const;
 
 export async function compose(project: ComposeInput): Promise<Composition> {
-  const { document: doc, root, font } = project;
-  checkTextWidths(font, textObjects(doc.objects).filter((object) => object.visible));
+  const { document: doc, root, font } = project, userFonts = project.fonts ?? new Map<string, Buffer>();
+  const texts = textObjects(doc.objects).filter((object) => object.visible);
+  checkTextWidths(font, texts, userFonts);
   // Encode only rasters that visible objects draw; history keeps every asset bound.
   const images = new Map<string, string>();
   for (const object of doc.objects) {
@@ -28,9 +32,10 @@ export async function compose(project: ComposeInput): Promise<Composition> {
     if (object.kind === "image") return { type: "img", props: { src: images.get(object.asset_id), style: { ...style, objectFit: object.fit } } };
     if (object.kind === "rect") return { type: "div", props: { style: { ...style, backgroundColor: object.color, borderRadius: object.radius } } };
     // Measure natural text height rather than clipping it into the declared box.
-    // Satori outlines the bound font, so SVG/PNG never use a host font fallback.
+    // Satori outlines only the fonts given to it, so SVG/PNG never use a host font. A user
+    // font comes first; characters it lacks fall back to the pinned font, which is always loaded.
     const { height: _height, ...textStyle } = style;
-    return { type: "div", props: { id: `text-${object.id}`, style: { ...textStyle, fontFamily: doc.font.family, fontWeight: 400,
+    return { type: "div", props: { id: `text-${object.id}`, style: { ...textStyle, fontFamily: object.font_id ? userFamily(object.font_id) : doc.font.family, fontWeight: 400,
       fontSize: object.font_size, lineHeight: object.line_height, color: object.color, flexDirection: "column" },
       // Explicit lines must remain independent blocks: Satori's break-all
       // wrapping otherwise collapses newlines even with pre-wrap.
@@ -41,7 +46,11 @@ export async function compose(project: ComposeInput): Promise<Composition> {
   const rootNode: SatoriNode = { type: "div", props: { style: { display: "flex", position: "relative", width: doc.canvas.width, height: doc.canvas.height, backgroundColor: doc.canvas.background }, children } };
   const svg = await satori(rootNode as unknown as Parameters<typeof satori>[0], {
     width: doc.canvas.width, height: doc.canvas.height,
-    embedFont: true, fonts: [{ name: doc.font.family, data: font, weight: 400, style: "normal" }],
+    embedFont: true, fonts: [
+      { name: doc.font.family, data: font, weight: 400, style: "normal" },
+      ...[...new Set(texts.flatMap((object) => object.font_id ? [object.font_id] : []))].map((fontId) => (
+        { name: userFamily(fontId), data: userFonts.get(fontId) ?? fail(`Missing font for ${fontId}`), weight: 400 as const, style: "normal" as const }))
+    ],
     onNodeDetected: (node) => {
       const nodeId = (node.props as { id?: unknown } | undefined)?.id;
       if (typeof nodeId === "string" && nodeId.startsWith("text-")) measurements.set(nodeId.slice(5), { width: node.width, height: node.height });

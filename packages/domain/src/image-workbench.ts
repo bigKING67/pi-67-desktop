@@ -36,14 +36,19 @@ interface ImageObjectBase { id: string; locked: boolean; visible: boolean; x: nu
 export interface ImageRasterObject extends ImageObjectBase { kind: "image"; asset_id: string; fit: ImageFit }
 export interface ImageTextObject extends ImageObjectBase {
   kind: "text"; text: string; font_size: number; color: string; align: ImageTextAlign; line_height: number;
+  /** A user font from the document's `fonts`; absent means the built-in font. */
+  font_id?: string;
 }
 export interface ImageRectObject extends ImageObjectBase { kind: "rect"; color: string; radius: number }
 export type ImageSceneObject = ImageRasterObject | ImageTextObject | ImageRectObject;
 export interface ImageFontBinding { profile: string; family: string; file: string; sha256: string; weight: number }
+export interface ImageUserFont { id: string; family: string; file: string; sha256: string; bytes: number; format: "ttf" | "otf" }
+/** At most this many user fonts per project. */
+export const IMAGE_USER_FONT_LIMIT = 8;
 export interface ImageChange { author: ImageChangeAuthor; summary: string; operations: string[]; candidate?: { id: string; sha256: string } }
 export interface ImageDocument {
   schema: string; project_id: string; title: string; revision: number; parent_sha256: string | null;
-  canvas: ImageCanvas; assets: ImageAsset[]; font: ImageFontBinding; objects: ImageSceneObject[]; change: ImageChange;
+  canvas: ImageCanvas; assets: ImageAsset[]; font: ImageFontBinding; fonts?: ImageUserFont[]; objects: ImageSceneObject[]; change: ImageChange;
 }
 
 /**
@@ -51,7 +56,9 @@ export interface ImageDocument {
  * file needs a path, and paths reach the engine only through Main's dialogs or
  * the Agent's tools, never from renderer payloads.
  */
-export type ImageObjectPatch = Partial<Omit<ImageRasterObject, "id" | "kind"> & Omit<ImageTextObject, "id" | "kind"> & Omit<ImageRectObject, "id" | "kind">>;
+type PatchFields = Partial<Omit<ImageRasterObject, "id" | "kind"> & Omit<ImageTextObject, "id" | "kind" | "font_id"> & Omit<ImageRectObject, "id" | "kind">>
+  & { /** Text only: a bound user font, or `null` for the built-in font. */ font_id?: string | null };
+export type ImageObjectPatch = { [Key in keyof PatchFields]: PatchFields[Key] };
 export type ImageEditOperation =
   | { type: "update_object"; id: string; patch: ImageObjectPatch }
   | { type: "add_object"; object: ImageTextObject | ImageRectObject }

@@ -1,4 +1,4 @@
-import type { ImageDocument, ImageEditOperation, ImageEngineFailure, ImageMark, ImageReferenceRole, ImageSceneObject, ImageSizePreset } from "@pi67/domain";
+import { IMAGE_USER_FONT_LIMIT, type ImageDocument, type ImageEditOperation, type ImageEngineFailure, type ImageMark, type ImageReferenceRole, type ImageSceneObject, type ImageSizePreset } from "@pi67/domain";
 import { ProtocolRequestError } from "@pi67/protocol";
 import type { AgentCommandType, CommandPayloads, CommandResults, ImageCandidateSummary, ImageDeriveOutcome, ImageRevisionEntry } from "@pi67/protocol";
 import { create } from "zustand";
@@ -322,6 +322,54 @@ export async function deriveImageSizes(presets: readonly ImageSizePreset[]): Pro
   } finally {
     useImageProject.setState({ busy: false });
   }
+}
+
+/**
+ * Adds a font file the person chose (TTF/OTF, staged through Main like a photo)
+ * and, with `objectId`, sets it on that text as a second revision. The engine
+ * refuses files it cannot parse; that reason is shown as product words.
+ */
+export async function addImageFont(file: File, objectId?: string): Promise<boolean> {
+  const { projectId, busy } = useImageProject.getState();
+  if (!projectId || busy) return false;
+  if (!/\.(ttf|otf)$/iu.test(file.name)) {
+    publishNotification({ level: "error", title: "没能添加字体", message: "请选择 TTF 或 OTF 字体文件。" });
+    return false;
+  }
+  useImageProject.setState({ busy: true });
+  let staged: { id: string; kind: string }[] = [];
+  let added: CommandResults["image.project.addFont"] | undefined;
+  try {
+    staged = await window.pi67.system.stagePromptAttachments([file]);
+    const attachment = staged[0];
+    if (!attachment || staged.length !== 1 || attachment.kind !== "file") throw new Error("请选择 TTF 或 OTF 字体文件。");
+    // The revision is read after staging, which can take a while for a large font.
+    const revision = useImageProject.getState().revision ?? 1;
+    added = await request("image.project.addFont", { projectId, baseRevision: revision, attachmentId: attachment.id });
+    if (objectId) await request("image.project.edit", { projectId, baseRevision: added.revision, summary: `使用字体 ${added.family}`, operations: [{ type: "update_object", id: objectId, patch: { font_id: added.fontId } }] });
+    return true;
+  } catch (error) {
+    // Once the font is bound, a failed "use it here" is that step's failure, not the add's.
+    publishNotification(added
+      ? { level: "warning", title: `已添加字体 ${added.family}`, message: `但没能用在这段文字上：${imageEditRefusal(error)}` }
+      : { level: "error", title: "没能添加字体", message: fontFailure(error) });
+    return false;
+  } finally {
+    useImageProject.setState({ busy: false });
+    await loadImageProject(projectId).catch(() => undefined);
+    if (staged.length) await window.pi67.system.releasePromptAttachments(staged.map((item) => item.id)).catch(() => undefined);
+  }
+}
+
+function fontFailure(error: unknown): string {
+  const message = error instanceof Error ? error.message : "未知错误";
+  if (/Unsupported font file: font collections/u.test(message)) return "这是字体集合（TTC），请选择其中单个字体的 TTF 或 OTF 文件。";
+  if (/Unsupported font file/u.test(message)) return "这个文件不是可用的 TTF 或 OTF 字体（WOFF、WOFF2 和损坏的文件都不支持）。";
+  if (/already added as/u.test(message)) return "这个字体已经在项目里了。";
+  if (/at most \d+ fonts/u.test(message)) return `一个项目最多添加 ${IMAGE_USER_FONT_LIMIT} 个字体。`;
+  if (/not a plain file/u.test(message)) return "请选择 TTF 或 OTF 字体文件。";
+  if (/Revision conflict/u.test(message)) return "项目刚被更新，请再添加一次。";
+  return message;
 }
 
 /** Sizes derived from exactly this revision; ones from earlier revisions stay in the library but out of the set. */

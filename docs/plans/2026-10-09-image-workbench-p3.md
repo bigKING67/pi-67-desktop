@@ -42,7 +42,7 @@ export presets and user fonts. Product model §6–§8 and §17 (P3 row).
 - [x] 5a. 候选: candidate receipts and the compare divider.
 - [x] 5b. 导出: multi-size presets as derived projects (decided 2026-10-10 over same-project
   derived revisions), multi-file export into a new directory with receipts.
-- [ ] 6. User fonts (engine and Host support, Inspector picker).
+- [x] 6. User fonts (engine and Host support, Inspector picker).
 - [ ] 7. Authority docs, packaged verification, Windows packaged smoke.
 
 ## Rollback
@@ -124,4 +124,21 @@ the image Inspector returns the P2 page; no project content is rewritten.
   `saveImageSet` writes a new folder with `receipt.json`. Deferred: listing a source's
   derived projects across sessions (the session list only), and Settings' check glyph,
   which uses the undefined `--accent-contrast` token (pre-existing).
+- 2026-10-10: checkpoint 6 done. Decisions with the user: characters a user font lacks fall
+  back to the built-in Noto Sans CJK SC (satori falls back across loaded fonts, verified);
+  only the person adds fonts, the Agent may only set `font_id`. A bounds-checked parser
+  (`font-parse.ts`: table directory, cmap 4/12, hmtx, name) replaces the digest-only one and
+  refuses TTC/WOFF/WOFF2 and lying tables; glyph and width checks resolve per object with the
+  fallback. Documents are written as `newmoney.image-project.v2` only while fonts are bound or
+  used (rollback keeps other projects readable). Host `image.project.addFont` reads a staged
+  `file` attachment; the Agent tool refuses `add_font` even past schema validation. Fixture:
+  KaTeX_SansSerif (OFL, 19 KB). Known risk: satori still parses user fonts in the Host process
+  after our parser screens them. `/security-review` found nothing reportable; `/code-review high`
+  found and fixed: a font the parser accepts but satori cannot load was bound for good (now a
+  sample is composed before binding); a failed "use it here" after a successful add read as a
+  failed add without a refresh; staging errors went unnoticed and a .woff2 was staged before
+  being refused; two weights shared one label (now `Brand Bold`); non-Roman Mac name records
+  became mojibake (Windows records win, Mac only as ASCII); every read hashed every bound font
+  (now only fonts text uses are loaded, the rest checked for size); the Host read the project
+  only to name the font (the engine names it); duplicated staged-read code.
 
