@@ -109,3 +109,72 @@
   left: 0;
   height: 1px;
 }
+
+/* In-place text editing: the box itself, above handles and guides, with scaled type. */
+.textEditor {
+  position: absolute;
+  z-index: 10002;
+}
+
+/* The object's box: the space the words have, drawn behind a field that may grow past it. */
+.textEditor::before {
+  position: absolute;
+  inset: 0;
+  border: 1px dashed transparent;
+  content: "";
+  pointer-events: none;
+}
+
+.textEditor[data-overflow="true"]::before {
+  z-index: 1;
+  border-color: var(--danger);
+}
+
+.textField {
+  display: block;
+  width: 100%;
+  min-height: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 2px;
+  outline: 1px solid var(--focus);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 28%, transparent);
+  font-family: inherit;
+  resize: none;
+}
+
+/* Covers the rendered words it replaces; light or dark against the text colour. */
+.textField[data-backdrop="light"] {
+  background: rgb(255 255 255 / 0.94);
+}
+
+.textField[data-backdrop="dark"] {
+  background: rgb(20 20 22 / 0.92);
+}
+
+.textField[aria-invalid="true"] {
+  outline-color: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 24%, transparent);
+}
+
+.textStatus {
+  display: block;
+  width: max-content;
+  margin-top: 8px;
+  max-width: min(360px, 60vw);
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-composer);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: 1.45;
+}
+
+.textStatus[data-state="refused"] {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  color: var(--danger);
+}

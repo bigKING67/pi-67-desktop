@@ -1,6 +1,7 @@
 import type { ImageDocument, ImageEditOperation, ImageObjectPatch, ImageSceneObject as SceneObject } from "@pi67/domain";
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { boundsOf, clampInside, RESIZE_HANDLES, resizeRect, snapMove, type Guide, type Rect, type ResizeHandle } from "./image-canvas-geometry.js";
+import { ImageInlineTextEditor } from "./ImageInlineTextEditor.js";
 import styles from "./ImageCanvas.module.css";
 
 const INSET = 20;
@@ -33,6 +34,7 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
   const stage = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState<Fit>();
   const [gesture, setGesture] = useState<Gesture>();
+  const [editingId, setEditingId] = useState<string>();
   const canvas = document?.canvas;
 
   useLayoutEffect(() => {
@@ -53,7 +55,9 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
   const movable = (ids: readonly string[]) => objects.filter((object) => ids.includes(object.id) && !object.locked);
   const others = (ids: readonly string[]) => objects.filter((object) => !ids.includes(object.id)).map(rectOf);
   const primary = objects.find((object) => object.id === selectedIds.at(-1));
-  const resizable = editable && selectedIds.length === 1 && primary && !primary.locked ? primary : undefined;
+  const editingObject = editable ? objects.find((object) => object.id === editingId && object.kind === "text" && !object.locked) : undefined;
+  const editing = editingObject?.kind === "text" ? editingObject : undefined;
+  const resizable = editable && !editing && selectedIds.length === 1 && primary && !primary.locked ? primary : undefined;
 
   const commitMove = (ids: readonly string[], dx: number, dy: number) => {
     if (dx === 0 && dy === 0) return;
@@ -101,8 +105,16 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
     if (gesture?.kind === "resize") { const object = objects.find((item) => item.id === gesture.id); if (object) commitResize(object, gesture.rect); }
     setGesture(undefined);
   };
+  const startEditing = (object: SceneObject) => {
+    if (!editable || object.kind !== "text" || object.locked) return;
+    setGesture(undefined);
+    onSelect(object.id);
+    setEditingId(object.id);
+  };
   const keyDown = (event: KeyboardEvent<HTMLButtonElement>, object: SceneObject) => {
     if (event.key === "Escape") { onSelect(undefined); return; }
+    // Enter opens the words for editing, the keyboard twin of double-click.
+    if (event.key === "Enter" && object.kind === "text") { event.preventDefault(); startEditing(object); return; }
     const step = event.shiftKey ? 10 : 1;
     const delta = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[event.key];
     if (!delta || !editable || !canvas) return;
@@ -143,6 +155,7 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
                 data-object-id={object.id}
                 style={{ ...place(frameOf(object), fit.scale), zIndex: index + 1 }}
                 type="button"
+                onDoubleClick={() => startEditing(object)}
                 onKeyDown={(event) => keyDown(event, object)}
                 onPointerCancel={() => setGesture(undefined)}
                 onPointerDown={(event) => pointerDown(event, object)}
@@ -159,6 +172,14 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
                   onPointerMove={pointerMove} onPointerUp={pointerUp} />
               ))}
             </div>
+          ) : null}
+          {editing ? (
+            <ImageInlineTextEditor key={editing.id} frame={place(rectOf(editing), fit.scale)} object={editing} scale={fit.scale}
+              onClose={() => {
+                setEditingId(undefined);
+                // Focus returns to the object the words belong to.
+                requestAnimationFrame(() => stage.current?.querySelector<HTMLButtonElement>(`[data-object-id="${editing.id}"]`)?.focus());
+              }} />
           ) : null}
           {gesture?.guides.map((guide) => (
             <span key={`${guide.axis}-${guide.at}`} aria-hidden="true" className={styles.guide} data-axis={guide.axis}

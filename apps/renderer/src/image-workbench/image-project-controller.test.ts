@@ -24,6 +24,7 @@ vi.mock("../connection/AgentConnectionController.js", () => ({
           const { message, imageReason } = host.refuseNext; host.refuseNext = undefined;
           return Promise.reject(new ProtocolRequestError({ code: "INVALID_PAYLOAD", message, recoverable: true, details: { imageReason } }));
         }
+        if (payload.dryRun === true) return Promise.resolve({ projectId: "p", revision: host.revision + 1, sha256: "s", dryRun: true });
         host.revision += 1;
         return Promise.resolve({ projectId: "p", revision: host.revision, sha256: "s", dryRun: false });
       }
@@ -39,6 +40,7 @@ vi.mock("../notifications/notification-store.js", () => ({ publishNotification: 
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   acceptCandidate,
+  checkImageEdit,
   discardCandidate,
   inspectCandidate,
   editImageProject,
@@ -129,5 +131,14 @@ describe("image object selection", () => {
     expect(useImageProject.getState().inspecting).toBe("cool");
     expect(await discardCandidate("cool")).toBe(true);
     expect(useImageProject.getState().inspecting).toBeUndefined();
+  });
+
+  it("checks a draft with a dry run that never publishes or touches undo history", async () => {
+    expect(await checkImageEdit([{ type: "update_object", id: "t", patch: { text: "春日" } }])).toEqual({ outcome: "applied" });
+    expect(edits().at(-1)).toMatchObject({ dryRun: true, baseRevision: 1 });
+    expect(useImageProject.getState()).toMatchObject({ revision: 1, back: [] });
+    host.refuseNext = { message: "Text overflow: t", imageReason: "text_overflow" };
+    expect(await checkImageEdit([{ type: "update_object", id: "t", patch: { text: "很长很长的文字" } }]))
+      .toEqual({ outcome: "refused", message: "文字放不下：把文本框调大，或减小字号、行高。" });
   });
 });

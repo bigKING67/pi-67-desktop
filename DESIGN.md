@@ -249,6 +249,16 @@ Application-level surfaces use a separate wide-window shell:
   under one object's fields. Locked objects stay put. A refused change keeps the
   field with the danger border and one warning-coloured line naming the reason in
   product words; canvas gestures report refusals as a warning notice.
+- Inline text editing (P3, 2026-10-10): double-click or Enter on an unlocked text object
+  opens a textarea at its box with the object's colour, alignment, line height and size
+  scaled to the canvas, on a light or dark backdrop chosen against the text colour (94% /
+  92% opaque) so it covers the rendered words. The field grows with the words; the box
+  stays drawn behind it (dashed `--danger` once the words overflow) so nothing scrolls out
+  of sight. A raised caption below reads `Esc 取消 · ⌘↵ 保存`, `正在检查排版…`, `放得下 · ⌘↵
+  保存` or the refusal in `--danger`; every draft is checked by an engine dry run 300 ms
+  after typing stops. Enter adds a line, ⌘/Ctrl + Enter or leaving the field saves, Escape
+  restores the words; a refused draft never saves and leaving it does not pull focus
+  back. Focus returns to the object when the editor closes.
 - The navigation rail is the only Workspace and conversation switcher. Each
   Workspace is a collapsible group containing active tasks, waiting tasks,
   provisional drafts, and Catalog-backed recent Sessions. Workspace groups use

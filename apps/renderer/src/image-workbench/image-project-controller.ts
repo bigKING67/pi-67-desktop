@@ -135,11 +135,30 @@ export async function editImageProject(summary: string, operations: ImageEditOpe
     await loadImageProject(projectId);
     return { outcome: "applied" };
   } catch (error) {
-    if (error instanceof ProtocolRequestError && error.details?.imageReason === "revision_conflict") {
-      await loadImageProject(projectId);
-      return { outcome: "conflict" };
-    }
-    return { outcome: "refused", message: imageEditRefusal(error) };
+    const outcome = failedEdit(error);
+    if (outcome.outcome === "conflict") await loadImageProject(projectId);
+    return outcome;
+  }
+}
+
+function failedEdit(error: unknown): ImageEditOutcome {
+  if (error instanceof ProtocolRequestError && error.details?.imageReason === "revision_conflict") return { outcome: "conflict" };
+  return { outcome: "refused", message: imageEditRefusal(error) };
+}
+
+/**
+ * Asks the engine whether a batch would apply (structure, glyphs, text layout)
+ * without publishing a revision, so text that would overflow is refused while
+ * the person is still typing (flow E).
+ */
+export async function checkImageEdit(operations: ImageEditOperation[]): Promise<ImageEditOutcome> {
+  const { projectId, revision } = useImageProject.getState();
+  if (!projectId || revision === undefined) return { outcome: "refused", message: "项目尚未就绪。" };
+  try {
+    await request("image.project.edit", { projectId, baseRevision: revision, summary: "检查", operations, dryRun: true });
+    return { outcome: "applied" };
+  } catch (error) {
+    return failedEdit(error);
   }
 }
 

@@ -1487,6 +1487,9 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   canvas and other objects; 属性 aligns or distributes the selection and edits the
   canvas size and background. Every result stays wholly on the canvas, as the engine
   requires, and an engine refusal is shown in product words instead of being dropped.
+  Text is edited in place on the canvas (double-click or Enter); the engine checks each
+  draft without publishing, so words that would overflow or lack a glyph are named while
+  typing and never saved.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

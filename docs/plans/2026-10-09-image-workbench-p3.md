@@ -37,7 +37,7 @@ export presets and user fonts. Product model §6–§8 and §17 (P3 row).
 
 - [x] 1. Image Inspector shell with 图层, 属性 and 历史; TitleBar shows `创作库` / project.
 - [x] 2. Transform handles, snapping and multi-select alignment.
-- [ ] 3. Inline text editing on the canvas.
+- [x] 3. Inline text editing on the canvas.
 - [ ] 4. Marks (mark-and-rework) and reference slots in the structured context.
 - [ ] 5. 候选 and 导出 tabs: candidate receipts, comparison, multi-size export presets.
 - [ ] 6. User fonts (engine and Host support, Inspector picker).
@@ -72,3 +72,11 @@ the image Inspector returns the P2 page; no project content is rewritten.
   preview, driven over CDP: centre snap (guide at x=540, lands at 410), Shift resize
   260×120 → 303×140, three-object 左对齐 as one revision, ⌘Z, canvas background
   change and a refused canvas width that keeps the field with the reason.
+- 2026-10-10: checkpoint 3 done. `ImageInlineTextEditor` on double-click / Enter;
+  `checkImageEdit` dry-runs each draft (glyphs and text layout, no revision). Packaged
+  preview over CDP: a 20-character headline shows `文字放不下…`, ⌘↵ is refused and the
+  draft stays; a shorter one shows `放得下`, saves as revision 23 and returns focus to the
+  object; Enter then Escape restores the words with no revision. The first draft of the
+  editor scrolled overflowing lines out of sight; it now grows with a dashed box outline.
+  Before this, `image_project_edit` got an operation schema (malformed batches refused
+  before approval, `add_asset` checked by path) and the watcher test stopped racing disk I/O.

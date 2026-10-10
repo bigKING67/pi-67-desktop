@@ -17,7 +17,7 @@ export function ImageSelectionBar({ object, count, busy }: { object: ImageSceneO
   useEffect(() => { setDraft(objectText ?? ""); setNotice(undefined); }, [object?.id, objectText]);
 
   if (count > 1) return <p className={styles.selectionHint}>已选 {count} 个对象：一起拖动或用方向键移动，在属性里对齐。</p>;
-  if (!object) return <p className={styles.selectionHint}>点选画布上的文字可以直接改字，拖动可以移动，按住 Shift 多选；照片层默认锁定。</p>;
+  if (!object) return <p className={styles.selectionHint}>双击画布上的文字直接改字，拖动可以移动，按住 Shift 多选；照片层默认锁定。</p>;
   if (object.kind !== "text") {
     return (
       <p className={styles.selectionHint}>
