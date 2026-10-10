@@ -1,6 +1,6 @@
 # Image workbench P3: professional panels
 
-Status: active
+Status: done
 Owner: Claude
 Started: 2026-10-09
 Last updated: 2026-10-10
@@ -43,8 +43,7 @@ export presets and user fonts. Product model §6–§8 and §17 (P3 row).
 - [x] 5b. 导出: multi-size presets as derived projects (decided 2026-10-10 over same-project
   derived revisions), multi-file export into a new directory with receipts.
 - [x] 6. User fonts (engine and Host support, Inspector picker).
-- [ ] 7. Authority docs, packaged verification, Windows packaged smoke (macOS done; Windows waits for a
-  real Windows run).
+- [x] 7. Authority docs, packaged verification, Windows packaged smoke.
 
 ## Rollback
 
@@ -161,4 +160,7 @@ the image Inspector returns the P2 page; no project content is rewritten.
   covered `应用`. The spec now opens the Inspector for its tabs and closes it before canvas
   work, and starts at 1180 so the drawer case runs everywhere. Also annotated
   `generateArkImages` so its declaration emits (5 non-fatal TS2883 messages in every build).
+- 2026-10-10: P3 done. CI run 38044848963 on a43dc47c passed every job: quality gates, renderer
+  E2E and native smoke (including the image workbench e2e) on macOS arm64; build, native smoke
+  and installer lifecycle on Windows x64.
 
