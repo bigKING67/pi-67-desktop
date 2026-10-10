@@ -261,11 +261,15 @@
 }
 
 .catalogItem:hover + .catalogItem,
-.catalogItem:focus-within + .catalogItem {
+.catalogItem:focus-within + .catalogItem,
+.catalogItem[data-selected] + .catalogItem {
   background-image: none;
 }
 
-.catalogRow[aria-pressed="true"] {
+/* Selection paints the whole item so a row's trailing actions share its surface. */
+.catalogItem[data-selected],
+.catalogItem[data-selected]:hover,
+.catalogItem[data-selected]:focus-within {
   background: var(--surface-active);
 }
 

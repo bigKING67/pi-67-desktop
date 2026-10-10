@@ -166,3 +166,9 @@
     white-space: normal;
   }
 }
+
+/* Row removal stays visible at rest (never hover-only) in the quiet icon-action tone. */
+.modelRowAction {
+  display: inline-flex;
+  align-items: center;
+}

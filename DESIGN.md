@@ -1957,7 +1957,12 @@ loading error where the operation can produce those states
   under Pi's official DeepSeek Provider and `api.deepseek.com` endpoint is
   declared native-search capable. Filtering or switching models preserves the Provider draft. Adding a
   model clears filters, selects the new row, and focuses Model ID; removing the
-  active model selects a neighboring row. Header mutations and advanced JSON
+  active model selects a neighboring row. Editable rows also carry a resting
+  `删除模型 <name>` icon action at the trailing edge (never hover-only) that removes
+  the model from the draft without opening detail; focus moves to the removal action
+  now in that position, or the previous one at the end. Nothing is written until
+  `保存到 Pi`. A selected Settings Catalog item paints its whole surface, trailing
+  actions included. Header mutations and advanced JSON
   remain collapsed until requested or an error requires attention.
 - Model Catalog and model detail are mutually exclusive at every editor width.
   `返回模型列表` restores search, filters, selected item, and scroll position while

@@ -133,13 +133,13 @@ test("organizes Provider task views while search and drill-down preserve the act
   await panel.getByRole("button", { name: "清除模型搜索" }).click();
   await panel.getByRole("button", { name: "支持图片" }).click();
   await expect(modelList.getByTestId("provider-model-row")).toHaveCount(5);
-  await modelList.getByRole("button", { name: /Claude Test 5/u }).click();
+  await modelList.getByTestId("provider-model-row").filter({ hasText: "Claude Test 5" }).click();
   await panel.getByLabel("显示名称").fill("Unsaved Claude Five");
   await panel.getByRole("button", { name: "返回模型列表" }).click();
   await panel.getByRole("button", { name: "支持推理" }).click();
   await expect(modelList.getByTestId("provider-model-row")).toHaveCount(3);
   await panel.getByRole("button", { name: "全部" }).click();
-  await modelList.getByRole("button", { name: /Unsaved Claude Five/u }).click();
+  await modelList.getByTestId("provider-model-row").filter({ hasText: "Unsaved Claude Five" }).click();
   await expect(panel.getByLabel("Model ID")).toHaveValue("claude-test-5");
   await expect(panel.getByLabel("显示名称")).toHaveValue("Unsaved Claude Five");
   await panel.getByRole("button", { name: "删除模型 Unsaved Claude Five" }).click();

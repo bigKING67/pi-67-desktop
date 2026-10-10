@@ -269,7 +269,12 @@ export function SettingsCatalogRow({
   onSelect: () => void;
 }) {
   return (
-    <div className={styles.catalogItem} data-actions={actions ? true : undefined} role="listitem">
+    <div
+      className={styles.catalogItem}
+      data-actions={actions ? true : undefined}
+      data-selected={selected ? true : undefined}
+      role="listitem"
+    >
       <button
         aria-pressed={selected}
         className={styles.catalogRow}
