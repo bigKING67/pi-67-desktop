@@ -43,7 +43,8 @@ export presets and user fonts. Product model §6–§8 and §17 (P3 row).
 - [x] 5b. 导出: multi-size presets as derived projects (decided 2026-10-10 over same-project
   derived revisions), multi-file export into a new directory with receipts.
 - [x] 6. User fonts (engine and Host support, Inspector picker).
-- [ ] 7. Authority docs, packaged verification, Windows packaged smoke.
+- [ ] 7. Authority docs, packaged verification, Windows packaged smoke (macOS done; Windows waits for a
+  real Windows run).
 
 ## Rollback
 
@@ -141,4 +142,12 @@ the image Inspector returns the P2 page; no project content is rewritten.
   became mojibake (Windows records win, Mac only as ASCII); every read hashed every bound font
   (now only fonts text uses are loaded, the rest checked for size); the Host read the project
   only to name the font (the engine names it); duplicated staged-read code.
+- 2026-10-10: checkpoint 7, macOS part. `tests/e2e/electron-image-workbench.spec.ts` drives the
+  real Electron app, Agent Host and image engine with stubbed folder pickers: creative library,
+  a photo project, flow B (a property, the words, an arrow-key move, ⌘Z as a new revision), D (a
+  drawn and worded mark attached to the next message), E (保留风格 on the photo), a user font, F
+  (a derived 4:5 and an export set whose receipt lists 800×1320 and 800×1000), then the page at
+  1440 / 1180 / 960 in light and dark with no horizontal overflow (screenshots attached to the
+  test). Authority docs were updated in each checkpoint's commit. Still open: the Windows x64
+  packaged smoke, which needs a real Windows run.
 
