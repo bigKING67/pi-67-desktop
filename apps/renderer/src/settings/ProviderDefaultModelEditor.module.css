@@ -158,7 +158,7 @@
 
 .defaultModelOption small {
   color: var(--text-tertiary);
-  font-family: var(--font-mono);
+  font-family: var(--font-code);
   font-size: var(--font-size-caption);
 }
 
@@ -188,7 +188,7 @@
 .effectiveDefault strong {
   overflow: hidden;
   color: var(--text-primary);
-  font-family: var(--font-mono);
+  font-family: var(--font-code);
   font-size: var(--font-size-interface);
   text-overflow: ellipsis;
   white-space: nowrap;

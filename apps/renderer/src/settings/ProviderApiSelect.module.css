@@ -154,7 +154,7 @@
 
 .option small {
   color: var(--text-tertiary);
-  font-family: var(--font-mono);
+  font-family: var(--font-code);
   font-size: var(--font-size-caption);
 }
 

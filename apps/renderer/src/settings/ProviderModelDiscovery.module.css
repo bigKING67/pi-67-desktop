@@ -185,7 +185,7 @@
 .modelOption[data-selected] .checkIndicator {
   border-color: var(--accent);
   background: var(--accent);
-  color: var(--accent-contrast);
+  color: var(--canvas);
 }
 
 .groupSelector[data-indeterminate] .checkIndicator {
@@ -196,7 +196,7 @@
 .groupSelector[data-indeterminate] .checkIndicator::after {
   width: 8px;
   height: 1px;
-  background: var(--accent-contrast);
+  background: var(--canvas);
   content: "";
 }
 
@@ -291,7 +291,7 @@
 
 .modelOption small {
   overflow-wrap: anywhere;
-  font-family: var(--font-mono);
+  font-family: var(--font-code);
 }
 
 .conflicts {

@@ -185,7 +185,7 @@
 
 .preview {
   padding: 20px;
-  background: var(--surface-panel);
+  background: var(--surface);
 }
 
 .preview > p {
@@ -218,7 +218,7 @@
   padding: 0 12px;
   border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border));
   border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--danger) 10%, var(--surface-panel));
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
   color: var(--danger);
   font-weight: var(--font-weight-semibold);
 }
