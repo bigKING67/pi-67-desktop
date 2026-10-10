@@ -1,6 +1,7 @@
 import type { RiskCategory } from "@pi67/domain";
 import { imageTools } from "./image-workbench-tools.js";
-import { Check } from "typebox/value";
+import { Check, Errors } from "typebox/value";
+import { editAssetSources } from "./image-workbench-edit-schema.js";
 import { classifyPathToolIntent, classifySensitivePathTarget } from "./path-tool-safety.js";
 import { stringField } from "./tool-input-contracts.js";
 
@@ -35,8 +36,11 @@ export async function classifyImageWorkbenchToolIntent(
   const tool = TOOLS.get(toolName);
   const projectId = stringField(input, "project_id");
   if (!tool || !projectId || !Check(tool.parameters, input)) {
+    // Name the first mismatch so the model can repair the call instead of guessing shapes.
+    const first = tool ? [...Errors(tool.parameters, input)][0] : undefined;
+    const detail = first ? `（${first.instancePath || "/"}: ${first.message}）` : "";
     return { toolName, category: "unverified-tool", target: toolName, targetKind: "tool", sourceLabel,
-      nonApprovableReason: "图像工作台 Tool 输入不符合已注册合同；请修正参数后重试。" };
+      nonApprovableReason: `图像工作台 Tool 输入不符合已注册合同${detail}；请按 Tool 参数说明修正后重试。` };
   }
   const project = `.newmoney/images/${projectId}`;
   if (toolName === "image_project_create_from_photo") {
@@ -44,6 +48,16 @@ export async function classifyImageWorkbenchToolIntent(
     const sensitive = classifySensitivePathTarget(source.target);
     if (sensitive) return { toolName, category: sensitive, target: source.target, targetKind: "path", sourceLabel };
     if (source.category !== "workspace-read" && source.category !== "resource-read") return source;
+    return { toolName, category: "workspace-write", target: project, targetKind: "tool", sourceLabel };
+  }
+  if (toolName === "image_project_edit") {
+    // An imported asset is a file read like a photo: outside the Workspace it asks, credentials stop.
+    for (const sourcePath of editAssetSources(input.operations)) {
+      const source = await classifyPathToolIntent(toolName, sourceLabel, "read", sourcePath, workspace, undefined, taskTrustedRoots);
+      const sensitive = classifySensitivePathTarget(source.target);
+      if (sensitive) return { toolName, category: sensitive, target: source.target, targetKind: "path", sourceLabel };
+      if (source.category !== "workspace-read" && source.category !== "resource-read") return source;
+    }
     return { toolName, category: "workspace-write", target: project, targetKind: "tool", sourceLabel };
   }
   if (toolName === "image_generate") {

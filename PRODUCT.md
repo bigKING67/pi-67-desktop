@@ -1199,7 +1199,7 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   `image_project_edit`, `image_render`, `image_candidates`, `image_candidate_decide`,
   `image_generate`) are first-party customTools with the same exact SDK identity
   check. Project reads are Workspace reads; edits, renders and candidate decisions
-  are Workspace writes; a photo outside the Workspace needs path approval;
+  are Workspace writes; a photo or imported asset outside the Workspace needs path approval;
   `image_generate` is an external submission to a model from the user's image
   sources (Settings → 图像生成; one `newmoney-images-<source>` Pi Provider each,
   never edited as JSON, ADR 0010 decision 14), approved per call in

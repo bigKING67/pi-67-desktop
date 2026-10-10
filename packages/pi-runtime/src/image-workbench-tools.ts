@@ -5,6 +5,7 @@ import { IMAGE_PROVIDER_ID, imageCandidateActions } from "@pi67/domain";
 import type { ImageDocument, ImageGenerator } from "@pi67/image-engine";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createPiImageGenerator, type ImageRegistry } from "./image-workbench-generator.js";
+import { IMAGE_EDIT_OPERATION, resolveEditAssetSources } from "./image-workbench-edit-schema.js";
 import { buildImageJob, IMAGE_ID_PATTERN, newCandidateId, type ImageJobMode, type ImageJobQuality } from "./image-workbench-job.js";
 
 type ToolDefinition = Parameters<ExtensionAPI["registerTool"]>[0];
@@ -93,7 +94,7 @@ export function imageTools(): ToolDefinition[] {
     },
     {
       name: "image_project_edit", label: "Edit image project",
-      description: "Apply one batch of object edits as a new revision: update_object, add_object, remove_object, reorder_objects, set_canvas, add_asset, revert_to. Use dry_run first for layout changes. Text is set exactly; never ask an image model to draw copy, prices or logos.",
+      description: "Apply one batch of object edits as a new revision. Operations: {type:update_object,id,patch}, {type:add_object,object}, {type:add_asset,asset:{id,source}}, {type:remove_object,id}, {type:reorder_objects,ids}, {type:set_canvas,canvas}, {type:revert_to,revision}. Unlock with exactly [{type:update_object,id,patch:{locked:false}}] as its own batch. Use dry_run first for layout changes. Text is set exactly; never ask an image model to draw copy, prices or logos.",
       promptSnippet: "Edit image project objects as one revision",
       promptGuidelines: [
         "Put copy, prices and logos in text or image objects instead of generated pixels.",
@@ -102,12 +103,13 @@ export function imageTools(): ToolDefinition[] {
       ],
       parameters: Type.Object({
         project_id: projectId, base_revision: Type.Integer({ minimum: 1 }), summary: Type.String({ minLength: 1, maxLength: 500 }),
-        operations: Type.Array(Type.Any(), { minItems: 1, maxItems: 100 }), dry_run: optional(Type.Boolean())
+        operations: Type.Array(IMAGE_EDIT_OPERATION, { minItems: 1, maxItems: 100 }), dry_run: optional(Type.Boolean())
       }),
       async execute(_id, raw, _signal, _update, ctx) {
         const params = raw as Params, engine = await loadEngine();
         const result = await engine.editBatch(engine.projectRoot(ctx.cwd, str(params, "project_id")), {
-          base_revision: int(params, "base_revision"), author: "agent", summary: str(params, "summary"), operations: params.operations
+          base_revision: int(params, "base_revision"), author: "agent", summary: str(params, "summary"),
+          operations: resolveEditAssetSources(params.operations, (source) => path.resolve(ctx.cwd, source))
         }, { dryRun: params.dry_run === true });
         return text({ revision: result.document.revision, sha256: result.sha256, dry_run: result.dry_run === true });
       }

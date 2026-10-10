@@ -190,7 +190,11 @@ Evidence that shaped the decisions:
     `resize_to_target` resamples a returned image within 0.5% of the target
     ratio; the receipt keeps both sizes and anything further is still refused.
     A failed run now names the receipt's error codes instead of pointing the
-    Agent at a receipt it cannot read.
+    Agent at a receipt it cannot read. `image_project_edit` gets the same treatment:
+    its operations carry a schema mirroring the engine's exact field checks (the
+    run guessed six unlock shapes), so a malformed batch is refused before
+    approval with the first mismatching field named; `add_asset` sources are
+    classified by path like photos and resolve against the Workspace.
 
 ## Consequences
 

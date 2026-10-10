@@ -30,7 +30,7 @@ describe("image workbench tool safety", () => {
     const intent = (toolName: string, input: Record<string, unknown>) => classifyImageWorkbenchToolIntent(toolName, input, cwd, LABEL, []);
     expect(await intent("image_project_read", { project_id: "poster" })).toEqual({ toolName: "image_project_read", category: "workspace-read", target: ".newmoney/images/poster", targetKind: "tool", sourceLabel: LABEL });
     expect((await intent("image_candidates", { project_id: "poster" })).category).toBe("workspace-read");
-    expect((await intent("image_project_edit", { project_id: "poster", base_revision: 1, summary: "x", operations: [{}] })).category).toBe("workspace-write");
+    expect((await intent("image_project_edit", { project_id: "poster", base_revision: 1, summary: "x", operations: [{ type: "update_object", id: "photo", patch: { locked: false } }] })).category).toBe("workspace-write");
     expect((await intent("image_render", { project_id: "poster", mode: "preview" })).category).toBe("workspace-write");
     expect((await intent("image_candidate_decide", { project_id: "poster", candidate_id: "a", decision: "discard", summary: "x" })).category).toBe("workspace-write");
   });
@@ -42,6 +42,21 @@ describe("image workbench tool safety", () => {
     const outside = path.join(os.tmpdir(), "outside-photo.png");
     expect(await create(outside)).toMatchObject({ category: "external-path", targetKind: "path" });
     expect((await create(path.join(os.homedir(), ".ssh", "id_ed25519"))).category).toBe("credential-or-auth");
+  });
+
+  it("refuses a malformed edit before approval, naming the mismatch, and checks imported assets by path", async () => {
+    const cwd = await workspace();
+    const edit = (operations: unknown[]) => classifyImageWorkbenchToolIntent("image_project_edit", { project_id: "poster", base_revision: 1, summary: "x", operations }, cwd, LABEL, []);
+    // The shapes the first real run guessed: none may reach an approval or the engine.
+    for (const guessed of [{ type: "update_object", id: "photo", locked: false }, { type: "update_object", object_id: "photo", patch: { locked: false } },
+      { op: "update_object", id: "photo", updates: { locked: false } }, { type: "unlock_object", id: "photo" }]) {
+      const refused = await edit([guessed]);
+      expect(refused).toMatchObject({ category: "unverified-tool" });
+      expect(refused).toHaveProperty("nonApprovableReason", expect.stringMatching(/^图像工作台 Tool 输入不符合已注册合同（\/operations\/0/u));
+    }
+    expect((await edit([{ type: "add_asset", asset: { id: "logo", source: "brand/logo.png" } }])).category).toBe("workspace-write");
+    expect(await edit([{ type: "add_asset", asset: { id: "logo", source: path.join(os.tmpdir(), "private.png") } }])).toMatchObject({ category: "external-path", targetKind: "path" });
+    expect((await edit([{ type: "add_asset", asset: { id: "key", source: path.join(os.homedir(), ".ssh", "id_ed25519") } }])).category).toBe("credential-or-auth");
   });
 
   it("submits generation to the image Provider and reports files from outside the Workspace", async () => {
@@ -69,7 +84,7 @@ describe("image workbench tool safety", () => {
     const policy = { ...trustedPolicy(), cwd, taskToolMode: "auto" as const };
     const handler = safetyHandler(policy, request, tools);
     const call = (toolName: string, input: Record<string, unknown>) => handler({ toolCallId: toolName, toolName, input }, { hasUI: true });
-    expect(await call("image_project_edit", { project_id: "poster", base_revision: 1, summary: "改标题", operations: [{}] })).toBeUndefined();
+    expect(await call("image_project_edit", { project_id: "poster", base_revision: 1, summary: "改标题", operations: [{ type: "update_object", id: "headline", patch: { text: "春日" } }] })).toBeUndefined();
     expect(request).not.toHaveBeenCalled();
     expect(await call("image_generate", generate())).toBeUndefined();
     expect(request).toHaveBeenCalledTimes(1);

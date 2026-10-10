@@ -100,6 +100,17 @@ describe("image workbench tools", { timeout: 120_000 }, () => {
     expect(history.document.change).toMatchObject({ author: "agent", operations: ["accept_candidate"] });
   });
 
+  it("resolves an imported asset against the Workspace, not the Host's own directory", async () => {
+    const cwd = await workspace();
+    await sharp({ create: { width: 640, height: 640, channels: 3, background: "#d8c8b0" } }).png().toFile(path.join(cwd, "photo.png"));
+    await sharp({ create: { width: 64, height: 64, channels: 3, background: "#b5452f" } }).png().toFile(path.join(cwd, "logo.png"));
+    const t = harness(cwd);
+    await t.json("image_project_create_from_photo", { project_id: "poster", source: "photo.png", headline: "春日" });
+    expect((await t.json("image_project_edit", { project_id: "poster", base_revision: 1, summary: "加角标素材",
+      operations: [{ type: "add_asset", asset: { id: "logo", source: "logo.png" } }] })).revision).toBe(2);
+    expect((await readProject(projectRoot(cwd, "poster"))).document.assets.map((asset) => asset.id)).toContain("logo");
+  });
+
   it("builds the job from a plain instruction and refuses repairable mistakes before any request", async () => {
     const cwd = await workspace();
     const photo = path.join(cwd, "photo.png");
