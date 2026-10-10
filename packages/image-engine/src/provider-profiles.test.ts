@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { executeProvider, type ProviderReceipt } from "./provider.js";
 import { canonicalContracts } from "./contracts.js";
-import { ANY_MODEL, PROFILE_MODELS, profileAllowsModel, profileForModel, profileSurface, resolveProfileModel } from "./provider-profiles.js";
+import { ANY_MODEL, PROFILE_MODELS, profileAllowsModel, profileForModel, profileSurface, requestSizeFor, resolveProfileModel } from "./provider-profiles.js";
 import { providerFixture } from "./test-support/provider-fixture.js";
 
 const GENERIC_OPENAI = "newmoney.openai-images.generic";
@@ -51,3 +51,30 @@ describe("image source profiles", { timeout: 120_000 }, () => {
     await expect(executeProvider(f.root, { ...f.spec, candidate_id: "other" }, { generator: f.generator })).rejects.toThrow(/execution_surface does not support provider_profile/);
   });
 });
+
+describe("request sizes for real photos", () => {
+  const profile = "openai.gpt-image-2.5.2026-10-09";
+  it("keeps a size the profile accepts", () => {
+    expect(requestSizeFor(profile, 1024, 1024)).toEqual({ width: 1024, height: 1024 });
+  });
+
+  it("requests the exact ratio on the model's grid closest to the photo's pixel count", () => {
+    expect(requestSizeFor(profile, 1080, 1350)).toEqual({ width: 1088, height: 1360 });
+    expect(requestSizeFor(profile, 4032, 3024)).toEqual({ width: 2176, height: 1632 });
+    expect(requestSizeFor(profile, 800, 600)).toEqual({ width: 960, height: 720 });
+  });
+
+  it("refuses a ratio with no exact size on the grid instead of cropping or stretching", () => {
+    expect(requestSizeFor(profile, 1000, 667)).toBeUndefined();
+    expect(requestSizeFor(profile, 4000, 1000)).toBeUndefined();
+  });
+
+  it("lets resize_to_target run an exact-ratio request and resample back to the target", async () => {
+    const f = await providerFixture();
+    Object.assign(f.job, { job_id: "ratio", canvas: { ...(f.job.canvas as object), size: "2048x2048" } }); await f.saveJob();
+    await expect(executeProvider(f.root, { ...f.spec, candidate_id: "strict" }, { generator: f.generator })).rejects.toThrow(/exact aspect ratio with output_policy resize_to_target/);
+    const resized = await executeProvider(f.root, { ...f.spec, candidate_id: "resized", output_policy: "resize_to_target" }, { generator: f.generator });
+    expect(resized.status).toBe("candidate");
+  });
+});
+

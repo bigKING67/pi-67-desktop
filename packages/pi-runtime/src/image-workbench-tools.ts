@@ -5,6 +5,7 @@ import { IMAGE_PROVIDER_ID, imageCandidateActions } from "@pi67/domain";
 import type { ImageDocument, ImageGenerator } from "@pi67/image-engine";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createPiImageGenerator, type ImageRegistry } from "./image-workbench-generator.js";
+import { buildImageJob, IMAGE_ID_PATTERN, newCandidateId, type ImageJobMode, type ImageJobQuality } from "./image-workbench-job.js";
 
 type ToolDefinition = Parameters<ExtensionAPI["registerTool"]>[0];
 type ToolContext = Parameters<ToolDefinition["execute"]>[4];
@@ -165,18 +166,29 @@ export function imageTools(): ToolDefinition[] {
     },
     {
       name: "image_generate", label: "Generate image candidate",
-      description: "Run one Image Job v2 on a model from the user's image sources and stage the result as a candidate for one image object. Nothing is accepted automatically; masked edits keep protected pixels byte-identical. The job's provider_profile and execution_surface are filled from the model.",
+      description: "Generate or edit one image layer of a project with a model from the user's image sources and stage the result as a candidate. Describe the intent in instruction (and optionally preserve / exclude / exact_text); the tool builds the image job, sizes it to the layer and attaches the current image for an edit. Nothing is accepted automatically.",
       promptSnippet: "Generate or edit one image layer through the configured Pi image model",
       promptGuidelines: [
         "Use this for an image project's layer; for a one-off image in conversation with no project, use generate_image.",
-        "Each call is one paid request and is never retried automatically; inspect the candidate before generating again.",
-        "Edits need a change list and a preserve list; reference images need an explicit role."
+        "Call image_models with no provider first and pass one of its <provider>/<model> values as model.",
+        "The target layer must be unlocked: unlock it with image_project_edit as its own batch first, then generate against that new revision.",
+        "Use mode edit (default) to change the current image and keep the rest; list what must stay the same in preserve. Use mode generate for a fresh image.",
+        "Each call is one paid request and is never retried automatically; inspect the candidate before generating again."
       ],
       parameters: Type.Object({
-        project_id: projectId, candidate_id: Type.String(), target_id: Type.String(), base_revision: Type.Integer({ minimum: 1 }),
-        model: Type.String({ minLength: 3, maxLength: 200, description: "<provider>/<model> from image_models, Provider named newmoney-images-<source>." }),
-        job: Type.Any({ description: "creative-craft.image-job.v2 object (declared_status ready, single_turn, one PNG)." }),
-        references: optional(Type.Array(Type.Object({ asset_id: Type.String(), source: Type.String() }), { maxItems: 3 })),
+        project_id: projectId,
+        target_id: Type.String({ pattern: IMAGE_ID_PATTERN, description: "Id of the unlocked image object to change." }),
+        model: Type.String({ minLength: 3, maxLength: 200, description: "<provider>/<model> exactly as image_models (called with no provider) returned it, e.g. newmoney-images-<source>/<model>; never guess the source." }),
+        instruction: optional(Type.String({ minLength: 1, maxLength: 4000, description: "What to change (edit) or what to make (generate), in plain words. Required unless job is given." })),
+        mode: optional(Type.Union([Type.Literal("edit"), Type.Literal("generate")], { description: "edit (default) keeps the current image as the base; generate makes a new one." })),
+        preserve: optional(Type.Array(Type.String({ minLength: 1, maxLength: 300 }), { maxItems: 12, description: "What must stay unchanged, e.g. the product, its label, the framing." })),
+        exclude: optional(Type.Array(Type.String({ minLength: 1, maxLength: 300 }), { maxItems: 12, description: "What must not appear." })),
+        exact_text: optional(Type.Array(Type.String({ minLength: 1, maxLength: 300 }), { maxItems: 8, description: "Text that must appear exactly as written." })),
+        quality: optional(Type.Union([Type.Literal("low"), Type.Literal("medium"), Type.Literal("high")])),
+        base_revision: optional(Type.Integer({ minimum: 1, description: "The revision you read; defaults to the latest." })),
+        candidate_id: optional(Type.String({ pattern: IMAGE_ID_PATTERN, description: "Optional; one is generated when omitted." })),
+        job: optional(Type.Any({ description: "Advanced: a complete creative-craft.image-job.v2 object instead of instruction. job_id defaults to the candidate id." })),
+        references: optional(Type.Array(Type.Object({ asset_id: Type.String(), source: Type.String() }), { maxItems: 3, description: "Advanced, with job only." })),
         edit: optional(Type.Object({
           context: Type.Object({ x: Type.Integer(), y: Type.Integer(), width: Type.Integer(), height: Type.Integer() }),
           generation_mask: Type.String(), protection_mask: Type.String(), blend_mask: Type.String()
@@ -184,25 +196,48 @@ export function imageTools(): ToolDefinition[] {
         output_policy: optional(Type.Union([Type.Literal("strict"), Type.Literal("resize_to_target")]))
       }),
       async execute(_id, raw, signal, _update, ctx) {
-        const params = raw as Params, id = str(params, "project_id"), engine = await loadEngine();
+        const params = raw as Params, id = str(params, "project_id"), engine = await loadEngine(), root = engine.projectRoot(ctx.cwd, id);
         const { generator, modelId, profile, surface } = await sourceModel(engine, ctx, str(params, "model"));
-        const job = isObject(params.job) ? { ...params.job, provider_profile: profile, execution_surface: surface } : params.job;
+        // Every refusal the model can repair is checked here, before anything is written or sent.
+        const project = await engine.readProject(root), doc = project.document;
+        const baseRevision = params.base_revision === undefined ? doc.revision : int(params, "base_revision");
+        if (baseRevision !== doc.revision) throw new Error(`REVISION_CONFLICT: the project is at revision ${doc.revision}; read it again and use that revision.`);
+        const targetId = str(params, "target_id"), target = doc.objects.find((object) => object.id === targetId);
+        if (!target || target.kind !== "image") throw new Error(`TARGET_NOT_IMAGE: ${targetId} is not an image object of this project.`);
+        if (target.locked) throw new Error(`TARGET_LOCKED: ${targetId} is locked. Unlock it with image_project_edit (one batch: update_object ${targetId} patch {locked:false}), then call image_generate against the new revision.`);
+        const candidateId = typeof params.candidate_id === "string" ? params.candidate_id : newCandidateId();
+        let job: unknown, references: unknown, outputPolicy = params.output_policy;
+        if (isObject(params.job)) {
+          job = { job_id: candidateId, ...params.job, provider_profile: profile, execution_surface: surface };
+          references = Array.isArray(params.references) ? params.references.map((ref: Params) => ({ ...ref, source: local(ctx.cwd, ref.source) })) : [];
+        } else {
+          const asset = doc.assets.find((item) => item.id === target.asset_id)!;
+          const request = engine.requestSizeFor(profile, asset.width, asset.height);
+          if (!request) throw new Error(`IMAGE_SIZE_UNSUPPORTED: no ${asset.width}×${asset.height}-ratio size fits this model; the engine never crops or stretches. Ask the person to crop the photo to a common ratio such as 1:1, 4:5 or 3:4.`);
+          // A photo rarely sits on the model's 16px grid: request the exact ratio and resample back full-frame.
+          if (request.width !== asset.width) outputPolicy = "resize_to_target";
+          const mode: ImageJobMode = params.mode === "generate" ? "generate" : "edit";
+          const strings = (key: string) => Array.isArray(params[key]) ? params[key] as string[] : undefined;
+          job = buildImageJob({ instruction: str(params, "instruction"), mode, preserve: strings("preserve"), exclude: strings("exclude"), exactText: strings("exact_text"),
+            quality: params.quality as ImageJobQuality | undefined },
+          { jobId: candidateId, profile, surface, width: request.width, height: request.height, targetAssetId: asset.id });
+          // The original file re-imports to the asset's own render digest, which an edit must start from.
+          references = mode === "edit" ? [{ asset_id: asset.id, source: path.join(root, asset.file) }] : [];
+        }
         const directory = await engine.workDirectory(ctx.cwd, id, "job");
         await fs.mkdir(directory);
         const jobPath = path.join(directory, "job.json");
-        await fs.writeFile(jobPath, JSON.stringify(job ?? null), { flag: "wx" });
-        const spec: Params = { job: jobPath, candidate_id: str(params, "candidate_id"), target_id: str(params, "target_id"),
-          base_revision: int(params, "base_revision"), model: modelId,
-          references: Array.isArray(params.references) ? params.references.map((ref: Params) => ({ ...ref, source: local(ctx.cwd, ref.source) })) : params.references ?? [] };
+        await fs.writeFile(jobPath, JSON.stringify(job), { flag: "wx" });
+        const spec: Params = { job: jobPath, candidate_id: candidateId, target_id: targetId, base_revision: baseRevision, model: modelId, references };
         if (params.edit !== undefined) {
           const edit = params.edit as Params;
           spec.edit = { ...edit, generation_mask: local(ctx.cwd, edit.generation_mask), protection_mask: local(ctx.cwd, edit.protection_mask), blend_mask: local(ctx.cwd, edit.blend_mask) };
         }
-        if (params.output_policy !== undefined) spec.output_policy = params.output_policy;
-        const result = await engine.executeProvider(engine.projectRoot(ctx.cwd, id), spec, { generator, signal, operator: "agent" });
+        if (outputPolicy !== undefined) spec.output_policy = outputPolicy;
+        const result = await engine.executeProvider(root, spec, { generator, signal, operator: "agent" });
         if (result.status === "dry_run") return text(result);
         return text({ candidate_id: result.candidate.candidate.id, status: result.candidate.status, outcome: result.receipt.outcome,
-          model: result.receipt.model, protected_changed_pixels: result.candidate.candidate.qa?.protected_changed_pixels ?? null, job: result.job });
+          model: result.receipt.model, protected_changed_pixels: result.candidate.candidate.qa?.protected_changed_pixels ?? null });
       }
     }
   ];

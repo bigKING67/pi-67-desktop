@@ -82,7 +82,7 @@ describe("transparent Provider outputs", { timeout: 120_000 }, () => {
       await writeMasks(f.directory, f.spec, { generation_mask: full, protection_mask: protection, blend_mask: full });
       if (hideAllClearPixels) {
         if (hideAllClearPixels === "recovery") {
-          await expect(executeProvider(f.root, f.spec, { generator: f.generator })).rejects.toThrow(/see bound receipt/);
+          await expect(executeProvider(f.root, f.spec, { generator: f.generator })).rejects.toThrow(/the receipt is kept in the project/);
           const error = await failure(recoverProvider(f.root, { job_id: "background-job", candidate_id: f.spec.candidate_id, output_policy: "resize_to_target" }));
           expect(error.message).toMatch(/candidate staging failed/); expect(error.receipt.outcome).toBe("succeeded");
           expect(await fs.stat(path.join(error.output ?? "", "output.png"))).toBeTruthy();
@@ -105,7 +105,7 @@ describe("transparent Provider outputs", { timeout: 120_000 }, () => {
   it("transparent size recovery binds raw and normalized alpha without another POST", async () => {
     const f = await providerFixture(respondImage(await transparentPNG(1254)));
     f.job.canvas.background = "transparent"; await f.saveJob();
-    await expect(executeProvider(f.root, f.spec, { generator: f.generator })).rejects.toThrow(/see bound receipt/);
+    await expect(executeProvider(f.root, f.spec, { generator: f.generator })).rejects.toThrow(/the receipt is kept in the project/);
     const old = await fs.readFile(path.join(f.root, "jobs/background-job/receipt.json"));
     const recovered = await recoverProvider(f.root, { job_id: "background-job", candidate_id: "transparent-recovery", output_policy: "resize_to_target" });
     const checks = transparency(recovered.receipt);

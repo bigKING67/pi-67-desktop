@@ -56,3 +56,39 @@ export function profileForModel(surfaceId: string, model: string): string | unde
   const listed = Array.isArray(surface?.provider_profiles) ? surface.provider_profiles.filter((id): id is string => typeof id === "string") : [];
   return listed.find((id) => PROFILE_MODELS.get(id) === model) ?? listed.find((id) => PROFILE_MODELS.get(id) === ANY_MODEL && profileAllowsModel(id, model));
 }
+
+const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+
+/**
+ * The size to request for a `width`×`height` target under `profileId`: the target
+ * itself when the profile accepts it, else the exact-ratio size (edges on the
+ * profile's multiple, inside its pixel range, below its experimental boundary
+ * when possible) closest to the target's pixel count. The output is then
+ * resampled full-frame to the target; undefined when no exact-ratio size fits,
+ * because the engine never crops or stretches.
+ */
+export function requestSizeFor(profileId: string, width: number, height: number): { width: number; height: number } | undefined {
+  const profile = providerProfiles.get(profileId);
+  const capabilities = isRecord(profile?.capabilities) ? profile.capabilities : {};
+  const size = isRecord(capabilities.size) ? capabilities.size : {};
+  const cap = (key: string, fallback: number): number => typeof size[key] === "number" ? size[key] : fallback;
+  const multiple = cap("edge_multiple_px", 1), maxEdge = cap("max_edge_px", Number.POSITIVE_INFINITY);
+  const minPixels = cap("min_total_pixels", 0), maxPixels = cap("max_total_pixels", Number.POSITIVE_INFINITY);
+  const comfortable = Math.min(maxPixels, cap("experimental_above_total_pixels", maxPixels));
+  if (Math.max(width, height) / Math.min(width, height) > cap("max_aspect_ratio", Number.POSITIVE_INFINITY)) return undefined;
+  const fits = (w: number, h: number, ceiling: number) => w % multiple === 0 && h % multiple === 0 && Math.max(w, h) <= maxEdge && w * h >= minPixels && w * h <= ceiling;
+  if (fits(width, height, maxPixels)) return { width, height };
+  const divisor = gcd(width, height), a = width / divisor, b = height / divisor;
+  // The smallest exact-ratio step whose edges both land on the multiple.
+  const stepA = multiple / gcd(multiple, a), stepB = multiple / gcd(multiple, b);
+  const step = (stepA * stepB) / gcd(stepA, stepB);
+  const target = width * height;
+  for (const ceiling of [comfortable, maxPixels]) {
+    let best: { width: number; height: number } | undefined;
+    for (let k = step; a * k <= Math.min(maxEdge, 16384) && b * k <= Math.min(maxEdge, 16384) && a * k * b * k <= ceiling; k += step) {
+      if (fits(a * k, b * k, ceiling) && (!best || Math.abs(a * k * b * k - target) < Math.abs(best.width * best.height - target))) best = { width: a * k, height: b * k };
+    }
+    if (best) return best;
+  }
+  return undefined;
+}

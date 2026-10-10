@@ -135,7 +135,8 @@ export async function executeProvider(root: string, spec: unknown, options: Prov
   await save("receipt.json", receiptBytes);
   if (receipt.outcome !== "succeeded") {
     const hint = rejected ? ` The image service rejected the request parameter \`${rejected}\`; change it before trying again.` : "";
-    throw new ProviderError(`Provider execution failed or cancelled; see bound receipt. No automatic retry.${hint}`, receipt, directory);
+    const codes = receipt.provider_errors.map((error) => error.code).filter(Boolean).join(", ");
+    throw new ProviderError(`Provider execution ${receipt.outcome}${codes ? ` (${codes})` : ""}; the receipt is kept in the project. No automatic retry.${hint}`, receipt, directory);
   }
   const candidate = await publishProviderCandidate(root, directory, { candidateId: prepared.spec.candidate_id, request: prepared.request, receipt, receiptBytes,
     receiptFile: "receipt.json", job: prepared.job, jobBytes: prepared.jobBytes });

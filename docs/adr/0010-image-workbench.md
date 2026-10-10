@@ -163,6 +163,35 @@ Evidence that shaped the decisions:
     the same endpoint policy without the key; a refused parameter is reported
     by name only.
 
+15. **`image_generate` takes an intent; the tool owns the Image Job.** (Added
+    2026-10-10, user-approved after the first real Agent run.) A real model could
+    not author a valid creative-craft Image Job v2 (about twenty required fields)
+    from a schema-less `job` parameter: three attempts failed validation and each
+    spent an approval. The tool now takes `project_id`, `target_id`, `model` and an
+    `instruction`, with optional `mode` (`edit` default, `generate`), `preserve`,
+    `exclude`, `exact_text`, `quality`, `base_revision` and `candidate_id`. It
+    reads the project, refuses a stale revision, a non-image or locked target and
+    an unavailable model with repair instructions before writing or sending
+    anything, builds the job (ids, profile and surface from the model, rights
+    `UNVERIFIED` because the tool cannot vouch for them), and attaches the
+    target's original file as an edit's first reference. Id fields carry the
+    engine's id pattern so a malformed id fails schema validation before the
+    approval prompt. The complete-job path stays as an advanced option, with
+    `job_id` defaulting to the candidate id.
+    Real photos rarely sit on a model's 16px grid, and the engine required the
+    request to equal the target raster, so almost no photo could be edited. With
+    `output_policy: resize_to_target` the engine now accepts a request of exactly
+    the target's aspect ratio; `requestSizeFor` picks the exact-ratio size on the
+    profile's grid closest to the target (inside its pixel range, below its
+    experimental boundary when possible), and the output is resampled full-frame
+    back to the target with the normalization in the receipt. A ratio with no
+    exact size on the grid is refused, never cropped or stretched. The first real
+    run returned 1122×1402 for a 1088×1360 request (0.04% off the ratio), so
+    `resize_to_target` resamples a returned image within 0.5% of the target
+    ratio; the receipt keeps both sizes and anything further is still refused.
+    A failed run now names the receipt's error codes instead of pointing the
+    Agent at a receipt it cannot read.
+
 ## Consequences
 
 - Satori, resvg-js, Sharp and the CJK font become Desktop dependencies; native

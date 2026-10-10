@@ -106,7 +106,7 @@ describe("image Provider execution through an injected generator", { timeout: 12
       const small = await sharp({ create: { width: 64, height: 64, channels: 4, background: "#ffffff" } }).png().toBuffer();
       const images = { "no-image": [], "two-images": [small, small], "not-an-image": [Buffer.from("not a png")], "wrong-size": [small] }[mode];
       const f = await providerFixture(() => ({ images }));
-      await expect(executeProvider(f.root, f.spec, { generator: f.generator })).rejects.toThrow(/see bound receipt/);
+      await expect(executeProvider(f.root, f.spec, { generator: f.generator })).rejects.toThrow(/the receipt is kept in the project/);
       const receipt = await readJson(path.join(f.root, "jobs/background-job/receipt.json")) as ProviderReceipt;
       expect(receipt.outcome).toBe(mode === "wrong-size" ? "partial" : "failed");
       if (mode === "wrong-size") { expect(receipt.outputs).toHaveLength(1); expect((receipt.parameters.returned_image as JsonRecord).width).toBe(64); }
@@ -178,7 +178,7 @@ describe("image Provider execution through an injected generator", { timeout: 12
 
   it("retained native-size output recovers offline without mutating the old receipt or generating again", async () => {
     const f = await providerFixture(resized(1254, 1254));
-    await expect(executeProvider(f.root, f.spec, { generator: f.generator })).rejects.toThrow(/see bound receipt/);
+    await expect(executeProvider(f.root, f.spec, { generator: f.generator })).rejects.toThrow(/the receipt is kept in the project/);
     const before = await fs.readFile(path.join(f.root, "jobs/background-job/receipt.json"));
     const recovered = await recoverProvider(f.root, { job_id: "background-job", candidate_id: "recovered-native", output_policy: "resize_to_target" });
     expect(recovered.network_requests).toBe(0); expect(f.calls).toHaveLength(1); expect(recovered.candidate.status).toBe("ready");
@@ -188,9 +188,18 @@ describe("image Provider execution through an injected generator", { timeout: 12
     await expect(inspectCandidate(f.root, "recovered-native")).rejects.toThrow(/Normalization source binding/);
   });
 
+  it("resamples a gateway's few-pixel ratio drift under resize_to_target and names the failure otherwise", async () => {
+    // 1027×1024 is 0.3% off the 1:1 target, as gateways return natively.
+    const drift = await providerFixture(resized(1027, 1024));
+    await expect(executeProvider(drift.root, drift.spec, { generator: drift.generator })).rejects.toThrow(/Provider execution partial \(output_dimensions_or_format_mismatch\)/);
+    const tolerated = await providerFixture(resized(1027, 1024));
+    const result = await executeProvider(tolerated.root, { ...tolerated.spec, output_policy: "resize_to_target" }, { generator: tolerated.generator });
+    expect(result.status).toBe("candidate");
+  });
+
   it("normalization does not crop or stretch a different aspect ratio", async () => {
     const f = await providerFixture(resized(1024, 1536));
-    await expect(executeProvider(f.root, { ...f.spec, output_policy: "resize_to_target" }, { generator: f.generator })).rejects.toThrow(/see bound receipt/);
+    await expect(executeProvider(f.root, { ...f.spec, output_policy: "resize_to_target" }, { generator: f.generator })).rejects.toThrow(/the receipt is kept in the project/);
     await expect(recoverProvider(f.root, { job_id: "background-job", candidate_id: "reject-distortion", output_policy: "resize_to_target" })).rejects.toThrow(/output_dimensions/);
     expect(f.calls).toHaveLength(1); expect((await readProject(f.root)).sha256).toBe(f.created.sha256);
   });

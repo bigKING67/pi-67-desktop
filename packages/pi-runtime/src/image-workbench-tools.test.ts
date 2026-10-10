@@ -100,6 +100,37 @@ describe("image workbench tools", { timeout: 120_000 }, () => {
     expect(history.document.change).toMatchObject({ author: "agent", operations: ["accept_candidate"] });
   });
 
+  it("builds the job from a plain instruction and refuses repairable mistakes before any request", async () => {
+    const cwd = await workspace();
+    const photo = path.join(cwd, "photo.png");
+    await sharp({ create: { width: 800, height: 600, channels: 3, background: "#d8c8b0" } }).png().toFile(photo);
+    const proposed = await sharp({ create: { width: 800, height: 600, channels: 3, background: "#f0e0c8" } }).png().toBuffer();
+    const t = harness(cwd, { available: [imageModel("gpt-image-2.5-sunburst")], image: proposed });
+    await t.json("image_project_create_from_photo", { project_id: "poster", source: photo, headline: "春日" });
+    const model = "newmoney-images-gateway/gpt-image-2.5-sunburst";
+    const intent = { project_id: "poster", target_id: "photo", model, instruction: "把背景换成暖色影棚", preserve: ["商品和包装"] };
+
+    await expect(t.call("image_generate", intent)).rejects.toThrow(/TARGET_LOCKED: photo is locked/);
+    await t.json("image_project_edit", { project_id: "poster", base_revision: 1, summary: "解锁", operations: [{ type: "update_object", id: "photo", patch: { locked: false } }] });
+    await expect(t.call("image_generate", { ...intent, base_revision: 1 })).rejects.toThrow(/REVISION_CONFLICT: the project is at revision 2/);
+    await expect(t.call("image_generate", { ...intent, target_id: "headline" })).rejects.toThrow(/TARGET_NOT_IMAGE/);
+    expect(t.generated).toHaveLength(0);
+
+    // No job, candidate id or revision: the tool sizes the job to the layer and attaches the current image.
+    const edited = await t.json("image_generate", intent);
+    expect(edited).toMatchObject({ status: "ready", outcome: "succeeded", model: "gpt-image-2.5-sunburst" });
+    expect(String(edited.candidate_id)).toMatch(/^cand-[a-z0-9]+-[a-z0-9]{4}$/u);
+    const [, context, options] = t.generated[0] as [unknown, { input?: unknown[]; prompt?: string }, Record<string, unknown>];
+    expect(JSON.stringify(context)).toContain("把背景换成暖色影棚");
+    expect(JSON.stringify(context)).toContain("image/png");
+    expect(JSON.stringify(options ?? {})).not.toContain("UNVERIFIED");
+
+    const fresh = await t.json("image_generate", { ...intent, mode: "generate", instruction: "暖色影棚里的空桌面", candidate_id: "fresh" });
+    expect(fresh).toMatchObject({ candidate_id: "fresh", status: "ready" });
+    expect(JSON.stringify(t.generated[1])).not.toContain("image/png\",\"data");
+    expect((await readProject(projectRoot(cwd, "poster"))).document.revision).toBe(2);
+  });
+
   it("refuses generation before writing anything when the source model is unknown, unavailable or not an image source", async () => {
     const cwd = await workspace();
     const photo = path.join(cwd, "photo.png");

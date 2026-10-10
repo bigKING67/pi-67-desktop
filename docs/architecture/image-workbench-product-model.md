@@ -255,7 +255,7 @@ browser67 在打包预览上取证。
 | `image_project_edit` | 提交编辑批次，支持 `dry_run` | 引擎校验结构、字形、排版、锁定 |
 | `image_render` | 渲染预览或导出 | 预览最长边 640px，供视觉模型查看 |
 | `image_candidate_stage / list / compare / accept / discard` | 候选生命周期 | 决定不可变 |
-| `image_generate` | 按 Image Job 调 Provider 生成或编辑，结果进入暂存区 | 受预算与轮次上限约束 |
+| `image_generate` | Agent 给出意图（指令、保留、排除、原样文字），工具组装 Image Job 并按模型网格取同比例尺寸，结果进入暂存区 | 锁定图层、过期修订在请求前拒绝；受预算与轮次上限约束 |
 | `image_photo_create` | 从照片建项目 | 自动保护区 |
 | `image_copy_variants` | 一次改文案同步多个版式 | 派生工程 |
 | `image_process` | 无工程的文件处理 | 转换、缩放、压缩、裁切 |

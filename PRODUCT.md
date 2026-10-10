@@ -1203,7 +1203,10 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   `image_generate` is an external submission to a model from the user's image
   sources (Settings → 图像生成; one `newmoney-images-<source>` Pi Provider each,
   never edited as JSON, ADR 0010 decision 14), approved per call in
-  AUTO without showing the prompt, unavailable in PLAN. Credential and system
+  AUTO without showing the prompt, unavailable in PLAN. The Agent states an intent
+  (instruction, preserve, exclude, exact text); the tool builds the image job, sizes
+  the request to the layer's exact ratio on the model's grid and refuses a locked
+  layer or stale revision before any request (ADR 0010 decision 15). Credential and system
   configuration paths are refused as photos, references or masks. The engine loads
   on the first image call, never at startup (ADR 0010).
 - Image generation uses Pi's public `ModelRegistry` image API, not a third-party

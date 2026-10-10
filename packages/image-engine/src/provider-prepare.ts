@@ -62,8 +62,13 @@ export async function prepareRequest(root: string, value: unknown, contracts: Im
   const object = project.document.objects.find((item) => item.id === spec.target_id);
   if (!object || object.kind !== "image" || object.locked) throw new Error("Provider target must be an unlocked image object");
   const asset = project.document.assets.find((item) => item.id === object.asset_id) as Asset;
-  const size = `${asset.width}x${asset.height}`;
-  if (canvas.size !== size) throw new Error("Job output size must explicitly match target raster");
+  // The request is the target size, or with resize_to_target an exact-ratio size the
+  // profile accepts; the output is then resampled full-frame, never cropped.
+  const size = typeof canvas.size === "string" ? canvas.size : "";
+  const [requestWidth, requestHeight] = size.split("x").map(Number);
+  if (size !== `${asset.width}x${asset.height}` && (spec.output_policy !== "resize_to_target" || !requestWidth || !requestHeight || requestWidth * asset.height !== requestHeight * asset.width)) {
+    throw new Error("Job output size must match the target raster, or its exact aspect ratio with output_policy resize_to_target");
+  }
   const assetRefs = Array.isArray(job.asset_refs) ? job.asset_refs : [];
   if (!Array.isArray(spec.references) || spec.references.length > 3 || spec.references.length !== assetRefs.length) throw new Error("Reference inputs must match job asset refs (maximum 3)");
   if (new Set(spec.references.map((ref) => ref.asset_id)).size !== spec.references.length) throw new Error("Duplicate reference IDs");
