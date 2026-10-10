@@ -115,6 +115,12 @@ describe("image workbench tools", { timeout: 120_000 }, () => {
     expect(turned.find((object) => object.id === "headline")).toMatchObject({ rotation: -8, flip_x: true });
     expect((await t.json("image_project_edit", { project_id: "poster", base_revision: 2, summary: "摆正", operations: [{ type: "update_object", id: "headline", patch: { rotation: null, flip_x: null } }] })).revision).toBe(3);
     expect(((await t.json("image_project_read", { project_id: "poster" })).objects as { id: string }[]).find((object) => object.id === "headline")).not.toHaveProperty("rotation");
+    // And add an ellipse with a gradient, which reads back with its fill.
+    const ring = { id: "ring", kind: "ellipse", locked: false, visible: true, x: 10, y: 10, width: 80, height: 80, opacity: 1, color: "#ff0000",
+      gradient: { type: "linear", angle: 0, stops: [{ offset: 0, color: "#ff0000" }, { offset: 1, color: "#ffffff" }] } };
+    expect((await t.json("image_project_edit", { project_id: "poster", base_revision: 3, summary: "加圆", operations: [{ type: "add_object", object: ring }] })).revision).toBe(4);
+    expect(((await t.json("image_project_read", { project_id: "poster" })).objects as { id: string }[]).find((object) => object.id === "ring"))
+      .toMatchObject({ kind: "ellipse", color: "#ff0000", gradient: { type: "linear", angle: 0 } });
   });
 
   it("resolves an imported asset against the Workspace, not the Host's own directory", async () => {

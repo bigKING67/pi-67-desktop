@@ -33,7 +33,9 @@ function documentSummary(doc: ImageDocument, latestRevision: number): Record<str
       ...(object.kind === "text" ? { text: object.text, font_size: object.font_size, color: object.color, align: object.align, line_height: object.line_height,
         ...(object.font_id ? { font_id: object.font_id } : {}) } : {}),
       ...(object.kind === "image" ? { asset_id: object.asset_id, fit: object.fit } : {}),
-      ...(object.kind === "rect" ? { color: object.color, radius: object.radius } : {})
+      ...(object.kind === "rect" ? { color: object.color, radius: object.radius } : {}),
+      ...(object.kind === "ellipse" ? { color: object.color } : {}),
+      ...((object.kind === "rect" || object.kind === "ellipse") && object.gradient ? { gradient: object.gradient } : {})
     })),
     assets: doc.assets.map((asset) => ({ id: asset.id, width: asset.width, height: asset.height })),
     // Fonts the person added; text uses one with font_id (missing glyphs fall back to the built-in font).

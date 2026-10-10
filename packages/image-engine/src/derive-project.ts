@@ -41,7 +41,8 @@ export function relayoutObjects(objects: readonly SceneObject[], from: Canvas, c
     if (object.kind !== "text" && object.width >= from.width * BAND_SHARE) {
       const x = Math.round(object.x * sx), y = Math.round(object.y * sy);
       const width = Math.min(canvas.width - x, Math.max(1, Math.round(object.width * sx))), height = Math.min(canvas.height - y, Math.max(1, Math.round(object.height * sy)));
-      return object.kind === "image" ? { ...object, x, y, width, height, fit: turns ? "contain" : "cover" } : { ...object, x, y, width, height, radius: Math.min(Math.round(object.radius * s), Math.floor(Math.min(width, height) / 2)) };
+      if (object.kind === "image") return { ...object, x, y, width, height, fit: turns ? "contain" : "cover" };
+      return object.kind === "rect" ? { ...object, x, y, width, height, radius: Math.min(Math.round(object.radius * s), Math.floor(Math.min(width, height) / 2)) } : { ...object, x, y, width, height };
     }
     const width = Math.min(canvas.width, Math.max(1, Math.round(object.width * s))), height = Math.min(canvas.height, Math.max(1, Math.round(object.height * s)));
     const x = clamp(Math.round((object.x + object.width / 2) * sx - width / 2), canvas.width - width);

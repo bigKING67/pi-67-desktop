@@ -396,3 +396,11 @@
 .flipRow {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+
+/* 图层: add text, rectangle or ellipse above the list. */
+.addLayer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}

@@ -40,7 +40,7 @@ with shared samples first, then protocol, then UI (product model §8).
   newer-schema-only-when-used rule.
 - [x] 3. Rotation and flip: engine, canvas handles (rotate grip, Shift for 15° steps),
   属性 fields, snapping on the rotated bounds, derive/relayout behaviour.
-- [ ] 4. Shapes and gradients: ellipse and line, gradient fills in 属性.
+- [x] 4. Shapes and gradients: ellipse and line, gradient fills in 属性.
 - [ ] 5. Blend modes and opacity masks, including how candidates' protected regions
   interact with masked layers.
 - [ ] 6. Adjustments on image layers (non-destructive, rendered per layer).
@@ -105,4 +105,19 @@ page and earlier releases still open projects that do not use it.
   clipped near the top of the well (hangs below there) and the angle readout turned with the
   box (upright now); the grip's centre comes from the fit, not a DOM query; protocol and Agent
   tests for rotation/flip; shared `rotateStyle`, a field `fallback`, a flip label map.
+- 2026-10-10: checkpoint 4 done. Engine `ellipse` kind and rect/ellipse `gradient` (linear with
+  angle or radial, 2–5 ordered stops; validated), rendered by satori as `borderRadius: 50%` and
+  `backgroundImage`; both make a document v3; relayout keeps ellipses. Domain/protocol/Agent
+  schemas and read output carry them. UI: 图层 adds text, rectangles and ellipses centred and
+  selected (there was no way to add an object before); 属性 has a 填充 control with two-stop
+  gradient editing. Lines stay thin rotated rects (decided at checkpoint 2).
+- 2026-10-10: `/code-review high` on checkpoint 4, all fixed: 添加 was hidden on a project with
+  no layers; re-choosing a gradient type kept an Agent's many stops (now first and last, so
+  it becomes editable, as the hint says); 颜色 stayed editable under a gradient although not
+  drawn (hidden then); a radial gradient ended at the box corners (satori ignores
+  `farthest-side`, so the radii are explicit: `ellipse 50% 50% at 50% 50%`, edge test); 添加
+  ignored conflicts (now the shared notice); the linear-only angle is a schema union in
+  protocol and the Agent schema; one `OPTIONAL_FIELDS` table (with v3 fields and kinds) drives
+  validation, patching and the schema version, guarded against prototype names; one kind
+  label map, so the canvas no longer calls rectangles and ellipses 形状.
 

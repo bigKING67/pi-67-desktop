@@ -44,8 +44,14 @@ export interface ImageTextObject extends ImageObjectBase {
   /** A user font from the document's `fonts`; absent means the built-in font. */
   font_id?: string;
 }
-export interface ImageRectObject extends ImageObjectBase { kind: "rect"; color: string; radius: number }
-export type ImageSceneObject = ImageRasterObject | ImageTextObject | ImageRectObject;
+/** A linear (with `angle`, CSS degrees) or radial fill of 2–5 ordered stops; replaces `color` when present (P4). */
+export type ImageGradient =
+  | { type: "linear"; angle?: number; stops: { offset: number; color: string }[] }
+  | { type: "radial"; stops: { offset: number; color: string }[] };
+export interface ImageRectObject extends ImageObjectBase { kind: "rect"; color: string; radius: number; gradient?: ImageGradient }
+/** An ellipse filling its box (P4, schema v3). */
+export interface ImageEllipseObject extends ImageObjectBase { kind: "ellipse"; color: string; gradient?: ImageGradient }
+export type ImageSceneObject = ImageRasterObject | ImageTextObject | ImageRectObject | ImageEllipseObject;
 export interface ImageFontBinding { profile: string; family: string; file: string; sha256: string; weight: number }
 export interface ImageUserFont { id: string; family: string; file: string; sha256: string; bytes: number; format: "ttf" | "otf" }
 /** At most this many user fonts per project. */
@@ -61,9 +67,10 @@ export interface ImageDocument {
  * file needs a path, and paths reach the engine only through Main's dialogs or
  * the Agent's tools, never from renderer payloads.
  */
-type Optional = "font_id" | "rotation" | "flip_x" | "flip_y";
+type Optional = "font_id" | "rotation" | "flip_x" | "flip_y" | "gradient";
 type PatchFields = Partial<Omit<ImageRasterObject, "id" | "kind" | Optional> & Omit<ImageTextObject, "id" | "kind" | Optional> & Omit<ImageRectObject, "id" | "kind" | Optional>>
   & {
+    /** Rect and ellipse: a gradient fill, or `null` for the solid colour. */ gradient?: ImageGradient | null;
     /** Text only: a bound user font, or `null` for the built-in font. */ font_id?: string | null;
     /** `null` or 0 removes the rotation. */ rotation?: number | null;
     /** `null` or false removes the flip. */ flip_x?: boolean | null; flip_y?: boolean | null;
@@ -71,7 +78,7 @@ type PatchFields = Partial<Omit<ImageRasterObject, "id" | "kind" | Optional> & O
 export type ImageObjectPatch = { [Key in keyof PatchFields]: PatchFields[Key] };
 export type ImageEditOperation =
   | { type: "update_object"; id: string; patch: ImageObjectPatch }
-  | { type: "add_object"; object: ImageTextObject | ImageRectObject }
+  | { type: "add_object"; object: ImageTextObject | ImageRectObject | ImageEllipseObject }
   | { type: "remove_object"; id: string }
   | { type: "reorder_objects"; ids: string[] }
   | { type: "set_canvas"; canvas: ImageCanvas }

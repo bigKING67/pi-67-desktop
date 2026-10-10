@@ -293,6 +293,12 @@ Application-level surfaces use a separate wide-window shell:
   figures. Selection outlines and the inline text editor rotate with the object. 属性 adds a
   `旋转 °` field after 不透明度 and a two-part 水平翻转 / 垂直翻转 segmented row (pressed state
   on the active surface).
+- Shapes and fills (P4, 2026-10-10): 图层 opens with an `添加` caption and three text actions
+  with kind glyphs (文字 T, 矩形 square, 椭圆 circle); the list shows ellipses with the circle
+  glyph. 属性 labels rect objects `矩形 · id` and ellipses `椭圆 · id`, and for both adds a
+  `填充` section: a three-part segmented control (纯色 / 线性渐变 / 径向渐变), then 起点颜色 and
+  终点颜色 fields and, for linear, `角度 °` in the two-column field grid; a gradient of more
+  than two stops shows one tertiary line instead of fields.
 - Text fonts (P3, 2026-10-10): 属性 for text adds a `字体` section — the shared Settings
   select at full panel width (`Noto Sans CJK SC · 内置`, then each added font's family with
   `TTF`/`OTF` as detail), a `添加字体…` text action with a plus glyph (disabled at 8 fonts or

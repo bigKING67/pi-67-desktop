@@ -50,6 +50,7 @@ import { useImageWorkbench } from "./image-workbench-store.js";
 import {
   acceptCandidate,
   addImageFont,
+  addImageObject,
   checkImageEdit,
   deriveImageSizes,
   derivedSizes,
@@ -201,6 +202,17 @@ describe("image object selection", () => {
     await exportImageSizes();
     expect(host.calls.filter((call) => call.type === "image.project.render").map((call) => call.payload.projectId)).toEqual(["p"]);
     vi.unstubAllGlobals();
+  });
+
+  it("adds text, rectangles and ellipses centred on the canvas with ids that never collide, and selects them", async () => {
+    host.calls = [];
+    expect(await addImageObject("ellipse")).toEqual({ outcome: "applied" });
+    expect(edits().at(-1)).toMatchObject({ summary: "添加椭圆", operations: [{ type: "add_object", object: { id: "ellipse", kind: "ellipse", x: 35, y: 35, width: 30, height: 30, color: "#d9c2a3" } }] });
+    expect(useImageProject.getState().selectedObjectIds).toEqual(["ellipse"]);
+    host.objectIds = ["t", "u", "text"];
+    await loadImageProject("p");
+    await addImageObject("text");
+    expect(edits().at(-1)?.operations).toMatchObject([{ type: "add_object", object: { id: "text-2", kind: "text", text: "新文字", align: "center" } }]);
   });
 
   it("adds a staged font, sets it on the text as a second revision, and explains refusals in product words", async () => {

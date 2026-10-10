@@ -3,6 +3,7 @@ import { Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button, Input, TextField } from "react-aria-components";
 import { editImageProject } from "./image-project-controller.js";
+import { IMAGE_OBJECT_KIND_LABELS } from "./image-object-kinds.js";
 import styles from "./ImageProjectPage.module.css";
 
 /**
@@ -21,7 +22,7 @@ export function ImageSelectionBar({ object, count, busy }: { object: ImageSceneO
   if (object.kind !== "text") {
     return (
       <p className={styles.selectionHint}>
-        {object.locked ? <><Lock aria-hidden="true" size={12} /> {object.kind === "image" ? "照片" : "形状"}已锁定，保持原样</>
+        {object.locked ? <><Lock aria-hidden="true" size={12} /> {object.kind === "image" ? "照片" : IMAGE_OBJECT_KIND_LABELS[object.kind]}已锁定，保持原样</>
           : object.rotation ? "拖动或用方向键移动，拖圆形手柄或按 [ ] 旋转；旋转后的大小在属性里改"
           : "拖动或用方向键移动（Shift 每次 10px），拖角上的手柄调整大小，拖圆形手柄或按 [ ] 旋转"}
       </p>

@@ -10,6 +10,11 @@ const id = (description: string) => Type.String({ pattern: IMAGE_ID_PATTERN, des
 const color = Type.String({ pattern: "^#[0-9a-fA-F]{6}$", description: "#RRGGBB" });
 const int = (minimum?: number) => Type.Integer(minimum === undefined ? {} : { minimum });
 const align = Type.Union([Type.Literal("left"), Type.Literal("center"), Type.Literal("right")]);
+const stops = Type.Array(Type.Object({ offset: Type.Number({ minimum: 0, maximum: 1 }), color }, { additionalProperties: false }), { minItems: 2, maxItems: 5, description: "In order of offset." });
+const gradient = Type.Union([
+  Type.Object({ type: Type.Literal("linear"), angle: Type.Optional(Type.Number({ minimum: 0, maximum: 360, description: "CSS degrees; 90 runs left to right." })), stops }, { additionalProperties: false }),
+  Type.Object({ type: Type.Literal("radial"), stops }, { additionalProperties: false })
+], { description: "Replaces the solid color of a rect or ellipse." });
 const box = { x: int(0), y: int(0), width: int(1), height: int(1) };
 const rotation = Type.Number({ minimum: -180, maximum: 180, description: "Degrees clockwise about the box centre; the unrotated box must stay on the canvas." });
 const common = { id: id("New object id."), locked: Type.Boolean(), visible: Type.Boolean(), ...box, opacity: Type.Number({ minimum: 0, maximum: 1 }),
@@ -21,6 +26,7 @@ const fontId = Type.Union([id("A font id from image_project_read fonts."), Type.
 const patch = Type.Partial(Type.Object({
   ...box, opacity: common.opacity, visible: Type.Boolean(), locked: Type.Boolean(), ...text, font_id: fontId,
   rotation: Type.Union([rotation, Type.Null()], { description: "Degrees clockwise; null or 0 removes it." }),
+  gradient: Type.Union([gradient, Type.Null()], { description: "Rect or ellipse: a gradient fill; null returns to the solid color." }),
   flip_x: Type.Union([Type.Boolean(), Type.Null()], { description: "Mirror left-right; false or null removes it." }),
   flip_y: Type.Union([Type.Boolean(), Type.Null()], { description: "Mirror top-bottom; false or null removes it." }),
   radius: int(0), fit: Type.Union([Type.Literal("contain"), Type.Literal("cover"), Type.Literal("fill")])
@@ -31,7 +37,8 @@ export const IMAGE_EDIT_OPERATION = Type.Union([
   Type.Object({ type: Type.Literal("update_object"), id: id("Existing object id."), patch }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("add_object"), object: Type.Union([
     Type.Object({ ...common, kind: Type.Literal("text"), ...text, font_id: Type.Optional(id("A font id from image_project_read fonts.")) }, { additionalProperties: false }),
-    Type.Object({ ...common, kind: Type.Literal("rect"), color, radius: int(0) }, { additionalProperties: false })
+    Type.Object({ ...common, kind: Type.Literal("rect"), color, radius: int(0), gradient: Type.Optional(gradient) }, { additionalProperties: false }),
+    Type.Object({ ...common, kind: Type.Literal("ellipse"), color, gradient: Type.Optional(gradient) }, { additionalProperties: false })
   ]) }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("add_asset"), asset: Type.Object({ id: id("New asset id."), source: Type.String({ minLength: 1, maxLength: 4096, description: "Local PNG/JPEG/WebP path, absolute or relative to the Workspace." }) }, { additionalProperties: false }) }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("remove_object"), id: id("Existing unlocked object id.") }, { additionalProperties: false }),

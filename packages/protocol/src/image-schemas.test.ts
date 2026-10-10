@@ -128,6 +128,18 @@ describe("image protocol schemas", () => {
     expect([patch({ rotation: -181 }), patch({ flip_x: "yes" })]).toEqual([false, false]);
   });
 
+  it("carries ellipses and gradient fills, and lets a patch set or drop a gradient", () => {
+    const ellipse = { id: "ring", kind: "ellipse", locked: false, visible: true, x: 0, y: 0, width: 100, height: 60, opacity: 1, color: "#ff0000",
+      gradient: { type: "radial", stops: [{ offset: 0, color: "#000000" }, { offset: 1, color: "#ffffff" }] } };
+    expect(check(ImageDocumentSchema, { ...document, schema: "newmoney.image-project.v3", objects: [ellipse] })).toBe(true);
+    expect(check(ImageDocumentSchema, { ...document, objects: [{ ...ellipse, radius: 4 }] })).toBe(false);
+    expect(check(ImageEditOperationSchema, { type: "add_object", object: ellipse })).toBe(true);
+    const patch = (gradient: unknown) => check(ImageEditOperationSchema, { type: "update_object", id: "ring", patch: { gradient } });
+    expect([patch(null), patch({ type: "linear", angle: 45, stops: [{ offset: 0, color: "#000000" }, { offset: 1, color: "#ffffff" }] })]).toEqual([true, true]);
+    expect([patch({ type: "linear", stops: [{ offset: 0, color: "#000000" }] }), patch({ type: "conic", stops: [] }),
+      patch({ type: "radial", angle: 45, stops: [{ offset: 0, color: "#000000" }, { offset: 1, color: "#ffffff" }] })]).toEqual([false, false, false]);
+  });
+
   it("validates change, candidate and job events", () => {
     expect(check(EventPayloadSchemas["image.project.changed"], { projectId: "p", revision: 3, sha256: sha, author: "agent" })).toBe(true);
     expect(check(EventPayloadSchemas["image.candidate.changed"], { projectId: "p", candidateId: "pink", status: "stale" })).toBe(true);

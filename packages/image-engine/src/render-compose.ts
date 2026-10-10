@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import satori from "satori";
-import { textObjects, type ImageDocument, type SceneObject } from "./document.js";
+import { textObjects, type Gradient, type ImageDocument, type SceneObject } from "./document.js";
 import { checkTextWidths } from "./font.js";
 import { fail } from "./content-store.js";
 
@@ -24,6 +24,17 @@ function transformOf(object: SceneObject): { transform?: string; transformOrigin
   return parts.length ? { transform: parts.join(" "), transformOrigin: `${object.width / 2}px ${object.height / 2}px` } : {};
 }
 
+/**
+ * CSS for a gradient fill; offsets are percentages of the box. A radial one is an
+ * ellipse of half the box each way, so offset 1 lands on the box's edges (an ellipse's
+ * own boundary), not on its corners as the CSS default would. Satori ignores the size
+ * keywords (`farthest-side`, `closest-side`), so the radii are given explicitly.
+ */
+function gradientCss(gradient: Gradient): string {
+  const stops = gradient.stops.map((stop) => `${stop.color} ${Math.round(stop.offset * 1000) / 10}%`).join(", ");
+  return gradient.type === "linear" ? `linear-gradient(${gradient.angle ?? 90}deg, ${stops})` : `radial-gradient(ellipse 50% 50% at 50% 50%, ${stops})`;
+}
+
 export async function compose(project: ComposeInput): Promise<Composition> {
   const { document: doc, root, font } = project, userFonts = project.fonts ?? new Map<string, Buffer>();
   const texts = textObjects(doc.objects).filter((object) => object.visible);
@@ -40,7 +51,10 @@ export async function compose(project: ComposeInput): Promise<Composition> {
   const children: SatoriNode[] = doc.objects.filter((object) => object.visible).map((object) => {
     const style = { display: "flex", position: "absolute", left: object.x, top: object.y, width: object.width, height: object.height, opacity: object.opacity, ...transformOf(object) };
     if (object.kind === "image") return { type: "img", props: { src: images.get(object.asset_id), style: { ...style, objectFit: object.fit } } };
-    if (object.kind === "rect") return { type: "div", props: { style: { ...style, backgroundColor: object.color, borderRadius: object.radius } } };
+    if (object.kind === "rect" || object.kind === "ellipse") {
+      const fill = object.gradient ? { backgroundImage: gradientCss(object.gradient) } : { backgroundColor: object.color };
+      return { type: "div", props: { style: { ...style, ...fill, borderRadius: object.kind === "ellipse" ? "50%" : object.radius } } };
+    }
     // Measure natural text height rather than clipping it into the declared box.
     // Satori outlines only the fonts given to it, so SVG/PNG never use a host font. A user
     // font comes first; characters it lacks fall back to the pinned font, which is always loaded.

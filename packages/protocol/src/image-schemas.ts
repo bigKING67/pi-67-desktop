@@ -39,8 +39,15 @@ const TextObjectSchema = strictObject({
   ...common, kind: Type.Literal("text"), text: TextSchema, font_size: FontSizeSchema, color: ColorSchema, align: AlignSchema, line_height: LineHeightSchema,
   font_id: Type.Optional(IdSchema)
 });
-const RectObjectSchema = strictObject({ ...common, kind: Type.Literal("rect"), color: ColorSchema, radius: RadiusSchema });
-const SceneObjectSchema = Type.Union([RasterObjectSchema, TextObjectSchema, RectObjectSchema]);
+// Stops must also be in offset order; the engine refuses that, a schema cannot say it.
+const GradientStopsSchema = Type.Array(strictObject({ offset: Type.Number({ minimum: 0, maximum: 1 }), color: ColorSchema }), { minItems: 2, maxItems: 5 });
+const GradientSchema = Type.Union([
+  strictObject({ type: Type.Literal("linear"), angle: Type.Optional(Type.Number({ minimum: 0, maximum: 360 })), stops: GradientStopsSchema }),
+  strictObject({ type: Type.Literal("radial"), stops: GradientStopsSchema })
+]);
+const RectObjectSchema = strictObject({ ...common, kind: Type.Literal("rect"), color: ColorSchema, radius: RadiusSchema, gradient: Type.Optional(GradientSchema) });
+const EllipseObjectSchema = strictObject({ ...common, kind: Type.Literal("ellipse"), color: ColorSchema, gradient: Type.Optional(GradientSchema) });
+const SceneObjectSchema = Type.Union([RasterObjectSchema, TextObjectSchema, RectObjectSchema, EllipseObjectSchema]);
 const AssetSchema = strictObject({
   id: IdSchema,
   file: Type.String({ minLength: 1, maxLength: 160 }),
@@ -87,11 +94,12 @@ const PatchSchema = Type.Object({
   align: Type.Optional(AlignSchema), line_height: Type.Optional(LineHeightSchema), radius: Type.Optional(RadiusSchema),
   font_id: Type.Optional(Type.Union([IdSchema, Type.Null()])),
   rotation: Type.Optional(Type.Union([RotationSchema, Type.Null()])),
-  flip_x: Type.Optional(Type.Union([Type.Boolean(), Type.Null()])), flip_y: Type.Optional(Type.Union([Type.Boolean(), Type.Null()]))
+  flip_x: Type.Optional(Type.Union([Type.Boolean(), Type.Null()])), flip_y: Type.Optional(Type.Union([Type.Boolean(), Type.Null()])),
+  gradient: Type.Optional(Type.Union([GradientSchema, Type.Null()]))
 }, { additionalProperties: false, minProperties: 1 });
 const EditOperationSchema = Type.Union([
   strictObject({ type: Type.Literal("update_object"), id: IdSchema, patch: PatchSchema }),
-  strictObject({ type: Type.Literal("add_object"), object: Type.Union([TextObjectSchema, RectObjectSchema]) }),
+  strictObject({ type: Type.Literal("add_object"), object: Type.Union([TextObjectSchema, RectObjectSchema, EllipseObjectSchema]) }),
   strictObject({ type: Type.Literal("remove_object"), id: IdSchema }),
   strictObject({ type: Type.Literal("reorder_objects"), ids: Type.Array(IdSchema, { minItems: 1, maxItems: L.objects }) }),
   strictObject({ type: Type.Literal("set_canvas"), canvas: CanvasSchema }),

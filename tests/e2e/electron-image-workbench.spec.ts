@@ -137,6 +137,16 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     await expectRevision(page, 9);
     await expect(inspector.getByRole("button", { name: "字体" }).first()).toContainText("KaTeX_SansSerif");
 
+    // P4: add an ellipse from 图层 and give it a linear gradient in 属性.
+    await tab("图层");
+    await inspector.getByRole("group", { name: "添加图层" }).getByRole("button", { name: "添加椭圆" }).click();
+    await expectRevision(page, 10);
+    await tab("属性");
+    await expect(inspector.getByText("椭圆 · ellipse")).toBeVisible();
+    await inspector.getByRole("group", { name: "填充" }).getByRole("button", { name: "线性渐变" }).click();
+    await expectRevision(page, 11);
+    await expect(inspector.getByLabel("角度 °")).toHaveValue("90");
+
     // F. A derived 4:5 size and one export set with a receipt.
     await tab("导出");
     await inspector.locator("label").filter({ hasText: "4:5" }).click();

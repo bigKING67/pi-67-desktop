@@ -83,4 +83,30 @@ describe("rotation and flip", { timeout: 120_000 }, () => {
     expect(() => validateDocument({ ...v1, objects: v1.objects.map((object) => ({ ...object, rotation: 15 })) })).toThrow(/v3 document schema/u);
     expect(() => validateDocument({ ...v1, schema: SCHEMA_V3 })).toThrow(/must use an engine extension/u);
   });
+
+  it("draws ellipses and linear or radial gradients, and validates gradients", async () => {
+    const directory = await tempDirectory("image-engine-椭圆-");
+    const root = path.join(directory, "poster");
+    await createProject(root, { project_id: "poster", title: "形状", canvas: { width: 200, height: 200, background: "#ffffff" }, assets: [], objects: [rect("block", 0, 0, 200, 100, "#00ff00")] });
+    const added = await editBatch(root, { base_revision: 1, author: "human", summary: "椭圆", operations: [{ type: "add_object", object: { id: "ring", kind: "ellipse", locked: false, visible: true, x: 0, y: 100, width: 200, height: 100, opacity: 1, color: "#ff0000" } }] });
+    expect(added.document.schema).toBe(SCHEMA_V3);
+    await editBatch(root, { base_revision: 2, author: "human", summary: "渐变", operations: [{ type: "update_object", id: "block", patch: { gradient: { type: "linear", angle: 90, stops: [{ offset: 0, color: "#ff0000" }, { offset: 1, color: "#0000ff" }] } } }] });
+    let at = await pixels(root, directory, "shapes");
+    expect(at(100, 150)).toEqual([255, 0, 0]);          // ellipse centre
+    expect(at(3, 103)).toEqual([255, 255, 255]);         // outside the ellipse, in its box corner
+    expect(at(2, 50)[0]).toBeGreaterThan(240); expect(at(197, 50)[2]).toBeGreaterThan(240);   // red to blue, left to right
+    await editBatch(root, { base_revision: 3, author: "human", summary: "径向", operations: [{ type: "update_object", id: "ring", patch: { gradient: { type: "radial", stops: [{ offset: 0, color: "#000000" }, { offset: 1, color: "#ffffff" }] } } }] });
+    at = await pixels(root, directory, "radial");
+    expect(at(100, 150)[0]).toBeLessThan(20);
+    // Sized to the box's sides, the last stop reaches the ellipse's own edge.
+    expect(at(3, 150)[0]).toBeGreaterThan(200);
+    const plain = await editBatch(root, { base_revision: 4, author: "human", summary: "纯色", operations: [{ type: "update_object", id: "ring", patch: { gradient: null } }] });
+    expect(plain.document.objects.find((object) => object.id === "ring")).not.toHaveProperty("gradient");
+    const bad = (gradient: unknown) => editBatch(root, { base_revision: 5, author: "human", summary: "坏", operations: [{ type: "update_object", id: "block", patch: { gradient } }] });
+    await expect(bad({ type: "linear", stops: [{ offset: 0, color: "#000000" }] })).rejects.toThrow(/2–5 stops/u);
+    await expect(bad({ type: "radial", angle: 45, stops: [{ offset: 0, color: "#000000" }, { offset: 1, color: "#ffffff" }] })).rejects.toThrow(/Only a linear gradient/u);
+    await expect(bad({ type: "linear", stops: [{ offset: 0.8, color: "#000000" }, { offset: 0.2, color: "#ffffff" }] })).rejects.toThrow(/in order/u);
+    await expect(editBatch(root, { base_revision: 5, author: "human", summary: "圆角", operations: [{ type: "update_object", id: "ring", patch: { radius: 4 } }] })).rejects.toThrow(/unsupported field radius/u);
+  });
 });
+

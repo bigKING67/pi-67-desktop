@@ -38,15 +38,32 @@ export interface ObjectBase {
   flip_x?: true; flip_y?: true;
 }
 /** Optional fields every object kind may carry; a patch writes `null` (or 0 / false) to drop one. */
-export const OPTIONAL_COMMON = ["rotation", "flip_x", "flip_y"] as const;
+const OPTIONAL_COMMON = ["rotation", "flip_x", "flip_y"] as const;
+/**
+ * Every optional field each kind may carry, and which of them need the v3 schema.
+ * One table drives validation, patching and the schema version, so a later P4 field
+ * is declared once here.
+ */
+export const OPTIONAL_FIELDS: Readonly<Record<SceneObject["kind"], readonly string[]>> = {
+  image: [...OPTIONAL_COMMON], text: [...OPTIONAL_COMMON, "font_id"], rect: [...OPTIONAL_COMMON, "gradient"], ellipse: [...OPTIONAL_COMMON, "gradient"]
+};
+const V3_FIELDS: ReadonlySet<string> = new Set([...OPTIONAL_COMMON, "gradient"]);
+/** Kinds that exist only from v3. */
+const V3_KINDS: ReadonlySet<SceneObject["kind"]> = new Set(["ellipse"]);
 export interface ImageObject extends ObjectBase { kind: "image"; asset_id: string; fit: "contain" | "cover" | "fill" }
 export interface TextObject extends ObjectBase {
   kind: "text"; text: string; font_size: number; color: string; align: "left" | "center" | "right"; line_height: number;
   /** A user font from `fonts`; absent means the pinned font. Missing glyphs fall back to the pinned font. */
   font_id?: string;
 }
-export interface RectObject extends ObjectBase { kind: "rect"; color: string; radius: number }
-export type SceneObject = ImageObject | TextObject | RectObject;
+/** A linear (with `angle`, CSS degrees) or radial fill of 2–5 stops in order; replaces `color` when present. */
+export type Gradient =
+  | { type: "linear"; angle?: number; stops: { offset: number; color: string }[] }
+  | { type: "radial"; stops: { offset: number; color: string }[] };
+export interface RectObject extends ObjectBase { kind: "rect"; color: string; radius: number; gradient?: Gradient }
+/** An ellipse filling its box (P4); a line is a thin rotated rect. */
+export interface EllipseObject extends ObjectBase { kind: "ellipse"; color: string; gradient?: Gradient }
+export type SceneObject = ImageObject | TextObject | RectObject | EllipseObject;
 export interface FontBinding { profile: string; family: string; file: string; sha256: string; weight: number }
 /** A font file the person added to the project; bound by digest like an asset. */
 export interface UserFont { id: string; family: string; file: string; sha256: string; bytes: number; format: "ttf" | "otf" }
@@ -59,7 +76,8 @@ export interface ImageDocument {
 
 /** v3 while any engine extension is used, else v2 while a user font is bound or used, else v1. */
 export function documentSchema(document: Pick<ImageDocument, "fonts" | "objects">): string {
-  if (document.objects.some((object) => OPTIONAL_COMMON.some((key) => object[key] !== undefined))) return SCHEMA_V3;
+  // Called before validation too, so an unknown kind falls through to validation's refusal.
+  if (document.objects.some((object) => V3_KINDS.has(object.kind) || (Object.hasOwn(OPTIONAL_FIELDS, object.kind) ? OPTIONAL_FIELDS[object.kind] : []).some((key) => V3_FIELDS.has(key) && (object as unknown as JsonRecord)[key] !== undefined))) return SCHEMA_V3;
   return document.fonts?.length || document.objects.some((object) => object.kind === "text" && object.font_id !== undefined) ? SCHEMA_V2 : SCHEMA;
 }
 
@@ -124,13 +142,13 @@ function hasControlCharacter(text: string): boolean {
 
 const COMMON = ["id", "kind", "locked", "visible", "x", "y", "width", "height", "opacity", ...OPTIONAL_COMMON] as const;
 const EXTRA = {
-  image: ["asset_id", "fit"], text: ["text", "font_size", "color", "align", "line_height", "font_id"], rect: ["color", "radius"]
+  image: ["asset_id", "fit"], text: ["text", "font_size", "color", "align", "line_height", "font_id"], rect: ["color", "radius", "gradient"], ellipse: ["color", "gradient"]
 } as const satisfies Record<SceneObject["kind"], readonly string[]>;
 
 function validateObject(value: unknown, canvas: Canvas, assets: ReadonlySet<string>, fonts: ReadonlySet<string>): SceneObject {
   if (!isRecord(value)) fail("object must be an object");
   const kind = value.kind;
-  if (kind !== "image" && kind !== "text" && kind !== "rect") fail("Unsupported object kind");
+  if (kind !== "image" && kind !== "text" && kind !== "rect" && kind !== "ellipse") fail("Unsupported object kind");
   record(value, [...COMMON, ...EXTRA[kind]], "object"); id(value.id, "object.id");
   boolean(value.locked, "locked"); boolean(value.visible, "visible");
   number(value.x, "object.x", 0, canvas.width); number(value.y, "object.y", 0, canvas.height);
@@ -148,7 +166,11 @@ function validateObject(value: unknown, canvas: Canvas, assets: ReadonlySet<stri
     number(value.font_size, "font_size", 8, 500); number(value.line_height, "line_height", 1, 2);
     color(value.color); oneOf(value.align, ["left", "center", "right"] as const, "Invalid text alignment");
     if (value.font_id !== undefined && (typeof value.font_id !== "string" || !fonts.has(value.font_id))) fail(`Missing font for ${value.id}`);
-  } else { color(value.color); number(value.radius, "radius", 0, Math.min(value.width, value.height) / 2); }
+  } else {
+    color(value.color);
+    if (kind === "rect") number(value.radius, "radius", 0, Math.min(value.width, value.height) / 2);
+    if (value.gradient !== undefined) validateGradient(value.gradient);
+  }
   return value as unknown as SceneObject;
 }
 
@@ -196,8 +218,21 @@ export function validateDocument(value: unknown): ImageDocument {
   const needed = documentSchema(document);
   if (value.schema === SCHEMA_V2 && needed !== SCHEMA_V2) fail("A v2 document must bind or use a user font and nothing newer");
   if (value.schema === SCHEMA_V3 && needed !== SCHEMA_V3) fail("A v3 document must use an engine extension");
-  if (needed === SCHEMA_V3 && value.schema !== SCHEMA_V3) fail("Rotation and flip need the v3 document schema");
+  if (needed === SCHEMA_V3 && value.schema !== SCHEMA_V3) fail("Rotation, flips, ellipses and gradients need the v3 document schema");
   return document;
+}
+
+function validateGradient(value: unknown): Gradient {
+  record(value, ["type", "angle", "stops"], "gradient");
+  const type = oneOf(value.type, ["linear", "radial"] as const, "Invalid gradient type");
+  if (value.angle !== undefined) { if (type !== "linear") fail("Only a linear gradient has an angle"); number(value.angle, "gradient angle", 0, 360); }
+  if (!Array.isArray(value.stops) || value.stops.length < 2 || value.stops.length > 5) fail("A gradient needs 2–5 stops");
+  let previous = 0;
+  for (const stop of value.stops) {
+    record(stop, ["offset", "color"], "gradient stop"); number(stop.offset, "gradient offset", 0, 1); color(stop.color);
+    if (stop.offset < previous) fail("Gradient stops must be in order"); previous = stop.offset;
+  }
+  return value as unknown as Gradient;
 }
 
 function validateUserFonts(value: unknown): UserFont[] {

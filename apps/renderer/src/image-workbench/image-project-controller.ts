@@ -2,6 +2,7 @@ import { IMAGE_SIZE_PRESETS, IMAGE_USER_FONT_LIMIT, type ImageDocument, type Ima
 import { ProtocolRequestError } from "@pi67/protocol";
 import type { AgentCommandType, CommandPayloads, CommandResults, ImageCandidateSummary, ImageDeriveOutcome, ImageProjectSummary, ImageRevisionEntry } from "@pi67/protocol";
 import { useImageWorkbench } from "./image-workbench-store.js";
+import { IMAGE_OBJECT_KIND_LABELS } from "./image-object-kinds.js";
 import { create } from "zustand";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
@@ -101,6 +102,32 @@ async function loadCandidates(projectId: string): Promise<void> {
       .then((preview) => { useImageProject.setState((state) => ({ candidatePreviews: { ...state.candidatePreviews, [candidate.candidateId]: preview } })); })
       .catch(() => undefined);
   }
+}
+
+export type NewObjectKind = "text" | "rect" | "ellipse";
+const NEW_OBJECT_NAMES: Readonly<Record<NewObjectKind, string>> = { text: "text", rect: "shape", ellipse: "ellipse" };
+
+/**
+ * Adds a text, rectangle or ellipse layer on top, centred on the canvas at a size that
+ * suits it, then selects it. Ids continue `shape-2`, `shape-3`… so they never collide.
+ */
+export async function addImageObject(kind: NewObjectKind): Promise<ImageEditOutcome> {
+  const { document } = useImageProject.getState();
+  if (!document) return { outcome: "refused", message: "项目尚未就绪。" };
+  const { width: canvasWidth, height: canvasHeight } = document.canvas, short = Math.min(canvasWidth, canvasHeight);
+  const taken = new Set(document.objects.map((object) => object.id));
+  let id = NEW_OBJECT_NAMES[kind];
+  for (let index = 2; taken.has(id); index += 1) id = `${NEW_OBJECT_NAMES[kind]}-${index}`;
+  const fontSize = Math.max(8, Math.round(short / 14));
+  const width = kind === "text" ? Math.round(canvasWidth * 0.6) : Math.round(short * 0.3);
+  const height = kind === "text" ? Math.round(fontSize * 1.4) : width;
+  const base = { id, locked: false, visible: true, x: Math.round((canvasWidth - width) / 2), y: Math.round((canvasHeight - height) / 2), width, height, opacity: 1 };
+  const object = kind === "text" ? { ...base, kind, text: "新文字", font_size: fontSize, color: "#222222", align: "center" as const, line_height: 1.2 }
+    : kind === "rect" ? { ...base, kind, color: "#d9c2a3", radius: 0 } : { ...base, kind, color: "#d9c2a3" };
+  // Refusals and conflicts read like every other layer action.
+  const result = await editImageProjectWithNotice(`添加${IMAGE_OBJECT_KIND_LABELS[kind]}`, [{ type: "add_object", object }]);
+  if (result.outcome === "applied") useImageProject.setState({ selectedObjectIds: [id] });
+  return result;
 }
 
 /** Selects one object, or with `extend` (Shift) adds or removes it from the selection. */

@@ -1538,8 +1538,13 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   垂直翻转. Only the unrotated box must stay on the canvas; corners past it are clipped. A
   turned object resizes through 属性 (the eight handles assume an upright box) and edits its
   words turned. The Agent may set `rotation` / `flip_x` / `flip_y`. A document is written as
-  schema v3 only while an object is turned or flipped (v3 may also bind fonts), so others
-  stay readable by earlier releases.
+  schema v3 only while an object is turned or flipped, is an ellipse or has a gradient
+  (v3 may also bind fonts), so others stay readable by earlier releases.
+  图层 adds text, rectangles and ellipses (`添加 文字 / 矩形 / 椭圆`), centred on the canvas
+  and selected. Rectangles and ellipses take a 填充: 纯色, 线性渐变 (start and end colour,
+  angle) or 径向渐变 (start and end colour); a gradient of more stops, which only the Agent
+  writes, is shown but not edited until the fill is chosen again. A line is a thin rotated
+  rectangle. The Agent may add ellipses and set or drop `gradient`.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

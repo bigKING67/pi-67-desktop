@@ -1,17 +1,38 @@
 import type { ImageSceneObject } from "@pi67/domain";
-import { ArrowDown, ArrowUp, Eye, EyeOff, Image as ImageIcon, Lock, LockOpen, Square, Type } from "lucide-react";
+import { ArrowDown, ArrowUp, Circle, Eye, EyeOff, Image as ImageIcon, Lock, LockOpen, Square, Type } from "lucide-react";
 import { Button } from "react-aria-components";
 import {
+  addImageObject,
   editImageProjectWithNotice,
+  type NewObjectKind,
   type ImageProjectState,
   selectImageObject,
   toggleImageObjectLock,
   toggleImageObjectVisibility,
   useImageProject
 } from "./image-project-controller.js";
+import { IMAGE_OBJECT_KIND_LABELS } from "./image-object-kinds.js";
 import styles from "./ImageInspector.module.css";
 
-const KIND_ICONS = { image: ImageIcon, text: Type, rect: Square } as const;
+const KIND_ICONS = { image: ImageIcon, text: Type, rect: Square, ellipse: Circle } as const;
+const ADDABLE: readonly NewObjectKind[] = ["text", "rect", "ellipse"];
+
+/** Adds a text, rectangle or ellipse layer, centred and selected. */
+function AddLayer({ busy }: { busy: boolean }) {
+  return (
+    <div aria-label="添加图层" className={styles.addLayer} role="group">
+      <span className={styles.alignCaption}>添加</span>
+      {ADDABLE.map((kind) => {
+        const Icon = KIND_ICONS[kind], label = IMAGE_OBJECT_KIND_LABELS[kind];
+        return (
+          <Button key={kind} aria-label={`添加${label}`} className={styles.historyAction!} isDisabled={busy} onPress={() => void addImageObject(kind)}>
+            <Icon aria-hidden="true" size={12} />{label}
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
 /** A stable empty list: a fresh `[]` per snapshot loops the store subscription before the document loads. */
 const NO_OBJECTS: readonly ImageSceneObject[] = [];
 export const selectImageObjects = (state: Pick<ImageProjectState, "document">): readonly ImageSceneObject[] => state.document?.objects ?? NO_OBJECTS;
@@ -29,8 +50,11 @@ export function ImageLayersPanel() {
     [ids[index], ids[target]] = [ids[target]!, ids[index]!];
     void editImageProjectWithNotice(direction > 0 ? "上移图层" : "下移图层", [{ type: "reorder_objects", ids }]);
   };
-  if (objects.length === 0) return <p className={styles.empty}>项目还没有图层。</p>;
+  // Adding stays available with no layers at all, the one state where it is the only way on.
+  if (objects.length === 0) return <><AddLayer busy={busy} /><p className={styles.empty}>项目还没有图层。</p></>;
   return (
+    <>
+    <AddLayer busy={busy} />
     <ul aria-label="图层" className={styles.layers}>
       {topDown.map((object, position) => {
         const Icon = KIND_ICONS[object.kind];
@@ -60,5 +84,6 @@ export function ImageLayersPanel() {
         );
       })}
     </ul>
+    </>
   );
 }

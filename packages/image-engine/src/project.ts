@@ -3,7 +3,7 @@ import path from "node:path";
 import { regularPath, readBytes, importRaster, saveAsset, readAsset, type ImportedRaster } from "./raster.js";
 import { readCandidateEntry, verifyCandidateAgainst, readDiscard, decisionPending, withDecisionLock, type CandidateEntry } from "./candidate-store.js";
 import { encodeJson, errorCode, fail, sha256, writeOnce } from "./content-store.js";
-import { SCHEMA, LIMITS, OPTIONAL_COMMON, USER_FONT_LIMIT, documentSchema, validateDocument, validateCanvas, record, id, number, isRecord, textObjects, type ImageDocument, type JsonRecord, type SceneObject, type ChangeAuthor, type AcceptedCandidate, type UserFont } from "./document.js";
+import { SCHEMA, LIMITS, OPTIONAL_FIELDS, USER_FONT_LIMIT, documentSchema, validateDocument, validateCanvas, record, id, number, isRecord, textObjects, type ImageDocument, type JsonRecord, type SceneObject, type ChangeAuthor, type AcceptedCandidate, type UserFont } from "./document.js";
 import { fontManifest, installedFont, checkGlyphs, checkTextGlyphs, inspectUserFont, userFontSample } from "./font.js";
 import { USER_FONT_MAX_BYTES } from "./font-parse.js";
 import { preparePhotoProject, type PhotoLayout } from "./photo-layout.js";
@@ -285,12 +285,17 @@ async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: 
         const imported = await importUserFont(op.font, doc);
         doc.fonts = [...(doc.fonts ?? []), imported.font]; fontImports.push(imported); break;
       }
-      case "add_object": doc.objects.push(withoutNoOps(structuredClone(op.object) as unknown as JsonRecord, [...OPTIONAL_COMMON, "font_id"]) as unknown as SceneObject); break;
+      case "add_object": {
+        const object = structuredClone(op.object) as unknown as JsonRecord;
+        // Only the kind's own optional fields are dropped as no-ops; anything else stays for validation to refuse.
+        const optional = typeof object.kind === "string" && Object.hasOwn(OPTIONAL_FIELDS, object.kind) ? OPTIONAL_FIELDS[object.kind as SceneObject["kind"]] : [];
+        doc.objects.push(withoutNoOps(object, optional) as unknown as SceneObject); break;
+      }
       case "update_object": {
         const index = objectAt(doc, op.id), object = doc.objects[index] as SceneObject;
         // Optional fields may be added, and dropped with `null` (or 0 / false for rotation and
         // flips), so a document never carries a no-op value and keeps the oldest schema it can.
-        const optional = [...OPTIONAL_COMMON, ...(object.kind === "text" ? ["font_id"] : [])];
+        const optional = OPTIONAL_FIELDS[object.kind];
         const mutable = [...new Set([...Object.keys(object).filter((key) => !["id", "kind"].includes(key)), ...optional])];
         record(op.patch, mutable, "object patch");
         if (!Object.keys(op.patch).length) fail("Empty object patch");
