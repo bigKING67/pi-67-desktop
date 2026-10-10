@@ -1,4 +1,4 @@
-import { createImageApi } from "./image-workbench-openai-images.js";
+import { createImageApi, type GenerateImages } from "./image-workbench-openai-images.js";
 
 // The `ark-images` image API for Pi (ADR 0010 decision 14): Volcengine Ark
 // Seedream through `POST {baseUrl}/images/generations`. Seedream has no mask
@@ -15,7 +15,7 @@ export function arkImageBody(model: string, size: string, prompt: string, images
   };
 }
 
-export const generateArkImages = createImageApi((model, request, prompt, images) => {
+export const generateArkImages: GenerateImages = createImageApi((model, request, prompt, images) => {
   if (request.endpoint === "images/generations" && (images.length || request.mask)) throw new Error("invalid_request");
   if (request.endpoint === "images/edits" && !images.length) throw new Error("invalid_request");
   return { endpoint: "images/generations", body: JSON.stringify(arkImageBody(model.id, request.size, prompt, images)) };

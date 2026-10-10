@@ -57,7 +57,7 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     }, folder);
     await answerFolder(library);
     const page = await application.firstWindow();
-    await application.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0]?.setSize(1_440, 900); });
+    await application.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0]?.setSize(1_180, 820); });
     await page.waitForLoadState("domcontentloaded");
 
     // Library and a photo project.
@@ -72,11 +72,14 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     const project = page.getByTestId("image-project");
     await expect(project).toBeVisible({ timeout: 30_000 });
     await expectRevision(page, 1);
-    // A fresh profile starts with the Inspector closed.
-    await page.getByTestId("inspector-toggle").click();
+    // On a small screen the window cannot reach 1440 and the Inspector becomes a drawer over
+    // the page, so it is opened for its tabs and closed before working on the canvas or bars.
     const inspector = page.locator("#task-inspector");
-    await expect(inspector).toBeVisible();
-    const tab = (name: string) => inspector.getByRole("tab", { name }).click();
+    const showInspector = async (open: boolean) => {
+      if (await inspector.isVisible() !== open) await page.getByTestId("inspector-toggle").click();
+      await expect(inspector).toBeVisible({ visible: open });
+    };
+    const tab = async (name: string) => { await showInspector(true); await inspector.getByRole("tab", { name }).click(); };
 
     // B. Direct edits: a property, the words, a keyboard move, then undo as a new revision.
     await tab("图层");
@@ -85,6 +88,7 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     await inspector.getByLabel("字号").fill("72");
     await inspector.getByLabel("字号").press("Enter");
     await expectRevision(page, 2);
+    await showInspector(false);
     await project.getByLabel("文字内容").fill("春日上新 SALE");
     await project.getByRole("button", { name: "应用" }).click();
     await expectRevision(page, 3);
@@ -96,6 +100,7 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     await expectRevision(page, 5);
 
     // D. Marks: draw a region, word it, and see it attached to the next message.
+    await showInspector(false);
     await project.getByRole("button", { name: /^标记/u }).click();
     const layer = await project.getByTestId("image-mark-layer").boundingBox();
     expect(layer).not.toBeNull();

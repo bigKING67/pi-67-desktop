@@ -154,4 +154,11 @@ the image Inspector returns the P2 page; no project content is rewritten.
   derived project from revision 1's summary and adds an optional `derivedFrom` to
   `ImageProjectSummary` (protocol revision regenerated); 导出 lists sizes from the library,
   older revisions marked `较旧` and kept out of the set; library cards read `派生自 <source>`.
+- 2026-10-10: pushed (260f88fb..072324b2). CI run 38043710774: Build / Windows x64, Native
+  smoke / Windows x64 and Windows installer lifecycle passed, which is the Windows packaged
+  evidence checkpoint 7 asked for. macOS native smoke failed only in the new image e2e: CI's
+  smaller screen kept the window under 1440, the Inspector became a drawer over the page and
+  covered `应用`. The spec now opens the Inspector for its tabs and closes it before canvas
+  work, and starts at 1180 so the drawer case runs everywhere. Also annotated
+  `generateArkImages` so its declaration emits (5 non-fatal TS2883 messages in every build).
 
