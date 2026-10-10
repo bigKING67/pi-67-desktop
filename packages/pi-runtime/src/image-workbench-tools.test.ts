@@ -127,6 +127,11 @@ describe("image workbench tools", { timeout: 120_000 }, () => {
     expect((await t.json("image_project_edit", { project_id: "poster", base_revision: 5, summary: "调暗", operations: [{ type: "update_object", id: photo.id, patch: { adjust: { brightness: 0.8, blur: 2 } } }] })).revision).toBe(6);
     expect(((await t.json("image_project_read", { project_id: "poster" })).objects as { id: string }[]).find((object) => object.id === photo.id))
       .toMatchObject({ adjust: { brightness: 0.8, blur: 2 } });
+    // And group the headline with the ring, which reads back as a group.
+    expect((await t.json("image_project_edit", { project_id: "poster", base_revision: 6, summary: "编组", operations: [{ type: "group_objects", group: { id: "title-set", name: "标题" }, ids: ["headline", "ring"] }] })).revision).toBe(7);
+    const grouped = await t.json("image_project_read", { project_id: "poster" });
+    expect(grouped.groups).toEqual([{ id: "title-set", name: "标题", locked: false, visible: true, opacity: 1 }]);
+    expect((grouped.objects as { id: string }[]).find((object) => object.id === "ring")).toMatchObject({ group_id: "title-set" });
   });
 
   it("resolves an imported asset against the Workspace, not the Host's own directory", async () => {

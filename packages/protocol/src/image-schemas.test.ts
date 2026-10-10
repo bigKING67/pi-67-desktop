@@ -128,6 +128,18 @@ describe("image protocol schemas", () => {
     expect([patch({ rotation: -181 }), patch({ flip_x: "yes" })]).toEqual([false, false]);
   });
 
+  it("carries groups and the operations that make, change and remove them", () => {
+    const grouped = { ...document, schema: "newmoney.image-project.v3", groups: [{ id: "g", name: "标题组", locked: false, visible: true, opacity: 0.8 }], objects: [{ ...text, group_id: "g" }] };
+    expect(check(ImageDocumentSchema, grouped)).toBe(true);
+    expect(check(ImageDocumentSchema, { ...grouped, groups: [{ id: "g", name: "", locked: false, visible: true, opacity: 1 }] })).toBe(false);
+    expect(check(ImageDocumentSchema, { ...grouped, groups: [] })).toBe(false);
+    const op = (value: Record<string, unknown>) => check(ImageEditOperationSchema, value);
+    expect([op({ type: "group_objects", group: { id: "g", name: "组" }, ids: ["a", "b"] }), op({ type: "update_group", id: "g", patch: { opacity: 0.5 } }),
+      op({ type: "ungroup", id: "g" }), op({ type: "update_object", id: "a", patch: { group_id: null } })]).toEqual([true, true, true, true]);
+    expect([op({ type: "group_objects", group: { id: "g", name: "组", locked: true }, ids: ["a"] }), op({ type: "update_group", id: "g", patch: {} }),
+      op({ type: "group_objects", group: { id: "g", name: "组" }, ids: [] })]).toEqual([false, false, false]);
+  });
+
   it("carries image adjustments and lets a patch set or drop them", () => {
     const photo = { id: "photo", kind: "image", locked: false, visible: true, x: 0, y: 0, width: 100, height: 60, opacity: 1, asset_id: "a", fit: "cover" };
     const v3 = { ...document, schema: "newmoney.image-project.v3" };

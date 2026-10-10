@@ -1,7 +1,7 @@
 import path from "node:path";
 import sharp from "sharp";
 import { errorCode, errorMessage, sha256, writeOnce } from "./content-store.js";
-import { LIMITS, record, id, string, isRecord, type Asset } from "./document.js";
+import { LIMITS, record, id, string, isLocked, isRecord, type Asset } from "./document.js";
 import { readProject, editBatch, type ProjectState, type PublishedRevision } from "./project.js";
 import { importRaster, saveAsset, regularPath, readAsset } from "./raster.js";
 import { importMask, compositeRaster, validateContext, type CompositeQa, type MaskData } from "./composite.js";
@@ -41,7 +41,7 @@ export async function stageCandidate(root: string, input: unknown, { signal }: {
   await assertCandidateSlot(root, input.id);
   const object = project.document.objects.find((item) => item.id === input.target_id);
   if (!object || object.kind !== "image") throw new Error("Candidate target must be an existing image object");
-  if (object.locked) throw new Error(`Object is locked: ${object.id}`);
+  if (isLocked(project.document, object)) throw new Error(`Object is locked: ${object.id}`);
   const asset = project.document.assets.find((item) => item.id === object.asset_id) as Asset;
   const source = await importRaster({ id: "candidate-source", source: input.source });
   const receipt = input.execution === undefined ? null : await readExecution(root, input.execution, source.asset);

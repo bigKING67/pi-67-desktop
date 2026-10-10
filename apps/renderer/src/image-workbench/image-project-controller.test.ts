@@ -227,6 +227,27 @@ describe("image object selection", () => {
     vi.unstubAllGlobals();
   });
 
+  it("selects a grouped layer's whole group unless just the one is asked for, and groups the selection", async () => {
+    const { selectImageObject } = await import("./image-project-controller.js");
+    const { groupSelectedLayers } = await import("./image-project-groups.js");
+    const document = useImageProject.getState().document!;
+    useImageProject.setState({ document: { ...document, groups: [{ id: "g", name: "组", locked: false, visible: true, opacity: 1 }],
+      objects: document.objects.map((item) => ({ ...item, group_id: "g" })) } });
+    selectImageObject("t");
+    expect(useImageProject.getState().selectedObjectIds).toEqual(["t", "u"]);
+    selectImageObject("u", { single: true });
+    expect(useImageProject.getState().selectedObjectIds).toEqual(["u"]);
+    selectImageObject("t", { extend: true });
+    expect(useImageProject.getState().selectedObjectIds).toEqual(["u", "t"]);
+    selectImageObject("t", { extend: true });
+    expect(useImageProject.getState().selectedObjectIds).toEqual([]);
+    await loadImageProject("p");
+    useImageProject.setState({ selectedObjectIds: ["t", "u"] });
+    host.calls = [];
+    await groupSelectedLayers();
+    expect(edits().at(-1)).toMatchObject({ summary: "编组", operations: [{ type: "group_objects", group: { id: "group", name: "编组 1" }, ids: ["t", "u"] }] });
+  });
+
   it("adds text, rectangles and ellipses centred on the canvas with ids that never collide, and selects them", async () => {
     host.calls = [];
     expect(await addImageObject("ellipse")).toEqual({ outcome: "applied" });

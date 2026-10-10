@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import path from "node:path";
 import satori from "satori";
 import sharp from "sharp";
-import { textObjects, type Adjust, type Gradient, type ImageDocument, type SceneObject } from "./document.js";
+import { groupOf, isShown, textObjects, type Adjust, type Group, type Gradient, type ImageDocument, type SceneObject } from "./document.js";
 import { checkTextWidths } from "./font.js";
 import { fail } from "./content-store.js";
 
@@ -42,7 +42,7 @@ function gradientCss(gradient: Gradient): string {
 
 export async function compose(project: ComposeInput): Promise<Composition> {
   const { document: doc, root, font } = project, userFonts = project.fonts ?? new Map<string, Buffer>();
-  const visible = doc.objects.filter((object) => object.visible);
+  const visible = doc.objects.filter((object) => isShown(doc, object));
   const texts = textObjects(visible);
   checkTextWidths(font, texts, userFonts);
   // Encode only rasters that visible objects draw; history keeps every asset bound.
@@ -68,9 +68,9 @@ export async function compose(project: ComposeInput): Promise<Composition> {
       if (typeof nodeId === "string" && nodeId.startsWith("text-")) measurements.set(nodeId.slice(5), { width: node.width, height: node.height });
     }
   });
-  // One satori pass unless something blends or is masked; satori drops both, so then each such
-  // object becomes its own layer and resvg composites the assembled SVG (P4 spike).
-  const layered = !project.layoutOnly && visible.some((object) => object.blend || object.mask);
+  // One satori pass unless something blends, is masked or sits in a see-through group; satori
+  // cannot express those, so such objects become layers and resvg composites the assembled SVG (P4 spike).
+  const layered = !project.layoutOnly && visible.some((object) => object.blend || object.mask || picture(doc, visible, groupOf(doc, object)));
   const svg = layered ? await assemble(doc, root, visible, pass) : await pass(visible, doc.canvas.background);
   for (const object of texts) {
     const size = measurements.get(object.id);
@@ -116,18 +116,38 @@ function nodeOf(object: SceneObject, doc: ImageDocument, images: ReadonlyMap<str
  * each layer's ids are prefixed before they meet.
  */
 async function assemble(doc: ImageDocument, root: string, visible: readonly SceneObject[], pass: (objects: readonly SceneObject[], background: undefined) => Promise<string>): Promise<string> {
-  const runs: SceneObject[][] = [];
-  for (const object of visible) {
-    const alone = Boolean(object.blend || object.mask), last = runs.at(-1);
-    if (!alone && last && !last.some((item) => item.blend || item.mask)) last.push(object);
-    else runs.push([object]);
-  }
   const { width, height, background } = doc.canvas;
   const defs: string[] = [], groups: string[] = [];
   // One read (and negation) per mask image and direction, however many objects use it.
   const maskImages = new Map<string, Promise<string>>();
-  for (const [index, run] of runs.entries()) {
-    const prefix = `l${index}-`;
+  let layer = 0;
+  const layers = async (objects: readonly SceneObject[]): Promise<string[]> => {
+    const runs: SceneObject[][] = [];
+    for (const object of objects) {
+      const alone = Boolean(object.blend || object.mask), last = runs.at(-1);
+      if (!alone && last && !last.some((item) => item.blend || item.mask)) last.push(object);
+      else runs.push([object]);
+    }
+    const drawn: string[] = [];
+    for (const run of runs) drawn.push(await runLayer(run, `l${layer++}-`));
+    return drawn;
+  };
+  // A see-through group, or one with a blended member, is one picture: its members are assembled
+  // in one isolated `<g>`, so overlapping members do not show through each other and blend modes
+  // blend within the group at every opacity, never with what lies below it.
+  for (let start = 0; start < visible.length;) {
+    const group = picture(doc, visible, groupOf(doc, visible[start]!));
+    let end = start + 1;
+    if (group) while (end < visible.length && visible[end]!.group_id === group.id) end++;
+    else while (end < visible.length && !picture(doc, visible, groupOf(doc, visible[end]!))) end++;
+    const drawn = await layers(visible.slice(start, end));
+    groups.push(group ? `<g style="isolation:isolate"${group.opacity < 1 ? ` opacity="${group.opacity}"` : ""}>${drawn.join("")}</g>` : drawn.join(""));
+    start = end;
+  }
+  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">`
+    + `${defs.length ? `<defs>${defs.join("")}</defs>` : ""}<rect width="${width}" height="${height}" fill="${background}"/>${groups.join("")}</svg>`;
+
+  async function runLayer(run: readonly SceneObject[], prefix: string): Promise<string> {
     const inner = namespace((await pass(run, undefined)).replace(/^<svg[^>]*>/u, "").replace(/<\/svg>\s*$/u, ""), prefix);
     const object = run.length === 1 ? run[0]! : undefined;
     const attributes: string[] = [];
@@ -136,11 +156,13 @@ async function assemble(doc: ImageDocument, root: string, visible: readonly Scen
       defs.push(await maskDef(doc, root, object, `${prefix}mask`, maskImages));
       attributes.push(`mask="url(#${prefix}mask)"`);
     }
-    groups.push(`<g${attributes.length ? ` ${attributes.join(" ")}` : ""}>${inner}</g>`);
+    return `<g${attributes.length ? ` ${attributes.join(" ")}` : ""}>${inner}</g>`;
   }
-  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">`
-    + `${defs.length ? `<defs>${defs.join("")}</defs>` : ""}<rect width="${width}" height="${height}" fill="${background}"/>${groups.join("")}</svg>`;
 }
+
+/** A group that must be composited as one picture: drawn below full opacity, or holding a blended member. */
+const picture = (doc: ImageDocument, visible: readonly SceneObject[], group: Group | undefined): Group | undefined =>
+  group && (group.opacity < 1 || visible.some((object) => object.group_id === group.id && object.blend)) ? group : undefined;
 
 /** Prefixes every id a layer defines and every reference to one. */
 function namespace(svg: string, prefix: string): string {

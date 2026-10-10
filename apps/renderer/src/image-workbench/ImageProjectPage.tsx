@@ -1,7 +1,7 @@
-import { imageCandidateActions, type ImageCandidateListStatus } from "@pi67/domain";
+import { imageCandidateActions, imageObjectInEffect, type ImageCandidateListStatus, type ImageDocument, type ImageSceneObject } from "@pi67/domain";
 import type { ImageCandidateSummary } from "@pi67/protocol";
 import { ArrowLeft, Check, Columns2, Download, Redo2, SquareDashedMousePointer, Undo2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import {
@@ -23,6 +23,7 @@ import { ImageMarksBar } from "./ImageMarksBar.js";
 import { addImageMark } from "./image-project-marks.js";
 import type { Rect } from "./image-canvas-geometry.js";
 import { ImageSelectionBar } from "./ImageSelectionBar.js";
+import { groupSelectedLayers, selectedGroup, ungroupImageGroup } from "./image-project-groups.js";
 import { ImageProjectConversationDock } from "./ImageProjectConversationDock.js";
 import { imagePreviewUrl } from "./image-workbench-controller.js";
 import { useImageWorkbench } from "./image-workbench-store.js";
@@ -75,13 +76,22 @@ export function ImageProjectPage({ projectId }: { projectId: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [marking]);
 
-  // ⌘Z / ⇧⌘Z (Ctrl on Windows) publish `revert_to`, except while typing in a field.
+  const groupingAllowed = useRef(true);
+  groupingAllowed.current = !inspecting && !marking;
+  // ⌘Z / ⇧⌘Z (Ctrl on Windows) publish `revert_to`, and ⌘G / ⇧⌘G group and ungroup the selection, except while typing in a field.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z") return;
+      const key = event.key.toLowerCase();
+      if (!(event.metaKey || event.ctrlKey) || (key !== "z" && key !== "g")) return;
       if (event.target instanceof HTMLElement && event.target.closest("input, textarea, [contenteditable=true]")) return;
       event.preventDefault();
-      void (event.shiftKey ? redoImageEdit() : undoImageEdit());
+      if (key === "z") { void (event.shiftKey ? redoImageEdit() : undoImageEdit()); return; }
+      // Grouping edits what is on the canvas, so not while a candidate is shown or marks are drawn.
+      const { document: current, selectedObjectIds, busy: working } = useImageProject.getState();
+      if (working || !groupingAllowed.current) return;
+      const group = selectedGroup(current, selectedObjectIds);
+      if (event.shiftKey) { if (group && !group.locked) void ungroupImageGroup(group); }
+      else void groupSelectedLayers();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -144,7 +154,7 @@ export function ImageProjectPage({ projectId }: { projectId: string }) {
       </div>
       {marking ? <ImageMarksBar focus={focusMark} onAdd={mark} onDone={() => setMarking(false)} /> : (
         <ImageSelectionBar busy={busy} count={inspecting ? 0 : selectedIds.length}
-          object={inspecting || selectedIds.length !== 1 ? undefined : document?.objects.find((object) => object.id === selectedIds[0])} />
+          object={inspecting || selectedIds.length !== 1 || !document ? undefined : effectOf(document, selectedIds[0])} />
       )}
       <div className={styles.dock}>
         <section aria-label="候选" className={styles.candidates}>
@@ -184,4 +194,10 @@ function CandidateTile({ candidate, previewUrl, inspecting, busy }: { candidate:
       ) : null}
     </li>
   );
+}
+
+/** The selected object as it behaves, its group's lock and visibility folded in. */
+function effectOf(document: ImageDocument, objectId: string | undefined): ImageSceneObject | undefined {
+  const object = document.objects.find((item) => item.id === objectId);
+  return object && imageObjectInEffect(document, object);
 }

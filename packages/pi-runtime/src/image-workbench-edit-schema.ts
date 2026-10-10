@@ -26,7 +26,9 @@ const rotation = Type.Number({ minimum: -180, maximum: 180, description: "Degree
 const blend = Type.Union(IMAGE_BLEND_MODES.map((mode) => Type.Literal(mode)), { description: "How the object composites onto what is below it; omit for normal." });
 const mask = Type.Object({ asset_id: id("A project raster asset: white shows the object, black hides it."), invert: Type.Optional(Type.Literal(true)) }, { additionalProperties: false });
 const common = { id: id("New object id."), locked: Type.Boolean(), visible: Type.Boolean(), ...box, opacity: Type.Number({ minimum: 0, maximum: 1 }),
-  rotation: Type.Optional(rotation), flip_x: Type.Optional(Type.Literal(true)), flip_y: Type.Optional(Type.Literal(true)), blend: Type.Optional(blend), mask: Type.Optional(mask) };
+  rotation: Type.Optional(rotation), flip_x: Type.Optional(Type.Literal(true)), flip_y: Type.Optional(Type.Literal(true)), blend: Type.Optional(blend), mask: Type.Optional(mask),
+  group_id: Type.Optional(id("An existing group to join. New objects are added on top of everything, so this works only when the group is the topmost block; otherwise add the object, reorder_objects it next to the group, then update_object its group_id.")) };
+const groupName = Type.String({ minLength: 1, maxLength: 64 });
 const text = { text: Type.String({ maxLength: 2000 }), font_size: Type.Integer({ minimum: 8, maximum: 500 }), color, align, line_height: Type.Number({ minimum: 1, maximum: 2 }) };
 
 // Fonts are added by the person only (add_font is not an Agent operation); text may use a bound one.
@@ -38,6 +40,7 @@ const patch = Type.Partial(Type.Object({
   blend: Type.Union([blend, Type.Null()], { description: "null returns to normal blending." }),
   mask: Type.Union([mask, Type.Null()], { description: "A luminance mask over the box (add the image first with add_asset); null removes it." }),
   adjust: Type.Union([adjust, Type.Null()], { description: "Image only: brightness, contrast, saturation and blur; null removes them all." }),
+  group_id: Type.Union([id("Group id."), Type.Null()], { description: "Join a group from right next to it, or null to leave it; a group's members must stay contiguous in paint order." }),
   flip_x: Type.Union([Type.Boolean(), Type.Null()], { description: "Mirror left-right; false or null removes it." }),
   flip_y: Type.Union([Type.Boolean(), Type.Null()], { description: "Mirror top-bottom; false or null removes it." }),
   radius: int(0), fit: Type.Union([Type.Literal("contain"), Type.Literal("cover"), Type.Literal("fill")])
@@ -55,6 +58,12 @@ export const IMAGE_EDIT_OPERATION = Type.Union([
   Type.Object({ type: Type.Literal("remove_object"), id: id("Existing unlocked object id.") }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("reorder_objects"), ids: Type.Array(id("Object id."), { minItems: 1, description: "Every object id once, bottom to top." }) }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("set_canvas"), canvas: Type.Object({ width: Type.Integer({ minimum: 64, maximum: 8192 }), height: Type.Integer({ minimum: 64, maximum: 8192 }), background: color }, { additionalProperties: false }) }, { additionalProperties: false }),
+  Type.Object({ type: Type.Literal("group_objects"), group: Type.Object({ id: id("New group id (not an object id)."), name: groupName }, { additionalProperties: false }),
+    ids: Type.Array(id("Ungrouped, unlocked object id."), { minItems: 1, description: "Gathered next to the topmost of them, keeping their order." }) }, { additionalProperties: false }),
+  Type.Object({ type: Type.Literal("update_group"), id: id("Existing group id."), patch: Type.Object({ name: Type.Optional(groupName), locked: Type.Optional(Type.Boolean()),
+    visible: Type.Optional(Type.Boolean()), opacity: Type.Optional(Type.Number({ minimum: 0, maximum: 1, description: "The group drawn as one picture." })) },
+  { additionalProperties: false, minProperties: 1, description: "A lock change ({locked}) must be the only field and the only operation in its batch. A locked group locks every member." }) }, { additionalProperties: false }),
+  Type.Object({ type: Type.Literal("ungroup"), id: id("Unlocked group id; members keep their places.") }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("revert_to"), revision: Type.Integer({ minimum: 1, description: "Must be the only operation in its batch." }) }, { additionalProperties: false })
 ]);
 

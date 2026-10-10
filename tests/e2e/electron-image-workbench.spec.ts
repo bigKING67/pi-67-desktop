@@ -171,6 +171,26 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     await inspector.getByRole("button", { name: "还原调整" }).click();
     await expectRevision(page, adjusted + 1);
     await expect(inspector.getByRole("button", { name: "还原调整" })).toHaveCount(0);
+    // P4: group the ellipse with the headline in 图层, hide and show the group, make it see-through in 属性, then ungroup.
+    await tab("图层");
+    await inspector.getByRole("button", { name: "选择图层 ellipse" }).click();
+    await inspector.getByRole("button", { name: "选择图层 春日上新 SALE" }).click({ modifiers: ["Shift"] });
+    await inspector.getByRole("group", { name: "编组" }).getByRole("button", { name: "编组" }).click();
+    await expectRevision(page, adjusted + 2);
+    await expect(inspector.getByRole("button", { name: "选择组 编组 1" })).toHaveAttribute("aria-pressed", "true");
+    await inspector.getByRole("button", { name: "隐藏组 编组 1" }).click();
+    await expectRevision(page, adjusted + 3);
+    await inspector.getByRole("button", { name: "显示组 编组 1" }).click();
+    await expectRevision(page, adjusted + 4);
+    await tab("属性");
+    await expect(inspector.getByText("组 · 编组 1")).toBeVisible();
+    await inspector.getByLabel("不透明度").fill("0.6");
+    await inspector.getByLabel("不透明度").press("Enter");
+    await expectRevision(page, adjusted + 5);
+    await inspector.getByRole("button", { name: "取消编组" }).click();
+    await expectRevision(page, adjusted + 6);
+    await tab("图层");
+    await expect(inspector.getByRole("button", { name: /选择组/u })).toHaveCount(0);
 
     // F. A derived 4:5 size and one export set with a receipt.
     await tab("导出");

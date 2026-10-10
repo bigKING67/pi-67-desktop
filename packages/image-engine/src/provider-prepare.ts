@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { sha256 } from "./content-store.js";
-import { id, record, LIMITS, isRecord, type Asset, type JsonRecord } from "./document.js";
+import { id, record, LIMITS, isRecord, type Asset, type JsonRecord, isLocked } from "./document.js";
 import { readProject, type ProjectState } from "./project.js";
 import { readBytes, importRaster } from "./raster.js";
 import { assertCandidateSlot } from "./candidate-store.js";
@@ -60,7 +60,7 @@ export async function prepareRequest(root: string, value: unknown, contracts: Im
   if (project.document.revision !== spec.base_revision) throw new Error("Provider base revision conflict");
   await assertCandidateSlot(root, spec.candidate_id);
   const object = project.document.objects.find((item) => item.id === spec.target_id);
-  if (!object || object.kind !== "image" || object.locked) throw new Error("Provider target must be an unlocked image object");
+  if (!object || object.kind !== "image" || isLocked(project.document, object)) throw new Error("Provider target must be an unlocked image object");
   const asset = project.document.assets.find((item) => item.id === object.asset_id) as Asset;
   // The request is the target size, or with resize_to_target an exact-ratio size the
   // profile accepts; the output is then resampled full-frame, never cropped.

@@ -1,8 +1,9 @@
-import type { ImageDocument, ImageEditOperation, ImageMark, ImageObjectPatch, ImageSceneObject as SceneObject } from "@pi67/domain";
+import { imageObjectInEffect, type ImageDocument, type ImageEditOperation, type ImageMark, type ImageObjectPatch, type ImageSceneObject as SceneObject } from "@pi67/domain";
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { boundsOf, clampInside, normalizeRotation, RESIZE_HANDLES, resizeRect, rotateAbout, rotateStyle, snapMove, type Guide, type Rect, type ResizeHandle } from "./image-canvas-geometry.js";
 import { useCanvasFit } from "./image-canvas-fit.js";
 import { ImageInlineTextEditor } from "./ImageInlineTextEditor.js";
+import { selectionFor } from "./image-project-controller.js";
 import { IMAGE_OBJECT_KIND_LABELS } from "./image-object-kinds.js";
 import styles from "./ImageCanvas.module.css";
 
@@ -36,7 +37,7 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
   alt: string;
   selectedIds: readonly string[];
   editable: boolean;
-  onSelect: (objectId: string | undefined, options?: { extend?: boolean }) => void;
+  onSelect: (objectId: string | undefined, options?: { extend?: boolean; single?: boolean }) => void;
   onEdit: (summary: string, operations: ImageEditOperation[]) => void;
   marks?: readonly ImageMark[];
   marking?: boolean;
@@ -49,8 +50,11 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
   const canvas = document?.canvas;
   const fit = useCanvasFit(stage, canvas);
 
-  const objects = document?.objects.filter((object) => object.visible) ?? [];
-  const movable = (ids: readonly string[]) => objects.filter((object) => ids.includes(object.id) && !object.locked);
+  // As they behave: a locked or hidden group locks or hides its members here too.
+  const all = document?.objects.map((object) => imageObjectInEffect(document, object)) ?? [];
+  const objects = all.filter((object) => object.visible);
+  // A selected group moves whole, hidden members too, so they are in place when shown again.
+  const movable = (ids: readonly string[]) => all.filter((object) => ids.includes(object.id) && !object.locked);
   const others = (ids: readonly string[]) => objects.filter((object) => !ids.includes(object.id)).map(rectOf);
   const primary = objects.find((object) => object.id === selectedIds.at(-1));
   const editingObject = editable ? objects.find((object) => object.id === editingId && object.kind === "text" && !object.locked) : undefined;
@@ -78,9 +82,12 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
 
   const pointerDown = (event: PointerEvent<HTMLButtonElement>, object: SceneObject) => {
     if (event.button !== 0) return;
-    if (event.shiftKey) { onSelect(object.id, { extend: true }); return; }
-    const ids = selectedIds.includes(object.id) ? selectedIds : [object.id];
-    if (!selectedIds.includes(object.id)) onSelect(object.id);
+    // A grouped object brings its group; ⌘-click (Ctrl on Windows) takes just the one.
+    const single = event.metaKey || event.ctrlKey;
+    if (event.shiftKey) { onSelect(object.id, { extend: true, single }); return; }
+    const group = selectionFor(document, object.id, single);
+    const ids = selectedIds.includes(object.id) && !single ? selectedIds : group;
+    if (!selectedIds.includes(object.id) || single) onSelect(object.id, { single });
     if (!editable || movable(ids).length === 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     setGesture({ kind: "move", ids: [...ids], startX: event.clientX, startY: event.clientY, dx: 0, dy: 0, guides: [] });
@@ -127,7 +134,7 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
   const startEditing = (object: SceneObject) => {
     if (!editable || object.kind !== "text" || object.locked) return;
     setGesture(undefined);
-    onSelect(object.id);
+    onSelect(object.id, { single: true });
     setEditingId(object.id);
   };
   const keyDown = (event: KeyboardEvent<HTMLButtonElement>, object: SceneObject) => {

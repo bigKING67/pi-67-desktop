@@ -1557,6 +1557,17 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   changing it; each slider writes one revision when let go, and 还原调整 drops them all.
   Unchanged values are never written; derived sizes scale the blur with the layout. The
   Agent may set or drop `adjust`.
+  Layers can be grouped (flat, no nesting): 图层 offers `编组` (⌘G) for two or more ungrouped,
+  unlocked layers and `取消编组` (⇧⌘G) for a selected group. A group is one block in the stack
+  (members stay together; moves that would split it are refused), shows as a collapsible row
+  over its indented members, and is shown, hidden, locked, unlocked and moved as a whole.
+  Locking or hiding a group locks or hides every member, for the Agent and candidates too.
+  Its opacity treats the group as one picture (overlapping members do not show through each
+  other), and a group holding a blended layer is composited the same way, so blends stay
+  inside the group. 取消编组 keeps how members looked: a hidden group leaves them hidden and
+  its opacity is multiplied into each. Clicking a grouped layer on the canvas selects its group; ⌘-click or the layer's
+  own row selects just that layer. 属性 for a group edits its name and opacity and aligns its
+  members. The Agent may `group_objects`, `update_group` and `ungroup`.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

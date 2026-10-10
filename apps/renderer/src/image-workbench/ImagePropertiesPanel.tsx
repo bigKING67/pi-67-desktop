@@ -1,6 +1,6 @@
-import { IMAGE_ASSET_LIMIT, IMAGE_BLEND_MODES, IMAGE_PROMPT_CONTEXT_LIMITS, IMAGE_REFERENCE_ROLE_LABELS, IMAGE_REFERENCE_ROLES, IMAGE_USER_FONT_LIMIT, type ImageBlendMode, type ImageCanvas, type ImageDocument, type ImageEllipseObject, type ImageGradient, type ImageObjectPatch, type ImageRectObject, type ImageSceneObject, type ImageTextObject, type ImageUserFont } from "@pi67/domain";
+import { imageObjectInEffect, IMAGE_ASSET_LIMIT, IMAGE_BLEND_MODES, IMAGE_PROMPT_CONTEXT_LIMITS, IMAGE_REFERENCE_ROLE_LABELS, IMAGE_REFERENCE_ROLES, IMAGE_USER_FONT_LIMIT, type ImageBlendMode, type ImageCanvas, type ImageDocument, type ImageEllipseObject, type ImageGradient, type ImageGroup, type ImageObjectPatch, type ImageRectObject, type ImageSceneObject, type ImageTextObject, type ImageUserFont } from "@pi67/domain";
 import { Eye, EyeOff, Lock, LockOpen, Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Input, Label, TextField } from "react-aria-components";
 import { ImageAdjustments } from "./ImageAdjustments.js";
 import { ImageAlignToolbar } from "./ImageAlignToolbar.js";
@@ -15,9 +15,10 @@ import {
   useImageProject
 } from "./image-project-controller.js";
 import { setImageReference } from "./image-project-marks.js";
+import { selectedGroup, ungroupImageGroup, updateImageGroup } from "./image-project-groups.js";
 import styles from "./ImageInspector.module.css";
 
-type FieldKind = "int" | "number" | "color";
+type FieldKind = "int" | "number" | "color" | "name";
 interface FieldSpec<K extends string> { key: K; label: string; kind: FieldKind; min?: number; max?: number; /** Shown while the field is absent. */ fallback?: number }
 
 // Ranges follow the engine's document validation, so a value it would refuse never leaves the field.
@@ -49,8 +50,12 @@ export function ImagePropertiesPanel() {
   const [notice, setNotice] = useState<string>();
   useEffect(() => setNotice(undefined), [selectedIds]);
   if (!document) return null;
-  const selected = selectedIds.flatMap((id) => document.objects.find((object) => object.id === id) ?? []);
+  // As they behave: a locked or hidden group locks or hides its members. Toggles still write the object's own flag.
+  const own = selectedIds.flatMap((id) => document.objects.find((object) => object.id === id) ?? []);
+  const selected = own.map((object) => imageObjectInEffect(document, object));
   const object = selected.length === 1 ? selected[0] : undefined;
+  // A one-layer group shows that layer; its group is still in 图层.
+  const group = selected.length > 1 ? selectedGroup(document, selectedIds) : undefined;
   const report = (result: ImageEditOutcome) => setNotice(result.outcome === "refused" ? result.message : result.outcome === "conflict" ? "项目刚被更新，已刷新到最新修订。" : undefined);
   const status = notice ? <p className={styles.notice} role="status">{notice}</p> : null;
 
@@ -70,6 +75,7 @@ export function ImagePropertiesPanel() {
       </div>
     );
   }
+  if (group) return <GroupProperties busy={busy} canvas={document.canvas} group={group} members={selected} status={status} onResult={report} />;
   if (!object) {
     return (
       <div className={styles.properties}>
@@ -83,14 +89,14 @@ export function ImagePropertiesPanel() {
     <div className={styles.properties}>
       <div className={styles.objectHead}>
         <p className={styles.sectionLabel}>{IMAGE_OBJECT_KIND_LABELS[object.kind]} · {object.id}</p>
-        <Button aria-label={object.visible ? "隐藏" : "显示"} className={styles.layerAction!} isDisabled={busy} onPress={() => void toggleImageObjectVisibility(object)}>
-          {object.visible ? <Eye aria-hidden="true" size={13} /> : <EyeOff aria-hidden="true" size={13} />}
+        <Button aria-label={own[0]!.visible ? "隐藏" : "显示"} className={styles.layerAction!} isDisabled={busy} onPress={() => void toggleImageObjectVisibility(own[0]!)}>
+          {own[0]!.visible ? <Eye aria-hidden="true" size={13} /> : <EyeOff aria-hidden="true" size={13} />}
         </Button>
-        <Button aria-label={object.locked ? "解锁" : "锁定"} className={styles.layerAction!} isDisabled={busy} onPress={() => void toggleImageObjectLock(object)}>
-          {object.locked ? <Lock aria-hidden="true" size={13} /> : <LockOpen aria-hidden="true" size={13} />}
+        <Button aria-label={own[0]!.locked ? "解锁" : "锁定"} className={styles.layerAction!} isDisabled={busy} onPress={() => void toggleImageObjectLock(own[0]!)}>
+          {own[0]!.locked ? <Lock aria-hidden="true" size={13} /> : <LockOpen aria-hidden="true" size={13} />}
         </Button>
       </div>
-      {object.locked ? <p className={styles.empty}>已锁定。解锁后才能修改。</p> : null}
+      {own[0]!.locked ? <p className={styles.empty}>已锁定。解锁后才能修改。</p> : object.locked ? <p className={styles.empty}>所在的组已锁定。在图层里解锁组后才能修改。</p> : null}
       <div className={styles.fieldGrid}>
         {/* Under a gradient the solid 颜色 is not drawn, so it is not offered. */}
         {[...COMMON, ...BY_KIND[object.kind].filter((spec) => !(spec.key === "color" && "gradient" in object && object.gradient))].map((spec) => (
@@ -171,6 +177,47 @@ function BlendAndMask({ object, document, busy, onResult }: { object: ImageScene
       <input ref={input} accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" className={styles.fileInput} tabIndex={-1} type="file"
         onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void addImageMask(file, object.id); }} />
       <p className={styles.empty}>蒙版按亮度生效：白色显示、黑色隐藏，随图层的框、旋转和翻转一起变。{full ? `项目已有 ${IMAGE_ASSET_LIMIT} 张图片，不能再添加。` : ""}</p>
+    </div>
+  );
+}
+
+const GROUP_FIELDS: FieldSpec<"name" | "opacity">[] = [{ key: "name", label: "名称", kind: "name" }, { key: "opacity", label: "不透明度", kind: "number", min: 0, max: 1 }];
+
+/**
+ * 属性 when the selection is exactly a group: its name and opacity (the group drawn as one
+ * picture), visibility and lock for every member, alignment of the members, and 取消编组.
+ */
+function GroupProperties({ group, members, canvas, busy, status, onResult }: {
+  group: ImageGroup; members: readonly ImageSceneObject[]; canvas: ImageCanvas; busy: boolean; status: ReactNode; onResult: (result: ImageEditOutcome) => void;
+}) {
+  return (
+    <div className={styles.properties}>
+      <div className={styles.objectHead}>
+        <p className={styles.sectionLabel}>组 · {group.name}</p>
+        <Button aria-label={group.visible ? "隐藏组" : "显示组"} className={styles.layerAction!} isDisabled={busy}
+          onPress={() => void updateImageGroup(group, group.visible ? "隐藏组" : "显示组", { visible: !group.visible }).then(onResult)}>
+          {group.visible ? <Eye aria-hidden="true" size={13} /> : <EyeOff aria-hidden="true" size={13} />}
+        </Button>
+        <Button aria-label={group.locked ? "解锁组" : "锁定组"} className={styles.layerAction!} isDisabled={busy}
+          onPress={() => void updateImageGroup(group, group.locked ? "解锁组" : "锁定组", { locked: !group.locked }).then(onResult)}>
+          {group.locked ? <Lock aria-hidden="true" size={13} /> : <LockOpen aria-hidden="true" size={13} />}
+        </Button>
+      </div>
+      {group.locked ? <p className={styles.empty}>组已锁定，组里的 {members.length} 个图层都不能修改。</p> : null}
+      <div className={styles.fieldGrid}>
+        {GROUP_FIELDS.map((spec) => (
+          <PropertyField key={`${group.id}-${spec.key}`} disabled={group.locked || busy} spec={spec} value={group[spec.key]}
+            onCommit={async (value) => { const result = await updateImageGroup(group, `修改组${spec.label}`, { [spec.key]: value }); onResult(result); return result; }} />
+        ))}
+      </div>
+      <p className={styles.empty}>组的不透明度把整组当作一张图：组里重叠的图层不会互相透出来。</p>
+      {status}
+      {group.locked ? null : (
+        <>
+          <ImageAlignToolbar busy={busy} canvas={canvas} objects={members} />
+          <Button className={styles.historyAction!} isDisabled={busy} onPress={() => void ungroupImageGroup(group).then(onResult)}>取消编组</Button>
+        </>
+      )}
     </div>
   );
 }
@@ -275,9 +322,9 @@ function PropertyField<K extends string>({ spec, value, disabled, onCommit }: {
   useEffect(() => { setDraft(shown); setInvalid(false); }, [shown]);
 
   const commit = async () => {
-    if (draft === shown) return;
-    const next = spec.kind === "color" ? draft.trim() : Number(draft);
-    const valid = typeof next === "string" ? COLOR.test(next)
+    if (draft === shown || (spec.kind === "name" && draft.trim() === shown)) { setDraft(shown); return; }
+    const next = spec.kind === "color" || spec.kind === "name" ? draft.trim() : Number(draft);
+    const valid = typeof next === "string" ? (spec.kind === "name" ? next.length > 0 && next.length <= 64 : COLOR.test(next))
       : Number.isFinite(next) && (spec.kind !== "int" || Number.isInteger(next)) && (spec.min === undefined || next >= spec.min) && (spec.max === undefined || next <= spec.max);
     if (!valid) { setInvalid(true); return; }
     // The same number written differently ("15.0", or an emptied field already at 0) is not an edit.
@@ -289,7 +336,7 @@ function PropertyField<K extends string>({ spec, value, disabled, onCommit }: {
     <TextField className={styles.field!} isDisabled={disabled} isInvalid={invalid} value={draft} onChange={setDraft}
       onBlur={() => void commit()} onKeyDown={(event) => { if (event.key === "Enter") void commit(); if (event.key === "Escape") { setDraft(shown); setInvalid(false); } }}>
       <Label>{spec.label}</Label>
-      <Input inputMode={spec.kind === "color" ? "text" : "decimal"} />
+      <Input inputMode={spec.kind === "color" || spec.kind === "name" ? "text" : "decimal"} />
     </TextField>
   );
 }

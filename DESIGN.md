@@ -310,6 +310,12 @@ Application-level surfaces use a separate wide-window shell:
   neutral point (the middle, or the left end for blur) and a 14px round `--surface` thumb
   with `--border-strong` (accent while hovered or dragged, `--focus` ring); then a
   `还原调整` text action while any is set. Disabled sliders dim to 0.55 like other controls.
+- Groups (P4, 2026-10-10): in 图层 a group row leads with a chevron (collapse) and a folder
+  glyph, its name in medium weight, then the same eye / lock / up / down actions acting on
+  the whole group; members follow indented 30px. A `选中` row under `添加` offers `编组`
+  (folder glyph) while it applies and `取消编组` for a selected group, so `添加` never wraps. 属性 for a group heads `组 · name` with
+  eye and lock, then 名称 and 不透明度 fields, a tertiary line on group opacity, the align
+  row and a `取消编组` text action; a member of a locked group says the group is locked.
 - Text fonts (P3, 2026-10-10): 属性 for text adds a `字体` section — the shared Settings
   select at full panel width (`Noto Sans CJK SC · 内置`, then each added font's family with
   `TTF`/`OTF` as detail), a `添加字体…` text action with a plus glyph (disabled at 8 fonts or

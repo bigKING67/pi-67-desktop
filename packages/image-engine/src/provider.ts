@@ -3,7 +3,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { ALPHA_ERRORS, inspectAlpha, requireAlpha, verifyAlpha, type AlphaEvidence } from "./provider-alpha.js";
 import { encodeJson, errorCode, errorMessage, sha256, writeOnce } from "./content-store.js";
-import { id, record, number, LIMITS, isRecord, type JsonRecord } from "./document.js";
+import { id, record, number, LIMITS, isRecord, type JsonRecord, isLocked } from "./document.js";
 import { readProject } from "./project.js";
 import { readBytes } from "./raster.js";
 import { ensureDirectory, assertCandidateSlot } from "./candidate-store.js";
@@ -218,7 +218,7 @@ export async function recoverProvider(root: string, input: unknown, options: { c
   if (project.sha256 !== request.base_sha256 || project.document.project_id !== request.project_id) throw new Error("Recovery project basis mismatch");
   const object = project.document.objects.find((item) => item.id === request.target_id);
   const asset = object?.kind === "image" ? project.document.assets.find((item) => item.id === object.asset_id) : undefined;
-  if (!asset || object?.locked) throw new Error("Invalid recovery target");
+  if (!asset || !object || isLocked(project.document, object)) throw new Error("Invalid recovery target");
   const normalized = await normalizeImage(bytes, asset.width, asset.height, input.output_policy as OutputPolicy);
   if (!normalized.normalization) throw new Error("Recovery requires actual dimension normalization");
   const alpha = transparentJob ? requireAlpha(await inspectAlpha(normalized.bytes)) : null;

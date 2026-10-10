@@ -44,7 +44,7 @@ with shared samples first, then protocol, then UI (product model §8).
 - [x] 5. Blend modes and opacity masks, including how candidates' protected regions
   interact with masked layers.
 - [x] 6. Adjustments on image layers (non-destructive, rendered per layer).
-- [ ] 7. Layer groups: 图层 tree, move/lock/hide a group, selection and alignment.
+- [x] 7. Layer groups: 图层 tree, move/lock/hide a group, selection and alignment.
 - [ ] 8. OCR gate for key text in generated candidates, and the VLM debias / golden
   eval with a report (separate design; may move to its own plan).
 - [ ] 9. Authority docs, packaged macOS verification, Windows CI evidence, Agent tool
@@ -96,6 +96,35 @@ can share one satori pass, so the common case keeps today's cost.
 - Evidence: pixel tests per blend family against resvg's own results, mask with invert and
   rotation, a byte-identical render for documents without either, the id-namespacing case
   (two layers that each define a gradient), e2e and packaged screenshots.
+
+## Checkpoint 7 plan (layer groups; proposed 2026-10-10)
+
+- Schema (v3, written only while a group exists): document `groups: [{ id, name, locked,
+  visible, opacity }]` (at most 32; ids distinct from object ids), objects carry
+  `group_id`. No nesting, no empty groups, and a group's members are **contiguous in paint
+  order** (a group is one block in the stack, as in Figma and Photoshop); any edit that
+  would split a group is refused.
+- Meaning: an object is locked if it or its group is locked, and drawn only if both are
+  visible. Every lock check in the engine (edit, remove, reorder, revert, candidates) asks
+  the effective lock. A group's opacity applies to the group as one picture: the group is
+  rendered as its own layer and assembled in `<g opacity>`, so overlapping members do not
+  show through each other; blend modes inside a group blend within the group.
+- Operations: `group_objects { group: { id, name }, ids }` gathers the members next to the
+  topmost one (keeping their order; refused if that would move a locked object),
+  `update_group { id, patch: { name?, locked?, visible?, opacity? } }`, `ungroup { id }`
+  (members keep their places). Moving a group up or down is a `reorder_objects` that keeps
+  it whole. The Agent gets all three plus `groups` in its read output.
+- 图层: groups show as a row (folder glyph, name, eye, lock, up/down that move the whole
+  block, collapse) with members indented beneath. Selecting a group row selects its members;
+  with two or more selected layers `编组` (⌘G) appears, and on a group `取消编组` (⇧⌘G).
+- Canvas: clicking a grouped object selects the whole group; ⌘-click (or the 图层 list)
+  selects one member. Moving, aligning and resizing act on the selection as today.
+- 属性: when the selection is exactly a group, it shows the group's name and opacity plus the
+  alignment row; otherwise as today.
+- Evidence: engine tests for contiguity, effective lock and visibility, group opacity pixels
+  (two overlapping members at 50% must not show the lower one through the upper one),
+  revert across grouping; protocol / Agent / renderer tests, e2e (group, hide, move, ungroup)
+  and packaged screenshots in both themes.
 
 ## Rollback
 
@@ -182,3 +211,26 @@ page and earlier releases still open projects that do not use it.
   could not clear an Agent factor that rounds to 0 (compared with the written value);
   protocol and Agent ranges come from `IMAGE_ADJUST_LIMITS`; the engine's `Adjust` is the
   domain type.
+- 2026-10-10: checkpoint 7 plan confirmed by the user as written and done. Engine: `groups`
+  (≤32, `IMAGE_GROUP_LIMIT`) and `group_id`, v3; contiguity, no empty groups (a group goes with
+  its last member) and group ids distinct from object ids are validated; `isLocked` / `isShown`
+  fold the group into every lock check (edit, remove, reorder, revert, candidates, Agent
+  `image_generate`) and into rendering; a see-through group renders as its own layers in one
+  `<g opacity>`; `group_objects` / `update_group` (lock changes isolated) / `ungroup` in a new
+  `groups.ts`. Protocol, Agent schema, read output. 图层 group rows with collapse and whole-group
+  actions, `编组` / `取消编组` and ⌘G / ⇧⌘G, group-aware canvas selection (⌘-click for one),
+  属性 group view. Tests: contiguity, locks through every path, hidden and see-through pixels,
+  validation; protocol, Agent, renderer (moves, selection, grouping) and e2e.
+- 2026-10-10: `/code-review high` on checkpoint 7, all fixed: a blended member blended with
+  what lay below at group opacity 1 but within the group below 1 (a group with a blended
+  member is now always one isolated picture, `isolation:isolate`, which resvg honours; pixel
+  test); provider preparation, provider recovery and copy variants still read only the
+  layer's own lock (`isLocked` now); a revert could put a layer back into a locked group (one
+  check after every batch keeps a locked group's members exactly, replacing the per-op
+  guard); ungrouping showed hidden members and dropped group opacity (folded into members);
+  canvas group drags left hidden members behind (moves use all selected members); ⌘G worked
+  while a candidate was shown or marks drawn (not now); the Agent's `group_id` on add_object
+  promised a join that only works for the topmost group (described with the reorder recipe);
+  the group limit and duplicate ids failed late and vaguely (checked in `group_objects`, and
+  `编组` hides at the limit); a name differing only by spaces sent a refused no-op; the
+  engine's `Group` is the domain type and the Agent and canvas reuse the shared helpers.

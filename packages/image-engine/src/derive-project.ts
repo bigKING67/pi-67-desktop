@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { errorCode, sha256, writeOnce } from "./content-store.js";
-import { digest, documentSchema, id, LIMITS, number, record, textObjects, validateCanvas, validateDocument, type Canvas, type ImageDocument, type SceneObject } from "./document.js";
+import { digest, documentSchema, id, isShown, LIMITS, number, record, textObjects, validateCanvas, validateDocument, type Canvas, type ImageDocument, type SceneObject } from "./document.js";
 import { encode, readProject } from "./project.js";
 import { regularPath } from "./raster.js";
 import { compose } from "./render-compose.js";
@@ -102,7 +102,7 @@ export async function deriveProject(sourceRoot: string, target: string, input: u
   const shrunk = new Set<string>();
   for (;;) {
     try {
-      await compose({ root, font, fonts, layoutOnly: true, document: { ...document, assets: [], objects: textObjects(document.objects).filter((object) => object.visible) } });
+      await compose({ root, font, fonts, layoutOnly: true, document: { ...document, assets: [], objects: textObjects(document.objects).filter((object) => isShown(document, object)) } });
       break;
     } catch (error) {
       const overflow = /^Text (?:overflow|box narrower than glyph): (.+)$/u.exec(error instanceof Error ? error.message : "");

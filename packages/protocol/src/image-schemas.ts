@@ -1,4 +1,4 @@
-import { IMAGE_ADJUST_LIMITS, IMAGE_ID_PATTERN, IMAGE_PROJECT_LIMITS, IMAGE_SIZE_PRESETS, IMAGE_USER_FONT_LIMIT } from "@pi67/domain";
+import { IMAGE_ADJUST_LIMITS, IMAGE_GROUP_LIMIT, IMAGE_ID_PATTERN, IMAGE_PROJECT_LIMITS, IMAGE_SIZE_PRESETS, IMAGE_USER_FONT_LIMIT } from "@pi67/domain";
 import { strictObject, Type, Value, type TSchema } from "./typebox-schema.js";
 import type { ImageCommandPayloads, ImageCommandResults, ImageEventPayloads } from "./image-command-messages.js";
 
@@ -40,8 +40,10 @@ const common = {
   id: IdSchema, locked: Type.Boolean(), visible: Type.Boolean(),
   x: CoordinateSchema, y: CoordinateSchema, width: SizeSchema, height: SizeSchema, opacity: OpacitySchema,
   rotation: Type.Optional(RotationSchema), flip_x: Type.Optional(Type.Literal(true)), flip_y: Type.Optional(Type.Literal(true)),
-  blend: Type.Optional(BlendSchema), mask: Type.Optional(MaskSchema)
+  blend: Type.Optional(BlendSchema), mask: Type.Optional(MaskSchema), group_id: Type.Optional(IdSchema)
 };
+const GroupNameSchema = Type.String({ minLength: 1, maxLength: 64 });
+const GroupSchema = strictObject({ id: IdSchema, name: GroupNameSchema, locked: Type.Boolean(), visible: Type.Boolean(), opacity: OpacitySchema });
 // The engine also refuses neutral values (1, or a 0 blur) and an empty object.
 const adjustRange = (key: keyof typeof IMAGE_ADJUST_LIMITS) => Type.Optional(Type.Number({ minimum: IMAGE_ADJUST_LIMITS[key][0], maximum: IMAGE_ADJUST_LIMITS[key][1] }));
 const AdjustSchema = strictObject({ brightness: adjustRange("brightness"), contrast: adjustRange("contrast"), saturation: adjustRange("saturation"), blur: adjustRange("blur") });
@@ -88,6 +90,8 @@ const DocumentSchema = strictObject({
     id: IdSchema, family: Type.String({ minLength: 1, maxLength: 64 }), file: Type.String({ minLength: 1, maxLength: 160 }),
     sha256: Sha256Schema, bytes: Type.Integer({ minimum: 1, maximum: 20_000_000 }), format: Type.Union([Type.Literal("ttf"), Type.Literal("otf")])
   }), { minItems: 1, maxItems: IMAGE_USER_FONT_LIMIT })),
+  // Members are contiguous and every group has one; the engine refuses that, a schema cannot say it.
+  groups: Type.Optional(Type.Array(GroupSchema, { minItems: 1, maxItems: IMAGE_GROUP_LIMIT })),
   objects: Type.Array(SceneObjectSchema, { minItems: 1, maxItems: L.objects }),
   change: strictObject({
     author: AuthorSchema,
@@ -108,7 +112,10 @@ const PatchSchema = Type.Object({
   flip_x: Type.Optional(Type.Union([Type.Boolean(), Type.Null()])), flip_y: Type.Optional(Type.Union([Type.Boolean(), Type.Null()])),
   gradient: Type.Optional(Type.Union([GradientSchema, Type.Null()])),
   blend: Type.Optional(Type.Union([BlendSchema, Type.Null()])), mask: Type.Optional(Type.Union([MaskSchema, Type.Null()])),
-  adjust: Type.Optional(Type.Union([AdjustSchema, Type.Null()]))
+  adjust: Type.Optional(Type.Union([AdjustSchema, Type.Null()])), group_id: Type.Optional(Type.Union([IdSchema, Type.Null()]))
+}, { additionalProperties: false, minProperties: 1 });
+const GroupPatchSchema = Type.Object({
+  name: Type.Optional(GroupNameSchema), locked: Type.Optional(Type.Boolean()), visible: Type.Optional(Type.Boolean()), opacity: Type.Optional(OpacitySchema)
 }, { additionalProperties: false, minProperties: 1 });
 const EditOperationSchema = Type.Union([
   strictObject({ type: Type.Literal("update_object"), id: IdSchema, patch: PatchSchema }),
@@ -116,7 +123,10 @@ const EditOperationSchema = Type.Union([
   strictObject({ type: Type.Literal("remove_object"), id: IdSchema }),
   strictObject({ type: Type.Literal("reorder_objects"), ids: Type.Array(IdSchema, { minItems: 1, maxItems: L.objects }) }),
   strictObject({ type: Type.Literal("set_canvas"), canvas: CanvasSchema }),
-  strictObject({ type: Type.Literal("revert_to"), revision: RevisionSchema })
+  strictObject({ type: Type.Literal("revert_to"), revision: RevisionSchema }),
+  strictObject({ type: Type.Literal("group_objects"), group: strictObject({ id: IdSchema, name: GroupNameSchema }), ids: Type.Array(IdSchema, { minItems: 1, maxItems: L.objects }) }),
+  strictObject({ type: Type.Literal("update_group"), id: IdSchema, patch: GroupPatchSchema }),
+  strictObject({ type: Type.Literal("ungroup"), id: IdSchema })
 ]);
 
 const CandidateStatusSchema = Type.Union([

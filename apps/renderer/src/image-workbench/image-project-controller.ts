@@ -104,11 +104,24 @@ async function loadCandidates(projectId: string): Promise<void> {
 }
 
 /** Selects one object, or with `extend` (Shift) adds or removes it from the selection. */
-export function selectImageObject(objectId: string | undefined, options: { extend?: boolean } = {}): void {
+/** The ids selecting this object selects: its whole group, unless just the one is asked for. */
+export function selectionFor(document: ImageDocument | undefined, objectId: string, single = false): string[] {
+  const object = document?.objects.find((item) => item.id === objectId);
+  if (!document || !object || single || object.group_id === undefined) return [objectId];
+  return document.objects.filter((item) => item.group_id === object.group_id).map((item) => item.id);
+}
+
+/**
+ * Selects an object, or with `extend` adds or removes it. A grouped object brings its
+ * whole group unless `single` (⌘-click, or its own row in 图层) asks for just that one.
+ */
+export function selectImageObject(objectId: string | undefined, options: { extend?: boolean; single?: boolean } = {}): void {
   useImageProject.setState((state) => {
     if (objectId === undefined) return { selectedObjectIds: [] };
-    if (!options.extend) return { selectedObjectIds: [objectId] };
-    return { selectedObjectIds: state.selectedObjectIds.includes(objectId) ? state.selectedObjectIds.filter((id) => id !== objectId) : [...state.selectedObjectIds, objectId] };
+    const ids = selectionFor(state.document, objectId, options.single);
+    if (!options.extend) return { selectedObjectIds: ids };
+    const all = ids.every((id) => state.selectedObjectIds.includes(id));
+    return { selectedObjectIds: all ? state.selectedObjectIds.filter((id) => !ids.includes(id)) : [...state.selectedObjectIds, ...ids.filter((id) => !state.selectedObjectIds.includes(id))] };
   });
 }
 

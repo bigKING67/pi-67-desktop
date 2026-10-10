@@ -41,6 +41,8 @@ interface ImageObjectBase {
   blend?: ImageBlendMode;
   /** A project raster read by luminance (white shows, black hides) over the box (P4, v3). */
   mask?: ImageObjectMask;
+  /** The group this object belongs to; members are contiguous in paint order (P4, v3). */
+  group_id?: string;
 }
 export const IMAGE_BLEND_MODES = ["multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light",
   "difference", "exclusion", "hue", "saturation", "color", "luminosity"] as const;
@@ -68,12 +70,27 @@ export interface ImageFontBinding { profile: string; family: string; file: strin
 export interface ImageUserFont { id: string; family: string; file: string; sha256: string; bytes: number; format: "ttf" | "otf" }
 /** At most this many user fonts per project. */
 export const IMAGE_USER_FONT_LIMIT = 8;
+/** A flat layer group: lock and visibility apply to every member, opacity to the group as one picture (P4, v3). */
+export interface ImageGroup { id: string; name: string; locked: boolean; visible: boolean; opacity: number }
+/** At most this many groups per project. */
+export const IMAGE_GROUP_LIMIT = 32;
+/** The group an object belongs to, if any. */
+export const imageObjectGroup = (document: Pick<ImageDocument, "groups">, object: ImageSceneObject): ImageGroup | undefined =>
+  object.group_id === undefined ? undefined : document.groups?.find((group) => group.id === object.group_id);
+/**
+ * The object as it behaves: locked by itself or its group, and visible only while its group is.
+ * For display and gestures; a lock or visibility toggle still writes the object's own flag.
+ */
+export function imageObjectInEffect<T extends ImageSceneObject>(document: Pick<ImageDocument, "groups">, object: T): T {
+  const group = imageObjectGroup(document, object);
+  return group && (group.locked || !group.visible) ? { ...object, locked: object.locked || group.locked, visible: object.visible && group.visible } : object;
+}
 /** Images (photo, generated layers, masks) one project may hold. */
 export const IMAGE_ASSET_LIMIT = 64;
 export interface ImageChange { author: ImageChangeAuthor; summary: string; operations: string[]; candidate?: { id: string; sha256: string } }
 export interface ImageDocument {
   schema: string; project_id: string; title: string; revision: number; parent_sha256: string | null;
-  canvas: ImageCanvas; assets: ImageAsset[]; font: ImageFontBinding; fonts?: ImageUserFont[]; objects: ImageSceneObject[]; change: ImageChange;
+  canvas: ImageCanvas; assets: ImageAsset[]; font: ImageFontBinding; fonts?: ImageUserFont[]; groups?: ImageGroup[]; objects: ImageSceneObject[]; change: ImageChange;
 }
 
 /**
@@ -81,12 +98,13 @@ export interface ImageDocument {
  * file needs a path, and paths reach the engine only through Main's dialogs or
  * the Agent's tools, never from renderer payloads.
  */
-type Optional = "font_id" | "rotation" | "flip_x" | "flip_y" | "gradient" | "blend" | "mask" | "adjust";
+type Optional = "font_id" | "rotation" | "flip_x" | "flip_y" | "gradient" | "blend" | "mask" | "adjust" | "group_id";
 type PatchFields = Partial<Omit<ImageRasterObject, "id" | "kind" | Optional> & Omit<ImageTextObject, "id" | "kind" | Optional> & Omit<ImageRectObject, "id" | "kind" | Optional>>
   & {
     /** Rect and ellipse: a gradient fill, or `null` for the solid colour. */ gradient?: ImageGradient | null;
     /** `null` returns to normal blending. */ blend?: ImageBlendMode | null;
     /** `null` removes the mask. */ mask?: ImageObjectMask | null;
+    /** Joins a group (the group must stay contiguous), or `null` leaves it. */ group_id?: string | null;
     /** Image only: replaces every adjustment; unchanged values are dropped, `null` removes them all. */ adjust?: ImageAdjust | null;
     /** Text only: a bound user font, or `null` for the built-in font. */ font_id?: string | null;
     /** `null` or 0 removes the rotation. */ rotation?: number | null;
@@ -99,7 +117,12 @@ export type ImageEditOperation =
   | { type: "remove_object"; id: string }
   | { type: "reorder_objects"; ids: string[] }
   | { type: "set_canvas"; canvas: ImageCanvas }
-  | { type: "revert_to"; revision: number };
+  | { type: "revert_to"; revision: number }
+  | { type: "group_objects"; group: { id: string; name: string }; ids: string[] }
+  | { type: "update_group"; id: string; patch: ImageGroupPatch }
+  | { type: "ungroup"; id: string };
+/** A lock change must be the only field and the only operation in its batch, as for objects. */
+export type ImageGroupPatch = Partial<Pick<ImageGroup, "name" | "locked" | "visible" | "opacity">>;
 
 export type ImageCandidateStatus = "ready" | "stale" | "accepted" | "discarded" | "decision_pending";
 export type ImageCandidateListStatus = ImageCandidateStatus | "incomplete" | "unreadable";

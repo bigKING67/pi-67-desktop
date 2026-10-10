@@ -3,7 +3,8 @@ import path from "node:path";
 import { regularPath, readBytes, importRaster, saveAsset, readAsset, type ImportedRaster } from "./raster.js";
 import { readCandidateEntry, verifyCandidateAgainst, readDiscard, decisionPending, withDecisionLock, type CandidateEntry } from "./candidate-store.js";
 import { encodeJson, errorCode, fail, sha256, writeOnce } from "./content-store.js";
-import { SCHEMA, LIMITS, ADJUST_NEUTRAL, OPTIONAL_FIELDS, USER_FONT_LIMIT, documentSchema, validateDocument, validateCanvas, record, id, number, isRecord, textObjects, type ImageDocument, type JsonRecord, type SceneObject, type ChangeAuthor, type AcceptedCandidate, type UserFont } from "./document.js";
+import { SCHEMA, LIMITS, ADJUST_NEUTRAL, OPTIONAL_FIELDS, isLocked, isShown, USER_FONT_LIMIT, documentSchema, validateDocument, validateCanvas, record, id, number, isRecord, textObjects, type ImageDocument, type JsonRecord, type SceneObject, type ChangeAuthor, type AcceptedCandidate, type UserFont } from "./document.js";
+import { applyGroupOperation, dropEmptyGroups, GROUP_OPERATIONS, keepLockedGroups } from "./groups.js";
 import { fontManifest, installedFont, checkGlyphs, checkTextGlyphs, inspectUserFont, userFontSample } from "./font.js";
 import { USER_FONT_MAX_BYTES } from "./font-parse.js";
 import { preparePhotoProject, type PhotoLayout } from "./photo-layout.js";
@@ -56,7 +57,7 @@ async function loadUserFonts(root: string, doc: ImageDocument, loaded: ReadonlyM
 }
 
 async function checkTextLayout(root: string, doc: ImageDocument, font: Buffer, fonts: ReadonlyMap<string, Buffer>): Promise<void> {
-  const objects = textObjects(doc.objects).filter((object) => object.visible);
+  const objects = textObjects(doc.objects).filter((object) => isShown(doc, object));
   if (!objects.length) return;
   // Measure with the export engine without reading or writing temporary assets.
   await compose({ root, font, fonts, layoutOnly: true, document: { ...doc, assets: [], objects } });
@@ -237,7 +238,7 @@ export async function editBatch(root: string, batch: unknown, { dryRun = false }
 export async function candidateDocument(root: string, project: ProjectState, candidateId: string, entry?: CandidateEntry): Promise<{ document: ImageDocument; entry: CandidateEntry }> {
   const bound = entry ?? await readCandidateEntry(root, candidateId);
   const object = await verifyCandidateAgainst(root, project, bound);
-  if (object.locked) fail(`Object is locked: ${object.id}`);
+  if (isLocked(project.document, object)) fail(`Object is locked: ${object.id}`);
   const doc = structuredClone(project.document);
   const output = bound.candidate.output;
   const existing = doc.assets.find((asset) => asset.id === output.id);
@@ -253,7 +254,7 @@ export async function candidateDocument(root: string, project: ProjectState, can
 // A Map keeps prototype names such as "constructor" from resolving to inherited members.
 const OPERATION_FIELDS: ReadonlyMap<string, readonly string[]> = new Map([
   ["add_asset", ["asset"]], ["add_font", ["font"]], ["add_object", ["object"]], ["update_object", ["id", "patch"]], ["remove_object", ["id"]], ["reorder_objects", ["ids"]],
-  ["set_canvas", ["canvas"]], ["revert_to", ["revision"]], ["accept_candidate", ["candidate_id"]]
+  ["set_canvas", ["canvas"]], ["revert_to", ["revision"]], ["accept_candidate", ["candidate_id"]], ...GROUP_OPERATIONS
 ]);
 
 async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: boolean }): Promise<PublishedRevision> {
@@ -268,7 +269,7 @@ async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: 
   // relock an object while disguising the change as a protected edit.
   for (const op of batch.operations) {
     if (opType(op) === "revert_to" && batch.operations.length !== 1) fail("Revert must be an isolated operation");
-    if (opType(op) === "update_object" && isRecord(op.patch) && Object.hasOwn(op.patch, "locked") &&
+    if ((opType(op) === "update_object" || opType(op) === "update_group") && isRecord(op.patch) && Object.hasOwn(op.patch, "locked") &&
         (batch.operations.length !== 1 || Object.keys(op.patch).length !== 1)) fail("Lock changes must be isolated");
   }
   for (const op of batch.operations) {
@@ -307,14 +308,14 @@ async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: 
         const mutable = [...new Set([...Object.keys(object).filter((key) => !["id", "kind"].includes(key)), ...optional])];
         record(op.patch, mutable, "object patch");
         if (!Object.keys(op.patch).length) fail("Empty object patch");
-        if (object.locked && !Object.hasOwn(op.patch, "locked")) fail(`Object is locked: ${object.id}`);
+        if (isLocked(doc, object) && !Object.hasOwn(op.patch, "locked")) fail(`Object is locked: ${object.id}`);
         const next = withoutNoOps({ ...object, ...structuredClone(op.patch) } as JsonRecord, optional);
         // A patch of optional fields alone that leaves the object as it was would publish an invisible revision.
         if (Object.keys(op.patch).every((key) => optional.includes(key)) && JSON.stringify(next) === JSON.stringify(object)) fail(`Patch changes nothing on ${object.id}`);
         doc.objects[index] = next as unknown as SceneObject; break;
       }
       case "remove_object": {
-        const index = objectAt(doc, op.id); if (doc.objects[index]?.locked) fail(`Object is locked: ${String(op.id)}`);
+        const index = objectAt(doc, op.id); if (isLocked(doc, doc.objects[index]!)) fail(`Object is locked: ${String(op.id)}`);
         doc.objects.splice(index, 1); break;
       }
       case "reorder_objects": {
@@ -323,7 +324,7 @@ async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: 
         const ordered = ids.map((value) => doc.objects[objectAt(doc, value)] as SceneObject);
         for (let index = 0; index < doc.objects.length; index++) {
           const object = doc.objects[index];
-          if (object?.locked && ordered[index]?.id !== object.id) fail("Cannot reorder a locked object");
+          if (object && isLocked(doc, object) && ordered[index]?.id !== object.id) fail("Cannot reorder a locked object");
         }
         doc.objects = ordered; break;
       }
@@ -331,13 +332,20 @@ async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: 
       case "revert_to": {
         number(op.revision, "revert revision", 1, current.document.revision - 1, true);
         const previous = (await readProject(root, { revision: op.revision })).document;
+        // Locked objects (by themselves or their group) and locked groups come through a revert unchanged.
         for (const [index, locked] of current.document.objects.entries()) {
-          if (!locked.locked) continue;
+          if (!isLocked(current.document, locked)) continue;
           const earlier = previous.objects.find((object) => object.id === locked.id);
-          if (!earlier || JSON.stringify({ ...earlier, locked: true }) !== JSON.stringify(locked)) fail(`Revert would change locked object: ${locked.id}`);
+          if (!earlier || JSON.stringify({ ...earlier, locked: locked.locked }) !== JSON.stringify(locked)) fail(`Revert would change locked object: ${locked.id}`);
           if (previous.objects[index]?.id !== locked.id) fail(`Revert would reorder locked object: ${locked.id}`);
         }
+        for (const group of current.document.groups ?? []) {
+          const earlier = previous.groups?.find((item) => item.id === group.id);
+          if (group.locked && (!earlier || JSON.stringify({ ...earlier, locked: true }) !== JSON.stringify(group))) fail(`Revert would change locked group: ${group.id}`);
+        }
         doc.canvas = structuredClone(previous.canvas); doc.assets = structuredClone(previous.assets); doc.objects = structuredClone(previous.objects);
+        if (previous.groups) doc.groups = structuredClone(previous.groups); else delete doc.groups;
+        for (const group of doc.groups ?? []) group.locked = current.document.groups?.find((item) => item.id === group.id)?.locked ?? false;
         // Fonts bound later stay bound (their bytes are already in the project); objects revert to their own font choice.
         if (previous.fonts) doc.fonts = [...structuredClone(previous.fonts), ...(doc.fonts ?? []).filter((font) => !previous.fonts?.some((item) => item.id === font.id))];
         // Lock state is an explicit current policy, not an undo side effect.
@@ -347,9 +355,13 @@ async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: 
         }
         break;
       }
-      default: fail(`Unsupported operation: ${type}`);
+      default:
+        if (type !== undefined && GROUP_OPERATIONS.has(type)) { applyGroupOperation(doc, type, op as unknown as JsonRecord); break; }
+        fail(`Unsupported operation: ${type}`);
     }
   }
+  dropEmptyGroups(doc);
+  keepLockedGroups(current.document, doc);
   if (doc.fonts && !doc.fonts.length) delete doc.fonts;
   doc.schema = documentSchema(doc);
   doc.revision++; doc.parent_sha256 = current.sha256;
@@ -366,7 +378,7 @@ async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: 
   // Unlocking changes no pixels and must remain possible to repair a locked
   // legacy layout. Isolation and patch validation above prohibit other changes.
   const only = batch.operations.length === 1 ? batch.operations[0] : undefined;
-  const unlockOnly = opType(only) === "update_object" && isRecord(only?.patch) && only.patch.locked === false;
+  const unlockOnly = (opType(only) === "update_object" || opType(only) === "update_group") && isRecord(only?.patch) && only.patch.locked === false;
   if (!unlockOnly) await checkTextLayout(current.root, doc, current.font, used);
   if (dryRun) return { root: current.root, dry_run: true, document: doc, sha256: sha256(encode(doc)) };
   await regularPath(path.join(root, "assets"), { directory: true });

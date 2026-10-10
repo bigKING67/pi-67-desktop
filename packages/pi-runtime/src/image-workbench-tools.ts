@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { Type, type TSchema } from "typebox";
-import { IMAGE_PROMPT_CONTEXT_LIMITS, IMAGE_PROVIDER_ID, IMAGE_REFERENCE_ROLES, imageCandidateActions, type ImageReferenceRole } from "@pi67/domain";
+import { IMAGE_PROMPT_CONTEXT_LIMITS, IMAGE_PROVIDER_ID, IMAGE_REFERENCE_ROLES, imageCandidateActions, imageObjectGroup, imageObjectInEffect, type ImageReferenceRole } from "@pi67/domain";
 import type { ImageDocument, ImageGenerator } from "@pi67/image-engine";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createPiImageGenerator, type ImageRegistry } from "./image-workbench-generator.js";
@@ -30,7 +30,7 @@ function documentSummary(doc: ImageDocument, latestRevision: number): Record<str
     objects: doc.objects.map((object) => ({
       id: object.id, kind: object.kind, locked: object.locked, visible: object.visible, box: [object.x, object.y, object.width, object.height], opacity: object.opacity,
       ...(object.rotation ? { rotation: object.rotation } : {}), ...(object.flip_x ? { flip_x: true } : {}), ...(object.flip_y ? { flip_y: true } : {}),
-      ...(object.blend ? { blend: object.blend } : {}), ...(object.mask ? { mask: object.mask } : {}),
+      ...(object.blend ? { blend: object.blend } : {}), ...(object.mask ? { mask: object.mask } : {}), ...(object.group_id ? { group_id: object.group_id } : {}),
       ...(object.kind === "text" ? { text: object.text, font_size: object.font_size, color: object.color, align: object.align, line_height: object.line_height,
         ...(object.font_id ? { font_id: object.font_id } : {}) } : {}),
       ...(object.kind === "image" ? { asset_id: object.asset_id, fit: object.fit, ...(object.adjust ? { adjust: object.adjust } : {}) } : {}),
@@ -40,7 +40,9 @@ function documentSummary(doc: ImageDocument, latestRevision: number): Record<str
     })),
     assets: doc.assets.map((asset) => ({ id: asset.id, width: asset.width, height: asset.height })),
     // Fonts the person added; text uses one with font_id (missing glyphs fall back to the built-in font).
-    fonts: (doc.fonts ?? []).map((font) => ({ id: font.id, family: font.family }))
+    fonts: (doc.fonts ?? []).map((font) => ({ id: font.id, family: font.family })),
+    // Flat groups; a locked or hidden group locks or hides every member.
+    groups: doc.groups ?? []
   };
 }
 
@@ -101,7 +103,7 @@ export function imageTools(): ToolDefinition[] {
     },
     {
       name: "image_project_edit", label: "Edit image project",
-      description: "Apply one batch of object edits as a new revision. Operations: {type:update_object,id,patch}, {type:add_object,object}, {type:add_asset,asset:{id,source}}, {type:remove_object,id}, {type:reorder_objects,ids}, {type:set_canvas,canvas}, {type:revert_to,revision}. Unlock with exactly [{type:update_object,id,patch:{locked:false}}] as its own batch. Use dry_run first for layout changes. Text is set exactly; never ask an image model to draw copy, prices or logos.",
+      description: "Apply one batch of object edits as a new revision. Operations: {type:update_object,id,patch}, {type:add_object,object}, {type:add_asset,asset:{id,source}}, {type:remove_object,id}, {type:reorder_objects,ids}, {type:set_canvas,canvas}, {type:revert_to,revision}, {type:group_objects,group:{id,name},ids}, {type:update_group,id,patch}, {type:ungroup,id}. Unlock with exactly [{type:update_object,id,patch:{locked:false}}] as its own batch. Use dry_run first for layout changes. Text is set exactly; never ask an image model to draw copy, prices or logos.",
       promptSnippet: "Edit image project objects as one revision",
       promptGuidelines: [
         "Put copy, prices and logos in text or image objects instead of generated pixels.",
@@ -223,6 +225,8 @@ export function imageTools(): ToolDefinition[] {
         const targetId = str(params, "target_id"), target = doc.objects.find((object) => object.id === targetId);
         if (!target || target.kind !== "image") throw new Error(`TARGET_NOT_IMAGE: ${targetId} is not an image object of this project.`);
         if (target.locked) throw new Error(`TARGET_LOCKED: ${targetId} is locked. Unlock it with image_project_edit (one batch: update_object ${targetId} patch {locked:false}), then call image_generate against the new revision.`);
+        const lockedGroup = imageObjectInEffect(doc, target).locked ? imageObjectGroup(doc, target) : undefined;
+        if (lockedGroup) throw new Error(`TARGET_LOCKED: ${targetId} is in locked group ${lockedGroup.id}. Unlock the group with image_project_edit (one batch: update_group ${lockedGroup.id} patch {locked:false}), then call image_generate against the new revision.`);
         const candidateId = typeof params.candidate_id === "string" ? params.candidate_id : newCandidateId();
         let job: unknown, references: unknown, outputPolicy = params.output_policy;
         if (isObject(params.job)) {

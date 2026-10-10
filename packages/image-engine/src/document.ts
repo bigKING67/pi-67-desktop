@@ -1,4 +1,4 @@
-import { IMAGE_ADJUST_LIMITS, IMAGE_ASSET_LIMIT, IMAGE_BLEND_MODES, IMAGE_USER_FONT_LIMIT, type ImageAdjust, type ImageBlendMode } from "@pi67/domain";
+import { IMAGE_ADJUST_LIMITS, IMAGE_ASSET_LIMIT, IMAGE_BLEND_MODES, IMAGE_GROUP_LIMIT, IMAGE_USER_FONT_LIMIT, type ImageAdjust, type ImageGroup, type ImageBlendMode } from "@pi67/domain";
 import { fail } from "./content-store.js";
 import { fontManifest } from "./font.js";
 
@@ -40,12 +40,14 @@ export interface ObjectBase {
   blend?: BlendMode;
   /** A project raster read by luminance (white shows, black hides), stretched over the box and turned with it. */
   mask?: ObjectMask;
+  /** The group this object belongs to; a group's members are contiguous in paint order (P4, v3). */
+  group_id?: string;
 }
 const BLEND_MODES = IMAGE_BLEND_MODES;
 export type BlendMode = ImageBlendMode;
 export interface ObjectMask { asset_id: string; invert?: true }
 /** Optional fields every object kind may carry; a patch writes `null` (or 0 / false) to drop one. */
-const OPTIONAL_COMMON = ["rotation", "flip_x", "flip_y", "blend", "mask"] as const;
+const OPTIONAL_COMMON = ["rotation", "flip_x", "flip_y", "blend", "mask", "group_id"] as const;
 /**
  * Every optional field each kind may carry, and which of them need the v3 schema.
  * One table drives validation, patching and the schema version, so a later P4 field
@@ -83,13 +85,24 @@ export interface FontBinding { profile: string; family: string; file: string; sh
 export interface UserFont { id: string; family: string; file: string; sha256: string; bytes: number; format: "ttf" | "otf" }
 export interface AcceptedCandidate { id: string; sha256: string }
 export interface Change { author: ChangeAuthor; summary: string; operations: string[]; candidate?: AcceptedCandidate }
+/** A flat layer group: its lock and visibility apply to every member, its opacity to the group as one picture. */
+export type Group = ImageGroup;
 export interface ImageDocument {
   schema: string; project_id: string; title: string; revision: number; parent_sha256: string | null;
-  canvas: Canvas; assets: Asset[]; font: FontBinding; fonts?: UserFont[]; objects: SceneObject[]; change: Change;
+  canvas: Canvas; assets: Asset[]; font: FontBinding; fonts?: UserFont[]; groups?: Group[]; objects: SceneObject[]; change: Change;
 }
 
+/** The group an object belongs to, if any. */
+export const groupOf = (doc: Pick<ImageDocument, "groups">, object: SceneObject): Group | undefined =>
+  object.group_id === undefined ? undefined : doc.groups?.find((group) => group.id === object.group_id);
+/** Locked by itself or by its group: every lock check asks this. */
+export const isLocked = (doc: Pick<ImageDocument, "groups">, object: SceneObject): boolean => object.locked || groupOf(doc, object)?.locked === true;
+/** Drawn only while it and its group are visible. */
+export const isShown = (doc: Pick<ImageDocument, "groups">, object: SceneObject): boolean => object.visible && groupOf(doc, object)?.visible !== false;
+
 /** v3 while any engine extension is used, else v2 while a user font is bound or used, else v1. */
-export function documentSchema(document: Pick<ImageDocument, "fonts" | "objects">): string {
+export function documentSchema(document: Pick<ImageDocument, "fonts" | "groups" | "objects">): string {
+  if (document.groups?.length) return SCHEMA_V3;
   // Called before validation too, so an unknown kind falls through to validation's refusal.
   if (document.objects.some((object) => V3_KINDS.has(object.kind) || (Object.hasOwn(OPTIONAL_FIELDS, object.kind) ? OPTIONAL_FIELDS[object.kind] : []).some((key) => V3_FIELDS.has(key) && (object as unknown as JsonRecord)[key] !== undefined))) return SCHEMA_V3;
   return document.fonts?.length || document.objects.some((object) => object.kind === "text" && object.font_id !== undefined) ? SCHEMA_V2 : SCHEMA;
@@ -172,6 +185,7 @@ function validateObject(value: unknown, canvas: Canvas, assets: ReadonlySet<stri
   if (value.rotation !== undefined) { number(value.rotation, "rotation", -180, 180); if (value.rotation === 0) fail("Write no rotation instead of 0"); }
   for (const key of ["flip_x", "flip_y"] as const) if (value[key] !== undefined && value[key] !== true) fail(`Invalid ${key}`);
   if (value.blend !== undefined) oneOf(value.blend, BLEND_MODES, "Invalid blend mode");
+  if (value.group_id !== undefined) id(value.group_id, "group_id");
   if (value.mask !== undefined) {
     record(value.mask, ["asset_id", "invert"], "mask");
     if (typeof value.mask.asset_id !== "string" || !assets.has(value.mask.asset_id)) fail(`Missing mask asset for ${String(value.id)}`);
@@ -196,7 +210,7 @@ function validateObject(value: unknown, canvas: Canvas, assets: ReadonlySet<stri
 }
 
 export function validateDocument(value: unknown): ImageDocument {
-  record(value, ["schema", "project_id", "title", "revision", "parent_sha256", "canvas", "assets", "font", "fonts", "objects", "change"], "document");
+  record(value, ["schema", "project_id", "title", "revision", "parent_sha256", "canvas", "assets", "font", "fonts", "groups", "objects", "change"], "document");
   if (value.schema !== SCHEMA && value.schema !== SCHEMA_V2 && value.schema !== SCHEMA_V3 && !LEGACY_SCHEMAS.includes(value.schema as string)) fail("Unsupported image document schema");
   if (value.schema !== SCHEMA_V2 && value.schema !== SCHEMA_V3 && value.fonts !== undefined) fail("User fonts need the v2 document schema");
   id(value.project_id, "project_id"); string(value.title, "title", 200);
@@ -224,6 +238,8 @@ export function validateDocument(value: unknown): ImageDocument {
     if (ids.has(valid.id)) fail("Duplicate object id"); ids.add(valid.id);
     return valid;
   });
+  const groups = value.groups === undefined ? undefined : validateGroups(value.groups, objects);
+  for (const object of objects) if (object.group_id !== undefined && !groups?.some((group) => group.id === object.group_id)) fail(`Missing group for ${object.id}`);
   record(value.change, ["author", "summary", "operations", "candidate"], "change");
   const change = value.change;
   oneOf(change.author, ["human", "agent", "system"] as const, "Invalid change author");
@@ -234,13 +250,36 @@ export function validateDocument(value: unknown): ImageDocument {
     record(change.candidate, ["id", "sha256"], "accepted candidate"); id(change.candidate.id, "candidate id"); digest(change.candidate.sha256);
     if (operations.length !== 1 || operations[0] !== "accept_candidate") fail("Candidate acceptance must be isolated");
   } else if (operations.includes("accept_candidate")) fail("Candidate acceptance needs a bound candidate");
-  const document = { ...(value as unknown as ImageDocument), canvas, assets, objects, ...(fonts ? { fonts } : {}) };
+  const document = { ...(value as unknown as ImageDocument), canvas, assets, objects, ...(fonts ? { fonts } : {}), ...(groups ? { groups } : {}) };
   // Each schema is written only for what it needs, so a release that predates a feature still opens the rest.
   const needed = documentSchema(document);
   if (value.schema === SCHEMA_V2 && needed !== SCHEMA_V2) fail("A v2 document must bind or use a user font and nothing newer");
   if (value.schema === SCHEMA_V3 && needed !== SCHEMA_V3) fail("A v3 document must use an engine extension");
-  if (needed === SCHEMA_V3 && value.schema !== SCHEMA_V3) fail("Rotation, flips, ellipses, gradients, blend modes, masks and adjustments need the v3 document schema");
+  if (needed === SCHEMA_V3 && value.schema !== SCHEMA_V3) fail("Rotation, flips, ellipses, gradients, blend modes, masks, adjustments and groups need the v3 document schema");
   return document;
+}
+
+/**
+ * Groups are written only while one exists, hold at least one member each, never share an
+ * id with an object, and are each one contiguous block in paint order.
+ */
+function validateGroups(value: unknown, objects: readonly SceneObject[]): Group[] {
+  if (!Array.isArray(value) || !value.length || value.length > IMAGE_GROUP_LIMIT) fail("Invalid groups list");
+  const ids = new Set<string>(), objectIds = new Set(objects.map((object) => object.id));
+  const groups = value.map((group) => {
+    record(group, ["id", "name", "locked", "visible", "opacity"], "group"); id(group.id, "group id");
+    if (ids.has(group.id) || objectIds.has(group.id)) fail(`Duplicate group id ${group.id}`); ids.add(group.id);
+    string(group.name, "group name", 64);
+    if (!group.name.trim()) fail("Invalid group name");
+    boolean(group.locked, "group locked"); boolean(group.visible, "group visible"); number(group.opacity, "group opacity", 0, 1);
+    return group as unknown as Group;
+  });
+  for (const group of groups) {
+    const at = objects.flatMap((object, index) => object.group_id === group.id ? [index] : []);
+    if (!at.length) fail(`Empty group ${group.id}`);
+    if (at.at(-1)! - at[0]! !== at.length - 1) fail(`Group ${group.id} must be contiguous in paint order`);
+  }
+  return groups;
 }
 
 function validateAdjust(value: unknown): void {

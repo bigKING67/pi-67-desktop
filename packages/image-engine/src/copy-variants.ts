@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises";
 import path from "node:path";
-import { record, id, string, number, digest, validateDocument, LIMITS, type JsonRecord } from "./document.js";
+import { record, id, string, number, digest, validateDocument, LIMITS, type JsonRecord, isLocked } from "./document.js";
 import { readProject, editBatch, encode, regularPath, type ProjectState } from "./project.js";
 import { assertOutsideProject } from "./raster.js";
 import { renderProject } from "./render.js";
@@ -46,7 +46,7 @@ export async function copyVariants(rootPath: string, input: unknown, { signal }:
     if (source.sha256 !== variant.sha256) throw new Error(`Stale source binding: ${variant.name}`);
     for (const update of textUpdates) {
       const object = source.document.objects.find((value) => value.id === update.id);
-      if (!object || object.kind !== "text" || object.locked) throw new Error(`Expected unlocked text object: ${update.id} in ${variant.name}`);
+      if (!object || object.kind !== "text" || isLocked(source.document, object)) throw new Error(`Expected unlocked text object: ${update.id} in ${variant.name}`);
     }
     sources.push(source);
   }

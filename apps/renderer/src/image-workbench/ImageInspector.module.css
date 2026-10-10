@@ -470,3 +470,19 @@
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
+
+/* 图层 groups: the group row leads with a collapse chevron; members sit indented beneath it. */
+.groupHead {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.groupRow .layerName span {
+  font-weight: var(--font-weight-medium);
+}
+
+.layerInGroup .layerName {
+  padding-left: 30px;
+}
