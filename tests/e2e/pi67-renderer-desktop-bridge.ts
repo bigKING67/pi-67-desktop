@@ -246,6 +246,7 @@ export async function installMockDesktopBridge(
           },
           chooseImageLibrary: async () => undefined,
           saveImage: async () => false,
+          saveImageSet: async () => undefined,
           pickAndAddWorkspace: async () => {
             const workspace = bridgeFixture.pickerQueue[
               Math.min(pickerIndex, Math.max(bridgeFixture.pickerQueue.length - 1, 0))

@@ -1,9 +1,10 @@
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join, win32 } from "node:path";
-import { isImageId } from "@pi67/protocol";
+import { IMAGE_EXPORT_SET_MAX_ITEMS, isImageId } from "@pi67/protocol";
 import { app, dialog, type BrowserWindow } from "electron";
-import { readVerifiedImagePreview, trustedWorkspaceRoot } from "./app-protocol-image.js";
+import { readVerifiedImagePreview, trustedWorkspaceRoot, WORKSPACE_ID } from "./app-protocol-image.js";
 import type { AuthorizedIpcHandle } from "./authorized-ipc.js";
 import type { WorkbenchStateStore } from "./workbench-state.js";
 import { addOrRefreshWorkspace } from "./workbench-state-mutations.js";
@@ -63,6 +64,24 @@ export function registerImageLibraryBridge(handle: AuthorizedIpcHandle, getMainW
     await writeFile(result.filePath, new Uint8Array(bytes));
     return true;
   });
+
+  // Several sizes at once: the person picks a place, the set goes into a new folder there.
+  handle("pi67:image-save-set", async (_event, value: unknown): Promise<{ folderName: string } | undefined> => {
+    const request = asImageExportSetRequest(value);
+    const files = [];
+    for (const item of request.items) {
+      const bytes = await readVerifiedImagePreview({ workspaceId: request.workspaceId, ...item }, trustedWorkspaceRoot(() => workbenchState));
+      if (!bytes) throw new Error("An image is no longer available; render it again.");
+      files.push({ item, bytes });
+    }
+    const window = getMainWindow();
+    const options = { title: "选择导出位置", buttonLabel: "导出到这里", defaultPath: app.getPath("downloads"),
+      properties: ["openDirectory", "createDirectory"] as ("openDirectory" | "createDirectory")[] };
+    const result = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
+    const parent = result.canceled ? undefined : result.filePaths[0];
+    if (!parent) return undefined;
+    return { folderName: await writeImageExportSet(parent, request.title, files) };
+  });
 }
 
 /** Registers (or refreshes) the library and records it without changing the user's current Workspace or tree. */
@@ -80,10 +99,64 @@ export async function registerLibrary(workbenchState: Pick<WorkbenchStateStore, 
   return library;
 }
 
+export interface ImageExportItem { projectId: string; revision: number; pngSha256: string; fileName: string }
+interface ImageExportSetRequest { workspaceId: string; title: string; items: ImageExportItem[] }
+
+/**
+ * Writes one export set into a new folder under `parent` (product model §7 F:
+ * always a new directory, never over existing files): each PNG plus
+ * `receipt.json` binding file, project, revision, digest and pixel size.
+ * A failure removes the folder this call created. Returns the folder's name.
+ */
+export async function writeImageExportSet(parent: string, title: string, files: { item: ImageExportItem; bytes: Buffer }[], now = new Date()): Promise<string> {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const base = `${teamChatSaveFileName(title).slice(0, 80)} 导出 ${stamp}`;
+  let folder = "";
+  for (let index = 1; !folder; index += 1) {
+    const name = index === 1 ? base : `${base} ${index}`;
+    try { await mkdir(join(parent, name)); folder = name; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST" || index >= 99) throw error; }
+  }
+  try {
+    const used = new Set<string>(), receipt = [];
+    for (const { item, bytes } of files) {
+      const stem = teamChatSaveFileName(item.fileName).replace(/\.png$/iu, "").slice(0, 120);
+      let file = `${stem}.png`;
+      for (let index = 2; used.has(file.toLowerCase()); index += 1) file = `${stem}-${index}.png`;
+      used.add(file.toLowerCase());
+      await writeFile(join(parent, folder, file), new Uint8Array(bytes), { flag: "wx" });
+      receipt.push({ file, project_id: item.projectId, revision: item.revision, png_sha256: createHash("sha256").update(bytes).digest("hex"),
+        width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) });
+    }
+    await writeFile(join(parent, folder, "receipt.json"), `${JSON.stringify({ schema: "pi67.image-export-set.v1", exported_at: now.toISOString(), items: receipt }, null, 2)}\n`, { flag: "wx" });
+    return folder;
+  } catch (error) {
+    await rm(join(parent, folder), { recursive: true, force: true });
+    throw error;
+  }
+}
+
+const isWorkspaceId = (value: unknown): value is string => typeof value === "string" && WORKSPACE_ID.test(value);
+
+function asImageExportSetRequest(value: unknown): ImageExportSetRequest {
+  const record = typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
+  const { workspaceId, title, items } = record;
+  if (typeof title !== "string" || !title || title.length > 200 || !Array.isArray(items) || items.length < 1 || items.length > IMAGE_EXPORT_SET_MAX_ITEMS) throw new Error("Invalid image export payload.");
+  if (!isWorkspaceId(workspaceId)) throw new Error("Invalid image export payload.");
+  return { workspaceId, title,
+    items: items.map((item: unknown) => {
+      const entry = typeof item === "object" && item !== null ? item as Record<string, unknown> : {};
+      if (!Number.isInteger(entry.revision) || (entry.revision as number) < 1) throw new Error("Invalid image export payload.");
+      const { projectId, pngSha256, fileName } = asImageSaveRequest({ workspaceId, ...entry });
+      return { projectId, pngSha256, fileName, revision: entry.revision as number };
+    }) };
+}
+
 function asImageSaveRequest(value: unknown): { workspaceId: string; projectId: string; pngSha256: string; fileName: string } {
   const record = typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
   const { workspaceId, projectId, pngSha256, fileName } = record;
-  if (typeof workspaceId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/u.test(workspaceId) || !isImageId(projectId) ||
+  if (!isWorkspaceId(workspaceId) || !isImageId(projectId) ||
     typeof pngSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(pngSha256) || typeof fileName !== "string" || fileName.length > 200) throw new Error("Invalid image save payload.");
   return { workspaceId, projectId, pngSha256, fileName };
 }

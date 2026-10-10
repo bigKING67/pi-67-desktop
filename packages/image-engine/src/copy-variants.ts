@@ -2,9 +2,9 @@ import * as fs from "node:fs/promises";
 import path from "node:path";
 import { record, id, string, number, digest, validateDocument, LIMITS, type JsonRecord } from "./document.js";
 import { readProject, editBatch, encode, regularPath, type ProjectState } from "./project.js";
-import { readBytes, assertOutsideProject } from "./raster.js";
+import { assertOutsideProject } from "./raster.js";
 import { renderProject } from "./render.js";
-import { sha256 } from "./content-store.js";
+import { copyProjectFiles } from "./project-copy.js";
 
 export const COPY_VARIANTS_SCHEMA = "newmoney.image-copy-variants.v1";
 export interface VariantSpec { name: string; revision: number; sha256: string }
@@ -58,16 +58,7 @@ export async function copyVariants(rootPath: string, input: unknown, { signal }:
       cancelled();
       const source = sources[index] as ProjectState, directory = path.join(output, variant.name), projectRoot = path.join(directory, "project");
       await fs.mkdir(directory); await fs.mkdir(projectRoot);
-      for (const folder of ["assets", "fonts", "revisions"]) await fs.mkdir(path.join(projectRoot, folder));
-      const bindings = new Map<string, string>([[source.document.font.file, source.document.font.sha256]]);
-      for (const asset of source.document.assets) {
-        bindings.set(asset.file, asset.sha256); bindings.set(asset.render_file, asset.render_sha256);
-      }
-      for (const [file, expected] of bindings) {
-        const bytes = await readBytes(path.join(root, file), LIMITS.renderBytes);
-        if (sha256(bytes) !== expected) throw new Error("Source asset changed during copy");
-        await fs.writeFile(path.join(projectRoot, file), bytes, { flag: "wx" });
-      }
+      await copyProjectFiles(root, projectRoot, source.document);
       const document = structuredClone(source.document);
       document.revision = 1; document.parent_sha256 = null;
       document.change = { author: "system", summary: `Snapshot of source revision ${variant.revision}`, operations: ["create"] };

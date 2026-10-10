@@ -31,6 +31,9 @@ vi.mock("../connection/AgentConnectionController.js", () => ({
       if (type === "image.candidate.accept") { host.revision += 1; return Promise.resolve({ projectId: "p", revision: host.revision, sha256: "s" }); }
       if (type === "image.candidate.discard") return Promise.resolve({ projectId: "p", candidateId: payload.candidateId, status: "discarded" });
       if (type === "image.project.history") return Promise.resolve({ projectId: "p", revisions: [] });
+      if (type === "image.project.derive") return Promise.resolve({ projectId: "p", revision: host.revision, results: (payload.presets as string[]).map((preset) => preset === "16x9"
+        ? { preset, status: "refused", reason: "文字「春日」在 178×100 里放不下" }
+        : { preset, status: "derived", projectId: `p-${preset}`, title: `海报 · ${preset}`, canvas: { width: 100, height: 100, background: "#fff" }, shrunkText: 0 }) });
       return Promise.reject(new Error(`unexpected ${type}`));
     }
   }
@@ -41,10 +44,12 @@ import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   acceptCandidate,
   checkImageEdit,
+  deriveImageSizes,
   discardCandidate,
   inspectCandidate,
   editImageProject,
   editImageProjectWithNotice,
+  exportImageSizes,
   loadImageProject,
   primaryImageObject,
   redoImageEdit,
@@ -153,6 +158,33 @@ describe("image object selection", () => {
     expect(renders()).toHaveLength(1);
     inspectCandidate(undefined, { compare: true });
     expect(useImageProject.getState()).toMatchObject({ inspecting: undefined, comparing: false });
+  });
+
+  it("derives presets from the revision on screen, replaces a re-derived preset, and exports this revision with every derived size", async () => {
+    host.calls = [];
+    const results = await deriveImageSizes(["1x1", "16x9"]);
+    expect(host.calls.find((call) => call.type === "image.project.derive")?.payload).toEqual({ projectId: "p", revision: 1, presets: ["1x1", "16x9"] });
+    expect(results?.map((item) => item.status)).toEqual(["derived", "refused"]);
+    await deriveImageSizes(["1x1"]);
+    expect(useImageProject.getState().derived.map((item) => item.preset)).toEqual(["16x9", "1x1"]);
+
+    const saveImageSet = vi.fn(() => Promise.resolve({ folderName: "海报 导出" }));
+    vi.stubGlobal("window", { pi67: { system: { saveImageSet } } });
+    rendererWorkbenchStore.setState({ imageLibraryWorkspaceId: "lib" } as never);
+    host.calls = [];
+    await exportImageSizes();
+    // The source is pinned to the revision on screen; derived sizes have one revision each.
+    expect(host.calls.filter((call) => call.type === "image.project.render").map((call) => [call.payload.projectId, call.payload.revision])).toEqual([["p", 1], ["p-1x1", undefined]]);
+    expect(saveImageSet).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: "lib", title: "海报", items: [
+      expect.objectContaining({ projectId: "p", fileName: "海报 100×100" }), expect.objectContaining({ projectId: "p-1x1" })] }));
+    expect(notices.at(-1)).toMatchObject({ level: "success", title: "已导出 2 张图片" });
+    expect(useImageProject.getState().busy).toBe(false);
+    // A newer revision leaves the earlier sizes out of the next set.
+    useImageProject.setState({ revision: 2 });
+    host.calls = [];
+    await exportImageSizes();
+    expect(host.calls.filter((call) => call.type === "image.project.render").map((call) => call.payload.projectId)).toEqual(["p"]);
+    vi.unstubAllGlobals();
   });
 
   it("returns the canvas to the revision once the previewed candidate is accepted or discarded", async () => {

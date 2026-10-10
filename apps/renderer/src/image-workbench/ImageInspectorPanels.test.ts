@@ -20,6 +20,7 @@ describe("image history summaries", () => {
   it("shows the engine's English system summaries as product copy", () => {
     expect(historySummary({ author: "system", summary: "Create local image project" })).toBe("创建项目");
     expect(historySummary({ author: "system", summary: "Snapshot of source revision 4" })).toBe("复制自修订 4");
+    expect(historySummary({ author: "system", summary: "Derived from spring-tea revision 23 for 4:5" })).toBe("派生自 spring-tea 修订 23 · 4:5");
   });
 
   it("keeps human and Agent summaries verbatim", () => {

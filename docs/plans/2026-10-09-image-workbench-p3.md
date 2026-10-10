@@ -40,7 +40,7 @@ export presets and user fonts. Product model §6–§8 and §17 (P3 row).
 - [x] 3. Inline text editing on the canvas.
 - [x] 4. Marks (mark-and-rework) and reference slots in the structured context.
 - [x] 5a. 候选: candidate receipts and the compare divider.
-- [ ] 5b. 导出: multi-size presets as derived projects (decided 2026-10-10 over same-project
+- [x] 5b. 导出: multi-size presets as derived projects (decided 2026-10-10 over same-project
   derived revisions), multi-file export into a new directory with receipts.
 - [ ] 6. User fonts (engine and Host support, Inspector picker).
 - [ ] 7. Authority docs, packaged verification, Windows packaged smoke.
@@ -115,4 +115,13 @@ the image Inspector returns the P2 page; no project content is rewritten.
   pointer (the frame takes the pointer, the range only the keyboard); the fit math was
   duplicated (`useCanvasFit`); the receipt showed the request size, not the candidate's.
   Deferred: Host and protocol each spell the receipt limits.
+- 2026-10-10: 5b done. Rules confirmed with the user: short edge kept; bands (≥90% width)
+  span the new width with `cover` (`contain` when portrait and landscape swap, decided
+  after the packaged 16:9 cut the product); other objects scale by the smaller axis around a
+  proportional centre; overflowing text shrinks to 70% then the preset is refused. Engine
+  `deriveProject` writes one revision beside the source (nothing on refusal); Host
+  `image.project.derive` numbers repeats (`-2`); presets live in domain; Main
+  `saveImageSet` writes a new folder with `receipt.json`. Deferred: listing a source's
+  derived projects across sessions (the session list only), and Settings' check glyph,
+  which uses the undefined `--accent-contrast` token (pre-existing).
 

@@ -281,6 +281,12 @@ Application-level surfaces use a separate wide-window shell:
   the divider. Until both canvas-size renders arrive the canvas stays with `正在准备对比…`. 候选
   rows add one tertiary receipt line (`model · 高质量 · 1088×1360 · 用时 22 秒 · 费用未估计 ·
   画面质量未核验`).
+- Size presets (P3, 2026-10-10): `导出` adds a `多尺寸 · 基于修订 N` section — one 30px
+  checkbox row per preset (16px indicator as in Settings, ratio in tabular figures, pixel
+  size tertiary), a secondary `生成 N 个尺寸` (`生成尺寸` while none is ticked), a list of outcomes (ratio, size, `缩小了 N
+  段文字`, `打开「title」` text action; a refused preset reads `未生成` with its reason in
+  the warning line), and the primary `导出全部尺寸（N 张）` with a folder glyph. The
+  full-size `导出 PNG` becomes secondary so the tab has one primary action.
 - The navigation rail is the only Workspace and conversation switcher. Each
   Workspace is a collapsible group containing active tasks, waiting tasks,
   provisional drafts, and Catalog-backed recent Sessions. Workspace groups use

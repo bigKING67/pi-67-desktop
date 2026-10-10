@@ -1,9 +1,9 @@
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { IMAGE_WORK_DIRECTORY, isImageId, type ImageCandidateListStatus, type ImageChangeAuthor } from "@pi67/domain";
+import { IMAGE_WORK_DIRECTORY, imageSizePresetLabel, isImageId, type ImageCandidateListStatus, type ImageChangeAuthor, type ImageSizePreset } from "@pi67/domain";
 type ImageEngine = typeof import("@pi67/image-engine");
-import type { AgentCommand, AgentEvent, CommandPayloads, CommandResults, ImageCandidateReceipt, ImageCandidateSummary, ImageEventPayloads, ImageProjectSummary } from "@pi67/protocol";
+import type { AgentCommand, AgentEvent, CommandPayloads, CommandResults, ImageCandidateReceipt, ImageCandidateSummary, ImageDeriveOutcome, ImageEventPayloads, ImageProjectSummary } from "@pi67/protocol";
 import { HostCommandError } from "../protocol-error.js";
 import type { ImageCommandType } from "./image-command-router.js";
 import { imageEngineError } from "./image-engine-errors.js";
@@ -83,6 +83,8 @@ export class ImageEngineHost {
       }
       case "image.project.createFromPhoto":
         return this.createFromPhoto(engine, workspaceId, cwd, (command as Command<"image.project.createFromPhoto">).payload);
+      case "image.project.derive":
+        return this.derive(engine, workspaceId, cwd, (command as Command<"image.project.derive">).payload);
       case "image.project.read": {
         const { projectId, revision } = (command as Command<"image.project.read">).payload;
         const project = await readProject(projectRoot(cwd, projectId), { revision });
@@ -166,6 +168,41 @@ export class ImageEngineHost {
     });
   }
 
+  // Each preset becomes a sibling project `<source>-<preset>` (then `-2`, `-3`…),
+  // re-laid out from the one revision the person was looking at.
+  private async derive(engine: ImageEngine, workspaceId: string, cwd: string,
+    { projectId, revision, presets }: CommandPayloads["image.project.derive"]): Promise<CommandResults["image.project.derive"]> {
+    return this.queue.serial(key(workspaceId, projectId), async () => {
+      const root = engine.projectRoot(cwd, projectId);
+      const source = await engine.readProject(root, { revision });
+      const results: ImageDeriveOutcome[] = [];
+      const title = (preset: ImageSizePreset) => `${source.document.title.slice(0, 190)} · ${imageSizePresetLabel(preset)}`;
+      // Each preset stands alone: one that fails is reported, and the ones already written stay listed.
+      for (const preset of presets) {
+        try {
+          const result = await this.deriveOne(engine, cwd, root, { revision, sha256: source.sha256, preset, title: title(preset) }, `${projectId.slice(0, 54)}-${preset}`);
+          if (result.status === "refused") { results.push({ preset, status: "refused", reason: result.reason }); continue; }
+          this.announce(workspaceId, event("image.project.changed", { projectId: result.project_id, revision: 1, sha256: result.sha256, author: "system" }));
+          results.push({ preset, status: "derived", projectId: result.project_id, title: title(preset), canvas: result.canvas, shrunkText: result.shrunk.length });
+        } catch (error) {
+          results.push({ preset, status: "refused", reason: `没能生成：${imageEngineError(error).message}`.slice(0, 500) });
+        }
+      }
+      return { projectId, revision, results };
+    });
+  }
+
+  // Another writer may claim the free name first (another window, the Agent): take the next one.
+  private async deriveOne(engine: ImageEngine, cwd: string, root: string, input: { revision: number; sha256: string; preset: ImageSizePreset; title: string }, base: string) {
+    for (let attempt = 0; ; attempt += 1) {
+      const derivedId = await freeProjectId(engine, cwd, base);
+      const target = engine.projectRoot(cwd, derivedId);
+      await engine.ensureProjectParent(target);
+      try { return await engine.deriveProject(root, target, { ...input, project_id: derivedId }); }
+      catch (error) { if (attempt >= 2 || !(error instanceof Error && error.message === "Derived project already exists")) throw error; }
+    }
+  }
+
   // Renders go to a fresh work folder outside the project, then the PNG moves
   // into the content-addressed preview cache that Main serves by digest.
   private render(engine: ImageEngine, workspaceId: string, cwd: string, command: Command<"image.project.render">, signal: AbortSignal | undefined): Promise<CommandResults["image.project.render"]> {
@@ -209,6 +246,16 @@ async function readConversation(cwd: string, projectId: string): Promise<{ sessi
     return typeof record.sessionPath === "string" && typeof record.sessionFileIdentity === "string" && record.sessionPath.length <= 4096 && record.sessionFileIdentity.length <= 512
       ? { sessionPath: record.sessionPath, sessionFileIdentity: record.sessionFileIdentity } : undefined;
   } catch { return undefined; }
+}
+
+/** `base`, or `base-2`, `base-3`… when a project of that name already exists. */
+async function freeProjectId(engine: ImageEngine, cwd: string, base: string): Promise<string> {
+  for (let index = 1; index <= 99; index += 1) {
+    const candidate = index === 1 ? base : `${base}-${index}`;
+    try { await fs.lstat(engine.projectRoot(cwd, candidate)); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return candidate; throw error; }
+  }
+  throw new HostCommandError("INVALID_PAYLOAD", "这个尺寸已经派生过太多次，请先整理创作库。", false);
 }
 
 const PHOTO_EXTENSIONS: Readonly<Record<string, string>> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };

@@ -234,6 +234,8 @@ const systemBridge = {
   ),
   chooseImageLibrary: (): Promise<WorkspaceDescriptor | undefined> => ipcRenderer.invoke("pi67:image-library-choose"),
   saveImage: (request: { workspaceId: string; projectId: string; pngSha256: string; fileName: string }): Promise<boolean> => ipcRenderer.invoke("pi67:image-save", request),
+  saveImageSet: (request: { workspaceId: string; title: string; items: { projectId: string; revision: number; pngSha256: string; fileName: string }[] }): Promise<{ folderName: string } | undefined> =>
+    ipcRenderer.invoke("pi67:image-save-set", request),
   repairWorkspace: (workspaceId: string): Promise<WorkspaceDescriptor | undefined> => (
     ipcRenderer.invoke("pi67:workspace-repair", workspaceId)
   ),

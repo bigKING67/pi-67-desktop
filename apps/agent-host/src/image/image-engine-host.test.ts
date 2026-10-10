@@ -210,4 +210,35 @@ describe("image engine host", { timeout: 120_000 }, () => {
       .toEqual({ model: "gpt-image-2.5-sunburst", quality: "high", size: "1080x1350", durationMs: 22_481 });
     expect(candidateReceipt({ ...base, completed_at: "nope", parameters: { quality: 3 } }, { width: 0, height: 1350 })).toEqual({ model: "gpt-image-2.5-sunburst" });
   });
+
+  it("derives each size preset as a sibling project, numbering repeats, and lists them in the library", async () => {
+    const cwd = await workspace(true);
+    await project(cwd);
+    const { run, events } = host(cwd);
+    const first = await run("image.project.derive", { projectId: "poster", revision: 1, presets: ["1x1", "16x9"] });
+    expect(first.results).toEqual([
+      { preset: "1x1", status: "derived", projectId: "poster-1x1", title: "春日海报 · 1:1", canvas: { width: 256, height: 256, background: "#ffffff" }, shrunkText: 0 },
+      expect.objectContaining({ preset: "16x9", status: "derived", projectId: "poster-16x9", canvas: { width: 455, height: 256, background: "#ffffff" } })
+    ]);
+    const again = await run("image.project.derive", { projectId: "poster", revision: 1, presets: ["1x1"] });
+    expect(again.results[0]).toMatchObject({ projectId: "poster-1x1-2" });
+    expect(events.filter((item) => item.type === "image.project.changed").map((item) => (item.payload as { projectId: string; author: string })))
+      .toEqual(["poster-1x1", "poster-16x9", "poster-1x1-2"].map((projectId) => expect.objectContaining({ projectId, author: "system" })));
+    const listed = (await run("image.project.list", {})).projects.map((item) => item.projectId).sort();
+    expect(listed).toEqual(["poster", "poster-16x9", "poster-1x1", "poster-1x1-2"]);
+    expect((await readProject(projectRoot(cwd, "poster"))).document.revision).toBe(1);
+  });
+
+  it("reports a preset that cannot be made and still derives the rest", async () => {
+    const cwd = await workspace(true);
+    const root = projectRoot(cwd, "big");
+    await fs.mkdir(path.dirname(root), { recursive: true });
+    await createProject(root, { project_id: "big", title: "大海报", canvas: { width: 4096, height: 4096, background: "#ffffff" }, assets: [],
+      objects: [{ id: "block", kind: "rect", locked: false, visible: true, x: 0, y: 0, width: 4096, height: 4096, opacity: 1, color: "#b5452f", radius: 0 }] });
+    const { run } = host(cwd);
+    const { results } = await run("image.project.derive", { projectId: "big", revision: 1, presets: ["16x9", "1x1"] });
+    expect(results.map((item) => [item.preset, item.status])).toEqual([["16x9", "refused"], ["1x1", "derived"]]);
+    expect(results[0]).toMatchObject({ reason: expect.stringContaining("超出画布上限") });
+  });
 });
+

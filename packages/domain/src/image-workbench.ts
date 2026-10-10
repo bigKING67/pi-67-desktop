@@ -182,6 +182,22 @@ export function imageBudgetDecision(budget: ImageTaskBudget, used: ImageTaskUsag
   return used.finals + request.count <= budget.finals && rank[request.quality] <= rank[budget.finalQuality] ? "proceed" : "ask";
 }
 
+/** Multi-size export presets (product model §7 F): each becomes a derived project, re-laid out, never a scaled copy. */
+export const IMAGE_SIZE_PRESETS = ["1x1", "3x4", "4x5", "9x16", "16x9"] as const;
+export type ImageSizePreset = typeof IMAGE_SIZE_PRESETS[number];
+export const imageSizePresetLabel = (preset: ImageSizePreset): string => preset.replace("x", ":");
+
+/** Whether a canvas of this size is within the engine's limits (8192 per side, 16.7 million pixels). */
+export const imageSizePresetFits = (size: { width: number; height: number }): boolean =>
+  size.width <= IMAGE_PROJECT_LIMITS.edge && size.height <= IMAGE_PROJECT_LIMITS.edge && size.width * size.height <= IMAGE_PROJECT_LIMITS.pixels;
+
+/** A preset's pixel size: the source's short edge kept, the other edge from the ratio. */
+export function imageSizePresetSize(source: { width: number; height: number }, preset: ImageSizePreset): { width: number; height: number } {
+  const [across, down] = preset.split("x").map(Number) as [number, number];
+  const short = Math.min(source.width, source.height);
+  return across >= down ? { width: Math.round(short * across / down), height: short } : { width: short, height: Math.round(short * down / across) };
+}
+
 export type ImageReferenceRole = "keep-subject" | "keep-style" | "take-composition";
 export interface ImageMark { id: string; x: number; y: number; width: number; height: number; instruction: string }
 export interface ImagePromptContext {

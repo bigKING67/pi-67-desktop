@@ -1,4 +1,4 @@
-import { IMAGE_ID_PATTERN, IMAGE_PROJECT_LIMITS } from "@pi67/domain";
+import { IMAGE_ID_PATTERN, IMAGE_PROJECT_LIMITS, IMAGE_SIZE_PRESETS } from "@pi67/domain";
 import { strictObject, Type, Value, type TSchema } from "./typebox-schema.js";
 import type { ImageCommandPayloads, ImageCommandResults, ImageEventPayloads } from "./image-command-messages.js";
 
@@ -124,6 +124,11 @@ const ConversationSchema = strictObject({
   sessionFileIdentity: Type.String({ minLength: 1, maxLength: 512 })
 });
 
+/** One export set: the source revision plus one file per size preset. */
+export const IMAGE_EXPORT_SET_MAX_ITEMS = IMAGE_SIZE_PRESETS.length + 1;
+
+const SizePresetSchema = Type.Union(IMAGE_SIZE_PRESETS.map((preset) => Type.Literal(preset)));
+
 export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSchema> = {
   "image.project.list": strictObject({}),
   "image.project.createFromPhoto": strictObject({
@@ -143,7 +148,9 @@ export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSch
   "image.candidate.list": ProjectRefSchema,
   "image.candidate.accept": strictObject({ projectId: IdSchema, candidateId: IdSchema, baseRevision: RevisionSchema, summary: SummarySchema }),
   "image.candidate.discard": strictObject({ projectId: IdSchema, candidateId: IdSchema, summary: SummarySchema }),
-  "image.project.conversation.set": strictObject({ projectId: IdSchema, conversation: ConversationSchema })
+  "image.project.conversation.set": strictObject({ projectId: IdSchema, conversation: ConversationSchema }),
+  "image.project.derive": strictObject({ projectId: IdSchema, revision: RevisionSchema,
+    presets: Type.Array(SizePresetSchema, { minItems: 1, maxItems: IMAGE_SIZE_PRESETS.length, uniqueItems: true }) })
 };
 
 export const ImageCommandResultSchemas: Record<keyof ImageCommandResults, TSchema> = {
@@ -163,7 +170,12 @@ export const ImageCommandResultSchemas: Record<keyof ImageCommandResults, TSchem
   "image.candidate.list": strictObject({ projectId: IdSchema, candidates: Type.Array(CandidateSummarySchema, { maxItems: L.candidates }) }),
   "image.candidate.accept": RevisionResultSchema,
   "image.candidate.discard": strictObject({ projectId: IdSchema, candidateId: IdSchema, status: Type.Literal("discarded") }),
-  "image.project.conversation.set": ProjectRefSchema
+  "image.project.conversation.set": ProjectRefSchema,
+  "image.project.derive": strictObject({ projectId: IdSchema, revision: RevisionSchema, results: Type.Array(Type.Union([
+    strictObject({ preset: SizePresetSchema, status: Type.Literal("derived"), projectId: IdSchema, title: Type.String({ minLength: 1, maxLength: L.title }), canvas: CanvasSchema,
+      shrunkText: Type.Integer({ minimum: 0, maximum: L.objects }) }),
+    strictObject({ preset: SizePresetSchema, status: Type.Literal("refused"), reason: Type.String({ minLength: 1, maxLength: 500 }) })
+  ]), { maxItems: IMAGE_SIZE_PRESETS.length }) })
 };
 
 export const ImageEventPayloadSchemas: Record<keyof ImageEventPayloads, TSchema> = {

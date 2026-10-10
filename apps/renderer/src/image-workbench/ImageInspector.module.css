@@ -320,3 +320,58 @@
 .roleRow {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
+
+/* 导出 size presets: checkbox rows with the same indicator as Settings' model picker. */
+.presetList {
+  display: grid;
+  gap: 2px;
+}
+
+.preset {
+  display: grid;
+  min-height: 30px;
+  grid-template-columns: 16px 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px;
+  border-radius: var(--radius-control);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.preset[data-hovered] {
+  background: var(--surface-hover);
+}
+
+.preset[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.preset[data-disabled] {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.presetBox {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-inline);
+  background: var(--surface-muted);
+  color: transparent;
+}
+
+.preset[data-selected] .presetBox {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--canvas);
+}
+
+.presetName {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}

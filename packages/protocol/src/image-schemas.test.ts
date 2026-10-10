@@ -37,7 +37,7 @@ describe("image protocol schemas", () => {
   it("binds every command and event to the Workspace scope", () => {
     // Image source settings (`image.generation.*`) are App-scope configuration, not project commands.
     const commands = Object.keys(CommandPayloadSchemas).filter((type) => type.startsWith("image.") && !type.startsWith("image.generation."));
-    expect(commands.sort()).toEqual(["image.candidate.accept", "image.candidate.discard", "image.candidate.list", "image.project.conversation.set", "image.project.createFromPhoto", "image.project.edit", "image.project.history", "image.project.list", "image.project.read", "image.project.render"]);
+    expect(commands.sort()).toEqual(["image.candidate.accept", "image.candidate.discard", "image.candidate.list", "image.project.conversation.set", "image.project.createFromPhoto", "image.project.derive", "image.project.edit", "image.project.history", "image.project.list", "image.project.read", "image.project.render"]);
     for (const type of commands) expect(COMMAND_CONTEXT_SCOPE_REQUIREMENTS[type as keyof ImageCommandPayloads], type).toBe("workspace");
     for (const type of ["image.project.changed", "image.candidate.changed", "image.job.changed"] as (keyof ImageEventPayloads)[]) {
       expect(EVENT_CONTEXT_REQUIREMENTS[type]).toEqual({ session: false, operation: false, requiredScope: "workspace" });
@@ -102,6 +102,15 @@ describe("image protocol schemas", () => {
     expect(check(candidates, { projectId: "p", candidates: [{ candidateId: "gen", status: "ready", receipt: { model: "m", size: "1088 by 1360" } }] })).toBe(false);
     expect(check(candidates, { projectId: "p", candidates: [{ candidateId: "gen", status: "ready", receipt: { model: "m", prompt: "secret" } }] })).toBe(false);
     expect(check(candidates, { projectId: "p", candidates: [{ candidateId: "pink", status: "approved" }] })).toBe(false);
+    expect(check(CommandPayloadSchemas["image.project.derive"], { projectId: "p", revision: 3, presets: ["1x1", "16x9"] })).toBe(true);
+    expect(check(CommandPayloadSchemas["image.project.derive"], { projectId: "p", revision: 3, presets: ["1x1", "1x1"] })).toBe(false);
+    expect(check(CommandPayloadSchemas["image.project.derive"], { projectId: "p", revision: 3, presets: ["2x1"] })).toBe(false);
+    expect(check(CommandPayloadSchemas["image.project.derive"], { projectId: "p", revision: 3, presets: [] })).toBe(false);
+    expect(check(CommandResultSchemas["image.project.derive"], { projectId: "p", revision: 3, results: [
+      { preset: "4x5", status: "derived", projectId: "p-4x5", title: "海报 · 4:5", canvas, shrunkText: 1 },
+      { preset: "16x9", status: "refused", reason: "文字放不下" }
+    ] })).toBe(true);
+    expect(check(CommandResultSchemas["image.project.derive"], { projectId: "p", revision: 3, results: [{ preset: "4x5", status: "derived", projectId: "../x", title: "t", canvas, shrunkText: 0 }] })).toBe(false);
     expect(check(CommandResultSchemas["image.project.list"], { projects: [{ projectId: "p", title: "海报", revision: 1, canvas, updatedAt: 1, readyCandidates: 3 }] })).toBe(true);
     expect(check(CommandResultSchemas["image.project.render"], { projectId: "p", revision: 1, pngSha256: sha, width: 640, height: 640 })).toBe(true);
     expect(check(CommandResultSchemas["image.candidate.discard"], { projectId: "p", candidateId: "pink", status: "accepted" })).toBe(false);

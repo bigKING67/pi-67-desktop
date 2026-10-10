@@ -11,7 +11,7 @@ import { refreshPersistedWorkspaceDescriptor } from "./workspace-identity.js";
 // resolves the trusted Workspace root itself and re-hashes the bytes, so a
 // replaced or symlinked file is never served under a digest it does not have.
 const PREFIX = "/image/";
-const WORKSPACE_ID = /^[A-Za-z0-9_-]{1,128}$/u;
+export const WORKSPACE_ID = /^[A-Za-z0-9_-]{1,128}$/u;
 const PREVIEW_FILE = /^([a-f0-9]{64})\.png$/u;
 const MAX_PREVIEW_BYTES = IMAGE_PROJECT_LIMITS.pixels * 5;
 

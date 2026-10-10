@@ -1509,6 +1509,18 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   (model, quality, the candidate's own size, time taken) and always says the cost is not estimated and the
   picture's quality is not verified; `对比` splits the canvas between the revision the
   candidate was made from and the candidate, without changing the project.
+  `导出` keeps the full-size PNG and adds size presets (1:1, 3:4, 4:5, 9:16, 16:9, each
+  showing its pixel size: the source's short edge kept). Generating them derives one
+  project per preset beside the source in the library (`<title> · 4:5`, history
+  `派生自 <source> 修订 N · 4:5`), re-laid out rather than scaled: images and shapes
+  spanning the width stretch across the new width and scale vertically, images cropping
+  with `cover` (fitting whole with `contain` when the canvas turns between portrait and
+  landscape, so the subject is not blown up and cut); everything else scales by the smaller axis around its proportionally
+  moved centre, inside the canvas. Text that no longer fits shrinks in 5% steps to 70%
+  of its proportional size; past that the preset is refused naming the text and nothing
+  is written. `导出全部尺寸` renders this revision and every size derived in the session
+  at full size into a new folder under a place the person picks, never over existing
+  files, with `receipt.json` binding each file to its project, revision, digest and size.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

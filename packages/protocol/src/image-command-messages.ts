@@ -6,7 +6,8 @@ import type {
   ImageDocument,
   ImageEditOperation,
   ImageJobKind,
-  ImageJobState
+  ImageJobState,
+  ImageSizePreset
 } from "@pi67/domain";
 
 // Image workbench commands (ADR 0010). All are Workspace-scoped: the envelope's
@@ -25,7 +26,14 @@ export interface ImageCommandPayloads {
   "image.candidate.discard": { projectId: string; candidateId: string; summary: string };
   /** Records which Pi conversation belongs to the project (the image page's dock). */
   "image.project.conversation.set": { projectId: string; conversation: ImageProjectConversation };
+  /** Derived projects for size presets, each re-laid out from one revision of the source. */
+  "image.project.derive": { projectId: string; revision: number; presets: ImageSizePreset[] };
 }
+
+/** One preset's outcome: a new project beside the source, or the reason the layout does not fit. */
+export type ImageDeriveOutcome =
+  | { preset: ImageSizePreset; status: "derived"; projectId: string; title: string; canvas: ImageCanvas; shrunkText: number }
+  | { preset: ImageSizePreset; status: "refused"; reason: string };
 
 /** One published revision as the 历史 tab lists it (newest last). */
 export interface ImageRevisionEntry { revision: number; author: ImageChangeAuthor; summary: string; operationCount: number; candidateId?: string; writtenAt: number }
@@ -74,6 +82,7 @@ export interface ImageCommandResults {
   "image.candidate.accept": ImageRevisionResult;
   "image.candidate.discard": { projectId: string; candidateId: string; status: "discarded" };
   "image.project.conversation.set": { projectId: string };
+  "image.project.derive": { projectId: string; revision: number; results: ImageDeriveOutcome[] };
 }
 
 export interface ImageEventPayloads {

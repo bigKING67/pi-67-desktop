@@ -1,6 +1,6 @@
-import type { ImageDocument, ImageEditOperation, ImageEngineFailure, ImageMark, ImageReferenceRole, ImageSceneObject } from "@pi67/domain";
+import type { ImageDocument, ImageEditOperation, ImageEngineFailure, ImageMark, ImageReferenceRole, ImageSceneObject, ImageSizePreset } from "@pi67/domain";
 import { ProtocolRequestError } from "@pi67/protocol";
-import type { AgentCommandType, CommandPayloads, CommandResults, ImageCandidateSummary, ImageRevisionEntry } from "@pi67/protocol";
+import type { AgentCommandType, CommandPayloads, CommandResults, ImageCandidateSummary, ImageDeriveOutcome, ImageRevisionEntry } from "@pi67/protocol";
 import { create } from "zustand";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
@@ -48,11 +48,13 @@ export interface ImageProjectState {
   references: { objectId: string; role: ImageReferenceRole }[];
   /** The person detached the marks from the next message without deleting them. */
   marksHeld: boolean;
+  /** Size presets derived from this project while it is open, each with the revision it came from. */
+  derived: (ImageDeriveOutcome & { revision: number })[];
 }
 
 export const useImageProject = create<ImageProjectState>(() => ({
   projectId: undefined, revision: undefined, document: undefined, preview: undefined,
-  candidates: [], candidatePreviews: {}, candidateCanvases: {}, revisionCanvases: {}, inspecting: undefined, comparing: false, busy: false, error: undefined, back: [], forward: [], selectedObjectIds: [], conversation: undefined, conversationKnown: false, history: [], marks: [], references: [], marksHeld: false
+  candidates: [], candidatePreviews: {}, candidateCanvases: {}, revisionCanvases: {}, inspecting: undefined, comparing: false, busy: false, error: undefined, back: [], forward: [], selectedObjectIds: [], conversation: undefined, conversationKnown: false, history: [], marks: [], references: [], marksHeld: false, derived: []
 }));
 
 function libraryId(): string {
@@ -68,7 +70,7 @@ function request<T extends AgentCommandType>(type: T, payload: CommandPayloads[T
 /** Opens (or refreshes) a project: document, fitted preview and candidates. */
 export async function loadImageProject(projectId: string): Promise<void> {
   if (useImageProject.getState().projectId !== projectId) {
-    useImageProject.setState({ projectId, revision: undefined, document: undefined, preview: undefined, candidates: [], candidatePreviews: {}, candidateCanvases: {}, revisionCanvases: {}, inspecting: undefined, comparing: false, error: undefined, back: [], forward: [], selectedObjectIds: [], conversation: undefined, conversationKnown: false, history: [], marks: [], references: [], marksHeld: false });
+    useImageProject.setState({ projectId, revision: undefined, document: undefined, preview: undefined, candidates: [], candidatePreviews: {}, candidateCanvases: {}, revisionCanvases: {}, inspecting: undefined, comparing: false, error: undefined, back: [], forward: [], selectedObjectIds: [], conversation: undefined, conversationKnown: false, history: [], marks: [], references: [], marksHeld: false, derived: [] });
   }
   try {
     const read = await request("image.project.read", { projectId });
@@ -295,6 +297,57 @@ export async function exportImageProject(): Promise<void> {
     await window.pi67.system.saveImage({ workspaceId: libraryId(), projectId, pngSha256: full.pngSha256, fileName: document.title });
   } catch (error) {
     publishNotification({ level: "error", title: "导出失败", message: error instanceof Error ? error.message : "未知错误" });
+  }
+}
+
+/**
+ * Derives the chosen size presets from the revision on screen. Each becomes a
+ * project beside this one in the library; a preset whose text cannot fit is
+ * reported with its reason and writes nothing.
+ */
+export async function deriveImageSizes(presets: readonly ImageSizePreset[]): Promise<ImageDeriveOutcome[] | undefined> {
+  const { projectId, revision, busy } = useImageProject.getState();
+  if (!projectId || revision === undefined || busy || presets.length === 0) return undefined;
+  useImageProject.setState({ busy: true });
+  try {
+    const { results } = await request("image.project.derive", { projectId, revision, presets: [...presets] });
+    if (useImageProject.getState().projectId === projectId) {
+      // A preset derived again replaces its earlier entry in the list; both projects stay in the library.
+      useImageProject.setState((state) => ({ derived: [...state.derived.filter((item) => !results.some((result) => result.preset === item.preset)), ...results.map((result) => ({ ...result, revision }))] }));
+    }
+    return results;
+  } catch (error) {
+    publishNotification({ level: "error", title: "没能生成多尺寸", message: error instanceof Error ? error.message : "未知错误" });
+    return undefined;
+  } finally {
+    useImageProject.setState({ busy: false });
+  }
+}
+
+/** Sizes derived from exactly this revision; ones from earlier revisions stay in the library but out of the set. */
+export function derivedSizes(state: Pick<ImageProjectState, "derived" | "revision">): Extract<ImageDeriveOutcome, { status: "derived" }>[] {
+  return state.derived.flatMap((item) => item.status === "derived" && item.revision === state.revision ? [item] : []);
+}
+
+/** The revision on screen plus every size derived from it, rendered at full size into one new export folder. */
+export async function exportImageSizes(): Promise<void> {
+  const { projectId, revision, document, busy } = useImageProject.getState();
+  if (!projectId || revision === undefined || !document || busy) return;
+  const sizes = derivedSizes(useImageProject.getState());
+  useImageProject.setState({ busy: true });
+  try {
+    const items = [];
+    for (const target of [{ projectId, canvas: document.canvas, revision }, ...sizes.map((size) => ({ ...size, revision: undefined }))]) {
+      const rendered = await request("image.project.render", { projectId: target.projectId, ...(target.revision === undefined ? {} : { revision: target.revision }),
+        previewMax: Math.max(target.canvas.width, target.canvas.height) });
+      items.push({ projectId: target.projectId, revision: rendered.revision, pngSha256: rendered.pngSha256, fileName: `${document.title} ${rendered.width}×${rendered.height}` });
+    }
+    const saved = await window.pi67.system.saveImageSet({ workspaceId: libraryId(), title: document.title, items });
+    if (saved) publishNotification({ level: "success", title: `已导出 ${items.length} 张图片`, message: `在「${saved.folderName}」里，附带 receipt.json。` });
+  } catch (error) {
+    publishNotification({ level: "error", title: "导出失败", message: error instanceof Error ? error.message : "未知错误" });
+  } finally {
+    useImageProject.setState({ busy: false });
   }
 }
 

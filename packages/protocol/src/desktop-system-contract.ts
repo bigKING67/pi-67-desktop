@@ -203,6 +203,11 @@ export interface DesktopSystemBridge {
   chooseImageLibrary(): Promise<WorkspaceDescriptor | undefined>;
   /** Saves a rendered image PNG the user is viewing, after Main re-verifies its digest. */
   saveImage(request: { workspaceId: string; projectId: string; pngSha256: string; fileName: string }): Promise<boolean>;
+  /**
+   * Saves several rendered PNGs (one per size) into a new folder under a place the
+   * person picks, with a receipt; undefined when they cancel. Main re-verifies each digest.
+   */
+  saveImageSet(request: { workspaceId: string; title: string; items: { projectId: string; revision: number; pngSha256: string; fileName: string }[] }): Promise<{ folderName: string } | undefined>;
   repairWorkspace(workspaceId: string): Promise<WorkspaceDescriptor | undefined>;
   removeWorkspace(workspaceId: string): Promise<WorkbenchStateV5>;
   reorderWorkspaces(workspaceIds: string[]): Promise<WorkbenchStateV5>;
