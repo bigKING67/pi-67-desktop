@@ -1,6 +1,7 @@
-import { IMAGE_USER_FONT_LIMIT, type ImageDocument, type ImageEditOperation, type ImageEngineFailure, type ImageMark, type ImageReferenceRole, type ImageSceneObject, type ImageSizePreset } from "@pi67/domain";
+import { IMAGE_SIZE_PRESETS, IMAGE_USER_FONT_LIMIT, type ImageDocument, type ImageEditOperation, type ImageEngineFailure, type ImageMark, type ImageReferenceRole, type ImageSceneObject, type ImageSizePreset } from "@pi67/domain";
 import { ProtocolRequestError } from "@pi67/protocol";
-import type { AgentCommandType, CommandPayloads, CommandResults, ImageCandidateSummary, ImageDeriveOutcome, ImageRevisionEntry } from "@pi67/protocol";
+import type { AgentCommandType, CommandPayloads, CommandResults, ImageCandidateSummary, ImageDeriveOutcome, ImageProjectSummary, ImageRevisionEntry } from "@pi67/protocol";
+import { useImageWorkbench } from "./image-workbench-store.js";
 import { create } from "zustand";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
@@ -373,19 +374,28 @@ function fontFailure(error: unknown): string {
 }
 
 /** Sizes derived from exactly this revision; ones from earlier revisions stay in the library but out of the set. */
-export function derivedSizes(state: Pick<ImageProjectState, "derived" | "revision">): Extract<ImageDeriveOutcome, { status: "derived" }>[] {
-  return state.derived.flatMap((item) => item.status === "derived" && item.revision === state.revision ? [item] : []);
+export function derivedSizes(projects: readonly ImageProjectSummary[], projectId: string | undefined, revision: number | undefined): { current: ImageProjectSummary[]; older: ImageProjectSummary[] } {
+  // The library knows every size derived from this project, in any session; per preset the newest from this revision goes in the set.
+  const mine = projects.filter((project) => project.derivedFrom?.projectId === projectId)
+    .sort((a, b) => IMAGE_SIZE_PRESETS.indexOf(a.derivedFrom!.preset) - IMAGE_SIZE_PRESETS.indexOf(b.derivedFrom!.preset) || b.updatedAt - a.updatedAt);
+  const current: ImageProjectSummary[] = [], older: ImageProjectSummary[] = [];
+  for (const project of mine) {
+    const sameRevision = project.derivedFrom!.revision === revision;
+    if (sameRevision && !current.some((item) => item.derivedFrom!.preset === project.derivedFrom!.preset)) current.push(project);
+    else older.push(project);
+  }
+  return { current, older };
 }
 
 /** The revision on screen plus every size derived from it, rendered at full size into one new export folder. */
 export async function exportImageSizes(): Promise<void> {
   const { projectId, revision, document, busy } = useImageProject.getState();
   if (!projectId || revision === undefined || !document || busy) return;
-  const sizes = derivedSizes(useImageProject.getState());
+  const sizes = derivedSizes(useImageWorkbench.getState().projects, projectId, revision).current;
   useImageProject.setState({ busy: true });
   try {
     const items = [];
-    for (const target of [{ projectId, canvas: document.canvas, revision }, ...sizes.map((size) => ({ ...size, revision: undefined }))]) {
+    for (const target of [{ projectId, canvas: document.canvas, revision }, ...sizes.map((size) => ({ projectId: size.projectId, canvas: size.canvas, revision: undefined }))]) {
       const rendered = await request("image.project.render", { projectId: target.projectId, ...(target.revision === undefined ? {} : { revision: target.revision }),
         previewMax: Math.max(target.canvas.width, target.canvas.height) });
       items.push({ projectId: target.projectId, revision: rendered.revision, pngSha256: rendered.pngSha256, fileName: `${document.title} ${rendered.width}×${rendered.height}` });

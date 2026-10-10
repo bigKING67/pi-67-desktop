@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Button, Checkbox, CheckboxGroup } from "react-aria-components";
 import { acceptCandidate, deriveImageSizes, derivedSizes, discardCandidate, editImageProject, exportImageProject, exportImageSizes, inspectCandidate, useImageProject } from "./image-project-controller.js";
 import { useImageWorkbench } from "./image-workbench-store.js";
+import { loadImageLibrary } from "./image-workbench-controller.js";
 import styles from "./ImageInspector.module.css";
 
 const AUTHORS = { human: "人", agent: "Agent", system: "系统" } as const;
@@ -95,14 +96,16 @@ export function ImageExportPanel() {
   const revision = useImageProject((state) => state.revision);
   const busy = useImageProject((state) => state.busy);
   const projectId = useImageProject((state) => state.projectId);
-  const allDerived = useImageProject((state) => state.derived);
+  const outcomes = useImageProject((state) => state.derived);
+  const library = useImageWorkbench((state) => state.projects);
   const openProject = useImageWorkbench((state) => state.openProject);
   const [chosen, setChosen] = useState<ImageSizePreset[]>([]);
-  // A choice belongs to one project; another project starts with none ticked.
-  useEffect(() => setChosen([]), [projectId]);
+  // A choice belongs to one project; another project starts with none ticked. The library
+  // list says which sizes exist, including ones derived in earlier sessions.
+  useEffect(() => { setChosen([]); void loadImageLibrary(); }, [projectId]);
   if (!document) return null;
-  const derived = allDerived.filter((item) => item.revision === revision);
-  const sizes = derivedSizes({ derived: allDerived, revision }).length;
+  const { current, older } = derivedSizes(library, projectId, revision);
+  const refused = outcomes.filter((item) => item.status === "refused" && item.revision === revision);
   return (
     <div className={styles.properties}>
       <p className={styles.sectionLabel}>原尺寸 PNG</p>
@@ -123,33 +126,39 @@ export function ImageExportPanel() {
           );
         })}
       </CheckboxGroup>
-      <Button className="secondary-button" isDisabled={busy || chosen.length === 0} onPress={() => void deriveImageSizes(chosen).then((results) => { if (results) setChosen([]); })}>
+      <Button className="secondary-button" isDisabled={busy || chosen.length === 0} onPress={() => void deriveImageSizes(chosen).then(async (results) => { if (results) { setChosen([]); await loadImageLibrary(); } })}>
         {chosen.length ? `生成 ${chosen.length} 个尺寸` : "生成尺寸"}
       </Button>
       <p className={styles.empty}>每个尺寸会成为创作库里的一个新项目，按新画布重新排版（不缩放成品图），之后可以单独微调；这个项目不受影响。</p>
-      {derived.length ? (
+      {current.length || older.length || refused.length ? (
         <ul aria-label="已生成的尺寸" className={styles.candidateList}>
-          {derived.map((item) => (
-            <li key={item.preset} className={styles.candidateItem}>
-              {item.status === "derived" ? (
-                <>
-                  <span className={styles.historyHead}><strong>{imageSizePresetLabel(item.preset)}</strong><span className={styles.historyMeta}>{item.canvas.width}×{item.canvas.height}{item.shrunkText ? ` · 缩小了 ${item.shrunkText} 段文字` : ""}</span></span>
-                  <span className={styles.candidateActions}><Button className={styles.historyAction!} onPress={() => openProject(item.projectId)}>打开「{item.title}」</Button></span>
-                </>
-              ) : (
-                <>
-                  <span className={styles.historyHead}><strong>{imageSizePresetLabel(item.preset)}</strong><span className={styles.historyMeta}>未生成</span></span>
-                  <span className={styles.notice}>{item.reason}，可以先在这个项目里缩短文字或加宽文本框。</span>
-                </>
-              )}
+          {[...current, ...older].map((size) => {
+            const shrunk = outcomes.find((item) => item.status === "derived" && item.projectId === size.projectId);
+            const isOlder = !current.includes(size);
+            return (
+              <li key={size.projectId} className={styles.candidateItem}>
+                <span className={styles.historyHead}>
+                  <strong>{imageSizePresetLabel(size.derivedFrom!.preset)}</strong>
+                  <span className={styles.historyMeta}>{size.canvas.width}×{size.canvas.height}
+                    {isOlder ? ` · 基于修订 ${size.derivedFrom!.revision} · 较旧` : ""}
+                    {shrunk?.status === "derived" && shrunk.shrunkText ? ` · 缩小了 ${shrunk.shrunkText} 段文字` : ""}</span>
+                </span>
+                <span className={styles.candidateActions}><Button className={styles.historyAction!} onPress={() => openProject(size.projectId)}>打开「{size.title}」</Button></span>
+              </li>
+            );
+          })}
+          {refused.map((item) => item.status === "refused" ? (
+            <li key={`refused-${item.preset}`} className={styles.candidateItem}>
+              <span className={styles.historyHead}><strong>{imageSizePresetLabel(item.preset)}</strong><span className={styles.historyMeta}>未生成</span></span>
+              <span className={styles.notice}>{item.reason}，可以先在这个项目里缩短文字或加宽文本框。</span>
             </li>
-          ))}
+          ) : null)}
         </ul>
       ) : null}
-      <Button className="primary-button" isDisabled={busy || sizes === 0} onPress={() => void exportImageSizes()}>
-        <FolderDown aria-hidden="true" size={14} />导出全部尺寸（{sizes + 1} 张）
+      <Button className="primary-button" isDisabled={busy || current.length === 0} onPress={() => void exportImageSizes()}>
+        <FolderDown aria-hidden="true" size={14} />导出全部尺寸（{current.length + 1} 张）
       </Button>
-      <p className={styles.empty}>选择一个位置后，会在那里新建一个文件夹，放入这一版和各尺寸的 PNG 以及 receipt.json，不会覆盖已有文件。</p>
+      <p className={styles.empty}>选择一个位置后，会在那里新建一个文件夹，放入这一版和基于这一版的各尺寸 PNG 以及 receipt.json，不会覆盖已有文件；较旧修订派生的尺寸不会混进来。</p>
     </div>
   );
 }

@@ -81,10 +81,13 @@ export function ImageLibrary() {
 }
 
 function ProjectCard({ libraryId, project }: { libraryId: string; project: ImageProjectSummary }) {
+  const projects = useImageWorkbench((state) => state.projects);
   const thumbnail = useImageWorkbench((state) => state.thumbnails[project.projectId]);
   const openProject = useImageWorkbench((state) => state.openProject);
   const { width, height } = project.canvas;
-  const meta = [`${width}×${height}`, `修订 ${project.revision}`, ...(project.readyCandidates ? [`${project.readyCandidates} 个候选待选`] : []), updatedLabel(project.updatedAt)];
+  const source = project.derivedFrom ? projects.find((item) => item.projectId === project.derivedFrom!.projectId) : undefined;
+  const meta = [`${width}×${height}`, `修订 ${project.revision}`, ...(project.derivedFrom ? [`派生自 ${source?.title ?? project.derivedFrom.projectId}`] : []),
+    ...(project.readyCandidates ? [`${project.readyCandidates} 个候选待选`] : []), updatedLabel(project.updatedAt)];
   return (
     <li>
       <Button aria-label={`打开 ${project.title}`} className={styles.card!} onPress={() => openProject(project.projectId)}>

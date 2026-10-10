@@ -121,7 +121,8 @@ const ProjectSummarySchema = strictObject({
   revision: RevisionSchema,
   canvas: CanvasSchema,
   updatedAt: TimestampSchema,
-  readyCandidates: Type.Integer({ minimum: 0, maximum: L.candidates })
+  readyCandidates: Type.Integer({ minimum: 0, maximum: L.candidates }),
+  derivedFrom: Type.Optional(strictObject({ projectId: IdSchema, revision: RevisionSchema, preset: Type.Union(IMAGE_SIZE_PRESETS.map((preset) => Type.Literal(preset))) }))
 });
 const RevisionResultSchema = strictObject({ projectId: IdSchema, revision: RevisionSchema, sha256: Sha256Schema, dryRun: Type.Boolean() });
 const ProjectRefSchema = strictObject({ projectId: IdSchema });

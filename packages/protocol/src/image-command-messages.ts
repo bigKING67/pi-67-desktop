@@ -49,6 +49,8 @@ export interface ImageProjectSummary {
   canvas: ImageCanvas;
   updatedAt: number;
   readyCandidates: number;
+  /** For a size derived from another project: which project, revision and preset it came from. */
+  derivedFrom?: { projectId: string; revision: number; preset: ImageSizePreset };
 }
 
 export interface ImageCandidateSummary {

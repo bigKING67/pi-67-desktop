@@ -284,7 +284,7 @@ Application-level surfaces use a separate wide-window shell:
 - Size presets (P3, 2026-10-10): `导出` adds a `多尺寸 · 基于修订 N` section — one 30px
   checkbox row per preset (16px indicator as in Settings, ratio in tabular figures, pixel
   size tertiary), a secondary `生成 N 个尺寸` (`生成尺寸` while none is ticked), a list of outcomes (ratio, size, `缩小了 N
-  段文字`, `打开「title」` text action; a refused preset reads `未生成` with its reason in
+  段文字` or `基于修订 N · 较旧` for a size from an earlier revision, `打开「title」` text action; a refused preset reads `未生成` with its reason in
   the warning line), and the primary `导出全部尺寸（N 张）` with a folder glyph. The
   full-size `导出 PNG` becomes secondary so the tab has one primary action.
 - Text fonts (P3, 2026-10-10): 属性 for text adds a `字体` section — the shared Settings

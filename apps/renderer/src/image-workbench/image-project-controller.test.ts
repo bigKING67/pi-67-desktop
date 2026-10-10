@@ -46,11 +46,13 @@ vi.mock("../connection/AgentConnectionController.js", () => ({
 vi.mock("../notifications/notification-store.js", () => ({ publishNotification: (notice: { level: string; title: string; message: string }) => notices.push(notice) }));
 
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import { useImageWorkbench } from "./image-workbench-store.js";
 import {
   acceptCandidate,
   addImageFont,
   checkImageEdit,
   deriveImageSizes,
+  derivedSizes,
   discardCandidate,
   inspectCandidate,
   editImageProject,
@@ -174,15 +176,23 @@ describe("image object selection", () => {
     await deriveImageSizes(["1x1"]);
     expect(useImageProject.getState().derived.map((item) => item.preset)).toEqual(["16x9", "1x1"]);
 
+    // The library lists every derived size, from any session: per preset the newest from this revision goes in the set.
+    const canvas = { width: 100, height: 100, background: "#fff" };
+    const size = (projectId: string, preset: "1x1" | "4x5", revision: number, updatedAt: number) =>
+      ({ projectId, title: projectId, revision: 1, canvas, updatedAt, readyCandidates: 0, derivedFrom: { projectId: "p", revision, preset } });
+    useImageWorkbench.setState({ projects: [size("p-1x1", "1x1", 1, 1), size("p-1x1-2", "1x1", 1, 2), size("p-4x5", "4x5", 0, 3),
+      { projectId: "other", title: "other", revision: 1, canvas, updatedAt: 4, readyCandidates: 0 }] });
+    expect(derivedSizes(useImageWorkbench.getState().projects, "p", 1)).toMatchObject({
+      current: [{ projectId: "p-1x1-2" }], older: [{ projectId: "p-1x1" }, { projectId: "p-4x5" }] });
     const saveImageSet = vi.fn(() => Promise.resolve({ folderName: "海报 导出" }));
     vi.stubGlobal("window", { pi67: { system: { saveImageSet } } });
     rendererWorkbenchStore.setState({ imageLibraryWorkspaceId: "lib" } as never);
     host.calls = [];
     await exportImageSizes();
     // The source is pinned to the revision on screen; derived sizes have one revision each.
-    expect(host.calls.filter((call) => call.type === "image.project.render").map((call) => [call.payload.projectId, call.payload.revision])).toEqual([["p", 1], ["p-1x1", undefined]]);
+    expect(host.calls.filter((call) => call.type === "image.project.render").map((call) => [call.payload.projectId, call.payload.revision])).toEqual([["p", 1], ["p-1x1-2", undefined]]);
     expect(saveImageSet).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: "lib", title: "海报", items: [
-      expect.objectContaining({ projectId: "p", fileName: "海报 100×100" }), expect.objectContaining({ projectId: "p-1x1" })] }));
+      expect.objectContaining({ projectId: "p", fileName: "海报 100×100" }), expect.objectContaining({ projectId: "p-1x1-2" })] }));
     expect(notices.at(-1)).toMatchObject({ level: "success", title: "已导出 2 张图片" });
     expect(useImageProject.getState().busy).toBe(false);
     // A newer revision leaves the earlier sizes out of the next set.

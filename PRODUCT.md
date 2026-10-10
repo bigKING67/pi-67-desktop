@@ -1518,8 +1518,11 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   landscape, so the subject is not blown up and cut); everything else scales by the smaller axis around its proportionally
   moved centre, inside the canvas. Text that no longer fits shrinks in 5% steps to 70%
   of its proportional size; past that the preset is refused naming the text and nothing
-  is written. `导出全部尺寸` renders this revision and every size derived in the session
-  at full size into a new folder under a place the person picks, never over existing
+  is written. 导出 lists every size derived from the project, from any session (the
+  library recognises a derived project by its first revision); sizes from an earlier
+  revision read `基于修订 N · 较旧` and can be opened but stay out of the set, and library
+  cards of derived sizes read `派生自 <source>`. `导出全部尺寸` renders this revision and,
+  per preset, the newest size derived from it at full size into a new folder under a place the person picks, never over existing
   files, with `receipt.json` binding each file to its project, revision, digest and size.
   属性 for text adds `字体`: the built-in Noto Sans CJK SC or a font added to the project
   with `添加字体…` (a TTF or OTF file the person picks, staged like a photo; at most 8,

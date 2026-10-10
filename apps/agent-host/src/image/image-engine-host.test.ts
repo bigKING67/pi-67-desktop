@@ -224,8 +224,14 @@ describe("image engine host", { timeout: 120_000 }, () => {
     expect(again.results[0]).toMatchObject({ projectId: "poster-1x1-2" });
     expect(events.filter((item) => item.type === "image.project.changed").map((item) => (item.payload as { projectId: string; author: string })))
       .toEqual(["poster-1x1", "poster-16x9", "poster-1x1-2"].map((projectId) => expect.objectContaining({ projectId, author: "system" })));
-    const listed = (await run("image.project.list", {})).projects.map((item) => item.projectId).sort();
-    expect(listed).toEqual(["poster", "poster-16x9", "poster-1x1", "poster-1x1-2"]);
+    const listed = (await run("image.project.list", {})).projects;
+    expect(listed.map((item) => item.projectId).sort()).toEqual(["poster", "poster-16x9", "poster-1x1", "poster-1x1-2"]);
+    // The library says where each size came from; the source itself has no derivation.
+    expect(listed.find((item) => item.projectId === "poster-16x9")?.derivedFrom).toEqual({ projectId: "poster", revision: 1, preset: "16x9" });
+    expect(listed.find((item) => item.projectId === "poster")).not.toHaveProperty("derivedFrom");
+    // Still recognised after the derived size gets its own edits.
+    await run("image.project.edit", { projectId: "poster-1x1", baseRevision: 1, summary: "微调", operations: [{ type: "update_object", id: "headline", patch: { x: 20 } }] });
+    expect((await run("image.project.list", {})).projects.find((item) => item.projectId === "poster-1x1")?.derivedFrom).toMatchObject({ preset: "1x1" });
     expect((await readProject(projectRoot(cwd, "poster"))).document.revision).toBe(1);
   });
 

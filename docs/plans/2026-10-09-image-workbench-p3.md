@@ -150,4 +150,8 @@ the image Inspector returns the P2 page; no project content is rewritten.
   1440 / 1180 / 960 in light and dark with no horizontal overflow (screenshots attached to the
   test). Authority docs were updated in each checkpoint's commit. Still open: the Windows x64
   packaged smoke, which needs a real Windows run.
+- 2026-10-10: derived sizes listed across sessions (user-approved plan). The Host recognises a
+  derived project from revision 1's summary and adds an optional `derivedFrom` to
+  `ImageProjectSummary` (protocol revision regenerated); 导出 lists sizes from the library,
+  older revisions marked `较旧` and kept out of the set; library cards read `派生自 <source>`.
 

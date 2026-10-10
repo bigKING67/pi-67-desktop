@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { IMAGE_WORK_DIRECTORY, imageSizePresetLabel, isImageId, type ImageCandidateListStatus, type ImageChangeAuthor, type ImageSizePreset } from "@pi67/domain";
+import { IMAGE_SIZE_PRESETS, IMAGE_WORK_DIRECTORY, imageSizePresetLabel, isImageId, type ImageCandidateListStatus, type ImageChangeAuthor, type ImageSizePreset } from "@pi67/domain";
 type ImageEngine = typeof import("@pi67/image-engine");
 import type { AgentCommand, AgentEvent, CommandPayloads, CommandResults, ImageCandidateReceipt, ImageCandidateSummary, ImageDeriveOutcome, ImageEventPayloads, ImageProjectSummary } from "@pi67/protocol";
 import { HostCommandError } from "../protocol-error.js";
@@ -278,6 +278,24 @@ async function readConversation(cwd: string, projectId: string): Promise<{ sessi
   } catch { return undefined; }
 }
 
+const isImageSizePreset = (value: string): value is ImageSizePreset => (IMAGE_SIZE_PRESETS as readonly string[]).includes(value);
+const DERIVED = /^Derived from ([a-zA-Z][a-zA-Z0-9_-]{0,63}) revision (\d{1,4}) for (\d+):(\d+)$/u;
+
+/**
+ * A derived size names its source in revision 1's summary (engine deriveProject).
+ * `readProject` has already validated the whole chain, so one small read suffices.
+ */
+async function derivation(root: string, firstSummary: string | undefined): Promise<ImageProjectSummary["derivedFrom"]> {
+  let summary = firstSummary;
+  if (summary === undefined) {
+    try { summary = (JSON.parse(await fs.readFile(path.join(root, "revisions", "000001.json"), "utf8")) as { change?: { summary?: unknown } }).change?.summary as string | undefined; }
+    catch { return undefined; }
+  }
+  const match = typeof summary === "string" ? DERIVED.exec(summary) : null;
+  const preset = match ? `${match[3]}x${match[4]}` : "";
+  return match && isImageSizePreset(preset) ? { projectId: match[1]!, revision: Number(match[2]), preset } : undefined;
+}
+
 /** `base`, or `base-2`, `base-3`… when a project of that name already exists. */
 async function freeProjectId(engine: ImageEngine, cwd: string, base: string): Promise<string> {
   for (let index = 1; index <= 99; index += 1) {
@@ -332,8 +350,10 @@ async function listProjects(engine: ImageEngine, cwd: string): Promise<ImageProj
       const project = await readProject(root);
       const latest = path.join(root, "revisions", `${String(project.latest_revision).padStart(6, "0")}.json`);
       const candidates = await listCandidates(root);
+      const derivedFrom = await derivation(root, project.latest_revision === 1 ? project.document.change.summary : undefined);
       projects.push({ projectId, title: project.document.title, revision: project.document.revision, canvas: project.document.canvas,
-        updatedAt: Math.floor((await fs.stat(latest)).mtimeMs), readyCandidates: candidates.filter((item) => item.status === "ready").length });
+        updatedAt: Math.floor((await fs.stat(latest)).mtimeMs), readyCandidates: candidates.filter((item) => item.status === "ready").length,
+        ...(derivedFrom ? { derivedFrom } : {}) });
     } catch { /* A damaged project stays on disk for inspection; it is not listed. */ }
   }
   return projects;

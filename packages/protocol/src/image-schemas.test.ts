@@ -112,6 +112,8 @@ describe("image protocol schemas", () => {
     ] })).toBe(true);
     expect(check(CommandResultSchemas["image.project.derive"], { projectId: "p", revision: 3, results: [{ preset: "4x5", status: "derived", projectId: "../x", title: "t", canvas, shrunkText: 0 }] })).toBe(false);
     expect(check(CommandResultSchemas["image.project.list"], { projects: [{ projectId: "p", title: "海报", revision: 1, canvas, updatedAt: 1, readyCandidates: 3 }] })).toBe(true);
+    expect(check(CommandResultSchemas["image.project.list"], { projects: [{ projectId: "p-4x5", title: "海报 · 4:5", revision: 2, canvas, updatedAt: 1, readyCandidates: 0, derivedFrom: { projectId: "p", revision: 3, preset: "4x5" } }] })).toBe(true);
+    expect(check(CommandResultSchemas["image.project.list"], { projects: [{ projectId: "p-4x5", title: "t", revision: 2, canvas, updatedAt: 1, readyCandidates: 0, derivedFrom: { projectId: "p", revision: 3, preset: "2x1" } }] })).toBe(false);
     expect(check(CommandResultSchemas["image.project.render"], { projectId: "p", revision: 1, pngSha256: sha, width: 640, height: 640 })).toBe(true);
     expect(check(CommandResultSchemas["image.candidate.discard"], { projectId: "p", candidateId: "pink", status: "accepted" })).toBe(false);
   });
