@@ -1,6 +1,6 @@
 import type { ImageDocument, ImageEditOperation, ImageMark, ImageObjectPatch, ImageSceneObject as SceneObject } from "@pi67/domain";
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { boundsOf, clampInside, RESIZE_HANDLES, resizeRect, snapMove, type Guide, type Rect, type ResizeHandle } from "./image-canvas-geometry.js";
+import { boundsOf, clampInside, normalizeRotation, RESIZE_HANDLES, resizeRect, rotateAbout, rotateStyle, snapMove, type Guide, type Rect, type ResizeHandle } from "./image-canvas-geometry.js";
 import { useCanvasFit } from "./image-canvas-fit.js";
 import { ImageInlineTextEditor } from "./ImageInlineTextEditor.js";
 import styles from "./ImageCanvas.module.css";
@@ -10,7 +10,14 @@ const SNAP_PX = 6;
 
 type Gesture =
   | { kind: "move"; ids: string[]; startX: number; startY: number; dx: number; dy: number; guides: Guide[] }
-  | { kind: "resize"; id: string; handle: ResizeHandle; startX: number; startY: number; rect: Rect; guides: Guide[] };
+  | { kind: "resize"; id: string; handle: ResizeHandle; startX: number; startY: number; rect: Rect; guides: Guide[] }
+  | { kind: "rotate"; id: string; centre: { x: number; y: number }; from: { x: number; y: number }; start: number; rotation: number; guides: Guide[] };
+
+/** Keyboard turns: `]` clockwise, `[` anticlockwise, 15° a press (Shift: 1°). By key position, since Shift turns them into `}` / `{`. */
+const ROTATE_KEYS: Readonly<Record<string, number>> = { BracketRight: 1, BracketLeft: -1 };
+/** Room the grip needs above a box; nearer the top of the well it goes below the box. */
+const GRIP_ROOM = 34;
+const ROTATE_STEP = 15;
 
 const rectOf = ({ x, y, width, height }: SceneObject): Rect => ({ x, y, width, height });
 
@@ -47,7 +54,14 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
   const primary = objects.find((object) => object.id === selectedIds.at(-1));
   const editingObject = editable ? objects.find((object) => object.id === editingId && object.kind === "text" && !object.locked) : undefined;
   const editing = editingObject?.kind === "text" ? editingObject : undefined;
-  const resizable = editable && !marking && !editing && selectedIds.length === 1 && primary && !primary.locked ? primary : undefined;
+  const handled = editable && !marking && !editing && selectedIds.length === 1 && primary && !primary.locked ? primary : undefined;
+  // The eight handles assume an upright box; a turned object resizes through 属性 and keeps only the rotate grip.
+  const resizable = handled && !handled.rotation ? handled : undefined;
+  const rotationOf = (object: SceneObject): number => gesture?.kind === "rotate" && gesture.id === object.id ? gesture.rotation : object.rotation ?? 0;
+  const commitRotation = (object: SceneObject, rotation: number) => {
+    if (rotation === (object.rotation ?? 0)) return;
+    onEdit("旋转", [{ type: "update_object", id: object.id, patch: { rotation: rotation || null } }]);
+  };
 
   const commitMove = (ids: readonly string[], dx: number, dy: number) => {
     if (dx === 0 && dy === 0) return;
@@ -76,7 +90,20 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
     event.currentTarget.setPointerCapture(event.pointerId);
     setGesture({ kind: "resize", id: object.id, handle, startX: event.clientX, startY: event.clientY, rect: rectOf(object), guides: [] });
   };
+  const gripDown = (event: PointerEvent<HTMLSpanElement>, object: SceneObject) => {
+    const well = stage.current?.getBoundingClientRect();
+    if (event.button !== 0 || !fit || !well) return;
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    // The engine turns about the stored box's centre; the same point on screen, from the fit.
+    const centre = { x: well.left + fit.left + (object.x + object.width / 2) * fit.scale, y: well.top + fit.top + (object.y + object.height / 2) * fit.scale };
+    setGesture({ kind: "rotate", id: object.id, centre, from: { x: event.clientX, y: event.clientY }, start: object.rotation ?? 0, rotation: object.rotation ?? 0, guides: [] });
+  };
   const pointerMove = (event: PointerEvent) => {
+    if (gesture?.kind === "rotate") {
+      setGesture({ ...gesture, rotation: rotateAbout(gesture.start, gesture.centre, gesture.from, { x: event.clientX, y: event.clientY }, event.shiftKey ? ROTATE_STEP : undefined) });
+      return;
+    }
     if (!gesture || !fit || !canvas) return;
     const dx = (event.clientX - gesture.startX) / fit.scale, dy = (event.clientY - gesture.startY) / fit.scale;
     const threshold = event.metaKey || event.ctrlKey ? 0 : SNAP_PX / fit.scale;
@@ -93,6 +120,7 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
   const pointerUp = () => {
     if (gesture?.kind === "move") commitMove(gesture.ids, gesture.dx, gesture.dy);
     if (gesture?.kind === "resize") { const object = objects.find((item) => item.id === gesture.id); if (object) commitResize(object, gesture.rect); }
+    if (gesture?.kind === "rotate") { const object = objects.find((item) => item.id === gesture.id); if (object) commitRotation(object, gesture.rotation); }
     setGesture(undefined);
   };
   const startEditing = (object: SceneObject) => {
@@ -105,6 +133,12 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
     if (event.key === "Escape") { onSelect(undefined); return; }
     // Enter opens the words for editing, the keyboard twin of double-click.
     if (event.key === "Enter" && object.kind === "text") { event.preventDefault(); startEditing(object); return; }
+    const turn = ROTATE_KEYS[event.code];
+    if (turn && editable && !object.locked) {
+      event.preventDefault();
+      commitRotation(object, normalizeRotation((object.rotation ?? 0) + turn * (event.shiftKey ? 1 : ROTATE_STEP)));
+      return;
+    }
     const step = event.shiftKey ? 10 : 1;
     const delta = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[event.key];
     if (!delta || !editable || !canvas) return;
@@ -165,7 +199,7 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
                 aria-pressed={selected}
                 className={`${styles.box} ${selected ? styles.selected : ""} ${object.locked ? styles.locked : ""}`}
                 data-object-id={object.id}
-                style={{ ...place(frameOf(object), fit.scale), zIndex: index + 1 }}
+                style={{ ...place(frameOf(object), fit.scale), zIndex: index + 1, ...rotateStyle(rotationOf(object)) }}
                 type="button"
                 onDoubleClick={() => startEditing(object)}
                 onKeyDown={(event) => keyDown(event, object)}
@@ -176,14 +210,23 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
               />
             );
           })}
-          {resizable ? (
-            <div aria-hidden="true" className={styles.handles} style={place(frameOf(resizable), fit.scale)}>
-              {RESIZE_HANDLES.map((handle) => (
+          {handled ? (
+            <div aria-hidden="true" className={styles.handles} data-grip={fit.top + handled.y * fit.scale < GRIP_ROOM ? "below" : "above"}
+              style={{ ...place(frameOf(handled), fit.scale), ...rotateStyle(rotationOf(handled)) }}>
+              {resizable ? RESIZE_HANDLES.map((handle) => (
                 <span key={handle} className={styles.handle} data-handle={handle}
                   onPointerCancel={() => setGesture(undefined)} onPointerDown={(event) => handleDown(event, resizable, handle)}
                   onPointerMove={pointerMove} onPointerUp={pointerUp} />
-              ))}
+              )) : null}
+              <span className={styles.rotateGrip} data-testid="image-rotate-grip" title="拖动旋转，按住 Shift 每次 15°"
+                onPointerCancel={() => setGesture(undefined)} onPointerDown={(event) => gripDown(event, handled)}
+                onPointerMove={pointerMove} onPointerUp={pointerUp} />
             </div>
+          ) : null}
+          {/* The angle reads upright beside the box centre, whatever the turn. */}
+          {gesture?.kind === "rotate" && handled ? (
+            <span aria-live="polite" className={styles.rotateReadout}
+              style={{ left: (handled.x + handled.width / 2) * fit.scale, top: (handled.y + handled.height / 2) * fit.scale }}>{gesture.rotation}°</span>
           ) : null}
           {editing ? (
             <ImageInlineTextEditor key={editing.id} frame={place(rectOf(editing), fit.scale)} object={editing} scale={fit.scale}

@@ -1532,6 +1532,14 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   licence is theirs to hold. The Agent sees the fonts in `image_project_read` and may set
   `font_id`, but cannot add fonts. A project document becomes schema v2 only while it
   binds or uses user fonts, so projects without them stay readable by earlier releases.
+  P4 (engine extensions) starts with rotation and flip: any object turns about its centre
+  (−180…180°) by dragging the rotate grip above it (Shift: 15° steps), with `[` / `]` on the
+  focused object (15°; Shift: 1°) or the `旋转 °` field in 属性, and mirrors with 水平翻转 /
+  垂直翻转. Only the unrotated box must stay on the canvas; corners past it are clipped. A
+  turned object resizes through 属性 (the eight handles assume an upright box) and edits its
+  words turned. The Agent may set `rotation` / `flip_x` / `flip_y`. A document is written as
+  schema v3 only while an object is turned or flipped (v3 may also bind fonts), so others
+  stay readable by earlier releases.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

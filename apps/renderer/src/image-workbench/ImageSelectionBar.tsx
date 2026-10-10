@@ -21,7 +21,9 @@ export function ImageSelectionBar({ object, count, busy }: { object: ImageSceneO
   if (object.kind !== "text") {
     return (
       <p className={styles.selectionHint}>
-        {object.locked ? <><Lock aria-hidden="true" size={12} /> {object.kind === "image" ? "照片" : "形状"}已锁定，保持原样</> : "拖动或用方向键移动（Shift 每次 10px），拖角上的手柄调整大小"}
+        {object.locked ? <><Lock aria-hidden="true" size={12} /> {object.kind === "image" ? "照片" : "形状"}已锁定，保持原样</>
+          : object.rotation ? "拖动或用方向键移动，拖圆形手柄或按 [ ] 旋转；旋转后的大小在属性里改"
+          : "拖动或用方向键移动（Shift 每次 10px），拖角上的手柄调整大小，拖圆形手柄或按 [ ] 旋转"}
       </p>
     );
   }

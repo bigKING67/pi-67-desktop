@@ -118,6 +118,16 @@ describe("image protocol schemas", () => {
     expect(check(CommandResultSchemas["image.candidate.discard"], { projectId: "p", candidateId: "pink", status: "accepted" })).toBe(false);
   });
 
+  it("carries rotation and flips on objects and lets a patch set or drop them", () => {
+    const turned = { ...document, schema: "newmoney.image-project.v3", objects: [{ ...text, rotation: -12.5, flip_x: true }] };
+    expect(check(ImageDocumentSchema, turned)).toBe(true);
+    expect(check(ImageDocumentSchema, { ...turned, objects: [{ ...text, rotation: 190 }] })).toBe(false);
+    expect(check(ImageDocumentSchema, { ...turned, objects: [{ ...text, flip_y: false }] })).toBe(false);
+    const patch = (value: Record<string, unknown>) => check(ImageEditOperationSchema, { type: "update_object", id: "headline", patch: value });
+    expect([patch({ rotation: 45 }), patch({ rotation: null }), patch({ flip_x: true }), patch({ flip_y: false }), patch({ flip_x: null })]).toEqual([true, true, true, true, true]);
+    expect([patch({ rotation: -181 }), patch({ flip_x: "yes" })]).toEqual([false, false]);
+  });
+
   it("validates change, candidate and job events", () => {
     expect(check(EventPayloadSchemas["image.project.changed"], { projectId: "p", revision: 3, sha256: sha, author: "agent" })).toBe(true);
     expect(check(EventPayloadSchemas["image.candidate.changed"], { projectId: "p", candidateId: "pink", status: "stale" })).toBe(true);

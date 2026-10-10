@@ -228,7 +228,7 @@ describe("image project revisions", { timeout: 180_000 }, () => {
   it("out-of-bounds/unsupported fields/missing glyphs fail without changing the project", async () => {
     const { root } = await fixture();
     const before = await tree(root);
-    for (const patch of [{ x: 980 }, { rotation: 30 }, { text: "missing\u{10FFFF}" }]) {
+    for (const patch of [{ x: 980 }, { blend: "multiply" }, { text: "missing\u{10FFFF}" }]) {
       await expect(editBatch(root, batch(1, [update("text" in patch ? "headline" : "product", patch)]))).rejects.toThrow();
       expect(await tree(root)).toEqual(before);
     }

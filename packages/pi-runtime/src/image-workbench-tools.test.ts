@@ -105,6 +105,18 @@ describe("image workbench tools", { timeout: 120_000 }, () => {
     expect(history.document.change).toMatchObject({ author: "agent", operations: ["accept_candidate"] });
   });
 
+  it("lets the Agent turn and mirror an object, read it back and straighten it", async () => {
+    const cwd = await workspace();
+    await sharp({ create: { width: 640, height: 640, channels: 3, background: "#d8c8b0" } }).png().toFile(path.join(cwd, "photo.png"));
+    const t = harness(cwd);
+    await t.json("image_project_create_from_photo", { project_id: "poster", source: "photo.png", headline: "春日" });
+    expect((await t.json("image_project_edit", { project_id: "poster", base_revision: 1, summary: "斜放标题", operations: [{ type: "update_object", id: "headline", patch: { rotation: -8, flip_x: true } }] })).revision).toBe(2);
+    const turned = (await t.json("image_project_read", { project_id: "poster" })).objects as { id: string; rotation?: number; flip_x?: boolean }[];
+    expect(turned.find((object) => object.id === "headline")).toMatchObject({ rotation: -8, flip_x: true });
+    expect((await t.json("image_project_edit", { project_id: "poster", base_revision: 2, summary: "摆正", operations: [{ type: "update_object", id: "headline", patch: { rotation: null, flip_x: null } }] })).revision).toBe(3);
+    expect(((await t.json("image_project_read", { project_id: "poster" })).objects as { id: string }[]).find((object) => object.id === "headline")).not.toHaveProperty("rotation");
+  });
+
   it("resolves an imported asset against the Workspace, not the Host's own directory", async () => {
     const cwd = await workspace();
     await sharp({ create: { width: 640, height: 640, channels: 3, background: "#d8c8b0" } }).png().toFile(path.join(cwd, "photo.png"));

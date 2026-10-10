@@ -3,7 +3,7 @@ import path from "node:path";
 import { regularPath, readBytes, importRaster, saveAsset, readAsset, type ImportedRaster } from "./raster.js";
 import { readCandidateEntry, verifyCandidateAgainst, readDiscard, decisionPending, withDecisionLock, type CandidateEntry } from "./candidate-store.js";
 import { encodeJson, errorCode, fail, sha256, writeOnce } from "./content-store.js";
-import { SCHEMA, LIMITS, USER_FONT_LIMIT, documentSchema, validateDocument, validateCanvas, record, id, number, isRecord, textObjects, type ImageDocument, type JsonRecord, type SceneObject, type ChangeAuthor, type AcceptedCandidate, type UserFont } from "./document.js";
+import { SCHEMA, LIMITS, OPTIONAL_COMMON, USER_FONT_LIMIT, documentSchema, validateDocument, validateCanvas, record, id, number, isRecord, textObjects, type ImageDocument, type JsonRecord, type SceneObject, type ChangeAuthor, type AcceptedCandidate, type UserFont } from "./document.js";
 import { fontManifest, installedFont, checkGlyphs, checkTextGlyphs, inspectUserFont, userFontSample } from "./font.js";
 import { USER_FONT_MAX_BYTES } from "./font-parse.js";
 import { preparePhotoProject, type PhotoLayout } from "./photo-layout.js";
@@ -197,6 +197,12 @@ export async function projectHistory(root: string): Promise<RevisionEntry[]> {
   return entries;
 }
 
+/** Drops optional fields written as null, 0 or false, so a document never stores a no-op value. */
+function withoutNoOps(object: JsonRecord, optional: readonly string[]): JsonRecord {
+  for (const key of optional) if (object[key] === null || object[key] === 0 || object[key] === false) delete object[key];
+  return object;
+}
+
 function objectAt(doc: ImageDocument, objectId: unknown): number {
   id(objectId, "object id");
   const index = doc.objects.findIndex((object) => object.id === objectId);
@@ -279,19 +285,20 @@ async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: 
         const imported = await importUserFont(op.font, doc);
         doc.fonts = [...(doc.fonts ?? []), imported.font]; fontImports.push(imported); break;
       }
-      case "add_object": doc.objects.push(structuredClone(op.object) as SceneObject); break;
+      case "add_object": doc.objects.push(withoutNoOps(structuredClone(op.object) as unknown as JsonRecord, [...OPTIONAL_COMMON, "font_id"]) as unknown as SceneObject); break;
       case "update_object": {
         const index = objectAt(doc, op.id), object = doc.objects[index] as SceneObject;
-        // Text may also take a user font, or drop it with `font_id: null`.
-        const mutable = [...Object.keys(object).filter((key) => !["id", "kind"].includes(key)), ...(object.kind === "text" ? ["font_id"] : [])];
+        // Optional fields may be added, and dropped with `null` (or 0 / false for rotation and
+        // flips), so a document never carries a no-op value and keeps the oldest schema it can.
+        const optional = [...OPTIONAL_COMMON, ...(object.kind === "text" ? ["font_id"] : [])];
+        const mutable = [...new Set([...Object.keys(object).filter((key) => !["id", "kind"].includes(key)), ...optional])];
         record(op.patch, mutable, "object patch");
         if (!Object.keys(op.patch).length) fail("Empty object patch");
         if (object.locked && !Object.hasOwn(op.patch, "locked")) fail(`Object is locked: ${object.id}`);
-        const { font_id: fontId, ...rest } = structuredClone(op.patch) as JsonRecord;
-        const next = { ...object, ...rest } as SceneObject & { font_id?: string };
-        if (fontId === null) delete next.font_id;
-        else if (fontId !== undefined) next.font_id = fontId as string;
-        doc.objects[index] = next; break;
+        const next = withoutNoOps({ ...object, ...structuredClone(op.patch) } as JsonRecord, optional);
+        // A patch of optional fields alone that leaves the object as it was would publish an invisible revision.
+        if (Object.keys(op.patch).every((key) => optional.includes(key)) && JSON.stringify(next) === JSON.stringify(object)) fail(`Patch changes nothing on ${object.id}`);
+        doc.objects[index] = next as unknown as SceneObject; break;
       }
       case "remove_object": {
         const index = objectAt(doc, op.id); if (doc.objects[index]?.locked) fail(`Object is locked: ${String(op.id)}`);

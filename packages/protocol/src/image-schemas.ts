@@ -28,9 +28,11 @@ const CanvasSchema = strictObject({
   height: Type.Integer({ minimum: L.minCanvasEdge, maximum: L.edge }),
   background: ColorSchema
 });
+const RotationSchema = Type.Number({ minimum: -180, maximum: 180 });
 const common = {
   id: IdSchema, locked: Type.Boolean(), visible: Type.Boolean(),
-  x: CoordinateSchema, y: CoordinateSchema, width: SizeSchema, height: SizeSchema, opacity: OpacitySchema
+  x: CoordinateSchema, y: CoordinateSchema, width: SizeSchema, height: SizeSchema, opacity: OpacitySchema,
+  rotation: Type.Optional(RotationSchema), flip_x: Type.Optional(Type.Literal(true)), flip_y: Type.Optional(Type.Literal(true))
 };
 const RasterObjectSchema = strictObject({ ...common, kind: Type.Literal("image"), asset_id: IdSchema, fit: FitSchema });
 const TextObjectSchema = strictObject({
@@ -83,7 +85,9 @@ const PatchSchema = Type.Object({
   opacity: Type.Optional(OpacitySchema), asset_id: Type.Optional(IdSchema), fit: Type.Optional(FitSchema),
   text: Type.Optional(TextSchema), font_size: Type.Optional(FontSizeSchema), color: Type.Optional(ColorSchema),
   align: Type.Optional(AlignSchema), line_height: Type.Optional(LineHeightSchema), radius: Type.Optional(RadiusSchema),
-  font_id: Type.Optional(Type.Union([IdSchema, Type.Null()]))
+  font_id: Type.Optional(Type.Union([IdSchema, Type.Null()])),
+  rotation: Type.Optional(Type.Union([RotationSchema, Type.Null()])),
+  flip_x: Type.Optional(Type.Union([Type.Boolean(), Type.Null()])), flip_y: Type.Optional(Type.Union([Type.Boolean(), Type.Null()]))
 }, { additionalProperties: false, minProperties: 1 });
 const EditOperationSchema = Type.Union([
   strictObject({ type: Type.Literal("update_object"), id: IdSchema, patch: PatchSchema }),

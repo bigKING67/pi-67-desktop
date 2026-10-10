@@ -126,3 +126,23 @@ function distribute<T extends Rect & { id: string }>(rects: readonly T[], axis: 
     return { id: rect.id, x: axis === "x" ? at : rect.x, y: axis === "y" ? at : rect.y };
   });
 }
+
+/** Degrees folded into −180…180 (180 rather than −180), rounded to 0.1°. */
+export function normalizeRotation(degrees: number): number {
+  const folded = ((degrees % 360) + 540) % 360 - 180;
+  const rounded = Math.round((folded === -180 ? 180 : folded) * 10) / 10;
+  return Object.is(rounded, -0) ? 0 : rounded;
+}
+
+/**
+ * The rotation after dragging a grip from `from` to `to` around `centre`, starting
+ * at `start` degrees; with `step` (Shift: 15°) the result lands on its multiples.
+ */
+export function rotateAbout(start: number, centre: { x: number; y: number }, from: { x: number; y: number }, to: { x: number; y: number }, step?: number): number {
+  const angle = (point: { x: number; y: number }) => Math.atan2(point.y - centre.y, point.x - centre.x) * 180 / Math.PI;
+  const turned = normalizeRotation(start + angle(to) - angle(from));
+  return step ? normalizeRotation(Math.round(turned / step) * step) : turned;
+}
+
+/** The CSS that turns a box drawn over the canvas the way the engine turns the object. */
+export const rotateStyle = (degrees: number | undefined): { transform?: string } => degrees ? { transform: `rotate(${degrees}deg)` } : {};

@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import satori from "satori";
-import { textObjects, type ImageDocument } from "./document.js";
+import { textObjects, type ImageDocument, type SceneObject } from "./document.js";
 import { checkTextWidths } from "./font.js";
 import { fail } from "./content-store.js";
 
@@ -13,6 +13,16 @@ export interface Composition { svg: string; text_measurements: Record<string, Te
 
 type SatoriNode = { type: string; props: Record<string, unknown> };
 const JUSTIFY = { left: "flex-start", center: "center", right: "flex-end" } as const;
+
+/**
+ * Rotation and flips about the declared box's centre, given explicitly: a text node is
+ * laid out at its natural height, so satori's default origin (the node's own centre)
+ * would turn the words about a point above the box's middle.
+ */
+function transformOf(object: SceneObject): { transform?: string; transformOrigin?: string } {
+  const parts = [object.rotation ? `rotate(${object.rotation}deg)` : "", object.flip_x ? "scaleX(-1)" : "", object.flip_y ? "scaleY(-1)" : ""].filter(Boolean);
+  return parts.length ? { transform: parts.join(" "), transformOrigin: `${object.width / 2}px ${object.height / 2}px` } : {};
+}
 
 export async function compose(project: ComposeInput): Promise<Composition> {
   const { document: doc, root, font } = project, userFonts = project.fonts ?? new Map<string, Buffer>();
@@ -28,7 +38,7 @@ export async function compose(project: ComposeInput): Promise<Composition> {
   }
   const measurements = new Map<string, TextMeasurement>();
   const children: SatoriNode[] = doc.objects.filter((object) => object.visible).map((object) => {
-    const style = { display: "flex", position: "absolute", left: object.x, top: object.y, width: object.width, height: object.height, opacity: object.opacity };
+    const style = { display: "flex", position: "absolute", left: object.x, top: object.y, width: object.width, height: object.height, opacity: object.opacity, ...transformOf(object) };
     if (object.kind === "image") return { type: "img", props: { src: images.get(object.asset_id), style: { ...style, objectFit: object.fit } } };
     if (object.kind === "rect") return { type: "div", props: { style: { ...style, backgroundColor: object.color, borderRadius: object.radius } } };
     // Measure natural text height rather than clipping it into the declared box.

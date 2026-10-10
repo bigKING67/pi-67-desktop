@@ -1,6 +1,7 @@
 import type { ImageTextObject } from "@pi67/domain";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { checkImageEdit, editImageProject, type ImageEditOutcome } from "./image-project-controller.js";
+import { rotateStyle } from "./image-canvas-geometry.js";
 import styles from "./ImageCanvas.module.css";
 
 const CHECK_DELAY_MS = 300;
@@ -75,7 +76,7 @@ export function ImageInlineTextEditor({ object, frame, scale, onClose }: {
 
   const status = fit.state === "refused" ? fit.message : fit.state === "checking" ? "正在检查排版…" : fit.state === "fits" ? "放得下 · ⌘↵ 保存" : "Esc 取消 · ⌘↵ 保存";
   return (
-    <div className={styles.textEditor} data-overflow={fit.state === "refused"} style={frame}>
+    <div className={styles.textEditor} data-overflow={fit.state === "refused"} style={{ ...frame, ...rotateStyle(object.rotation) }}>
       <textarea
         ref={field}
         aria-describedby={`text-fit-${object.id}`}

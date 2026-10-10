@@ -291,3 +291,60 @@
   pointer-events: none;
   appearance: none;
 }
+
+/* Rotate grip: a round handle 22px above the top edge on a hairline stem; it turns with the box. */
+.rotateGrip {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  width: 11px;
+  height: 11px;
+  margin-left: -6px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  background: var(--surface);
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.rotateGrip::before {
+  position: absolute;
+  top: 10px;
+  left: 4px;
+  width: 1px;
+  height: 12px;
+  background: var(--accent);
+  content: "";
+}
+
+/* A 11px circle with a 24px hit area. */
+.rotateGrip::after {
+  position: absolute;
+  inset: -7px;
+  content: "";
+}
+
+/* Near the top of the well the grip hangs below the box instead, so it is never clipped. */
+.handles[data-grip="below"] .rotateGrip {
+  top: calc(100% + 11px);
+}
+
+.handles[data-grip="below"] .rotateGrip::before {
+  top: -12px;
+}
+
+/* Upright at the box centre, outside the turned handles. */
+.rotateReadout {
+  position: absolute;
+  z-index: 10004;
+  padding: 1px 6px;
+  border-radius: var(--radius-compact);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}

@@ -34,11 +34,11 @@ with shared samples first, then protocol, then UI (product model §8).
   alpha masks, linear/radial gradients, ellipse/line, and the four adjustments through
   satori, resvg and Sharp, with render-regression fixtures; pick a path per feature and
   record it here. Nothing user-visible.
-- [ ] 2. Schema proposal (needs confirmation): per-object `rotation`/`flip`, `blend`,
+- [x] 2. Schema proposal (needs confirmation): per-object `rotation`/`flip`, `blend`,
   `mask` (asset ref), rect `fill` gradients, `ellipse`/`line` kinds, image `adjust`,
   and `group` objects; limits, validation, shared samples, protocol mirror; the
   newer-schema-only-when-used rule.
-- [ ] 3. Rotation and flip: engine, canvas handles (rotate grip, Shift for 15° steps),
+- [x] 3. Rotation and flip: engine, canvas handles (rotate grip, Shift for 15° steps),
   属性 fields, snapping on the rotated bounds, derive/relayout behaviour.
 - [ ] 4. Shapes and gradients: ellipse and line, gradient fills in 属性.
 - [ ] 5. Blend modes and opacity masks, including how candidates' protected regions
@@ -83,4 +83,26 @@ page and earlier releases still open projects that do not use it.
 - 2026-10-10: checkpoint 1 done (spike in a scratch directory, nothing in the product). See
   "Spike results": everything but blend modes and bitmap masks works in satori; those two go
   through per-layer SVG assembly, which resvg composites correctly.
+- 2026-10-10: checkpoint 2 design confirmed by the user: all fields optional and written only
+  when used (v3 once any is used); `rotation` (−180…180) and `flip_x`/`flip_y`, `blend`
+  (16 modes), `mask: {asset_id, invert}` on every object; rect/ellipse `gradient` (linear or
+  radial, 2–5 stops); new `ellipse` kind (a line is a thin rotated rect); image `adjust`
+  (brightness, contrast, saturation, blur); flat groups (`groups` list with name, lock,
+  visibility, opacity; objects carry `group_id`; no nesting); rotation constrains only the
+  unrotated box, corners past the canvas are clipped. Each checkpoint opens only its own
+  fields; the engine refuses a field until its rendering exists.
+- 2026-10-10: checkpoints 2 (framework) and 3 done. Engine: `SCHEMA_V3` written only while a P4
+  field is used; `OPTIONAL_COMMON` fields can be added by patch and dropped with null / 0 /
+  false so documents stay canonical; rotation and flips render as a satori transform about the
+  box centre. Domain/protocol mirror it (parity test), the Agent's edit schema and read output
+  carry it. UI: rotated outlines, a rotate grip (Shift 15°), `[` / `]`, `旋转 °` and flip toggles;
+  the eight resize handles hide on a turned object. Snapping still uses the unrotated box.
+- 2026-10-10: `/code-review high` on checkpoint 3, all fixed: text turned about its natural
+  height instead of its declared box (explicit transform origin, regression test with a tall
+  box); Shift+`[` / `]` never matched (keys by position now); `add_object` with `rotation: 0`
+  failed (optional no-op fields dropped on add too); an optional-only patch that changed
+  nothing published an empty revision (refused, and fields skip equal numbers); the grip
+  clipped near the top of the well (hangs below there) and the angle readout turned with the
+  box (upright now); the grip's centre comes from the fit, not a DOM query; protocol and Agent
+  tests for rotation/flip; shared `rotateStyle`, a field `fallback`, a flip label map.
 

@@ -9,6 +9,11 @@ export const SCHEMA = "newmoney.image-project.v1";
  * earlier releases after a rollback.
  */
 export const SCHEMA_V2 = "newmoney.image-project.v2";
+/**
+ * Documents that use any P4 engine extension (rotation and flip so far). Like v2,
+ * a document is written as v3 only while it uses one; v3 may also bind user fonts.
+ */
+export const SCHEMA_V3 = "newmoney.image-project.v3";
 export const USER_FONT_LIMIT = IMAGE_USER_FONT_LIMIT;
 // Projects written by the creative-craft source executor open read-only and
 // upgrade to the current schema on their next published revision.
@@ -25,7 +30,15 @@ export interface Canvas { width: number; height: number; background: string }
 export interface Asset {
   id: string; file: string; sha256: string; format: RasterFormat; width: number; height: number; render_file: string; render_sha256: string;
 }
-export interface ObjectBase { id: string; locked: boolean; visible: boolean; x: number; y: number; width: number; height: number; opacity: number }
+export interface ObjectBase {
+  id: string; locked: boolean; visible: boolean; x: number; y: number; width: number; height: number; opacity: number;
+  /** Degrees clockwise about the box centre, −180…180; absent means none. The unrotated box stays on the canvas. */
+  rotation?: number;
+  /** Mirrored across the box's vertical (`flip_x`) or horizontal (`flip_y`) centre line; absent means not. */
+  flip_x?: true; flip_y?: true;
+}
+/** Optional fields every object kind may carry; a patch writes `null` (or 0 / false) to drop one. */
+export const OPTIONAL_COMMON = ["rotation", "flip_x", "flip_y"] as const;
 export interface ImageObject extends ObjectBase { kind: "image"; asset_id: string; fit: "contain" | "cover" | "fill" }
 export interface TextObject extends ObjectBase {
   kind: "text"; text: string; font_size: number; color: string; align: "left" | "center" | "right"; line_height: number;
@@ -44,8 +57,9 @@ export interface ImageDocument {
   canvas: Canvas; assets: Asset[]; font: FontBinding; fonts?: UserFont[]; objects: SceneObject[]; change: Change;
 }
 
-/** v2 while any user font is bound or used, v1 otherwise. */
+/** v3 while any engine extension is used, else v2 while a user font is bound or used, else v1. */
 export function documentSchema(document: Pick<ImageDocument, "fonts" | "objects">): string {
+  if (document.objects.some((object) => OPTIONAL_COMMON.some((key) => object[key] !== undefined))) return SCHEMA_V3;
   return document.fonts?.length || document.objects.some((object) => object.kind === "text" && object.font_id !== undefined) ? SCHEMA_V2 : SCHEMA;
 }
 
@@ -108,7 +122,7 @@ function hasControlCharacter(text: string): boolean {
   return false;
 }
 
-const COMMON = ["id", "kind", "locked", "visible", "x", "y", "width", "height", "opacity"] as const;
+const COMMON = ["id", "kind", "locked", "visible", "x", "y", "width", "height", "opacity", ...OPTIONAL_COMMON] as const;
 const EXTRA = {
   image: ["asset_id", "fit"], text: ["text", "font_size", "color", "align", "line_height", "font_id"], rect: ["color", "radius"]
 } as const satisfies Record<SceneObject["kind"], readonly string[]>;
@@ -123,6 +137,8 @@ function validateObject(value: unknown, canvas: Canvas, assets: ReadonlySet<stri
   number(value.width, "object.width", 1, canvas.width); number(value.height, "object.height", 1, canvas.height);
   if (value.x + value.width > canvas.width || value.y + value.height > canvas.height) fail(`Object outside canvas: ${value.id}`);
   number(value.opacity, "opacity", 0, 1);
+  if (value.rotation !== undefined) { number(value.rotation, "rotation", -180, 180); if (value.rotation === 0) fail("Write no rotation instead of 0"); }
+  for (const key of ["flip_x", "flip_y"] as const) if (value[key] !== undefined && value[key] !== true) fail(`Invalid ${key}`);
   if (kind === "image") {
     if (typeof value.asset_id !== "string" || !assets.has(value.asset_id)) fail(`Missing asset for ${value.id}`);
     oneOf(value.fit, ["contain", "cover", "fill"] as const, "Invalid image fit");
@@ -138,8 +154,8 @@ function validateObject(value: unknown, canvas: Canvas, assets: ReadonlySet<stri
 
 export function validateDocument(value: unknown): ImageDocument {
   record(value, ["schema", "project_id", "title", "revision", "parent_sha256", "canvas", "assets", "font", "fonts", "objects", "change"], "document");
-  if (value.schema !== SCHEMA && value.schema !== SCHEMA_V2 && !LEGACY_SCHEMAS.includes(value.schema as string)) fail("Unsupported image document schema");
-  if (value.schema !== SCHEMA_V2 && value.fonts !== undefined) fail("User fonts need the v2 document schema");
+  if (value.schema !== SCHEMA && value.schema !== SCHEMA_V2 && value.schema !== SCHEMA_V3 && !LEGACY_SCHEMAS.includes(value.schema as string)) fail("Unsupported image document schema");
+  if (value.schema !== SCHEMA_V2 && value.schema !== SCHEMA_V3 && value.fonts !== undefined) fail("User fonts need the v2 document schema");
   id(value.project_id, "project_id"); string(value.title, "title", 200);
   number(value.revision, "revision", 1, LIMITS.revisions, true);
   if (value.revision === 1) { if (value.parent_sha256 !== null) fail("Initial revision must have null parent"); }
@@ -176,7 +192,11 @@ export function validateDocument(value: unknown): ImageDocument {
     if (operations.length !== 1 || operations[0] !== "accept_candidate") fail("Candidate acceptance must be isolated");
   } else if (operations.includes("accept_candidate")) fail("Candidate acceptance needs a bound candidate");
   const document = { ...(value as unknown as ImageDocument), canvas, assets, objects, ...(fonts ? { fonts } : {}) };
-  if (value.schema === SCHEMA_V2 && documentSchema(document) !== SCHEMA_V2) fail("A v2 document must bind or use a user font");
+  // Each schema is written only for what it needs, so a release that predates a feature still opens the rest.
+  const needed = documentSchema(document);
+  if (value.schema === SCHEMA_V2 && needed !== SCHEMA_V2) fail("A v2 document must bind or use a user font and nothing newer");
+  if (value.schema === SCHEMA_V3 && needed !== SCHEMA_V3) fail("A v3 document must use an engine extension");
+  if (needed === SCHEMA_V3 && value.schema !== SCHEMA_V3) fail("Rotation and flip need the v3 document schema");
   return document;
 }
 

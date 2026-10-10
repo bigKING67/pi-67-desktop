@@ -32,7 +32,12 @@ export interface ImageCanvas { width: number; height: number; background: string
 export interface ImageAsset {
   id: string; file: string; sha256: string; format: ImageRasterFormat; width: number; height: number; render_file: string; render_sha256: string;
 }
-interface ImageObjectBase { id: string; locked: boolean; visible: boolean; x: number; y: number; width: number; height: number; opacity: number }
+interface ImageObjectBase {
+  id: string; locked: boolean; visible: boolean; x: number; y: number; width: number; height: number; opacity: number;
+  /** Degrees clockwise about the box centre, −180…180 (P4, document schema v3). */
+  rotation?: number;
+  flip_x?: true; flip_y?: true;
+}
 export interface ImageRasterObject extends ImageObjectBase { kind: "image"; asset_id: string; fit: ImageFit }
 export interface ImageTextObject extends ImageObjectBase {
   kind: "text"; text: string; font_size: number; color: string; align: ImageTextAlign; line_height: number;
@@ -56,8 +61,13 @@ export interface ImageDocument {
  * file needs a path, and paths reach the engine only through Main's dialogs or
  * the Agent's tools, never from renderer payloads.
  */
-type PatchFields = Partial<Omit<ImageRasterObject, "id" | "kind"> & Omit<ImageTextObject, "id" | "kind" | "font_id"> & Omit<ImageRectObject, "id" | "kind">>
-  & { /** Text only: a bound user font, or `null` for the built-in font. */ font_id?: string | null };
+type Optional = "font_id" | "rotation" | "flip_x" | "flip_y";
+type PatchFields = Partial<Omit<ImageRasterObject, "id" | "kind" | Optional> & Omit<ImageTextObject, "id" | "kind" | Optional> & Omit<ImageRectObject, "id" | "kind" | Optional>>
+  & {
+    /** Text only: a bound user font, or `null` for the built-in font. */ font_id?: string | null;
+    /** `null` or 0 removes the rotation. */ rotation?: number | null;
+    /** `null` or false removes the flip. */ flip_x?: boolean | null; flip_y?: boolean | null;
+  };
 export type ImageObjectPatch = { [Key in keyof PatchFields]: PatchFields[Key] };
 export type ImageEditOperation =
   | { type: "update_object"; id: string; patch: ImageObjectPatch }

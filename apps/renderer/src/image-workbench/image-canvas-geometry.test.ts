@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alignRects, clampInside, resizeRect, snapMove } from "./image-canvas-geometry.js";
+import { alignRects, clampInside, normalizeRotation, resizeRect, rotateAbout, snapMove } from "./image-canvas-geometry.js";
 
 const canvas = { width: 1000, height: 800 };
 const box = { x: 100, y: 100, width: 200, height: 100 };
@@ -62,5 +62,20 @@ describe("canvas geometry", () => {
     ];
     expect(alignRects(row, "hdistribute", canvas)).toEqual([{ id: "a", x: 0, y: 0 }, { id: "b", x: 350, y: 0 }, { id: "c", x: 700, y: 0 }]);
     expect(alignRects(row.slice(0, 2), "hdistribute", canvas)).toEqual([{ id: "c", x: 700, y: 0 }, { id: "a", x: 0, y: 0 }]);
+  });
+});
+
+describe("rotation", () => {
+  it("folds any angle into −180…180 and keeps 180", () => {
+    expect([0, 90, 180, -180, 270, -270, 360, 359.96, -0.01].map(normalizeRotation)).toEqual([0, 90, 180, 180, -90, 90, 0, 0, 0]);
+  });
+
+  it("turns by the angle swept around the centre, snapping to the step with Shift", () => {
+    const centre = { x: 100, y: 100 };
+    // From straight up to straight right is a quarter turn clockwise (screen y points down).
+    expect(rotateAbout(0, centre, { x: 100, y: 0 }, { x: 200, y: 100 })).toBe(90);
+    expect(rotateAbout(170, centre, { x: 100, y: 0 }, { x: 200, y: 100 })).toBe(-100);
+    expect(rotateAbout(0, centre, { x: 100, y: 0 }, { x: 120, y: 0 }, 15)).toBe(15);
+    expect(rotateAbout(0, centre, { x: 100, y: 0 }, { x: 105, y: 0 }, 15)).toBe(0);
   });
 });

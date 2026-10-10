@@ -11,13 +11,18 @@ const color = Type.String({ pattern: "^#[0-9a-fA-F]{6}$", description: "#RRGGBB"
 const int = (minimum?: number) => Type.Integer(minimum === undefined ? {} : { minimum });
 const align = Type.Union([Type.Literal("left"), Type.Literal("center"), Type.Literal("right")]);
 const box = { x: int(0), y: int(0), width: int(1), height: int(1) };
-const common = { id: id("New object id."), locked: Type.Boolean(), visible: Type.Boolean(), ...box, opacity: Type.Number({ minimum: 0, maximum: 1 }) };
+const rotation = Type.Number({ minimum: -180, maximum: 180, description: "Degrees clockwise about the box centre; the unrotated box must stay on the canvas." });
+const common = { id: id("New object id."), locked: Type.Boolean(), visible: Type.Boolean(), ...box, opacity: Type.Number({ minimum: 0, maximum: 1 }),
+  rotation: Type.Optional(rotation), flip_x: Type.Optional(Type.Literal(true)), flip_y: Type.Optional(Type.Literal(true)) };
 const text = { text: Type.String({ maxLength: 2000 }), font_size: Type.Integer({ minimum: 8, maximum: 500 }), color, align, line_height: Type.Number({ minimum: 1, maximum: 2 }) };
 
 // Fonts are added by the person only (add_font is not an Agent operation); text may use a bound one.
 const fontId = Type.Union([id("A font id from image_project_read fonts."), Type.Null()], { description: "A bound user font id, or null for the built-in font." });
 const patch = Type.Partial(Type.Object({
   ...box, opacity: common.opacity, visible: Type.Boolean(), locked: Type.Boolean(), ...text, font_id: fontId,
+  rotation: Type.Union([rotation, Type.Null()], { description: "Degrees clockwise; null or 0 removes it." }),
+  flip_x: Type.Union([Type.Boolean(), Type.Null()], { description: "Mirror left-right; false or null removes it." }),
+  flip_y: Type.Union([Type.Boolean(), Type.Null()], { description: "Mirror top-bottom; false or null removes it." }),
   radius: int(0), fit: Type.Union([Type.Literal("contain"), Type.Literal("cover"), Type.Literal("fill")])
 }, { additionalProperties: false }), { additionalProperties: false, minProperties: 1,
   description: "Only the fields to change. A lock change ({locked}) must be the only field and the only operation in its batch." });

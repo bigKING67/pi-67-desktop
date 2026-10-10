@@ -287,6 +287,12 @@ Application-level surfaces use a separate wide-window shell:
   段文字` or `基于修订 N · 较旧` for a size from an earlier revision, `打开「title」` text action; a refused preset reads `未生成` with its reason in
   the warning line), and the primary `导出全部尺寸（N 张）` with a folder glyph. The
   full-size `导出 PNG` becomes secondary so the tab has one primary action.
+- Rotation (P4, 2026-10-10): a selected unlocked object shows an 11px round rotate grip 22px
+  above its top centre on a 12px accent stem (surface fill, accent border, 24px hit area),
+  turning with the box; while dragging, a raised caption above it reads the angle in tabular
+  figures. Selection outlines and the inline text editor rotate with the object. 属性 adds a
+  `旋转 °` field after 不透明度 and a two-part 水平翻转 / 垂直翻转 segmented row (pressed state
+  on the active surface).
 - Text fonts (P3, 2026-10-10): 属性 for text adds a `字体` section — the shared Settings
   select at full panel width (`Noto Sans CJK SC · 内置`, then each added font's family with
   `TTF`/`OTF` as detail), a `添加字体…` text action with a plus glyph (disabled at 8 fonts or

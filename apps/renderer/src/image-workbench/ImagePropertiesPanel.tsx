@@ -16,13 +16,14 @@ import { setImageReference } from "./image-project-marks.js";
 import styles from "./ImageInspector.module.css";
 
 type FieldKind = "int" | "number" | "color";
-interface FieldSpec<K extends string> { key: K; label: string; kind: FieldKind; min?: number; max?: number }
+interface FieldSpec<K extends string> { key: K; label: string; kind: FieldKind; min?: number; max?: number; /** Shown while the field is absent. */ fallback?: number }
 
 // Ranges follow the engine's document validation, so a value it would refuse never leaves the field.
 const COMMON: FieldSpec<keyof ImageObjectPatch>[] = [
   { key: "x", label: "X", kind: "int", min: 0 }, { key: "y", label: "Y", kind: "int", min: 0 },
   { key: "width", label: "宽", kind: "int", min: 1 }, { key: "height", label: "高", kind: "int", min: 1 },
-  { key: "opacity", label: "不透明度", kind: "number", min: 0, max: 1 }
+  { key: "opacity", label: "不透明度", kind: "number", min: 0, max: 1 },
+  { key: "rotation", label: "旋转 °", kind: "number", min: -180, max: 180, fallback: 0 }
 ];
 const BY_KIND: Record<ImageSceneObject["kind"], FieldSpec<keyof ImageObjectPatch>[]> = {
   text: [{ key: "font_size", label: "字号", kind: "int", min: 8, max: 500 }, { key: "line_height", label: "行高", kind: "number", min: 1, max: 2 }, { key: "color", label: "颜色", kind: "color" }],
@@ -34,6 +35,7 @@ const CANVAS: FieldSpec<keyof ImageCanvas>[] = [
   { key: "background", label: "背景", kind: "color" }
 ];
 const COLOR = /^#[0-9a-fA-F]{6}$/u;
+const FLIPS = { flip_x: "水平翻转", flip_y: "垂直翻转" } as const;
 const KIND_LABELS = { text: "文字", image: "图片", rect: "形状" } as const;
 
 /** 属性: the canvas, one object's fields, or alignment for several. Each change is one revision. */
@@ -88,8 +90,16 @@ export function ImagePropertiesPanel() {
       {object.locked ? <p className={styles.empty}>已锁定。解锁后才能修改。</p> : null}
       <div className={styles.fieldGrid}>
         {[...COMMON, ...BY_KIND[object.kind]].map((spec) => (
-          <PropertyField key={`${object.id}-${spec.key}`} disabled={object.locked || busy} spec={spec} value={(object as unknown as Record<string, unknown>)[spec.key]}
+          <PropertyField key={`${object.id}-${spec.key}`} disabled={object.locked || busy} spec={spec} value={(object as unknown as Record<string, unknown>)[spec.key] ?? spec.fallback}
             onCommit={async (value) => { const result = await editImageProject(`修改${spec.label}`, [{ type: "update_object", id: object.id, patch: { [spec.key]: value } as ImageObjectPatch }]); report(result); return result; }} />
+        ))}
+      </div>
+      <div className={`${styles.alignRow} ${styles.flipRow}`} role="group" aria-label="翻转">
+        {(Object.entries(FLIPS) as [keyof typeof FLIPS, string][]).map(([key, label]) => (
+          <Button key={key} aria-pressed={object[key] === true} className={`${styles.segment} ${object[key] ? styles.segmentSelected : ""}`}
+            isDisabled={object.locked || busy} onPress={() => void editImageProject(label, [{ type: "update_object", id: object.id, patch: { [key]: object[key] ? null : true } }]).then(report)}>
+            {label}
+          </Button>
         ))}
       </div>
       {object.kind === "text" ? <FontChoice busy={busy} fonts={document.fonts ?? []} object={object} onResult={report} /> : null}
@@ -170,6 +180,8 @@ function PropertyField<K extends string>({ spec, value, disabled, onCommit }: {
     const valid = typeof next === "string" ? COLOR.test(next)
       : Number.isFinite(next) && (spec.kind !== "int" || Number.isInteger(next)) && (spec.min === undefined || next >= spec.min) && (spec.max === undefined || next <= spec.max);
     if (!valid) { setInvalid(true); return; }
+    // The same number written differently ("15.0", or an emptied field already at 0) is not an edit.
+    if (typeof next === "number" && next === Number(shown || 0)) { setDraft(shown); return; }
     const result = await onCommit(next);
     setInvalid(result.outcome === "refused");
   };

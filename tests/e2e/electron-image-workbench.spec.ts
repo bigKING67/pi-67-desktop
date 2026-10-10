@@ -98,6 +98,15 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     await expectRevision(page, 4);
     await page.keyboard.press(process.platform === "darwin" ? "Meta+z" : "Control+z");
     await expectRevision(page, 5);
+    // P4: `]` turns the focused object 15°, shown in 属性; a horizontal flip is one more revision.
+    await headline.focus();
+    await page.keyboard.press("]");
+    await expectRevision(page, 6);
+    await tab("属性");
+    await expect(inspector.getByLabel("旋转 °")).toHaveValue("15");
+    await inspector.getByRole("group", { name: "翻转" }).getByRole("button", { name: "水平翻转" }).click();
+    await expectRevision(page, 7);
+    await expect(inspector.getByRole("group", { name: "翻转" }).getByRole("button", { name: "水平翻转" })).toHaveAttribute("aria-pressed", "true");
 
     // D. Marks: draw a region, word it, and see it attached to the next message.
     await showInspector(false);
@@ -125,7 +134,7 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     await inspector.getByRole("button", { name: "选择图层 春日上新 SALE" }).click();
     await tab("属性");
     await inspector.locator("input[type=file]").setInputFiles(fontFixture);
-    await expectRevision(page, 7);
+    await expectRevision(page, 9);
     await expect(inspector.getByRole("button", { name: "字体" }).first()).toContainText("KaTeX_SansSerif");
 
     // F. A derived 4:5 size and one export set with a receipt.
