@@ -1,4 +1,5 @@
 import { imageCandidateActions } from "@pi67/domain";
+import type { ImageCandidateReceipt } from "@pi67/protocol";
 import { Bot, Download, FilePlus, RotateCcw, User } from "lucide-react";
 import { Button } from "react-aria-components";
 import { acceptCandidate, discardCandidate, editImageProject, exportImageProject, inspectCandidate, useImageProject } from "./image-project-controller.js";
@@ -50,6 +51,7 @@ export function ImageHistoryPanel() {
 export function ImageCandidatesPanel() {
   const candidates = useImageProject((state) => state.candidates);
   const inspecting = useImageProject((state) => state.inspecting);
+  const comparing = useImageProject((state) => state.comparing);
   const busy = useImageProject((state) => state.busy);
   if (candidates.length === 0) return <p className={styles.empty}>还没有候选。生成或编辑图片内容时，结果先放在这里，由你决定是否采用。</p>;
   return (
@@ -63,8 +65,11 @@ export function ImageCandidatesPanel() {
               {candidate.generated ? "模型生成" : "本地合成"}{candidate.baseRevision ? ` · 基于修订 ${candidate.baseRevision}` : ""}
               {candidate.protectedChangedPixels === 0 ? " · 保护区未变" : candidate.protectedChangedPixels ? ` · 保护区 ${candidate.protectedChangedPixels} 像素变化` : ""}
             </span>
+            {candidate.receipt ? <span className={styles.historyMeta}>{candidateReceiptLine(candidate.receipt)}</span> : null}
             <span className={styles.candidateActions}>
               {actions.compare ? <Button className={styles.historyAction!} onPress={() => inspectCandidate(inspecting === candidate.candidateId ? undefined : candidate.candidateId)}>{inspecting === candidate.candidateId ? "结束预览" : "在画布预览"}</Button> : null}
+              {actions.compare ? <Button aria-pressed={inspecting === candidate.candidateId && comparing} className={styles.historyAction!}
+                onPress={() => inspectCandidate(candidate.candidateId, { compare: !(inspecting === candidate.candidateId && comparing) })}>对比</Button> : null}
               {actions.accept ? <Button className={styles.historyAction!} isDisabled={busy} onPress={() => void acceptCandidate(candidate.candidateId)}>接受</Button> : null}
               {actions.discard ? <Button className={styles.historyAction!} isDisabled={busy} onPress={() => void discardCandidate(candidate.candidateId)}>丢弃</Button> : null}
             </span>
@@ -89,6 +94,17 @@ export function ImageExportPanel() {
       <p className={styles.empty}>导出前会重新渲染当前修订并校验文件摘要；文字始终是排版层，不会被模型改写。</p>
     </div>
   );
+}
+
+const QUALITY: Readonly<Record<string, string>> = { low: "低质量", medium: "中质量", high: "高质量" };
+
+/** A generation receipt in words. The image itself is never judged, so visual quality is always unverified. */
+export function candidateReceiptLine(receipt: ImageCandidateReceipt): string {
+  const parts = [receipt.model];
+  if (receipt.quality) parts.push(QUALITY[receipt.quality] ?? receipt.quality);
+  if (receipt.size) parts.push(receipt.size.replace("x", "×"));
+  if (receipt.durationMs !== undefined) parts.push(`用时 ${Math.max(1, Math.round(receipt.durationMs / 1000))} 秒`);
+  return [...parts, "费用未估计", "画面质量未核验"].join(" · ");
 }
 
 function timeLabel(timestamp: number): string {

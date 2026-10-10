@@ -6,7 +6,7 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import { IMAGE_LIBRARY_MARKER } from "@pi67/domain";
 import { createProject, previewCachePath, projectRoot, readProject, sha256, stageCandidate } from "@pi67/image-engine";
 import type { AgentCommand, AgentEvent } from "@pi67/protocol";
-import { ImageEngineHost } from "./image-engine-host.js";
+import { candidateReceipt, ImageEngineHost } from "./image-engine-host.js";
 import { ImageProjectWatcher } from "./image-project-watcher.js";
 import { ImageWorkQueue } from "./image-work-queue.js";
 import { imageEngineError } from "./image-engine-errors.js";
@@ -172,6 +172,8 @@ describe("image engine host", { timeout: 120_000 }, () => {
       expect.objectContaining({ candidateId: "cool", status: "ready", targetId: "background", mode: "replace", baseRevision: 1, generated: false }),
       expect.objectContaining({ candidateId: "warm", status: "ready" })
     ]);
+    // Local composites have no execution receipt to show.
+    expect(listed.candidates[0]).not.toHaveProperty("receipt");
     expect(await run("image.candidate.discard", { projectId: "poster", candidateId: "cool", summary: "不要冷色" })).toEqual({ projectId: "poster", candidateId: "cool", status: "discarded" });
     const accepted = await run("image.candidate.accept", { projectId: "poster", candidateId: "warm", baseRevision: 1, summary: "采用暖色" });
     expect(accepted).toMatchObject({ revision: 2, dryRun: false });
@@ -199,5 +201,13 @@ describe("image engine host", { timeout: 120_000 }, () => {
 
   it("returns an empty list when the Workspace has no image folder", async () => {
     expect((await host(await workspace()).run("image.project.list", {})).projects).toEqual([]);
+  });
+
+  it("reduces a generation receipt to what a person reads and leaves malformed fields out", () => {
+    const base = { model: "gpt-image-2.5-sunburst", started_at: "2026-10-10T02:35:53.677Z", completed_at: "2026-10-10T02:36:16.158Z" };
+    // The request ran on the model's 1088×1360 grid; the candidate is the layer's 1080×1350.
+    expect(candidateReceipt({ ...base, parameters: { quality: "high", size: "1088x1360" } }, { width: 1080, height: 1350 }))
+      .toEqual({ model: "gpt-image-2.5-sunburst", quality: "high", size: "1080x1350", durationMs: 22_481 });
+    expect(candidateReceipt({ ...base, completed_at: "nope", parameters: { quality: 3 } }, { width: 0, height: 1350 })).toEqual({ model: "gpt-image-2.5-sunburst" });
   });
 });

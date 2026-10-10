@@ -217,3 +217,77 @@
   cursor: crosshair;
   touch-action: none;
 }
+
+/* 对比: both renders in one fitted frame, split by a divider the whole frame drags. */
+.compareFrame {
+  position: absolute;
+  cursor: ew-resize;
+  touch-action: none;
+  filter: drop-shadow(0 8px 24px rgb(0 0 0 / 0.18));
+}
+
+.compareImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.compareDivider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.28);
+  pointer-events: none;
+}
+
+/* A grip on the divider so it reads as draggable; white with a dark edge reads on any pixels, in either theme. */
+.compareDivider::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 32px;
+  border: 1px solid rgb(0 0 0 / 0.28);
+  border-radius: 7px;
+  background: #ffffff;
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.compareFrame:has(.compareRange:focus-visible) .compareDivider,
+.compareFrame:has(.compareRange:focus-visible) .compareDivider::after {
+  box-shadow: var(--shadow-focus);
+}
+
+/* Bottom corners: the preview badge floats over the top edge. */
+.compareLabel {
+  position: absolute;
+  bottom: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-compact);
+  background: rgb(0 0 0 / 0.55);
+  color: #ffffff;
+  font-size: var(--font-size-caption);
+  line-height: 18px;
+  pointer-events: none;
+}
+
+.compareLabel[data-side="before"] { left: 8px; }
+.compareLabel[data-side="after"] { right: 8px; }
+
+/* Keyboard only: the frame takes the pointer, so the split follows the cursor exactly. */
+.compareRange {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+  appearance: none;
+}

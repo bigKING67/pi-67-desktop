@@ -1,6 +1,6 @@
 import { imageCandidateActions, type ImageCandidateListStatus } from "@pi67/domain";
 import type { ImageCandidateSummary } from "@pi67/protocol";
-import { ArrowLeft, Check, Download, Redo2, SquareDashedMousePointer, Undo2, X } from "lucide-react";
+import { ArrowLeft, Check, Columns2, Download, Redo2, SquareDashedMousePointer, Undo2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "react-aria-components";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
@@ -18,6 +18,7 @@ import {
   useImageProject
 } from "./image-project-controller.js";
 import { ImageCanvas } from "./ImageCanvas.js";
+import { ImageCandidateCompare } from "./ImageCandidateCompare.js";
 import { ImageMarksBar } from "./ImageMarksBar.js";
 import { addImageMark } from "./image-project-marks.js";
 import type { Rect } from "./image-canvas-geometry.js";
@@ -43,6 +44,7 @@ export function ImageProjectPage({ projectId }: { projectId: string }) {
   const candidates = useImageProject((state) => state.candidates);
   const candidatePreviews = useImageProject((state) => state.candidatePreviews);
   const inspecting = useImageProject((state) => state.inspecting);
+  const comparing = useImageProject((state) => state.comparing);
   const error = useImageProject((state) => state.error);
   const busy = useImageProject((state) => state.busy);
   const selectedIds = useImageProject((state) => state.selectedObjectIds);
@@ -85,7 +87,15 @@ export function ImageProjectPage({ projectId }: { projectId: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const shown = inspecting ? candidatePreviews[inspecting] : preview;
+  const candidateCanvases = useImageProject((state) => state.candidateCanvases);
+  const revisionCanvases = useImageProject((state) => state.revisionCanvases);
+  const shown = inspecting ? candidateCanvases[inspecting] ?? candidatePreviews[inspecting] : preview;
+  // Compare against the revision the candidate was made from, both at canvas size; until both arrive the canvas stays.
+  const base = candidates.find((candidate) => candidate.candidateId === inspecting)?.baseRevision;
+  const baseRender = base === undefined || base === revision ? preview : revisionCanvases[base];
+  const candidateRender = inspecting ? candidateCanvases[inspecting] : undefined;
+  const asImage = (render: typeof preview) => render && libraryId ? { src: imagePreviewUrl(libraryId, projectId, render.pngSha256), width: render.width, height: render.height } : undefined;
+  const compareBefore = comparing ? asImage(baseRender) : undefined, compareAfter = comparing ? asImage(candidateRender) : undefined;
   const visible = candidates.filter((candidate) => candidate.status !== "discarded");
   return (
     <section aria-label={document?.title ?? "图像项目"} className={styles.page} data-testid="image-project">
@@ -105,7 +115,9 @@ export function ImageProjectPage({ projectId }: { projectId: string }) {
         </Button>
       </header>
       <div className={styles.stageFrame}>
-        {error ? <p className={styles.status} role="alert">{error}</p> : (
+        {error ? <p className={styles.status} role="alert">{error}</p> : compareBefore && compareAfter ? (
+          <ImageCandidateCompare after={compareAfter} baseRevision={base ?? revision ?? 1} before={compareBefore} />
+        ) : (
           <ImageCanvas
             alt={inspecting ? "候选预览" : `${document?.title ?? "图像"} 修订 ${revision}`}
             document={document}
@@ -120,7 +132,15 @@ export function ImageProjectPage({ projectId }: { projectId: string }) {
           />
         )}
         {!error && !shown ? <p className={styles.stageStatus} role="status">正在渲染…</p> : null}
-        {inspecting ? <span className={styles.inspectingBadge}>正在预览候选，项目尚未改变</span> : null}
+        {!error && comparing && shown && !(compareBefore && compareAfter) ? <p className={styles.stageStatus} role="status">正在准备对比…</p> : null}
+        {inspecting ? (
+          <div className={styles.inspectingBadge}>
+            <span>{comparing ? `对比候选与修订 ${base ?? revision}，项目尚未改变` : "正在预览候选，项目尚未改变"}</span>
+            <Button aria-pressed={comparing} className={styles.badgeAction!} onPress={() => inspectCandidate(inspecting, { compare: !comparing })}>
+              <Columns2 aria-hidden="true" size={13} />对比
+            </Button>
+          </div>
+        ) : null}
       </div>
       {marking ? <ImageMarksBar focus={focusMark} onAdd={mark} onDone={() => setMarking(false)} /> : (
         <ImageSelectionBar busy={busy} count={inspecting ? 0 : selectedIds.length}

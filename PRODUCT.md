@@ -1505,7 +1505,10 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   sends up to two references after the edited image with their role in the job and
   receipt, refuses unknown or repeated assets, the edited image itself, a missing role,
   references in `generate` mode, or (with a full `job`) a reference without its source
-  before anything is written or requested.
+  before anything is written or requested. 候选 shows each generated candidate's receipt
+  (model, quality, the candidate's own size, time taken) and always says the cost is not estimated and the
+  picture's quality is not verified; `对比` splits the canvas between the revision the
+  candidate was made from and the candidate, without changing the project.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

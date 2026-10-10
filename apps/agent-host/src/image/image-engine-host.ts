@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { IMAGE_WORK_DIRECTORY, isImageId, type ImageCandidateListStatus, type ImageChangeAuthor } from "@pi67/domain";
 type ImageEngine = typeof import("@pi67/image-engine");
-import type { AgentCommand, AgentEvent, CommandPayloads, CommandResults, ImageCandidateSummary, ImageEventPayloads, ImageProjectSummary } from "@pi67/protocol";
+import type { AgentCommand, AgentEvent, CommandPayloads, CommandResults, ImageCandidateReceipt, ImageCandidateSummary, ImageEventPayloads, ImageProjectSummary } from "@pi67/protocol";
 import { HostCommandError } from "../protocol-error.js";
 import type { ImageCommandType } from "./image-command-router.js";
 import { imageEngineError } from "./image-engine-errors.js";
@@ -220,8 +220,23 @@ function candidateSummary(item: Awaited<ReturnType<ImageEngine["listCandidates"]
   return {
     candidateId: candidate.id, status: item.status as ImageCandidateListStatus, targetId: candidate.target_id, mode: candidate.mode,
     baseRevision: candidate.base_revision, summary: candidate.summary, outputSha256: candidate.output.sha256, generated: candidate.execution !== undefined,
-    ...(candidate.qa ? { protectedChangedPixels: candidate.qa.protected_changed_pixels } : {})
+    ...(candidate.qa ? { protectedChangedPixels: candidate.qa.protected_changed_pixels } : {}),
+    ...(item.receipt ? { receipt: candidateReceipt(item.receipt, candidate.output) } : {})
   };
+}
+
+/**
+ * The receipt fields a person reads; anything malformed is left out rather than
+ * guessed. The size is the candidate's own pixels: a request on the model's grid
+ * is resampled to the layer, so the request size would misstate what is accepted.
+ */
+export function candidateReceipt(receipt: { model: string; parameters: Record<string, unknown>; [key: string]: unknown }, output: { width: number; height: number }): ImageCandidateReceipt {
+  const { quality } = receipt.parameters, size = `${output.width}x${output.height}`;
+  const duration = Date.parse(String(receipt.completed_at)) - Date.parse(String(receipt.started_at));
+  return { model: receipt.model.slice(0, 128),
+    ...(typeof quality === "string" && quality.length > 0 && quality.length <= 16 ? { quality } : {}),
+    ...(/^[1-9][0-9]{0,4}x[1-9][0-9]{0,4}$/u.test(size) ? { size } : {}),
+    ...(Number.isFinite(duration) && duration >= 0 && duration <= 86_400_000 ? { durationMs: duration } : {}) };
 }
 
 /** Every readable project under the Workspace's image folder; unreadable folders are skipped. */

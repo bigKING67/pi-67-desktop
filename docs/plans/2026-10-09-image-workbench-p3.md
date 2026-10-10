@@ -39,7 +39,9 @@ export presets and user fonts. Product model §6–§8 and §17 (P3 row).
 - [x] 2. Transform handles, snapping and multi-select alignment.
 - [x] 3. Inline text editing on the canvas.
 - [x] 4. Marks (mark-and-rework) and reference slots in the structured context.
-- [ ] 5. 候选 and 导出 tabs: candidate receipts, comparison, multi-size export presets.
+- [x] 5a. 候选: candidate receipts and the compare divider.
+- [ ] 5b. 导出: multi-size presets as derived projects (decided 2026-10-10 over same-project
+  derived revisions), multi-file export into a new directory with receipts.
 - [ ] 6. User fonts (engine and Host support, Inspector picker).
 - [ ] 7. Authority docs, packaged verification, Windows packaged smoke.
 
@@ -97,3 +99,20 @@ the image Inspector returns the P2 page; no project content is rewritten.
   objects still moved by keyboard in mark mode; removing the marks chip deleted the marks
   (now detaches them); the tool wrote job.json before refusing duplicate or source-less
   references.
+- 2026-10-10: checkpoint 5 split; 5a done. The engine's candidate inspection now carries
+  its verified execution receipt; the Host reduces it to model, quality, size and duration
+  (malformed fields dropped) as an optional `receipt` on `ImageCandidateSummary`. 候选 reads
+  it in words with `费用未估计 · 画面质量未核验` (no price table exists yet). `对比`, from
+  the candidate row or the preview badge, splits the canvas: 当前 left, 候选 right, divider
+  dragged anywhere or moved with arrow keys. Packaged check found the candidate side (and
+  plain 在画布预览 before it) drawn from the 233px tile render; an inspected candidate now
+  renders at the canvas edge. Labels moved below the badge; the divider is white so it
+  reads in dark theme. `/code-review high` then found and fixed: compare set the latest
+  revision against a stale candidate (now its base revision, labelled `修订 N`, sized from
+  that render); `comparing` outlived accept/discard/project switch; renders were not
+  de-duplicated; the tile stood in for the candidate while loading (now `正在准备对比…`,
+  and a failed render says so); the invisible range thumb offset the divider from the
+  pointer (the frame takes the pointer, the range only the keyboard); the fit math was
+  duplicated (`useCanvasFit`); the receipt showed the request size, not the candidate's.
+  Deferred: Host and protocol each spell the receipt limits.
+

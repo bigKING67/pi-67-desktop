@@ -5,7 +5,7 @@ import { LIMITS, record, id, string, isRecord, type Asset } from "./document.js"
 import { readProject, editBatch, type ProjectState, type PublishedRevision } from "./project.js";
 import { importRaster, saveAsset, regularPath, readAsset } from "./raster.js";
 import { importMask, compositeRaster, validateContext, type CompositeQa, type MaskData } from "./composite.js";
-import { readExecution, type ExecutionBinding } from "./provider-store.js";
+import { readExecution, type ExecutionBinding, type ExecutionReceipt } from "./provider-store.js";
 import { inspectAlpha, requireAlpha } from "./provider-alpha.js";
 import {
   CANDIDATE_SCHEMA, MASK_KEYS, candidateBytes, ensureDirectory, assertCandidateSlot, publishCandidate, readCandidateEntry, verifyCandidateAgainst,
@@ -17,6 +17,8 @@ export type CandidateStatus = "ready" | "stale" | "accepted" | "discarded" | "de
 export interface CandidateInspection {
   candidate: Candidate; sha256: string; status: CandidateStatus; current_revision: number; accepted_revision: number | null;
   applied_in_current: boolean; stale: boolean; decision_pending: boolean;
+  /** The verified execution receipt of a generated candidate; null for local composites. */
+  receipt: ExecutionReceipt | null;
 }
 export interface CandidateListFailure { candidate_id: string; status: "incomplete" | "unreadable"; error: string }
 export interface StagedCandidate { candidate: Candidate; sha256: string; status: "ready" | "stale"; current_revision: number }
@@ -104,7 +106,7 @@ export async function inspectCandidate(root: string, candidateId: string): Promi
   const status: CandidateStatus = decision ? "accepted" : discarded ? "discarded" : pending ? "decision_pending" : stale ? "stale" : "ready";
   const object = current.document.objects.find((item) => item.id === entry.candidate.target_id);
   return { candidate: entry.candidate, sha256: entry.sha256, status, current_revision: current.document.revision, accepted_revision: decision?.revision ?? null,
-    applied_in_current: !!decision && object?.kind === "image" && object.asset_id === entry.candidate.output.id, stale, decision_pending: pending };
+    applied_in_current: !!decision && object?.kind === "image" && object.asset_id === entry.candidate.output.id, stale, decision_pending: pending, receipt: entry.receipt };
 }
 
 export async function listCandidates(root: string): Promise<(CandidateInspection | CandidateListFailure)[]> {

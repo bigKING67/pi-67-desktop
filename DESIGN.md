@@ -271,6 +271,16 @@ Application-level surfaces use a separate wide-window shell:
   `保留主体`, `保留风格`, `取构图`). Above the Composer, `已附带` lists 24px chips on the
   muted surface (`N 个标记`, `N 个选中图层`, `参考 <layer> · <role>`), each with a 20px
   remove glyph; detached marks become a dashed-border `附带 N 个标记` text action.
+- Candidate compare (P3, 2026-10-10): `对比` (in a 候选 row and as a pressed-state text
+  action in the floating preview badge) replaces the canvas with one fitted frame holding
+  both renders: the candidate's base revision (`修订 N`) left, `候选` right, labelled by 55%-black caption tags in the bottom
+  corners (the badge floats over the top), split by a 2px white divider with a dark edge
+  and a 14×32 grip so it reads on any pixels in either theme. Both sides are canvas-size
+  renders. Pressing anywhere on the frame moves the split under
+  the cursor; an invisible range input carries arrows and Home/End, its focus ring shown on
+  the divider. Until both canvas-size renders arrive the canvas stays with `正在准备对比…`. 候选
+  rows add one tertiary receipt line (`model · 高质量 · 1088×1360 · 用时 22 秒 · 费用未估计 ·
+  画面质量未核验`).
 - The navigation rail is the only Workspace and conversation switcher. Each
   Workspace is a collapsible group containing active tasks, waiting tasks,
   provisional drafts, and Catalog-backed recent Sessions. Workspace groups use

@@ -96,8 +96,11 @@ describe("image protocol schemas", () => {
     const candidates = CommandResultSchemas["image.candidate.list"];
     expect(check(candidates, { projectId: "p", candidates: [
       { candidateId: "pink", status: "ready", targetId: "background", mode: "masked", baseRevision: 1, summary: "Pink", outputSha256: sha, generated: true, protectedChangedPixels: 0 },
-      { candidateId: "interrupted", status: "incomplete" }
+      { candidateId: "interrupted", status: "incomplete" },
+      { candidateId: "gen", status: "ready", generated: true, receipt: { model: "gpt-image-2.5-sunburst", quality: "high", size: "1088x1360", durationMs: 22481 } }
     ] })).toBe(true);
+    expect(check(candidates, { projectId: "p", candidates: [{ candidateId: "gen", status: "ready", receipt: { model: "m", size: "1088 by 1360" } }] })).toBe(false);
+    expect(check(candidates, { projectId: "p", candidates: [{ candidateId: "gen", status: "ready", receipt: { model: "m", prompt: "secret" } }] })).toBe(false);
     expect(check(candidates, { projectId: "p", candidates: [{ candidateId: "pink", status: "approved" }] })).toBe(false);
     expect(check(CommandResultSchemas["image.project.list"], { projects: [{ projectId: "p", title: "海报", revision: 1, canvas, updatedAt: 1, readyCandidates: 3 }] })).toBe(true);
     expect(check(CommandResultSchemas["image.project.render"], { projectId: "p", revision: 1, pngSha256: sha, width: 640, height: 640 })).toBe(true);

@@ -130,10 +130,35 @@ describe("image object selection", () => {
     expect(useImageProject.getState().selectedObjectIds).toEqual([]);
   });
 
-  it("returns the canvas to the revision once the previewed candidate is accepted or discarded", async () => {
+  it("compares a stale candidate against its own base revision, rendering each once even when pressed twice", async () => {
+    useImageProject.setState({ revision: 3, candidates: [{ candidateId: "old", status: "stale", baseRevision: 1 }], candidateCanvases: {}, revisionCanvases: {} });
+    host.calls = [];
+    inspectCandidate("old");
+    inspectCandidate("old", { compare: true });
+    inspectCandidate("old", { compare: true });
+    const renders = host.calls.filter((call) => call.type === "image.project.render").map((call) => call.payload);
+    expect(renders).toEqual([{ projectId: "p", candidateId: "old", previewMax: 1600 }, { projectId: "p", revision: 1, previewMax: 1600 }]);
+    await vi.waitFor(() => expect(useImageProject.getState().revisionCanvases[1]).toBeDefined());
+  });
+
+  it("renders an inspected candidate once at the canvas size and compares only while inspecting", async () => {
+    host.calls = [];
+    inspectCandidate("warm", { compare: true });
+    await Promise.resolve();
+    expect(useImageProject.getState()).toMatchObject({ inspecting: "warm", comparing: true });
+    const renders = () => host.calls.filter((call) => call.type === "image.project.render" && call.payload.candidateId === "warm");
+    expect(renders().map((call) => call.payload.previewMax)).toEqual([1600]);
+    await vi.waitFor(() => expect(useImageProject.getState().candidateCanvases.warm).toBeDefined());
     inspectCandidate("warm");
+    expect(renders()).toHaveLength(1);
+    inspectCandidate(undefined, { compare: true });
+    expect(useImageProject.getState()).toMatchObject({ inspecting: undefined, comparing: false });
+  });
+
+  it("returns the canvas to the revision once the previewed candidate is accepted or discarded", async () => {
+    inspectCandidate("warm", { compare: true });
     expect(await acceptCandidate("warm")).toBe(true);
-    expect(useImageProject.getState()).toMatchObject({ inspecting: undefined, revision: 2 });
+    expect(useImageProject.getState()).toMatchObject({ inspecting: undefined, comparing: false, revision: 2 });
     inspectCandidate("cool");
     expect(await discardCandidate("other")).toBe(true);
     expect(useImageProject.getState().inspecting).toBe("cool");

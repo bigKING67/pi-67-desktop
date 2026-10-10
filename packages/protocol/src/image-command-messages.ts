@@ -52,7 +52,11 @@ export interface ImageCandidateSummary {
   outputSha256?: string;
   generated?: boolean;
   protectedChangedPixels?: number;
+  /** What the generation receipt records; absent for local composites. Visual quality stays unverified. */
+  receipt?: ImageCandidateReceipt;
 }
+
+export interface ImageCandidateReceipt { model: string; quality?: string; size?: string; durationMs?: number }
 
 export interface ImageRevisionResult { projectId: string; revision: number; sha256: string; dryRun: boolean }
 

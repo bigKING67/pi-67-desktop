@@ -1,14 +1,13 @@
 import type { ImageDocument, ImageEditOperation, ImageMark, ImageObjectPatch, ImageSceneObject as SceneObject } from "@pi67/domain";
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { boundsOf, clampInside, RESIZE_HANDLES, resizeRect, snapMove, type Guide, type Rect, type ResizeHandle } from "./image-canvas-geometry.js";
+import { useCanvasFit } from "./image-canvas-fit.js";
 import { ImageInlineTextEditor } from "./ImageInlineTextEditor.js";
 import styles from "./ImageCanvas.module.css";
 
-const INSET = 20;
 /** Snap distance in screen pixels, converted to canvas units by the fit scale. */
 const SNAP_PX = 6;
 
-interface Fit { left: number; top: number; scale: number }
 type Gesture =
   | { kind: "move"; ids: string[]; startX: number; startY: number; dx: number; dy: number; guides: Guide[] }
   | { kind: "resize"; id: string; handle: ResizeHandle; startX: number; startY: number; rect: Rect; guides: Guide[] };
@@ -36,25 +35,11 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
   onMark?: (rect: Rect) => void;
 }) {
   const stage = useRef<HTMLDivElement>(null);
-  const [fit, setFit] = useState<Fit>();
   const [gesture, setGesture] = useState<Gesture>();
   const [editingId, setEditingId] = useState<string>();
   const [drawing, setDrawing] = useState<{ start: { x: number; y: number }; rect: Rect }>();
   const canvas = document?.canvas;
-
-  useLayoutEffect(() => {
-    const element = stage.current;
-    if (!element || !canvas) return undefined;
-    const measure = () => {
-      const width = element.clientWidth - INSET * 2, height = element.clientHeight - INSET * 2;
-      const scale = Math.max(0.01, Math.min(width / canvas.width, height / canvas.height));
-      setFit({ scale, left: INSET + (width - canvas.width * scale) / 2, top: INSET + (height - canvas.height * scale) / 2 });
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [canvas]);
+  const fit = useCanvasFit(stage, canvas);
 
   const objects = document?.objects.filter((object) => object.visible) ?? [];
   const movable = (ids: readonly string[]) => objects.filter((object) => ids.includes(object.id) && !object.locked);

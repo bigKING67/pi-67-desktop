@@ -22,8 +22,14 @@ export interface ImageProjectState {
   preview: ImagePreview | undefined;
   candidates: ImageCandidateSummary[];
   candidatePreviews: Record<string, ImagePreview>;
+  /** Canvas-size renders of candidates once inspected; tiles keep the small previews. */
+  candidateCanvases: Record<string, ImagePreview>;
+  /** Canvas-size renders of earlier revisions a candidate is compared against (its base). */
+  revisionCanvases: Record<number, ImagePreview>;
   /** A candidate shown on the canvas instead of the revision (preview only, nothing changes). */
   inspecting: string | undefined;
+  /** The inspected candidate is shown split against the current revision. */
+  comparing: boolean;
   busy: boolean;
   error: string | undefined;
   /** Content to return to on undo / redo, newest last (revision numbers; each step is a new `revert_to`). */
@@ -46,7 +52,7 @@ export interface ImageProjectState {
 
 export const useImageProject = create<ImageProjectState>(() => ({
   projectId: undefined, revision: undefined, document: undefined, preview: undefined,
-  candidates: [], candidatePreviews: {}, inspecting: undefined, busy: false, error: undefined, back: [], forward: [], selectedObjectIds: [], conversation: undefined, conversationKnown: false, history: [], marks: [], references: [], marksHeld: false
+  candidates: [], candidatePreviews: {}, candidateCanvases: {}, revisionCanvases: {}, inspecting: undefined, comparing: false, busy: false, error: undefined, back: [], forward: [], selectedObjectIds: [], conversation: undefined, conversationKnown: false, history: [], marks: [], references: [], marksHeld: false
 }));
 
 function libraryId(): string {
@@ -62,7 +68,7 @@ function request<T extends AgentCommandType>(type: T, payload: CommandPayloads[T
 /** Opens (or refreshes) a project: document, fitted preview and candidates. */
 export async function loadImageProject(projectId: string): Promise<void> {
   if (useImageProject.getState().projectId !== projectId) {
-    useImageProject.setState({ projectId, revision: undefined, document: undefined, preview: undefined, candidates: [], candidatePreviews: {}, inspecting: undefined, error: undefined, back: [], forward: [], selectedObjectIds: [], conversation: undefined, conversationKnown: false, history: [], marks: [], references: [], marksHeld: false });
+    useImageProject.setState({ projectId, revision: undefined, document: undefined, preview: undefined, candidates: [], candidatePreviews: {}, candidateCanvases: {}, revisionCanvases: {}, inspecting: undefined, comparing: false, error: undefined, back: [], forward: [], selectedObjectIds: [], conversation: undefined, conversationKnown: false, history: [], marks: [], references: [], marksHeld: false });
   }
   try {
     const read = await request("image.project.read", { projectId });
@@ -207,8 +213,41 @@ export async function redoImageEdit(): Promise<void> {
   if (result.outcome === "applied") useImageProject.setState({ back: [...back, revision], forward: forward.slice(0, -1) });
 }
 
-export function inspectCandidate(candidateId: string | undefined): void {
-  useImageProject.setState({ inspecting: candidateId });
+/**
+ * Shows a candidate on the canvas at the canvas's own resolution (not the tile's)
+ * and, with `compare`, against the revision it was made from, so the divider shows
+ * only what the candidate changed. Each render is requested once per project.
+ */
+export function inspectCandidate(candidateId: string | undefined, options: { compare?: boolean } = {}): void {
+  const compare = candidateId !== undefined && options.compare === true;
+  useImageProject.setState({ inspecting: candidateId, comparing: compare });
+  const { projectId, revision, candidates } = useImageProject.getState();
+  if (!projectId || candidateId === undefined) return;
+  const failed = () => {
+    if (!compare || useImageProject.getState().inspecting !== candidateId) return;
+    useImageProject.setState({ comparing: false });
+    publishNotification({ level: "error", title: "没能准备对比", message: "候选或它所基于的修订渲染失败，可以继续单独预览候选。" });
+  };
+  renderOnce(projectId, `c:${candidateId}`, (state) => state.candidateCanvases[candidateId], { projectId, candidateId, previewMax: CANVAS_EDGE },
+    (state, preview) => ({ candidateCanvases: { ...state.candidateCanvases, [candidateId]: preview } }), failed);
+  const base = candidates.find((candidate) => candidate.candidateId === candidateId)?.baseRevision;
+  if (compare && base !== undefined && base !== revision) {
+    renderOnce(projectId, `r:${base}`, (state) => state.revisionCanvases[base], { projectId, revision: base, previewMax: CANVAS_EDGE },
+      (state, preview) => ({ revisionCanvases: { ...state.revisionCanvases, [base]: preview } }), failed);
+  }
+}
+
+const pendingRenders = new Set<string>();
+
+function renderOnce(projectId: string, key: string, cached: (state: ImageProjectState) => ImagePreview | undefined, payload: CommandPayloads["image.project.render"],
+  store: (state: ImageProjectState, preview: ImagePreview) => Partial<ImageProjectState>, failed: () => void): void {
+  const pending = `${projectId}\u0000${key}`;
+  if (cached(useImageProject.getState()) || pendingRenders.has(pending)) return;
+  pendingRenders.add(pending);
+  request("image.project.render", payload)
+    .then((preview) => { if (useImageProject.getState().projectId === projectId) useImageProject.setState((state) => store(state, preview)); })
+    .catch(failed)
+    .finally(() => pendingRenders.delete(pending));
 }
 
 async function mutate(action: () => Promise<unknown>, failure: string): Promise<boolean> {
@@ -234,7 +273,7 @@ export function acceptCandidate(candidateId: string): Promise<boolean> {
   return mutate(async () => {
     await request("image.candidate.accept", { projectId, candidateId, baseRevision: revision, summary: "接受候选" });
     // The accepted pixels are now the revision; the canvas returns to it.
-    useImageProject.setState((state) => ({ back: [...state.back, revision], forward: [], inspecting: undefined }));
+    useImageProject.setState((state) => ({ back: [...state.back, revision], forward: [], inspecting: undefined, comparing: false }));
   }, "没能接受候选");
 }
 
@@ -243,7 +282,7 @@ export function discardCandidate(candidateId: string): Promise<boolean> {
   if (!projectId) return Promise.resolve(false);
   return mutate(async () => {
     await request("image.candidate.discard", { projectId, candidateId, summary: "丢弃候选" });
-    if (useImageProject.getState().inspecting === candidateId) useImageProject.setState({ inspecting: undefined });
+    if (useImageProject.getState().inspecting === candidateId) useImageProject.setState({ inspecting: undefined, comparing: false });
   }, "没能丢弃候选");
 }
 
