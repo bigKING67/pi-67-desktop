@@ -9,6 +9,7 @@ import { canRenderLiveTask } from "../workbench/live-task-authority.js";
 import { selectedWorkbenchTask, useWorkbenchStore } from "../workbench/workbench-store.js";
 import { useImageProject } from "./image-project-controller.js";
 import { bindImageProjectConversation, openImageProjectConversation } from "./image-project-conversation.js";
+import { ImagePromptAttachments } from "./ImagePromptAttachments.js";
 import styles from "./ImageProjectPage.module.css";
 
 /** The project's Pi conversation, shown beside the candidates (product model §6). */
@@ -32,15 +33,15 @@ export function ImageProjectConversationDock({ projectId }: { projectId: string 
       <div className={`conversation-region ${styles.conversationRegion}`}>
         <StreamingAnnouncer />
         <Transcript />
-        <Composer />
+        <Composer context={<ImagePromptAttachments />} />
       </div>
     );
   }
   if (inLibrary && task.conversation.kind === "provisional" && !transitionPending) {
     return (
       <div className={`conversation-region ${styles.conversationRegion}`}>
-        <p className={styles.conversationIntro}>告诉 Agent 要做什么，比如“把背景换成暖色影棚”“加一行价格 ¥199”。消息会附带当前修订和选中的图层。</p>
-        <Composer />
+        <p className={styles.conversationIntro}>告诉 Agent 要做什么，比如“把背景换成暖色影棚”“加一行价格 ¥199”。消息会附带当前修订、选中的图层、标记和参考。</p>
+        <Composer context={<ImagePromptAttachments />} />
       </div>
     );
   }

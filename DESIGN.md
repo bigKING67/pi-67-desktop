@@ -259,6 +259,18 @@ Application-level surfaces use a separate wide-window shell:
   after typing stops. Enter adds a line, ⌘/Ctrl + Enter or leaving the field saves, Escape
   restores the words; a refused draft never saves and leaving it does not pull focus
   back. Focus returns to the object when the editor closes.
+- Marks and references (P3, 2026-10-10): the project header's quiet `标记` toggle (dashed
+  pointer glyph, active surface and strong inset border when on, a `--focus` count pill
+  while marks exist) swaps the selection bar for the marks bar: one caption line with
+  `框选选中对象` and `完成`, then a fixed 72px (two-row) scrolling list of rows (`m1` tag, 520px
+  instruction field, remove icon) so adding marks never rescales the canvas. In mark mode
+  a crosshair layer covers the canvas, resize handles hide, and Escape outside a field
+  leaves the mode. Marks draw as 1.5px dashed `--focus` regions with a 10% tint and a
+  surface halo, tagged top-left with their id on `--focus`; an unworded mark is fainter
+  and untinted. 属性 for an image adds `作为参考`, a four-part segmented control (`不用`,
+  `保留主体`, `保留风格`, `取构图`). Above the Composer, `已附带` lists 24px chips on the
+  muted surface (`N 个标记`, `N 个选中图层`, `参考 <layer> · <role>`), each with a 20px
+  remove glyph; detached marks become a dashed-border `附带 N 个标记` text action.
 - The navigation rail is the only Workspace and conversation switcher. Each
   Workspace is a collapsible group containing active tasks, waiting tasks,
   provisional drafts, and Catalog-backed recent Sessions. Workspace groups use

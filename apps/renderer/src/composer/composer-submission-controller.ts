@@ -8,7 +8,7 @@ import {
   type PromptSubmissionResult
 } from "./prompt-submission-controller.js";
 import { promptTextValidationMessage } from "./prompt-text-validation.js";
-import { composerPromptContext } from "./composer-prompt-context.js";
+import { composerPromptContext, composerPromptContextAccepted } from "./composer-prompt-context.js";
 import { withImagePromptContext } from "@pi67/domain";
 
 export function submitComposerDraft(input: {
@@ -47,6 +47,7 @@ export function clearAcceptedComposerDraft(input: {
   attachments: readonly DraftAttachment[];
   reviewCommentIds: readonly string[];
 }): void {
+  composerPromptContextAccepted();
   const drafts = useTaskDraftStore.getState();
   drafts.setText(input.taskId, "");
   drafts.setWorkspaceFiles(input.taskId, []);

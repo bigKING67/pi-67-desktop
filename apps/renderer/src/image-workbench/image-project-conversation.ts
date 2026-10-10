@@ -1,10 +1,11 @@
-import { formatImagePromptContext } from "@pi67/domain";
+import { formatImagePromptContext, type ImageMark } from "@pi67/domain";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { setComposerPromptContext } from "../composer/composer-prompt-context.js";
 import { rendererWorkbenchStore, selectedWorkbenchTask } from "../workbench/workbench-store.js";
 import { beginRendererSessionIntentInWorkspace } from "../workspace/workspace-session-controller.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import { useImageProject } from "./image-project-controller.js";
+import { resolveImageReferences, retireImageMarks, sendableImageMarks } from "./image-project-marks.js";
 
 // The image page's dock hosts one ordinary Pi conversation per project, in the
 // library Workspace. The app renders one live conversation (the selected task),
@@ -37,13 +38,17 @@ export async function openImageProjectConversation(projectId: string, conversati
  * message has created its session.
  */
 export function bindImageProjectConversation(projectId: string): () => void {
+  let sent: ImageMark[] = [];
   const releaseContext = setComposerPromptContext(() => {
     const state = rendererWorkbenchStore.getState();
     const task = selectedWorkbenchTask(state);
     const project = useImageProject.getState();
     if (!task || task.workspaceId !== state.imageLibraryWorkspaceId || project.projectId !== projectId || project.revision === undefined) return undefined;
-    return formatImagePromptContext({ projectId, revision: project.revision, selectedObjectIds: project.selectedObjectIds, marks: [], references: [] });
-  });
+    const marks = project.marksHeld ? [] : sendableImageMarks(project.marks);
+    sent = marks;
+    return formatImagePromptContext({ projectId, revision: project.revision, selectedObjectIds: project.selectedObjectIds, marks,
+      references: resolveImageReferences(project.document, project.references) });
+  }, () => retireImageMarks(sent));
   const unsubscribe = rendererWorkbenchStore.subscribe((state) => {
     const task = selectedWorkbenchTask(state);
     const project = useImageProject.getState();

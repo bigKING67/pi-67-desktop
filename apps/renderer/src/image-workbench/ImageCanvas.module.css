@@ -178,3 +178,42 @@
   border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
   color: var(--danger);
 }
+
+/* Marks: dashed --focus regions with their id, above objects and below the editor. */
+.mark {
+  position: absolute;
+  z-index: 10001;
+  border: 1.5px dashed var(--focus);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--focus) 10%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--surface) 70%, transparent);
+  pointer-events: none;
+}
+
+/* Drawn but not yet worded: quieter, and it stays out of the message. */
+.mark[data-empty="true"] {
+  border-color: color-mix(in srgb, var(--focus) 60%, transparent);
+  background: transparent;
+}
+
+.markTag {
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  padding: 1px 5px;
+  border-radius: 2px 0 4px 0;
+  background: var(--focus);
+  color: var(--surface);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  line-height: 16px;
+}
+
+/* Mark mode: one layer over the whole canvas takes the pointer from the objects. */
+.markLayer {
+  position: absolute;
+  z-index: 10003;
+  inset: 0;
+  cursor: crosshair;
+  touch-action: none;
+}

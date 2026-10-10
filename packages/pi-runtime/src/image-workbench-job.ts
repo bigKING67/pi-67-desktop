@@ -4,10 +4,17 @@
 // model to author them made every real run fail validation, so the tool owns
 // them and the model states only the intent.
 
+import type { ImageReferenceRole } from "@pi67/domain";
+
 /** The engine's id rule (document.ts): a letter, then up to 63 letters, digits, `-` or `_`. */
 export const IMAGE_ID_PATTERN = "^[a-zA-Z][a-zA-Z0-9_-]{0,63}$";
 
 export type ImageJobMode = "edit" | "generate";
+const ROLE_GUIDANCE: Readonly<Record<ImageReferenceRole, string>> = {
+  "keep-subject": "keep this subject's identity, shape and details",
+  "keep-style": "match this image's style, palette and lighting",
+  "take-composition": "follow this image's composition and framing"
+};
 export type ImageJobQuality = "low" | "medium" | "high";
 
 export interface ImageJobIntent {
@@ -17,6 +24,8 @@ export interface ImageJobIntent {
   exclude?: readonly string[] | undefined;
   exactText?: readonly string[] | undefined;
   quality?: ImageJobQuality | undefined;
+  /** Further project images, after the edited one, each with the role the person gave it. */
+  references?: readonly { assetId: string; role: ImageReferenceRole }[] | undefined;
 }
 
 export interface ImageJobBinding {
@@ -42,6 +51,8 @@ export function buildImageJob(intent: ImageJobIntent, binding: ImageJobBinding):
   if (!instruction) throw new Error("instruction must describe the change or the image to make");
   const edit = intent.mode === "edit";
   const preserve = list(intent.preserve);
+  const extra = intent.references ?? [];
+  if (extra.length && !edit) throw new Error("REFERENCES_NEED_EDIT: reference images work in mode edit; the engine sends none for generate.");
   return {
     schema_version: "creative-craft.image-job.v2",
     job_id: binding.jobId,
@@ -54,7 +65,7 @@ export function buildImageJob(intent: ImageJobIntent, binding: ImageJobBinding):
     task_type: intent.mode,
     execution_mode: "single_turn",
     intended_use: instruction.slice(0, 200),
-    asset_refs: edit ? [binding.targetAssetId] : [],
+    asset_refs: edit ? [binding.targetAssetId, ...extra.map((reference) => reference.assetId)] : [],
     canvas: { size: `${binding.width}x${binding.height}`, quality: intent.quality ?? "medium", format: "png", compression: null, background: "opaque", variants: 1 },
     prompt: {
       scene: instruction,
@@ -63,7 +74,8 @@ export function buildImageJob(intent: ImageJobIntent, binding: ImageJobBinding):
       lighting: edit ? "Consistent with the requested change" : "As described",
       materials_style: edit ? "Match the current image unless the change says otherwise" : "As described",
       exact_text: list(intent.exactText),
-      references: edit ? [{ asset_id: binding.targetAssetId, role: "the image being edited", preserve }] : [],
+      references: edit ? [{ asset_id: binding.targetAssetId, role: "the image being edited", preserve },
+        ...extra.map((reference) => ({ asset_id: reference.assetId, role: ROLE_GUIDANCE[reference.role], preserve: [] }))] : [],
       change: [instruction],
       preserve,
       constraints: ["Output one image at exactly the target size."],

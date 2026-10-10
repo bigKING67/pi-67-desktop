@@ -96,11 +96,11 @@ describe("image workbench policy", () => {
         ...base,
         selectedObjectIds: ["headline", "price", "bad id"],
         marks: [{ id: "m1", x: 10, y: 20, width: 30, height: 40, instruction: "  去掉\n左上角装饰\t " }],
-        references: [{ assetId: "style", role: "keep-style" }, { assetId: "bottle", role: "keep-subject" }, { assetId: "layout", role: "take-composition" }]
+        references: [{ assetId: "style", role: "keep-style" }, { assetId: "layout", role: "take-composition" }]
       })).toBe([
         "<image-context>", "project: poster", "revision: 3", "selected: headline, price",
         "mark m1 [x=10 y=20 w=30 h=40]: 去掉 左上角装饰",
-        "reference style: 保留风格", "reference bottle: 保留主体", "reference layout: 取构图", "</image-context>"
+        "reference style: 保留风格", "reference layout: 取构图", "</image-context>"
       ].join("\n"));
     });
 
@@ -119,7 +119,7 @@ describe("image workbench policy", () => {
       expect(() => formatImagePromptContext({ ...base, revision: 0 })).toThrow(/Invalid image prompt context/);
       expect(() => formatImagePromptContext({ ...base, selectedObjectIds: Array.from({ length: 33 }, (_, i) => `o${i}`) })).toThrow(/limits/);
       expect(() => formatImagePromptContext({ ...base, marks: Array.from({ length: 17 }, (_, i) => ({ id: `m${i}`, x: 0, y: 0, width: 1, height: 1, instruction: "x" })) })).toThrow(/limits/);
-      expect(() => formatImagePromptContext({ ...base, references: Array.from({ length: 4 }, () => ({ assetId: "a", role: "keep-style" as const })) })).toThrow(/limits/);
+      expect(() => formatImagePromptContext({ ...base, references: Array.from({ length: 3 }, () => ({ assetId: "a", role: "keep-style" as const })) })).toThrow(/limits/);
     });
   });
 

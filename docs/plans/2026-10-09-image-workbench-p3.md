@@ -3,7 +3,7 @@
 Status: active
 Owner: Claude
 Started: 2026-10-09
-Last updated: 2026-10-09
+Last updated: 2026-10-10
 
 ## Goal
 
@@ -38,7 +38,7 @@ export presets and user fonts. Product model §6–§8 and §17 (P3 row).
 - [x] 1. Image Inspector shell with 图层, 属性 and 历史; TitleBar shows `创作库` / project.
 - [x] 2. Transform handles, snapping and multi-select alignment.
 - [x] 3. Inline text editing on the canvas.
-- [ ] 4. Marks (mark-and-rework) and reference slots in the structured context.
+- [x] 4. Marks (mark-and-rework) and reference slots in the structured context.
 - [ ] 5. 候选 and 导出 tabs: candidate receipts, comparison, multi-size export presets.
 - [ ] 6. User fonts (engine and Host support, Inspector picker).
 - [ ] 7. Authority docs, packaged verification, Windows packaged smoke.
@@ -80,3 +80,20 @@ the image Inspector returns the P2 page; no project content is rewritten.
   editor scrolled overflowing lines out of sight; it now grows with a dashed box outline.
   Before this, `image_project_edit` got an operation schema (malformed batches refused
   before approval, `add_asset` checked by path) and the watcher test stopped racing disk I/O.
+- 2026-10-10: checkpoint 4 done. `标记` mode draws canvas-pixel regions (or frames the
+  selection) with one instruction each; 属性 gives an image layer a reference role; `已附带`
+  above the Composer lists what the next message carries. Marks retire only when the Host
+  accepts the message that carried them (by identity, so a reworded mark stays).
+  `image_generate` takes `references` with roles (at most two after the edited image,
+  the engine's three-input cap) and records them in the job and receipt. Packaged preview
+  over CDP: two marks and a `保留风格` reference reached the Agent as one `<image-context>`
+  block (transcript shows only the words) and the marks cleared after acceptance. Fixes
+  from the run: the marks list grew with each row and rescaled the canvas mid-drawing (now
+  a fixed two-row scrolling list); resize handles showed but were inert in mark mode (now
+  hidden). `/code-review high` then found and fixed: framed marks bleeding off the canvas
+  were silently left out of the block (now clipped); the page allowed three references
+  where the tool takes two (one limit, two); references keyed by asset went stale after an
+  accepted candidate (now keyed by layer); leaving the page mid-send lost the retirement;
+  objects still moved by keyboard in mark mode; removing the marks chip deleted the marks
+  (now detaches them); the tool wrote job.json before refusing duplicate or source-less
+  references.

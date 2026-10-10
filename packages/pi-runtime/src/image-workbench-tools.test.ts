@@ -142,6 +142,36 @@ describe("image workbench tools", { timeout: 120_000 }, () => {
     expect((await readProject(projectRoot(cwd, "poster"))).document.revision).toBe(2);
   });
 
+  it("sends project images as role references after the edited one and refuses ones it cannot use", async () => {
+    const cwd = await workspace();
+    await sharp({ create: { width: 800, height: 600, channels: 3, background: "#d8c8b0" } }).png().toFile(path.join(cwd, "photo.png"));
+    await sharp({ create: { width: 64, height: 64, channels: 3, background: "#b5452f" } }).png().toFile(path.join(cwd, "mood.png"));
+    const proposed = await sharp({ create: { width: 800, height: 600, channels: 3, background: "#f0e0c8" } }).png().toBuffer();
+    const t = harness(cwd, { available: [imageModel("gpt-image-2.5-sunburst")], image: proposed });
+    await t.json("image_project_create_from_photo", { project_id: "poster", source: "photo.png", headline: "春日" });
+    await t.json("image_project_edit", { project_id: "poster", base_revision: 1, summary: "加参考", operations: [{ type: "add_asset", asset: { id: "mood", source: "mood.png" } }] });
+    await t.json("image_project_edit", { project_id: "poster", base_revision: 2, summary: "解锁", operations: [{ type: "update_object", id: "photo", patch: { locked: false } }] });
+    const intent = { project_id: "poster", target_id: "photo", model: "newmoney-images-gateway/gpt-image-2.5-sunburst", instruction: "按参考图换成同样的色调" };
+    const photoAsset = (await readProject(projectRoot(cwd, "poster"))).document.assets[0]!.id;
+
+    await expect(t.call("image_generate", { ...intent, references: [{ asset_id: "nope", role: "keep-style" }] })).rejects.toThrow(/REFERENCE_NOT_FOUND/);
+    await expect(t.call("image_generate", { ...intent, references: [{ asset_id: photoAsset, role: "keep-subject" }] })).rejects.toThrow(/REFERENCE_IS_TARGET/);
+    await expect(t.call("image_generate", { ...intent, references: [{ asset_id: "mood" }] })).rejects.toThrow(/REFERENCE_ROLE_REQUIRED/);
+    await expect(t.call("image_generate", { ...intent, mode: "generate", references: [{ asset_id: "mood", role: "keep-style" }] })).rejects.toThrow(/REFERENCES_NEED_EDIT/);
+    await expect(t.call("image_generate", { ...intent, references: [{ asset_id: "mood", role: "keep-style" }, { asset_id: "mood", role: "take-composition" }] })).rejects.toThrow(/DUPLICATE_REFERENCE/);
+    await expect(t.call("image_generate", { project_id: "poster", target_id: "photo", model: intent.model, job: job(), references: [{ asset_id: "mood" }] })).rejects.toThrow(/REFERENCE_SOURCE_REQUIRED/);
+    expect(t.generated).toHaveLength(0);
+
+    const edited = await t.json("image_generate", { ...intent, candidate_id: "toned", references: [{ asset_id: "mood", role: "keep-style" }] });
+    expect(edited).toMatchObject({ candidate_id: "toned", status: "ready", outcome: "succeeded" });
+    const [, context] = t.generated[0] as [unknown, { messages?: unknown }];
+    expect(JSON.stringify(context).match(/image\/png/gu)).toHaveLength(2);
+    const written = JSON.parse(await fs.readFile(path.join(projectRoot(cwd, "poster"), "jobs/toned/job.json"), "utf8")) as {
+      asset_refs: string[]; prompt: { references: { asset_id: string; role: string }[] } };
+    expect(written.asset_refs).toEqual([photoAsset, "mood"]);
+    expect(written.prompt.references[1]).toEqual({ asset_id: "mood", role: "match this image's style, palette and lighting", preserve: [] });
+  });
+
   it("refuses generation before writing anything when the source model is unknown, unavailable or not an image source", async () => {
     const cwd = await workspace();
     const photo = path.join(cwd, "photo.png");

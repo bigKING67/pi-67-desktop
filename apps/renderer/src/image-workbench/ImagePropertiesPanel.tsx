@@ -1,4 +1,4 @@
-import type { ImageCanvas, ImageObjectPatch, ImageSceneObject } from "@pi67/domain";
+import { IMAGE_PROMPT_CONTEXT_LIMITS, IMAGE_REFERENCE_ROLE_LABELS, IMAGE_REFERENCE_ROLES, type ImageCanvas, type ImageObjectPatch, type ImageSceneObject } from "@pi67/domain";
 import { Eye, EyeOff, Lock, LockOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button, Input, Label, TextField } from "react-aria-components";
@@ -10,6 +10,7 @@ import {
   toggleImageObjectVisibility,
   useImageProject
 } from "./image-project-controller.js";
+import { setImageReference } from "./image-project-marks.js";
 import styles from "./ImageInspector.module.css";
 
 type FieldKind = "int" | "number" | "color";
@@ -99,9 +100,31 @@ export function ImagePropertiesPanel() {
           ))}
         </div>
       ) : null}
+      {object.kind === "image" ? <ReferenceRole objectId={object.id} /> : null}
       {status}
       {object.locked ? null : <ImageAlignToolbar busy={busy} canvas={document.canvas} objects={selected} />}
     </div>
+  );
+}
+
+/** An image's reference role for the next message (product model §7 E); a page note, not a revision. */
+function ReferenceRole({ objectId }: { objectId: string }) {
+  const references = useImageProject((state) => state.references);
+  const role = references.find((reference) => reference.objectId === objectId)?.role;
+  const full = role === undefined && references.length >= IMAGE_PROMPT_CONTEXT_LIMITS.references;
+  return (
+    <>
+      <p className={styles.sectionLabel}>作为参考</p>
+      <div aria-label="作为参考" className={`${styles.alignRow} ${styles.roleRow}`} role="group">
+        {[undefined, ...IMAGE_REFERENCE_ROLES].map((option) => (
+          <Button key={option ?? "none"} aria-pressed={role === option} className={`${styles.segment} ${role === option ? styles.segmentSelected : ""}`}
+            isDisabled={full && option !== undefined} onPress={() => setImageReference(objectId, option)}>
+            {option ? IMAGE_REFERENCE_ROLE_LABELS[option] : "不用"}
+          </Button>
+        ))}
+      </div>
+      <p className={styles.empty}>{full ? `最多 ${IMAGE_PROMPT_CONTEXT_LIMITS.references} 张参考。` : ""}设为参考的图片随下一条消息交给 Agent；正在改的那张图说清要保留什么即可。</p>
+    </>
   );
 }
 

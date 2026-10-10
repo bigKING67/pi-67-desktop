@@ -289,3 +289,195 @@
   line-height: 1.5;
 }
 
+
+/* `标记` mode toggle: a quiet header action that reads pressed on the active surface. */
+.modeToggle {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-interface);
+}
+
+.modeToggle[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.modeToggle[data-focus-visible] {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.modeToggle[data-disabled] {
+  color: var(--text-tertiary);
+  opacity: 0.5;
+}
+
+.modeToggleOn,
+.modeToggleOn[data-hovered] {
+  background: var(--surface-active);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+.modeCount {
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--focus);
+  color: var(--surface);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* Mark mode's bar sits where the selection bar does; long lists scroll inside it. */
+.marksBar {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.marksHead {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.marksHint {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+  line-height: 1.45;
+}
+
+/* A fixed height, so adding marks never rescales the canvas being drawn on. */
+.marksList {
+  display: grid;
+  height: 72px;
+  align-content: start;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  gap: 4px;
+  list-style: none;
+}
+
+.marksEmpty {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+}
+
+.markRow {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 520px) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.markId {
+  justify-self: start;
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: var(--focus);
+  color: var(--surface);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  line-height: 16px;
+}
+
+/* `已附带` above the Composer: what the next message carries, each removable. */
+.attachments {
+  display: flex;
+  width: min(var(--conversation-track-width, 860px), 100%);
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 auto 8px;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+}
+
+.attachment {
+  display: inline-flex;
+  min-height: 24px;
+  max-width: 100%;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+
+.attachmentRemove {
+  position: relative;
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-compact);
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
+/* A 20px glyph button with a 24px hit area. */
+.attachmentRemove::after {
+  position: absolute;
+  inset: -2px;
+  content: "";
+}
+
+.attachmentRemove[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.attachmentRemove[data-focus-visible] {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+/* Detached marks: a quiet text action that attaches them again. */
+.attachmentRestore {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.attachmentRestore[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.attachmentRestore[data-focus-visible] {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.attachmentsLabel {
+  color: var(--text-tertiary);
+}

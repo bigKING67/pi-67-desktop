@@ -1,4 +1,4 @@
-import type { ImageDocument, ImageEditOperation, ImageEngineFailure, ImageSceneObject } from "@pi67/domain";
+import type { ImageDocument, ImageEditOperation, ImageEngineFailure, ImageMark, ImageReferenceRole, ImageSceneObject } from "@pi67/domain";
 import { ProtocolRequestError } from "@pi67/protocol";
 import type { AgentCommandType, CommandPayloads, CommandResults, ImageCandidateSummary, ImageRevisionEntry } from "@pi67/protocol";
 import { create } from "zustand";
@@ -36,11 +36,17 @@ export interface ImageProjectState {
   history: ImageRevisionEntry[];
   /** Selected objects in selection order; the last one is primary (its handles and fields show). */
   selectedObjectIds: string[];
+  /** Regions the person marked with an instruction; sent with the next message, then retired. */
+  marks: ImageMark[];
+  /** Image layers offered to the Agent as references, one role each; sent as the layer's current asset. */
+  references: { objectId: string; role: ImageReferenceRole }[];
+  /** The person detached the marks from the next message without deleting them. */
+  marksHeld: boolean;
 }
 
 export const useImageProject = create<ImageProjectState>(() => ({
   projectId: undefined, revision: undefined, document: undefined, preview: undefined,
-  candidates: [], candidatePreviews: {}, inspecting: undefined, busy: false, error: undefined, back: [], forward: [], selectedObjectIds: [], conversation: undefined, conversationKnown: false, history: []
+  candidates: [], candidatePreviews: {}, inspecting: undefined, busy: false, error: undefined, back: [], forward: [], selectedObjectIds: [], conversation: undefined, conversationKnown: false, history: [], marks: [], references: [], marksHeld: false
 }));
 
 function libraryId(): string {
@@ -56,16 +62,18 @@ function request<T extends AgentCommandType>(type: T, payload: CommandPayloads[T
 /** Opens (or refreshes) a project: document, fitted preview and candidates. */
 export async function loadImageProject(projectId: string): Promise<void> {
   if (useImageProject.getState().projectId !== projectId) {
-    useImageProject.setState({ projectId, revision: undefined, document: undefined, preview: undefined, candidates: [], candidatePreviews: {}, inspecting: undefined, error: undefined, back: [], forward: [], selectedObjectIds: [], conversation: undefined, conversationKnown: false, history: [] });
+    useImageProject.setState({ projectId, revision: undefined, document: undefined, preview: undefined, candidates: [], candidatePreviews: {}, inspecting: undefined, error: undefined, back: [], forward: [], selectedObjectIds: [], conversation: undefined, conversationKnown: false, history: [], marks: [], references: [], marksHeld: false });
   }
   try {
     const read = await request("image.project.read", { projectId });
     const rendered = await request("image.project.render", { projectId, revision: read.latestRevision, previewMax: CANVAS_EDGE });
     if (useImageProject.getState().projectId !== projectId) return;
     const present = new Set(read.document.objects.map((object) => object.id));
+    const images = new Set(read.document.objects.filter((object) => object.kind === "image").map((object) => object.id));
     useImageProject.setState((state) => ({ revision: read.latestRevision, document: read.document, preview: rendered, error: undefined,
       conversation: read.conversation ?? state.conversation, conversationKnown: true,
-      selectedObjectIds: state.selectedObjectIds.every((id) => present.has(id)) ? state.selectedObjectIds : state.selectedObjectIds.filter((id) => present.has(id)) }));
+      selectedObjectIds: state.selectedObjectIds.every((id) => present.has(id)) ? state.selectedObjectIds : state.selectedObjectIds.filter((id) => present.has(id)),
+      references: state.references.every((reference) => images.has(reference.objectId)) ? state.references : state.references.filter((reference) => images.has(reference.objectId)) }));
     await loadCandidates(projectId);
     const { revisions } = await request("image.project.history", { projectId });
     if (useImageProject.getState().projectId === projectId) useImageProject.setState({ history: revisions });

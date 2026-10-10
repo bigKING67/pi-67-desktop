@@ -192,8 +192,10 @@ export interface ImagePromptContext {
   references: { assetId: string; role: ImageReferenceRole }[];
 }
 
-export const IMAGE_PROMPT_CONTEXT_LIMITS = { selected: 32, marks: 16, references: 3, instruction: 500 } as const;
-const ROLE_LABELS: Record<ImageReferenceRole, string> = { "keep-subject": "保留主体", "keep-style": "保留风格", "take-composition": "取构图" };
+/** References stop at two: a Provider takes three input images and the edited one is always first. */
+export const IMAGE_PROMPT_CONTEXT_LIMITS = { selected: 32, marks: 16, references: 2, instruction: 500 } as const;
+export const IMAGE_REFERENCE_ROLE_LABELS: Readonly<Record<ImageReferenceRole, string>> = { "keep-subject": "保留主体", "keep-style": "保留风格", "take-composition": "取构图" };
+export const IMAGE_REFERENCE_ROLES = Object.keys(IMAGE_REFERENCE_ROLE_LABELS) as readonly ImageReferenceRole[];
 
 /**
  * Renders the project page's structured context as a stable text block the
@@ -216,7 +218,7 @@ export function formatImagePromptContext(context: ImagePromptContext): string {
     lines.push(`mark ${mark.id} [x=${mark.x} y=${mark.y} w=${mark.width} h=${mark.height}]: ${clean(mark.instruction)}`);
   }
   for (const reference of context.references) {
-    if (isImageId(reference.assetId)) lines.push(`reference ${reference.assetId}: ${ROLE_LABELS[reference.role]}`);
+    if (isImageId(reference.assetId)) lines.push(`reference ${reference.assetId}: ${IMAGE_REFERENCE_ROLE_LABELS[reference.role]}`);
   }
   lines.push("</image-context>");
   return lines.join("\n");

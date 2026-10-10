@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { Type, type TSchema } from "typebox";
-import { IMAGE_PROVIDER_ID, imageCandidateActions } from "@pi67/domain";
+import { IMAGE_PROMPT_CONTEXT_LIMITS, IMAGE_PROVIDER_ID, IMAGE_REFERENCE_ROLES, imageCandidateActions, type ImageReferenceRole } from "@pi67/domain";
 import type { ImageDocument, ImageGenerator } from "@pi67/image-engine";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createPiImageGenerator, type ImageRegistry } from "./image-workbench-generator.js";
@@ -175,6 +175,7 @@ export function imageTools(): ToolDefinition[] {
         "Call image_models with no provider first and pass one of its <provider>/<model> values as model.",
         "The target layer must be unlocked: unlock it with image_project_edit as its own batch first, then generate against that new revision.",
         "Use mode edit (default) to change the current image and keep the rest; list what must stay the same in preserve. Use mode generate for a fresh image.",
+        "<image-context> lines `mark mN [x y w h]: …` are regions with instructions; `reference <asset>: 保留主体 / 保留风格 / 取构图` map to references roles keep-subject / keep-style / take-composition; a reference that is the edited image itself belongs in preserve.",
         "Each call is one paid request and is never retried automatically; inspect the candidate before generating again."
       ],
       parameters: Type.Object({
@@ -190,7 +191,10 @@ export function imageTools(): ToolDefinition[] {
         base_revision: optional(Type.Integer({ minimum: 1, description: "The revision you read; defaults to the latest." })),
         candidate_id: optional(Type.String({ pattern: IMAGE_ID_PATTERN, description: "Optional; one is generated when omitted." })),
         job: optional(Type.Any({ description: "Advanced: a complete creative-craft.image-job.v2 object instead of instruction. job_id defaults to the candidate id." })),
-        references: optional(Type.Array(Type.Object({ asset_id: Type.String(), source: Type.String() }), { maxItems: 3, description: "Advanced, with job only." })),
+        references: optional(Type.Array(Type.Object({
+          asset_id: Type.String(), source: optional(Type.String({ description: "Advanced, with job only: the file for this reference." })),
+          role: optional(Type.Union(IMAGE_REFERENCE_ROLES.map((role) => Type.Literal(role)), { description: "With instruction: the reference's role, as given in <image-context>." }))
+        }), { maxItems: 3, description: "With instruction: up to two project images (asset ids from image_project_read) besides the edited one, each with a role. With job: every reference with its source." })),
         edit: optional(Type.Object({
           context: Type.Object({ x: Type.Integer(), y: Type.Integer(), width: Type.Integer(), height: Type.Integer() }),
           generation_mask: Type.String(), protection_mask: Type.String(), blend_mask: Type.String()
@@ -211,6 +215,7 @@ export function imageTools(): ToolDefinition[] {
         let job: unknown, references: unknown, outputPolicy = params.output_policy;
         if (isObject(params.job)) {
           job = { job_id: candidateId, ...params.job, provider_profile: profile, execution_surface: surface };
+          if (Array.isArray(params.references) && params.references.some((ref: Params) => typeof ref.source !== "string")) throw new Error("REFERENCE_SOURCE_REQUIRED: with job, give every reference its source file.");
           references = Array.isArray(params.references) ? params.references.map((ref: Params) => ({ ...ref, source: local(ctx.cwd, ref.source) })) : [];
         } else {
           const asset = doc.assets.find((item) => item.id === target.asset_id)!;
@@ -220,11 +225,20 @@ export function imageTools(): ToolDefinition[] {
           if (request.width !== asset.width) outputPolicy = "resize_to_target";
           const mode: ImageJobMode = params.mode === "generate" ? "generate" : "edit";
           const strings = (key: string) => Array.isArray(params[key]) ? params[key] as string[] : undefined;
+          const extra = (Array.isArray(params.references) ? params.references as Params[] : []).map((reference) => {
+            const found = doc.assets.find((item) => item.id === reference.asset_id);
+            if (found?.id === asset.id) throw new Error(`REFERENCE_IS_TARGET: ${found.id} is the image being edited; it is always sent first, so put what to keep from it in preserve.`);
+            if (!found) throw new Error(`REFERENCE_NOT_FOUND: ${String(reference.asset_id)} is not an image asset of this project; use asset ids from image_project_read.`);
+            if (typeof reference.role !== "string") throw new Error(`REFERENCE_ROLE_REQUIRED: give each reference a role: ${IMAGE_REFERENCE_ROLES.join(", ")}.`);
+            return { assetId: found.id, role: reference.role as ImageReferenceRole, source: path.join(root, found.file) };
+          });
+          if (extra.length > IMAGE_PROMPT_CONTEXT_LIMITS.references) throw new Error(`TOO_MANY_REFERENCES: at most ${IMAGE_PROMPT_CONTEXT_LIMITS.references} references besides the edited image.`);
+          if (new Set(extra.map((reference) => reference.assetId)).size !== extra.length) throw new Error("DUPLICATE_REFERENCE: give each reference asset once, with one role.");
           job = buildImageJob({ instruction: str(params, "instruction"), mode, preserve: strings("preserve"), exclude: strings("exclude"), exactText: strings("exact_text"),
-            quality: params.quality as ImageJobQuality | undefined },
+            quality: params.quality as ImageJobQuality | undefined, references: extra },
           { jobId: candidateId, profile, surface, width: request.width, height: request.height, targetAssetId: asset.id });
           // The original file re-imports to the asset's own render digest, which an edit must start from.
-          references = mode === "edit" ? [{ asset_id: asset.id, source: path.join(root, asset.file) }] : [];
+          references = mode === "edit" ? [{ asset_id: asset.id, source: path.join(root, asset.file) }, ...extra.map((reference) => ({ asset_id: reference.assetId, source: reference.source }))] : [];
         }
         const directory = await engine.workDirectory(ctx.cwd, id, "job");
         await fs.mkdir(directory);

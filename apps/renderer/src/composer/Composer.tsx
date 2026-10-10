@@ -1,5 +1,5 @@
 import type { ComposerWorkspaceFileRef, WorkspaceFileEntry } from "@pi67/domain";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAppStore } from "../app/app-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import {
@@ -49,7 +49,7 @@ import { prepareComposerReviewSubmission } from "../changes/change-review-contro
 import { clearAcceptedComposerDraft, submitComposerDraft } from "./composer-submission-controller.js";
 import { composerDraftActions } from "./composer-draft-actions.js";
 import { ActivePlanActionBar } from "../transcript/ActivePlanActionBar.js";
-export function Composer() {
+export function Composer({ context }: { context?: ReactNode } = {}) { // context: what a surface attaches to the next message
   const sessionId = useSessionProjectionStore(selectSessionId);
   const connected = useAppStore((state) => state.connected);
   const hostEpoch = useAppStore((state) => state.hostEpoch);
@@ -414,7 +414,7 @@ export function Composer() {
     submissionError={submissionError}
     submitting={submitting}
     textInput={textInput}
-    widgetItems={widgetItems}
+    widgetItems={widgetItems} context={context}
     onAddAttachments={(files) => void addAttachments(files)}
     onDroppedWorkspaceFile={insertDroppedWorkspaceFile}
     onFileSelect={selectWorkspaceFile}

@@ -1,4 +1,4 @@
-import type { ImageDocument, ImageEditOperation, ImageObjectPatch, ImageSceneObject as SceneObject } from "@pi67/domain";
+import type { ImageDocument, ImageEditOperation, ImageMark, ImageObjectPatch, ImageSceneObject as SceneObject } from "@pi67/domain";
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { boundsOf, clampInside, RESIZE_HANDLES, resizeRect, snapMove, type Guide, type Rect, type ResizeHandle } from "./image-canvas-geometry.js";
 import { ImageInlineTextEditor } from "./ImageInlineTextEditor.js";
@@ -20,9 +20,10 @@ const rectOf = ({ x, y, width, height }: SceneObject): Rect => ({ x, y, width, h
  * coordinates. Shift-click builds a selection; unlocked selected objects drag
  * together and the primary one resizes from eight handles, both snapping to the
  * canvas and to other objects (hold ⌘/Ctrl to place freely). Each gesture
- * commits once, when the pointer lifts. Rendering stays the engine's.
+ * commits once, when the pointer lifts. Rendering stays the engine's. In mark
+ * mode a layer above the boxes draws regions instead; marks always show.
  */
-export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelect, onEdit }: {
+export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelect, onEdit, marks = [], marking = false, onMark }: {
   document: ImageDocument | undefined;
   src: string | undefined;
   alt: string;
@@ -30,11 +31,15 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
   editable: boolean;
   onSelect: (objectId: string | undefined, options?: { extend?: boolean }) => void;
   onEdit: (summary: string, operations: ImageEditOperation[]) => void;
+  marks?: readonly ImageMark[];
+  marking?: boolean;
+  onMark?: (rect: Rect) => void;
 }) {
   const stage = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState<Fit>();
   const [gesture, setGesture] = useState<Gesture>();
   const [editingId, setEditingId] = useState<string>();
+  const [drawing, setDrawing] = useState<{ start: { x: number; y: number }; rect: Rect }>();
   const canvas = document?.canvas;
 
   useLayoutEffect(() => {
@@ -57,7 +62,7 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
   const primary = objects.find((object) => object.id === selectedIds.at(-1));
   const editingObject = editable ? objects.find((object) => object.id === editingId && object.kind === "text" && !object.locked) : undefined;
   const editing = editingObject?.kind === "text" ? editingObject : undefined;
-  const resizable = editable && !editing && selectedIds.length === 1 && primary && !primary.locked ? primary : undefined;
+  const resizable = editable && !marking && !editing && selectedIds.length === 1 && primary && !primary.locked ? primary : undefined;
 
   const commitMove = (ids: readonly string[], dx: number, dy: number) => {
     if (dx === 0 && dy === 0) return;
@@ -136,6 +141,28 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
     if (gesture?.kind === "move" && gesture.ids.includes(object.id) && !object.locked) return { ...rectOf(object), x: object.x + gesture.dx, y: object.y + gesture.dy };
     return rectOf(object);
   };
+  // Mark drawing works in canvas pixels, clamped to the canvas.
+  const canvasPoint = (event: PointerEvent<HTMLDivElement>) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    const clamp = (value: number, max: number) => Math.min(max, Math.max(0, value));
+    return { x: clamp((event.clientX - box.left) / fit!.scale, canvas!.width), y: clamp((event.clientY - box.top) / fit!.scale, canvas!.height) };
+  };
+  const drawDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || !fit || !canvas) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const start = canvasPoint(event);
+    setDrawing({ start, rect: { ...start, width: 0, height: 0 } });
+  };
+  const drawMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (!drawing) return;
+    const point = canvasPoint(event), { start } = drawing;
+    setDrawing({ start, rect: { x: Math.min(start.x, point.x), y: Math.min(start.y, point.y), width: Math.abs(point.x - start.x), height: Math.abs(point.y - start.y) } });
+  };
+  const drawUp = () => {
+    if (drawing) onMark?.(drawing.rect);
+    setDrawing(undefined);
+  };
+
   const place = (rect: Rect, scale: number) => ({ left: rect.x * scale, top: rect.y * scale, width: rect.width * scale, height: rect.height * scale });
 
   return (
@@ -180,6 +207,16 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
                 // Focus returns to the object the words belong to.
                 requestAnimationFrame(() => stage.current?.querySelector<HTMLButtonElement>(`[data-object-id="${editing.id}"]`)?.focus());
               }} />
+          ) : null}
+          {marks.map((mark) => (
+            <span key={mark.id} aria-hidden="true" className={styles.mark} data-empty={mark.instruction.trim() ? undefined : "true"} style={place(mark, fit.scale)}>
+              <span className={styles.markTag}>{mark.id}</span>
+            </span>
+          ))}
+          {drawing ? <span aria-hidden="true" className={styles.mark} style={place(drawing.rect, fit.scale)} /> : null}
+          {marking ? (
+            <div aria-hidden="true" className={styles.markLayer} data-testid="image-mark-layer"
+              onPointerCancel={() => setDrawing(undefined)} onPointerDown={drawDown} onPointerMove={drawMove} onPointerUp={drawUp} />
           ) : null}
           {gesture?.guides.map((guide) => (
             <span key={`${guide.axis}-${guide.at}`} aria-hidden="true" className={styles.guide} data-axis={guide.axis}

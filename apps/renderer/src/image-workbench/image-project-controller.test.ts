@@ -12,7 +12,7 @@ vi.mock("../connection/AgentConnectionController.js", () => ({
     subscribe: () => () => undefined,
     request: (type: string, payload: Record<string, unknown>) => {
       host.calls.push({ type, payload });
-      if (type === "image.project.read") return Promise.resolve({ projectId: "p", revision: host.revision, latestRevision: host.revision, sha256: "s", document: { title: "海报", canvas: { width: 100, height: 100, background: "#fff" }, objects: host.objectIds.map((id) => ({ id, kind: "rect", locked: false, visible: true, x: 0, y: 0, width: 10, height: 10, opacity: 1, color: "#000000", radius: 0 })) } });
+      if (type === "image.project.read") return Promise.resolve({ projectId: "p", revision: host.revision, latestRevision: host.revision, sha256: "s", document: { title: "海报", canvas: { width: 100, height: 100, background: "#fff" }, assets: [], objects: host.objectIds.map((id) => ({ id, kind: "rect", locked: false, visible: true, x: 0, y: 0, width: 10, height: 10, opacity: 1, color: "#000000", radius: 0 })) } });
       if (type === "image.project.render") return Promise.resolve({ projectId: "p", revision: host.revision, pngSha256: "a".repeat(64), width: 100, height: 100 });
       if (type === "image.candidate.list") return Promise.resolve({ projectId: "p", candidates: [] });
       if (type === "image.project.edit") {
@@ -104,6 +104,14 @@ describe("image project editing", () => {
 });
 
 describe("image object selection", () => {
+  it("keeps marks across a reload but drops references whose layer is gone or not an image", async () => {
+    const marks = [{ id: "m1", x: 0, y: 0, width: 10, height: 10, instruction: "换色" }];
+    useImageProject.setState({ marks, references: [{ objectId: "gone", role: "keep-style" }, { objectId: "t", role: "keep-subject" }] });
+    await loadImageProject("p");
+    expect(useImageProject.getState().references).toEqual([]);
+    expect(useImageProject.getState().marks).toBe(marks);
+  });
+
   it("extends with Shift, keeps the last as primary, and drops objects that left the document", async () => {
     selectImageObject("t");
     selectImageObject("u", { extend: true });

@@ -1,7 +1,7 @@
 import { imageCandidateActions, type ImageCandidateListStatus } from "@pi67/domain";
 import type { ImageCandidateSummary } from "@pi67/protocol";
-import { ArrowLeft, Check, Download, Redo2, Undo2, X } from "lucide-react";
-import { useEffect } from "react";
+import { ArrowLeft, Check, Download, Redo2, SquareDashedMousePointer, Undo2, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "react-aria-components";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import {
@@ -18,6 +18,9 @@ import {
   useImageProject
 } from "./image-project-controller.js";
 import { ImageCanvas } from "./ImageCanvas.js";
+import { ImageMarksBar } from "./ImageMarksBar.js";
+import { addImageMark } from "./image-project-marks.js";
+import type { Rect } from "./image-canvas-geometry.js";
 import { ImageSelectionBar } from "./ImageSelectionBar.js";
 import { ImageProjectConversationDock } from "./ImageProjectConversationDock.js";
 import { imagePreviewUrl } from "./image-workbench-controller.js";
@@ -45,11 +48,30 @@ export function ImageProjectPage({ projectId }: { projectId: string }) {
   const selectedIds = useImageProject((state) => state.selectedObjectIds);
   const canUndo = useImageProject((state) => state.back.length > 0 || (state.revision ?? 0) > 1);
   const canRedo = useImageProject((state) => state.forward.length > 0);
+  const marks = useImageProject((state) => state.marks);
+  const [marking, setMarking] = useState(false);
+  const [focusMark, setFocusMark] = useState<{ id: string }>();
+  const mark = (rect: Rect) => { const id = addImageMark(rect); if (id) setFocusMark({ id }); };
 
   useEffect(() => {
     void loadImageProject(projectId);
     return subscribeImageProjectChanges();
   }, [projectId]);
+  // A new project starts outside mark mode; its marks were reset with the project.
+  useEffect(() => setMarking(false), [projectId]);
+  // Previewing a candidate ends mark mode rather than hiding it until the preview closes.
+  useEffect(() => { if (inspecting) setMarking(false); }, [inspecting]);
+
+  // Escape leaves mark mode unless a field (a mark's instruction) has focus.
+  useEffect(() => {
+    if (!marking) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || (event.target instanceof HTMLElement && event.target.closest("input, textarea"))) return;
+      setMarking(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [marking]);
 
   // ⌘Z / ⇧⌘Z (Ctrl on Windows) publish `revert_to`, except while typing in a field.
   useEffect(() => {
@@ -72,6 +94,10 @@ export function ImageProjectPage({ projectId }: { projectId: string }) {
         <span className={styles.title}>{document?.title ?? projectId}</span>
         {document ? <span className={styles.meta}>{document.canvas.width}×{document.canvas.height} · 修订 {revision}</span> : null}
         <span className={styles.spacer} />
+        <Button aria-pressed={marking} className={`${styles.modeToggle} ${marking ? styles.modeToggleOn : ""}`} isDisabled={!document || Boolean(inspecting)}
+          onPress={() => setMarking((value) => !value)}>
+          <SquareDashedMousePointer aria-hidden="true" size={15} />标记{marks.length ? <span className={styles.modeCount}>{marks.length}</span> : null}
+        </Button>
         <Button aria-label="撤销" className={styles.iconAction!} isDisabled={!canUndo || busy} onPress={() => void undoImageEdit()}><Undo2 aria-hidden="true" size={15} /></Button>
         <Button aria-label="重做" className={styles.iconAction!} isDisabled={!canRedo || busy} onPress={() => void redoImageEdit()}><Redo2 aria-hidden="true" size={15} /></Button>
         <Button className="secondary-button" isDisabled={!document || busy} onPress={() => void exportImageProject()}>
@@ -83,18 +109,23 @@ export function ImageProjectPage({ projectId }: { projectId: string }) {
           <ImageCanvas
             alt={inspecting ? "候选预览" : `${document?.title ?? "图像"} 修订 ${revision}`}
             document={document}
-            editable={!inspecting && !busy}
+            editable={!inspecting && !busy && !marking}
+            marking={marking}
+            marks={marks}
             selectedIds={inspecting ? NO_SELECTION : selectedIds}
             src={shown && libraryId ? imagePreviewUrl(libraryId, projectId, shown.pngSha256) : undefined}
             onEdit={(summary, operations) => void editImageProjectWithNotice(summary, operations)}
+            onMark={mark}
             onSelect={selectImageObject}
           />
         )}
         {!error && !shown ? <p className={styles.stageStatus} role="status">正在渲染…</p> : null}
         {inspecting ? <span className={styles.inspectingBadge}>正在预览候选，项目尚未改变</span> : null}
       </div>
-      <ImageSelectionBar busy={busy} count={inspecting ? 0 : selectedIds.length}
-        object={inspecting || selectedIds.length !== 1 ? undefined : document?.objects.find((object) => object.id === selectedIds[0])} />
+      {marking ? <ImageMarksBar focus={focusMark} onAdd={mark} onDone={() => setMarking(false)} /> : (
+        <ImageSelectionBar busy={busy} count={inspecting ? 0 : selectedIds.length}
+          object={inspecting || selectedIds.length !== 1 ? undefined : document?.objects.find((object) => object.id === selectedIds[0])} />
+      )}
       <div className={styles.dock}>
         <section aria-label="候选" className={styles.candidates}>
           <h2>候选</h2>

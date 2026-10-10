@@ -316,3 +316,7 @@
   border-color: var(--border-strong);
   color: var(--text-primary);
 }
+
+.roleRow {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}

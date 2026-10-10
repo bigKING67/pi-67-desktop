@@ -1490,6 +1490,22 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   Text is edited in place on the canvas (double-click or Enter); the engine checks each
   draft without publishing, so words that would overflow or lack a glyph are named while
   typing and never saved.
+  `标记` mode draws regions on the canvas (or frames the selection from the keyboard,
+  clipped to the canvas), each with one instruction; objects stay put while it is on and
+  previewing a candidate ends it. Worded marks (up to 16) travel with the next message as
+  canvas-pixel rectangles and are dropped only once the Host accepts that message (even
+  if the page was left meanwhile), so a failed send keeps them and marks reworded
+  meanwhile stay. An image layer can be given one reference role (`保留主体`, `保留风格`,
+  `取构图`; up to two per message, the Provider's three inputs less the edited image) in
+  属性; a reference follows the layer, so the layer's current asset is sent, and it stays
+  until removed or the layer is gone. `已附带` above the Composer lists the marks,
+  selection and references a message carries; removing the marks only detaches them
+  (`附带 N 个标记` restores them), the others are cleared. The transcript shows only the
+  person's words. `image_generate`
+  sends up to two references after the edited image with their role in the job and
+  receipt, refuses unknown or repeated assets, the edited image itself, a missing role,
+  references in `generate` mode, or (with a full `job`) a reference without its source
+  before anything is written or requested.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

@@ -4,6 +4,7 @@ import {
   lazy,
   Suspense,
   type Dispatch,
+  type ReactNode,
   type RefObject,
   type SetStateAction
 } from "react";
@@ -80,6 +81,7 @@ interface ComposerSurfaceProps {
   submitting: boolean;
   textInput: RefObject<HTMLTextAreaElement | null>;
   widgetItems: ExtensionWidgetItem[];
+  context?: ReactNode;
   onAddAttachments: (files: Iterable<File>) => void;
   onDroppedWorkspaceFile: (reference: ComposerWorkspaceFileRef) => void;
   onFileSelect: (entry: WorkspaceFileEntry) => void;
@@ -102,6 +104,7 @@ export function ComposerSurface(props: ComposerSurfaceProps) {
   const disabled = props.submitting || props.stagingAttachments;
   return (
     <footer className={styles.region} data-testid="composer-region">
+      {props.context}
       <ExtensionWidgets items={props.widgetItems} placement="aboveEditor" />
       {props.activeSessionAuthority ? <ComposerQueuePanel /> : null}
       {props.slashPickerOpen ? (
