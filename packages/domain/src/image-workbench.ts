@@ -37,7 +37,15 @@ interface ImageObjectBase {
   /** Degrees clockwise about the box centre, −180…180 (P4, document schema v3). */
   rotation?: number;
   flip_x?: true; flip_y?: true;
+  /** How the object composites onto what is below it; absent means normal (P4, v3). */
+  blend?: ImageBlendMode;
+  /** A project raster read by luminance (white shows, black hides) over the box (P4, v3). */
+  mask?: ImageObjectMask;
 }
+export const IMAGE_BLEND_MODES = ["multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light",
+  "difference", "exclusion", "hue", "saturation", "color", "luminosity"] as const;
+export type ImageBlendMode = typeof IMAGE_BLEND_MODES[number];
+export interface ImageObjectMask { asset_id: string; invert?: true }
 export interface ImageRasterObject extends ImageObjectBase { kind: "image"; asset_id: string; fit: ImageFit }
 export interface ImageTextObject extends ImageObjectBase {
   kind: "text"; text: string; font_size: number; color: string; align: ImageTextAlign; line_height: number;
@@ -56,6 +64,8 @@ export interface ImageFontBinding { profile: string; family: string; file: strin
 export interface ImageUserFont { id: string; family: string; file: string; sha256: string; bytes: number; format: "ttf" | "otf" }
 /** At most this many user fonts per project. */
 export const IMAGE_USER_FONT_LIMIT = 8;
+/** Images (photo, generated layers, masks) one project may hold. */
+export const IMAGE_ASSET_LIMIT = 64;
 export interface ImageChange { author: ImageChangeAuthor; summary: string; operations: string[]; candidate?: { id: string; sha256: string } }
 export interface ImageDocument {
   schema: string; project_id: string; title: string; revision: number; parent_sha256: string | null;
@@ -67,10 +77,12 @@ export interface ImageDocument {
  * file needs a path, and paths reach the engine only through Main's dialogs or
  * the Agent's tools, never from renderer payloads.
  */
-type Optional = "font_id" | "rotation" | "flip_x" | "flip_y" | "gradient";
+type Optional = "font_id" | "rotation" | "flip_x" | "flip_y" | "gradient" | "blend" | "mask";
 type PatchFields = Partial<Omit<ImageRasterObject, "id" | "kind" | Optional> & Omit<ImageTextObject, "id" | "kind" | Optional> & Omit<ImageRectObject, "id" | "kind" | Optional>>
   & {
     /** Rect and ellipse: a gradient fill, or `null` for the solid colour. */ gradient?: ImageGradient | null;
+    /** `null` returns to normal blending. */ blend?: ImageBlendMode | null;
+    /** `null` removes the mask. */ mask?: ImageObjectMask | null;
     /** Text only: a bound user font, or `null` for the built-in font. */ font_id?: string | null;
     /** `null` or 0 removes the rotation. */ rotation?: number | null;
     /** `null` or false removes the flip. */ flip_x?: boolean | null; flip_y?: boolean | null;

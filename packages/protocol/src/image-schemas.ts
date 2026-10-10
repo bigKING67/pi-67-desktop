@@ -29,10 +29,18 @@ const CanvasSchema = strictObject({
   background: ColorSchema
 });
 const RotationSchema = Type.Number({ minimum: -180, maximum: 180 });
+// Spelled out so the static type is the literal union; the parity test in image-schemas.test.ts fails if it drifts from IMAGE_BLEND_MODES.
+const BlendSchema = Type.Union([
+  Type.Literal("multiply"), Type.Literal("screen"), Type.Literal("overlay"), Type.Literal("darken"), Type.Literal("lighten"),
+  Type.Literal("color-dodge"), Type.Literal("color-burn"), Type.Literal("hard-light"), Type.Literal("soft-light"), Type.Literal("difference"),
+  Type.Literal("exclusion"), Type.Literal("hue"), Type.Literal("saturation"), Type.Literal("color"), Type.Literal("luminosity")
+]);
+const MaskSchema = strictObject({ asset_id: IdSchema, invert: Type.Optional(Type.Literal(true)) });
 const common = {
   id: IdSchema, locked: Type.Boolean(), visible: Type.Boolean(),
   x: CoordinateSchema, y: CoordinateSchema, width: SizeSchema, height: SizeSchema, opacity: OpacitySchema,
-  rotation: Type.Optional(RotationSchema), flip_x: Type.Optional(Type.Literal(true)), flip_y: Type.Optional(Type.Literal(true))
+  rotation: Type.Optional(RotationSchema), flip_x: Type.Optional(Type.Literal(true)), flip_y: Type.Optional(Type.Literal(true)),
+  blend: Type.Optional(BlendSchema), mask: Type.Optional(MaskSchema)
 };
 const RasterObjectSchema = strictObject({ ...common, kind: Type.Literal("image"), asset_id: IdSchema, fit: FitSchema });
 const TextObjectSchema = strictObject({
@@ -95,7 +103,8 @@ const PatchSchema = Type.Object({
   font_id: Type.Optional(Type.Union([IdSchema, Type.Null()])),
   rotation: Type.Optional(Type.Union([RotationSchema, Type.Null()])),
   flip_x: Type.Optional(Type.Union([Type.Boolean(), Type.Null()])), flip_y: Type.Optional(Type.Union([Type.Boolean(), Type.Null()])),
-  gradient: Type.Optional(Type.Union([GradientSchema, Type.Null()]))
+  gradient: Type.Optional(Type.Union([GradientSchema, Type.Null()])),
+  blend: Type.Optional(Type.Union([BlendSchema, Type.Null()])), mask: Type.Optional(Type.Union([MaskSchema, Type.Null()]))
 }, { additionalProperties: false, minProperties: 1 });
 const EditOperationSchema = Type.Union([
   strictObject({ type: Type.Literal("update_object"), id: IdSchema, patch: PatchSchema }),
@@ -168,6 +177,8 @@ export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSch
   "image.candidate.accept": strictObject({ projectId: IdSchema, candidateId: IdSchema, baseRevision: RevisionSchema, summary: SummarySchema }),
   "image.candidate.discard": strictObject({ projectId: IdSchema, candidateId: IdSchema, summary: SummarySchema }),
   "image.project.conversation.set": strictObject({ projectId: IdSchema, conversation: ConversationSchema }),
+  "image.project.addAsset": strictObject({ projectId: IdSchema, baseRevision: RevisionSchema,
+    attachmentId: Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" }) }),
   "image.project.addFont": strictObject({ projectId: IdSchema, baseRevision: RevisionSchema,
     attachmentId: Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" }) }),
   "image.project.derive": strictObject({ projectId: IdSchema, revision: RevisionSchema,
@@ -192,6 +203,7 @@ export const ImageCommandResultSchemas: Record<keyof ImageCommandResults, TSchem
   "image.candidate.accept": RevisionResultSchema,
   "image.candidate.discard": strictObject({ projectId: IdSchema, candidateId: IdSchema, status: Type.Literal("discarded") }),
   "image.project.conversation.set": ProjectRefSchema,
+  "image.project.addAsset": strictObject({ projectId: IdSchema, revision: RevisionSchema, sha256: Sha256Schema, dryRun: Type.Boolean(), assetId: IdSchema }),
   "image.project.addFont": strictObject({ projectId: IdSchema, revision: RevisionSchema, sha256: Sha256Schema, dryRun: Type.Boolean(),
     fontId: IdSchema, family: Type.String({ minLength: 1, maxLength: 64 }) }),
   "image.project.derive": strictObject({ projectId: IdSchema, revision: RevisionSchema, results: Type.Array(Type.Union([

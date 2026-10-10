@@ -1,4 +1,4 @@
-import { IMAGE_USER_FONT_LIMIT } from "@pi67/domain";
+import { IMAGE_ASSET_LIMIT, IMAGE_BLEND_MODES, IMAGE_USER_FONT_LIMIT, type ImageBlendMode } from "@pi67/domain";
 import { fail } from "./content-store.js";
 import { fontManifest } from "./font.js";
 
@@ -19,7 +19,7 @@ export const USER_FONT_LIMIT = IMAGE_USER_FONT_LIMIT;
 // upgrade to the current schema on their next published revision.
 export const LEGACY_SCHEMAS: readonly string[] = ["creative-craft.local-image.v1"];
 export const LIMITS = Object.freeze({
-  pixels: 16_777_216, sourceBytes: 20_000_000, renderBytes: 16_777_216 * 5, objects: 100, assets: 64, operations: 100, revisions: 1000
+  pixels: 16_777_216, sourceBytes: 20_000_000, renderBytes: 16_777_216 * 5, objects: 100, assets: IMAGE_ASSET_LIMIT, operations: 100, revisions: 1000
 });
 
 export type JsonRecord = Record<string, unknown>;
@@ -36,9 +36,16 @@ export interface ObjectBase {
   rotation?: number;
   /** Mirrored across the box's vertical (`flip_x`) or horizontal (`flip_y`) centre line; absent means not. */
   flip_x?: true; flip_y?: true;
+  /** How the object composites onto what is below it; absent means normal. */
+  blend?: BlendMode;
+  /** A project raster read by luminance (white shows, black hides), stretched over the box and turned with it. */
+  mask?: ObjectMask;
 }
+const BLEND_MODES = IMAGE_BLEND_MODES;
+export type BlendMode = ImageBlendMode;
+export interface ObjectMask { asset_id: string; invert?: true }
 /** Optional fields every object kind may carry; a patch writes `null` (or 0 / false) to drop one. */
-const OPTIONAL_COMMON = ["rotation", "flip_x", "flip_y"] as const;
+const OPTIONAL_COMMON = ["rotation", "flip_x", "flip_y", "blend", "mask"] as const;
 /**
  * Every optional field each kind may carry, and which of them need the v3 schema.
  * One table drives validation, patching and the schema version, so a later P4 field
@@ -157,6 +164,12 @@ function validateObject(value: unknown, canvas: Canvas, assets: ReadonlySet<stri
   number(value.opacity, "opacity", 0, 1);
   if (value.rotation !== undefined) { number(value.rotation, "rotation", -180, 180); if (value.rotation === 0) fail("Write no rotation instead of 0"); }
   for (const key of ["flip_x", "flip_y"] as const) if (value[key] !== undefined && value[key] !== true) fail(`Invalid ${key}`);
+  if (value.blend !== undefined) oneOf(value.blend, BLEND_MODES, "Invalid blend mode");
+  if (value.mask !== undefined) {
+    record(value.mask, ["asset_id", "invert"], "mask");
+    if (typeof value.mask.asset_id !== "string" || !assets.has(value.mask.asset_id)) fail(`Missing mask asset for ${String(value.id)}`);
+    if (value.mask.invert !== undefined && value.mask.invert !== true) fail("Invalid mask invert");
+  }
   if (kind === "image") {
     if (typeof value.asset_id !== "string" || !assets.has(value.asset_id)) fail(`Missing asset for ${value.id}`);
     oneOf(value.fit, ["contain", "cover", "fill"] as const, "Invalid image fit");
@@ -218,7 +231,7 @@ export function validateDocument(value: unknown): ImageDocument {
   const needed = documentSchema(document);
   if (value.schema === SCHEMA_V2 && needed !== SCHEMA_V2) fail("A v2 document must bind or use a user font and nothing newer");
   if (value.schema === SCHEMA_V3 && needed !== SCHEMA_V3) fail("A v3 document must use an engine extension");
-  if (needed === SCHEMA_V3 && value.schema !== SCHEMA_V3) fail("Rotation, flips, ellipses and gradients need the v3 document schema");
+  if (needed === SCHEMA_V3 && value.schema !== SCHEMA_V3) fail("Rotation, flips, ellipses, gradients, blend modes and masks need the v3 document schema");
   return document;
 }
 

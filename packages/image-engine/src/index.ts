@@ -1,5 +1,5 @@
 export { SCHEMA, LEGACY_SCHEMAS, LIMITS, validateDocument, validateAsset, validateCanvas } from "./document.js";
-export type { Asset, Canvas, Change, ChangeAuthor, EllipseObject, FontBinding, Gradient, ImageDocument, ImageObject, ObjectBase, RectObject, SceneObject, TextObject } from "./document.js";
+export type { Asset, BlendMode, Canvas, Change, ChangeAuthor, EllipseObject, FontBinding, Gradient, ImageDocument, ImageObject, ObjectBase, ObjectMask, RectObject, SceneObject, TextObject } from "./document.js";
 export { fontManifest, fontDirectory, installedFont, checkGlyphs, checkTextWidths } from "./font.js";
 export { sha256, writeOnce, encodeJson } from "./content-store.js";
 export { regularPath, assertOutsideProject, readBytes, importRaster, saveAsset, readAsset } from "./raster.js";

@@ -30,6 +30,7 @@ function documentSummary(doc: ImageDocument, latestRevision: number): Record<str
     objects: doc.objects.map((object) => ({
       id: object.id, kind: object.kind, locked: object.locked, visible: object.visible, box: [object.x, object.y, object.width, object.height], opacity: object.opacity,
       ...(object.rotation ? { rotation: object.rotation } : {}), ...(object.flip_x ? { flip_x: true } : {}), ...(object.flip_y ? { flip_y: true } : {}),
+      ...(object.blend ? { blend: object.blend } : {}), ...(object.mask ? { mask: object.mask } : {}),
       ...(object.kind === "text" ? { text: object.text, font_size: object.font_size, color: object.color, align: object.align, line_height: object.line_height,
         ...(object.font_id ? { font_id: object.font_id } : {}) } : {}),
       ...(object.kind === "image" ? { asset_id: object.asset_id, fit: object.fit } : {}),

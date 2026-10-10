@@ -1545,6 +1545,13 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   angle) or 径向渐变 (start and end colour); a gradient of more stops, which only the Agent
   writes, is shown but not edited until the fill is chosen again. A line is a thin rotated
   rectangle. The Agent may add ellipses and set or drop `gradient`.
+  Any object takes a 混合 mode (正常 and 15 others: 正片叠底, 滤色, 叠加, 变暗, 变亮, 颜色减淡,
+  颜色加深, 强光, 柔光, 差值, 排除, 色相, 饱和度, 颜色, 明度) and a 蒙版: any project image read by
+  luminance (white shows, black hides), stretched over the box and turned and flipped with
+  it, with 反相. `添加蒙版图片…` stages a PNG/JPEG/WebP like a photo and binds it as `mask-N`.
+  Candidates' protected regions are unchanged (they compare the target layer's own raster).
+  A document without blend or masks renders exactly as before; with them, those objects
+  render as their own layers composited by resvg. The Agent may set `blend` and `mask`.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

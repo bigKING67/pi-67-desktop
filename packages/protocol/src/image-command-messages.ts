@@ -28,6 +28,8 @@ export interface ImageCommandPayloads {
   "image.project.conversation.set": { projectId: string; conversation: ImageProjectConversation };
   /** Binds a font file the person chose (staged by Main) to the project; never sent by the Agent. */
   "image.project.addFont": { projectId: string; baseRevision: number; attachmentId: string };
+  /** Adds an image the person chose (staged by Main) to the project's assets, e.g. as a mask; never sent by the Agent. */
+  "image.project.addAsset": { projectId: string; baseRevision: number; attachmentId: string };
   /** Derived projects for size presets, each re-laid out from one revision of the source. */
   "image.project.derive": { projectId: string; revision: number; presets: ImageSizePreset[] };
 }
@@ -88,6 +90,7 @@ export interface ImageCommandResults {
   "image.project.conversation.set": { projectId: string };
   "image.project.derive": { projectId: string; revision: number; results: ImageDeriveOutcome[] };
   "image.project.addFont": ImageRevisionResult & { fontId: string; family: string };
+  "image.project.addAsset": ImageRevisionResult & { assetId: string };
 }
 
 export interface ImageEventPayloads {

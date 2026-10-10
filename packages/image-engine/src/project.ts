@@ -59,7 +59,7 @@ async function checkTextLayout(root: string, doc: ImageDocument, font: Buffer, f
   const objects = textObjects(doc.objects).filter((object) => object.visible);
   if (!objects.length) return;
   // Measure with the export engine without reading or writing temporary assets.
-  await compose({ root, font, fonts, document: { ...doc, assets: [], objects } });
+  await compose({ root, font, fonts, layoutOnly: true, document: { ...doc, assets: [], objects } });
 }
 
 /**
@@ -92,7 +92,7 @@ async function importUserFont(input: unknown, doc: ImageDocument): Promise<{ fon
 async function probeUserFont(root: string, doc: ImageDocument, font: Buffer, imported: { font: UserFont; bytes: Buffer }): Promise<void> {
   const sample = userFontSample(imported.bytes) ?? fail("Unsupported font file: it has no letters, digits or common CJK characters");
   try {
-    await compose({ root, font, fonts: new Map([[imported.font.id, imported.bytes]]), document: { ...doc, canvas: { width: 1024, height: 256, background: "#ffffff" }, assets: [],
+    await compose({ root, font, fonts: new Map([[imported.font.id, imported.bytes]]), layoutOnly: true, document: { ...doc, canvas: { width: 1024, height: 256, background: "#ffffff" }, assets: [],
       objects: [{ id: "probe", kind: "text", locked: false, visible: true, x: 0, y: 0, width: 1024, height: 256, opacity: 1, text: sample, font_size: 48, color: "#000000", align: "left", line_height: 1.2, font_id: imported.font.id }] } });
   } catch {
     fail("Unsupported font file: the renderer could not load it");

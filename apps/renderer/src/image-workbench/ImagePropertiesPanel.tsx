@@ -1,12 +1,12 @@
-import { IMAGE_PROMPT_CONTEXT_LIMITS, IMAGE_REFERENCE_ROLE_LABELS, IMAGE_REFERENCE_ROLES, IMAGE_USER_FONT_LIMIT, type ImageCanvas, type ImageEllipseObject, type ImageGradient, type ImageObjectPatch, type ImageRectObject, type ImageSceneObject, type ImageTextObject, type ImageUserFont } from "@pi67/domain";
+import { IMAGE_ASSET_LIMIT, IMAGE_BLEND_MODES, IMAGE_PROMPT_CONTEXT_LIMITS, IMAGE_REFERENCE_ROLE_LABELS, IMAGE_REFERENCE_ROLES, IMAGE_USER_FONT_LIMIT, type ImageBlendMode, type ImageCanvas, type ImageDocument, type ImageEllipseObject, type ImageGradient, type ImageObjectPatch, type ImageRectObject, type ImageSceneObject, type ImageTextObject, type ImageUserFont } from "@pi67/domain";
 import { Eye, EyeOff, Lock, LockOpen, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button, Input, Label, TextField } from "react-aria-components";
 import { ImageAlignToolbar } from "./ImageAlignToolbar.js";
 import { IMAGE_OBJECT_KIND_LABELS } from "./image-object-kinds.js";
 import { SettingsSelect } from "../settings/SettingsPrimitives.js";
+import { addImageFont, addImageMask } from "./image-project-additions.js";
 import {
-  addImageFont,
   editImageProject,
   type ImageEditOutcome,
   toggleImageObjectLock,
@@ -105,6 +105,7 @@ export function ImagePropertiesPanel() {
           </Button>
         ))}
       </div>
+      <BlendAndMask busy={busy} document={document} object={object} onResult={report} />
       {object.kind === "text" ? <FontChoice busy={busy} fonts={document.fonts ?? []} object={object} onResult={report} /> : null}
       {object.kind === "text" ? (
         <div className={styles.alignRow} role="group" aria-label="文字对齐">
@@ -120,6 +121,54 @@ export function ImagePropertiesPanel() {
       {object.kind === "rect" || object.kind === "ellipse" ? <FillChoice busy={busy} object={object} onResult={report} /> : null}
       {status}
       {object.locked ? null : <ImageAlignToolbar busy={busy} canvas={document.canvas} objects={selected} />}
+    </div>
+  );
+}
+
+const NORMAL = "normal";
+const BLEND_LABELS: Readonly<Record<ImageBlendMode, string>> = {
+  multiply: "正片叠底", screen: "滤色", overlay: "叠加", darken: "变暗", lighten: "变亮", "color-dodge": "颜色减淡", "color-burn": "颜色加深",
+  "hard-light": "强光", "soft-light": "柔光", difference: "差值", exclusion: "排除", hue: "色相", saturation: "饱和度", color: "颜色", luminosity: "明度"
+};
+// Never a valid asset id, so no project image can be mistaken for "no mask".
+const NO_MASK = "";
+
+/**
+ * 混合 and 蒙版 for any object: how it composites onto what is below, and a project
+ * image read by luminance (white shows, black hides), optionally inverted. A new mask
+ * image is added the way a font is, through Main's staging.
+ */
+function BlendAndMask({ object, document, busy, onResult }: { object: ImageSceneObject; document: ImageDocument; busy: boolean; onResult: (result: ImageEditOutcome) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const disabled = busy || object.locked;
+  const patch = (summary: string, value: ImageObjectPatch) => void editImageProject(summary, [{ type: "update_object", id: object.id, patch: value }]).then(onResult);
+  // An image layer's name says more than its asset id, unless that name is itself another asset's id.
+  const assetIds = new Set(document.assets.map((asset) => asset.id));
+  const assetLabel = (assetId: string) => {
+    const layer = document.objects.find((item) => item.kind === "image" && item.asset_id === assetId)?.id;
+    return layer && !assetIds.has(layer) ? layer : assetId;
+  };
+  const full = document.assets.length >= IMAGE_ASSET_LIMIT;
+  return (
+    <div className={styles.fontRow}>
+      <p className={styles.sectionLabel}>混合</p>
+      <SettingsSelect className={styles.fontSelect ?? ""} isDisabled={disabled} label="混合" value={object.blend ?? NORMAL}
+        options={[{ id: NORMAL, label: "正常" }, ...IMAGE_BLEND_MODES.map((mode) => ({ id: mode, label: BLEND_LABELS[mode] }))]}
+        onChange={(value) => { if (value !== (object.blend ?? NORMAL)) patch("更换混合模式", { blend: value === NORMAL ? null : value as ImageBlendMode }); }} />
+      <p className={styles.sectionLabel}>蒙版</p>
+      <SettingsSelect className={styles.fontSelect ?? ""} isDisabled={disabled} label="蒙版" value={object.mask?.asset_id ?? NO_MASK}
+        options={[{ id: NO_MASK, label: "无" }, ...document.assets.map((asset) => ({ id: asset.id, label: assetLabel(asset.id), detail: `${asset.width}×${asset.height}` }))]}
+        onChange={(value) => { if (value !== (object.mask?.asset_id ?? NO_MASK)) patch(value === NO_MASK ? "移除蒙版" : "使用蒙版", { mask: value === NO_MASK ? null : { asset_id: value } }); }} />
+      <span className={styles.candidateActions}>
+        {object.mask ? (
+          <Button aria-pressed={object.mask.invert === true} className={`${styles.segment} ${object.mask.invert ? styles.segmentSelected : ""}`} isDisabled={disabled}
+            onPress={() => patch("反相蒙版", { mask: object.mask?.invert ? { asset_id: object.mask.asset_id } : { asset_id: object.mask!.asset_id, invert: true } })}>反相</Button>
+        ) : null}
+        <Button className={styles.historyAction!} isDisabled={disabled || full} onPress={() => input.current?.click()}><Plus aria-hidden="true" size={12} />添加蒙版图片…</Button>
+      </span>
+      <input ref={input} accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" className={styles.fileInput} tabIndex={-1} type="file"
+        onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void addImageMask(file, object.id); }} />
+      <p className={styles.empty}>蒙版按亮度生效：白色显示、黑色隐藏，随图层的框、旋转和翻转一起变。{full ? `项目已有 ${IMAGE_ASSET_LIMIT} 张图片，不能再添加。` : ""}</p>
     </div>
   );
 }

@@ -38,7 +38,8 @@ export function relayoutObjects(objects: readonly SceneObject[], from: Canvas, c
   const sx = canvas.width / from.width, sy = canvas.height / from.height, s = Math.min(sx, sy);
   const turns = Math.sign(from.width - from.height) * Math.sign(canvas.width - canvas.height) < 0;
   return objects.map((object) => {
-    if (object.kind !== "text" && object.width >= from.width * BAND_SHARE) {
+    // A masked object scales as one piece: stretching a band would slide its mask off the pixels it shapes.
+    if (object.kind !== "text" && !object.mask && object.width >= from.width * BAND_SHARE) {
       const x = Math.round(object.x * sx), y = Math.round(object.y * sy);
       const width = Math.min(canvas.width - x, Math.max(1, Math.round(object.width * sx))), height = Math.min(canvas.height - y, Math.max(1, Math.round(object.height * sy)));
       if (object.kind === "image") return { ...object, x, y, width, height, fit: turns ? "contain" : "cover" };
@@ -89,7 +90,7 @@ export async function deriveProject(sourceRoot: string, target: string, input: u
   const shrunk = new Set<string>();
   for (;;) {
     try {
-      await compose({ root, font, fonts, document: { ...document, assets: [], objects: textObjects(document.objects).filter((object) => object.visible) } });
+      await compose({ root, font, fonts, layoutOnly: true, document: { ...document, assets: [], objects: textObjects(document.objects).filter((object) => object.visible) } });
       break;
     } catch (error) {
       const overflow = /^Text (?:overflow|box narrower than glyph): (.+)$/u.exec(error instanceof Error ? error.message : "");

@@ -299,6 +299,11 @@ Application-level surfaces use a separate wide-window shell:
   `填充` section: a three-part segmented control (纯色 / 线性渐变 / 径向渐变), then 起点颜色 and
   终点颜色 fields and, for linear, `角度 °` in the two-column field grid; a gradient of more
   than two stops shows one tertiary line instead of fields.
+- Blend and mask (P4, 2026-10-10): 属性 for any object adds `混合` (the shared Settings
+  select, full width: 正常 then the 15 modes by their Photoshop names) and `蒙版` (the same
+  select: 无, then every project image by the layer showing it or its asset id, size as
+  detail), a `反相` segment shown while a mask is set and a `添加蒙版图片…` text action with a
+  plus glyph, then one tertiary line explaining luminance masks.
 - Text fonts (P3, 2026-10-10): 属性 for text adds a `字体` section — the shared Settings
   select at full panel width (`Noto Sans CJK SC · 内置`, then each added font's family with
   `TTF`/`OTF` as detail), a `添加字体…` text action with a plus glyph (disabled at 8 fonts or

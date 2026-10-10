@@ -1,4 +1,5 @@
 import { Type } from "typebox";
+import { IMAGE_BLEND_MODES } from "@pi67/domain";
 import { IMAGE_ID_PATTERN } from "./image-workbench-job.js";
 
 // The operations `image_project_edit` accepts, mirroring the engine's exact field
@@ -17,8 +18,10 @@ const gradient = Type.Union([
 ], { description: "Replaces the solid color of a rect or ellipse." });
 const box = { x: int(0), y: int(0), width: int(1), height: int(1) };
 const rotation = Type.Number({ minimum: -180, maximum: 180, description: "Degrees clockwise about the box centre; the unrotated box must stay on the canvas." });
+const blend = Type.Union(IMAGE_BLEND_MODES.map((mode) => Type.Literal(mode)), { description: "How the object composites onto what is below it; omit for normal." });
+const mask = Type.Object({ asset_id: id("A project raster asset: white shows the object, black hides it."), invert: Type.Optional(Type.Literal(true)) }, { additionalProperties: false });
 const common = { id: id("New object id."), locked: Type.Boolean(), visible: Type.Boolean(), ...box, opacity: Type.Number({ minimum: 0, maximum: 1 }),
-  rotation: Type.Optional(rotation), flip_x: Type.Optional(Type.Literal(true)), flip_y: Type.Optional(Type.Literal(true)) };
+  rotation: Type.Optional(rotation), flip_x: Type.Optional(Type.Literal(true)), flip_y: Type.Optional(Type.Literal(true)), blend: Type.Optional(blend), mask: Type.Optional(mask) };
 const text = { text: Type.String({ maxLength: 2000 }), font_size: Type.Integer({ minimum: 8, maximum: 500 }), color, align, line_height: Type.Number({ minimum: 1, maximum: 2 }) };
 
 // Fonts are added by the person only (add_font is not an Agent operation); text may use a bound one.
@@ -27,6 +30,8 @@ const patch = Type.Partial(Type.Object({
   ...box, opacity: common.opacity, visible: Type.Boolean(), locked: Type.Boolean(), ...text, font_id: fontId,
   rotation: Type.Union([rotation, Type.Null()], { description: "Degrees clockwise; null or 0 removes it." }),
   gradient: Type.Union([gradient, Type.Null()], { description: "Rect or ellipse: a gradient fill; null returns to the solid color." }),
+  blend: Type.Union([blend, Type.Null()], { description: "null returns to normal blending." }),
+  mask: Type.Union([mask, Type.Null()], { description: "A luminance mask over the box (add the image first with add_asset); null removes it." }),
   flip_x: Type.Union([Type.Boolean(), Type.Null()], { description: "Mirror left-right; false or null removes it." }),
   flip_y: Type.Union([Type.Boolean(), Type.Null()], { description: "Mirror top-bottom; false or null removes it." }),
   radius: int(0), fit: Type.Union([Type.Literal("contain"), Type.Literal("cover"), Type.Literal("fill")])

@@ -29,6 +29,9 @@ describe("derive presets", () => {
     expect(photo).toMatchObject({ x: 0, width: 1920, fit: "contain", y: 207, height: 873 });
     expect(relayoutObjects(objects, from, presetCanvas(from, "4x5"))[0]).toMatchObject({ fit: "cover" });
     expect(relayoutObjects(objects, from, presetCanvas(from, "1x1"))[0]).toMatchObject({ fit: "cover" });
+    // A masked band scales as one piece, keeping its proportions and fit, so the mask stays on its pixels.
+    const [masked] = relayoutObjects([{ ...objects[0]!, mask: { asset_id: "m" } } as SceneObject], from, to) as [ImageObject];
+    expect(masked.fit).toBe("contain"); expect(masked.width / masked.height).toBeCloseTo(1080 / 1350, 2);
     const s = 1080 / 1670;
     expect(title).toMatchObject({ font_size: Math.round(64 * s), width: Math.round(600 * s), height: Math.round(90 * s) });
     // Its centre moves with the canvas: x by 1920/1080, y by 1080/1670.

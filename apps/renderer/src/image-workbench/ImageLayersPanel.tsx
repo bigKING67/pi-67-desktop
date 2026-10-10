@@ -1,10 +1,9 @@
 import type { ImageSceneObject } from "@pi67/domain";
 import { ArrowDown, ArrowUp, Circle, Eye, EyeOff, Image as ImageIcon, Lock, LockOpen, Square, Type } from "lucide-react";
 import { Button } from "react-aria-components";
+import { addImageObject, type NewObjectKind } from "./image-project-additions.js";
 import {
-  addImageObject,
   editImageProjectWithNotice,
-  type NewObjectKind,
   type ImageProjectState,
   selectImageObject,
   toggleImageObjectLock,

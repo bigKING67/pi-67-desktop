@@ -41,7 +41,7 @@ with shared samples first, then protocol, then UI (product model §8).
 - [x] 3. Rotation and flip: engine, canvas handles (rotate grip, Shift for 15° steps),
   属性 fields, snapping on the rotated bounds, derive/relayout behaviour.
 - [x] 4. Shapes and gradients: ellipse and line, gradient fills in 属性.
-- [ ] 5. Blend modes and opacity masks, including how candidates' protected regions
+- [x] 5. Blend modes and opacity masks, including how candidates' protected regions
   interact with masked layers.
 - [ ] 6. Adjustments on image layers (non-destructive, rendered per layer).
 - [ ] 7. Layer groups: 图层 tree, move/lock/hide a group, selection and alignment.
@@ -71,6 +71,31 @@ bitmap-masked layer over a base composites correctly and text stays paths. Assem
 namespace each layer's ids — satori reuses the same ids in every render (7 ids, 3 distinct in
 the probe), which would cross-wire gradients, clips and masks. Objects without blend or mask
 can share one satori pass, so the common case keeps today's cost.
+
+## Checkpoint 5 plan (blend modes and masks; proposed 2026-10-10)
+
+- Schema (v3): every object may carry `blend` (multiply, screen, overlay, darken, lighten,
+  color-dodge, color-burn, hard-light, soft-light, difference, exclusion, hue, saturation,
+  color, luminosity; absent = normal) and `mask: { asset_id, invert?: true }`, a project
+  raster read by luminance (white shows, black hides), stretched over the object's box and
+  turned and flipped with it.
+- Renderer: when no object uses either, compose stays one satori pass and today's output is
+  byte-identical. Otherwise objects are split into runs in paint order — consecutive plain
+  objects share one satori layer, each blended or masked object is its own — every layer is
+  rendered transparent at canvas size, its ids are namespaced (`l3-…` for `id`, `url(#…)`,
+  `href="#…"`), and one SVG is assembled over the canvas background with
+  `<g style="mix-blend-mode:…" mask="url(#…)">`. resvg composites it (verified in the spike).
+  Text measurement merges per layer. An inverted mask is pre-negated with Sharp.
+- Candidates and protection: unchanged. Protection compares the target layer's own raster
+  byte for byte; a mask or blend only changes how that layer lands on the canvas.
+- People add a mask image the way they add a font: 属性 `蒙版` → `添加蒙版图片…` stages a
+  PNG/JPEG/WebP through Main and a new Host command `image.project.addAsset` binds it (the
+  renderer still never sends a path). The same picker can reuse any project image.
+  `混合` is a select in 属性 for every object. The Agent gets `blend` and `mask` in its schema
+  (it already adds assets with `add_asset`).
+- Evidence: pixel tests per blend family against resvg's own results, mask with invert and
+  rotation, a byte-identical render for documents without either, the id-namespacing case
+  (two layers that each define a gradient), e2e and packaged screenshots.
 
 ## Rollback
 
@@ -120,4 +145,22 @@ page and earlier releases still open projects that do not use it.
   protocol and the Agent schema; one `OPTIONAL_FIELDS` table (with v3 fields and kinds) drives
   validation, patching and the schema version, guarded against prototype names; one kind
   label map, so the canvas no longer calls rectangles and ellipses 形状.
+- 2026-10-10: checkpoint 5 done as planned. Engine: `blend` (15 modes, list in domain) and
+  `mask` (asset, optional invert) on every object, v3; compose keeps one satori pass unless a
+  visible object blends or is masked, then renders runs as transparent layers, prefixes each
+  layer's ids, and assembles one SVG with `mix-blend-mode` groups and luminance `<mask>`s
+  (turned and flipped with the object; inverted with Sharp); layout-only calls skip assembly.
+  Host `image.project.addAsset` binds a staged image as `mask-N`. 属性: 混合 and 蒙版 with 反相
+  and 添加蒙版图片…; adding a font and a mask share one staged-file flow. Tests: multiply and
+  screen pixels, mask / invert / flip, two layers each defining a gradient (id collision), a
+  plain document still one pass; Host, protocol (blend literals spelled out so the parity type
+  test holds), Agent, renderer and e2e.
 
+- 2026-10-10: `/code-review high` on checkpoint 5, all fixed: inverting a mask with transparent
+  areas kept them hidden (the image is laid on black before negating; pixel test); a band
+  image's mask slid off when derive changed its fit (masked objects scale as one piece); mask
+  images are read and negated once per render, not per object; add failures read as product
+  words (64-image limit, conflict, size) and 添加蒙版图片… is disabled at the limit
+  (`IMAGE_ASSET_LIMIT` in domain); "no mask" is an empty value no asset id can take; mask
+  labels fall back to the asset id when a layer name would repeat another; one Host helper
+  writes staged bytes into the import work folder for photos, images and fonts.

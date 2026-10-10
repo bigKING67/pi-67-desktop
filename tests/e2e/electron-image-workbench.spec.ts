@@ -133,7 +133,7 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     await tab("图层");
     await inspector.getByRole("button", { name: "选择图层 春日上新 SALE" }).click();
     await tab("属性");
-    await inspector.locator("input[type=file]").setInputFiles(fontFixture);
+    await inspector.locator("input[type=file][accept*='.ttf']").setInputFiles(fontFixture);
     await expectRevision(page, 9);
     await expect(inspector.getByRole("button", { name: "字体" }).first()).toContainText("KaTeX_SansSerif");
 
@@ -146,6 +146,13 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     await inspector.getByRole("group", { name: "填充" }).getByRole("button", { name: "线性渐变" }).click();
     await expectRevision(page, 11);
     await expect(inspector.getByLabel("角度 °")).toHaveValue("90");
+    // P4: blend the ellipse with 正片叠底 and mask it with a newly added image.
+    await inspector.getByRole("button", { name: "混合" }).first().click();
+    await page.getByRole("option", { name: "正片叠底" }).click();
+    await expectRevision(page, 12);
+    await inspector.locator("input[type=file][accept*='.png']").setInputFiles(photo);
+    await expectRevision(page, 14);
+    await expect(inspector.getByRole("button", { name: "蒙版" }).first()).toContainText("mask-1");
 
     // F. A derived 4:5 size and one export set with a receipt.
     await tab("导出");

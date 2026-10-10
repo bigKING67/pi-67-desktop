@@ -31,6 +31,10 @@ vi.mock("../connection/AgentConnectionController.js", () => ({
       if (type === "image.candidate.accept") { host.revision += 1; return Promise.resolve({ projectId: "p", revision: host.revision, sha256: "s" }); }
       if (type === "image.candidate.discard") return Promise.resolve({ projectId: "p", candidateId: payload.candidateId, status: "discarded" });
       if (type === "image.project.history") return Promise.resolve({ projectId: "p", revisions: [] });
+      if (type === "image.project.addAsset") {
+        if (payload.attachmentId === "full") return Promise.reject(new ProtocolRequestError({ code: "INVALID_PAYLOAD", message: "Invalid assets list", recoverable: true }));
+        host.revision += 1; return Promise.resolve({ projectId: "p", revision: host.revision, sha256: "s", dryRun: false, assetId: "mask-1" });
+      }
       if (type === "image.project.addFont") {
         if (payload.attachmentId === "bad") return Promise.reject(new ProtocolRequestError({ code: "INVALID_PAYLOAD", message: "Unsupported font file: not TrueType or OpenType", recoverable: true }));
         host.revision += 1;
@@ -49,8 +53,6 @@ import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { useImageWorkbench } from "./image-workbench-store.js";
 import {
   acceptCandidate,
-  addImageFont,
-  addImageObject,
   checkImageEdit,
   deriveImageSizes,
   derivedSizes,
@@ -66,6 +68,7 @@ import {
   undoImageEdit,
   useImageProject
 } from "./image-project-controller.js";
+import { addImageFont, addImageMask, addImageObject } from "./image-project-additions.js";
 
 const edits = () => host.calls.filter((call) => call.type === "image.project.edit").map((call) => call.payload);
 
@@ -201,6 +204,26 @@ describe("image object selection", () => {
     host.calls = [];
     await exportImageSizes();
     expect(host.calls.filter((call) => call.type === "image.project.render").map((call) => call.payload.projectId)).toEqual(["p"]);
+    vi.unstubAllGlobals();
+  });
+
+  it("adds a staged image as a mask asset and masks the layer with it as a second revision", async () => {
+    const released: string[][] = [];
+    vi.stubGlobal("window", { pi67: { system: {
+      stagePromptAttachments: () => Promise.resolve([{ id: "img", kind: "image" }]),
+      releasePromptAttachments: (ids: string[]) => { released.push(ids); return Promise.resolve(); }
+    } } });
+    host.calls = [];
+    expect(await addImageMask(new File([new Uint8Array(4)], "shape.png"), "t")).toBe(true);
+    expect(host.calls.find((call) => call.type === "image.project.addAsset")?.payload).toMatchObject({ projectId: "p", baseRevision: 1, attachmentId: "img" });
+    expect(edits().at(-1)).toMatchObject({ baseRevision: 2, summary: "使用蒙版", operations: [{ type: "update_object", id: "t", patch: { mask: { asset_id: "mask-1" } } }] });
+    expect(await addImageMask(new File([new Uint8Array(4)], "shape.gif"), "t")).toBe(false);
+    expect(notices.at(-1)).toMatchObject({ title: "没能添加蒙版图片", message: "请选择 PNG、JPEG 或 WebP 图片。" });
+    expect(released).toEqual([["img"]]);
+    // A full project reads as product words, not the engine's.
+    vi.stubGlobal("window", { pi67: { system: { stagePromptAttachments: () => Promise.resolve([{ id: "full", kind: "image" }]), releasePromptAttachments: () => Promise.resolve() } } });
+    expect(await addImageMask(new File([new Uint8Array(4)], "shape.png"), "t")).toBe(false);
+    expect(notices.at(-1)).toMatchObject({ title: "没能添加蒙版图片", message: "一个项目最多有 64 张图片。" });
     vi.unstubAllGlobals();
   });
 

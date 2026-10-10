@@ -85,6 +85,8 @@ export class ImageEngineHost {
       }
       case "image.project.createFromPhoto":
         return this.createFromPhoto(engine, workspaceId, cwd, (command as Command<"image.project.createFromPhoto">).payload);
+      case "image.project.addAsset":
+        return this.addAsset(engine, workspaceId, cwd, (command as Command<"image.project.addAsset">).payload);
       case "image.project.addFont":
         return this.addFont(engine, workspaceId, cwd, (command as Command<"image.project.addFont">).payload);
       case "image.project.derive":
@@ -148,28 +150,37 @@ export class ImageEngineHost {
     }
   }
 
-  // The photo arrives as a staged attachment (never a renderer path) and is copied into a work
-  // folder outside the project; the engine imports it and the work folder is removed.
+  // The photo arrives as a staged attachment (never a renderer path); see `withStagedSource`.
   private async createFromPhoto(engine: ImageEngine, workspaceId: string, cwd: string,
     { projectId, attachmentId, headline, title }: CommandPayloads["image.project.createFromPhoto"]): Promise<CommandResults["image.project.createFromPhoto"]> {
     if (!this.dependencies.readStagedImage) throw new HostCommandError("UNSUPPORTED", "此设备上不能导入图片附件。", false);
     const staged = await this.dependencies.readStagedImage(attachmentId);
     const extension = PHOTO_EXTENSIONS[staged.mimeType];
     if (!extension) throw new HostCommandError("INVALID_PAYLOAD", "只支持 PNG、JPEG 或 WebP 照片。", false);
-    return this.queue.serial(key(workspaceId, projectId), async () => {
-      const root = engine.projectRoot(cwd, projectId), work = await engine.workDirectory(cwd, projectId, "import");
-      await fs.mkdir(work);
-      try {
-        const source = path.join(work, `photo.${extension}`);
-        await fs.writeFile(source, staged.bytes, { flag: "wx" });
-        await engine.ensureProjectParent(root);
-        const created = await engine.createPhotoProject(root, { project_id: projectId, source, headline, ...(title ? { title } : {}) });
-        this.announce(workspaceId, event("image.project.changed", { projectId, revision: created.document.revision, sha256: created.sha256, author: "human" }));
-        return { projectId, revision: created.document.revision, sha256: created.sha256, dryRun: false };
-      } finally {
-        await fs.rm(work, { recursive: true, force: true });
-      }
-    });
+    return this.queue.serial(key(workspaceId, projectId), () => withStagedSource(engine, cwd, projectId, `photo.${extension}`, staged.bytes, async (root, source) => {
+      await engine.ensureProjectParent(root);
+      const created = await engine.createPhotoProject(root, { project_id: projectId, source, headline, ...(title ? { title } : {}) });
+      this.announce(workspaceId, event("image.project.changed", { projectId, revision: created.document.revision, sha256: created.sha256, author: "human" }));
+      return { projectId, revision: created.document.revision, sha256: created.sha256, dryRun: false };
+    }));
+  }
+
+  // An image the person chose in the image page (a mask so far): staged by Main as an
+  // image attachment, copied into a work folder and imported as `mask-N`.
+  private async addAsset(engine: ImageEngine, workspaceId: string, cwd: string,
+    { projectId, baseRevision, attachmentId }: CommandPayloads["image.project.addAsset"]): Promise<CommandResults["image.project.addAsset"]> {
+    if (!this.dependencies.readStagedImage) throw new HostCommandError("UNSUPPORTED", "此设备上不能导入图片附件。", false);
+    const staged = await this.dependencies.readStagedImage(attachmentId);
+    const extension = PHOTO_EXTENSIONS[staged.mimeType];
+    if (!extension) throw new HostCommandError("INVALID_PAYLOAD", "只支持 PNG、JPEG 或 WebP 图片。", false);
+    return this.queue.serial(key(workspaceId, projectId), () => withStagedSource(engine, cwd, projectId, `image.${extension}`, staged.bytes, async (root, source) => {
+      const taken = new Set((await engine.readProject(root)).document.assets.map((asset) => asset.id));
+      let assetId = "mask-1";
+      for (let index = 2; taken.has(assetId); index += 1) assetId = `mask-${index}`;
+      const result = await engine.editBatch(root, { base_revision: baseRevision, author: "human", summary: "添加蒙版图片", operations: [{ type: "add_asset", asset: { id: assetId, source } }] });
+      this.announce(workspaceId, event("image.project.changed", { projectId, revision: result.document.revision, sha256: result.sha256, author: "human" }));
+      return { projectId, revision: result.document.revision, sha256: result.sha256, dryRun: false, assetId };
+    }));
   }
 
   // A font the person chose in the image page (never the Agent): staged by Main,
@@ -181,21 +192,13 @@ export class ImageEngineHost {
     const staged = await this.dependencies.readStagedFile(attachmentId);
     const extension = /\.(ttf|otf)$/iu.exec(staged.name)?.[1]?.toLowerCase();
     if (!extension) throw new HostCommandError("INVALID_PAYLOAD", "只支持 TTF 或 OTF 字体文件。", false);
-    return this.queue.serial(key(workspaceId, projectId), async () => {
-      const root = engine.projectRoot(cwd, projectId), work = await engine.workDirectory(cwd, projectId, "import");
-      await fs.mkdir(work);
-      try {
-        const source = path.join(work, `font.${extension}`);
-        await fs.writeFile(source, staged.bytes, { flag: "wx" });
-        // The engine names the font (`font-N`); it is the last one bound.
-        const result = await engine.editBatch(root, { base_revision: baseRevision, author: "human", summary: "添加字体", operations: [{ type: "add_font", font: { source } }] });
-        this.announce(workspaceId, event("image.project.changed", { projectId, revision: result.document.revision, sha256: result.sha256, author: "human" }));
-        const added = result.document.fonts?.at(-1) ?? fail("The font was not bound");
-        return { projectId, revision: result.document.revision, sha256: result.sha256, dryRun: false, fontId: added.id, family: added.family };
-      } finally {
-        await fs.rm(work, { recursive: true, force: true });
-      }
-    });
+    return this.queue.serial(key(workspaceId, projectId), () => withStagedSource(engine, cwd, projectId, `font.${extension}`, staged.bytes, async (root, source) => {
+      // The engine names the font (`font-N`); it is the last one bound.
+      const result = await engine.editBatch(root, { base_revision: baseRevision, author: "human", summary: "添加字体", operations: [{ type: "add_font", font: { source } }] });
+      this.announce(workspaceId, event("image.project.changed", { projectId, revision: result.document.revision, sha256: result.sha256, author: "human" }));
+      const added = result.document.fonts?.at(-1) ?? fail("The font was not bound");
+      return { projectId, revision: result.document.revision, sha256: result.sha256, dryRun: false, fontId: added.id, family: added.family };
+    }));
   }
 
   // Each preset becomes a sibling project `<source>-<preset>` (then `-2`, `-3`…),
@@ -357,4 +360,21 @@ async function listProjects(engine: ImageEngine, cwd: string): Promise<ImageProj
     } catch { /* A damaged project stays on disk for inspection; it is not listed. */ }
   }
   return projects;
+}
+
+/**
+ * Staged bytes (never a renderer path) are written into a fresh work folder outside the
+ * project for the engine to import, and the folder is removed whatever happens.
+ */
+async function withStagedSource<T>(engine: ImageEngine, cwd: string, projectId: string, name: string, bytes: Uint8Array,
+  run: (root: string, source: string) => Promise<T>): Promise<T> {
+  const root = engine.projectRoot(cwd, projectId), work = await engine.workDirectory(cwd, projectId, "import");
+  await fs.mkdir(work);
+  try {
+    const source = path.join(work, name);
+    await fs.writeFile(source, bytes, { flag: "wx" });
+    return await run(root, source);
+  } finally {
+    await fs.rm(work, { recursive: true, force: true });
+  }
 }

@@ -260,5 +260,17 @@ describe("image engine host", { timeout: 120_000 }, () => {
     await expect(run("image.project.addFont", { projectId: "poster", baseRevision: 2, attachmentId: "brand" })).rejects.toThrow(/already added/u);
     await expect(fs.readdir(path.join(cwd, ".newmoney", "image-work", "poster")).catch(() => [])).resolves.toEqual([]);
   });
+
+  it("adds a staged image as the next mask asset and refuses anything but PNG, JPEG or WebP", async () => {
+    const cwd = await workspace(true);
+    await project(cwd);
+    const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: "#ffffff" } }).png().toBuffer();
+    const staged: Record<string, { mimeType: string; bytes: Buffer }> = { mask: { mimeType: "image/png", bytes: png }, gif: { mimeType: "image/gif", bytes: png } };
+    const { run } = host(cwd, undefined, (id) => Promise.resolve(staged[id]!));
+    expect(await run("image.project.addAsset", { projectId: "poster", baseRevision: 1, attachmentId: "mask" })).toMatchObject({ revision: 2, assetId: "mask-1" });
+    expect(await run("image.project.addAsset", { projectId: "poster", baseRevision: 2, attachmentId: "mask" })).toMatchObject({ revision: 3, assetId: "mask-2" });
+    await expect(run("image.project.addAsset", { projectId: "poster", baseRevision: 3, attachmentId: "gif" })).rejects.toThrow(/PNG、JPEG 或 WebP/u);
+    expect((await readProject(projectRoot(cwd, "poster"))).document.assets.map((asset) => asset.id)).toEqual(["background", "mask-1", "mask-2"]);
+  });
 });
 
