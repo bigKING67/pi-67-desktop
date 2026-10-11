@@ -1,4 +1,4 @@
-import { IMAGE_ADJUST_LIMITS, IMAGE_ASSET_LIMIT, IMAGE_BLEND_MODES, IMAGE_GROUP_LIMIT, IMAGE_USER_FONT_LIMIT, type ImageAdjust, type ImageGroup, type ImageBlendMode } from "@pi67/domain";
+import { IMAGE_ADJUST_LIMITS, IMAGE_ASSET_LIMIT, IMAGE_BLEND_MODES, IMAGE_GROUP_LIMIT, IMAGE_TEMPLATE_SLOT_LIMIT, IMAGE_USER_FONT_LIMIT, type ImageAdjust, type ImageGroup, type ImageTemplate, type ImageBlendMode } from "@pi67/domain";
 import { fail } from "./content-store.js";
 import { fontManifest } from "./font.js";
 
@@ -90,9 +90,12 @@ export interface AcceptedCandidate { id: string; sha256: string }
 export interface Change { author: ChangeAuthor; summary: string; operations: string[]; candidate?: AcceptedCandidate }
 /** A flat layer group: its lock and visibility apply to every member, its opacity to the group as one picture. */
 export type Group = ImageGroup;
+type Template = ImageTemplate;
 export interface ImageDocument {
   schema: string; project_id: string; title: string; revision: number; parent_sha256: string | null;
-  canvas: Canvas; assets: Asset[]; font: FontBinding; fonts?: UserFont[]; groups?: Group[]; objects: SceneObject[]; change: Change;
+  canvas: Canvas; assets: Asset[]; font: FontBinding; fonts?: UserFont[]; groups?: Group[];
+  /** A template's replaceable layers (P5, v3); absent on every other project. */
+  template?: Template; objects: SceneObject[]; change: Change;
 }
 
 /** The group an object belongs to, if any. */
@@ -104,8 +107,8 @@ export const isLocked = (doc: Pick<ImageDocument, "groups">, object: SceneObject
 export const isShown = (doc: Pick<ImageDocument, "groups">, object: SceneObject): boolean => object.visible && groupOf(doc, object)?.visible !== false;
 
 /** v3 while any engine extension is used, else v2 while a user font is bound or used, else v1. */
-export function documentSchema(document: Pick<ImageDocument, "fonts" | "groups" | "objects">): string {
-  if (document.groups?.length) return SCHEMA_V3;
+export function documentSchema(document: Pick<ImageDocument, "fonts" | "groups" | "template" | "objects">): string {
+  if (document.groups?.length || document.template) return SCHEMA_V3;
   // Called before validation too, so an unknown kind falls through to validation's refusal.
   if (document.objects.some((object) => V3_KINDS.has(object.kind) || (Object.hasOwn(OPTIONAL_FIELDS, object.kind) ? OPTIONAL_FIELDS[object.kind] : []).some((key) => V3_FIELDS.has(key) && (object as unknown as JsonRecord)[key] !== undefined))) return SCHEMA_V3;
   return document.fonts?.length || document.objects.some((object) => object.kind === "text" && object.font_id !== undefined) ? SCHEMA_V2 : SCHEMA;
@@ -213,7 +216,7 @@ function validateObject(value: unknown, canvas: Canvas, assets: ReadonlySet<stri
 }
 
 export function validateDocument(value: unknown): ImageDocument {
-  record(value, ["schema", "project_id", "title", "revision", "parent_sha256", "canvas", "assets", "font", "fonts", "groups", "objects", "change"], "document");
+  record(value, ["schema", "project_id", "title", "revision", "parent_sha256", "canvas", "assets", "font", "fonts", "groups", "template", "objects", "change"], "document");
   if (value.schema !== SCHEMA && value.schema !== SCHEMA_V2 && value.schema !== SCHEMA_V3 && !LEGACY_SCHEMAS.includes(value.schema as string)) fail("Unsupported image document schema");
   if (value.schema !== SCHEMA_V2 && value.schema !== SCHEMA_V3 && value.fonts !== undefined) fail("User fonts need the v2 document schema");
   id(value.project_id, "project_id"); string(value.title, "title", 200);
@@ -243,6 +246,7 @@ export function validateDocument(value: unknown): ImageDocument {
   });
   const groups = value.groups === undefined ? undefined : validateGroups(value.groups, objects);
   for (const object of objects) if (object.group_id !== undefined && !groups?.some((group) => group.id === object.group_id)) fail(`Missing group for ${object.id}`);
+  if (value.template !== undefined) validateTemplate(value.template, objects);
   record(value.change, ["author", "summary", "operations", "candidate"], "change");
   const change = value.change;
   oneOf(change.author, ["human", "agent", "system"] as const, "Invalid change author");
@@ -258,8 +262,18 @@ export function validateDocument(value: unknown): ImageDocument {
   const needed = documentSchema(document);
   if (value.schema === SCHEMA_V2 && needed !== SCHEMA_V2) fail("A v2 document must bind or use a user font and nothing newer");
   if (value.schema === SCHEMA_V3 && needed !== SCHEMA_V3) fail("A v3 document must use an engine extension");
-  if (needed === SCHEMA_V3 && value.schema !== SCHEMA_V3) fail("Rotation, flips, ellipses, gradients, blend modes, masks, adjustments and groups need the v3 document schema");
+  if (needed === SCHEMA_V3 && value.schema !== SCHEMA_V3) fail("Rotation, flips, ellipses, gradients, blend modes, masks, adjustments, groups and templates need the v3 document schema");
   return document;
+}
+
+/** Slots are distinct text or image layers of the document, at most 20; a template may have none yet. */
+function validateTemplate(value: unknown, objects: readonly SceneObject[]): void {
+  record(value, ["slots"], "template");
+  if (!Array.isArray(value.slots) || value.slots.length > IMAGE_TEMPLATE_SLOT_LIMIT || new Set(value.slots).size !== value.slots.length) fail("Invalid template slots");
+  for (const slot of value.slots) {
+    const object = objects.find((item) => item.id === slot);
+    if (object?.kind !== "text" && object?.kind !== "image") fail(`Template slot is not a text or image layer: ${String(slot)}`);
+  }
 }
 
 /**

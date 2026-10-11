@@ -17,6 +17,8 @@ const IMAGE_COMMANDS: ReadonlySet<string> = new Set<ImageCommandType>([
   "image.project.derive",
   "image.batch.create",
   "image.batch.remove",
+  "image.template.create",
+  "image.template.instantiate",
   "image.project.addFont",
   "image.project.addAsset",
   "image.project.checkText"

@@ -254,7 +254,7 @@ export async function candidateDocument(root: string, project: ProjectState, can
 // A Map keeps prototype names such as "constructor" from resolving to inherited members.
 const OPERATION_FIELDS: ReadonlyMap<string, readonly string[]> = new Map([
   ["add_asset", ["asset"]], ["add_font", ["font"]], ["add_object", ["object"]], ["update_object", ["id", "patch"]], ["remove_object", ["id"]], ["reorder_objects", ["ids"]],
-  ["set_canvas", ["canvas"]], ["revert_to", ["revision"]], ["accept_candidate", ["candidate_id"]], ...GROUP_OPERATIONS
+  ["set_canvas", ["canvas"]], ["revert_to", ["revision"]], ["accept_candidate", ["candidate_id"]], ["set_template", ["slots"]], ...GROUP_OPERATIONS
 ]);
 
 async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: boolean }): Promise<PublishedRevision> {
@@ -329,6 +329,10 @@ async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: 
         doc.objects = ordered; break;
       }
       case "set_canvas": doc.canvas = validateCanvas(structuredClone(op.canvas)); break;
+      case "set_template":
+        // Validated with the document; `null` turns a template back into a plain project.
+        if (op.slots === null) delete doc.template; else doc.template = { slots: structuredClone(op.slots) as string[] };
+        break;
       case "revert_to": {
         number(op.revision, "revert revision", 1, current.document.revision - 1, true);
         const previous = (await readProject(root, { revision: op.revision })).document;
@@ -345,6 +349,7 @@ async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: 
         }
         doc.canvas = structuredClone(previous.canvas); doc.assets = structuredClone(previous.assets); doc.objects = structuredClone(previous.objects);
         if (previous.groups) doc.groups = structuredClone(previous.groups); else delete doc.groups;
+        if (previous.template) doc.template = structuredClone(previous.template); else delete doc.template;
         for (const group of doc.groups ?? []) group.locked = current.document.groups?.find((item) => item.id === group.id)?.locked ?? false;
         // Fonts bound later stay bound (their bytes are already in the project); objects revert to their own font choice.
         if (previous.fonts) doc.fonts = [...structuredClone(previous.fonts), ...(doc.fonts ?? []).filter((font) => !previous.fonts?.some((item) => item.id === font.id))];
@@ -361,6 +366,8 @@ async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: 
     }
   }
   dropEmptyGroups(doc);
+  // A slot whose layer was removed drops out of the template.
+  if (doc.template) doc.template = { slots: doc.template.slots.filter((slot) => doc.objects.some((object) => object.id === slot)) };
   keepLockedGroups(current.document, doc);
   if (doc.fonts && !doc.fonts.length) delete doc.fonts;
   doc.schema = documentSchema(doc);

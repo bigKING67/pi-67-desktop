@@ -1,5 +1,5 @@
 import { Type } from "typebox";
-import { IMAGE_ADJUST_LIMITS, IMAGE_BLEND_MODES } from "@pi67/domain";
+import { IMAGE_ADJUST_LIMITS, IMAGE_BLEND_MODES, IMAGE_TEMPLATE_SLOT_LIMIT } from "@pi67/domain";
 import { IMAGE_ID_PATTERN } from "./image-workbench-job.js";
 
 // The operations `image_project_edit` accepts, mirroring the engine's exact field
@@ -64,6 +64,8 @@ export const IMAGE_EDIT_OPERATION = Type.Union([
     visible: Type.Optional(Type.Boolean()), opacity: Type.Optional(Type.Number({ minimum: 0, maximum: 1, description: "The group drawn as one picture." })) },
   { additionalProperties: false, minProperties: 1, description: "A lock change ({locked}) must be the only field and the only operation in its batch. A locked group locks every member." }) }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("ungroup"), id: id("Unlocked group id; members keep their places.") }, { additionalProperties: false }),
+  Type.Object({ type: Type.Literal("set_template"), slots: Type.Union([Type.Array(id("A text or image layer id."), { maxItems: IMAGE_TEMPLATE_SLOT_LIMIT, uniqueItems: true }), Type.Null()],
+    { description: "Marks the layers a project made from this template may replace; null makes it a plain project." }) }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("revert_to"), revision: Type.Integer({ minimum: 1, description: "Must be the only operation in its batch." }) }, { additionalProperties: false })
 ]);
 

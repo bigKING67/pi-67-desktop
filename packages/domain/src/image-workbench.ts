@@ -85,6 +85,10 @@ export function imageObjectInEffect<T extends ImageSceneObject>(document: Pick<I
   const group = imageObjectGroup(document, object);
   return group && (group.locked || !group.visible) ? { ...object, locked: object.locked || group.locked, visible: object.visible && group.visible } : object;
 }
+/** A template's replaceable layers (P5): text or image layers a new project from it may change. */
+export interface ImageTemplate { slots: string[] }
+/** At most this many slots per template. */
+export const IMAGE_TEMPLATE_SLOT_LIMIT = 20;
 /** One batch (P5): rows of a table, text layers one row sets, characters per cell. */
 export const IMAGE_BATCH_LIMITS = Object.freeze({ rows: 200, texts: 20, characters: 2000 });
 /** Images (photo, generated layers, masks) one project may hold. */
@@ -92,7 +96,7 @@ export const IMAGE_ASSET_LIMIT = 64;
 export interface ImageChange { author: ImageChangeAuthor; summary: string; operations: string[]; candidate?: { id: string; sha256: string } }
 export interface ImageDocument {
   schema: string; project_id: string; title: string; revision: number; parent_sha256: string | null;
-  canvas: ImageCanvas; assets: ImageAsset[]; font: ImageFontBinding; fonts?: ImageUserFont[]; groups?: ImageGroup[]; objects: ImageSceneObject[]; change: ImageChange;
+  canvas: ImageCanvas; assets: ImageAsset[]; font: ImageFontBinding; fonts?: ImageUserFont[]; groups?: ImageGroup[]; template?: ImageTemplate; objects: ImageSceneObject[]; change: ImageChange;
 }
 
 /**
@@ -122,7 +126,9 @@ export type ImageEditOperation =
   | { type: "revert_to"; revision: number }
   | { type: "group_objects"; group: { id: string; name: string }; ids: string[] }
   | { type: "update_group"; id: string; patch: ImageGroupPatch }
-  | { type: "ungroup"; id: string };
+  | { type: "ungroup"; id: string }
+  /** Marks the replaceable layers of a template; `null` makes it a plain project again (P5). */
+  | { type: "set_template"; slots: string[] | null };
 /** A lock change must be the only field and the only operation in its batch, as for objects. */
 export type ImageGroupPatch = Partial<Pick<ImageGroup, "name" | "locked" | "visible" | "opacity">>;
 

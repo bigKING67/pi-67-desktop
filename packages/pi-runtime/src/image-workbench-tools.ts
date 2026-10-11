@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { Type, type TSchema } from "typebox";
-import { IMAGE_BATCH_LIMITS, IMAGE_PROMPT_CONTEXT_LIMITS, IMAGE_PROVIDER_ID, IMAGE_REFERENCE_ROLES, imageCandidateActions, imageObjectGroup, imageObjectInEffect, type ImageReferenceRole } from "@pi67/domain";
+import { IMAGE_BATCH_LIMITS, IMAGE_PROMPT_CONTEXT_LIMITS, IMAGE_TEMPLATE_SLOT_LIMIT, IMAGE_PROVIDER_ID, IMAGE_REFERENCE_ROLES, imageCandidateActions, imageObjectGroup, imageObjectInEffect, type ImageReferenceRole } from "@pi67/domain";
 import type { ImageDocument, ImageGenerator } from "@pi67/image-engine";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createPiImageGenerator, type ImageRegistry } from "./image-workbench-generator.js";
@@ -42,7 +42,9 @@ function documentSummary(doc: ImageDocument, latestRevision: number): Record<str
     // Fonts the person added; text uses one with font_id (missing glyphs fall back to the built-in font).
     fonts: (doc.fonts ?? []).map((font) => ({ id: font.id, family: font.family })),
     // Flat groups; a locked or hidden group locks or hides every member.
-    groups: doc.groups ?? []
+    groups: doc.groups ?? [],
+    // On a template: the layers a project made from it may replace.
+    ...(doc.template ? { template_slots: doc.template.slots } : {})
   };
 }
 
@@ -103,7 +105,7 @@ export function imageTools(): ToolDefinition[] {
     },
     {
       name: "image_project_edit", label: "Edit image project",
-      description: "Apply one batch of object edits as a new revision. Operations: {type:update_object,id,patch}, {type:add_object,object}, {type:add_asset,asset:{id,source}}, {type:remove_object,id}, {type:reorder_objects,ids}, {type:set_canvas,canvas}, {type:revert_to,revision}, {type:group_objects,group:{id,name},ids}, {type:update_group,id,patch}, {type:ungroup,id}. Unlock with exactly [{type:update_object,id,patch:{locked:false}}] as its own batch. Use dry_run first for layout changes. Text is set exactly; never ask an image model to draw copy, prices or logos.",
+      description: "Apply one batch of object edits as a new revision. Operations: {type:update_object,id,patch}, {type:add_object,object}, {type:add_asset,asset:{id,source}}, {type:remove_object,id}, {type:reorder_objects,ids}, {type:set_canvas,canvas}, {type:revert_to,revision}, {type:group_objects,group:{id,name},ids}, {type:update_group,id,patch}, {type:ungroup,id}, {type:set_template,slots}. Unlock with exactly [{type:update_object,id,patch:{locked:false}}] as its own batch. Use dry_run first for layout changes. Text is set exactly; never ask an image model to draw copy, prices or logos.",
       promptSnippet: "Edit image project objects as one revision",
       promptGuidelines: [
         "Put copy, prices and logos in text or image objects instead of generated pixels.",
@@ -148,6 +150,27 @@ export function imageTools(): ToolDefinition[] {
         const { batch_id: batchId, results } = await engine.createBatch(ctx.cwd, { project_id: str(params, "project_id"), revision: int(params, "revision"), rows });
         // Digests mean nothing to the model; the row, its project and title or its reason do.
         return text({ batch_id: batchId, results: results.map((result) => result.status === "refused" ? result : { row: result.row, status: result.status, project_id: result.project_id, title: result.title, shrunk_text: result.shrunk }) });
+      }
+    },
+    {
+      name: "image_from_template", label: "New image project from template",
+      description: "Make a new plain project from a template (a project whose image_project_read shows template_slots): set the words of text slots and, for image slots, a new picture from a local PNG/JPEG/WebP. Only slots can change; in the new project every other layer is locked. Text that grows shrinks to at most 70%; otherwise the project is refused with its reason and nothing is written.",
+      promptSnippet: "Start a new image project from a template",
+      parameters: Type.Object({
+        template_id: projectId, project_id: projectId, title: Type.String({ minLength: 1, maxLength: 200 }),
+        texts: Type.Array(Type.Object({ layer: Type.String({ pattern: IMAGE_ID_PATTERN }), text: Type.String({ minLength: 1, maxLength: 2000 }) }, { additionalProperties: false }), { maxItems: IMAGE_TEMPLATE_SLOT_LIMIT }),
+        images: Type.Array(Type.Object({ layer: Type.String({ pattern: IMAGE_ID_PATTERN }), source: Type.String({ minLength: 1, maxLength: 4096, description: "Local image path, absolute or relative to the Workspace." }) },
+          { additionalProperties: false }), { maxItems: IMAGE_TEMPLATE_SLOT_LIMIT })
+      }),
+      async execute(_id, raw, _signal, _update, ctx) {
+        const params = raw as Params, engine = await loadEngine();
+        const template = await engine.readProject(engine.projectRoot(ctx.cwd, str(params, "template_id")));
+        const target = engine.projectRoot(ctx.cwd, str(params, "project_id"));
+        await engine.ensureProjectParent(target);
+        const result = await engine.instantiateTemplate(template, target, { project_id: str(params, "project_id"), title: str(params, "title"),
+          texts: Object.fromEntries((params.texts as { layer: string; text: string }[]).map((cell) => [cell.layer, cell.text])),
+          images: Object.fromEntries((params.images as { layer: string; source: string }[]).map((cell) => [cell.layer, path.resolve(ctx.cwd, cell.source)])) });
+        return text(result.status === "refused" ? result : { status: "created", project_id: str(params, "project_id"), shrunk_text: result.shrunk.length });
       }
     },
     {

@@ -1,11 +1,10 @@
 import { IMAGE_BATCH_LIMITS } from "@pi67/domain";
 import { randomUUID } from "node:crypto";
-import { errorCode, sha256 } from "./content-store.js";
+import { errorCode } from "./content-store.js";
 import { ensureProjectParent, projectRoot } from "./project-location.js";
-import { documentSchema, id, isLocked, isRecord, number, record, string, type ImageDocument } from "./document.js";
-import { checkTextGlyphs } from "./font.js";
+import { id, isRecord, number, record, string } from "./document.js";
 import { readProject, type ProjectState } from "./project.js";
-import { fitText, writeSibling } from "./sibling-project.js";
+import { writeVariant } from "./variant.js";
 
 // P5 checkpoint 1: a table row becomes a sibling project — the source revision with the
 // row's words in its text layers, fitted like a derived size, written beside the source.
@@ -24,9 +23,8 @@ export const batchSummary = (batchId: string, row: number, projectId: string, re
 
 /**
  * Writes the row as a new project at `target` from `source` (one revision, read once for the
- * whole batch). A row that names a layer the source lacks, or a locked one, leaves a layer
- * empty, uses a character no font has, or has text that cannot fit even at 70% is refused in
- * product words and writes nothing.
+ * whole batch), through the shared variant core: refusals are in product words and write
+ * nothing, and rows from a template become plain projects with only their slots unlocked.
  */
 export async function batchVariant(source: ProjectState, target: string, input: unknown): Promise<BatchVariantResult> {
   record(input, ["project_id", "title", "batch_id", "row", "texts"], "batch row");
@@ -35,27 +33,11 @@ export async function batchVariant(source: ProjectState, target: string, input: 
   if (!isRecord(input.texts)) throw new Error("Row texts must be an object");
   const entries = Object.entries(input.texts);
   if (!entries.length || entries.length > BATCH_LIMITS.texts) throw new Error(`A row sets 1–${BATCH_LIMITS.texts} text layers`);
-  for (const [layer, text] of entries) {
-    id(layer, "text layer"); string(text, "row text", BATCH_LIMITS.characters);
-    if (!text.trim()) return { status: "refused", reason: `「${layer}」是空的；空格子应保留原文字，不要传入` };
-  }
+  for (const [layer, text] of entries) { id(layer, "text layer"); string(text, "row text", BATCH_LIMITS.characters); }
   const { project_id: projectId, title, batch_id: batchId, row, texts } = input as unknown as BatchInput;
-  const root = source.root, revision = source.document.revision;
-  const document: ImageDocument = { ...structuredClone(source.document), project_id: projectId, title, revision: 1, parent_sha256: null,
-    change: { author: "system", summary: batchSummary(batchId, row, source.document.project_id, revision), operations: ["create"] } };
-  for (const [layer, text] of Object.entries(texts)) {
-    const object = document.objects.find((item) => item.id === layer);
-    if (object?.kind !== "text") return { status: "refused", reason: `没有叫「${layer}」的文字图层` };
-    if (isLocked(document, object)) return { status: "refused", reason: `文字图层「${layer}」已锁定` };
-    object.text = text;
-  }
-  try { checkTextGlyphs(source.font, document.objects.filter((object) => object.kind === "text"), source.fonts); }
-  catch { return { status: "refused", reason: "有字体里没有的字符" }; }
-  document.schema = documentSchema(document);
-  const fitted = await fitText(root, source.font, source.fonts, document);
-  if (typeof fitted === "string") return { status: "refused", reason: fitted };
-  const bytes = await writeSibling(root, target, document);
-  return { status: "created", project_id: projectId, title, shrunk: fitted, sha256: sha256(bytes) };
+  const result = await writeVariant(source, target, { project_id: projectId, title, texts,
+    summary: batchSummary(batchId, row, source.document.project_id, source.document.revision) });
+  return result.status === "refused" ? result : { status: "created", project_id: projectId, title, shrunk: result.shrunk, sha256: result.sha256 };
 }
 
 export type BatchRowOutcome =

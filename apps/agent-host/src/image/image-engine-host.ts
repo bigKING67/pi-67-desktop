@@ -1,15 +1,17 @@
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { IMAGE_SIZE_PRESETS, IMAGE_WORK_DIRECTORY, imageSizePresetLabel, isImageId, type ImageCandidateListStatus, type ImageChangeAuthor, type ImageSizePreset } from "@pi67/domain";
-type ImageEngine = typeof import("@pi67/image-engine");
+import { IMAGE_WORK_DIRECTORY, imageSizePresetLabel, type ImageCandidateListStatus, type ImageChangeAuthor, type ImageSizePreset } from "@pi67/domain";
 type ImageDocument = import("@pi67/image-engine").ImageDocument;
-import type { AgentCommand, AgentEvent, CommandPayloads, CommandResults, ImageBatchRowOutcome, ImageCandidateReceipt, ImageCandidateSummary, ImageDeriveOutcome, ImageEventPayloads, ImageProjectSummary } from "@pi67/protocol";
+import type { AgentCommand, AgentEvent, CommandPayloads, CommandResults, ImageCandidateReceipt, ImageCandidateSummary, ImageDeriveOutcome, ImageEventPayloads } from "@pi67/protocol";
 import { HostCommandError } from "../protocol-error.js";
 import type { ImageCommandType } from "./image-command-router.js";
 import { imageEngineError } from "./image-engine-errors.js";
 import { ImageWorkQueue } from "./image-work-queue.js";
 import { ImageProjectWatcher } from "./image-project-watcher.js";
+import { event, freeProjectId, key, PHOTO_EXTENSIONS, type ImageEngine } from "./image-host-support.js";
+import { listProjects } from "./image-project-list.js";
+import { createBatch, createTemplate, instantiateTemplate, removeBatch, type VariantContext } from "./image-variant-commands.js";
 
 export interface ImageEngineHostDependencies {
   /** Host-local realpath of a registered, trusted Workspace. */
@@ -27,7 +29,6 @@ export interface ImageEngineHostDependencies {
 }
 
 type Command<T extends ImageCommandType> = AgentCommand<T>;
-const event = <T extends keyof ImageEventPayloads>(type: T, payload: ImageEventPayloads[T]): AgentEvent => ({ type, payload }) as AgentEvent;
 
 /**
  * Runs renderer-originated image commands against the engine (ADR 0010).
@@ -38,10 +39,12 @@ export class ImageEngineHost {
   private readonly queue: ImageWorkQueue;
   private readonly watcher: ImageProjectWatcher;
   private engine: Promise<ImageEngine> | undefined;
+  private readonly variants: VariantContext;
 
   constructor(private readonly dependencies: ImageEngineHostDependencies) {
     this.queue = dependencies.queue ?? new ImageWorkQueue();
     this.watcher = dependencies.watcher ?? new ImageProjectWatcher({ emit: (workspaceId, item) => dependencies.emit(workspaceId, item) });
+    this.variants = { queue: this.queue, announce: (workspaceId, announced) => this.announce(workspaceId, announced), readStagedImage: dependencies.readStagedImage?.bind(dependencies) };
   }
 
   /** Stops watching project folders; image commands after this still run. */
@@ -95,9 +98,13 @@ export class ImageEngineHost {
       case "image.project.addFont":
         return this.addFont(engine, workspaceId, cwd, (command as Command<"image.project.addFont">).payload);
       case "image.batch.create":
-        return this.createBatch(engine, workspaceId, cwd, (command as Command<"image.batch.create">).payload);
+        return createBatch(this.variants, engine, workspaceId, cwd, (command as Command<"image.batch.create">).payload);
       case "image.batch.remove":
-        return this.removeBatch(engine, workspaceId, cwd, (command as Command<"image.batch.remove">).payload);
+        return removeBatch(this.variants, engine, workspaceId, cwd, (command as Command<"image.batch.remove">).payload);
+      case "image.template.create":
+        return createTemplate(this.variants, engine, workspaceId, cwd, (command as Command<"image.template.create">).payload);
+      case "image.template.instantiate":
+        return instantiateTemplate(this.variants, engine, workspaceId, cwd, (command as Command<"image.template.instantiate">).payload);
       case "image.project.derive":
         return this.derive(engine, workspaceId, cwd, (command as Command<"image.project.derive">).payload);
       case "image.project.read": {
@@ -234,45 +241,6 @@ export class ImageEngineHost {
     });
   }
 
-  // Rows are written in table order under the source's queue (engine createBatch).
-  private createBatch(engine: ImageEngine, workspaceId: string, cwd: string,
-    { projectId, revision, rows }: CommandPayloads["image.batch.create"]): Promise<CommandResults["image.batch.create"]> {
-    return this.queue.serial(key(workspaceId, projectId), async () => {
-      const { batch_id: batchId, results } = await engine.createBatch(cwd, { project_id: projectId, revision, rows });
-      for (const result of results) if (result.status === "created") this.announce(workspaceId, event("image.project.changed", { projectId: result.project_id, revision: 1, sha256: result.sha256, author: "system" }));
-      return { projectId, revision, batchId, results: results.map((result): ImageBatchRowOutcome => result.status === "refused" ? result
-        : { row: result.row, status: "created", projectId: result.project_id, title: result.title, shrunkText: result.shrunk }) };
-    });
-  }
-
-  // A batch's projects are named `<source>-<batch>-<row>`; each is removed only when its first
-  // revision also names the batch, so a source is never one of them. The source is announced
-  // afterwards, so other windows reload their library.
-  private async removeBatch(engine: ImageEngine, workspaceId: string, cwd: string, { batchId }: CommandPayloads["image.batch.remove"]): Promise<CommandResults["image.batch.remove"]> {
-    let names: string[];
-    const member = new RegExp(`-${batchId}-\\d+$`, "u");
-    try { names = (await fs.readdir(engine.projectsDirectory(cwd))).filter((name) => isImageId(name) && member.test(name)); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return { batchId, removed: [] }; throw error; }
-    const removed: string[] = [];
-    let source: string | undefined;
-    for (const projectId of names.sort()) {
-      const batch = batchOf(await firstSummary(engine.projectRoot(cwd, projectId), undefined));
-      if (batch?.batchId !== batchId) continue;
-      source = batch.projectId;
-      // The project and its disposable state beside it (previews, its dock conversation).
-      await this.queue.serial(key(workspaceId, projectId), async () => {
-        await fs.rm(engine.projectRoot(cwd, projectId), { recursive: true, force: true });
-        await fs.rm(path.join(cwd, ...IMAGE_WORK_DIRECTORY, projectId), { recursive: true, force: true });
-      });
-      removed.push(projectId);
-    }
-    if (source) {
-      const project = await engine.readProject(engine.projectRoot(cwd, source)).catch(() => undefined);
-      if (project) this.announce(workspaceId, event("image.project.changed", { projectId: source, revision: project.document.revision, sha256: project.sha256, author: "system" }));
-    }
-    return { batchId, removed };
-  }
-
   // Another writer may claim the free name first (another window, the Agent): take the next one.
   private async deriveOne(engine: ImageEngine, cwd: string, root: string, input: { revision: number; sha256: string; preset: ImageSizePreset; title: string }, base: string) {
     for (let attempt = 0; ; attempt += 1) {
@@ -352,43 +320,7 @@ async function readConversation(cwd: string, projectId: string): Promise<{ sessi
   } catch { return undefined; }
 }
 
-const isImageSizePreset = (value: string): value is ImageSizePreset => (IMAGE_SIZE_PRESETS as readonly string[]).includes(value);
-const DERIVED = /^Derived from ([a-zA-Z][a-zA-Z0-9_-]{0,63}) revision (\d{1,4}) for (\d+):(\d+)$/u;
-
-/** Revision 1's summary, where a derived size or a batch row names its source (engine). */
-async function firstSummary(root: string, known: string | undefined): Promise<string | undefined> {
-  if (known !== undefined) return known;
-  // `readProject` has already validated the whole chain, so one small read suffices.
-  try { return (JSON.parse(await fs.readFile(path.join(root, "revisions", "000001.json"), "utf8")) as { change?: { summary?: unknown } }).change?.summary as string | undefined; }
-  catch { return undefined; }
-}
-
-function derivation(summary: string | undefined): ImageProjectSummary["derivedFrom"] {
-  const match = typeof summary === "string" ? DERIVED.exec(summary) : null;
-  const preset = match ? `${match[3]}x${match[4]}` : "";
-  return match && isImageSizePreset(preset) ? { projectId: match[1]!, revision: Number(match[2]), preset } : undefined;
-}
-
-const BATCH = /^Batch ([a-zA-Z][a-zA-Z0-9_-]{0,63}) row (\d{1,3}) from ([a-zA-Z][a-zA-Z0-9_-]{0,63}) revision (\d{1,4})$/u;
-function batchOf(summary: string | undefined): ImageProjectSummary["batch"] {
-  const match = typeof summary === "string" ? BATCH.exec(summary) : null;
-  return match ? { batchId: match[1]!, row: Number(match[2]), projectId: match[3]!, revision: Number(match[4]) } : undefined;
-}
-
-/** `base`, or `base-2`, `base-3`… when a project of that name already exists. */
-async function freeProjectId(engine: ImageEngine, cwd: string, base: string): Promise<string> {
-  for (let index = 1; index <= 99; index += 1) {
-    const candidate = index === 1 ? base : `${base}-${index}`;
-    try { await fs.lstat(engine.projectRoot(cwd, candidate)); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return candidate; throw error; }
-  }
-  throw new HostCommandError("INVALID_PAYLOAD", "这个尺寸已经派生过太多次，请先整理创作库。", false);
-}
-
 const fail = (message: string): never => { throw new Error(message); };
-
-const PHOTO_EXTENSIONS: Readonly<Record<string, string>> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
-const key = (workspaceId: string, projectId: string): string => `${workspaceId}\u0000${projectId}`;
 
 function candidateSummary(item: Awaited<ReturnType<ImageEngine["listCandidates"]>>[number]): ImageCandidateSummary {
   if (!("candidate" in item)) return { candidateId: item.candidate_id, status: item.status };
@@ -413,30 +345,6 @@ export function candidateReceipt(receipt: { model: string; parameters: Record<st
     ...(typeof quality === "string" && quality.length > 0 && quality.length <= 16 ? { quality } : {}),
     ...(/^[1-9][0-9]{0,4}x[1-9][0-9]{0,4}$/u.test(size) ? { size } : {}),
     ...(Number.isFinite(duration) && duration >= 0 && duration <= 86_400_000 ? { durationMs: duration } : {}) };
-}
-
-/** Every readable project under the Workspace's image folder; unreadable folders are skipped. */
-async function listProjects(engine: ImageEngine, cwd: string): Promise<ImageProjectSummary[]> {
-  const { listCandidates, projectRoot, projectsDirectory, readProject } = engine;
-  let entries: string[];
-  try { entries = (await fs.readdir(projectsDirectory(cwd), { withFileTypes: true })).filter((entry) => entry.isDirectory() && isImageId(entry.name)).map((entry) => entry.name).sort(); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return []; throw error; }
-  const projects: ImageProjectSummary[] = [];
-  for (const projectId of entries) {
-    const root = projectRoot(cwd, projectId);
-    try { await fs.access(path.join(root, "revisions")); } catch { continue; }
-    try {
-      const project = await readProject(root);
-      const latest = path.join(root, "revisions", `${String(project.latest_revision).padStart(6, "0")}.json`);
-      const candidates = await listCandidates(root);
-      const first = await firstSummary(root, project.latest_revision === 1 ? project.document.change.summary : undefined);
-      const derivedFrom = derivation(first), batch = batchOf(first);
-      projects.push({ projectId, title: project.document.title, revision: project.document.revision, canvas: project.document.canvas,
-        updatedAt: Math.floor((await fs.stat(latest)).mtimeMs), readyCandidates: candidates.filter((item) => item.status === "ready").length,
-        ...(derivedFrom ? { derivedFrom } : {}), ...(batch ? { batch } : {}) });
-    } catch { /* A damaged project stays on disk for inspection; it is not listed. */ }
-  }
-  return projects;
 }
 
 /**

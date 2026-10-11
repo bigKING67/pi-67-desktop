@@ -1,4 +1,4 @@
-import { IMAGE_ADJUST_LIMITS, IMAGE_BATCH_LIMITS, IMAGE_GROUP_LIMIT, IMAGE_ID_PATTERN, IMAGE_PROJECT_LIMITS, IMAGE_SIZE_PRESETS, IMAGE_USER_FONT_LIMIT } from "@pi67/domain";
+import { IMAGE_ADJUST_LIMITS, IMAGE_BATCH_LIMITS, IMAGE_GROUP_LIMIT, IMAGE_ID_PATTERN, IMAGE_TEMPLATE_SLOT_LIMIT, IMAGE_PROJECT_LIMITS, IMAGE_SIZE_PRESETS, IMAGE_USER_FONT_LIMIT } from "@pi67/domain";
 import { strictObject, Type, Value, type TSchema } from "./typebox-schema.js";
 import type { ImageCommandPayloads, ImageCommandResults, ImageEventPayloads } from "./image-command-messages.js";
 
@@ -92,6 +92,8 @@ const DocumentSchema = strictObject({
   }), { minItems: 1, maxItems: IMAGE_USER_FONT_LIMIT })),
   // Members are contiguous and every group has one; the engine refuses that, a schema cannot say it.
   groups: Type.Optional(Type.Array(GroupSchema, { minItems: 1, maxItems: IMAGE_GROUP_LIMIT })),
+  // Slots are text or image layers of this document; the engine checks that, a schema cannot.
+  template: Type.Optional(strictObject({ slots: Type.Array(IdSchema, { maxItems: IMAGE_TEMPLATE_SLOT_LIMIT, uniqueItems: true }) })),
   objects: Type.Array(SceneObjectSchema, { minItems: 1, maxItems: L.objects }),
   change: strictObject({
     author: AuthorSchema,
@@ -126,7 +128,8 @@ const EditOperationSchema = Type.Union([
   strictObject({ type: Type.Literal("revert_to"), revision: RevisionSchema }),
   strictObject({ type: Type.Literal("group_objects"), group: strictObject({ id: IdSchema, name: GroupNameSchema }), ids: Type.Array(IdSchema, { minItems: 1, maxItems: L.objects }) }),
   strictObject({ type: Type.Literal("update_group"), id: IdSchema, patch: GroupPatchSchema }),
-  strictObject({ type: Type.Literal("ungroup"), id: IdSchema })
+  strictObject({ type: Type.Literal("ungroup"), id: IdSchema }),
+  strictObject({ type: Type.Literal("set_template"), slots: Type.Union([Type.Array(IdSchema, { maxItems: IMAGE_TEMPLATE_SLOT_LIMIT, uniqueItems: true }), Type.Null()]) })
 ]);
 
 const CandidateStatusSchema = Type.Union([
@@ -158,7 +161,9 @@ const ProjectSummarySchema = strictObject({
   updatedAt: TimestampSchema,
   readyCandidates: Type.Integer({ minimum: 0, maximum: L.candidates }),
   derivedFrom: Type.Optional(strictObject({ projectId: IdSchema, revision: RevisionSchema, preset: Type.Union(IMAGE_SIZE_PRESETS.map((preset) => Type.Literal(preset))) })),
-  batch: Type.Optional(strictObject({ batchId: IdSchema, row: Type.Integer({ minimum: 1, maximum: IMAGE_BATCH_LIMITS.rows }), projectId: IdSchema, revision: RevisionSchema }))
+  batch: Type.Optional(strictObject({ batchId: IdSchema, row: Type.Integer({ minimum: 1, maximum: IMAGE_BATCH_LIMITS.rows }), projectId: IdSchema, revision: RevisionSchema })),
+  template: Type.Optional(Type.Literal(true)),
+  fromTemplate: Type.Optional(strictObject({ projectId: IdSchema, revision: RevisionSchema }))
 });
 const RevisionResultSchema = strictObject({ projectId: IdSchema, revision: RevisionSchema, sha256: Sha256Schema, dryRun: Type.Boolean() });
 const ProjectRefSchema = strictObject({ projectId: IdSchema });
@@ -204,7 +209,11 @@ export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSch
   "image.batch.create": strictObject({ projectId: IdSchema, revision: RevisionSchema, rows: Type.Array(strictObject({ row: Type.Integer({ minimum: 1, maximum: IMAGE_BATCH_LIMITS.rows }),
     texts: Type.Array(strictObject({ layer: IdSchema, text: Type.String({ minLength: 1, maxLength: IMAGE_BATCH_LIMITS.characters }) }), { minItems: 1, maxItems: IMAGE_BATCH_LIMITS.texts }) }),
   { minItems: 1, maxItems: IMAGE_BATCH_LIMITS.rows }) }),
-  "image.batch.remove": strictObject({ batchId: IdSchema })
+  "image.batch.remove": strictObject({ batchId: IdSchema }),
+  "image.template.create": strictObject({ projectId: IdSchema, revision: RevisionSchema }),
+  "image.template.instantiate": strictObject({ templateId: IdSchema, projectId: IdSchema, title: Type.String({ minLength: 1, maxLength: L.title }),
+    texts: Type.Array(strictObject({ layer: IdSchema, text: TextSchema }), { maxItems: IMAGE_TEMPLATE_SLOT_LIMIT }),
+    images: Type.Array(strictObject({ layer: IdSchema, attachmentId: Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" }) }), { maxItems: IMAGE_TEMPLATE_SLOT_LIMIT }) })
 };
 
 const BatchRowSchema = Type.Integer({ minimum: 1, maximum: IMAGE_BATCH_LIMITS.rows });
@@ -242,7 +251,10 @@ export const ImageCommandResultSchemas: Record<keyof ImageCommandResults, TSchem
       shrunkText: Type.Integer({ minimum: 0, maximum: L.objects }) }),
     strictObject({ row: BatchRowSchema, status: Type.Literal("refused"), reason: Type.String({ minLength: 1, maxLength: 500 }) })
   ]), { maxItems: IMAGE_BATCH_LIMITS.rows }) }),
-  "image.batch.remove": strictObject({ batchId: IdSchema, removed: Type.Array(IdSchema, { maxItems: IMAGE_BATCH_LIMITS.rows }) })
+  "image.batch.remove": strictObject({ batchId: IdSchema, removed: Type.Array(IdSchema, { maxItems: IMAGE_BATCH_LIMITS.rows }) }),
+  "image.template.create": strictObject({ projectId: IdSchema, title: Type.String({ minLength: 1, maxLength: L.title }), slots: Type.Array(IdSchema, { maxItems: IMAGE_TEMPLATE_SLOT_LIMIT }) }),
+  "image.template.instantiate": Type.Union([strictObject({ status: Type.Literal("created"), projectId: IdSchema }),
+    strictObject({ status: Type.Literal("refused"), reason: Type.String({ minLength: 1, maxLength: 500 }) })])
 };
 
 export const ImageEventPayloadSchemas: Record<keyof ImageEventPayloads, TSchema> = {

@@ -37,6 +37,11 @@ export interface ImageCommandPayloads {
   "image.batch.create": { projectId: string; revision: number; rows: { row: number; texts: { layer: string; text: string }[] }[] };
   /** Removes every project of the batch; the source project is never part of it. */
   "image.batch.remove": { batchId: string };
+  /** Copies the revision as a template beside it, every text and image layer a slot (P5). */
+  "image.template.create": { projectId: string; revision: number };
+  /** A new plain project from a template: slot words, and per image slot a staged picture. */
+  "image.template.instantiate": { templateId: string; projectId: string; title: string;
+    texts: { layer: string; text: string }[]; images: { layer: string; attachmentId: string }[] };
 }
 
 /** One preset's outcome: a new project beside the source, or the reason the layout does not fit. */
@@ -63,6 +68,10 @@ export interface ImageProjectSummary {
   readyCandidates: number;
   /** For a size derived from another project: which project, revision and preset it came from. */
   derivedFrom?: { projectId: string; revision: number; preset: ImageSizePreset };
+  /** Set on a template (its document marks slots). */
+  template?: true;
+  /** For a project made from a template: which template and revision. */
+  fromTemplate?: { projectId: string; revision: number };
   /** For a batch row: the batch, its row and the project and revision it came from. */
   batch?: { batchId: string; row: number; projectId: string; revision: number };
 }
@@ -103,6 +112,8 @@ export interface ImageCommandResults {
   "image.project.derive": { projectId: string; revision: number; results: ImageDeriveOutcome[] };
   "image.batch.create": { projectId: string; revision: number; batchId: string; results: ImageBatchRowOutcome[] };
   "image.batch.remove": { batchId: string; removed: string[] };
+  "image.template.create": { projectId: string; title: string; slots: string[] };
+  "image.template.instantiate": { status: "created"; projectId: string } | { status: "refused"; reason: string };
   "image.project.addFont": ImageRevisionResult & { fontId: string; family: string };
   "image.project.addAsset": ImageRevisionResult & { assetId: string };
   /** Each shown text read back from the full-size render by offline OCR (P4 checkpoint 8). */

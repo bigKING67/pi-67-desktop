@@ -68,6 +68,30 @@ Confirmed by the user: batch first, CSV only, a batch is a group of projects in 
 - Evidence: a 50-row price change and its removal timed in the packaged app; engine, Host,
   protocol, Agent, renderer (CSV parsing and matching) tests and e2e.
 
+## Checkpoint 2 design (templates)
+
+Confirmed by the user 2026-10-11: a template is a copied project with marked slots, a project
+made from it locks every layer that is not a slot, and image slots come in this checkpoint.
+
+- Schema (v3, written only on templates): document `template: { slots: [layer ids] }`, up to 20
+  text or image layers. `set_template { slots | null }` edits the slots (null makes it a plain
+  project again); slots whose layer is removed drop out by themselves.
+- `存为模板` copies the revision on screen into a sibling template project
+  (`Template from <project> revision <r>`), slots preset to every text and image layer.
+- `从模板新建` asks for a title, each text slot's words (prefilled) and, per image slot, an
+  optional new picture (staged through Main like a photo, laid in with the slot's box and fit);
+  the new project (`From template <template> revision <r>`) carries no template field, its slots
+  unlocked and every other layer locked. Text fits and is refused like a batch row.
+- A batch run on a template makes instances the same way (no template field, non-slots locked).
+- One engine core writes every variant (batch row or instance): texts, images, the lock rule,
+  fitting and the sibling write.
+- Host `image.template.create`, `image.template.instantiate`; the library lists templates in
+  their own row (`模板`) and marks projects made from one (`来自模板 …`). Agent: `set_template`
+  in `image_project_edit` and `image_from_template` (image slots from local files).
+- Evidence: engine (slots, locks, image slot replacement, schema), Host, protocol, Agent,
+  renderer and e2e; packaged screenshots of the template row, the 属性 slot toggle and the
+  新建 dialog.
+
 ## Rollback
 
 Each checkpoint is additive; the batch writes only new sibling projects and export folders, so
@@ -106,3 +130,12 @@ removing the feature leaves every existing project as it was.
   (read once per batch); removal scanned the whole library (only `<source>-<batch>-<row>` names,
   each checked against its first revision); batch grouping was written five times (one
   `batchGroups` helper).
+- 2026-10-11: checkpoint 2a (engine, Host, protocol, Agent). `template` (v3) with `set_template`,
+  slots pruned with their layers and restored by revert; one variant core (`variant.ts`) writes
+  batch rows and template instances (texts, imported pictures, the lock rule, fitting; new
+  pictures saved beside the copied files); `createTemplate` / `instantiateTemplate`; Host
+  `image.template.create` / `.instantiate` (staged pictures through one work folder, removed
+  afterwards) and `template` / `fromTemplate` in the listing; Agent `set_template`,
+  `template_slots` in reads and `image_from_template`. The Host file passed the 460-line limit,
+  so the listing and lineage (`image-project-list.ts`), batch and template commands
+  (`image-variant-commands.ts`) and shared helpers (`image-host-support.ts`) moved out.

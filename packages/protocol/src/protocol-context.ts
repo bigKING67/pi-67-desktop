@@ -174,6 +174,8 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "image.project.derive": "workspace",
   "image.batch.create": "workspace",
   "image.batch.remove": "workspace",
+  "image.template.create": "workspace",
+  "image.template.instantiate": "workspace",
   "image.project.addFont": "workspace",
   "image.project.addAsset": "workspace",
   "image.project.checkText": "workspace",

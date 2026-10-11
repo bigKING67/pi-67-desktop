@@ -4,6 +4,7 @@ import { errorCode, sha256, writeOnce } from "./content-store.js";
 import { isShown, textObjects, validateDocument, type ImageDocument } from "./document.js";
 import { encode } from "./project.js";
 import { copyProjectFiles } from "./project-copy.js";
+import { saveAsset, type ImportedRaster } from "./raster.js";
 import { compose } from "./render-compose.js";
 
 // A sibling project is a fresh one-revision project written beside its source from one
@@ -42,13 +43,15 @@ export async function fitText(root: string, font: Buffer, fonts: ReadonlyMap<str
   return [...shrunk];
 }
 
-/** Writes `document` as revision 1 of a new project at `target`, with the source's files. */
-export async function writeSibling(sourceRoot: string, target: string, document: ImageDocument): Promise<Buffer> {
+/** Writes `document` as revision 1 of a new project at `target`, with the source's files and any newly imported images. */
+export async function writeSibling(sourceRoot: string, target: string, document: ImageDocument, imports: readonly ImportedRaster[] = []): Promise<Buffer> {
   try { await fs.mkdir(target); }
   catch (error) { if (errorCode(error) === "EEXIST") throw new Error("Derived project already exists"); throw error; }
   const bytes = encode(document);
   try {
-    await copyProjectFiles(sourceRoot, target, document);
+    const fresh = new Set(imports.map((imported) => imported.asset.id));
+    await copyProjectFiles(sourceRoot, target, { ...document, assets: document.assets.filter((asset) => !fresh.has(asset.id)) });
+    for (const imported of imports) await saveAsset(target, imported);
     await writeOnce(path.join(target, "revisions/000001.json"), { bytes }, { expected: sha256(bytes) });
   } catch (error) {
     // Only this call created the directory; nothing else lives there yet.

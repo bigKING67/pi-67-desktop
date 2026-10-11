@@ -50,8 +50,8 @@ const job = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("image workbench tools", { timeout: 120_000 }, () => {
-  it("registers eight tools", () => {
-    expect(harness("/tmp").names).toEqual(["image_project_create_from_photo", "image_project_read", "image_project_edit", "image_batch", "image_render", "image_candidates", "image_candidate_decide", "image_generate"]);
+  it("registers nine tools", () => {
+    expect(harness("/tmp").names).toEqual(["image_project_create_from_photo", "image_project_read", "image_project_edit", "image_batch", "image_from_template", "image_render", "image_candidates", "image_candidate_decide", "image_generate"]);
   });
 
   it("creates, reads, edits, renders, generates, lists and accepts through the engine", async () => {
@@ -132,6 +132,21 @@ describe("image workbench tools", { timeout: 120_000 }, () => {
     const grouped = await t.json("image_project_read", { project_id: "poster" });
     expect(grouped.groups).toEqual([{ id: "title-set", name: "标题", locked: false, visible: true, opacity: 1 }]);
     expect((grouped.objects as { id: string }[]).find((object) => object.id === "ring")).toMatchObject({ group_id: "title-set" });
+  });
+
+  it("lets the Agent mark template slots and start a project from the template with a new picture", async () => {
+    const cwd = await workspace();
+    await sharp({ create: { width: 640, height: 640, channels: 3, background: "#d8c8b0" } }).png().toFile(path.join(cwd, "photo.png"));
+    await sharp({ create: { width: 320, height: 320, channels: 3, background: "#204060" } }).png().toFile(path.join(cwd, "new.png"));
+    const t = harness(cwd);
+    await t.json("image_project_create_from_photo", { project_id: "poster", source: "photo.png", headline: "春日" });
+    expect((await t.json("image_project_edit", { project_id: "poster", base_revision: 1, summary: "存为模板", operations: [{ type: "set_template", slots: ["headline", "photo"] }] })).revision).toBe(2);
+    expect((await t.json("image_project_read", { project_id: "poster" })).template_slots).toEqual(["headline", "photo"]);
+    expect(await t.json("image_from_template", { template_id: "poster", project_id: "summer", title: "夏日", texts: [{ layer: "headline", text: "夏日" }], images: [{ layer: "photo", source: "new.png" }] }))
+      .toEqual({ status: "created", project_id: "summer", shrunk_text: 0 });
+    const summer = await t.json("image_project_read", { project_id: "summer" });
+    expect(summer).not.toHaveProperty("template_slots");
+    expect((summer.objects as { id: string; locked: boolean }[]).every((object) => object.locked === !["headline", "photo"].includes(object.id))).toBe(true);
   });
 
   it("lets the Agent make a batch of priced variants from table rows, with refused rows explained", async () => {
