@@ -354,6 +354,11 @@ Application-level surfaces use a separate wide-window shell:
   the 字体 select with `品牌库` as detail; 图层's 添加 row gains a `Logo` text action (stamp glyph)
   opening the shared file-menu popover with one item per logo. In the narrow inspector the 添加
   row's caption takes only its text and its labels never wrap (the row may wrap instead).
+  导出 adds `按规格导出` after 原尺寸 PNG when the kit has specs: a caption heading over the
+  candidate-list rows (spec name strong, size · cap · 白底 as meta, a `导出` text action with the
+  download glyph) and a tertiary hint. Exact sizes join 已生成的尺寸 as `规格尺寸` with their size. The export check dialog lists spec failures first (the
+  failure strong, `规格` as meta) above unreadable texts; its heading counts both, and the text
+  hint shows only when texts are listed.
 - Text fonts (P3, 2026-10-10): 属性 for text adds a `字体` section — the shared Settings
   select at full panel width (`Noto Sans CJK SC · 内置`, then each added font's family with
   `TTF`/`OTF` as detail), a `添加字体…` text action with a plus glyph (disabled at 8 fonts or

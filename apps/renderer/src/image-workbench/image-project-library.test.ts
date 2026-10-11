@@ -152,4 +152,47 @@ describe("image library work: batches, templates, hand-off, brand", () => {
   });
 
 
+
+  it("exports for a brand spec: derives another size, lists what breaks the spec, and saves only when told", async () => {
+    const { exportImageForSpec, specIssues, useImageTextChecks } = await import("./image-project-export.js");
+    expect(specIssues({ id: "s", name: "主图", width: 800, height: 800, max_bytes: 3_000_000, background: "white" }, { width: 800, height: 800, bytes: 3_400_000, whiteEdges: false }))
+      .toEqual(["文件 3.4 MB，超过上限 3 MB", "四边不是全白（规格要求白底）"]);
+    const saveImage = vi.fn(() => Promise.resolve(undefined));
+    vi.stubGlobal("window", { pi67: { system: { saveImage } } });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array(4), { status: 200 })));
+    // Edges read white except where a test darkens one pixel.
+    let edge = 255;
+    vi.stubGlobal("createImageBitmap", vi.fn(async () => ({ width: 2, height: 2, close: () => undefined })));
+    vi.stubGlobal("OffscreenCanvas", class { getContext() { return { drawImage: () => undefined, getImageData: (_x: number, _y: number, w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4).fill(255).fill(edge, 0, 1) }) }; } });
+    try {
+      // The canvas is 100×100: a 100×100 spec exports this revision, white and small enough.
+      await exportImageForSpec({ id: "s1", name: "方图", width: 100, height: 100, max_bytes: 10, background: "white" });
+      expect(saveImage).toHaveBeenCalledWith({ workspaceId: "lib", projectId: "p", pngSha256: "a".repeat(64), fileName: "海报 方图" });
+      expect(host.calls.some((call) => call.type === "image.project.deriveSize")).toBe(false);
+
+      // Another size is derived first; what breaks the spec waits for the person.
+      edge = 254;
+      const pending = exportImageForSpec({ id: "s2", name: "主图", width: 300, height: 300, background: "white" });
+      await vi.waitFor(() => expect(useImageTextChecks.getState().pending).toBeDefined());
+      expect(host.calls.find((call) => call.type === "image.project.deriveSize")?.payload).toEqual({ projectId: "p", revision: 1, width: 300, height: 300, name: "主图" });
+      expect(useImageTextChecks.getState().pending?.issues).toEqual(["尺寸是 100×100，规格要求 300×300", "四边不是全白（规格要求白底）"]);
+      useImageTextChecks.getState().pending!.decide(false);
+      await pending;
+      expect(saveImage).toHaveBeenCalledTimes(1);
+
+      // A size the layout cannot fit is said, and nothing is exported.
+      await exportImageForSpec({ id: "s3", name: "放不下", width: 300, height: 10 });
+      expect(notices.at(-1)).toMatchObject({ title: "没能生成「放不下」的尺寸" });
+      expect(saveImage).toHaveBeenCalledTimes(1);
+      expect(useImageProject.getState().busy).toBe(false);
+
+      // A PNG that cannot be read for the spec is said, and the export goes on.
+      vi.stubGlobal("createImageBitmap", vi.fn(() => Promise.reject(new Error("decode"))));
+      await exportImageForSpec({ id: "s1", name: "方图", width: 100, height: 100, background: "white" });
+      expect(notices.some((notice) => notice.title === "没能核对规格")).toBe(true);
+      expect(saveImage).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

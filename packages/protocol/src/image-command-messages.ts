@@ -49,6 +49,8 @@ export interface ImageCommandPayloads {
   "image.project.useBrandFont": { projectId: string; baseRevision: number; fontId: string; objectId: string };
   /** Adds a brand logo as a new image layer at the top right (its longer side 20% of the canvas's short edge). */
   "image.project.addBrandLogo": { projectId: string; baseRevision: number; logoId: string };
+  /** Derives one exact size (a brand spec) from a revision as a sibling project, titled with `name`. */
+  "image.project.deriveSize": { projectId: string; revision: number; width: number; height: number; name: string };
   /** A staged PNG/JPEG/WebP added to the kit as a logo. */
   "image.brand.addLogo": { baseRevision: number; name: string; attachmentId: string };
   /** Copies the revision as a template beside it, every text and image layer a slot (P5). */
@@ -62,6 +64,11 @@ export interface ImageCommandPayloads {
 export type ImageDeriveOutcome =
   | { preset: ImageSizePreset; status: "derived"; projectId: string; title: string; canvas: ImageCanvas; shrunkText: number }
   | { preset: ImageSizePreset; status: "refused"; reason: string };
+
+/** An exact size's outcome (`image.project.deriveSize`): as a preset's, without the ratio. */
+export type ImageDeriveSizeOutcome =
+  | { status: "derived"; projectId: string; title: string; canvas: ImageCanvas; shrunkText: number }
+  | { status: "refused"; reason: string };
 
 /** One table row of a batch, numbered from 1 in table order. */
 export type ImageBatchRowOutcome =
@@ -80,8 +87,8 @@ export interface ImageProjectSummary {
   canvas: ImageCanvas;
   updatedAt: number;
   readyCandidates: number;
-  /** For a size derived from another project: which project, revision and preset it came from. */
-  derivedFrom?: { projectId: string; revision: number; preset: ImageSizePreset };
+  /** For a size derived from another project: which project, revision and preset it came from (no preset for an exact size). */
+  derivedFrom?: { projectId: string; revision: number; preset?: ImageSizePreset };
   /** Set on a template (its document marks slots). */
   template?: true;
   /** For a project made from a template: which template and revision. */
@@ -130,6 +137,7 @@ export interface ImageCommandResults {
   "image.brand.read": ImageBrandKit;
   "image.project.useBrandFont": ImageRevisionResult;
   "image.project.addBrandLogo": ImageRevisionResult & { objectId: string };
+  "image.project.deriveSize": { projectId: string; revision: number; result: ImageDeriveSizeOutcome };
   "image.brand.edit": ImageBrandKit;
   "image.brand.addFont": ImageBrandKit;
   "image.brand.addLogo": ImageBrandKit;

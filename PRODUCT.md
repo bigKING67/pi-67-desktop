@@ -1624,8 +1624,17 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   another font, and choosing one binds it into the project once (by digest) and sets it; 图层 →
   `Logo` inserts a brand logo as an image layer at the top right (its longer side 20% of the
   canvas's short edge, 4% from the edges), selected, reusing the project's copy when inserted
-  again. Each is one undo step; the kit is read again when a project opens. The Agent reads the kit with `image_brand_read` and uses its colours; brand fonts
-  and logos stay the person's to bind, as with fonts.
+  again. Each is one undo step; the kit is read again when a project opens. The Agent reads
+  the kit with `image_brand_read` and uses its colours; brand fonts and logos stay the person's
+  to bind, as with fonts.
+  导出 lists the specs under `按规格导出`. Exporting for a spec uses this revision when the canvas
+  already has the spec's size; otherwise the newest project derived from this revision at that
+  size (with its own later edits), or a new one derived now by the multi-size rule at the
+  exact size (`<title> · <spec name>`, listed with the other sizes). The full-size PNG is then
+  checked against the spec — exact size, file size under the cap, every edge pixel opaque white
+  for 白底 — together with the keyed-text check; anything that fails is listed in one dialog
+  and the person exports anyway or cancels. A size the layout cannot fit is said, and nothing
+  is exported. The file is named `<title> <spec name>`.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

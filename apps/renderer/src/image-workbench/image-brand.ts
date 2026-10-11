@@ -1,4 +1,4 @@
-import type { ImageBrandKit, ImageBrandOperation } from "@pi67/domain";
+import type { ImageBrandKit, ImageBrandOperation, ImageBrandSpec } from "@pi67/domain";
 import { useEffect } from "react";
 import { create } from "zustand";
 import { publishNotification } from "../notifications/notification-store.js";
@@ -75,6 +75,13 @@ function brandFailure(message: string): string {
   if (/canvas limit/u.test(message)) return "规格尺寸超出画布上限（单边 8192、总计 1677 万像素）。";
   return message;
 }
+
+/** Megabytes as the person enters them (1 MB = 1,000,000 bytes), to one decimal. */
+export const megabytes = (bytes: number): string => `${Math.round(bytes / 100_000) / 10} MB`;
+
+/** A spec in one line: size, file-size cap, background rule. */
+export const specDetail = (spec: ImageBrandSpec): string =>
+  [`${spec.width}×${spec.height}`, ...(spec.max_bytes ? [`≤ ${megabytes(spec.max_bytes)}`] : []), ...(spec.background ? ["白底"] : [])].join(" · ");
 
 /** The next free id for a new colour or spec. */
 export function nextBrandId(list: readonly { id: string }[], prefix: string): string {

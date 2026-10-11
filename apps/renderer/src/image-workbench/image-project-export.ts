@@ -1,11 +1,12 @@
-import { IMAGE_SIZE_PRESETS, TEAM_CHAT_ATTACHMENT_LIMITS, teamChatAttachmentRejection, type ImageCanvas } from "@pi67/domain";
+import { IMAGE_SIZE_PRESETS, TEAM_CHAT_ATTACHMENT_LIMITS, teamChatAttachmentRejection, type ImageBrandSpec, type ImageCanvas } from "@pi67/domain";
 import type { ImageProjectSummary, ImageTextCheck } from "@pi67/protocol";
 import { create } from "zustand";
 import { publishNotification } from "../notifications/notification-store.js";
 import { libraryId, request, useImageProject } from "./image-project-controller.js";
 import { useTeamChatDialogStore } from "../team-chat/team-chat-dialog-store.js";
 import type { HandoffPicture } from "../team-chat/team-chat-work-bridge.js";
-import { imagePreviewUrl } from "./image-workbench-controller.js";
+import { megabytes } from "./image-brand.js";
+import { imagePreviewUrl, loadImageLibrary } from "./image-workbench-controller.js";
 import { useImageWorkbench } from "./image-workbench-store.js";
 
 // Export, with the keyed-text check first (P4 checkpoint 8): every shown text is read back
@@ -20,15 +21,18 @@ const isClear = (check: ImageTextCheck): boolean => check.passed && !check.lowCo
 /** What the check guards, for its dialog's words: an export to a folder or a send to the team. */
 type TextCheckPurpose = "export" | "handoff";
 interface TextCheckState {
-  /** Texts the last export check could not read, waiting for 仍然导出 or 取消. */
-  pending: { unread: UnreadText[]; purpose: TextCheckPurpose; decide: (proceed: boolean) => void } | undefined;
+  /** Texts the last export check could not read, and what the PNG breaks of a spec, waiting for 仍然导出 or 取消. */
+  pending: { unread: UnreadText[]; issues: string[]; purpose: TextCheckPurpose; decide: (proceed: boolean) => void } | undefined;
   /** Per `project/candidate`, the texts its render could not read; checked once when it is ready. */
   candidates: Record<string, ImageTextCheck[]>;
 }
 export const useImageTextChecks = create<TextCheckState>(() => ({ pending: undefined, candidates: {} }));
 
-/** Checks each target; resolves true when everything reads, or when the person chooses to export anyway. */
-async function textsReadable(targets: readonly { projectId: string; revision?: number; label: string }[], purpose: TextCheckPurpose = "export"): Promise<boolean> {
+/**
+ * Checks each target; resolves true when everything reads and `issues` (a spec's, found before)
+ * is empty, or when the person chooses to export anyway.
+ */
+async function textsReadable(targets: readonly { projectId: string; revision?: number; label: string }[], purpose: TextCheckPurpose = "export", issues: readonly string[] = []): Promise<boolean> {
   const unread: UnreadText[] = [];
   try {
     for (const target of targets) {
@@ -38,10 +42,10 @@ async function textsReadable(targets: readonly { projectId: string; revision?: n
     }
   } catch {
     publishNotification({ level: "warning", title: "没能核对图中文字", message: `这次${purpose === "export" ? "导出" : "发送"}没有检查文字是否完整可读。` });
-    return true;
+    unread.length = 0;
   }
-  if (!unread.length) return true;
-  return new Promise((resolve) => useImageTextChecks.setState({ pending: { unread, purpose, decide: (proceed) => { useImageTextChecks.setState({ pending: undefined }); resolve(proceed); } } }));
+  if (!unread.length && !issues.length) return true;
+  return new Promise((resolve) => useImageTextChecks.setState({ pending: { unread, issues: [...issues], purpose, decide: (proceed) => { useImageTextChecks.setState({ pending: undefined }); resolve(proceed); } } }));
 }
 
 export const candidateCheckKey = (projectId: string, candidateId: string): string => `${projectId}/${candidateId}`;
@@ -86,13 +90,19 @@ export function exportImageProject(): Promise<void> {
 
 /** Sizes derived from exactly this revision; ones from earlier revisions stay in the library but out of the set. */
 export function derivedSizes(projects: readonly ImageProjectSummary[], projectId: string | undefined, revision: number | undefined): { current: ImageProjectSummary[]; older: ImageProjectSummary[] } {
-  // The library knows every size derived from this project, in any session; per preset the newest from this revision goes in the set.
+  // The library knows every size derived from this project, in any session.
+  // Presets in their order, then exact sizes (brand specs) by size; one per size goes in the set.
+  const order = (project: ImageProjectSummary): number => {
+    const preset = project.derivedFrom!.preset;
+    return preset ? IMAGE_SIZE_PRESETS.indexOf(preset) : IMAGE_SIZE_PRESETS.length;
+  };
+  const size = (project: ImageProjectSummary): string => `${project.canvas.width}x${project.canvas.height}`;
   const mine = projects.filter((project) => project.derivedFrom?.projectId === projectId)
-    .sort((a, b) => IMAGE_SIZE_PRESETS.indexOf(a.derivedFrom!.preset) - IMAGE_SIZE_PRESETS.indexOf(b.derivedFrom!.preset) || b.updatedAt - a.updatedAt);
+    .sort((a, b) => order(a) - order(b) || a.canvas.width * a.canvas.height - b.canvas.width * b.canvas.height || b.updatedAt - a.updatedAt);
   const current: ImageProjectSummary[] = [], older: ImageProjectSummary[] = [];
   for (const project of mine) {
     const sameRevision = project.derivedFrom!.revision === revision;
-    if (sameRevision && !current.some((item) => item.derivedFrom!.preset === project.derivedFrom!.preset)) current.push(project);
+    if (sameRevision && !current.some((item) => size(item) === size(project))) current.push(project);
     else older.push(project);
   }
   return { current, older };
@@ -114,6 +124,13 @@ function currentSet(): { title: string; members: SetMember[] } | undefined {
   const fileName = (size: string) => `${document.title} ${size}`;
   return { title: document.title, members: [{ projectId, revision, canvas: document.canvas, label: document.title, fileName },
     ...sizes.map((item) => ({ projectId: item.projectId, canvas: item.canvas, label: `${item.canvas.width}×${item.canvas.height}`, fileName }))] };
+}
+
+/** A verified PNG from the preview cache, read as the page's own resource (never a path). */
+async function renderedBlob(projectId: string, pngSha256: string): Promise<Blob> {
+  const response = await fetch(imagePreviewUrl(libraryId(), projectId, pngSha256));
+  if (!response.ok) throw new Error("没能读取渲染好的图片");
+  return response.blob();
 }
 
 /** One member rendered at full size into the preview cache. */
@@ -173,10 +190,7 @@ async function handoffPictures(title: string, members: readonly SetMember[]): Pr
     const pictures: HandoffPicture[] = [];
     for (const member of members) {
       const rendered = await renderFull(member);
-      // The verified PNG from the preview cache, read as the page's own resource (never a path).
-      const response = await fetch(imagePreviewUrl(libraryId(), member.projectId, rendered.pngSha256));
-      if (!response.ok) throw new Error("没能读取渲染好的图片");
-      const file = new File([await response.blob()], `${base} ${rendered.width}×${rendered.height}.png`, { type: "image/png" });
+      const file = new File([await renderedBlob(member.projectId, rendered.pngSha256)], `${base} ${rendered.width}×${rendered.height}.png`, { type: "image/png" });
       if (teamChatAttachmentRejection(file) === "size") throw new Error(`${member.label} 超过 25 MB，不能随任务卡发送；可以先导出，再在会话里作为文件发送。`);
       pictures.push({ file, size: { width: rendered.width, height: rendered.height } });
     }
@@ -184,4 +198,94 @@ async function handoffPictures(title: string, members: readonly SetMember[]): Pr
   } finally {
     exporting = false;
   }
+}
+
+/** What a rendered PNG breaks of a spec, in words; empty when it meets it. `whiteEdges` is read only for a white-background spec. */
+export function specIssues(spec: ImageBrandSpec, png: { width: number; height: number; bytes?: number; whiteEdges?: boolean }): string[] {
+  return [
+    ...(png.width !== spec.width || png.height !== spec.height ? [`尺寸是 ${png.width}×${png.height}，规格要求 ${spec.width}×${spec.height}`] : []),
+    ...(spec.max_bytes !== undefined && png.bytes !== undefined && png.bytes > spec.max_bytes ? [`文件 ${megabytes(png.bytes)}，超过上限 ${megabytes(spec.max_bytes)}`] : []),
+    ...(spec.background === "white" && png.whiteEdges === false ? ["四边不是全白（规格要求白底）"] : [])
+  ];
+}
+
+/** Whether every pixel on the PNG's four edges is opaque white, read strip by strip without colour conversion. */
+async function edgesWhite(blob: Blob): Promise<boolean> {
+  const bitmap = await createImageBitmap(blob, { colorSpaceConversion: "none", premultiplyAlpha: "none" });
+  try {
+    const { width, height } = bitmap;
+    return [[0, 0, width, 1], [0, height - 1, width, 1], [0, 0, 1, height], [width - 1, 0, 1, height]].every(([x, y, w, h]) => {
+      const context = new OffscreenCanvas(w!, h!).getContext("2d");
+      if (!context) throw new Error("没能读取渲染好的图片");
+      context.drawImage(bitmap, x!, y!, w!, h!, 0, 0, w!, h!);
+      return context.getImageData(0, 0, w!, h!).data.every((value) => value === 255);
+    });
+  } finally {
+    bitmap.close();
+  }
+}
+
+/**
+ * The project for a spec: this revision when the canvas already has its size; else the size the
+ * set would export (`derivedSizes`, so both exports agree); else a new one derived now. A size
+ * that cannot be laid out is said, and nothing is exported.
+ */
+async function specMember(spec: ImageBrandSpec): Promise<SetMember | undefined> {
+  const { projectId, revision, document } = useImageProject.getState();
+  if (!projectId || revision === undefined || !document) return undefined;
+  // Named by the spec, not the size it renders at.
+  const fileName = () => `${document.title} ${spec.name}`, canvas = { ...document.canvas, width: spec.width, height: spec.height };
+  if (document.canvas.width === spec.width && document.canvas.height === spec.height) return { projectId, revision, canvas, label: document.title, fileName };
+  const existing = derivedSizes(useImageWorkbench.getState().projects, projectId, revision).current
+    .find((item) => item.canvas.width === spec.width && item.canvas.height === spec.height);
+  if (existing) return { projectId: existing.projectId, canvas, label: existing.title, fileName };
+  const { result } = await request("image.project.deriveSize", { projectId, revision, width: spec.width, height: spec.height, name: spec.name });
+  if (result.status === "refused") {
+    // Only a text that does not fit has a fix to suggest here.
+    const fit = /放不下/u.test(result.reason) ? "，可以先在这个项目里缩短文字或加宽文本框。" : "";
+    publishNotification({ level: "warning", title: `没能生成「${spec.name}」的尺寸`, message: `${result.reason}${fit}` });
+    return undefined;
+  }
+  if (result.shrunkText) publishNotification({ level: "info", title: `已生成「${spec.name}」的尺寸`, message: `为放进 ${spec.width}×${spec.height}，缩小了 ${result.shrunkText} 段文字；可以打开「${result.title}」单独微调。` });
+  await loadImageLibrary();
+  return { projectId: result.projectId, canvas, label: result.title, fileName };
+}
+
+/**
+ * The PNG's size in bytes and white edges, read only when the spec has those rules. Like the
+ * keyed-text check, a read that fails never blocks the export: it is said, and skipped.
+ */
+async function fileFacts(spec: ImageBrandSpec, projectId: string, pngSha256: string): Promise<{ bytes?: number; whiteEdges?: boolean }> {
+  if (spec.max_bytes === undefined && spec.background !== "white") return {};
+  try {
+    const blob = await renderedBlob(projectId, pngSha256);
+    return { bytes: blob.size, ...(spec.background === "white" ? { whiteEdges: await edgesWhite(blob) } : {}) };
+  } catch {
+    publishNotification({ level: "warning", title: "没能核对规格", message: `这次导出没有检查文件大小${spec.background === "white" ? "和白底" : ""}。` });
+    return {};
+  }
+}
+
+/**
+ * 按规格导出: the spec's size (derived when the canvas differs), rendered at full size, checked
+ * against the spec (exact size, file size, white edges) and by the keyed-text check; anything
+ * that fails is listed and the person decides before Main saves the PNG.
+ */
+export function exportImageForSpec(spec: ImageBrandSpec): Promise<void> {
+  return oneExport(async () => {
+    if (useImageProject.getState().busy) return;
+    useImageProject.setState({ busy: true });
+    try {
+      const member = await specMember(spec);
+      if (!member) return;
+      const rendered = await renderFull(member);
+      const issues = specIssues(spec, { width: rendered.width, height: rendered.height, ...await fileFacts(spec, member.projectId, rendered.pngSha256) });
+      if (!await textsReadable([{ projectId: member.projectId, revision: rendered.revision, label: member.label }], "export", issues)) return;
+      await window.pi67.system.saveImage({ workspaceId: libraryId(), projectId: member.projectId, pngSha256: rendered.pngSha256, fileName: member.fileName(`${rendered.width}×${rendered.height}`) });
+    } catch (error) {
+      publishNotification({ level: "error", title: "导出失败", message: error instanceof Error ? error.message : "未知错误" });
+    } finally {
+      useImageProject.setState({ busy: false });
+    }
+  });
 }

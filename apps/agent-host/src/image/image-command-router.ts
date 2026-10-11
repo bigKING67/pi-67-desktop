@@ -21,6 +21,7 @@ const IMAGE_COMMANDS: ReadonlySet<string> = new Set<ImageCommandType>([
   "image.brand.read",
   "image.project.useBrandFont",
   "image.project.addBrandLogo",
+  "image.project.deriveSize",
   "image.brand.edit",
   "image.brand.addFont",
   "image.brand.addLogo",

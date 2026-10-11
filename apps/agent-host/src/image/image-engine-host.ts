@@ -125,6 +125,8 @@ export class ImageEngineHost {
         return instantiateTemplate(this.variants, engine, workspaceId, cwd, (command as Command<"image.template.instantiate">).payload);
       case "image.project.derive":
         return this.derive(engine, workspaceId, cwd, (command as Command<"image.project.derive">).payload);
+      case "image.project.deriveSize":
+        return this.deriveSize(engine, workspaceId, cwd, (command as Command<"image.project.deriveSize">).payload);
       case "image.project.read": {
         const { projectId, revision } = (command as Command<"image.project.read">).payload;
         const project = await readProject(projectRoot(cwd, projectId), { revision });
@@ -259,8 +261,27 @@ export class ImageEngineHost {
     });
   }
 
+  // One exact size (a brand spec), `<source>-<width>x<height>`, by the same rule as a preset.
+  private deriveSize(engine: ImageEngine, workspaceId: string, cwd: string,
+    { projectId, revision, width, height, name }: CommandPayloads["image.project.deriveSize"]): Promise<CommandResults["image.project.deriveSize"]> {
+    return this.queue.serial(key(workspaceId, projectId), async () => {
+      const root = engine.projectRoot(cwd, projectId);
+      const source = await engine.readProject(root, { revision });
+      const title = `${source.document.title.slice(0, 150)} · ${name}`;
+      try {
+        const result = await this.deriveOne(engine, cwd, root, { revision, sha256: source.sha256, size: { width, height }, title }, `${projectId.slice(0, 48)}-${width}x${height}`);
+        if (result.status === "refused") return { projectId, revision, result: { status: "refused", reason: result.reason } };
+        this.announce(workspaceId, event("image.project.changed", { projectId: result.project_id, revision: 1, sha256: result.sha256, author: "system" }));
+        return { projectId, revision, result: { status: "derived", projectId: result.project_id, title, canvas: result.canvas, shrunkText: result.shrunk.length } };
+      } catch (error) {
+        return { projectId, revision, result: { status: "refused", reason: `没能生成：${imageEngineError(error).message}`.slice(0, 500) } };
+      }
+    });
+  }
+
   // Another writer may claim the free name first (another window, the Agent): take the next one.
-  private async deriveOne(engine: ImageEngine, cwd: string, root: string, input: { revision: number; sha256: string; preset: ImageSizePreset; title: string }, base: string) {
+  private async deriveOne(engine: ImageEngine, cwd: string, root: string,
+    input: { revision: number; sha256: string; title: string } & ({ preset: ImageSizePreset } | { size: { width: number; height: number } }), base: string) {
     for (let attempt = 0; ; attempt += 1) {
       const derivedId = await freeProjectId(engine, cwd, base, "这个尺寸已经派生过太多次，请先整理创作库。");
       const target = engine.projectRoot(cwd, derivedId);

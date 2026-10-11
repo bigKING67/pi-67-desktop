@@ -69,6 +69,9 @@ export const mockConnection = {
       if (type === "image.project.derive") return Promise.resolve({ projectId: "p", revision: host.revision, results: (payload.presets as string[]).map((preset) => preset === "16x9"
         ? { preset, status: "refused", reason: "文字「春日」在 178×100 里放不下" }
         : { preset, status: "derived", projectId: `p-${preset}`, title: `海报 · ${preset}`, canvas: { width: 100, height: 100, background: "#fff" }, shrunkText: 0 }) });
+      if (type === "image.project.deriveSize") return Promise.resolve({ projectId: "p", revision: host.revision, result: payload.name === "放不下"
+        ? { status: "refused", reason: "文字「春日」在 300×10 里放不下" }
+        : { status: "derived", projectId: `p-${String(payload.width)}x${String(payload.height)}`, title: `海报 · ${String(payload.name)}`, canvas: { width: payload.width, height: payload.height, background: "#fff" }, shrunkText: 0 } });
       return Promise.reject(new Error(`unexpected ${type}`));
     }
   }

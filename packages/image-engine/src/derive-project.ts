@@ -2,7 +2,7 @@ import { sha256 } from "./content-store.js";
 import { digest, documentSchema, id, LIMITS, number, record, textObjects, validateCanvas, type Canvas, type ImageDocument, type SceneObject } from "./document.js";
 import { readProject } from "./project.js";
 import { regularPath } from "./raster.js";
-import { IMAGE_SIZE_PRESETS, imageSizePresetFits, imageSizePresetLabel, imageSizePresetSize, type ImageSizePreset } from "@pi67/domain";
+import { IMAGE_PROJECT_LIMITS, IMAGE_SIZE_PRESETS, imageSizePresetFits, imageSizePresetLabel, imageSizePresetSize, type ImageSizePreset } from "@pi67/domain";
 import { fitText, writeSibling } from "./sibling-project.js";
 
 // Multi-size presets (product model §7 F, decided 2026-10-10): each size is a
@@ -61,42 +61,49 @@ function withScaledBlur(object: SceneObject, scale: number): SceneObject {
 
 const clamp = (value: number, max: number): number => Math.min(Math.max(0, max), Math.max(0, value));
 
-interface DeriveInput { revision: number; sha256: string; preset: DerivePreset; project_id: string; title: string }
+interface DeriveInput { revision: number; sha256: string; preset?: DerivePreset; size?: { width: number; height: number }; project_id: string; title: string }
+/** `preset` names the ratio derived; a size given exactly (a brand spec) has none. */
 export type DeriveResult =
-  | { status: "derived"; preset: DerivePreset; project_id: string; title: string; canvas: Canvas; shrunk: string[]; sha256: string }
-  | { status: "refused"; preset: DerivePreset; reason: string };
+  | { status: "derived"; preset?: DerivePreset; project_id: string; title: string; canvas: Canvas; shrunk: string[]; sha256: string }
+  | { status: "refused"; preset?: DerivePreset; reason: string };
 
 /**
  * Writes a new project at `target` holding one revision: the source revision
- * re-laid out for the preset. Text that overflows shrinks in 5% steps to 70% of
- * its proportional size; past that the preset is refused naming the text, and
- * nothing is written. The source project is only read.
+ * re-laid out for a preset's ratio or for an exact `size` (P5: a brand spec).
+ * Text that overflows shrinks in 5% steps to 70% of its proportional size; past
+ * that the size is refused naming the text, and nothing is written. The source
+ * project is only read.
  */
 export async function deriveProject(sourceRoot: string, target: string, input: unknown): Promise<DeriveResult> {
-  record(input, ["revision", "sha256", "preset", "project_id", "title"], "derive input");
+  record(input, ["revision", "sha256", "preset", "size", "project_id", "title"], "derive input");
   number(input.revision, "revision", 1, LIMITS.revisions, true); digest(input.sha256); id(input.project_id, "derived project id");
-  if (!isDerivePreset(input.preset)) throw new Error("Unknown size preset");
+  if ((input.preset === undefined) === (input.size === undefined)) throw new Error("Derive needs either a preset or a size");
+  if (input.preset !== undefined && !isDerivePreset(input.preset)) throw new Error("Unknown size preset");
+  if (input.size !== undefined) {
+    record(input.size, ["width", "height"], "derive size");
+    number(input.size.width, "derive width", IMAGE_PROJECT_LIMITS.minCanvasEdge, IMAGE_PROJECT_LIMITS.edge, true); number(input.size.height, "derive height", IMAGE_PROJECT_LIMITS.minCanvasEdge, IMAGE_PROJECT_LIMITS.edge, true);
+  }
   if (typeof input.title !== "string" || !input.title || input.title.length > 200) throw new Error("Invalid derived title");
   const { revision, preset, project_id: projectId, title } = input as unknown as DeriveInput;
   const root = await regularPath(sourceRoot, { directory: true });
   const source = await readProject(root, { revision });
   if (source.sha256 !== input.sha256) throw new Error("Stale source binding: the source revision changed");
-  if (!imageSizePresetFits(imageSizePresetSize(source.document.canvas, preset))) {
-    const { width, height } = imageSizePresetSize(source.document.canvas, preset);
-    return { status: "refused", preset, reason: `${width}×${height} 超出画布上限（单边 8192、总计 1677 万像素）` };
-  }
-  const canvas = presetCanvas(source.document.canvas, preset);
+  const size = preset ? imageSizePresetSize(source.document.canvas, preset) : (input as unknown as DeriveInput).size!;
+  const named = preset ? { preset } : {};
+  if (!imageSizePresetFits(size)) return { status: "refused", ...named, reason: `${size.width}×${size.height} 超出画布上限（单边 8192、总计 1677 万像素）` };
+  const canvas = preset ? presetCanvas(source.document.canvas, preset) : validateCanvas({ ...size, background: source.document.canvas.background });
   const { font, fonts } = source;
 
   const laid = relayoutObjects(source.document.objects, source.document.canvas, canvas);
   const proportional = new Map(textObjects(laid).map((object) => [object.id, object.font_size]));
   // Relayout can drop a v3 field (a blur that scales to nothing), so the schema is worked out again.
+  const summary = `Derived from ${source.document.project_id} revision ${revision} ${preset ? `for ${imageSizePresetLabel(preset)}` : `at ${size.width}x${size.height}`}`;
   const document: ImageDocument = { ...structuredClone(source.document), schema: documentSchema({ ...source.document, objects: laid }), project_id: projectId, title, revision: 1, parent_sha256: null, canvas, objects: laid,
-    change: { author: "system", summary: `Derived from ${source.document.project_id} revision ${revision} for ${imageSizePresetLabel(preset)}`, operations: ["create"] } };
+    change: { author: "system", summary, operations: ["create"] } };
   const fitted = await fitText(root, font, fonts, document, proportional);
-  if (typeof fitted === "string") return { status: "refused", preset, reason: fitted };
+  if (typeof fitted === "string") return { status: "refused", ...named, reason: fitted };
   const bytes = await writeSibling(root, target, document);
-  return { status: "derived", preset, project_id: projectId, title, canvas, shrunk: fitted, sha256: sha256(bytes) };
+  return { status: "derived", ...named, project_id: projectId, title, canvas, shrunk: fitted, sha256: sha256(bytes) };
 }
 
 export const isDerivePreset = (value: unknown): value is DerivePreset => typeof value === "string" && (IMAGE_SIZE_PRESETS as readonly string[]).includes(value);

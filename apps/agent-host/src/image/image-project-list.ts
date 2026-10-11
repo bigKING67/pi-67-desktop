@@ -32,7 +32,7 @@ export async function listProjects(engine: ImageEngine, cwd: string): Promise<Im
 }
 
 const isImageSizePreset = (value: string): value is ImageSizePreset => (IMAGE_SIZE_PRESETS as readonly string[]).includes(value);
-const DERIVED = /^Derived from ([a-zA-Z][a-zA-Z0-9_-]{0,63}) revision (\d{1,4}) for (\d+):(\d+)$/u;
+const DERIVED = /^Derived from ([a-zA-Z][a-zA-Z0-9_-]{0,63}) revision (\d{1,4}) (?:for (\d+):(\d+)|at \d+x\d+)$/u;
 
 /** Revision 1's summary, where a derived size or a batch row names its source (engine). */
 export async function firstSummary(root: string, known: string | undefined): Promise<string | undefined> {
@@ -44,8 +44,12 @@ export async function firstSummary(root: string, known: string | undefined): Pro
 
 function derivation(summary: string | undefined): ImageProjectSummary["derivedFrom"] {
   const match = typeof summary === "string" ? DERIVED.exec(summary) : null;
-  const preset = match ? `${match[3]}x${match[4]}` : "";
-  return match && isImageSizePreset(preset) ? { projectId: match[1]!, revision: Number(match[2]), preset } : undefined;
+  if (!match) return undefined;
+  const lineage = { projectId: match[1]!, revision: Number(match[2]) };
+  // An exact size (a brand spec) has no ratio; a ratio must be one of the presets.
+  if (match[3] === undefined) return lineage;
+  const preset = `${match[3]}x${match[4]}`;
+  return isImageSizePreset(preset) ? { ...lineage, preset } : undefined;
 }
 
 const FROM_TEMPLATE = /^From template ([a-zA-Z][a-zA-Z0-9_-]{0,63}) revision (\d{1,4})$/u;

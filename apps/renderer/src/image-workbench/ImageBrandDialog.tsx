@@ -2,7 +2,7 @@ import { IMAGE_BRAND_LIMITS, type ImageBrandSpec } from "@pi67/domain";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button, Dialog, Heading, Input, Label, Modal, ModalOverlay, TextField } from "react-aria-components";
-import { addBrandFile, editBrand, loadBrand, nextBrandId, useImageBrand } from "./image-brand.js";
+import { addBrandFile, editBrand, loadBrand, nextBrandId, specDetail, useImageBrand } from "./image-brand.js";
 import styles from "./ImageWorkbench.module.css";
 
 const HEX = /^#[0-9a-fA-F]{6}$/u;
@@ -53,9 +53,6 @@ export function ImageBrandDialog({ onDismiss }: { onDismiss: () => void }) {
     </ModalOverlay>
   );
 }
-
-const specDetail = (spec: ImageBrandSpec): string =>
-  [`${spec.width}×${spec.height}`, ...(spec.max_bytes ? [`≤ ${Math.round(spec.max_bytes / 100_000) / 10} MB`] : []), ...(spec.background ? ["白底"] : [])].join(" · ");
 
 function BrandSection({ title, empty, children }: { title: string; empty: string; children: React.ReactNode[] }) {
   return (

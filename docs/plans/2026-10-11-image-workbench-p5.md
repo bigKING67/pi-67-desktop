@@ -238,3 +238,20 @@ removing the feature leaves every existing project as it was.
   external changes behind renders; it is replaced by recording first: whichever of the Host and
   the watcher records a revision or candidate status first announces it, the other stays quiet,
   and a removed batch announces its source again on purpose.
+- 2026-10-11: checkpoint 3c: engine `deriveProject` takes an exact `size` as well as a preset
+  (first summary `… at WxH`); Host `image.project.deriveSize` (`<source>-WxH`, titled with the
+  spec); the library lists such sizes with `derivedFrom` lacking a preset (the protocol field is
+  now optional, its consumers sort presets first and group sizes by canvas). The renderer checks
+  the spec itself from the verified PNG it already fetches for hand-offs (bytes, and edges read
+  through an `OffscreenCanvas` without colour conversion), so no new check command was needed;
+  failures join the keyed-text dialog. The Agent has no spec export (it does not export).
+- 2026-10-11: `/code-review high` on checkpoint 3c. Accepted: a PNG that could not be read for
+  the spec failed the export (now said and skipped, like the text check); the spec export and
+  导出全部尺寸 could pick different projects for one size (both use `derivedSizes`); every
+  refusal suggested shortening text (only a text that does not fit does); sizes under the
+  64px canvas minimum passed the boundary; text shrunk for a spec size went unsaid (a notice);
+  the size label leaned on the title (`规格尺寸`); the edge read drew the whole image (four
+  strips), and the PNG was read with no rule needing it; the PNG fetch was written twice
+  (`renderedBlob`). Deferred: a 白底 spec derived from a coloured canvas keeps that colour (the
+  check lists it); making the derive turn the background white changes the design for the
+  person, so it waits for a product decision.

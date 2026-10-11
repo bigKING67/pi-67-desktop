@@ -95,6 +95,18 @@ describe("derive project", { timeout: 180_000 }, () => {
     await expect(deriveProject(root, path.join(directory, "y"), { revision: 1, sha256: created.sha256, preset: "2x1", project_id: "y", title: "y" })).rejects.toThrow(/Unknown size preset/u);
   });
 
+  it("derives an exact size (a brand spec), named in its first summary", async () => {
+    const { directory, root, created } = await source();
+    const target = path.join(directory, "spring-800x800");
+    const result = await deriveProject(root, target, { revision: 1, sha256: created.sha256, size: { width: 800, height: 800 }, project_id: "spring-800x800", title: "春日 · 主图" });
+    expect(result).toMatchObject({ status: "derived", canvas: { width: 800, height: 800 } });
+    expect(result).not.toHaveProperty("preset");
+    expect((await readProject(target)).document.change.summary).toBe("Derived from spring revision 1 at 800x800");
+    const both = { revision: 1, sha256: created.sha256, preset: "1x1", size: { width: 8, height: 8 }, project_id: "z", title: "z" };
+    await expect(deriveProject(root, path.join(directory, "z"), both)).rejects.toThrow(/either a preset or a size/u);
+    await expect(deriveProject(root, path.join(directory, "z"), { ...both, preset: undefined, size: { width: 0, height: 8 } })).rejects.toThrow(/derive width/u);
+  });
+
   it("refuses a size past the canvas limits instead of failing the call", async () => {
     const directory = await tempDirectory("image-engine-派生-");
     const root = path.join(directory, "big");

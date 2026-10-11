@@ -233,6 +233,12 @@ describe("image engine host", { timeout: 120_000 }, () => {
     await run("image.project.edit", { projectId: "poster-1x1", baseRevision: 1, summary: "微调", operations: [{ type: "update_object", id: "headline", patch: { x: 20 } }] });
     expect((await run("image.project.list", {})).projects.find((item) => item.projectId === "poster-1x1")?.derivedFrom).toMatchObject({ preset: "1x1" });
     expect((await readProject(projectRoot(cwd, "poster"))).document.revision).toBe(1);
+    // An exact size (a brand spec): named by its size, titled with the spec, listed without a ratio.
+    const spec = await run("image.project.deriveSize", { projectId: "poster", revision: 1, width: 300, height: 300, name: "方形主图" });
+    expect(spec.result).toEqual({ status: "derived", projectId: "poster-300x300", title: "春日海报 · 方形主图", canvas: { width: 300, height: 300, background: "#ffffff" }, shrunkText: 0 });
+    expect((await run("image.project.list", {})).projects.find((item) => item.projectId === "poster-300x300")?.derivedFrom).toEqual({ projectId: "poster", revision: 1 });
+    expect((await run("image.project.deriveSize", { projectId: "poster", revision: 1, width: 8192, height: 8192, name: "超大" })).result)
+      .toMatchObject({ status: "refused", reason: expect.stringContaining("超出画布上限") });
   });
 
   it("reports a preset that cannot be made and still derives the rest", async () => {

@@ -160,7 +160,7 @@ const ProjectSummarySchema = strictObject({
   canvas: CanvasSchema,
   updatedAt: TimestampSchema,
   readyCandidates: Type.Integer({ minimum: 0, maximum: L.candidates }),
-  derivedFrom: Type.Optional(strictObject({ projectId: IdSchema, revision: RevisionSchema, preset: Type.Union(IMAGE_SIZE_PRESETS.map((preset) => Type.Literal(preset))) })),
+  derivedFrom: Type.Optional(strictObject({ projectId: IdSchema, revision: RevisionSchema, preset: Type.Optional(Type.Union(IMAGE_SIZE_PRESETS.map((preset) => Type.Literal(preset)))) })),
   batch: Type.Optional(strictObject({ batchId: IdSchema, row: Type.Integer({ minimum: 1, maximum: IMAGE_BATCH_LIMITS.rows }), projectId: IdSchema, revision: RevisionSchema })),
   template: Type.Optional(Type.Literal(true)),
   fromTemplate: Type.Optional(strictObject({ projectId: IdSchema, revision: RevisionSchema }))
@@ -226,6 +226,8 @@ export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSch
   "image.brand.read": strictObject({}),
   "image.project.useBrandFont": strictObject({ projectId: IdSchema, baseRevision: RevisionSchema, fontId: IdSchema, objectId: IdSchema }),
   "image.project.addBrandLogo": strictObject({ projectId: IdSchema, baseRevision: RevisionSchema, logoId: IdSchema }),
+  "image.project.deriveSize": strictObject({ projectId: IdSchema, revision: RevisionSchema, width: Type.Integer({ minimum: L.minCanvasEdge, maximum: L.edge }),
+    height: Type.Integer({ minimum: L.minCanvasEdge, maximum: L.edge }), name: BrandNameSchema }),
   "image.brand.edit": strictObject({ baseRevision: Type.Integer({ minimum: 0, maximum: 1_000_000 }), operations: Type.Array(Type.Union([
     strictObject({ type: Type.Literal("set_color"), color: BrandColorSchema }), strictObject({ type: Type.Literal("remove_color"), id: IdSchema }),
     strictObject({ type: Type.Literal("set_spec"), spec: BrandSpecSchema }), strictObject({ type: Type.Literal("remove_spec"), id: IdSchema }),
@@ -279,6 +281,10 @@ export const ImageCommandResultSchemas: Record<keyof ImageCommandResults, TSchem
   "image.brand.read": BrandKitSchema,
   "image.project.useBrandFont": RevisionResultSchema,
   "image.project.addBrandLogo": strictObject({ projectId: IdSchema, revision: RevisionSchema, sha256: Sha256Schema, dryRun: Type.Boolean(), objectId: IdSchema }),
+  "image.project.deriveSize": strictObject({ projectId: IdSchema, revision: RevisionSchema, result: Type.Union([
+    strictObject({ status: Type.Literal("derived"), projectId: IdSchema, title: Type.String({ minLength: 1, maxLength: L.title }), canvas: CanvasSchema,
+      shrunkText: Type.Integer({ minimum: 0, maximum: L.objects }) }),
+    strictObject({ status: Type.Literal("refused"), reason: Type.String({ minLength: 1, maxLength: 500 }) })]) }),
   "image.brand.edit": BrandKitSchema,
   "image.brand.addFont": BrandKitSchema,
   "image.brand.addLogo": BrandKitSchema,

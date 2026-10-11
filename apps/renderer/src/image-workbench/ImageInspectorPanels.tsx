@@ -4,7 +4,8 @@ import { Bot, Check, Download, FilePlus, FolderDown, RotateCcw, Send, User } fro
 import { useEffect, useState } from "react";
 import { Button, Checkbox, CheckboxGroup } from "react-aria-components";
 import { acceptCandidate, deriveImageSizes, discardCandidate, editImageProject, inspectCandidate, useImageProject } from "./image-project-controller.js";
-import { derivedSizes, exportImageProject, exportImageSizes, handOffImages } from "./image-project-export.js";
+import { useBrandKit, specDetail } from "./image-brand.js";
+import { derivedSizes, exportImageForSpec, exportImageProject, exportImageSizes, handOffImages } from "./image-project-export.js";
 import { ImageBatchPanel } from "./ImageBatchPanel.js";
 import { ImageTemplatePanel } from "./ImageTemplatePanel.js";
 import { useImageWorkbench } from "./image-workbench-store.js";
@@ -14,7 +15,7 @@ import styles from "./ImageInspector.module.css";
 const AUTHORS = { human: "人", agent: "Agent", system: "系统" } as const;
 const AUTHOR_ICONS = { human: User, agent: Bot, system: FilePlus } as const;
 const SNAPSHOT = /^Snapshot of source revision (\d+)$/u;
-const DERIVED = /^Derived from (\S+) revision (\d+) for (\d+:\d+)$/u;
+const DERIVED = /^Derived from (\S+) revision (\d+) (?:for (\d+:\d+)|at (\d+)x(\d+))$/u;
 
 /** The engine writes system summaries in English; show them as product copy. */
 export function historySummary(entry: { author: keyof typeof AUTHORS; summary: string }): string {
@@ -22,7 +23,7 @@ export function historySummary(entry: { author: keyof typeof AUTHORS; summary: s
   const snapshot = SNAPSHOT.exec(entry.summary);
   if (snapshot) return `复制自修订 ${snapshot[1]}`;
   const derived = DERIVED.exec(entry.summary);
-  return derived ? `派生自 ${derived[1]} 修订 ${derived[2]} · ${derived[3]}` : "创建项目";
+  return derived ? `派生自 ${derived[1]} 修订 ${derived[2]} · ${derived[3] ?? `${derived[4]}×${derived[5]}`}` : "创建项目";
 }
 
 /** 历史: every revision newest first; returning to one publishes a new `revert_to` revision. */
@@ -115,6 +116,7 @@ export function ImageExportPanel() {
       <p className={styles.readout}>{document.canvas.width} × {document.canvas.height} · 修订 {revision}</p>
       <Button className="secondary-button" isDisabled={busy} onPress={() => void exportImageProject()}><Download aria-hidden="true" size={14} />导出 PNG</Button>
       <p className={styles.empty}>导出前会重新渲染当前修订并校验文件摘要；文字始终是排版层，不会被模型改写。</p>
+      <SpecExports busy={busy} />
 
       <p className={styles.sectionLabel}>多尺寸 · 基于修订 {revision}</p>
       <CheckboxGroup aria-label="选择尺寸" className={styles.presetList!} value={chosen} onChange={(value) => setChosen(value as ImageSizePreset[])}>
@@ -141,7 +143,7 @@ export function ImageExportPanel() {
             return (
               <li key={size.projectId} className={styles.candidateItem}>
                 <span className={styles.historyHead}>
-                  <strong>{imageSizePresetLabel(size.derivedFrom!.preset)}</strong>
+                  <strong>{size.derivedFrom!.preset ? imageSizePresetLabel(size.derivedFrom!.preset) : "规格尺寸"}</strong>
                   <span className={styles.historyMeta}>{size.canvas.width}×{size.canvas.height}
                     {isOlder ? ` · 基于修订 ${size.derivedFrom!.revision} · 较旧` : ""}
                     {shrunk?.status === "derived" && shrunk.shrunkText ? ` · 缩小了 ${shrunk.shrunkText} 段文字` : ""}</span>
@@ -167,6 +169,28 @@ export function ImageExportPanel() {
       <ImageBatchPanel />
       <ImageTemplatePanel />
     </div>
+  );
+}
+
+/** 按规格导出: one row per brand spec; a canvas of another size is derived to it first. Nothing shows without specs. */
+function SpecExports({ busy }: { busy: boolean }) {
+  const specs = useBrandKit((kit) => kit.specs);
+  if (!specs?.length) return null;
+  return (
+    <>
+      <p className={styles.sectionLabel}>按规格导出</p>
+      <ul aria-label="品牌规格" className={styles.candidateList}>
+        {specs.map((spec) => (
+          <li key={spec.id} className={styles.candidateItem}>
+            <span className={styles.historyHead}><strong>{spec.name}</strong><span className={styles.historyMeta}>{specDetail(spec)}</span></span>
+            <span className={styles.candidateActions}>
+              <Button aria-label={`按规格导出 ${spec.name}`} className={styles.historyAction!} isDisabled={busy} onPress={() => void exportImageForSpec(spec)}><Download aria-hidden="true" size={12} />导出</Button>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className={styles.empty}>画布尺寸不同时，会先按规格尺寸派生一个新项目（重新排版，不缩放成品图）；导出前核对尺寸、文件大小、白底和图中文字，不符合的会先列出来。</p>
+    </>
   );
 }
 
