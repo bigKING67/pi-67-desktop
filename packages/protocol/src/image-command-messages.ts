@@ -112,7 +112,8 @@ export interface ImageCandidateSummary {
   receipt?: ImageCandidateReceipt;
 }
 
-export interface ImageCandidateReceipt { model: string; quality?: string; size?: string; durationMs?: number }
+/** `reused`: an identical earlier request's output, staged without a request to the image service. */
+export interface ImageCandidateReceipt { model: string; quality?: string; size?: string; durationMs?: number; reused?: true }
 
 export interface ImageRevisionResult { projectId: string; revision: number; sha256: string; dryRun: boolean }
 

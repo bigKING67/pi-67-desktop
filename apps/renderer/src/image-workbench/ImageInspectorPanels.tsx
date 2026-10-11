@@ -201,6 +201,8 @@ export function candidateReceiptLine(receipt: ImageCandidateReceipt): string {
   const parts = [receipt.model];
   if (receipt.quality) parts.push(QUALITY[receipt.quality] ?? receipt.quality);
   if (receipt.size) parts.push(receipt.size.replace("x", "×"));
+  // A reused result cost nothing and took no generation time.
+  if (receipt.reused) return [...parts, "复用了之前的结果", "未再次请求", "画面质量未核验"].join(" · ");
   if (receipt.durationMs !== undefined) parts.push(`用时 ${Math.max(1, Math.round(receipt.durationMs / 1000))} 秒`);
   return [...parts, "费用未估计", "画面质量未核验"].join(" · ");
 }

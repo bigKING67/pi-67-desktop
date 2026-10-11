@@ -99,10 +99,19 @@ describe("image workbench tools", { timeout: 120_000 }, () => {
     const candidates = listed.details as unknown as { candidate_id: string; status: string; actions: { accept: boolean } }[];
     expect(candidates).toEqual([expect.objectContaining({ candidate_id: "warm", status: "ready", actions: expect.objectContaining({ accept: true }) })]);
 
+    // The same request again reuses that result at no cost; fresh asks for another variation.
+    const same = { project_id: "poster", target_id: "photo", base_revision: 3, model: "newmoney-images-gateway/gpt-image-2.5-sunburst" };
+    expect(await t.json("image_generate", { ...same, candidate_id: "warm-2", job: job({ job_id: "warm-again", provider_profile: "openai.gpt-image-2.5-flare.2026-09-08" }) }))
+      .toMatchObject({ candidate_id: "warm-2", status: "ready", reused_from_job: "warm-background" });
+    expect(t.generated).toHaveLength(1);
+    expect(await t.json("image_generate", { ...same, candidate_id: "warm-3", fresh: true, job: job({ job_id: "warm-fresh" }) })).not.toHaveProperty("reused_from_job");
+    expect(t.generated).toHaveLength(2);
+
     expect(await t.json("image_candidate_decide", { project_id: "poster", candidate_id: "warm", decision: "accept", base_revision: 3, summary: "用户选定暖色背景" }))
       .toMatchObject({ status: "accepted", revision: 4 });
     const history = await readProject(projectRoot(cwd, "poster"));
     expect(history.document.change).toMatchObject({ author: "agent", operations: ["accept_candidate"] });
+
   });
 
   it("lets the Agent turn and mirror an object, read it back and straighten it", async () => {

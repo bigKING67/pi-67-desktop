@@ -280,6 +280,7 @@ Application-level surfaces use a separate wide-window shell:
   the cursor; an invisible range input carries arrows and Home/End, its focus ring shown on
   the divider. Until both canvas-size renders arrive the canvas stays with `正在准备对比…`. 候选
   rows add one tertiary receipt line (`model · 高质量 · 1088×1360 · 用时 22 秒 · 费用未估计 ·
+  画面质量未核验`; a reused result reads `model · size · 复用了之前的结果 · 未再次请求 ·
   画面质量未核验`).
 - Size presets (P3, 2026-10-10): `导出` adds a `多尺寸 · 基于修订 N` section — one 30px
   checkbox row per preset (16px indicator as in Settings, ratio in tabular figures, pixel

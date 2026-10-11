@@ -34,6 +34,12 @@ describe("transparent Provider outputs", { timeout: 120_000 }, () => {
       expect(checks.output).toEqual(checks.received); expect(checks.output.sha256).toBe(sha256(image));
       expect((await inspectCandidate(f.root, f.spec.candidate_id)).status).toBe("ready");
       expect((await readProject(f.root)).sha256).toBe(f.created.sha256); expect(f.calls).toHaveLength(1);
+      // The identical request reuses the output with its alpha evidence, and stages.
+      Object.assign(f.job, { job_id: "again" }); await f.saveJob();
+      const reused = await run(f.root, { ...f.spec, candidate_id: "again" }, { generator: f.generator });
+      expect(f.calls).toHaveLength(1);
+      expect(transparency(reused.receipt)).toEqual(checks);
+      expect((await inspectCandidate(f.root, "again")).status).toBe("ready");
     });
   }
 

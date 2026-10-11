@@ -331,7 +331,11 @@ Provider 请求只允许 HTTPS 或 loopback，拒绝带凭据的 URL；凭据只
   共享样例保持一致（video harness 的双实现先例）。能力档案覆盖 GPT Image 2.5（sunburst / flare / 2.5）
   与 Seedream 5.0（pro / flash / lite）；其他模型走所属图像 API 的通用档案（`model: "*"`，保守尺寸），
   所以用户选的任何模型都能用。
-- 缓存：以 brief、参数、参考哈希为键缓存生成结果，避免重复请求；离线跑批可选 Batch API（后续）。
+- 缓存（P5，2026-10-11 已实现）：以实际发送的内容（档案与模型、端点与参数、提示词、每张参考图与
+  Provider 遮罩的字节摘要、输出策略、目标尺寸）为键，在项目内复用已成功的同一请求结果，不再请求；
+  Agent 可用 `fresh` 要新变体；同一请求的结果一旦被接受或丢弃就不再复用；不同图像来源不共享结果。Batch API 暂缓：仅 OpenAI
+  GPT Image 支持且需修订 ADR 0010 第 9 条，等有批量生图需求再做
+  （`docs/plans/2026-10-11-image-generation-cache-batch.md`）。
 
 ## 12. 数据模型与存储
 

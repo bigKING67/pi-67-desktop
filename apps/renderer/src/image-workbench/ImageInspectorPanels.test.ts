@@ -13,6 +13,7 @@ describe("candidate receipts", () => {
     expect(candidateReceiptLine({ model: "gpt-image-2.5-sunburst", quality: "high", size: "1088x1360", durationMs: 22_481 }))
       .toBe("gpt-image-2.5-sunburst · 高质量 · 1088×1360 · 用时 22 秒 · 费用未估计 · 画面质量未核验");
     expect(candidateReceiptLine({ model: "m", durationMs: 200 })).toBe("m · 用时 1 秒 · 费用未估计 · 画面质量未核验");
+    expect(candidateReceiptLine({ model: "m", size: "10x10", durationMs: 5, reused: true })).toBe("m · 10×10 · 复用了之前的结果 · 未再次请求 · 画面质量未核验");
   });
 });
 

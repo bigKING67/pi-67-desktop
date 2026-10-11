@@ -20,6 +20,8 @@ export interface ProviderSpec {
   output_policy?: OutputPolicy;
   /** The image source's model id; required by a generic profile, otherwise equal to the profile's model. */
   model?: string;
+  /** Asks for a new variation even when an identical request already succeeded (no cache reuse). */
+  fresh?: boolean;
 }
 export interface ProviderRequestRecord {
   endpoint: "images/edits" | "images/generations"; parameters: RequestParameters; output_policy: OutputPolicy; prompt_sha256: string;
@@ -41,7 +43,8 @@ export function compileJob(contracts: ImageContracts, job: unknown): { pack: str
 }
 
 export async function prepareRequest(root: string, value: unknown, contracts: ImageContracts): Promise<PreparedRequest> {
-  record(value, ["job", "candidate_id", "base_revision", "target_id", "references", "edit", "output_policy", "model"], "Provider input");
+  record(value, ["job", "candidate_id", "base_revision", "target_id", "references", "edit", "output_policy", "model", "fresh"], "Provider input");
+  if (value.fresh !== undefined && typeof value.fresh !== "boolean") throw new Error("Invalid fresh flag");
   if (value.output_policy !== undefined && !["strict", "resize_to_target"].includes(value.output_policy as string)) throw new Error("Unsupported output policy");
   id(value.candidate_id, "candidate id"); id(value.target_id, "target id");
   const spec = value as unknown as ProviderSpec;

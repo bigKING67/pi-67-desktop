@@ -6,7 +6,7 @@ import { readProject, editBatch } from "./project.js";
 import { executeProvider, recoverProvider, ProviderError, type ProviderReceipt } from "./provider.js";
 import { ImageGenerationError } from "./provider-generator.js";
 import { canonicalContracts } from "./contracts.js";
-import { inspectCandidate, acceptCandidate } from "./candidates.js";
+import { inspectCandidate, acceptCandidate, discardCandidate } from "./candidates.js";
 import type { ImageObject, JsonRecord, TextObject } from "./document.js";
 import { providerFixture, secretMarker, untilAborted, writeMasks } from "./test-support/provider-fixture.js";
 import { readJson } from "./test-support/harness.js";
@@ -59,6 +59,66 @@ describe("image Provider execution through an injected generator", { timeout: 12
     expect((await readProject(f.root)).document.revision).toBe(2);
     await fs.appendFile(path.join(result.job, "receipt.json"), "\n");
     await expect(inspectCandidate(f.root, f.spec.candidate_id)).rejects.toThrow(/Execution binding digest/);
+  });
+
+  it("reuses an identical request's verified output without a Provider call, unless asked for a fresh one", async () => {
+    const f = await providerFixture();
+    const first = await run(f.root, f.spec, { generator: f.generator });
+    const again = async (jobId: string, extra: JsonRecord = {}) => {
+      Object.assign(f.job, { job_id: jobId }); await f.saveJob();
+      return run(f.root, { ...f.spec, candidate_id: `c-${jobId}`, ...extra }, { generator: f.generator });
+    };
+    const reused = await again("job-2");
+    expect(f.calls).toHaveLength(1);
+    expect(reused.receipt).toMatchObject({ outcome: "succeeded", parameters: { client_post_attempts: 0, cache_key: first.receipt.parameters.cache_key,
+      cache: { hit: true, source_job_id: "background-job", source_receipt_sha256: expect.stringMatching(/^[a-f0-9]{64}$/u) } } });
+    expect(reused.receipt.outputs[0]).toMatchObject({ path: "jobs/job-2/output.png", sha256: first.receipt.outputs.at(-1)!.sha256 });
+    expect(reused.receipt.limitations.at(-1)).toMatch(/no Provider request was sent/u);
+    expect(reused.candidate.status).toBe("ready");
+    // A fresh variation is paid for; a changed prompt misses.
+    await again("job-3", { fresh: true });
+    expect(f.calls).toHaveLength(2);
+    const subject = (f.job.prompt as JsonRecord).subject;
+    (f.job.prompt as JsonRecord).subject = "另一个主体";
+    await again("job-4");
+    expect(f.calls).toHaveLength(3);
+    // An output changed on disk is no cache entry.
+    (f.job.prompt as JsonRecord).subject = subject;
+    for (const job of ["background-job", "job-2", "job-3"]) await fs.writeFile(path.join(f.root, "jobs", job, "output.png"), Buffer.from("x"));
+    await again("job-5");
+    expect(f.calls).toHaveLength(4);
+    await expect(executeProvider(f.root, { ...f.spec, fresh: "yes" }, { generator: f.generator })).rejects.toThrow(/Invalid fresh flag/u);
+    // Once a result of the request is accepted, asking again means another one.
+    await again("job-6");
+    expect(f.calls).toHaveLength(4);
+    await acceptCandidate(f.root, { candidate_id: "c-job-6", base_revision: 1, author: "agent", summary: "选定" });
+    Object.assign(f.job, { job_id: "job-7" }); await f.saveJob();
+    // The fixture's generator returns the same pixels, so this staging finds no change; what matters is the request.
+    await run(f.root, { ...f.spec, candidate_id: "c-job-7", base_revision: 2 }, { generator: f.generator }).catch(() => undefined);
+    expect(f.calls).toHaveLength(5);
+  });
+
+  it("never reuses another source's result, a result the person discarded, or one that did not stage", async () => {
+    const f = await providerFixture();
+    const next = async (jobId: string, options: { source?: string } = {}) => {
+      Object.assign(f.job, { job_id: jobId }); await f.saveJob();
+      return run(f.root, { ...f.spec, candidate_id: `c-${jobId}` }, { generator: f.generator, ...options });
+    };
+    await run(f.root, f.spec, { generator: f.generator, source: "newmoney-images-a" });
+    await next("other-source", { source: "newmoney-images-b" });
+    expect(f.calls).toHaveLength(2);
+    await next("same-source", { source: "newmoney-images-a" });
+    expect(f.calls).toHaveLength(2);
+    await discardCandidate(f.root, { candidate_id: "c-same-source", author: "human", summary: "不要这个" });
+    await next("after-discard", { source: "newmoney-images-a" });
+    expect(f.calls).toHaveLength(3);
+
+    // An output that failed to stage (here: no change to the layer) is never handed out again.
+    const h = await providerFixture(async (_call, _signal, _proposed, root) => ({ images: [await fs.readFile(path.join(path.dirname(root), "background.png"))], httpStatus: 200 }));
+    await expect(run(h.root, h.spec, { generator: h.generator })).rejects.toThrow(/candidate staging failed/u);
+    Object.assign(h.job, { job_id: "retry" }); await h.saveJob();
+    await expect(run(h.root, { ...h.spec, candidate_id: "retry" }, { generator: h.generator })).rejects.toThrow(/candidate staging failed/u);
+    expect(h.calls).toHaveLength(2);
   });
 
   it("drops request identifiers that are not plain tokens", async () => {

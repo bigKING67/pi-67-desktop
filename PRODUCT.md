@@ -1507,7 +1507,11 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   references in `generate` mode, or (with a full `job`) a reference without its source
   before anything is written or requested. 候选 shows each generated candidate's receipt
   (model, quality, the candidate's own size, time taken) and always says the cost is not estimated and the
-  picture's quality is not verified; `对比` splits the canvas between the revision the
+  picture's quality is not verified. A request identical to one that already succeeded in the
+  project (same model, words, quality, references and masks) reuses that result without
+  calling the image service — the receipt says `复用了之前的结果 · 未再次请求` — unless the Agent
+  asks for a fresh variation, or the person already accepted or discarded a result of that
+  request (asking again then means another one). Another image source never shares results. `对比` splits the canvas between the revision the
   candidate was made from and the candidate, without changing the project.
   `导出` keeps the full-size PNG and adds size presets (1:1, 3:4, 4:5, 9:16, 16:9, each
   showing its pixel size: the source's short edge kept). Generating them derives one

@@ -150,7 +150,8 @@ const CandidateSummarySchema = strictObject({
     model: Type.String({ minLength: 1, maxLength: 128 }),
     quality: Type.Optional(Type.String({ minLength: 1, maxLength: 16 })),
     size: Type.Optional(Type.String({ pattern: "^[1-9][0-9]{0,4}x[1-9][0-9]{0,4}$" })),
-    durationMs: Type.Optional(Type.Integer({ minimum: 0, maximum: 86_400_000 }))
+    durationMs: Type.Optional(Type.Integer({ minimum: 0, maximum: 86_400_000 })),
+    reused: Type.Optional(Type.Literal(true))
   }))
 });
 const ProjectSummarySchema = strictObject({

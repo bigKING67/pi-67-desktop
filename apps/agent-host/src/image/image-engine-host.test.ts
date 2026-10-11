@@ -209,6 +209,7 @@ describe("image engine host", { timeout: 120_000 }, () => {
     expect(candidateReceipt({ ...base, parameters: { quality: "high", size: "1088x1360" } }, { width: 1080, height: 1350 }))
       .toEqual({ model: "gpt-image-2.5-sunburst", quality: "high", size: "1080x1350", durationMs: 22_481 });
     expect(candidateReceipt({ ...base, completed_at: "nope", parameters: { quality: 3 } }, { width: 0, height: 1350 })).toEqual({ model: "gpt-image-2.5-sunburst" });
+    expect(candidateReceipt({ ...base, parameters: { cache: { hit: true, source_job_id: "j1" } } }, { width: 1080, height: 1350 })).toMatchObject({ reused: true });
   });
 
   it("derives each size preset as a sibling project, numbering repeats, and lists them in the library", async () => {

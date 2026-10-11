@@ -383,8 +383,11 @@ export function candidateReceipt(receipt: { model: string; parameters: Record<st
   return { model: receipt.model.slice(0, 128),
     ...(typeof quality === "string" && quality.length > 0 && quality.length <= 16 ? { quality } : {}),
     ...(/^[1-9][0-9]{0,4}x[1-9][0-9]{0,4}$/u.test(size) ? { size } : {}),
-    ...(Number.isFinite(duration) && duration >= 0 && duration <= 86_400_000 ? { durationMs: duration } : {}) };
+    ...(Number.isFinite(duration) && duration >= 0 && duration <= 86_400_000 ? { durationMs: duration } : {}),
+    ...(isCacheHit(receipt.parameters.cache) ? { reused: true as const } : {}) };
 }
+
+const isCacheHit = (value: unknown): boolean => typeof value === "object" && value !== null && (value as { hit?: unknown }).hit === true;
 
 /**
  * Staged bytes (never a renderer path) are written into a fresh work folder outside the

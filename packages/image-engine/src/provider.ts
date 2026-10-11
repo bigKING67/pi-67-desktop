@@ -12,6 +12,7 @@ import { profileAllowsModel } from "./provider-profiles.js";
 import { normalizeImage, type OutputPolicy } from "./provider-normalize.js";
 import { canonicalContracts, type ImageContracts } from "./contracts.js";
 import { ImageGenerationError, numericUsage, type ImageGenerationCall, type ImageGenerator } from "./provider-generator.js";
+import { findCachedOutput, generationCacheKey } from "./provider-cache.js";
 import { prepareRequest, compileJob, MASK_KEYS, type PreparedRequest, type ProviderRequestRecord, type ProviderSpec } from "./provider-prepare.js";
 
 export interface ReceiptOutput { asset_id: string; path: string; sha256: string; mime_type: string; bytes: number }
@@ -24,6 +25,8 @@ export interface ProviderReceipt extends JsonRecord {
 export interface ProviderOptions {
   /** Routes the request through Pi; absent when no Pi image model is configured. */
   generator?: ImageGenerator | undefined; contracts?: ImageContracts | undefined; signal?: AbortSignal | undefined;
+  /** The image source the generator sends to (its Pi provider id); part of the cache key, so sources never share results. */
+  source?: string | undefined;
   timeoutMs?: number; dryRun?: boolean; operator?: string;
 }
 export class ProviderError extends Error {
@@ -40,7 +43,10 @@ export async function executeProvider(root: string, spec: unknown, options: Prov
   const prepared = await prepareRequest(root, spec, contracts);
   if (dryRun) return { status: "dry_run", request: prepared.request, network_requests: 0 };
   signal?.throwIfAborted();
-  if (!generator) throw new ProviderError("Image generation unavailable: no Pi image model is configured");
+  const cacheKey = generationCacheKey(prepared, options.source);
+  const cached = prepared.spec.fresh ? undefined : await findCachedOutput(root, cacheKey);
+  signal?.throwIfAborted();
+  if (!generator && !cached) throw new ProviderError("Image generation unavailable: no Pi image model is configured");
   const jobs = path.join(root, "jobs"); await ensureDirectory(jobs);
   const directory = path.join(jobs, prepared.job.job_id);
   await fs.mkdir(directory); // Exclusive durable claim: same job is never retried automatically.
@@ -59,7 +65,7 @@ export async function executeProvider(root: string, spec: unknown, options: Prov
     references: prepared.refs.map((ref) => ({ id: ref.id, bytes: ref.bytes })), mask: prepared.providerMask };
   const timeout = AbortSignal.timeout(timeoutMs), combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
   const parameters: JsonRecord = { ...prepared.parameters, endpoint: prepared.request.endpoint, context: prepared.spec.edit?.context ?? null,
-    client_post_attempts: 0, usage: null, billing: { state: "UNVERIFIED", actual_cost: null, currency: null } };
+    client_post_attempts: 0, usage: null, billing: { state: "UNVERIFIED", actual_cost: null, currency: null }, cache_key: cacheKey };
   const receipt: ProviderReceipt = { schema_version: "creative-craft.execution-receipt.v1", receipt_id: `receipt-${prepared.job.job_id}`,
     job_id: prepared.job.job_id, job_sha256: sha256(prepared.jobBytes), provider_profile: String(prepared.job.provider_profile),
     execution_surface: String(prepared.job.execution_surface), model: prepared.parameters.model, snapshot: null,
@@ -69,12 +75,26 @@ export async function executeProvider(root: string, spec: unknown, options: Prov
       "Provider masks guide generation; deterministic composition protects pixels.", "This receipt is execution evidence, not visual approval."] };
   const canvas = isRecord(prepared.job.canvas) ? prepared.job.canvas : {};
   let rejected: string | undefined;
-  try {
+  if (cached) {
+    // An identical request already succeeded here: its verified output is this job's, unpaid.
+    try { await save("output.png", cached.bytes); }
+    catch (error) {
+      // Nothing was sent: release the claim like an unsent request.
+      await fs.rm(directory, { recursive: true, force: true });
+      throw new ProviderError(`No Provider request sent (cache output not written: ${errorMessage(error)}); job claim released`);
+    }
+    // The pixels are the source's, so its evidence about them (alpha, resampling, what was returned) holds.
+    Object.assign(parameters, cached.evidence);
+    parameters.cache = { hit: true, source_job_id: cached.jobId, source_receipt_sha256: cached.receiptSha256 };
+    receipt.outputs = [{ asset_id: `generated-${prepared.job.job_id}`, path: `jobs/${prepared.job.job_id}/output.png`, sha256: sha256(cached.bytes), mime_type: "image/png", bytes: cached.bytes.length }];
+    receipt.outcome = "succeeded";
+    receipt.limitations.push(`Reused the output of job ${cached.jobId} for an identical request; no Provider request was sent.`);
+  } else try {
     combined.throwIfAborted();
     // A price/human edit during preparation must not be charged against an old basis.
     if ((await readProject(root)).sha256 !== prepared.project.sha256) throw new Error("preflight_revision_conflict");
     parameters.client_post_attempts = 1;
-    const outcome = await generator(call, combined);
+    const outcome = await generator!(call, combined);
     if (outcome.httpStatus !== undefined) parameters.http_status = outcome.httpStatus;
     parameters.usage = numericUsage(outcome.usage);
     if (outcome.requestId && /^[a-zA-Z0-9_-]{1,200}$/.test(outcome.requestId)) receipt.provider_execution_id = outcome.requestId;
@@ -120,7 +140,7 @@ export async function executeProvider(root: string, spec: unknown, options: Prov
     receipt.provider_errors = [{ code: KNOWN_ERRORS.has(message) ? message : timeout.aborted ? "timeout" : signal?.aborted ? "cancelled" : "transport_or_response_error",
       upstream_execution_unknown: parameters.client_post_attempts === 1 && !receipt.outputs.length }];
   }
-  if (parameters.client_post_attempts === 0) {
+  if (!cached && parameters.client_post_attempts === 0) {
     // Nothing left this client: release the claim so the job can run after re-reading the project.
     await fs.rm(directory, { recursive: true, force: true });
     throw new ProviderError(`No Provider request sent (${String(receipt.provider_errors[0]?.code)}); job claim released`);

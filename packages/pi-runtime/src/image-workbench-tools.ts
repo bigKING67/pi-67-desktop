@@ -55,7 +55,7 @@ const SURFACES: Readonly<Record<string, string>> = { "openai-images": "openai.im
  * from the user's image sources (ADR 0010 decision 14) and the job profile and
  * execution surface it runs under. Nothing is written before this succeeds.
  */
-async function sourceModel(engine: Engine, ctx: Pick<ToolContext, "modelRegistry">, value: string): Promise<{ generator: ImageGenerator; modelId: string; profile: string; surface: string }> {
+async function sourceModel(engine: Engine, ctx: Pick<ToolContext, "modelRegistry">, value: string): Promise<{ generator: ImageGenerator; provider: string; modelId: string; profile: string; surface: string }> {
   const slash = value.indexOf("/"), provider = value.slice(0, slash), modelId = value.slice(slash + 1);
   if (slash < 1 || !provider.startsWith(`${IMAGE_PROVIDER_ID}-`)) throw new Error("model must be <provider>/<model> of an image source listed by image_models (Providers named newmoney-images-…)");
   const model = (await ctx.modelRegistry.getAvailableOfType("image", provider)).find((candidate) => candidate.id === modelId);
@@ -63,7 +63,7 @@ async function sourceModel(engine: Engine, ctx: Pick<ToolContext, "modelRegistry
   const surface = SURFACES[model.api];
   const profile = surface === undefined ? undefined : engine.profileForModel(surface, modelId);
   if (surface === undefined || profile === undefined) throw new Error("IMAGE_MODEL_UNSUPPORTED: this image API is not supported by the image engine.");
-  return { generator: createPiImageGenerator(ctx.modelRegistry as unknown as ImageRegistry, model), modelId, profile, surface };
+  return { generator: createPiImageGenerator(ctx.modelRegistry as unknown as ImageRegistry, model), provider, modelId, profile, surface };
 }
 
 const projectId = Type.String({ description: "Image project id (letters, digits, - and _; starts with a letter)." });
@@ -247,7 +247,8 @@ export function imageTools(): ToolDefinition[] {
         "The target layer must be unlocked: unlock it with image_project_edit as its own batch first, then generate against that new revision.",
         "Use mode edit (default) to change the current image and keep the rest; list what must stay the same in preserve. Use mode generate for a fresh image.",
         "<image-context> lines `mark mN [x y w h]: …` are regions with instructions; `reference <asset>: 保留主体 / 保留风格 / 取构图` map to references roles keep-subject / keep-style / take-composition; a reference that is the edited image itself belongs in preserve.",
-        "Each call is one paid request and is never retried automatically; inspect the candidate before generating again."
+        "Each call is one paid request and is never retried automatically; inspect the candidate before generating again.",
+        "An identical request (same model, words, quality, references and masks) that already succeeded in this project reuses that result at no cost (reused_from_job in the result); pass fresh: true when the person wants another variation of the same request."
       ],
       parameters: Type.Object({
         project_id: projectId,
@@ -270,11 +271,12 @@ export function imageTools(): ToolDefinition[] {
           context: Type.Object({ x: Type.Integer(), y: Type.Integer(), width: Type.Integer(), height: Type.Integer() }),
           generation_mask: Type.String(), protection_mask: Type.String(), blend_mask: Type.String()
         })),
-        output_policy: optional(Type.Union([Type.Literal("strict"), Type.Literal("resize_to_target")]))
+        output_policy: optional(Type.Union([Type.Literal("strict"), Type.Literal("resize_to_target")])),
+        fresh: optional(Type.Boolean({ description: "true: generate a new variation even if an identical request already succeeded (otherwise its result is reused at no cost)." }))
       }),
       async execute(_id, raw, signal, _update, ctx) {
         const params = raw as Params, id = str(params, "project_id"), engine = await loadEngine(), root = engine.projectRoot(ctx.cwd, id);
-        const { generator, modelId, profile, surface } = await sourceModel(engine, ctx, str(params, "model"));
+        const { generator, provider, modelId, profile, surface } = await sourceModel(engine, ctx, str(params, "model"));
         // Every refusal the model can repair is checked here, before anything is written or sent.
         const project = await engine.readProject(root), doc = project.document;
         const baseRevision = params.base_revision === undefined ? doc.revision : int(params, "base_revision");
@@ -323,10 +325,12 @@ export function imageTools(): ToolDefinition[] {
           spec.edit = { ...edit, generation_mask: local(ctx.cwd, edit.generation_mask), protection_mask: local(ctx.cwd, edit.protection_mask), blend_mask: local(ctx.cwd, edit.blend_mask) };
         }
         if (outputPolicy !== undefined) spec.output_policy = outputPolicy;
-        const result = await engine.executeProvider(root, spec, { generator, signal, operator: "agent" });
+        if (params.fresh === true) spec.fresh = true;
+        const result = await engine.executeProvider(root, spec, { generator, source: provider, signal, operator: "agent" });
         if (result.status === "dry_run") return text(result);
         return text({ candidate_id: result.candidate.candidate.id, status: result.candidate.status, outcome: result.receipt.outcome,
-          model: result.receipt.model, protected_changed_pixels: result.candidate.candidate.qa?.protected_changed_pixels ?? null });
+          model: result.receipt.model, protected_changed_pixels: result.candidate.candidate.qa?.protected_changed_pixels ?? null,
+          ...(isObject(result.receipt.parameters.cache) ? { reused_from_job: result.receipt.parameters.cache.source_job_id } : {}) });
       }
     }
   ];
