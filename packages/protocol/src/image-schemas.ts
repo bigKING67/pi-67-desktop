@@ -1,4 +1,4 @@
-import { IMAGE_ADJUST_LIMITS, IMAGE_GROUP_LIMIT, IMAGE_ID_PATTERN, IMAGE_PROJECT_LIMITS, IMAGE_SIZE_PRESETS, IMAGE_USER_FONT_LIMIT } from "@pi67/domain";
+import { IMAGE_ADJUST_LIMITS, IMAGE_BATCH_LIMITS, IMAGE_GROUP_LIMIT, IMAGE_ID_PATTERN, IMAGE_PROJECT_LIMITS, IMAGE_SIZE_PRESETS, IMAGE_USER_FONT_LIMIT } from "@pi67/domain";
 import { strictObject, Type, Value, type TSchema } from "./typebox-schema.js";
 import type { ImageCommandPayloads, ImageCommandResults, ImageEventPayloads } from "./image-command-messages.js";
 
@@ -157,7 +157,8 @@ const ProjectSummarySchema = strictObject({
   canvas: CanvasSchema,
   updatedAt: TimestampSchema,
   readyCandidates: Type.Integer({ minimum: 0, maximum: L.candidates }),
-  derivedFrom: Type.Optional(strictObject({ projectId: IdSchema, revision: RevisionSchema, preset: Type.Union(IMAGE_SIZE_PRESETS.map((preset) => Type.Literal(preset))) }))
+  derivedFrom: Type.Optional(strictObject({ projectId: IdSchema, revision: RevisionSchema, preset: Type.Union(IMAGE_SIZE_PRESETS.map((preset) => Type.Literal(preset))) })),
+  batch: Type.Optional(strictObject({ batchId: IdSchema, row: Type.Integer({ minimum: 1, maximum: IMAGE_BATCH_LIMITS.rows }), projectId: IdSchema, revision: RevisionSchema }))
 });
 const RevisionResultSchema = strictObject({ projectId: IdSchema, revision: RevisionSchema, sha256: Sha256Schema, dryRun: Type.Boolean() });
 const ProjectRefSchema = strictObject({ projectId: IdSchema });
@@ -197,9 +198,15 @@ export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSch
   "image.project.addFont": strictObject({ projectId: IdSchema, baseRevision: RevisionSchema,
     attachmentId: Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" }) }),
   "image.project.derive": strictObject({ projectId: IdSchema, revision: RevisionSchema,
-    presets: Type.Array(SizePresetSchema, { minItems: 1, maxItems: IMAGE_SIZE_PRESETS.length, uniqueItems: true }) })
+    presets: Type.Array(SizePresetSchema, { minItems: 1, maxItems: IMAGE_SIZE_PRESETS.length, uniqueItems: true }) }),
+  // Each layer once per row; the engine refuses a repeat, a schema cannot say it.
+  "image.batch.create": strictObject({ projectId: IdSchema, revision: RevisionSchema, rows: Type.Array(strictObject({
+    texts: Type.Array(strictObject({ layer: IdSchema, text: Type.String({ maxLength: IMAGE_BATCH_LIMITS.characters }) }), { minItems: 1, maxItems: IMAGE_BATCH_LIMITS.texts }) }),
+  { minItems: 1, maxItems: IMAGE_BATCH_LIMITS.rows }) }),
+  "image.batch.remove": strictObject({ batchId: IdSchema })
 };
 
+const BatchRowSchema = Type.Integer({ minimum: 1, maximum: IMAGE_BATCH_LIMITS.rows });
 export const ImageCommandResultSchemas: Record<keyof ImageCommandResults, TSchema> = {
   "image.project.list": strictObject({ projects: Type.Array(ProjectSummarySchema, { maxItems: 10_000 }) }),
   "image.project.read": strictObject({ projectId: IdSchema, revision: RevisionSchema, latestRevision: RevisionSchema, sha256: Sha256Schema, document: DocumentSchema,
@@ -228,7 +235,13 @@ export const ImageCommandResultSchemas: Record<keyof ImageCommandResults, TSchem
     strictObject({ preset: SizePresetSchema, status: Type.Literal("derived"), projectId: IdSchema, title: Type.String({ minLength: 1, maxLength: L.title }), canvas: CanvasSchema,
       shrunkText: Type.Integer({ minimum: 0, maximum: L.objects }) }),
     strictObject({ preset: SizePresetSchema, status: Type.Literal("refused"), reason: Type.String({ minLength: 1, maxLength: 500 }) })
-  ]), { maxItems: IMAGE_SIZE_PRESETS.length }) })
+  ]), { maxItems: IMAGE_SIZE_PRESETS.length }) }),
+  "image.batch.create": strictObject({ projectId: IdSchema, revision: RevisionSchema, batchId: IdSchema, results: Type.Array(Type.Union([
+    strictObject({ row: BatchRowSchema, status: Type.Literal("created"), projectId: IdSchema, title: Type.String({ minLength: 1, maxLength: L.title }),
+      shrunkText: Type.Integer({ minimum: 0, maximum: L.objects }) }),
+    strictObject({ row: BatchRowSchema, status: Type.Literal("refused"), reason: Type.String({ minLength: 1, maxLength: 500 }) })
+  ]), { maxItems: IMAGE_BATCH_LIMITS.rows }) }),
+  "image.batch.remove": strictObject({ batchId: IdSchema, removed: Type.Array(IdSchema, { maxItems: IMAGE_BATCH_LIMITS.rows }) })
 };
 
 export const ImageEventPayloadSchemas: Record<keyof ImageEventPayloads, TSchema> = {

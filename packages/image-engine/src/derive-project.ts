@@ -1,12 +1,9 @@
-import * as fs from "node:fs/promises";
-import path from "node:path";
-import { errorCode, sha256, writeOnce } from "./content-store.js";
-import { digest, documentSchema, id, isShown, LIMITS, number, record, textObjects, validateCanvas, validateDocument, type Canvas, type ImageDocument, type SceneObject } from "./document.js";
-import { encode, readProject } from "./project.js";
+import { sha256 } from "./content-store.js";
+import { digest, documentSchema, id, LIMITS, number, record, textObjects, validateCanvas, type Canvas, type ImageDocument, type SceneObject } from "./document.js";
+import { readProject } from "./project.js";
 import { regularPath } from "./raster.js";
-import { compose } from "./render-compose.js";
 import { IMAGE_SIZE_PRESETS, imageSizePresetFits, imageSizePresetLabel, imageSizePresetSize, type ImageSizePreset } from "@pi67/domain";
-import { copyProjectFiles } from "./project-copy.js";
+import { fitText, writeSibling } from "./sibling-project.js";
 
 // Multi-size presets (product model §7 F, decided 2026-10-10): each size is a
 // derived project beside the source, with its own history, re-laid out from one
@@ -17,9 +14,6 @@ export type DerivePreset = ImageSizePreset;
 
 /** Objects at least this share of the canvas width are bands: they span the new width. */
 const BAND_SHARE = 0.9;
-/** Text may shrink to this share of its proportional size before a preset is refused. */
-const MIN_TEXT_SHARE = 0.7;
-const TEXT_STEP = 0.05;
 
 /** The preset's canvas: the source's short edge kept, the other edge from the ratio. */
 export function presetCanvas(source: Canvas, preset: DerivePreset): Canvas {
@@ -99,36 +93,10 @@ export async function deriveProject(sourceRoot: string, target: string, input: u
   // Relayout can drop a v3 field (a blur that scales to nothing), so the schema is worked out again.
   const document: ImageDocument = { ...structuredClone(source.document), schema: documentSchema({ ...source.document, objects: laid }), project_id: projectId, title, revision: 1, parent_sha256: null, canvas, objects: laid,
     change: { author: "system", summary: `Derived from ${source.document.project_id} revision ${revision} for ${imageSizePresetLabel(preset)}`, operations: ["create"] } };
-  const shrunk = new Set<string>();
-  for (;;) {
-    try {
-      await compose({ root, font, fonts, layoutOnly: true, document: { ...document, assets: [], objects: textObjects(document.objects).filter((object) => isShown(document, object)) } });
-      break;
-    } catch (error) {
-      const overflow = /^Text (?:overflow|box narrower than glyph): (.+)$/u.exec(error instanceof Error ? error.message : "");
-      const object = overflow ? textObjects(document.objects).find((item) => item.id === overflow[1]) : undefined;
-      if (!object) throw error;
-      const floor = Math.max(8, Math.ceil((proportional.get(object.id) ?? object.font_size) * MIN_TEXT_SHARE));
-      const next = Math.max(floor, Math.floor(object.font_size * (1 - TEXT_STEP)));
-      if (next >= object.font_size) return { status: "refused", preset, reason: `文字「${object.text.slice(0, 24)}」在 ${canvas.width}×${canvas.height} 里放不下` };
-      document.objects = document.objects.map((item) => item.id === object.id ? { ...object, font_size: next } : item);
-      shrunk.add(object.id);
-    }
-  }
-  validateDocument(document);
-
-  try { await fs.mkdir(target); }
-  catch (error) { if (errorCode(error) === "EEXIST") throw new Error("Derived project already exists"); throw error; }
-  const bytes = encode(document);
-  try {
-    await copyProjectFiles(root, target, document);
-    await writeOnce(path.join(target, "revisions/000001.json"), { bytes }, { expected: sha256(bytes) });
-  } catch (error) {
-    // Only this call created the directory; nothing else lives there yet.
-    await fs.rm(target, { recursive: true, force: true });
-    throw error;
-  }
-  return { status: "derived", preset, project_id: projectId, title, canvas, shrunk: [...shrunk], sha256: sha256(bytes) };
+  const fitted = await fitText(root, font, fonts, document, proportional);
+  if (typeof fitted === "string") return { status: "refused", preset, reason: fitted };
+  const bytes = await writeSibling(root, target, document);
+  return { status: "derived", preset, project_id: projectId, title, canvas, shrunk: fitted, sha256: sha256(bytes) };
 }
 
 export const isDerivePreset = (value: unknown): value is DerivePreset => typeof value === "string" && (IMAGE_SIZE_PRESETS as readonly string[]).includes(value);

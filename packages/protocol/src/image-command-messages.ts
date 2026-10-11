@@ -33,12 +33,21 @@ export interface ImageCommandPayloads {
   "image.project.checkText": { projectId: string; revision?: number; candidateId?: string };
   /** Derived projects for size presets, each re-laid out from one revision of the source. */
   "image.project.derive": { projectId: string; revision: number; presets: ImageSizePreset[] };
+  /** Each row becomes a project beside this one: the revision with the row's words in its text layers (P5). */
+  "image.batch.create": { projectId: string; revision: number; rows: { texts: { layer: string; text: string }[] }[] };
+  /** Removes every project of the batch; the source project is never part of it. */
+  "image.batch.remove": { batchId: string };
 }
 
 /** One preset's outcome: a new project beside the source, or the reason the layout does not fit. */
 export type ImageDeriveOutcome =
   | { preset: ImageSizePreset; status: "derived"; projectId: string; title: string; canvas: ImageCanvas; shrunkText: number }
   | { preset: ImageSizePreset; status: "refused"; reason: string };
+
+/** One table row of a batch, numbered from 1 in table order. */
+export type ImageBatchRowOutcome =
+  | { row: number; status: "created"; projectId: string; title: string; shrunkText: number }
+  | { row: number; status: "refused"; reason: string };
 
 /** One published revision as the 历史 tab lists it (newest last). */
 export interface ImageRevisionEntry { revision: number; author: ImageChangeAuthor; summary: string; operationCount: number; candidateId?: string; writtenAt: number }
@@ -54,6 +63,8 @@ export interface ImageProjectSummary {
   readyCandidates: number;
   /** For a size derived from another project: which project, revision and preset it came from. */
   derivedFrom?: { projectId: string; revision: number; preset: ImageSizePreset };
+  /** For a batch row: the batch, its row and the project and revision it came from. */
+  batch?: { batchId: string; row: number; projectId: string; revision: number };
 }
 
 export interface ImageCandidateSummary {
@@ -90,6 +101,8 @@ export interface ImageCommandResults {
   "image.candidate.discard": { projectId: string; candidateId: string; status: "discarded" };
   "image.project.conversation.set": { projectId: string };
   "image.project.derive": { projectId: string; revision: number; results: ImageDeriveOutcome[] };
+  "image.batch.create": { projectId: string; revision: number; batchId: string; results: ImageBatchRowOutcome[] };
+  "image.batch.remove": { batchId: string; removed: string[] };
   "image.project.addFont": ImageRevisionResult & { fontId: string; family: string };
   "image.project.addAsset": ImageRevisionResult & { assetId: string };
   /** Each shown text read back from the full-size render by offline OCR (P4 checkpoint 8). */

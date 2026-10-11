@@ -37,7 +37,7 @@ describe("image protocol schemas", () => {
   it("binds every command and event to the Workspace scope", () => {
     // Image source settings (`image.generation.*`) are App-scope configuration, not project commands.
     const commands = Object.keys(CommandPayloadSchemas).filter((type) => type.startsWith("image.") && !type.startsWith("image.generation."));
-    expect(commands.sort()).toEqual(["image.candidate.accept", "image.candidate.discard", "image.candidate.list", "image.project.addAsset", "image.project.addFont", "image.project.checkText", "image.project.conversation.set", "image.project.createFromPhoto", "image.project.derive", "image.project.edit", "image.project.history", "image.project.list", "image.project.read", "image.project.render"]);
+    expect(commands.sort()).toEqual(["image.batch.create", "image.batch.remove", "image.candidate.accept", "image.candidate.discard", "image.candidate.list", "image.project.addAsset", "image.project.addFont", "image.project.checkText", "image.project.conversation.set", "image.project.createFromPhoto", "image.project.derive", "image.project.edit", "image.project.history", "image.project.list", "image.project.read", "image.project.render"]);
     for (const type of commands) expect(COMMAND_CONTEXT_SCOPE_REQUIREMENTS[type as keyof ImageCommandPayloads], type).toBe("workspace");
     for (const type of ["image.project.changed", "image.candidate.changed", "image.job.changed"] as (keyof ImageEventPayloads)[]) {
       expect(EVENT_CONTEXT_REQUIREMENTS[type]).toEqual({ session: false, operation: false, requiredScope: "workspace" });
@@ -126,6 +126,16 @@ describe("image protocol schemas", () => {
     const patch = (value: Record<string, unknown>) => check(ImageEditOperationSchema, { type: "update_object", id: "headline", patch: value });
     expect([patch({ rotation: 45 }), patch({ rotation: null }), patch({ flip_x: true }), patch({ flip_y: false }), patch({ flip_x: null })]).toEqual([true, true, true, true, true]);
     expect([patch({ rotation: -181 }), patch({ flip_x: "yes" })]).toEqual([false, false]);
+  });
+
+  it("carries batch rows as layer and text pairs, within the batch limits", () => {
+    const create = (rows: unknown) => check(CommandPayloadSchemas["image.batch.create"], { projectId: "p", revision: 2, rows });
+    expect(create([{ texts: [{ layer: "price", text: "¥299" }] }])).toBe(true);
+    expect([create([]), create([{ texts: [] }]), create([{ texts: [{ layer: "../x", text: "a" }] }]), create([{ texts: [{ layer: "price", text: "x".repeat(2001) }] }]),
+      create(Array.from({ length: 201 }, () => ({ texts: [{ layer: "price", text: "1" }] })))]).toEqual([false, false, false, false, false]);
+    expect(check(CommandResultSchemas["image.batch.create"], { projectId: "p", revision: 2, batchId: "b1234567", results: [
+      { row: 1, status: "created", projectId: "p-b1234567-1", title: "海报 · ¥299", shrunkText: 1 }, { row: 2, status: "refused", reason: "放不下" }] })).toBe(true);
+    expect(check(CommandResultSchemas["image.batch.remove"], { batchId: "b1234567", removed: ["p-b1234567-1"] })).toBe(true);
   });
 
   it("carries groups and the operations that make, change and remove them", () => {

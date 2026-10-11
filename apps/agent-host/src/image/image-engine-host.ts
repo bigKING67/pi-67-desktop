@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { IMAGE_SIZE_PRESETS, IMAGE_WORK_DIRECTORY, imageSizePresetLabel, isImageId, type ImageCandidateListStatus, type ImageChangeAuthor, type ImageSizePreset } from "@pi67/domain";
 type ImageEngine = typeof import("@pi67/image-engine");
 type ImageDocument = import("@pi67/image-engine").ImageDocument;
-import type { AgentCommand, AgentEvent, CommandPayloads, CommandResults, ImageCandidateReceipt, ImageCandidateSummary, ImageDeriveOutcome, ImageEventPayloads, ImageProjectSummary } from "@pi67/protocol";
+import type { AgentCommand, AgentEvent, CommandPayloads, CommandResults, ImageBatchRowOutcome, ImageCandidateReceipt, ImageCandidateSummary, ImageDeriveOutcome, ImageEventPayloads, ImageProjectSummary } from "@pi67/protocol";
 import { HostCommandError } from "../protocol-error.js";
 import type { ImageCommandType } from "./image-command-router.js";
 import { imageEngineError } from "./image-engine-errors.js";
@@ -94,6 +94,10 @@ export class ImageEngineHost {
         return this.addAsset(engine, workspaceId, cwd, (command as Command<"image.project.addAsset">).payload);
       case "image.project.addFont":
         return this.addFont(engine, workspaceId, cwd, (command as Command<"image.project.addFont">).payload);
+      case "image.batch.create":
+        return this.createBatch(engine, workspaceId, cwd, (command as Command<"image.batch.create">).payload);
+      case "image.batch.remove":
+        return this.removeBatch(engine, workspaceId, cwd, (command as Command<"image.batch.remove">).payload);
       case "image.project.derive":
         return this.derive(engine, workspaceId, cwd, (command as Command<"image.project.derive">).payload);
       case "image.project.read": {
@@ -230,6 +234,32 @@ export class ImageEngineHost {
     });
   }
 
+  // Rows are written in table order under the source's queue (engine createBatch).
+  private createBatch(engine: ImageEngine, workspaceId: string, cwd: string,
+    { projectId, revision, rows }: CommandPayloads["image.batch.create"]): Promise<CommandResults["image.batch.create"]> {
+    return this.queue.serial(key(workspaceId, projectId), async () => {
+      const { batch_id: batchId, results } = await engine.createBatch(cwd, { project_id: projectId, revision, rows: rows.map((row) => row.texts) });
+      for (const result of results) if (result.status === "created") this.announce(workspaceId, event("image.project.changed", { projectId: result.project_id, revision: 1, sha256: result.sha256, author: "system" }));
+      return { projectId, revision, batchId, results: results.map((result): ImageBatchRowOutcome => result.status === "refused" ? result
+        : { row: result.row, status: "created", projectId: result.project_id, title: result.title, shrunkText: result.shrunk }) };
+    });
+  }
+
+  // Only projects whose first revision names this batch are removed; a source is never one of them.
+  private async removeBatch(engine: ImageEngine, workspaceId: string, cwd: string, { batchId }: CommandPayloads["image.batch.remove"]): Promise<CommandResults["image.batch.remove"]> {
+    const members = (await listProjects(engine, cwd)).filter((project) => project.batch?.batchId === batchId);
+    const removed: string[] = [];
+    for (const member of members) {
+      // The project and its disposable state beside it (previews, its dock conversation).
+      await this.queue.serial(key(workspaceId, member.projectId), async () => {
+        await fs.rm(engine.projectRoot(cwd, member.projectId), { recursive: true, force: true });
+        await fs.rm(path.join(cwd, ...IMAGE_WORK_DIRECTORY, member.projectId), { recursive: true, force: true });
+      });
+      removed.push(member.projectId);
+    }
+    return { batchId, removed };
+  }
+
   // Another writer may claim the free name first (another window, the Agent): take the next one.
   private async deriveOne(engine: ImageEngine, cwd: string, root: string, input: { revision: number; sha256: string; preset: ImageSizePreset; title: string }, base: string) {
     for (let attempt = 0; ; attempt += 1) {
@@ -312,19 +342,24 @@ async function readConversation(cwd: string, projectId: string): Promise<{ sessi
 const isImageSizePreset = (value: string): value is ImageSizePreset => (IMAGE_SIZE_PRESETS as readonly string[]).includes(value);
 const DERIVED = /^Derived from ([a-zA-Z][a-zA-Z0-9_-]{0,63}) revision (\d{1,4}) for (\d+):(\d+)$/u;
 
-/**
- * A derived size names its source in revision 1's summary (engine deriveProject).
- * `readProject` has already validated the whole chain, so one small read suffices.
- */
-async function derivation(root: string, firstSummary: string | undefined): Promise<ImageProjectSummary["derivedFrom"]> {
-  let summary = firstSummary;
-  if (summary === undefined) {
-    try { summary = (JSON.parse(await fs.readFile(path.join(root, "revisions", "000001.json"), "utf8")) as { change?: { summary?: unknown } }).change?.summary as string | undefined; }
-    catch { return undefined; }
-  }
+/** Revision 1's summary, where a derived size or a batch row names its source (engine). */
+async function firstSummary(root: string, known: string | undefined): Promise<string | undefined> {
+  if (known !== undefined) return known;
+  // `readProject` has already validated the whole chain, so one small read suffices.
+  try { return (JSON.parse(await fs.readFile(path.join(root, "revisions", "000001.json"), "utf8")) as { change?: { summary?: unknown } }).change?.summary as string | undefined; }
+  catch { return undefined; }
+}
+
+function derivation(summary: string | undefined): ImageProjectSummary["derivedFrom"] {
   const match = typeof summary === "string" ? DERIVED.exec(summary) : null;
   const preset = match ? `${match[3]}x${match[4]}` : "";
   return match && isImageSizePreset(preset) ? { projectId: match[1]!, revision: Number(match[2]), preset } : undefined;
+}
+
+const BATCH = /^Batch ([a-zA-Z][a-zA-Z0-9_-]{0,63}) row (\d{1,3}) from ([a-zA-Z][a-zA-Z0-9_-]{0,63}) revision (\d{1,4})$/u;
+function batchOf(summary: string | undefined): ImageProjectSummary["batch"] {
+  const match = typeof summary === "string" ? BATCH.exec(summary) : null;
+  return match ? { batchId: match[1]!, row: Number(match[2]), projectId: match[3]!, revision: Number(match[4]) } : undefined;
 }
 
 /** `base`, or `base-2`, `base-3`… when a project of that name already exists. */
@@ -381,10 +416,11 @@ async function listProjects(engine: ImageEngine, cwd: string): Promise<ImageProj
       const project = await readProject(root);
       const latest = path.join(root, "revisions", `${String(project.latest_revision).padStart(6, "0")}.json`);
       const candidates = await listCandidates(root);
-      const derivedFrom = await derivation(root, project.latest_revision === 1 ? project.document.change.summary : undefined);
+      const first = await firstSummary(root, project.latest_revision === 1 ? project.document.change.summary : undefined);
+      const derivedFrom = derivation(first), batch = batchOf(first);
       projects.push({ projectId, title: project.document.title, revision: project.document.revision, canvas: project.document.canvas,
         updatedAt: Math.floor((await fs.stat(latest)).mtimeMs), readyCandidates: candidates.filter((item) => item.status === "ready").length,
-        ...(derivedFrom ? { derivedFrom } : {}) });
+        ...(derivedFrom ? { derivedFrom } : {}), ...(batch ? { batch } : {}) });
     } catch { /* A damaged project stays on disk for inspection; it is not listed. */ }
   }
   return projects;

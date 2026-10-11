@@ -50,8 +50,8 @@ const job = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("image workbench tools", { timeout: 120_000 }, () => {
-  it("registers seven tools", () => {
-    expect(harness("/tmp").names).toEqual(["image_project_create_from_photo", "image_project_read", "image_project_edit", "image_render", "image_candidates", "image_candidate_decide", "image_generate"]);
+  it("registers eight tools", () => {
+    expect(harness("/tmp").names).toEqual(["image_project_create_from_photo", "image_project_read", "image_project_edit", "image_batch", "image_render", "image_candidates", "image_candidate_decide", "image_generate"]);
   });
 
   it("creates, reads, edits, renders, generates, lists and accepts through the engine", async () => {
@@ -132,6 +132,18 @@ describe("image workbench tools", { timeout: 120_000 }, () => {
     const grouped = await t.json("image_project_read", { project_id: "poster" });
     expect(grouped.groups).toEqual([{ id: "title-set", name: "标题", locked: false, visible: true, opacity: 1 }]);
     expect((grouped.objects as { id: string }[]).find((object) => object.id === "ring")).toMatchObject({ group_id: "title-set" });
+  });
+
+  it("lets the Agent make a batch of priced variants from table rows, with refused rows explained", async () => {
+    const cwd = await workspace();
+    await sharp({ create: { width: 640, height: 640, channels: 3, background: "#d8c8b0" } }).png().toFile(path.join(cwd, "photo.png"));
+    const t = harness(cwd);
+    await t.json("image_project_create_from_photo", { project_id: "poster", source: "photo.png", headline: "春日" });
+    const batch = await t.json("image_batch", { project_id: "poster", revision: 1, rows: [[{ layer: "headline", text: "夏日" }], [{ layer: "price", text: "¥1" }]] });
+    expect(batch.results).toEqual([
+      { row: 1, status: "created", project_id: `poster-${String(batch.batch_id)}-1`, title: expect.any(String), shrunk_text: 0 },
+      { row: 2, status: "refused", reason: "没有叫「price」的文字图层" }]);
+    expect((await t.json("image_project_read", { project_id: `poster-${String(batch.batch_id)}-1` })).objects).toEqual(expect.arrayContaining([expect.objectContaining({ id: "headline", text: "夏日" })]));
   });
 
   it("resolves an imported asset against the Workspace, not the Host's own directory", async () => {

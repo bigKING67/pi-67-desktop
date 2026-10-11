@@ -85,6 +85,8 @@ export function imageObjectInEffect<T extends ImageSceneObject>(document: Pick<I
   const group = imageObjectGroup(document, object);
   return group && (group.locked || !group.visible) ? { ...object, locked: object.locked || group.locked, visible: object.visible && group.visible } : object;
 }
+/** One batch (P5): rows of a table, text layers one row sets, characters per cell. */
+export const IMAGE_BATCH_LIMITS = Object.freeze({ rows: 200, texts: 20, characters: 2000 });
 /** Images (photo, generated layers, masks) one project may hold. */
 export const IMAGE_ASSET_LIMIT = 64;
 export interface ImageChange { author: ImageChangeAuthor; summary: string; operations: string[]; candidate?: { id: string; sha256: string } }

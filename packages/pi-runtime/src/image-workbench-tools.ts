@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { Type, type TSchema } from "typebox";
-import { IMAGE_PROMPT_CONTEXT_LIMITS, IMAGE_PROVIDER_ID, IMAGE_REFERENCE_ROLES, imageCandidateActions, imageObjectGroup, imageObjectInEffect, type ImageReferenceRole } from "@pi67/domain";
+import { IMAGE_BATCH_LIMITS, IMAGE_PROMPT_CONTEXT_LIMITS, IMAGE_PROVIDER_ID, IMAGE_REFERENCE_ROLES, imageCandidateActions, imageObjectGroup, imageObjectInEffect, type ImageReferenceRole } from "@pi67/domain";
 import type { ImageDocument, ImageGenerator } from "@pi67/image-engine";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createPiImageGenerator, type ImageRegistry } from "./image-workbench-generator.js";
@@ -126,6 +126,27 @@ export function imageTools(): ToolDefinition[] {
           operations: resolveEditAssetSources(params.operations, (source) => path.resolve(ctx.cwd, source))
         }, { dryRun: params.dry_run === true });
         return text({ revision: result.document.revision, sha256: result.sha256, dry_run: result.dry_run === true });
+      }
+    },
+    {
+      name: "image_batch", label: "Batch image variants",
+      description: "Turn one revision into a batch of variants from a table: each row sets the words of some text layers and becomes its own project beside the source (the source is untouched). Text that no longer fits shrinks to at most 70%; a row naming a missing or locked layer, a character no font has, or text that still does not fit is refused with its reason and writes nothing. The person can remove the whole batch from the image page.",
+      promptSnippet: "Make one project per table row with different words",
+      promptGuidelines: [
+        "Use it for price lists, SKUs or translations: one row per variant, layer ids from image_project_read.",
+        "Report refused rows with their reasons; do not retry them by editing the source."
+      ],
+      parameters: Type.Object({
+        project_id: projectId, revision: Type.Integer({ minimum: 1, description: "The source revision every row starts from." }),
+        rows: Type.Array(Type.Array(Type.Object({ layer: Type.String({ pattern: IMAGE_ID_PATTERN, description: "A text layer id." }),
+          text: Type.String({ maxLength: IMAGE_BATCH_LIMITS.characters }) }, { additionalProperties: false }), { minItems: 1, maxItems: IMAGE_BATCH_LIMITS.texts }),
+        { minItems: 1, maxItems: IMAGE_BATCH_LIMITS.rows, description: "One entry per variant, in table order." })
+      }),
+      async execute(_id, raw, _signal, _update, ctx) {
+        const params = raw as Params, engine = await loadEngine();
+        const { batch_id: batchId, results } = await engine.createBatch(ctx.cwd, { project_id: str(params, "project_id"), revision: int(params, "revision"), rows: params.rows as { layer: string; text: string }[][] });
+        // Digests mean nothing to the model; the row, its project and title or its reason do.
+        return text({ batch_id: batchId, results: results.map((result) => result.status === "refused" ? result : { row: result.row, status: result.status, project_id: result.project_id, title: result.title, shrunk_text: result.shrunk }) });
       }
     },
     {
