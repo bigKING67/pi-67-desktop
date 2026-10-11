@@ -12,6 +12,7 @@ import { ImageProjectWatcher } from "./image-project-watcher.js";
 import { event, freeProjectId, key, PHOTO_EXTENSIONS, type ImageEngine } from "./image-host-support.js";
 import { listProjects } from "./image-project-list.js";
 import { createBatch, createTemplate, instantiateTemplate, removeBatch, type VariantContext } from "./image-variant-commands.js";
+import { addBrandFont, addBrandLogo, editBrand, readBrand } from "./image-brand-commands.js";
 
 export interface ImageEngineHostDependencies {
   /** Host-local realpath of a registered, trusted Workspace. */
@@ -44,7 +45,8 @@ export class ImageEngineHost {
   constructor(private readonly dependencies: ImageEngineHostDependencies) {
     this.queue = dependencies.queue ?? new ImageWorkQueue();
     this.watcher = dependencies.watcher ?? new ImageProjectWatcher({ emit: (workspaceId, item) => dependencies.emit(workspaceId, item) });
-    this.variants = { queue: this.queue, announce: (workspaceId, announced) => this.announce(workspaceId, announced), readStagedImage: dependencies.readStagedImage?.bind(dependencies) };
+    this.variants = { queue: this.queue, announce: (workspaceId, announced) => this.announce(workspaceId, announced), readStagedImage: dependencies.readStagedImage?.bind(dependencies),
+      readStagedFile: dependencies.readStagedFile?.bind(dependencies) };
   }
 
   /** Stops watching project folders; image commands after this still run. */
@@ -101,6 +103,14 @@ export class ImageEngineHost {
         return createBatch(this.variants, engine, workspaceId, cwd, (command as Command<"image.batch.create">).payload);
       case "image.batch.remove":
         return removeBatch(this.variants, engine, workspaceId, cwd, (command as Command<"image.batch.remove">).payload);
+      case "image.brand.read":
+        return readBrand(engine, cwd);
+      case "image.brand.edit":
+        return editBrand(this.variants, engine, workspaceId, cwd, (command as Command<"image.brand.edit">).payload);
+      case "image.brand.addFont":
+        return addBrandFont(this.variants, engine, workspaceId, cwd, (command as Command<"image.brand.addFont">).payload);
+      case "image.brand.addLogo":
+        return addBrandLogo(this.variants, engine, workspaceId, cwd, (command as Command<"image.brand.addLogo">).payload);
       case "image.template.create":
         return createTemplate(this.variants, engine, workspaceId, cwd, (command as Command<"image.template.create">).payload);
       case "image.template.instantiate":

@@ -3,7 +3,8 @@ import { ProtocolRequestError } from "@pi67/protocol";
 
 const host = vi.hoisted(() => ({
   revision: 1, calls: [] as { type: string; payload: Record<string, unknown> }[], conflictNext: false,
-  refuseNext: undefined as { message: string; imageReason: string } | undefined, objectIds: ["t", "u"], unreadNext: false
+  refuseNext: undefined as { message: string; imageReason: string } | undefined, objectIds: ["t", "u"], unreadNext: false,
+  brand: { schema: "newmoney.image-brand.v1", revision: 0, colors: [], fonts: [], logos: [], specs: [] } as { revision: number; [key: string]: unknown }
 }));
 const notices = vi.hoisted(() => [] as { level: string; title: string; message: string }[]);
 
@@ -42,6 +43,12 @@ vi.mock("../connection/AgentConnectionController.js", () => ({
         if (payload.attachmentId === "bad") return Promise.reject(new ProtocolRequestError({ code: "INVALID_PAYLOAD", message: "Unsupported font file: not TrueType or OpenType", recoverable: true }));
         host.revision += 1;
         return Promise.resolve({ projectId: "p", revision: host.revision, sha256: "s", dryRun: false, fontId: "font-1", family: "Brand Sans" });
+      }
+      if (type === "image.brand.read") return Promise.resolve(host.brand);
+      if (type === "image.brand.edit" || type === "image.brand.addFont" || type === "image.brand.addLogo") {
+        if (payload.baseRevision !== host.brand.revision) return Promise.reject(new Error("Brand conflict: expected 9, received 0"));
+        host.brand = { ...host.brand, revision: host.brand.revision + 1 };
+        return Promise.resolve(host.brand);
       }
       if (type === "image.template.create") return Promise.resolve({ projectId: "p-template", title: "海报 · 模板", slots: ["t"] });
       if (type === "image.template.instantiate") return Promise.resolve(payload.title === "放不下" ? { status: "refused", reason: "文字「x」在 100×100 里放不下" } : { status: "created", projectId: payload.projectId });
@@ -361,6 +368,26 @@ describe("image object selection", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array(26 * 1024 * 1024), { status: 200 })));
     await expect(source.images!.prepare()).rejects.toThrow(/超过 25 MB/u);
     useTeamChatDialogStore.getState().close();
+    vi.unstubAllGlobals();
+  });
+
+  it("edits the brand kit on the version shown, stages its files, and reloads a stale view", async () => {
+    const { loadBrand, editBrand, addBrandFile, useImageBrand } = await import("./image-brand.js");
+    host.brand = { schema: "newmoney.image-brand.v1", revision: 0, colors: [], fonts: [], logos: [], specs: [] };
+    await loadBrand();
+    expect(await editBrand("添加颜色", [{ type: "set_color", color: { id: "color-1", name: "红", value: "#b5452f" } }])).toBe(true);
+    expect(useImageBrand.getState().kit?.revision).toBe(1);
+    const released: string[][] = [];
+    vi.stubGlobal("window", { pi67: { system: { stagePromptAttachments: () => Promise.resolve([{ id: "f1", kind: "file" }]),
+      releasePromptAttachments: (ids: string[]) => { released.push(ids); return Promise.resolve(); } } } });
+    expect(await addBrandFile(new File([new Uint8Array(4)], "Brand.ttf"), "font")).toBe(true);
+    expect(host.calls.find((call) => call.type === "image.brand.addFont")?.payload).toEqual({ baseRevision: 1, attachmentId: "f1" });
+    expect(released).toEqual([["f1"]]);
+    // Someone else edited meanwhile: the kit reloads and the person is told to try again.
+    host.brand = { ...host.brand, revision: 9 };
+    expect(await editBrand("移除颜色", [{ type: "remove_color", id: "color-1" }])).toBe(false);
+    expect(notices.at(-1)).toMatchObject({ title: "品牌库刚被更新" });
+    expect(useImageBrand.getState().kit?.revision).toBe(9);
     vi.unstubAllGlobals();
   });
 

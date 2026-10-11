@@ -1612,6 +1612,12 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   uploads them as Team Chat attachments, creates the Work Card (assigned to the teammate in a
   direct message) and then posts one message `<title> · 交付图片` with the pictures. If the card
   fails, the uploaded pictures are discarded and nothing is posted.
+  The library's `品牌库` (P5) holds one brand kit for every project in it: colours (name and
+  #RRGGBB), fonts (TTF/OTF), logos (PNG/JPEG/WebP) and export specs the person writes from a
+  platform's rules (name, width and height, an optional MB cap, an optional white background —
+  every edge pixel white); none are built in. Limits: 32 colours, 8 fonts, 16 logos, 16 specs.
+  The kit is kept beside the projects as versions; an edit made on an older version reloads the
+  kit and asks again instead of overwriting. Files are staged through Main like any upload.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

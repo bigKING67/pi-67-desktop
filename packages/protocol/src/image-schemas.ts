@@ -1,4 +1,4 @@
-import { IMAGE_ADJUST_LIMITS, IMAGE_BATCH_LIMITS, IMAGE_GROUP_LIMIT, IMAGE_ID_PATTERN, IMAGE_TEMPLATE_SLOT_LIMIT, IMAGE_PROJECT_LIMITS, IMAGE_SIZE_PRESETS, IMAGE_USER_FONT_LIMIT } from "@pi67/domain";
+import { IMAGE_ADJUST_LIMITS, IMAGE_BATCH_LIMITS, IMAGE_BRAND_LIMITS, IMAGE_GROUP_LIMIT, IMAGE_ID_PATTERN, IMAGE_TEMPLATE_SLOT_LIMIT, IMAGE_PROJECT_LIMITS, IMAGE_SIZE_PRESETS, IMAGE_USER_FONT_LIMIT } from "@pi67/domain";
 import { strictObject, Type, Value, type TSchema } from "./typebox-schema.js";
 import type { ImageCommandPayloads, ImageCommandResults, ImageEventPayloads } from "./image-command-messages.js";
 
@@ -177,6 +177,19 @@ export const IMAGE_EXPORT_SET_MAX_ITEMS = Math.max(IMAGE_SIZE_PRESETS.length + 1
 
 const SizePresetSchema = Type.Union(IMAGE_SIZE_PRESETS.map((preset) => Type.Literal(preset)));
 
+const BrandNameSchema = Type.String({ minLength: 1, maxLength: IMAGE_BRAND_LIMITS.name });
+const BrandColorSchema = strictObject({ id: IdSchema, name: BrandNameSchema, value: ColorSchema });
+const BrandSpecSchema = strictObject({ id: IdSchema, name: BrandNameSchema, width: Type.Integer({ minimum: 64, maximum: L.edge }), height: Type.Integer({ minimum: 64, maximum: L.edge }),
+  max_bytes: Type.Optional(Type.Integer({ minimum: 1024, maximum: 100_000_000 })), background: Type.Optional(Type.Literal("white")) });
+const BrandKitSchema = strictObject({
+  schema: Type.String({ minLength: 1, maxLength: 64 }), revision: Type.Integer({ minimum: 0, maximum: 1_000_000 }),
+  colors: Type.Array(BrandColorSchema, { maxItems: IMAGE_BRAND_LIMITS.colors }),
+  fonts: Type.Array(strictObject({ id: IdSchema, family: Type.String({ minLength: 1, maxLength: 64 }), file: Type.String({ minLength: 1, maxLength: 160 }), sha256: Sha256Schema,
+    bytes: Type.Integer({ minimum: 1, maximum: 20_000_000 }), format: Type.Union([Type.Literal("ttf"), Type.Literal("otf")]) }), { maxItems: IMAGE_BRAND_LIMITS.fonts }),
+  logos: Type.Array(strictObject({ id: IdSchema, name: BrandNameSchema, file: Type.String({ minLength: 1, maxLength: 160 }), render_file: Type.String({ minLength: 1, maxLength: 160 }),
+    sha256: Sha256Schema, render_sha256: Sha256Schema, width: Type.Integer({ minimum: 1, maximum: 16_384 }), height: Type.Integer({ minimum: 1, maximum: 16_384 }) }), { maxItems: IMAGE_BRAND_LIMITS.logos }),
+  specs: Type.Array(BrandSpecSchema, { maxItems: IMAGE_BRAND_LIMITS.specs })
+});
 export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSchema> = {
   "image.project.list": strictObject({}),
   "image.project.createFromPhoto": strictObject({
@@ -210,6 +223,15 @@ export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSch
     texts: Type.Array(strictObject({ layer: IdSchema, text: Type.String({ minLength: 1, maxLength: IMAGE_BATCH_LIMITS.characters }) }), { minItems: 1, maxItems: IMAGE_BATCH_LIMITS.texts }) }),
   { minItems: 1, maxItems: IMAGE_BATCH_LIMITS.rows }) }),
   "image.batch.remove": strictObject({ batchId: IdSchema }),
+  "image.brand.read": strictObject({}),
+  "image.brand.edit": strictObject({ baseRevision: Type.Integer({ minimum: 0, maximum: 1_000_000 }), operations: Type.Array(Type.Union([
+    strictObject({ type: Type.Literal("set_color"), color: BrandColorSchema }), strictObject({ type: Type.Literal("remove_color"), id: IdSchema }),
+    strictObject({ type: Type.Literal("set_spec"), spec: BrandSpecSchema }), strictObject({ type: Type.Literal("remove_spec"), id: IdSchema }),
+    strictObject({ type: Type.Literal("remove_font"), id: IdSchema }), strictObject({ type: Type.Literal("remove_logo"), id: IdSchema })
+  ]), { minItems: 1, maxItems: 32 }) }),
+  "image.brand.addFont": strictObject({ baseRevision: Type.Integer({ minimum: 0, maximum: 1_000_000 }), attachmentId: Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" }) }),
+  "image.brand.addLogo": strictObject({ baseRevision: Type.Integer({ minimum: 0, maximum: 1_000_000 }), name: BrandNameSchema,
+    attachmentId: Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" }) }),
   "image.template.create": strictObject({ projectId: IdSchema, revision: RevisionSchema }),
   "image.template.instantiate": strictObject({ templateId: IdSchema, projectId: IdSchema, title: Type.String({ minLength: 1, maxLength: L.title }),
     texts: Type.Array(strictObject({ layer: IdSchema, text: TextSchema }), { maxItems: IMAGE_TEMPLATE_SLOT_LIMIT }),
@@ -252,6 +274,10 @@ export const ImageCommandResultSchemas: Record<keyof ImageCommandResults, TSchem
     strictObject({ row: BatchRowSchema, status: Type.Literal("refused"), reason: Type.String({ minLength: 1, maxLength: 500 }) })
   ]), { maxItems: IMAGE_BATCH_LIMITS.rows }) }),
   "image.batch.remove": strictObject({ batchId: IdSchema, removed: Type.Array(IdSchema, { maxItems: IMAGE_BATCH_LIMITS.rows }) }),
+  "image.brand.read": BrandKitSchema,
+  "image.brand.edit": BrandKitSchema,
+  "image.brand.addFont": BrandKitSchema,
+  "image.brand.addLogo": BrandKitSchema,
   "image.template.create": strictObject({ projectId: IdSchema, title: Type.String({ minLength: 1, maxLength: L.title }), slots: Type.Array(IdSchema, { maxItems: IMAGE_TEMPLATE_SLOT_LIMIT }) }),
   "image.template.instantiate": Type.Union([strictObject({ status: Type.Literal("created"), projectId: IdSchema }),
     strictObject({ status: Type.Literal("refused"), reason: Type.String({ minLength: 1, maxLength: 500 }) })])

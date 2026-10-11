@@ -1,5 +1,5 @@
 import type { ImageProjectSummary } from "@pi67/protocol";
-import { ArrowLeft, FolderOpen, ImagePlus } from "lucide-react";
+import { ArrowLeft, FolderOpen, ImagePlus, Palette } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
@@ -7,6 +7,7 @@ import { chooseImageLibrary, ensureLibraryThumbnails, imagePreviewUrl, loadImage
 import { batchGroups, type BatchGroup } from "./image-batch-groups.js";
 import { removeImageBatch } from "./image-project-batch.js";
 import { ImageBatchRemoveDialog } from "./ImageBatchPanel.js";
+import { ImageBrandDialog } from "./ImageBrandDialog.js";
 import { useImageWorkbench } from "./image-workbench-store.js";
 import styles from "./ImageWorkbench.module.css";
 import { NewImageFromPhotoDialog } from "./NewImageFromPhotoDialog.js";
@@ -29,6 +30,7 @@ export function ImageLibrary() {
   useEffect(() => { if (batch?.length) ensureLibraryThumbnails(batch); }, [drawn]);
   const [photo, setPhoto] = useState<File>();
   const [choosing, setChoosing] = useState(false);
+  const [brandOpen, setBrandOpen] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -51,7 +53,10 @@ export function ImageLibrary() {
           <h1 id="image-library-title">创作库</h1>
           {library ? <span className={styles.libraryPath} title={library.identity.canonicalPath}>{library.identity.canonicalPath.split(/[\\/]/u).filter(Boolean).at(-1)}</span> : null}
         </span>
-        {library && projects.length > 0 ? fromPhoto : null}
+        <span className={styles.libraryActions}>
+          {library ? <Button className="secondary-button" onPress={() => setBrandOpen(true)}><Palette aria-hidden="true" size={14} />品牌库</Button> : null}
+          {library && projects.length > 0 ? fromPhoto : null}
+        </span>
       </header>
       <input ref={input} accept={PHOTO_TYPES} className={styles.fileInput} tabIndex={-1} type="file"
         onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) setPhoto(file); }} />
@@ -101,6 +106,7 @@ export function ImageLibrary() {
         </>
       )}
       <ImageBatchRemoveDialog />
+      {brandOpen ? <ImageBrandDialog onDismiss={() => setBrandOpen(false)} /> : null}
       {photo ? <NewImageFromPhotoDialog photo={photo} onDismiss={() => setPhoto(undefined)} /> : null}
     </section>
   );

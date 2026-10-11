@@ -342,6 +342,13 @@ Application-level surfaces use a separate wide-window shell:
   glyph) and a tertiary line under the size export. It opens the existing Team Chat hand-off
   dialog unchanged in layout, with its privacy notice reworded for pictures and a second
   notice line `随任务卡发送 N 张图片：…`; the workspace and branch references do not appear.
+- Brand kit (P5, 2026-10-11): the library header adds a `品牌库` secondary button (palette glyph)
+  before `从图片开始`. The dialog (shared modal, 560px) has eyebrow `创作库`, a tertiary hint and a
+  scrolling body of four sections (`颜色`, `字体`, `Logo`, `导出规格`), each a caption heading over
+  rows of name and caption detail with a quiet `移除` text action (colours lead with a 20px
+  swatch); colours and specs end with an inline add form flush with the section (name wide,
+  numbers narrow, the action right; a small accent checkbox for 白底), fonts and logos with an
+  `添加字体…` / `添加 Logo…` secondary button. `完成` closes it.
 - Text fonts (P3, 2026-10-10): 属性 for text adds a `字体` section — the shared Settings
   select at full panel width (`Noto Sans CJK SC · 内置`, then each added font's family with
   `TTF`/`OTF` as detail), a `添加字体…` text action with a plus glyph (disabled at 8 fonts or

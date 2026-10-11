@@ -111,6 +111,29 @@ Money Server change; cards keep no attachments).
 - Evidence: renderer tests for the image source and the upload function, an e2e through the
   mock Team Chat service, packaged screenshots.
 
+## Checkpoint 3 design (brand kit and specs)
+
+Confirmed by the user 2026-10-11: one brand kit per creative library; platform specs are the
+person's own (name, size, file-size cap, background rule), none built in.
+
+- Storage (engine `brand-kit.ts`): the library's `.newmoney/images/brand/` holds immutable
+  versions `versions/000001.json`… (`newmoney.image-brand.v1`: `colors` [{id, name, value}],
+  `fonts` [{id, family, file, sha256, bytes, format}], `logos` [{id, name, file, render_file,
+  sha256, render_sha256, width, height}], `specs` [{id, name, width, height, max_bytes?,
+  background?: "white"}]) and content-addressed `fonts/` and `assets/` files; each edit names
+  the version it read, so two writers never overwrite each other. Limits: 32 colours, 8 fonts,
+  16 logos, 16 specs.
+- 3a: Host `image.brand.read` / `image.brand.edit` (colours, specs, removals) and
+  `image.brand.addFont` / `addLogo` (staged files, like a project's fonts and masks); the
+  library's `品牌库` dialog lists and edits all four.
+- 3b: in a project — colour fields offer the brand swatches; the font picker offers brand fonts
+  (bound into the project on use, as a user font); 图层 → `插入 Logo` adds a brand logo as an
+  image layer (top right, 15% of the short edge). The Agent reads the kit (`image_brand_read`)
+  and may use its colours, fonts and logos the same way.
+- 3c: 导出 lists the specs; `按规格导出` derives the size when the canvas differs (the derive rule,
+  any size), then checks the PNG against the spec (exact size, file size, white background =
+  every edge pixel white) along with the keyed-text check, listing what fails before saving.
+
 ## Rollback
 
 Each checkpoint is additive; the batch writes only new sibling projects and export folders, so
@@ -190,3 +213,7 @@ removing the feature leaves every existing project as it was.
   stop path had no test (`handOff`, tested). Deferred: pictures are held in the renderer until
   all are rendered (up to 10); a Host-side "attach the cached PNG" command would avoid holding
   and re-sending them, and belongs with a later Team Chat change.
+- 2026-10-11: checkpoint 3a: engine `brand-kit.ts` (versions under `.newmoney/brand`, fonts and
+  logos by digest, conflicts on a stale version), Host `image.brand.*` (`image-brand-commands.ts`),
+  protocol, the library's 品牌库 dialog. The packaged check found the add forms indented and the
+  checkbox stretched by the shared modal's form and input rules (outranked in the dialog).

@@ -52,3 +52,5 @@ export type { TextCheck, TextReader } from "./text-check.js";
 export { batchVariant, batchSummary, createBatch, BATCH_LIMITS } from "./batch-variant.js";
 export type { BatchRowOutcome, BatchVariantResult } from "./batch-variant.js";
 export { createTemplate, instantiateTemplate, templateSummary, fromTemplateSummary } from "./template.js";
+export { BRAND_SCHEMA, brandFile, brandRoot, editBrand, readBrand } from "./brand-kit.js";
+export type { BrandKit } from "./brand-kit.js";

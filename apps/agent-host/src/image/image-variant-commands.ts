@@ -13,6 +13,7 @@ export interface VariantContext {
   queue: ImageWorkQueue;
   announce(workspaceId: string, announced: AgentEvent): void;
   readStagedImage?: ((id: string) => Promise<{ mimeType: string; bytes: Buffer }>) | undefined;
+  readStagedFile?: ((id: string) => Promise<{ name: string; bytes: Buffer }>) | undefined;
 }
 
 // Rows are written in table order under the source's queue (engine createBatch).

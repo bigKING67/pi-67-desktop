@@ -85,6 +85,20 @@ export function imageObjectInEffect<T extends ImageSceneObject>(document: Pick<I
   const group = imageObjectGroup(document, object);
   return group && (group.locked || !group.visible) ? { ...object, locked: object.locked || group.locked, visible: object.visible && group.visible } : object;
 }
+/** The creative library's brand kit (P5): shared colours, fonts, logos and the person's own export specs. */
+export interface ImageBrandColor { id: string; name: string; value: string }
+export interface ImageBrandFont { id: string; family: string; file: string; sha256: string; bytes: number; format: "ttf" | "otf" }
+export interface ImageBrandLogo { id: string; name: string; file: string; render_file: string; sha256: string; render_sha256: string; width: number; height: number }
+/** A platform's rule as the person states it: exact size, an optional file-size cap and an optional all-white edge. */
+export interface ImageBrandSpec { id: string; name: string; width: number; height: number; max_bytes?: number; background?: "white" }
+export interface ImageBrandKit { schema: string; revision: number; colors: ImageBrandColor[]; fonts: ImageBrandFont[]; logos: ImageBrandLogo[]; specs: ImageBrandSpec[] }
+export const IMAGE_BRAND_LIMITS = Object.freeze({ colors: 32, fonts: 8, logos: 16, specs: 16, name: 40 });
+/** A brand kit edit; files arrive as local paths through the Host or the Agent's tools, never from the renderer. */
+export type ImageBrandOperation =
+  | { type: "set_color"; color: ImageBrandColor } | { type: "remove_color"; id: string }
+  | { type: "set_spec"; spec: ImageBrandSpec } | { type: "remove_spec"; id: string }
+  | { type: "remove_font"; id: string } | { type: "remove_logo"; id: string };
+
 /** A template's replaceable layers (P5): text or image layers a new project from it may change. */
 export interface ImageTemplate { slots: string[] }
 /** At most this many slots per template. */

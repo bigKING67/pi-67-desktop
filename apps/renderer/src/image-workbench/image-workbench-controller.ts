@@ -23,7 +23,7 @@ function imageLibraryWorkspace(): WorkspaceDescriptor | undefined {
   return state.imageLibraryWorkspaceId ? state.workspaces[state.imageLibraryWorkspaceId] : undefined;
 }
 
-function requestImage<T extends AgentCommandType>(workspaceId: string, type: T, payload: CommandPayloads[T]): Promise<CommandResults[T]> {
+export function requestImage<T extends AgentCommandType>(workspaceId: string, type: T, payload: CommandPayloads[T]): Promise<CommandResults[T]> {
   return agentConnectionController.request(type, payload, [], { context: { scope: "workspace", workspaceId } });
 }
 

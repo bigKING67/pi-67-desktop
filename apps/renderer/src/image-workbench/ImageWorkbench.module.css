@@ -295,3 +295,122 @@
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-medium);
 }
+
+/* 品牌库: four short sections in a scrolling body; rows are a name over its detail, with 移除. */
+.brandModal {
+  width: min(560px, calc(100vw - 40px));
+}
+
+.brandSections {
+  display: grid;
+  max-height: min(60vh, 560px);
+  gap: 12px;
+  padding-right: 4px;
+  overflow-y: auto;
+}
+
+.brandSection h3 {
+  margin: 0 0 6px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+}
+
+.brandSection ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.brandRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+}
+
+.brandSwatch {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-inline);
+}
+
+.brandLabel {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-interface);
+}
+
+.brandLabel span {
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.brandRemove {
+  padding: 0 8px;
+  min-height: 26px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.brandRemove[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.brandRemove[data-focus-visible],
+.brandAdd[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.brandAdd {
+  justify-self: start;
+}
+
+/* Add forms sit flush with their section, so `.modal-surface form`'s dialog padding is outranked here: name wide, numbers narrow, the action last. */
+.brandSections .brandForm {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 8px;
+  padding: 0;
+}
+
+.brandForm > :last-child {
+  justify-self: end;
+}
+
+.brandCheck {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
+.brandCheck input {
+  width: 14px;
+  height: 14px;
+  min-height: 0;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.libraryActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

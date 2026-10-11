@@ -1,4 +1,6 @@
 import type {
+  ImageBrandKit,
+  ImageBrandOperation,
   ImageCandidateListStatus,
   ImageCandidateMode,
   ImageCanvas,
@@ -37,6 +39,14 @@ export interface ImageCommandPayloads {
   "image.batch.create": { projectId: string; revision: number; rows: { row: number; texts: { layer: string; text: string }[] }[] };
   /** Removes every project of the batch; the source project is never part of it. */
   "image.batch.remove": { batchId: string };
+  /** The creative library's brand kit (P5); revision 0 before its first edit. */
+  "image.brand.read": Record<string, never>;
+  /** Colours and specs set or removed, fonts and logos removed, on the version the page read. */
+  "image.brand.edit": { baseRevision: number; operations: ImageBrandOperation[] };
+  /** A staged TTF/OTF added to the kit. */
+  "image.brand.addFont": { baseRevision: number; attachmentId: string };
+  /** A staged PNG/JPEG/WebP added to the kit as a logo. */
+  "image.brand.addLogo": { baseRevision: number; name: string; attachmentId: string };
   /** Copies the revision as a template beside it, every text and image layer a slot (P5). */
   "image.template.create": { projectId: string; revision: number };
   /** A new plain project from a template: slot words, and per image slot a staged picture. */
@@ -113,6 +123,10 @@ export interface ImageCommandResults {
   "image.batch.create": { projectId: string; revision: number; batchId: string; results: ImageBatchRowOutcome[] };
   "image.batch.remove": { batchId: string; removed: string[] };
   "image.template.create": { projectId: string; title: string; slots: string[] };
+  "image.brand.read": ImageBrandKit;
+  "image.brand.edit": ImageBrandKit;
+  "image.brand.addFont": ImageBrandKit;
+  "image.brand.addLogo": ImageBrandKit;
   "image.template.instantiate": { status: "created"; projectId: string } | { status: "refused"; reason: string };
   "image.project.addFont": ImageRevisionResult & { fontId: string; family: string };
   "image.project.addAsset": ImageRevisionResult & { assetId: string };
