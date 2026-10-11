@@ -1,9 +1,9 @@
 # Image workbench P4: engine extensions
 
-Status: active (confirmed 2026-10-10; schema changes still need confirmation at checkpoint 2)
+Status: done (2026-10-11; the VLM review and golden eval moved to docs/plans/2026-10-11-image-vlm-eval.md)
 Owner: Claude
 Started: 2026-10-10
-Last updated: 2026-10-10
+Last updated: 2026-10-11
 
 ## Goal
 
@@ -47,7 +47,7 @@ with shared samples first, then protocol, then UI (product model §8).
 - [x] 7. Layer groups: 图层 tree, move/lock/hide a group, selection and alignment.
 - [x] 8. OCR gate for key text in generated candidates, and the VLM debias / golden
   eval with a report (separate design; may move to its own plan).
-- [ ] 9. Authority docs, packaged macOS verification, Windows CI evidence, Agent tool
+- [x] 9. Authority docs, packaged macOS verification, Windows CI evidence, Agent tool
   schema and descriptions for each new operation.
 
 ## Spike results (checkpoint 1, 2026-10-10)
@@ -287,3 +287,11 @@ page and earlier releases still open projects that do not use it.
   OCR runs one at a time from `ocr-image-reader.ts` and reads the render's own document.json.
   Routing it through the attachment worker pool was not taken: that pool is shaped around
   staged attachments, and the image check now has its own one-at-a-time queue and timeout.
+- 2026-10-11: checkpoint 9 and P4 done. CI run 38106266799 on 7795ccc1 passed every job (quality
+  gates, renderer e2e and native smoke on macOS arm64; build, native smoke and installer
+  lifecycle on Windows x64); run 38063131558 on 30d91cf9 had done the same for checkpoints 3–7.
+  Each checkpoint was verified in the packaged macOS preview with screenshots in both themes
+  (kept outside the repository). The product model's status, P4 row and settled decisions are
+  updated; PRODUCT.md and DESIGN.md were updated with each checkpoint. The Agent's edit schema
+  and tool description carry every new operation and field (rotation, flips, ellipses,
+  gradients, blend, mask, adjust, group_objects / update_group / ungroup).
