@@ -191,6 +191,7 @@ export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSch
   "image.candidate.accept": strictObject({ projectId: IdSchema, candidateId: IdSchema, baseRevision: RevisionSchema, summary: SummarySchema }),
   "image.candidate.discard": strictObject({ projectId: IdSchema, candidateId: IdSchema, summary: SummarySchema }),
   "image.project.conversation.set": strictObject({ projectId: IdSchema, conversation: ConversationSchema }),
+  "image.project.checkText": strictObject({ projectId: IdSchema, revision: Type.Optional(RevisionSchema), candidateId: Type.Optional(IdSchema) }),
   "image.project.addAsset": strictObject({ projectId: IdSchema, baseRevision: RevisionSchema,
     attachmentId: Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" }) }),
   "image.project.addFont": strictObject({ projectId: IdSchema, baseRevision: RevisionSchema,
@@ -218,6 +219,8 @@ export const ImageCommandResultSchemas: Record<keyof ImageCommandResults, TSchem
   "image.candidate.discard": strictObject({ projectId: IdSchema, candidateId: IdSchema, status: Type.Literal("discarded") }),
   "image.project.conversation.set": ProjectRefSchema,
   "image.project.addAsset": strictObject({ projectId: IdSchema, revision: RevisionSchema, sha256: Sha256Schema, dryRun: Type.Boolean(), assetId: IdSchema }),
+  "image.project.checkText": strictObject({ projectId: IdSchema, revision: RevisionSchema, candidateId: Type.Optional(IdSchema),
+    texts: Type.Array(strictObject({ objectId: IdSchema, text: TextSchema, read: Type.String({ maxLength: 4000 }), passed: Type.Boolean() }), { maxItems: L.objects }) }),
   "image.project.addFont": strictObject({ projectId: IdSchema, revision: RevisionSchema, sha256: Sha256Schema, dryRun: Type.Boolean(),
     fontId: IdSchema, family: Type.String({ minLength: 1, maxLength: 64 }) }),
   "image.project.derive": strictObject({ projectId: IdSchema, revision: RevisionSchema, results: Type.Array(Type.Union([

@@ -1,6 +1,5 @@
 import { createRequire } from "node:module";
-import { copyFile, mkdir } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { prepareOcrData } from "./ocr-language-data.js";
 import { parentPort } from "node:worker_threads";
 import { detect } from "chardet";
 import { fileTypeFromBuffer } from "file-type";
@@ -176,23 +175,6 @@ async function ocrImage(task: PromptAttachmentWorkerTask): Promise<string> {
   } finally {
     await worker.terminate();
   }
-}
-
-async function prepareOcrData(root: string): Promise<string> {
-  await mkdir(root, { recursive: true, mode: 0o700 });
-  const require = createRequire(import.meta.url);
-  const languages = [
-    { language: "eng", packageEntry: require.resolve("@tesseract.js-data/eng") },
-    { language: "chi_sim", packageEntry: require.resolve("@tesseract.js-data/chi_sim") }
-  ] as const;
-  for (const { language, packageEntry } of languages) {
-    const source = join(dirname(packageEntry), "4.0.0", `${language}.traineddata.gz`);
-    const destination = join(root, `${language}.traineddata.gz`);
-    await copyFile(source, destination).catch(async (error: NodeJS.ErrnoException) => {
-      if (error.code !== "EEXIST") throw error;
-    });
-  }
-  return root;
 }
 
 async function searchText(task: PromptAttachmentWorkerTask): Promise<string> {

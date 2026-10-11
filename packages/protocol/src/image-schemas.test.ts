@@ -37,7 +37,7 @@ describe("image protocol schemas", () => {
   it("binds every command and event to the Workspace scope", () => {
     // Image source settings (`image.generation.*`) are App-scope configuration, not project commands.
     const commands = Object.keys(CommandPayloadSchemas).filter((type) => type.startsWith("image.") && !type.startsWith("image.generation."));
-    expect(commands.sort()).toEqual(["image.candidate.accept", "image.candidate.discard", "image.candidate.list", "image.project.addAsset", "image.project.addFont", "image.project.conversation.set", "image.project.createFromPhoto", "image.project.derive", "image.project.edit", "image.project.history", "image.project.list", "image.project.read", "image.project.render"]);
+    expect(commands.sort()).toEqual(["image.candidate.accept", "image.candidate.discard", "image.candidate.list", "image.project.addAsset", "image.project.addFont", "image.project.checkText", "image.project.conversation.set", "image.project.createFromPhoto", "image.project.derive", "image.project.edit", "image.project.history", "image.project.list", "image.project.read", "image.project.render"]);
     for (const type of commands) expect(COMMAND_CONTEXT_SCOPE_REQUIREMENTS[type as keyof ImageCommandPayloads], type).toBe("workspace");
     for (const type of ["image.project.changed", "image.candidate.changed", "image.job.changed"] as (keyof ImageEventPayloads)[]) {
       expect(EVENT_CONTEXT_REQUIREMENTS[type]).toEqual({ session: false, operation: false, requiredScope: "workspace" });

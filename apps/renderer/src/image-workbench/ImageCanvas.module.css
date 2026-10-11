@@ -1,6 +1,8 @@
 /* The canvas well: one step deeper than the surface, never pure black. */
+/* Its own stacking context: boxes, handles and mark editors stack in the thousands, which must never lift them over dialogs. */
 .stage {
   position: relative;
+  isolation: isolate;
   min-height: 0;
   overflow: hidden;
   background: var(--surface-muted);

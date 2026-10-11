@@ -1,5 +1,5 @@
 import { imageCandidateActions, imageObjectInEffect, type ImageCandidateListStatus, type ImageDocument, type ImageSceneObject } from "@pi67/domain";
-import type { ImageCandidateSummary } from "@pi67/protocol";
+import type { ImageCandidateSummary, ImageTextCheck } from "@pi67/protocol";
 import { ArrowLeft, Check, Columns2, Download, Redo2, SquareDashedMousePointer, Undo2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
@@ -7,7 +7,6 @@ import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   acceptCandidate,
   discardCandidate,
-  exportImageProject,
   inspectCandidate,
   editImageProjectWithNotice,
   loadImageProject,
@@ -17,6 +16,8 @@ import {
   undoImageEdit,
   useImageProject
 } from "./image-project-controller.js";
+import { candidateCheckKey, checkCandidateTexts, exportImageProject, useImageTextChecks } from "./image-project-export.js";
+import { ImageTextCheckDialog } from "./ImageTextCheckDialog.js";
 import { ImageCanvas } from "./ImageCanvas.js";
 import { ImageCandidateCompare } from "./ImageCandidateCompare.js";
 import { ImageMarksBar } from "./ImageMarksBar.js";
@@ -107,6 +108,8 @@ export function ImageProjectPage({ projectId }: { projectId: string }) {
   const asImage = (render: typeof preview) => render && libraryId ? { src: imagePreviewUrl(libraryId, projectId, render.pngSha256), width: render.width, height: render.height } : undefined;
   const compareBefore = comparing ? asImage(baseRender) : undefined, compareAfter = comparing ? asImage(candidateRender) : undefined;
   const visible = candidates.filter((candidate) => candidate.status !== "discarded");
+  // A ready candidate is read once, so its card can say which key text it leaves unreadable before it is accepted.
+  useEffect(() => { for (const candidate of candidates) if (candidate.status === "ready") checkCandidateTexts(projectId, candidate.candidateId); }, [candidates, projectId]);
   return (
     <section aria-label={document?.title ?? "图像项目"} className={styles.page} data-testid="image-project">
       <header className={styles.header}>
@@ -162,7 +165,7 @@ export function ImageProjectPage({ projectId }: { projectId: string }) {
           {visible.length === 0 ? <p className={styles.empty}>还没有候选。在对话里说要换什么，比如“把背景换成暖色影棚”。</p> : (
             <ul>
               {visible.map((candidate) => (
-                <CandidateTile key={candidate.candidateId} busy={busy} candidate={candidate} inspecting={inspecting === candidate.candidateId}
+                <CandidateTile key={candidate.candidateId} busy={busy} projectId={projectId} candidate={candidate} inspecting={inspecting === candidate.candidateId}
                   previewUrl={libraryId && candidatePreviews[candidate.candidateId] ? imagePreviewUrl(libraryId, projectId, candidatePreviews[candidate.candidateId]!.pngSha256) : undefined} />
               ))}
             </ul>
@@ -170,12 +173,16 @@ export function ImageProjectPage({ projectId }: { projectId: string }) {
         </section>
         <section aria-label="项目对话" className={styles.conversation}><ImageProjectConversationDock projectId={projectId} /></section>
       </div>
+      <ImageTextCheckDialog />
     </section>
   );
 }
 
-function CandidateTile({ candidate, previewUrl, inspecting, busy }: { candidate: ImageCandidateSummary; previewUrl: string | undefined; inspecting: boolean; busy: boolean }) {
+const NO_TEXT_CHECKS: readonly ImageTextCheck[] = [];
+
+function CandidateTile({ projectId, candidate, previewUrl, inspecting, busy }: { projectId: string; candidate: ImageCandidateSummary; previewUrl: string | undefined; inspecting: boolean; busy: boolean }) {
   const actions = imageCandidateActions(candidate.status);
+  const unread = useImageTextChecks((state) => state.candidates[candidateCheckKey(projectId, candidate.candidateId)]) ?? NO_TEXT_CHECKS;
   return (
     <li className={`${styles.tile} ${inspecting ? styles.tileInspecting : ""}`}>
       <Button aria-label={`在画布上预览候选 ${candidate.summary ?? candidate.candidateId}`} aria-pressed={inspecting} className={styles.tilePreview!}
@@ -185,6 +192,7 @@ function CandidateTile({ candidate, previewUrl, inspecting, busy }: { candidate:
       <span className={styles.tileMeta}>
         <span className={styles.tileStatus} data-status={candidate.status}>{STATUS_LABELS[candidate.status]}</span>
         {candidate.protectedChangedPixels ? <span className={styles.tileWarning}>保护区有 {candidate.protectedChangedPixels} 个像素变化</span> : null}
+        {unread.length ? <span className={styles.tileWarning} title={unread.map((check) => check.text).join("\n")}>{unread.length} 段文字读不全</span> : null}
       </span>
       {actions.accept || actions.discard ? (
         <span className={styles.tileActions}>

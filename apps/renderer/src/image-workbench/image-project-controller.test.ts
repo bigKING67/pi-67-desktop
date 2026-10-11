@@ -3,7 +3,7 @@ import { ProtocolRequestError } from "@pi67/protocol";
 
 const host = vi.hoisted(() => ({
   revision: 1, calls: [] as { type: string; payload: Record<string, unknown> }[], conflictNext: false,
-  refuseNext: undefined as { message: string; imageReason: string } | undefined, objectIds: ["t", "u"]
+  refuseNext: undefined as { message: string; imageReason: string } | undefined, objectIds: ["t", "u"], unreadNext: false
 }));
 const notices = vi.hoisted(() => [] as { level: string; title: string; message: string }[]);
 
@@ -31,6 +31,8 @@ vi.mock("../connection/AgentConnectionController.js", () => ({
       if (type === "image.candidate.accept") { host.revision += 1; return Promise.resolve({ projectId: "p", revision: host.revision, sha256: "s" }); }
       if (type === "image.candidate.discard") return Promise.resolve({ projectId: "p", candidateId: payload.candidateId, status: "discarded" });
       if (type === "image.project.history") return Promise.resolve({ projectId: "p", revisions: [] });
+      if (type === "image.project.checkText") return Promise.resolve({ projectId: payload.projectId, revision: host.revision, texts: host.unreadNext
+        ? [{ objectId: "t", text: "¥199", read: "", passed: false }, { objectId: "u", text: "春日", read: "春日", passed: true }] : [] });
       if (type === "image.project.addAsset") {
         if (payload.attachmentId === "full") return Promise.reject(new ProtocolRequestError({ code: "INVALID_PAYLOAD", message: "Invalid assets list", recoverable: true }));
         host.revision += 1; return Promise.resolve({ projectId: "p", revision: host.revision, sha256: "s", dryRun: false, assetId: "mask-1" });
@@ -55,12 +57,10 @@ import {
   acceptCandidate,
   checkImageEdit,
   deriveImageSizes,
-  derivedSizes,
   discardCandidate,
   inspectCandidate,
   editImageProject,
   editImageProjectWithNotice,
-  exportImageSizes,
   loadImageProject,
   primaryImageObject,
   redoImageEdit,
@@ -68,12 +68,13 @@ import {
   undoImageEdit,
   useImageProject
 } from "./image-project-controller.js";
+import { derivedSizes, exportImageProject, exportImageSizes } from "./image-project-export.js";
 import { addImageFont, addImageMask, addImageObject } from "./image-project-additions.js";
 
 const edits = () => host.calls.filter((call) => call.type === "image.project.edit").map((call) => call.payload);
 
 beforeEach(async () => {
-  host.revision = 1; host.calls = []; host.conflictNext = false; host.refuseNext = undefined; host.objectIds = ["t", "u"]; notices.length = 0;
+  host.revision = 1; host.calls = []; host.conflictNext = false; host.refuseNext = undefined; host.objectIds = ["t", "u"]; host.unreadNext = false; notices.length = 0;
   rendererWorkbenchStore.setState({ imageLibraryWorkspaceId: "lib" });
   useImageProject.setState({ projectId: undefined });
   await loadImageProject("p");
@@ -246,6 +247,28 @@ describe("image object selection", () => {
     host.calls = [];
     await groupSelectedLayers();
     expect(edits().at(-1)).toMatchObject({ summary: "编组", operations: [{ type: "group_objects", group: { id: "group", name: "编组 1" }, ids: ["t", "u"] }] });
+  });
+
+  it("asks before exporting text the OCR could not read, and exports only when told to", async () => {
+    const { useImageTextChecks } = await import("./image-project-export.js");
+    const saveImage = vi.fn(() => Promise.resolve(undefined));
+    vi.stubGlobal("window", { pi67: { system: { saveImage } } });
+    host.unreadNext = true;
+    let exporting = exportImageProject();
+    await vi.waitFor(() => expect(useImageTextChecks.getState().pending?.unread).toEqual([{ label: "海报", text: "¥199", read: "" }]));
+    useImageTextChecks.getState().pending!.decide(false);
+    await exporting;
+    expect(saveImage).not.toHaveBeenCalled();
+    exporting = exportImageProject();
+    await vi.waitFor(() => expect(useImageTextChecks.getState().pending).toBeDefined());
+    // A second press while the first is asking does nothing, so no decision is lost.
+    const pending = useImageTextChecks.getState().pending;
+    await exportImageProject();
+    expect(useImageTextChecks.getState().pending).toBe(pending);
+    useImageTextChecks.getState().pending!.decide(true);
+    await exporting;
+    expect(saveImage).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
   });
 
   it("adds text, rectangles and ellipses centred on the canvas with ids that never collide, and selects them", async () => {

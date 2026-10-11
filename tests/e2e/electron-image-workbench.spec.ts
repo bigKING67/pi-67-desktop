@@ -201,6 +201,8 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     await answerFolder(exports);
     await inspector.getByRole("button", { name: /导出全部尺寸（2 张）/u }).click();
     await expect.poll(async () => (await readdir(exports)).length, { timeout: 30_000 }).toBe(1);
+    // The keyed-text check ran with the bundled OCR in the real Host (it never fell back to exporting unchecked).
+    await expect(page.getByText("没能核对图中文字")).toHaveCount(0);
     const [folder] = await readdir(exports);
     const files = (await readdir(join(exports, folder!))).sort();
     expect(files).toHaveLength(3);

@@ -45,7 +45,7 @@ with shared samples first, then protocol, then UI (product model §8).
   interact with masked layers.
 - [x] 6. Adjustments on image layers (non-destructive, rendered per layer).
 - [x] 7. Layer groups: 图层 tree, move/lock/hide a group, selection and alignment.
-- [ ] 8. OCR gate for key text in generated candidates, and the VLM debias / golden
+- [x] 8. OCR gate for key text in generated candidates, and the VLM debias / golden
   eval with a report (separate design; may move to its own plan).
 - [ ] 9. Authority docs, packaged macOS verification, Windows CI evidence, Agent tool
   schema and descriptions for each new operation.
@@ -125,6 +125,36 @@ can share one satori pass, so the common case keeps today's cost.
   (two overlapping members at 50% must not show the lower one through the upper one),
   revert across grouping; protocol / Agent / renderer tests, e2e (group, hide, move, ungroup)
   and packaged screenshots in both themes.
+
+## Checkpoint 8 plan (keyed-text OCR check; proposed 2026-10-10)
+
+Spike (2026-10-10, scratch script, nothing in the product): the Agent Host already ships
+offline tesseract.js with `chi_sim` + `eng` for prompt attachments, so no new dependency or
+installer size. Per text box, cropped from the rendered PNG with 8px padding (upscaled 2× under
+32px; a turned box is cut around its rotated bounds and turned back upright), recognition
+compared on letters and digits only (NFKC, punctuation and symbols dropped):
+
+| Case | Read | Match | Time |
+| --- | --- | --- | --- |
+| 72px title, 24px and 16px small print, mixed `SALE 限时 8 折` | exact | 1.00 | 20–75 ms |
+| `¥199` | `#199` | 1.00 (symbol dropped) | 8 ms |
+| white or dark text over a busy photo | exact | 1.00 | 80–100 ms |
+| title turned 15° | exact | 1.00 | 51 ms |
+| very low contrast (#e8e2d8 on #f4efe6) | exact | 1.00 | 50 ms |
+| fully covered by a rectangle | nothing | 0.00 | 2 ms |
+| half covered | first half | 0.50 | 13 ms |
+
+So OCR catches text that is covered, masked, clipped, faded out or off the canvas, but not low
+contrast (tesseract binarises it back), which needs its own check later.
+
+- Check: every text object that is shown (`isShown`) is read back from the rendered PNG as
+  above; it passes when at least 90% of its letters and digits are read in order **and** every
+  digit run (prices, dates, percentages) is read exactly. Runs in the Agent Host's OCR worker,
+  never over the network; failures are reported, never retried with a model.
+- Where: at export (single PNG and the size set; the receipt records each text's result) and on
+  a candidate's preview render, so a generated layer that covers or imitates key text is
+  flagged on its card before acceptance.
+- Low contrast, VLM review and the golden eval are not in this checkpoint (see below).
 
 ## Rollback
 
@@ -234,3 +264,26 @@ page and earlier releases still open projects that do not use it.
   the group limit and duplicate ids failed late and vaguely (checked in `group_objects`, and
   `编组` hides at the limit); a name differing only by spaces sent a refused no-op; the
   engine's `Group` is the domain type and the Agent and canvas reuse the shared helpers.
+- 2026-10-11: checkpoint 8 decided by the user: an export with unreadable key text asks first
+  (仍然导出 / 取消); the VLM review and golden eval move to their own plan, written and costed
+  before any model spend. Done: engine `checkKeyedText` / `textMatches` (crop per shown text,
+  turned and mirrored boxes cut upright, small text doubled; OCR injected so the engine never
+  loads tesseract); Host `image.project.checkText` renders full size and reads crops with the
+  Agent Host's bundled tesseract (language data copying shared with attachment OCR); renderer
+  export moved to `image-project-export.ts` with the check first and an alert dialog, and
+  candidate tiles report unreadable text. Tests: matching rules and crops (engine), the real
+  OCR passing title / price / 18px / turned / mirrored text and failing covered text (Host),
+  protocol, and the ask-then-export flow (renderer).
+- 2026-10-11: packaged check found the canvas's selection handles drawn over the export dialog
+  (their z-indexes reached past the modal); the canvas stage is now its own stacking context.
+  `/code-review high` on checkpoint 8, all fixed: a box turned past 90° cut a 1px crop (absolute
+  cos/sin; test at 170°); OCR held the project's queue and a render slot (now only the render
+  does, the OCR runs after) and ignored cancellation (stops its engine); two export presses
+  could lose a decision (one export at a time); a failed candidate check was remembered as
+  clean (retried, keyed by project); a box past the canvas edge shifted its crop onto
+  neighbouring pixels (filled with the background instead); every crop decoded the whole PNG
+  in parallel (decoded once, cut one by one); `1199` passed for `¥199` (digits must equal the
+  digits written); language data copies raced between readers (copied once via rename); image
+  OCR runs one at a time from `ocr-image-reader.ts` and reads the render's own document.json.
+  Routing it through the attachment worker pool was not taken: that pool is shaped around
+  staged attachments, and the image check now has its own one-at-a-time queue and timeout.

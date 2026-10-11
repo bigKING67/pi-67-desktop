@@ -3,6 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { IMAGE_SIZE_PRESETS, IMAGE_WORK_DIRECTORY, imageSizePresetLabel, isImageId, type ImageCandidateListStatus, type ImageChangeAuthor, type ImageSizePreset } from "@pi67/domain";
 type ImageEngine = typeof import("@pi67/image-engine");
+type ImageDocument = import("@pi67/image-engine").ImageDocument;
 import type { AgentCommand, AgentEvent, CommandPayloads, CommandResults, ImageCandidateReceipt, ImageCandidateSummary, ImageDeriveOutcome, ImageEventPayloads, ImageProjectSummary } from "@pi67/protocol";
 import { HostCommandError } from "../protocol-error.js";
 import type { ImageCommandType } from "./image-command-router.js";
@@ -21,6 +22,8 @@ export interface ImageEngineHostDependencies {
   readStagedImage?(id: string): Promise<{ mimeType: string; bytes: Buffer }>;
   /** A verified staged plain file (a font); absent when the Host has no attachment store. */
   readStagedFile?(id: string): Promise<{ name: string; bytes: Buffer }>;
+  /** Offline OCR of image crops; absent when the Host has no attachment store (and so no OCR data). */
+  readTexts?(images: readonly Buffer[], signal?: AbortSignal): Promise<string[]>;
 }
 
 type Command<T extends ImageCommandType> = AgentCommand<T>;
@@ -85,6 +88,8 @@ export class ImageEngineHost {
       }
       case "image.project.createFromPhoto":
         return this.createFromPhoto(engine, workspaceId, cwd, (command as Command<"image.project.createFromPhoto">).payload);
+      case "image.project.checkText":
+        return this.checkText(engine, workspaceId, cwd, (command as Command<"image.project.checkText">).payload, signal);
       case "image.project.addAsset":
         return this.addAsset(engine, workspaceId, cwd, (command as Command<"image.project.addAsset">).payload);
       case "image.project.addFont":
@@ -234,6 +239,28 @@ export class ImageEngineHost {
       try { return await engine.deriveProject(root, target, { ...input, project_id: derivedId }); }
       catch (error) { if (attempt >= 2 || !(error instanceof Error && error.message === "Derived project already exists")) throw error; }
     }
+  }
+
+  // The full-size render, never a preview, is read back: small previews would fail honest text.
+  // Only the render holds the project's queue and a render slot; the OCR runs after both are free.
+  private async checkText(engine: ImageEngine, workspaceId: string, cwd: string, { projectId, revision, candidateId }: CommandPayloads["image.project.checkText"],
+    signal: AbortSignal | undefined): Promise<CommandResults["image.project.checkText"]> {
+    const reader = this.dependencies.readTexts?.bind(this.dependencies);
+    if (!reader) throw new HostCommandError("UNSUPPORTED", "此设备上不能核对图中文字。", false);
+    const rendered = await this.queue.serial(key(workspaceId, projectId), () => this.queue.render(async () => {
+      const output = await engine.workDirectory(cwd, projectId, "preview");
+      try {
+        const { receipt } = await engine.renderProject(engine.projectRoot(cwd, projectId), output, { revision, candidateId, signal });
+        // The render's own document (the candidate applied, when previewing one), written beside the PNG.
+        const document = JSON.parse(await fs.readFile(path.join(output, "document.json"), "utf8")) as ImageDocument;
+        return { revision: receipt.revision, png: await fs.readFile(path.join(output, "image.png")), document };
+      } finally {
+        await fs.rm(output, { recursive: true, force: true });
+      }
+    }, undefined, signal));
+    const checks = await engine.checkKeyedText(rendered.png, rendered.document, (images) => reader(images, signal));
+    return { projectId, revision: rendered.revision, ...(candidateId === undefined ? {} : { candidateId }),
+      texts: checks.map((check) => ({ objectId: check.object_id, text: check.text, read: check.read.slice(0, 4000), passed: check.passed })) };
   }
 
   // Renders go to a fresh work folder outside the project, then the PNG moves

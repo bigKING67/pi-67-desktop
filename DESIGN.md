@@ -316,6 +316,11 @@ Application-level surfaces use a separate wide-window shell:
   (folder glyph) while it applies and `取消编组` for a selected group, so `添加` never wraps. 属性 for a group heads `组 · name` with
   eye and lock, then 名称 and 不透明度 fields, a tertiary line on group opacity, the align
   row and a `取消编组` text action; a member of a locked group says the group is locked.
+- Keyed-text check (P4, 2026-10-11): an alert dialog in the shared modal surface — eyebrow
+  `导出`, title `有 N 段文字读不全`, a scrolling list (max 240px) of each text in interface size
+  medium weight with `尺寸 · 读到「…」` beneath in caption secondary, a tertiary hint on causes
+  and offline false alarms, then `取消` (secondary, focused) and `仍然导出` (primary). Candidate
+  tiles add a `N 段文字读不全` line in the existing tile warning style.
 - Text fonts (P3, 2026-10-10): 属性 for text adds a `字体` section — the shared Settings
   select at full panel width (`Noto Sans CJK SC · 内置`, then each added font's family with
   `TTF`/`OTF` as detail), a `添加字体…` text action with a plus glyph (disabled at 8 fonts or

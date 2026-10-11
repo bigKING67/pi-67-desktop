@@ -191,3 +191,32 @@
   font-size: var(--font-size-caption);
   line-height: 1.5;
 }
+
+/* 导出前核对文字: each unread text in full, then where it is and what the OCR saw. */
+.unreadList {
+  display: grid;
+  max-height: 240px;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.unreadList li {
+  display: grid;
+  gap: 2px;
+}
+
+.unreadList strong {
+  color: var(--text-primary);
+  font-size: var(--font-size-interface);
+  font-weight: var(--font-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.unreadList span {
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  overflow-wrap: anywhere;
+}

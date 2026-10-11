@@ -30,6 +30,7 @@ export interface ImageCommandPayloads {
   "image.project.addFont": { projectId: string; baseRevision: number; attachmentId: string };
   /** Adds an image the person chose (staged by Main) to the project's assets, e.g. as a mask; never sent by the Agent. */
   "image.project.addAsset": { projectId: string; baseRevision: number; attachmentId: string };
+  "image.project.checkText": { projectId: string; revision?: number; candidateId?: string };
   /** Derived projects for size presets, each re-laid out from one revision of the source. */
   "image.project.derive": { projectId: string; revision: number; presets: ImageSizePreset[] };
 }
@@ -91,6 +92,8 @@ export interface ImageCommandResults {
   "image.project.derive": { projectId: string; revision: number; results: ImageDeriveOutcome[] };
   "image.project.addFont": ImageRevisionResult & { fontId: string; family: string };
   "image.project.addAsset": ImageRevisionResult & { assetId: string };
+  /** Each shown text read back from the full-size render by offline OCR (P4 checkpoint 8). */
+  "image.project.checkText": { projectId: string; revision: number; candidateId?: string; texts: ImageTextCheck[] };
 }
 
 export interface ImageEventPayloads {
@@ -99,3 +102,6 @@ export interface ImageEventPayloads {
   "image.candidate.changed": { projectId: string; candidateId: string; status: ImageCandidateListStatus };
   "image.job.changed": { projectId: string; jobId: string; kind: ImageJobKind; state: ImageJobState; progress?: number };
 }
+
+/** One text object as read back: `passed` when 90% of its letters and digits and every digit run were read. */
+export interface ImageTextCheck { objectId: string; text: string; read: string; passed: boolean }

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readImageTexts } from "./ocr-image-reader.js";
 import { lstat, mkdir, rename, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type {
@@ -43,6 +44,8 @@ export interface PromptAttachmentAccessOwner {
   readStagedImage(id: string): Promise<{ name: string; mimeType: string; bytes: Buffer }>;
   /** One verified staged attachment of kind `file` (a font for the image workbench). */
   readStagedFile(id: string): Promise<{ name: string; bytes: Buffer }>;
+  /** Offline OCR of rendered image crops, with the same bundled language data as attachments. */
+  readImageTexts(images: readonly Buffer[], signal?: AbortSignal): Promise<string[]>;
   releaseTask(taskKey: string): Promise<void>;
   dispose(): Promise<void>;
 }
@@ -57,11 +60,13 @@ class AgentHostPromptAttachmentAccess implements PromptAttachmentAccessOwner {
   private readonly records = new Map<string, ClaimedSetRecord>();
   private readonly claimQueues = new Map<string, Promise<void>>();
   private readonly workers: PromptAttachmentWorkerPool;
+  private readonly ocrDataRoot: string;
 
   constructor(root: string) {
+    this.ocrDataRoot = join(root, "ocr-data");
     this.draftRoot = join(root, "draft");
     this.claimedRoot = join(root, "claimed");
-    this.workers = new PromptAttachmentWorkerPool(join(root, "ocr-data"));
+    this.workers = new PromptAttachmentWorkerPool(this.ocrDataRoot);
   }
 
   forTask(taskKey: string): PromptAttachmentAccess {
@@ -70,6 +75,10 @@ class AgentHostPromptAttachmentAccess implements PromptAttachmentAccessOwner {
       readImages: (setId) => this.readImages(taskKey, setId),
       read: (request, signal) => this.read(taskKey, request, signal)
     };
+  }
+
+  readImageTexts(images: readonly Buffer[], signal?: AbortSignal): Promise<string[]> {
+    return readImageTexts(this.ocrDataRoot, images, signal);
   }
 
   async readStagedImage(id: string): Promise<{ name: string; mimeType: string; bytes: Buffer }> {

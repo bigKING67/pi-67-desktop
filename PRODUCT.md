@@ -1568,6 +1568,13 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   its opacity is multiplied into each. Clicking a grouped layer on the canvas selects its group; ⌘-click or the layer's
   own row selects just that layer. 属性 for a group edits its name and opacity and aligns its
   members. The Agent may `group_objects`, `update_group` and `ungroup`.
+  Before an export (one PNG or the size set) every shown text is read back from the full-size
+  render by the bundled offline OCR (never the network or a model). Text whose letters and
+  digits cannot be read in full — at least 90% in order, every digit run exact — is listed
+  (which text, which size, what was read) and the person chooses 仍然导出 or 取消; if the check
+  itself cannot run, the export goes ahead with a warning. Each ready candidate is read the
+  same way once, and its card says how many texts it leaves unreadable. Low contrast is not
+  caught by OCR and is a separate, later check.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

@@ -47,3 +47,5 @@ export { ALPHA_ERRORS, inspectAlpha, requireAlpha, verifyAlpha } from "./provide
 export type { AlphaEvidence } from "./provider-alpha.js";
 export { normalizeImage } from "./provider-normalize.js";
 export type { Normalization, OutputPolicy } from "./provider-normalize.js";
+export { checkKeyedText, textMatches } from "./text-check.js";
+export type { TextCheck, TextReader } from "./text-check.js";

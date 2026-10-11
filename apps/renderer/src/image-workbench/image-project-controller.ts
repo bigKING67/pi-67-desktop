@@ -1,7 +1,6 @@
-import { IMAGE_SIZE_PRESETS, type ImageDocument, type ImageEditOperation, type ImageEngineFailure, type ImageMark, type ImageReferenceRole, type ImageSceneObject, type ImageSizePreset } from "@pi67/domain";
+import { type ImageDocument, type ImageEditOperation, type ImageEngineFailure, type ImageMark, type ImageReferenceRole, type ImageSceneObject, type ImageSizePreset } from "@pi67/domain";
 import { ProtocolRequestError } from "@pi67/protocol";
-import type { AgentCommandType, CommandPayloads, CommandResults, ImageCandidateSummary, ImageDeriveOutcome, ImageProjectSummary, ImageRevisionEntry } from "@pi67/protocol";
-import { useImageWorkbench } from "./image-workbench-store.js";
+import type { AgentCommandType, CommandPayloads, CommandResults, ImageCandidateSummary, ImageDeriveOutcome, ImageRevisionEntry } from "@pi67/protocol";
 import { create } from "zustand";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
@@ -58,7 +57,7 @@ export const useImageProject = create<ImageProjectState>(() => ({
   candidates: [], candidatePreviews: {}, candidateCanvases: {}, revisionCanvases: {}, inspecting: undefined, comparing: false, busy: false, error: undefined, back: [], forward: [], selectedObjectIds: [], conversation: undefined, conversationKnown: false, history: [], marks: [], references: [], marksHeld: false, derived: []
 }));
 
-function libraryId(): string {
+export function libraryId(): string {
   const id = rendererWorkbenchStore.getState().imageLibraryWorkspaceId;
   if (!id) throw new Error("创作库尚未设置。");
   return id;
@@ -302,18 +301,6 @@ export function discardCandidate(candidateId: string): Promise<boolean> {
   }, "没能丢弃候选");
 }
 
-/** Renders the current revision at full size and asks Main to save the verified PNG. */
-export async function exportImageProject(): Promise<void> {
-  const { projectId, revision, document } = useImageProject.getState();
-  if (!projectId || revision === undefined || !document) return;
-  try {
-    const full = await request("image.project.render", { projectId, revision, previewMax: Math.max(document.canvas.width, document.canvas.height) });
-    await window.pi67.system.saveImage({ workspaceId: libraryId(), projectId, pngSha256: full.pngSha256, fileName: document.title });
-  } catch (error) {
-    publishNotification({ level: "error", title: "导出失败", message: error instanceof Error ? error.message : "未知错误" });
-  }
-}
-
 /**
  * Derives the chosen size presets from the revision on screen. Each becomes a
  * project beside this one in the library; a preset whose text cannot fit is
@@ -333,42 +320,6 @@ export async function deriveImageSizes(presets: readonly ImageSizePreset[]): Pro
   } catch (error) {
     publishNotification({ level: "error", title: "没能生成多尺寸", message: error instanceof Error ? error.message : "未知错误" });
     return undefined;
-  } finally {
-    useImageProject.setState({ busy: false });
-  }
-}
-
-/** Sizes derived from exactly this revision; ones from earlier revisions stay in the library but out of the set. */
-export function derivedSizes(projects: readonly ImageProjectSummary[], projectId: string | undefined, revision: number | undefined): { current: ImageProjectSummary[]; older: ImageProjectSummary[] } {
-  // The library knows every size derived from this project, in any session; per preset the newest from this revision goes in the set.
-  const mine = projects.filter((project) => project.derivedFrom?.projectId === projectId)
-    .sort((a, b) => IMAGE_SIZE_PRESETS.indexOf(a.derivedFrom!.preset) - IMAGE_SIZE_PRESETS.indexOf(b.derivedFrom!.preset) || b.updatedAt - a.updatedAt);
-  const current: ImageProjectSummary[] = [], older: ImageProjectSummary[] = [];
-  for (const project of mine) {
-    const sameRevision = project.derivedFrom!.revision === revision;
-    if (sameRevision && !current.some((item) => item.derivedFrom!.preset === project.derivedFrom!.preset)) current.push(project);
-    else older.push(project);
-  }
-  return { current, older };
-}
-
-/** The revision on screen plus every size derived from it, rendered at full size into one new export folder. */
-export async function exportImageSizes(): Promise<void> {
-  const { projectId, revision, document, busy } = useImageProject.getState();
-  if (!projectId || revision === undefined || !document || busy) return;
-  const sizes = derivedSizes(useImageWorkbench.getState().projects, projectId, revision).current;
-  useImageProject.setState({ busy: true });
-  try {
-    const items = [];
-    for (const target of [{ projectId, canvas: document.canvas, revision }, ...sizes.map((size) => ({ projectId: size.projectId, canvas: size.canvas, revision: undefined }))]) {
-      const rendered = await request("image.project.render", { projectId: target.projectId, ...(target.revision === undefined ? {} : { revision: target.revision }),
-        previewMax: Math.max(target.canvas.width, target.canvas.height) });
-      items.push({ projectId: target.projectId, revision: rendered.revision, pngSha256: rendered.pngSha256, fileName: `${document.title} ${rendered.width}×${rendered.height}` });
-    }
-    const saved = await window.pi67.system.saveImageSet({ workspaceId: libraryId(), title: document.title, items });
-    if (saved) publishNotification({ level: "success", title: `已导出 ${items.length} 张图片`, message: `在「${saved.folderName}」里，附带 receipt.json。` });
-  } catch (error) {
-    publishNotification({ level: "error", title: "导出失败", message: error instanceof Error ? error.message : "未知错误" });
   } finally {
     useImageProject.setState({ busy: false });
   }
