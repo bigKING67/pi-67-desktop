@@ -1,9 +1,15 @@
 import { create } from "zustand";
+import type { HandoffPicture } from "./team-chat-work-bridge.js";
 
-/** A Work conversation offered for hand-off; only its title and Workspace identity. */
+/**
+ * What is offered for hand-off: a Work conversation (its title and Workspace identity, offered
+ * as references) or an image project's pictures, sent after the card in one message.
+ */
 export interface TeamChatHandoffSource {
-  workspaceId: string;
   title: string;
+  workspaceId?: string;
+  /** Pictures to list, and the files made on 发送 (undefined when the person stopped it, e.g. at the text check). */
+  images?: { labels: string[]; prepare: () => Promise<HandoffPicture[] | undefined> };
 }
 
 /** Reviewed starting text for a team-scoped Work draft. */

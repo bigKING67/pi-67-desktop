@@ -332,6 +332,38 @@ describe("image object selection", () => {
     vi.unstubAllGlobals();
   });
 
+  it("offers the revision and its sizes to the team hand-off, checked and rendered only on 发送", async () => {
+    const { handOffImages, useImageTextChecks } = await import("./image-project-export.js");
+    const { useTeamChatDialogStore } = await import("../team-chat/team-chat-dialog-store.js");
+    useImageWorkbench.setState({ projects: [] });
+    host.calls = [];
+    handOffImages();
+    const source = useTeamChatDialogStore.getState().handoff!;
+    expect(source).toMatchObject({ title: "海报", images: { labels: ["100×100（原尺寸）"] } });
+    expect(host.calls.some((call) => call.type === "image.project.render")).toBe(false);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array([137, 80, 78, 71]), { status: 200 })));
+    const pictures = await source.images!.prepare();
+    expect(pictures?.map((picture) => [picture.file.name, picture.file.type, picture.size])).toEqual([["海报 100×100.png", "image/png", { width: 100, height: 100 }]]);
+    expect(host.calls.map((call) => call.type)).toEqual(["image.project.checkText", "image.project.render"]);
+    // Stopped at the text check, nothing is rendered and nothing is sent.
+    host.unreadNext = true; host.calls = [];
+    const stopped = source.images!.prepare();
+    await vi.waitFor(() => expect(useImageTextChecks.getState().pending).toBeDefined());
+    expect(useImageTextChecks.getState().pending?.purpose).toBe("handoff");
+    // An export pressed meanwhile waits its turn instead of taking over the check.
+    await exportImageProject();
+    expect(useImageTextChecks.getState().pending?.purpose).toBe("handoff");
+    useImageTextChecks.getState().pending!.decide(false);
+    expect(await stopped).toBeUndefined();
+    expect(host.calls.some((call) => call.type === "image.project.render")).toBe(false);
+    // A picture over Team Chat's 25 MB limit is refused before anything is sent.
+    host.unreadNext = false;
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array(26 * 1024 * 1024), { status: 200 })));
+    await expect(source.images!.prepare()).rejects.toThrow(/超过 25 MB/u);
+    useTeamChatDialogStore.getState().close();
+    vi.unstubAllGlobals();
+  });
+
   it("adds text, rectangles and ellipses centred on the canvas with ids that never collide, and selects them", async () => {
     host.calls = [];
     expect(await addImageObject("ellipse")).toEqual({ outcome: "applied" });

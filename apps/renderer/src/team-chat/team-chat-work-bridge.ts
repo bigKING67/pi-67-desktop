@@ -1,5 +1,8 @@
+import type { createTeamChatController, TeamChatPort } from "./team-chat-controller.js";
+import { uploadTeamChatFile } from "./team-chat-uploads.js";
 import type {
   RepositoryEnvironmentSnapshot,
+  TeamChatAttachment,
   TeamChatWorkCardRef,
   TeamSessionScope,
   WorkspaceDescriptor
@@ -89,4 +92,52 @@ export function currentBranchName(snapshot: RepositoryEnvironmentSnapshot | unde
   if (!snapshot || snapshot.status !== "ready" || snapshot.stale) return undefined;
   const current = snapshot.worktrees.find((worktree) => worktree.worktreeId === snapshot.repository?.currentWorktreeId);
   return current && !current.detached ? current.branchName : undefined;
+}
+
+type TeamChatController = ReturnType<typeof createTeamChatController>;
+
+/** A hand-off target: a teammate (`dm:<user>`, the card is assigned to them) or a joined channel (`conversation:<id>`). */
+export function handoffTarget(target: string): { kind: "dm" | "conversation"; id: string } {
+  const [kind, id = ""] = target.split(":", 2);
+  return { kind: kind === "dm" ? "dm" : "conversation", id };
+}
+
+/** A picture for a hand-off, with its pixel size so recipients see it at its own proportions. */
+export interface HandoffPicture { file: File; size?: { width: number; height: number } }
+
+/**
+ * The dialog's 发送: pictures are made first (checked, rendered); when the person stops there,
+ * nothing is sent at all.
+ */
+export async function handOff(images: { prepare: () => Promise<HandoffPicture[] | undefined> } | undefined,
+  deliver: (pictures: readonly HandoffPicture[]) => Promise<void>): Promise<"sent" | "stopped"> {
+  const pictures = images ? await images.prepare() : [];
+  if (!pictures) return "stopped";
+  await deliver(pictures);
+  return "sent";
+}
+
+/**
+ * Sends a reviewed hand-off: pictures (if any) are uploaded first, then the Work Card, then one
+ * message with the pictures. If anything fails before the card exists, the uploads are
+ * discarded. If only the picture message fails, it stays in the conversation as a failed
+ * message to retry, and this rejects so the sender is told.
+ */
+export async function deliverHandoff(chat: Pick<TeamChatController, "ensureDirectMessage" | "createWorkCard" | "send">, request: TeamChatPort["request"], input: {
+  target: string; card: { title: string; goal: string; acceptance: string; summary: string; refs: TeamChatWorkCardRef[] }; pictures: readonly HandoffPicture[];
+  imagesMessage: string; picturesFailed: string;
+}): Promise<void> {
+  const { kind, id } = handoffTarget(input.target);
+  const conversationId = kind === "dm" ? await chat.ensureDirectMessage(id) : id;
+  const attachments: TeamChatAttachment[] = [];
+  try {
+    for (const picture of input.pictures) {
+      attachments.push(await uploadTeamChatFile(request, conversationId, picture.file, { fileName: picture.file.name, ...(picture.size ? { size: picture.size } : {}) }));
+    }
+    await chat.createWorkCard(conversationId, { ...input.card, ...(kind === "dm" ? { assigneeUserId: id } : {}) });
+  } catch (error) {
+    for (const attachment of attachments) void request("teamChat.attachment.discard", { attachmentId: attachment.id }).catch(() => undefined);
+    throw error;
+  }
+  if (attachments.length && !await chat.send(conversationId, input.imagesMessage, [], attachments)) throw new Error(input.picturesFailed);
 }

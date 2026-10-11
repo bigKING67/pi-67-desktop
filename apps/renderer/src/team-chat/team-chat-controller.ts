@@ -153,7 +153,8 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
     }
   }
 
-  async function deliver(pending: TeamChatPendingMessage): Promise<void> {
+  /** Sends a pending message; true once stored, false when it is left failed (the bubble offers 重试). */
+  async function deliver(pending: TeamChatPendingMessage): Promise<boolean> {
     const { conversationId, clientKey, body, mentionUserIds = [], attachments = [] } = pending;
     const settle = since();
     try {
@@ -163,8 +164,10 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
         ...(attachments.length === 0 ? {} : { attachmentIds: attachments.map((item) => item.id) })
       });
       settle((state) => applyMessage(state, message));
+      return true;
     } catch (error) {
       settle((state) => failPending(state, clientKey, teamChatErrorMessage(error)));
+      return false;
     }
   }
 
@@ -295,14 +298,14 @@ export function createTeamChatController(port: TeamChatPort, store: StoreApi<Tea
       body: string,
       mentionUserIds: readonly string[] = [],
       attachments: readonly TeamChatAttachment[] = []
-    ): Promise<void> {
+    ): Promise<boolean> {
       const pending: TeamChatPendingMessage = {
         clientKey: port.newClientKey(), conversationId, body, createdAt: Date.now(), status: "sending",
         ...(mentionUserIds.length === 0 ? {} : { mentionUserIds: [...mentionUserIds] }),
         ...(attachments.length === 0 ? {} : { attachments: [...attachments] })
       };
       update((state) => addPending(state, pending));
-      await deliver(pending);
+      return deliver(pending);
     },
     async retrySend(clientKey: string): Promise<void> {
       const pending = store.getState().pending.find((item) => item.clientKey === clientKey);

@@ -338,6 +338,10 @@ Application-level surfaces use a separate wide-window shell:
   image slot a row with the layer id over the chosen file name (caption secondary, `沿用模板里的图片`
   until one is chosen) and `换图片…`, a tertiary hint, then `取消` / `创建项目`. The library adds
   caption-size secondary section headings `模板` and `项目` when templates exist.
+- Team hand-off from images (P5, 2026-10-11): 导出 adds a `发到团队…` secondary button (send
+  glyph) and a tertiary line under the size export. It opens the existing Team Chat hand-off
+  dialog unchanged in layout, with its privacy notice reworded for pictures and a second
+  notice line `随任务卡发送 N 张图片：…`; the workspace and branch references do not appear.
 - Text fonts (P3, 2026-10-10): 属性 for text adds a `字体` section — the shared Settings
   select at full panel width (`Noto Sans CJK SC · 内置`, then each added font's family with
   `TTF`/`OTF` as detail), a `添加字体…` text action with a plus glyph (disabled at 8 fonts or

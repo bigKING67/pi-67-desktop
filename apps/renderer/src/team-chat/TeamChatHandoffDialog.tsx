@@ -8,8 +8,8 @@ import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { useRepositoryEnvironmentStore } from "../worktree/repository-environment-store.js";
 import { teamChatErrorMessage } from "./team-chat-controller.js";
 import { useTeamChatDialogStore, type TeamChatHandoffSource } from "./team-chat-dialog-store.js";
-import { teamChat, useTeamChat } from "./team-chat-instance.js";
-import { currentBranchName, handoffReferences, isHandoffLink } from "./team-chat-work-bridge.js";
+import { teamChat, teamChatRequest, useTeamChat } from "./team-chat-instance.js";
+import { currentBranchName, deliverHandoff, handOff, handoffReferences, handoffTarget, isHandoffLink } from "./team-chat-work-bridge.js";
 import styles from "./TeamChat.module.css";
 
 /** Work -> Chat: send a reviewed Work Card; never the Session transcript. */
@@ -17,8 +17,8 @@ export function TeamChatHandoffDialog({ source }: { source: TeamChatHandoffSourc
   const copy = messages.teamChat;
   const close = useTeamChatDialogStore((state) => state.close);
   const directory = useTeamChat((state) => state.directory);
-  const workspaceName = useWorkbenchStore((state) => state.workspaces[source.workspaceId]?.displayName);
-  const branchName = useRepositoryEnvironmentStore((state) => currentBranchName(state.records[source.workspaceId]?.snapshot));
+  const workspaceName = useWorkbenchStore((state) => source.workspaceId ? state.workspaces[source.workspaceId]?.displayName : undefined);
+  const branchName = useRepositoryEnvironmentStore((state) => source.workspaceId ? currentBranchName(state.records[source.workspaceId]?.snapshot) : undefined);
   const [target, setTarget] = useState("");
   const [title, setTitle] = useState(source.title);
   const [goal, setGoal] = useState("");
@@ -42,20 +42,16 @@ export function TeamChatHandoffDialog({ source }: { source: TeamChatHandoffSourc
     setSending(true);
     setError(undefined);
     try {
-      const [kind, id] = target.split(":", 2) as ["dm" | "conversation", string];
-      const conversationId = kind === "dm" ? await teamChat.ensureDirectMessage(id) : id;
-      await teamChat.createWorkCard(conversationId, {
-        title: title.trim(),
-        goal,
-        acceptance,
-        summary,
+      const { kind, id } = handoffTarget(target);
+      const outcome = await handOff(source.images, (pictures) => deliverHandoff(teamChat, teamChatRequest, { target, pictures, imagesMessage: copy.handoffImagesMessage(title.trim()), picturesFailed: copy.handoffImagesFailed, card: {
+        title: title.trim(), goal, acceptance, summary,
         refs: handoffReferences({
           ...(includeWorkspace && workspaceName ? { workspaceName } : {}),
           ...(includeBranch && branchName ? { branchName } : {}),
           link
-        }),
-        ...(kind === "dm" ? { assigneeUserId: id } : {})
-      });
+        })
+      } }));
+      if (outcome === "stopped") return;
       const label = kind === "dm"
         ? teammates.find((member) => member.userId === id)?.displayName ?? copy.unknownTeammate
         : `#${channels.find((item) => item.id === id)?.name ?? ""}`;
@@ -75,7 +71,8 @@ export function TeamChatHandoffDialog({ source }: { source: TeamChatHandoffSourc
           <Heading slot="title">{copy.handoffTitle}</Heading>
           {!directory ? <p className={styles.formNotice}>{copy.handoffSignedOut}</p> : (
             <form className={styles.channelForm} onSubmit={(event) => { event.preventDefault(); void send(); }}>
-              <p className={styles.formNotice}>{copy.handoffPrivacy}</p>
+              <p className={styles.formNotice}>{source.images ? copy.handoffImagesPrivacy : copy.handoffPrivacy}</p>
+              {source.images ? <p className={styles.formNotice}>{copy.handoffImagesList(source.images.labels)}</p> : null}
               <div className={styles.field}>
                 <span>{copy.handoffTarget}</span>
                 {/* Teammates, then #channels, as two labelled groups. */}
@@ -93,7 +90,7 @@ export function TeamChatHandoffDialog({ source }: { source: TeamChatHandoffSourc
               <TextAreaField label={copy.handoffAcceptance} maxLength={TEAM_CHAT_WORK_CARD_LIMITS.section} onChange={setAcceptance} value={acceptance} />
               <TextAreaField label={copy.handoffSummary} maxLength={TEAM_CHAT_WORK_CARD_LIMITS.summary} onChange={setSummary}
                 placeholder={copy.handoffSummaryPlaceholder} value={summary} />
-              <fieldset className={`${styles.memberPicker} ${styles.refPicker}`}>
+              {workspaceName || branchName ? <fieldset className={`${styles.memberPicker} ${styles.refPicker}`}>
                 <legend>{copy.workCardRefs}</legend>
                 <div>
                   {workspaceName ? (
@@ -109,7 +106,7 @@ export function TeamChatHandoffDialog({ source }: { source: TeamChatHandoffSourc
                     </label>
                   ) : null}
                 </div>
-              </fieldset>
+              </fieldset> : null}
               <label className={styles.field}>
                 <span>{copy.handoffLink}</span>
                 <input aria-invalid={!linkValid} inputMode="url" onChange={(event) => setLink(event.currentTarget.value)} value={link} />

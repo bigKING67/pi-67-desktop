@@ -36,6 +36,33 @@ interface UploadOptions {
   newId?: () => string;
 }
 
+/**
+ * Uploads one file into a conversation's attachments (begin, chunks, finish) and returns it,
+ * ready for a message. A failed or cancelled upload discards what was stored. Shared by the
+ * composer tray and the image page's hand-off.
+ */
+export async function uploadTeamChatFile(request: TeamChatPort["request"], conversationId: string, file: Blob, options: {
+  fileName: string; size?: { width: number; height: number }; onProgress?: (sentBytes: number) => void; isCancelled?: () => boolean;
+}): Promise<TeamChatAttachment> {
+  let attachmentId: string | undefined;
+  try {
+    const { attachment } = await request("teamChat.attachment.begin", { conversationId, fileName: options.fileName, byteSize: file.size, ...options.size });
+    attachmentId = attachment.id;
+    let offset = 0;
+    while (offset < file.size) {
+      if (options.isCancelled?.()) throw new Cancelled();
+      const data = await file.slice(offset, offset + TEAM_CHAT_ATTACHMENT_LIMITS.chunk).arrayBuffer();
+      offset = (await request("teamChat.attachment.chunk", { attachmentId, offset, data })).received;
+      options.onProgress?.(offset);
+    }
+    if (options.isCancelled?.()) throw new Cancelled();
+    return (await request("teamChat.attachment.finish", { attachmentId })).attachment;
+  } catch (error) {
+    if (attachmentId !== undefined) void request("teamChat.attachment.discard", { attachmentId }).catch(() => undefined);
+    throw error;
+  }
+}
+
 /** Local previews kept for sent images until their message is confirmed and scrolled away. */
 const MAX_SENT_PREVIEWS = 40;
 const MAX_DIMENSION = 20_000;
@@ -69,28 +96,14 @@ export function createTeamChatUploads(options: UploadOptions) {
     const file = files.get(localId);
     const item = current(localId);
     if (!file || !item || cancelled.delete(localId)) return;
-    let attachmentId: string | undefined;
     try {
       const size = item.previewUrl === undefined ? undefined : await measure(file);
-      const { attachment } = await options.request("teamChat.attachment.begin", {
-        conversationId: item.conversationId,
-        fileName: item.fileName,
-        byteSize: item.byteSize,
-        ...(size === undefined ? {} : size)
+      const attachment = await uploadTeamChatFile(options.request, item.conversationId, file, {
+        fileName: item.fileName, ...(size === undefined ? {} : { size }),
+        onProgress: (sentBytes) => patch(localId, { sentBytes }), isCancelled: () => cancelled.has(localId)
       });
-      attachmentId = attachment.id;
-      let offset = 0;
-      while (offset < item.byteSize) {
-        if (cancelled.has(localId)) throw new Cancelled();
-        const data = await file.slice(offset, offset + TEAM_CHAT_ATTACHMENT_LIMITS.chunk).arrayBuffer();
-        offset = (await options.request("teamChat.attachment.chunk", { attachmentId, offset, data })).received;
-        patch(localId, { sentBytes: offset });
-      }
-      if (cancelled.has(localId)) throw new Cancelled();
-      const stored = await options.request("teamChat.attachment.finish", { attachmentId });
-      patch(localId, { status: "ready", sentBytes: item.byteSize, attachment: stored.attachment });
+      patch(localId, { status: "ready", sentBytes: item.byteSize, attachment });
     } catch (error) {
-      if (attachmentId !== undefined) void options.request("teamChat.attachment.discard", { attachmentId }).catch(() => undefined);
       if (error instanceof Cancelled) cancelled.delete(localId);
       else patch(localId, { status: "failed", error: teamChatErrorMessage(error) });
     }

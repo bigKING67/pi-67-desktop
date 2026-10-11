@@ -1,8 +1,11 @@
-import { IMAGE_SIZE_PRESETS, type ImageCanvas } from "@pi67/domain";
+import { IMAGE_SIZE_PRESETS, TEAM_CHAT_ATTACHMENT_LIMITS, teamChatAttachmentRejection, type ImageCanvas } from "@pi67/domain";
 import type { ImageProjectSummary, ImageTextCheck } from "@pi67/protocol";
 import { create } from "zustand";
 import { publishNotification } from "../notifications/notification-store.js";
 import { libraryId, request, useImageProject } from "./image-project-controller.js";
+import { useTeamChatDialogStore } from "../team-chat/team-chat-dialog-store.js";
+import type { HandoffPicture } from "../team-chat/team-chat-work-bridge.js";
+import { imagePreviewUrl } from "./image-workbench-controller.js";
 import { useImageWorkbench } from "./image-workbench-store.js";
 
 // Export, with the keyed-text check first (P4 checkpoint 8): every shown text is read back
@@ -14,16 +17,18 @@ import { useImageWorkbench } from "./image-workbench-store.js";
 interface UnreadText { label: string; text: string; read: string; passed: boolean; contrast?: number }
 /** Read in full and with enough contrast for its size. */
 const isClear = (check: ImageTextCheck): boolean => check.passed && !check.lowContrast;
+/** What the check guards, for its dialog's words: an export to a folder or a send to the team. */
+type TextCheckPurpose = "export" | "handoff";
 interface TextCheckState {
   /** Texts the last export check could not read, waiting for 仍然导出 or 取消. */
-  pending: { unread: UnreadText[]; decide: (proceed: boolean) => void } | undefined;
+  pending: { unread: UnreadText[]; purpose: TextCheckPurpose; decide: (proceed: boolean) => void } | undefined;
   /** Per `project/candidate`, the texts its render could not read; checked once when it is ready. */
   candidates: Record<string, ImageTextCheck[]>;
 }
 export const useImageTextChecks = create<TextCheckState>(() => ({ pending: undefined, candidates: {} }));
 
 /** Checks each target; resolves true when everything reads, or when the person chooses to export anyway. */
-async function textsReadable(targets: readonly { projectId: string; revision?: number; label: string }[]): Promise<boolean> {
+async function textsReadable(targets: readonly { projectId: string; revision?: number; label: string }[], purpose: TextCheckPurpose = "export"): Promise<boolean> {
   const unread: UnreadText[] = [];
   try {
     for (const target of targets) {
@@ -32,11 +37,11 @@ async function textsReadable(targets: readonly { projectId: string; revision?: n
         ...(check.lowContrast && check.contrast !== undefined ? { contrast: check.contrast } : {}) })));
     }
   } catch {
-    publishNotification({ level: "warning", title: "没能核对图中文字", message: "这次导出没有检查文字是否完整可读。" });
+    publishNotification({ level: "warning", title: "没能核对图中文字", message: `这次${purpose === "export" ? "导出" : "发送"}没有检查文字是否完整可读。` });
     return true;
   }
   if (!unread.length) return true;
-  return new Promise((resolve) => useImageTextChecks.setState({ pending: { unread, decide: (proceed) => { useImageTextChecks.setState({ pending: undefined }); resolve(proceed); } } }));
+  return new Promise((resolve) => useImageTextChecks.setState({ pending: { unread, purpose, decide: (proceed) => { useImageTextChecks.setState({ pending: undefined }); resolve(proceed); } } }));
 }
 
 export const candidateCheckKey = (projectId: string, candidateId: string): string => `${projectId}/${candidateId}`;
@@ -95,14 +100,27 @@ export function derivedSizes(projects: readonly ImageProjectSummary[], projectId
 
 /** The revision on screen plus every size derived from it, rendered at full size into one new export folder. */
 export function exportImageSizes(): Promise<void> {
-  const { projectId, revision, document } = useImageProject.getState();
-  if (!projectId || revision === undefined || !document) return Promise.resolve();
-  const sizes = derivedSizes(useImageWorkbench.getState().projects, projectId, revision).current;
-  return exportProjectSet(document.title, [{ projectId, revision, canvas: document.canvas, label: document.title, fileName: (size) => `${document.title} ${size}` },
-    ...sizes.map((item) => ({ projectId: item.projectId, canvas: item.canvas, label: `${item.canvas.width}×${item.canvas.height}`, fileName: (size: string) => `${document.title} ${size}` }))]);
+  const set = currentSet();
+  return set ? exportProjectSet(set.title, set.members) : Promise.resolve();
 }
 
 interface SetMember { projectId: string; revision?: number; canvas: ImageCanvas; label: string; fileName: (size: string) => string }
+
+/** The revision on screen and every size derived from it, as one set (export, hand-off). */
+function currentSet(): { title: string; members: SetMember[] } | undefined {
+  const { projectId, revision, document } = useImageProject.getState();
+  if (!projectId || revision === undefined || !document) return undefined;
+  const sizes = derivedSizes(useImageWorkbench.getState().projects, projectId, revision).current;
+  const fileName = (size: string) => `${document.title} ${size}`;
+  return { title: document.title, members: [{ projectId, revision, canvas: document.canvas, label: document.title, fileName },
+    ...sizes.map((item) => ({ projectId: item.projectId, canvas: item.canvas, label: `${item.canvas.width}×${item.canvas.height}`, fileName }))] };
+}
+
+/** One member rendered at full size into the preview cache. */
+function renderFull(member: SetMember) {
+  return request("image.project.render", { projectId: member.projectId, ...(member.revision === undefined ? {} : { revision: member.revision }),
+    previewMax: Math.max(member.canvas.width, member.canvas.height) });
+}
 
 /**
  * Exports projects as one set: the keyed-text check over all of them first, then each rendered
@@ -116,8 +134,7 @@ export function exportProjectSet(title: string, members: readonly SetMember[]): 
       if (!await textsReadable(members)) return;
       const items = [];
       for (const member of members) {
-        const rendered = await request("image.project.render", { projectId: member.projectId, ...(member.revision === undefined ? {} : { revision: member.revision }),
-          previewMax: Math.max(member.canvas.width, member.canvas.height) });
+        const rendered = await renderFull(member);
         items.push({ projectId: member.projectId, revision: rendered.revision, pngSha256: rendered.pngSha256, fileName: member.fileName(`${rendered.width}×${rendered.height}`) });
       }
       const saved = await window.pi67.system.saveImageSet({ workspaceId: libraryId(), title, items });
@@ -128,4 +145,43 @@ export function exportProjectSet(title: string, members: readonly SetMember[]): 
       useImageProject.setState({ busy: false });
     }
   });
+}
+
+/**
+ * 发到团队…: the shared hand-off dialog with the revision on screen and its current sizes as
+ * pictures (Team Chat allows 10 per message). On 发送 the pictures pass the keyed-text check
+ * and are rendered at full size; the dialog sends the card, then one message with them.
+ */
+export function handOffImages(): void {
+  const set = currentSet();
+  if (!set) return;
+  const members = set.members.slice(0, TEAM_CHAT_ATTACHMENT_LIMITS.perMessage)
+    .map((member, index) => index === 0 ? { ...member, label: `${member.canvas.width}×${member.canvas.height}（原尺寸）` } : member);
+  useTeamChatDialogStore.getState().openHandoff({ title: set.title, images: { labels: members.map((member) => member.label), prepare: () => handoffPictures(set.title, members) } });
+}
+
+/**
+ * The pictures for a hand-off, one at a time with exports (it shares the text check), named so
+ * Team Chat accepts them and checked against its size limit before anything is sent.
+ */
+async function handoffPictures(title: string, members: readonly SetMember[]): Promise<HandoffPicture[] | undefined> {
+  if (exporting || useImageTextChecks.getState().pending) throw new Error("正在导出或核对文字，请稍后再发送。");
+  exporting = true;
+  try {
+    if (!await textsReadable(members, "handoff")) return undefined;
+    const base = title.replace(/^[.\s]+/u, "").slice(0, 120) || "图片";
+    const pictures: HandoffPicture[] = [];
+    for (const member of members) {
+      const rendered = await renderFull(member);
+      // The verified PNG from the preview cache, read as the page's own resource (never a path).
+      const response = await fetch(imagePreviewUrl(libraryId(), member.projectId, rendered.pngSha256));
+      if (!response.ok) throw new Error("没能读取渲染好的图片");
+      const file = new File([await response.blob()], `${base} ${rendered.width}×${rendered.height}.png`, { type: "image/png" });
+      if (teamChatAttachmentRejection(file) === "size") throw new Error(`${member.label} 超过 25 MB，不能随任务卡发送；可以先导出，再在会话里作为文件发送。`);
+      pictures.push({ file, size: { width: rendered.width, height: rendered.height } });
+    }
+    return pictures;
+  } finally {
+    exporting = false;
+  }
 }

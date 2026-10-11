@@ -1603,6 +1603,15 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   A batch run on a template makes such projects. The library lists templates first under
   `模板`, and a project made from one says `来自模板 …`. The Agent may `set_template` and use
   `image_from_template` (pictures from local files).
+  导出 → `发到团队…` (P5) opens the same hand-off dialog as Work's `交给同事…` (`交给同事或频道`):
+  teammate or joined channel, title (the project's), goal, acceptance, summary and an optional
+  https link, with a line listing the pictures that go along — the revision on screen and its
+  current sizes, at most 10 — and a privacy line saying only these fields and pictures are sent,
+  never the image project, prompts or conversation. 发送 runs the keyed-text check over the
+  pictures (its dialog may stop the hand-off, sending nothing), renders them at full size,
+  uploads them as Team Chat attachments, creates the Work Card (assigned to the teammate in a
+  direct message) and then posts one message `<title> · 交付图片` with the pictures. If the card
+  fails, the uploaded pictures are discarded and nothing is posted.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

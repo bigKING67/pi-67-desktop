@@ -92,6 +92,25 @@ made from it locks every layer that is not a slot, and image slots come in this 
   renderer and e2e; packaged screenshots of the template row, the 属性 slot toggle and the
   新建 dialog.
 
+## Checkpoint 4 design (Work Card handoff; taken before 3)
+
+Confirmed by the user 2026-10-11: a card followed by one message with the pictures (no New
+Money Server change; cards keep no attachments).
+
+- 导出 → `发到团队…` opens the shared hand-off dialog (`交给同事或频道`) with the project title,
+  goal, acceptance and summary, a teammate or joined channel, an optional https link and the
+  list of pictures that go with it: the revision on screen and its current sizes (at most 10).
+  The privacy line says only these fields and pictures are sent — never the project, prompts or
+  the conversation.
+- 发送 runs the keyed-text check over the pictures first (its own dialog may stop it), renders
+  each at full size, uploads them as Team Chat attachments, creates the Work Card (assigned to
+  the teammate for a direct message) and then sends one message with the pictures in the same
+  conversation. A failure before the card leaves nothing behind (uploaded files are discarded).
+- Team Chat's composer upload is split so the per-file upload (begin, chunks, finish, discard on
+  failure) is one function both callers use.
+- Evidence: renderer tests for the image source and the upload function, an e2e through the
+  mock Team Chat service, packaged screenshots.
+
 ## Rollback
 
 Each checkpoint is additive; the batch writes only new sibling projects and export folders, so
@@ -151,3 +170,23 @@ removing the feature leaves every existing project as it was.
   and copied (dropped when nothing uses it; the asset limit is a refusal); pictures were decoded
   before the slots were checked (checked first); emptied words were silently kept (refused with
   the layer named); 可替换 stayed on at 20 slots; the Agent tool resolved paths its own way.
+- 2026-10-11: checkpoint 4 (Work Card handoff) done before 3, as proposed. The Team Chat hand-off
+  dialog takes an optional `images` source (labels, and files made on 发送); its send path is
+  `deliverHandoff` (pictures uploaded, card, then one message; uploads discarded if the card
+  fails), tested against a scripted port; the composer's per-file upload is
+  `uploadTeamChatFile`, shared. The image page's `handOffImages` lists the revision and its sizes
+  and, on 发送, runs the keyed-text check and renders each, reading the verified PNG back as the
+  page's own `app://` resource. No New Money Server change. An end-to-end run needs a signed-in
+  Team Chat service, which the Electron e2e does not have; it is covered by the renderer tests,
+  the packaged dialog and the user's own signed-in check.
+- 2026-10-11: `/code-review high` on checkpoint 4: a failed picture message read as success (the
+  controller's `send` now reports delivery; the message stays to retry and the dialog says so);
+  the hand-off's text check could run beside an export and lose a decision (one at a time,
+  sharing the export guard); pictures over 25 MB or with names Team Chat refuses failed late
+  (names made safe, size checked before sending); pictures went without their size (sent, so
+  recipients see their proportions); an empty references group showed for images (hidden); the
+  text check spoke of 导出 during a send (发送 wording); the set and render steps were written
+  twice (`currentSet`, `renderFull`); the target was parsed twice (`handoffTarget`); the dialog's
+  stop path had no test (`handOff`, tested). Deferred: pictures are held in the renderer until
+  all are rendered (up to 10); a Host-side "attach the cached PNG" command would avoid holding
+  and re-sending them, and belongs with a later Team Chat change.

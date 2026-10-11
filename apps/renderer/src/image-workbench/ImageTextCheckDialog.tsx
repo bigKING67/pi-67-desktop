@@ -10,11 +10,12 @@ import styles from "./ImageWorkbench.module.css";
 export function ImageTextCheckDialog() {
   const pending = useImageTextChecks((state) => state.pending);
   if (!pending) return null;
+  const sending = pending.purpose === "handoff";
   return (
     <ModalOverlay className="modal-overlay" isDismissable isOpen onOpenChange={(open) => { if (!open) pending.decide(false); }}>
       <Modal className={`modal-surface ${styles.dialogModal}`}>
-        <Dialog aria-label="导出前核对文字" className={styles.dialog!} role="alertdialog">
-          <span className="dialog-eyebrow">导出</span>
+        <Dialog aria-label={sending ? "发送前核对文字" : "导出前核对文字"} className={styles.dialog!} role="alertdialog">
+          <span className="dialog-eyebrow">{sending ? "发到团队" : "导出"}</span>
           <Heading slot="title">有 {pending.unread.length} 段文字可能看不清</Heading>
           <ul className={styles.unreadList}>
             {pending.unread.map((item, index) => (
@@ -27,7 +28,7 @@ export function ImageTextCheckDialog() {
           <p className={styles.dialogHint}>读不全多半是被别的图层盖住、被蒙版遮住或超出画布；太淡是文字和身后的颜色太接近（大字至少 3:1，小字至少 4.5:1）。核对在本机离线完成，偶尔会误报。</p>
           <div className="dialog-actions">
             <Button autoFocus className="secondary-button" onPress={() => pending.decide(false)}>取消</Button>
-            <Button className="primary-button" onPress={() => pending.decide(true)}>仍然导出</Button>
+            <Button className="primary-button" onPress={() => pending.decide(true)}>{sending ? "仍然发送" : "仍然导出"}</Button>
           </div>
         </Dialog>
       </Modal>
