@@ -2,7 +2,8 @@ import type { ImageProjectSummary } from "@pi67/protocol";
 import { create } from "zustand";
 
 export type ImageInspectorTab = "layers" | "properties" | "candidates" | "history" | "export";
-type ImageWorkbenchView = { kind: "library" } | { kind: "project"; projectId: string };
+/** The library, optionally opened on one batch's projects (P5). */
+type ImageWorkbenchView = { kind: "library"; batchId?: string } | { kind: "project"; projectId: string };
 interface ImageThumbnail { pngSha256: string; width: number; height: number; revision: number }
 
 interface ImageWorkbenchState {
@@ -14,7 +15,7 @@ interface ImageWorkbenchState {
   thumbnails: Record<string, ImageThumbnail>;
   inspectorTab: ImageInspectorTab;
   setInspectorTab: (tab: ImageInspectorTab) => void;
-  openLibrary: () => void;
+  openLibrary: (batchId?: string) => void;
   openProject: (projectId: string) => void;
   close: () => void;
   setLoading: () => void;
@@ -31,7 +32,7 @@ export const useImageWorkbench = create<ImageWorkbenchState>((set) => ({
   thumbnails: {},
   inspectorTab: "layers",
   setInspectorTab(inspectorTab) { set({ inspectorTab }); },
-  openLibrary() { set({ view: { kind: "library" } }); },
+  openLibrary(batchId) { set({ view: { kind: "library", ...(batchId ? { batchId } : {}) } }); },
   openProject(projectId) { set({ view: { kind: "project", projectId } }); },
   close() { set({ view: undefined }); },
   setLoading() { set((state) => ({ phase: state.phase === "ready" ? "ready" : "loading", error: undefined })); },

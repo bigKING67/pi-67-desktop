@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Button, Checkbox, CheckboxGroup } from "react-aria-components";
 import { acceptCandidate, deriveImageSizes, discardCandidate, editImageProject, inspectCandidate, useImageProject } from "./image-project-controller.js";
 import { derivedSizes, exportImageProject, exportImageSizes } from "./image-project-export.js";
+import { ImageBatchPanel } from "./ImageBatchPanel.js";
 import { useImageWorkbench } from "./image-workbench-store.js";
 import { loadImageLibrary } from "./image-workbench-controller.js";
 import styles from "./ImageInspector.module.css";
@@ -160,6 +161,7 @@ export function ImageExportPanel() {
         <FolderDown aria-hidden="true" size={14} />导出全部尺寸（{current.length + 1} 张）
       </Button>
       <p className={styles.empty}>选择一个位置后，会在那里新建一个文件夹，放入这一版和基于这一版的各尺寸 PNG 以及 receipt.json，不会覆盖已有文件；较旧修订派生的尺寸不会混进来。</p>
+      <ImageBatchPanel />
     </div>
   );
 }

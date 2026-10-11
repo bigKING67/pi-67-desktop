@@ -139,7 +139,7 @@ export async function writeImageExportSet(parent: string, title: string, files: 
 
 const isWorkspaceId = (value: unknown): value is string => typeof value === "string" && WORKSPACE_ID.test(value);
 
-function asImageExportSetRequest(value: unknown): ImageExportSetRequest {
+export function asImageExportSetRequest(value: unknown): ImageExportSetRequest {
   const record = typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
   const { workspaceId, title, items } = record;
   if (typeof title !== "string" || !title || title.length > 200 || !Array.isArray(items) || items.length < 1 || items.length > IMAGE_EXPORT_SET_MAX_ITEMS) throw new Error("Invalid image export payload.");

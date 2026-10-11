@@ -1580,6 +1580,19 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   size at least 1/30 of the canvas's short edge) and 4.5:1 otherwise, judged on the ratio as
   shown (one decimal). A blend mode or mask on the text is judged as if drawn normally. Faint
   text is listed with its ratio in the same dialog, because OCR still reads it.
+  导出 → 批量 (P5) makes one project per row of a CSV table (comma or tab separated, UTF-8):
+  the first row names text layers by id or by their current words (`¥199`), each later row is
+  one variant, and an empty cell keeps the layer's words. The table is read in the renderer
+  and matched before anything is written (what matched, what was left out, why a table cannot
+  be used: no matching header, no rows, more than 200 rows, 20 layers or 2000 characters per
+  cell). `生成 N 个变体` writes each row beside the source from the revision on screen, fitted
+  like a derived size (text shrinks to 70%, then the row is refused); a row naming a missing
+  or locked layer or a character no font has is refused with its reason, and the rest are
+  written. Each batch is listed with `在创作库查看`, `导出批次` (all rows as one set after the
+  keyed-text check) and `撤销批次`, which asks first (saying how many were edited since) and
+  removes the batch's projects; the source and exported files stay. The library shows a batch
+  as one card (`批次 · <source>`, count, source revision) that opens to its rows in table order.
+  The Agent's `image_batch` makes the same batches from inline rows.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

@@ -220,3 +220,46 @@
   font-size: var(--font-size-caption);
   overflow-wrap: anywhere;
 }
+
+/* A batch (P5): one card with a second sheet edge behind its cover; opened, a bar leads its rows. */
+.cardStack {
+  box-shadow: 4px 4px 0 -1px var(--surface), 4px 4px 0 0 var(--border);
+}
+
+.batchBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.batchBar .back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.batchBar .back[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.batchBar .back[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.batchTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

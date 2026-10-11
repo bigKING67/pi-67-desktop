@@ -84,3 +84,25 @@ removing the feature leaves every existing project as it was.
   deletes the batch's projects and their work folders; the library reads `batch` from revision
   1's summary. Measured in the Host test: 50 SKUs (title and price) created in 3.1 s and removed
   in 0.9 s on an Apple Silicon Mac. The page (1b) is next.
+- 2026-10-11: checkpoint 1b (the page). CSV parsing and column matching in the renderer
+  (`image-batch-table.ts`), batch state and actions (`image-project-batch.ts`), 导出 → 批量, the
+  library's batch card and batch view, removal through the shared destructive dialog; export
+  sets share one `exportProjectSet` (sizes and batches); library reloads after Host events are
+  debounced (a batch announces every project) and only one cover per batch is drawn. Packaged
+  macOS (1080×1670 poster with a photo, so each row copies the photo): 50 SKUs created in
+  11.4 s from the click, removed in 7.9 s from the confirmation, timed through CDP. The packaged
+  check found a crash when the open batch view lost its last project (fixed: the library falls
+  back to all projects).
+- 2026-10-11: `/code-review high` on checkpoint 1, all fixed: exporting a batch of more than 6
+  failed in Main (the export-set limit was sizes + 1; now the larger of that and the batch row
+  limit, tested at 200 and 201); the panel lost its table and refusals on every tab switch and
+  could show another project's run (state now kept per project); refusals named filtered row
+  positions instead of table rows (rows carry their table number; rows with nothing to change
+  are listed as skipped); removal was announced nowhere (the source is announced, so other
+  windows reload); an open batch view kept stale thumbnails (redrawn when a row's revision
+  moves); engine and file-system messages reached the page in English with paths (product
+  words; empty texts refused as such and by the schemas); a tab-separated header holding
+  commas split on commas (a tab now always wins); each row re-read and re-validated the source
+  (read once per batch); removal scanned the whole library (only `<source>-<batch>-<row>` names,
+  each checked against its first revision); batch grouping was written five times (one
+  `batchGroups` helper).

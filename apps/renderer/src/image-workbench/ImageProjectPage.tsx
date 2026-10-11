@@ -113,7 +113,7 @@ export function ImageProjectPage({ projectId }: { projectId: string }) {
   return (
     <section aria-label={document?.title ?? "图像项目"} className={styles.page} data-testid="image-project">
       <header className={styles.header}>
-        <Button className={styles.back!} onPress={openLibrary}><ArrowLeft aria-hidden="true" size={15} />创作库</Button>
+        <Button className={styles.back!} onPress={() => openLibrary()}><ArrowLeft aria-hidden="true" size={15} />创作库</Button>
         <span className={styles.title}>{document?.title ?? projectId}</span>
         {document ? <span className={styles.meta}>{document.canvas.width}×{document.canvas.height} · 修订 {revision}</span> : null}
         <span className={styles.spacer} />

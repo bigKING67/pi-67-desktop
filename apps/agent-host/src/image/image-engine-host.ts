@@ -238,24 +238,37 @@ export class ImageEngineHost {
   private createBatch(engine: ImageEngine, workspaceId: string, cwd: string,
     { projectId, revision, rows }: CommandPayloads["image.batch.create"]): Promise<CommandResults["image.batch.create"]> {
     return this.queue.serial(key(workspaceId, projectId), async () => {
-      const { batch_id: batchId, results } = await engine.createBatch(cwd, { project_id: projectId, revision, rows: rows.map((row) => row.texts) });
+      const { batch_id: batchId, results } = await engine.createBatch(cwd, { project_id: projectId, revision, rows });
       for (const result of results) if (result.status === "created") this.announce(workspaceId, event("image.project.changed", { projectId: result.project_id, revision: 1, sha256: result.sha256, author: "system" }));
       return { projectId, revision, batchId, results: results.map((result): ImageBatchRowOutcome => result.status === "refused" ? result
         : { row: result.row, status: "created", projectId: result.project_id, title: result.title, shrunkText: result.shrunk }) };
     });
   }
 
-  // Only projects whose first revision names this batch are removed; a source is never one of them.
+  // A batch's projects are named `<source>-<batch>-<row>`; each is removed only when its first
+  // revision also names the batch, so a source is never one of them. The source is announced
+  // afterwards, so other windows reload their library.
   private async removeBatch(engine: ImageEngine, workspaceId: string, cwd: string, { batchId }: CommandPayloads["image.batch.remove"]): Promise<CommandResults["image.batch.remove"]> {
-    const members = (await listProjects(engine, cwd)).filter((project) => project.batch?.batchId === batchId);
+    let names: string[];
+    const member = new RegExp(`-${batchId}-\\d+$`, "u");
+    try { names = (await fs.readdir(engine.projectsDirectory(cwd))).filter((name) => isImageId(name) && member.test(name)); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return { batchId, removed: [] }; throw error; }
     const removed: string[] = [];
-    for (const member of members) {
+    let source: string | undefined;
+    for (const projectId of names.sort()) {
+      const batch = batchOf(await firstSummary(engine.projectRoot(cwd, projectId), undefined));
+      if (batch?.batchId !== batchId) continue;
+      source = batch.projectId;
       // The project and its disposable state beside it (previews, its dock conversation).
-      await this.queue.serial(key(workspaceId, member.projectId), async () => {
-        await fs.rm(engine.projectRoot(cwd, member.projectId), { recursive: true, force: true });
-        await fs.rm(path.join(cwd, ...IMAGE_WORK_DIRECTORY, member.projectId), { recursive: true, force: true });
+      await this.queue.serial(key(workspaceId, projectId), async () => {
+        await fs.rm(engine.projectRoot(cwd, projectId), { recursive: true, force: true });
+        await fs.rm(path.join(cwd, ...IMAGE_WORK_DIRECTORY, projectId), { recursive: true, force: true });
       });
-      removed.push(member.projectId);
+      removed.push(projectId);
+    }
+    if (source) {
+      const project = await engine.readProject(engine.projectRoot(cwd, source)).catch(() => undefined);
+      if (project) this.announce(workspaceId, event("image.project.changed", { projectId: source, revision: project.document.revision, sha256: project.sha256, author: "system" }));
     }
     return { batchId, removed };
   }

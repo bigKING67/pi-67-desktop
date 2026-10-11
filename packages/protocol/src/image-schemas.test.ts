@@ -130,9 +130,10 @@ describe("image protocol schemas", () => {
 
   it("carries batch rows as layer and text pairs, within the batch limits", () => {
     const create = (rows: unknown) => check(CommandPayloadSchemas["image.batch.create"], { projectId: "p", revision: 2, rows });
-    expect(create([{ texts: [{ layer: "price", text: "¥299" }] }])).toBe(true);
-    expect([create([]), create([{ texts: [] }]), create([{ texts: [{ layer: "../x", text: "a" }] }]), create([{ texts: [{ layer: "price", text: "x".repeat(2001) }] }]),
-      create(Array.from({ length: 201 }, () => ({ texts: [{ layer: "price", text: "1" }] })))]).toEqual([false, false, false, false, false]);
+    expect(create([{ row: 3, texts: [{ layer: "price", text: "¥299" }] }])).toBe(true);
+    expect([create([]), create([{ row: 1, texts: [] }]), create([{ row: 1, texts: [{ layer: "../x", text: "a" }] }]), create([{ row: 1, texts: [{ layer: "price", text: "x".repeat(2001) }] }]),
+      create([{ row: 1, texts: [{ layer: "price", text: "" }] }]), create([{ texts: [{ layer: "price", text: "1" }] }]),
+      create(Array.from({ length: 201 }, () => ({ row: 1, texts: [{ layer: "price", text: "1" }] })))]).toEqual([false, false, false, false, false, false, false]);
     expect(check(CommandResultSchemas["image.batch.create"], { projectId: "p", revision: 2, batchId: "b1234567", results: [
       { row: 1, status: "created", projectId: "p-b1234567-1", title: "海报 · ¥299", shrunkText: 1 }, { row: 2, status: "refused", reason: "放不下" }] })).toBe(true);
     expect(check(CommandResultSchemas["image.batch.remove"], { batchId: "b1234567", removed: ["p-b1234567-1"] })).toBe(true);

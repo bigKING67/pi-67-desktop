@@ -139,12 +139,13 @@ export function imageTools(): ToolDefinition[] {
       parameters: Type.Object({
         project_id: projectId, revision: Type.Integer({ minimum: 1, description: "The source revision every row starts from." }),
         rows: Type.Array(Type.Array(Type.Object({ layer: Type.String({ pattern: IMAGE_ID_PATTERN, description: "A text layer id." }),
-          text: Type.String({ maxLength: IMAGE_BATCH_LIMITS.characters }) }, { additionalProperties: false }), { minItems: 1, maxItems: IMAGE_BATCH_LIMITS.texts }),
+          text: Type.String({ minLength: 1, maxLength: IMAGE_BATCH_LIMITS.characters }) }, { additionalProperties: false }), { minItems: 1, maxItems: IMAGE_BATCH_LIMITS.texts }),
         { minItems: 1, maxItems: IMAGE_BATCH_LIMITS.rows, description: "One entry per variant, in table order." })
       }),
       async execute(_id, raw, _signal, _update, ctx) {
         const params = raw as Params, engine = await loadEngine();
-        const { batch_id: batchId, results } = await engine.createBatch(ctx.cwd, { project_id: str(params, "project_id"), revision: int(params, "revision"), rows: params.rows as { layer: string; text: string }[][] });
+        const rows = (params.rows as { layer: string; text: string }[][]).map((texts) => ({ texts }));
+        const { batch_id: batchId, results } = await engine.createBatch(ctx.cwd, { project_id: str(params, "project_id"), revision: int(params, "revision"), rows });
         // Digests mean nothing to the model; the row, its project and title or its reason do.
         return text({ batch_id: batchId, results: results.map((result) => result.status === "refused" ? result : { row: result.row, status: result.status, project_id: result.project_id, title: result.title, shrunk_text: result.shrunk }) });
       }

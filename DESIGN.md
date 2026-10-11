@@ -321,6 +321,15 @@ Application-level surfaces use a separate wide-window shell:
   medium weight with `尺寸 · 读到「…」` and / or `对比度 N:1，太淡` beneath in caption secondary, a tertiary hint on causes
   and offline false alarms, then `取消` (secondary, focused) and `仍然导出` (primary). Candidate
   tiles add a `N 段文字可能看不清` line in the existing tile warning style.
+- Batches (P5, 2026-10-11): 导出 ends with `批量 · 基于修订 N`, a tertiary how-to line and a
+  `选择表格…` secondary button with a table glyph; a chosen table shows in a bordered box (file
+  name and row count, `列 → 图层` pairs in caption secondary, left-out columns in tertiary, any
+  problem in the warning notice style) with `生成 N 个变体` (primary) and `取消`. Refused rows
+  list as warning notices `第 n 行：…`; batches list like derived sizes with `在创作库查看`,
+  `导出批次` and `撤销批次` text actions, and removal uses the shared destructive dialog. In the
+  library a batch card's cover carries a second sheet edge (a 4px offset `--border` line) and
+  the meta `N 个变体 · 基于修订 r · date`; opened, a bar leads with `全部项目`, the batch title
+  in medium weight and `撤销批次`, above the same grid of row cards (meta adds `第 n 行`).
 - Text fonts (P3, 2026-10-10): 属性 for text adds a `字体` section — the shared Settings
   select at full panel width (`Noto Sans CJK SC · 内置`, then each added font's family with
   `TTF`/`OTF` as detail), a `添加字体…` text action with a plus glyph (disabled at 8 fonts or

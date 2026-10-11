@@ -34,7 +34,7 @@ export interface ImageCommandPayloads {
   /** Derived projects for size presets, each re-laid out from one revision of the source. */
   "image.project.derive": { projectId: string; revision: number; presets: ImageSizePreset[] };
   /** Each row becomes a project beside this one: the revision with the row's words in its text layers (P5). */
-  "image.batch.create": { projectId: string; revision: number; rows: { texts: { layer: string; text: string }[] }[] };
+  "image.batch.create": { projectId: string; revision: number; rows: { row: number; texts: { layer: string; text: string }[] }[] };
   /** Removes every project of the batch; the source project is never part of it. */
   "image.batch.remove": { batchId: string };
 }

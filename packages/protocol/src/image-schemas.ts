@@ -167,8 +167,8 @@ const ConversationSchema = strictObject({
   sessionFileIdentity: Type.String({ minLength: 1, maxLength: 512 })
 });
 
-/** One export set: the source revision plus one file per size preset. */
-export const IMAGE_EXPORT_SET_MAX_ITEMS = IMAGE_SIZE_PRESETS.length + 1;
+/** One export set: the source revision plus one file per size preset, or every row of a batch (P5). */
+export const IMAGE_EXPORT_SET_MAX_ITEMS = Math.max(IMAGE_SIZE_PRESETS.length + 1, IMAGE_BATCH_LIMITS.rows);
 
 const SizePresetSchema = Type.Union(IMAGE_SIZE_PRESETS.map((preset) => Type.Literal(preset)));
 
@@ -199,9 +199,10 @@ export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSch
     attachmentId: Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" }) }),
   "image.project.derive": strictObject({ projectId: IdSchema, revision: RevisionSchema,
     presets: Type.Array(SizePresetSchema, { minItems: 1, maxItems: IMAGE_SIZE_PRESETS.length, uniqueItems: true }) }),
-  // Each layer once per row; the engine refuses a repeat, a schema cannot say it.
-  "image.batch.create": strictObject({ projectId: IdSchema, revision: RevisionSchema, rows: Type.Array(strictObject({
-    texts: Type.Array(strictObject({ layer: IdSchema, text: Type.String({ maxLength: IMAGE_BATCH_LIMITS.characters }) }), { minItems: 1, maxItems: IMAGE_BATCH_LIMITS.texts }) }),
+  // Each layer once per row; the engine refuses a repeat, a schema cannot say it. `row` is the
+  // table's own row number, so refusals and the library name the row the person sees.
+  "image.batch.create": strictObject({ projectId: IdSchema, revision: RevisionSchema, rows: Type.Array(strictObject({ row: Type.Integer({ minimum: 1, maximum: IMAGE_BATCH_LIMITS.rows }),
+    texts: Type.Array(strictObject({ layer: IdSchema, text: Type.String({ minLength: 1, maxLength: IMAGE_BATCH_LIMITS.characters }) }), { minItems: 1, maxItems: IMAGE_BATCH_LIMITS.texts }) }),
   { minItems: 1, maxItems: IMAGE_BATCH_LIMITS.rows }) }),
   "image.batch.remove": strictObject({ batchId: IdSchema })
 };

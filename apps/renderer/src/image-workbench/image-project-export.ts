@@ -1,4 +1,4 @@
-import { IMAGE_SIZE_PRESETS } from "@pi67/domain";
+import { IMAGE_SIZE_PRESETS, type ImageCanvas } from "@pi67/domain";
 import type { ImageProjectSummary, ImageTextCheck } from "@pi67/protocol";
 import { create } from "zustand";
 import { publishNotification } from "../notifications/notification-store.js";
@@ -95,21 +95,32 @@ export function derivedSizes(projects: readonly ImageProjectSummary[], projectId
 
 /** The revision on screen plus every size derived from it, rendered at full size into one new export folder. */
 export function exportImageSizes(): Promise<void> {
+  const { projectId, revision, document } = useImageProject.getState();
+  if (!projectId || revision === undefined || !document) return Promise.resolve();
+  const sizes = derivedSizes(useImageWorkbench.getState().projects, projectId, revision).current;
+  return exportProjectSet(document.title, [{ projectId, revision, canvas: document.canvas, label: document.title, fileName: (size) => `${document.title} ${size}` },
+    ...sizes.map((item) => ({ projectId: item.projectId, canvas: item.canvas, label: `${item.canvas.width}×${item.canvas.height}`, fileName: (size: string) => `${document.title} ${size}` }))]);
+}
+
+interface SetMember { projectId: string; revision?: number; canvas: ImageCanvas; label: string; fileName: (size: string) => string }
+
+/**
+ * Exports projects as one set: the keyed-text check over all of them first, then each rendered
+ * at full size, then Main writes them into one new folder with receipt.json.
+ */
+export function exportProjectSet(title: string, members: readonly SetMember[]): Promise<void> {
   return oneExport(async () => {
-    const { projectId, revision, document, busy } = useImageProject.getState();
-    if (!projectId || revision === undefined || !document || busy) return;
-    const sizes = derivedSizes(useImageWorkbench.getState().projects, projectId, revision).current;
+    if (useImageProject.getState().busy || !members.length) return;
     useImageProject.setState({ busy: true });
     try {
-      const targets = [{ projectId, revision, label: document.title }, ...sizes.map((size) => ({ projectId: size.projectId, label: `${size.canvas.width}×${size.canvas.height}` }))];
-      if (!await textsReadable(targets)) return;
+      if (!await textsReadable(members)) return;
       const items = [];
-      for (const target of [{ projectId, canvas: document.canvas, revision }, ...sizes.map((size) => ({ projectId: size.projectId, canvas: size.canvas, revision: undefined }))]) {
-        const rendered = await request("image.project.render", { projectId: target.projectId, ...(target.revision === undefined ? {} : { revision: target.revision }),
-          previewMax: Math.max(target.canvas.width, target.canvas.height) });
-        items.push({ projectId: target.projectId, revision: rendered.revision, pngSha256: rendered.pngSha256, fileName: `${document.title} ${rendered.width}×${rendered.height}` });
+      for (const member of members) {
+        const rendered = await request("image.project.render", { projectId: member.projectId, ...(member.revision === undefined ? {} : { revision: member.revision }),
+          previewMax: Math.max(member.canvas.width, member.canvas.height) });
+        items.push({ projectId: member.projectId, revision: rendered.revision, pngSha256: rendered.pngSha256, fileName: member.fileName(`${rendered.width}×${rendered.height}`) });
       }
-      const saved = await window.pi67.system.saveImageSet({ workspaceId: libraryId(), title: document.title, items });
+      const saved = await window.pi67.system.saveImageSet({ workspaceId: libraryId(), title, items });
       if (saved) publishNotification({ level: "success", title: `已导出 ${items.length} 张图片`, message: `在「${saved.folderName}」里，附带 receipt.json。` });
     } catch (error) {
       publishNotification({ level: "error", title: "导出失败", message: error instanceof Error ? error.message : "未知错误" });

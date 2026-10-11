@@ -1,9 +1,12 @@
 import type { ImageProjectSummary } from "@pi67/protocol";
-import { FolderOpen, ImagePlus } from "lucide-react";
+import { ArrowLeft, FolderOpen, ImagePlus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
-import { chooseImageLibrary, imagePreviewUrl, loadImageLibrary, subscribeImageLibraryChanges } from "./image-workbench-controller.js";
+import { chooseImageLibrary, ensureLibraryThumbnails, imagePreviewUrl, loadImageLibrary, subscribeImageLibraryChanges } from "./image-workbench-controller.js";
+import { batchGroups, type BatchGroup } from "./image-batch-groups.js";
+import { removeImageBatch } from "./image-project-batch.js";
+import { ImageBatchRemoveDialog } from "./ImageBatchPanel.js";
 import { useImageWorkbench } from "./image-workbench-store.js";
 import styles from "./ImageWorkbench.module.css";
 import { NewImageFromPhotoDialog } from "./NewImageFromPhotoDialog.js";
@@ -17,6 +20,13 @@ export function ImageLibrary() {
   const phase = useImageWorkbench((state) => state.phase);
   const error = useImageWorkbench((state) => state.error);
   const projects = useImageWorkbench((state) => state.projects);
+  const view = useImageWorkbench((state) => state.view);
+  const openBatchId = view?.kind === "library" ? view.batchId : undefined;
+  // A batch that is gone (removed here, in another window or by the Agent) leaves the library on all projects.
+  const batch = openBatchId ? batchGroups(projects).find((group) => group.batchId === openBatchId)?.members : undefined;
+  // Opening a batch draws its rows, and redraws any whose revision moved; the library draws one cover per batch.
+  const drawn = batch?.map((project) => `${project.projectId}:${project.revision}`).join(",");
+  useEffect(() => { if (batch?.length) ensureLibraryThumbnails(batch); }, [drawn]);
   const [photo, setPhoto] = useState<File>();
   const [choosing, setChoosing] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -70,13 +80,67 @@ export function ImageLibrary() {
           <p>选一张产品照片开始：照片保持原样，标题和文案是可编辑的文字层。之后在对话里说要做什么，比如换背景、加标题。</p>
           {fromPhoto}
         </div>
+      ) : batch ? (
+        <BatchView batchId={openBatchId!} libraryId={library.id} members={batch} />
       ) : (
         <ul aria-label="图像项目" className={styles.grid}>
-          {projects.map((project) => <ProjectCard key={project.projectId} libraryId={library.id} project={project} />)}
+          {libraryEntries(projects).map((entry) => "batchId" in entry
+            ? <BatchCard key={entry.batchId} batchId={entry.batchId} libraryId={library.id} members={entry.members} />
+            : <ProjectCard key={entry.projectId} libraryId={library.id} project={entry} />)}
         </ul>
       )}
+      <ImageBatchRemoveDialog />
       {photo ? <NewImageFromPhotoDialog photo={photo} onDismiss={() => setPhoto(undefined)} /> : null}
     </section>
+  );
+}
+
+/** Projects in library order, each batch folded into one entry where its newest row would stand. */
+function libraryEntries(projects: readonly ImageProjectSummary[]): (ImageProjectSummary | BatchGroup)[] {
+  const groups = new Map(batchGroups(projects).map((group) => [group.batchId, group]));
+  const entries: (ImageProjectSummary | BatchGroup)[] = [];
+  for (const project of projects) {
+    if (!project.batch) entries.push(project);
+    else if (groups.has(project.batch.batchId)) { entries.push(groups.get(project.batch.batchId)!); groups.delete(project.batch.batchId); }
+  }
+  return entries;
+}
+
+function BatchCard({ libraryId, batchId, members }: { libraryId: string; batchId: string; members: readonly ImageProjectSummary[] }) {
+  const projects = useImageWorkbench((state) => state.projects);
+  const openLibrary = useImageWorkbench((state) => state.openLibrary);
+  const cover = members[0]!, thumbnail = useImageWorkbench((state) => state.thumbnails[cover.projectId]);
+  const source = projects.find((item) => item.projectId === cover.batch!.projectId);
+  const title = `批次 · ${source?.title ?? cover.batch!.projectId}`;
+  return (
+    <li>
+      <Button aria-label={`打开${title}`} className={styles.card!} onPress={() => openLibrary(batchId)}>
+        <span className={`${styles.cardMedia} ${styles.cardStack}`}>
+          {thumbnail ? <img alt="" decoding="async" loading="lazy" src={imagePreviewUrl(libraryId, cover.projectId, thumbnail.pngSha256)} /> : null}
+        </span>
+        <span className={styles.cardTitle}>{title}</span>
+        <span className={styles.cardMeta}>{[`${members.length} 个变体`, `基于修订 ${cover.batch!.revision}`, updatedLabel(Math.max(...members.map((item) => item.updatedAt)))].join(" · ")}</span>
+      </Button>
+    </li>
+  );
+}
+
+/** One batch opened from the library: its rows in table order, removable as one. */
+function BatchView({ libraryId, batchId, members }: { libraryId: string; batchId: string; members: readonly ImageProjectSummary[] }) {
+  const projects = useImageWorkbench((state) => state.projects);
+  const openLibrary = useImageWorkbench((state) => state.openLibrary);
+  const source = projects.find((item) => item.projectId === members[0]!.batch!.projectId);
+  return (
+    <>
+      <div className={styles.batchBar}>
+        <Button className={styles.back!} onPress={() => openLibrary()}><ArrowLeft aria-hidden="true" size={15} />全部项目</Button>
+        <span className={styles.batchTitle}>批次 · {source?.title ?? members[0]!.batch!.projectId} · {members.length} 个变体</span>
+        <Button className="secondary-button" onPress={() => void removeImageBatch(batchId)}>撤销批次</Button>
+      </div>
+      <ul aria-label="批次里的项目" className={styles.grid}>
+        {members.map((project) => <ProjectCard key={project.projectId} libraryId={libraryId} project={project} />)}
+      </ul>
+    </>
   );
 }
 
@@ -87,6 +151,7 @@ function ProjectCard({ libraryId, project }: { libraryId: string; project: Image
   const { width, height } = project.canvas;
   const source = project.derivedFrom ? projects.find((item) => item.projectId === project.derivedFrom!.projectId) : undefined;
   const meta = [`${width}×${height}`, `修订 ${project.revision}`, ...(project.derivedFrom ? [`派生自 ${source?.title ?? project.derivedFrom.projectId}`] : []),
+    ...(project.batch ? [`第 ${project.batch.row} 行`] : []),
     ...(project.readyCandidates ? [`${project.readyCandidates} 个候选待选`] : []), updatedLabel(project.updatedAt)];
   return (
     <li>

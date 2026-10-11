@@ -486,3 +486,12 @@
 .layerInGroup .layerName {
   padding-left: 30px;
 }
+
+/* 批量: the chosen table, what it matched, and its run, before anything is written. */
+.batchDraft {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}

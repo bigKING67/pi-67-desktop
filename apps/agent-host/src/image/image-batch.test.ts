@@ -21,19 +21,20 @@ async function setup() {
   await fs.mkdir(path.dirname(root), { recursive: true });
   await createProject(root, { project_id: "poster", title: "春日茶礼", canvas: { width: 400, height: 300, background: "#ffffff" }, assets: [],
     objects: [text("title", "春日茶礼", 20, 300), text("price", "¥199", 120, 200)] });
-  const host = new ImageEngineHost({ workspaceRoot: () => cwd, emit: () => undefined, watcher: new ImageProjectWatcher({ emit: () => undefined, maxWorkspaces: 0 }) });
+  const events: string[] = [];
+  const host = new ImageEngineHost({ workspaceRoot: () => cwd, emit: (_workspace, event) => { events.push(`${event.type}:${(event.payload as { projectId?: string }).projectId}`); }, watcher: new ImageProjectWatcher({ emit: () => undefined, maxWorkspaces: 0 }) });
   const run = <T extends ImageCommandType>(type: T, payload: AgentCommand<T>["payload"]) => host.execute("w1", { type, payload } as AgentCommand<T>);
-  return { run };
+  return { run, events };
 }
 
 describe("image batches", { timeout: 180_000 }, () => {
   it("writes one project per row, reports refused rows, lists them as a batch and removes them as one", async () => {
-    const { run } = await setup();
+    const { run, events } = await setup();
     const created = await run("image.batch.create", { projectId: "poster", revision: 1, rows: [
-      { texts: [{ layer: "price", text: "¥299" }] },
-      { texts: [{ layer: "price", text: "¥399" }, { layer: "subtitle", text: "x" }] },
-      { texts: [{ layer: "price", text: "¥1" }, { layer: "price", text: "¥2" }] }] });
-    expect(created.results.map((result) => result.status)).toEqual(["created", "refused", "refused"]);
+      { row: 1, texts: [{ layer: "price", text: "¥299" }] },
+      { row: 3, texts: [{ layer: "price", text: "¥399" }, { layer: "subtitle", text: "x" }] },
+      { row: 4, texts: [{ layer: "price", text: "¥1" }, { layer: "price", text: "¥2" }] }] });
+    expect(created.results.map((result) => [result.row, result.status])).toEqual([[1, "created"], [3, "refused"], [4, "refused"]]);
     expect(created.results[1]).toMatchObject({ reason: "没有叫「subtitle」的文字图层" });
     expect(created.results[2]).toMatchObject({ reason: "同一个文字图层出现了两次" });
     expect(created.results[0]).toMatchObject({ projectId: `poster-${created.batchId}-1`, title: "春日茶礼 · ¥299" });
@@ -42,11 +43,13 @@ describe("image batches", { timeout: 180_000 }, () => {
     expect(projects.find((project) => project.projectId === "poster")).not.toHaveProperty("batch");
     expect(await run("image.batch.remove", { batchId: created.batchId })).toEqual({ batchId: created.batchId, removed: [`poster-${created.batchId}-1`] });
     expect((await run("image.project.list", {})).projects.map((project) => project.projectId)).toEqual(["poster"]);
+    // Removal is announced on the source, so other windows reload their library.
+    expect(events.at(-1)).toBe("image.project.changed:poster");
   });
 
   it("changes the price on 50 SKUs and removes them again, timed", async () => {
     const { run } = await setup();
-    const rows = Array.from({ length: 50 }, (_, index) => ({ texts: [{ layer: "title", text: `SKU ${index + 1}` }, { layer: "price", text: `¥${100 + index}` }] }));
+    const rows = Array.from({ length: 50 }, (_, index) => ({ row: index + 1, texts: [{ layer: "title", text: `SKU ${index + 1}` }, { layer: "price", text: `¥${100 + index}` }] }));
     const started = performance.now();
     const created = await run("image.batch.create", { projectId: "poster", revision: 1, rows });
     const createdMs = performance.now() - started;

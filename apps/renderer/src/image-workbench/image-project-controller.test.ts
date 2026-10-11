@@ -43,6 +43,9 @@ vi.mock("../connection/AgentConnectionController.js", () => ({
         host.revision += 1;
         return Promise.resolve({ projectId: "p", revision: host.revision, sha256: "s", dryRun: false, fontId: "font-1", family: "Brand Sans" });
       }
+      if (type === "image.batch.create") return Promise.resolve({ projectId: "p", revision: host.revision, batchId: "b1", results: [
+        { row: 1, status: "created", projectId: "p-b1-1", title: "海报 · ¥299", shrunkText: 0 }, { row: 2, status: "refused", reason: "文字「¥1999999」在 100×100 里放不下" }] });
+      if (type === "image.batch.remove") return Promise.resolve({ batchId: payload.batchId, removed: ["p-b1-1"] });
       if (type === "image.project.derive") return Promise.resolve({ projectId: "p", revision: host.revision, results: (payload.presets as string[]).map((preset) => preset === "16x9"
         ? { preset, status: "refused", reason: "文字「春日」在 178×100 里放不下" }
         : { preset, status: "derived", projectId: `p-${preset}`, title: `海报 · ${preset}`, canvas: { width: 100, height: 100, background: "#fff" }, shrunkText: 0 }) });
@@ -271,6 +274,35 @@ describe("image object selection", () => {
     await exporting;
     expect(saveImage).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
+  });
+
+  it("matches a CSV to text layers, runs it as a batch, and removes the batch only when told to", async () => {
+    const { chooseBatchTable, createImageBatch, removeImageBatch, useImageBatch, batchesOf, showBatchesOf } = await import("./image-project-batch.js");
+    showBatchesOf("p");
+    const document = useImageProject.getState().document!;
+    useImageProject.setState({ document: { ...document, objects: [{ ...document.objects[0]!, kind: "text", text: "¥199", font_size: 20, color: "#000000", align: "left", line_height: 1.2 } as never] } });
+    await chooseBatchTable(new File(["t,备注\n¥299,x\n¥1999999,y\n"], "prices.csv"));
+    expect(useImageBatch.getState().draft).toMatchObject({ fileName: "prices.csv", matched: [{ column: "t", layer: "t" }], unmatched: ["备注"], rows: [{ row: 1, texts: [{ layer: "t", text: "¥299" }] }, { row: 2, texts: [{ layer: "t", text: "¥1999999" }] }] });
+    await createImageBatch();
+    expect(host.calls.find((call) => call.type === "image.batch.create")?.payload).toEqual({ projectId: "p", revision: 1, rows: [{ row: 1, texts: [{ layer: "t", text: "¥299" }] }, { row: 2, texts: [{ layer: "t", text: "¥1999999" }] }] });
+    expect(useImageBatch.getState()).toMatchObject({ draft: undefined, last: { batchId: "b1", revision: 1 } });
+    expect(notices.at(-1)).toMatchObject({ level: "warning", title: "已生成 1 个变体" });
+    const member = { projectId: "p-b1-1", title: "海报 · ¥299", revision: 2, canvas: { width: 100, height: 100, background: "#fff" }, updatedAt: 1, readyCandidates: 0, batch: { batchId: "b1", row: 1, projectId: "p", revision: 1 } };
+    useImageWorkbench.setState({ projects: [member] });
+    expect(batchesOf([member], "p")).toEqual([{ batchId: "b1", projectId: "p", revision: 1, members: [member] }]);
+    let removal = removeImageBatch("b1");
+    await vi.waitFor(() => expect(useImageBatch.getState().removing).toMatchObject({ total: 1, edited: 1 }));
+    useImageBatch.getState().removing!.decide(false);
+    await removal;
+    expect(host.calls.some((call) => call.type === "image.batch.remove")).toBe(false);
+    removal = removeImageBatch("b1");
+    await vi.waitFor(() => expect(useImageBatch.getState().removing).toBeDefined());
+    useImageBatch.getState().removing!.decide(true);
+    await removal;
+    expect(host.calls.find((call) => call.type === "image.batch.remove")?.payload).toEqual({ batchId: "b1" });
+    expect(useImageBatch.getState().last).toBeUndefined();
+    await chooseBatchTable(new File(["x"], "prices.xlsx"));
+    expect(useImageBatch.getState().draft?.problem).toMatch(/CSV/u);
   });
 
   it("adds text, rectangles and ellipses centred on the canvas with ids that never collide, and selects them", async () => {

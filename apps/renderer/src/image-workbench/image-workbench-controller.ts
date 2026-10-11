@@ -1,5 +1,6 @@
 import type { WorkspaceDescriptor } from "@pi67/domain";
-import type { AgentCommandType, CommandPayloads, CommandResults } from "@pi67/protocol";
+import type { AgentCommandType, CommandPayloads, CommandResults, ImageProjectSummary } from "@pi67/protocol";
+import { batchGroups } from "./image-batch-groups.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { registerRendererWorkspaceWithHost } from "../workbench/workspace-host-registration-controller.js";
@@ -45,10 +46,18 @@ export async function loadImageLibrary(): Promise<void> {
     await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
     const { projects } = await requestImage(workspace.id, "image.project.list", {});
     useImageWorkbench.getState().setProjects(projects);
-    for (const project of projects) void ensureThumbnail(workspace.id, project.projectId, project.revision);
+    // A batch shows one card, so only its first row is drawn until the batch is opened.
+    const covers = batchGroups(projects).map((group) => group.members[0]!);
+    for (const project of [...projects.filter((item) => !item.batch), ...covers]) void ensureThumbnail(workspace.id, project.projectId, project.revision);
   } catch (error) {
     useImageWorkbench.getState().fail(error instanceof Error ? error.message : "创作库读取失败");
   }
+}
+
+/** Draws the thumbnails of projects shown on demand (a batch's rows once the batch is opened). */
+export function ensureLibraryThumbnails(projects: readonly ImageProjectSummary[]): void {
+  const workspace = imageLibraryWorkspace();
+  if (workspace) for (const project of projects) void ensureThumbnail(workspace.id, project.projectId, project.revision);
 }
 
 function ensureThumbnail(workspaceId: string, projectId: string, revision: number): Promise<void> {
@@ -94,10 +103,17 @@ export async function createImageProjectFromPhoto(file: File, title: string, hea
 
 /** Library changes from any writer (Agent, Pi TUI, another window) refresh the list and thumbnails. */
 export function subscribeImageLibraryChanges(): () => void {
-  return agentConnectionController.subscribe({
+  // A batch announces each of its projects; one reload after the burst settles is enough.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const unsubscribe = agentConnectionController.subscribe({
     onEvent(event, envelope) {
       if (event.type !== "image.project.changed" || envelope.context.scope !== "workspace") return;
-      if (envelope.context.workspaceId === rendererWorkbenchStore.getState().imageLibraryWorkspaceId) void loadImageLibrary();
+      if (envelope.context.workspaceId !== rendererWorkbenchStore.getState().imageLibraryWorkspaceId) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => void loadImageLibrary(), LIBRARY_RELOAD_MS);
     }
   });
+  return () => { clearTimeout(timer); unsubscribe(); };
 }
+
+const LIBRARY_RELOAD_MS = 250;

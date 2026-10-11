@@ -209,6 +209,18 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     const receipt = JSON.parse(await readFile(join(exports, folder!, "receipt.json"), "utf8")) as { items: { project_id: string; width: number; height: number }[] };
     expect(receipt.items.map(({ width, height }) => `${width}×${height}`)).toEqual(["800×1320", "800×1000"]);
 
+    // P5: a CSV with the headline's current words as its header makes a batch of two; one row is
+    // too long to fit and is refused with its reason; the batch is listed, then removed after a yes.
+    await inspector.locator("input[type=file][accept*='.csv']").setInputFiles({ name: "prices.csv", mimeType: "text/csv",
+      buffer: Buffer.from(`春日上新 SALE,备注\n夏日 SALE,a\n${"很长的标题".repeat(40)},b\n`) });
+    await expect(inspector.getByRole("group", { name: "批量表格" })).toContainText("春日上新 SALE →");
+    await inspector.getByRole("button", { name: "生成 2 个变体" }).click();
+    await expect(inspector.getByRole("list", { name: "没有生成的行" })).toContainText("第 2 行", { timeout: 30_000 });
+    await expect(inspector.getByRole("list", { name: "批次" })).toContainText("批次 · 1 个");
+    await inspector.getByRole("button", { name: "撤销批次" }).click();
+    await page.getByRole("dialog", { name: "撤销这个批次？" }).getByRole("button", { name: "撤销批次" }).click();
+    await expect(inspector.getByRole("list", { name: "批次" })).toHaveCount(0, { timeout: 30_000 });
+
     // The page at three widths and both themes: nothing overflows the window, and each is kept as evidence.
     await tab("属性");
     for (const scheme of ["light", "dark"] as const) {

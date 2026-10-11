@@ -5,7 +5,7 @@ vi.mock("electron", () => ({ app: { getPath: vi.fn(() => "/Users/me/Pictures") }
 import { mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { defaultImageLibraryPath, registerLibrary, writeImageExportSet } from "./image-library-bridge.js";
+import { asImageExportSetRequest, defaultImageLibraryPath, registerLibrary, writeImageExportSet } from "./image-library-bridge.js";
 import { addOrRefreshWorkspace, removeWorkspaceRegistration, replaceWorkbenchLayout } from "./workbench-state-mutations.js";
 import { parseWorkbenchStateV5 } from "./workbench-state-contract.js";
 import {
@@ -60,6 +60,12 @@ describe("image export sets", () => {
     const bytes = Buffer.alloc(33); Buffer.from("89504e470d0a1a0a0000000d49484452", "hex").copy(bytes); bytes.writeUInt32BE(width, 16); bytes.writeUInt32BE(height, 20); return bytes;
   };
   const item = (projectId: string, fileName: string) => ({ projectId, revision: 3, pngSha256: "a".repeat(64), fileName });
+
+  it("accepts an export set as large as a batch (200 rows), and no larger", () => {
+    const items = (count: number) => Array.from({ length: count }, (_, index) => ({ projectId: `p-b1-${index + 1}`, revision: 1, pngSha256: "a".repeat(64), fileName: `${index + 1}` }));
+    expect(asImageExportSetRequest({ workspaceId: "w1", title: "批次", items: items(200) }).items).toHaveLength(200);
+    expect(() => asImageExportSetRequest({ workspaceId: "w1", title: "批次", items: items(201) })).toThrow(/Invalid image export payload/u);
+  });
 
   it("writes every size and a receipt into a new folder, never over an existing one or file", async () => {
     const parent = await mkdtemp(join(tmpdir(), "image-export-"));
