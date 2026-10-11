@@ -176,6 +176,8 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "image.batch.remove": "workspace",
   "image.template.create": "workspace",
   "image.brand.read": "workspace",
+  "image.project.useBrandFont": "workspace",
+  "image.project.addBrandLogo": "workspace",
   "image.brand.edit": "workspace",
   "image.brand.addFont": "workspace",
   "image.brand.addLogo": "workspace",

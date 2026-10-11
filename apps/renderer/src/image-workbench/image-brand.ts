@@ -1,14 +1,18 @@
 import type { ImageBrandKit, ImageBrandOperation } from "@pi67/domain";
+import { useEffect } from "react";
 import { create } from "zustand";
 import { publishNotification } from "../notifications/notification-store.js";
-import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import { rendererWorkbenchStore, useWorkbenchStore } from "../workbench/workbench-store.js";
+import { fontFailure, maskFailure } from "./image-project-additions.js";
+import { mutateImageProject, request, useImageProject } from "./image-project-controller.js";
 import { requestImage } from "./image-workbench-controller.js";
 
 // P5 checkpoint 3 in the page: the creative library's one brand kit, read and edited through
 // the Host on the version shown; fonts and logos are staged through Main like any file.
 
-interface BrandState { kit: ImageBrandKit | undefined; busy: boolean }
-export const useImageBrand = create<BrandState>(() => ({ kit: undefined, busy: false }));
+/** `workspaceId` is the library the kit was read from: a kit from another library is never offered. */
+interface BrandState { kit: ImageBrandKit | undefined; workspaceId: string | undefined; busy: boolean }
+export const useImageBrand = create<BrandState>(() => ({ kit: undefined, workspaceId: undefined, busy: false }));
 
 const library = (): string | undefined => rendererWorkbenchStore.getState().imageLibraryWorkspaceId;
 
@@ -18,7 +22,7 @@ export async function loadBrand(): Promise<ImageBrandKit | undefined> {
   if (!workspaceId) return undefined;
   try {
     const kit = await requestImage(workspaceId, "image.brand.read", {});
-    useImageBrand.setState({ kit });
+    useImageBrand.setState({ kit, workspaceId });
     return kit;
   } catch (error) {
     publishNotification({ level: "error", title: "没能读取品牌库", message: error instanceof Error ? error.message : "未知错误" });
@@ -32,7 +36,7 @@ async function change(summary: string, run: (workspaceId: string, baseRevision: 
   if (!workspaceId || !kit || busy) return false;
   useImageBrand.setState({ busy: true });
   try {
-    useImageBrand.setState({ kit: await run(workspaceId, kit.revision) });
+    useImageBrand.setState({ kit: await run(workspaceId, kit.revision), workspaceId });
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : "未知错误";
@@ -78,3 +82,50 @@ export function nextBrandId(list: readonly { id: string }[], prefix: string): st
   for (let index = 2; list.some((item) => item.id === next); index++) next = `${prefix}-${index}`;
   return next;
 }
+
+/** Runs a brand action on the open project as one undo step; a refusal or conflict is said in a notice. */
+function onProject(summary: string, explain: (error: unknown) => string, run: (projectId: string, baseRevision: number) => Promise<unknown>): Promise<boolean> {
+  const { projectId, revision } = useImageProject.getState();
+  if (!projectId || revision === undefined) return Promise.resolve(false);
+  return mutateImageProject(async () => {
+    await run(projectId, revision);
+    useImageProject.setState((state) => ({ back: [...state.back, revision], forward: [] }));
+  }, `没能${summary}`, explain);
+}
+
+/** Sets a brand font on a text layer (bound into the project the first time). */
+export function useBrandFontOn(objectId: string, fontId: string): Promise<boolean> {
+  return onProject("使用品牌字体", fontFailure, (projectId, baseRevision) => request("image.project.useBrandFont", { projectId, baseRevision, fontId, objectId }));
+}
+
+/** Inserts a brand logo at the top right and selects it. */
+export function insertBrandLogo(logoId: string): Promise<boolean> {
+  return onProject("插入 Logo", maskFailure, async (projectId, baseRevision) => {
+    const { objectId } = await request("image.project.addBrandLogo", { projectId, baseRevision, logoId });
+    useImageProject.setState({ selectedObjectIds: [objectId] });
+  });
+}
+
+// The kit is read again whenever a project opens (another window may have changed it),
+// once at a time, and a failed read is reported once for that project.
+let requested: string | undefined;
+
+/**
+ * Part of the open project's kit for its panels, or undefined without one. A kit read from
+ * another library than the current one is never offered.
+ */
+export function useBrandKit<T>(select: (kit: ImageBrandKit) => T): T | undefined {
+  const projectId = useImageProject((state) => state.projectId);
+  const workspaceId = useWorkbenchStore((state) => state.imageLibraryWorkspaceId);
+  useEffect(() => {
+    const wanted = `${workspaceId ?? ""}\u0000${projectId ?? ""}`;
+    if (!workspaceId || !projectId || requested === wanted) return;
+    requested = wanted;
+    void loadBrand();
+  }, [workspaceId, projectId]);
+  return useImageBrand((state) => { const kit = offeredKit(state, workspaceId); return kit ? select(kit) : undefined; });
+}
+
+/** The kit, when it was read from `workspaceId` (the current creative library). */
+export const offeredKit = (state: BrandState, workspaceId: string | undefined): ImageBrandKit | undefined =>
+  state.kit && state.workspaceId === workspaceId ? state.kit : undefined;

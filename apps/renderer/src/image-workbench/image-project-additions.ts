@@ -96,7 +96,7 @@ export function addImageMask(file: File, objectId: string): Promise<boolean> {
   });
 }
 
-function maskFailure(error: unknown): string {
+export function maskFailure(error: unknown): string {
   const message = error instanceof Error ? error.message : "未知错误";
   if (/Invalid assets list/u.test(message)) return `一个项目最多有 ${IMAGE_ASSET_LIMIT} 张图片。`;
   if (/Revision conflict/u.test(message)) return "项目刚被更新，请再添加一次。";
@@ -104,7 +104,7 @@ function maskFailure(error: unknown): string {
   return message;
 }
 
-function fontFailure(error: unknown): string {
+export function fontFailure(error: unknown): string {
   const message = error instanceof Error ? error.message : "未知错误";
   if (/Unsupported font file: font collections/u.test(message)) return "这是字体集合（TTC），请选择其中单个字体的 TTF 或 OTF 文件。";
   if (/Unsupported font file/u.test(message)) return "这个文件不是可用的 TTF 或 OTF 字体（WOFF、WOFF2 和损坏的文件都不支持）。";

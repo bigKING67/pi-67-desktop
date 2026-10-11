@@ -224,6 +224,8 @@ export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSch
   { minItems: 1, maxItems: IMAGE_BATCH_LIMITS.rows }) }),
   "image.batch.remove": strictObject({ batchId: IdSchema }),
   "image.brand.read": strictObject({}),
+  "image.project.useBrandFont": strictObject({ projectId: IdSchema, baseRevision: RevisionSchema, fontId: IdSchema, objectId: IdSchema }),
+  "image.project.addBrandLogo": strictObject({ projectId: IdSchema, baseRevision: RevisionSchema, logoId: IdSchema }),
   "image.brand.edit": strictObject({ baseRevision: Type.Integer({ minimum: 0, maximum: 1_000_000 }), operations: Type.Array(Type.Union([
     strictObject({ type: Type.Literal("set_color"), color: BrandColorSchema }), strictObject({ type: Type.Literal("remove_color"), id: IdSchema }),
     strictObject({ type: Type.Literal("set_spec"), spec: BrandSpecSchema }), strictObject({ type: Type.Literal("remove_spec"), id: IdSchema }),
@@ -275,6 +277,8 @@ export const ImageCommandResultSchemas: Record<keyof ImageCommandResults, TSchem
   ]), { maxItems: IMAGE_BATCH_LIMITS.rows }) }),
   "image.batch.remove": strictObject({ batchId: IdSchema, removed: Type.Array(IdSchema, { maxItems: IMAGE_BATCH_LIMITS.rows }) }),
   "image.brand.read": BrandKitSchema,
+  "image.project.useBrandFont": RevisionResultSchema,
+  "image.project.addBrandLogo": strictObject({ projectId: IdSchema, revision: RevisionSchema, sha256: Sha256Schema, dryRun: Type.Boolean(), objectId: IdSchema }),
   "image.brand.edit": BrandKitSchema,
   "image.brand.addFont": BrandKitSchema,
   "image.brand.addLogo": BrandKitSchema,

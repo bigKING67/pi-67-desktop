@@ -3,6 +3,8 @@ import { Eye, EyeOff, Lock, LockOpen, Plus } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Input, Label, TextField } from "react-aria-components";
 import { ImageAdjustments } from "./ImageAdjustments.js";
+import { BrandSwatches } from "./ImageBrandSwatches.js";
+import { useBrandFontOn, useBrandKit } from "./image-brand.js";
 import { ImageAlignToolbar } from "./ImageAlignToolbar.js";
 import { IMAGE_OBJECT_KIND_LABELS } from "./image-object-kinds.js";
 import { SettingsSelect } from "../settings/SettingsPrimitives.js";
@@ -70,6 +72,7 @@ export function ImagePropertiesPanel() {
             <PropertyField key={spec.key} disabled={busy} spec={spec} value={canvas[spec.key]}
               onCommit={async (value) => { const result = await editImageProject(`修改画布${spec.label}`, [{ type: "set_canvas", canvas: { ...canvas, [spec.key]: value } }]); report(result); return result; }} />
           ))}
+          <BrandSwatches current={canvas.background} disabled={busy} onPick={(value) => void editImageProject("使用品牌颜色", [{ type: "set_canvas", canvas: { ...canvas, background: value } }]).then(report)} />
         </div>
         {status}
         <p className={styles.empty}>在画布或图层里选中对象查看它的属性；按住 Shift 可以多选并对齐。</p>
@@ -104,6 +107,10 @@ export function ImagePropertiesPanel() {
           <PropertyField key={`${object.id}-${spec.key}`} disabled={object.locked || busy} spec={spec} value={(object as unknown as Record<string, unknown>)[spec.key] ?? spec.fallback}
             onCommit={async (value) => { const result = await editImageProject(`修改${spec.label}`, [{ type: "update_object", id: object.id, patch: { [spec.key]: value } as ImageObjectPatch }]); report(result); return result; }} />
         ))}
+        {"color" in object && !("gradient" in object && object.gradient) ? (
+          <BrandSwatches current={object.color} disabled={object.locked || busy}
+            onPick={(value) => void editImageProject("使用品牌颜色", [{ type: "update_object", id: object.id, patch: { color: value } }]).then(report)} />
+        ) : null}
       </div>
       <div className={`${styles.alignRow} ${styles.flipRow}`} role="group" aria-label="翻转">
         {(Object.entries(FLIPS) as [keyof typeof FLIPS, string][]).map(([key, label]) => (
@@ -278,6 +285,8 @@ function FillChoice({ object, busy, onResult }: { object: ImageRectObject | Imag
 }
 
 const BUILT_IN = "built-in";
+/** Font picker ids for brand fonts not yet bound; never a valid font id (ids cannot hold a colon). */
+const BRAND_FONT = "brand:";
 
 /**
  * 字体 for text: the built-in Noto Sans CJK SC or a font added to the project.
@@ -286,12 +295,20 @@ const BUILT_IN = "built-in";
 function FontChoice({ object, fonts, busy, onResult }: { object: ImageTextObject; fonts: readonly ImageUserFont[]; busy: boolean; onResult: (result: ImageEditOutcome) => void }) {
   const input = useRef<HTMLInputElement>(null);
   const current = object.font_id ?? BUILT_IN;
+  // Brand fonts not yet in this project are offered too, while it has room; choosing one binds it here first.
+  const kitFonts = useBrandKit((kit) => kit.fonts) ?? [];
+  const brandFonts = fonts.length >= IMAGE_USER_FONT_LIMIT ? [] : kitFonts.filter((font) => !fonts.some((bound) => bound.sha256 === font.sha256));
   return (
     <div className={styles.fontRow}>
       <p className={styles.sectionLabel}>字体</p>
       <SettingsSelect className={styles.fontSelect ?? ""} isDisabled={busy || object.locked} label="字体" value={current}
-        options={[{ id: BUILT_IN, label: "Noto Sans CJK SC", detail: "内置" }, ...fonts.map((font) => ({ id: font.id, label: font.family, detail: font.format.toUpperCase() }))]}
-        onChange={(value) => { if (value !== current) void editImageProject("更换字体", [{ type: "update_object", id: object.id, patch: { font_id: value === BUILT_IN ? null : value } }]).then(onResult); }} />
+        options={[{ id: BUILT_IN, label: "Noto Sans CJK SC", detail: "内置" }, ...fonts.map((font) => ({ id: font.id, label: font.family, detail: font.format.toUpperCase() })),
+          ...brandFonts.map((font) => ({ id: `${BRAND_FONT}${font.id}`, label: font.family, detail: "品牌库" }))]}
+        onChange={(value) => {
+          if (value === current) return;
+          if (value.startsWith(BRAND_FONT)) { void useBrandFontOn(object.id, value.slice(BRAND_FONT.length)); return; }
+          void editImageProject("更换字体", [{ type: "update_object", id: object.id, patch: { font_id: value === BUILT_IN ? null : value } }]).then(onResult);
+        }} />
       <Button className={styles.historyAction!} isDisabled={busy || object.locked || fonts.length >= IMAGE_USER_FONT_LIMIT} onPress={() => input.current?.click()}>
         <Plus aria-hidden="true" size={12} />添加字体…
       </Button>

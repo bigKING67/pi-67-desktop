@@ -50,8 +50,8 @@ const job = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("image workbench tools", { timeout: 120_000 }, () => {
-  it("registers nine tools", () => {
-    expect(harness("/tmp").names).toEqual(["image_project_create_from_photo", "image_project_read", "image_project_edit", "image_batch", "image_from_template", "image_render", "image_candidates", "image_candidate_decide", "image_generate"]);
+  it("registers ten tools", () => {
+    expect(harness("/tmp").names).toEqual(["image_project_create_from_photo", "image_project_read", "image_project_edit", "image_batch", "image_from_template", "image_brand_read", "image_render", "image_candidates", "image_candidate_decide", "image_generate"]);
   });
 
   it("creates, reads, edits, renders, generates, lists and accepts through the engine", async () => {
@@ -147,6 +147,16 @@ describe("image workbench tools", { timeout: 120_000 }, () => {
     const summer = await t.json("image_project_read", { project_id: "summer" });
     expect(summer).not.toHaveProperty("template_slots");
     expect((summer.objects as { id: string; locked: boolean }[]).every((object) => object.locked === !["headline", "photo"].includes(object.id))).toBe(true);
+  });
+
+  it("reads the brand kit: empty at first, then the person's colours and specs", async () => {
+    const cwd = await workspace();
+    const t = harness(cwd);
+    expect(await t.json("image_brand_read", {})).toEqual({ revision: 0, colors: [], fonts: [], logos: [], specs: [] });
+    const engine = await import("@pi67/image-engine");
+    await engine.editBrand(cwd, { base_revision: 0, operations: [{ type: "set_color", color: { id: "red", name: "品牌红", value: "#b5452f" } },
+      { type: "set_spec", spec: { id: "tb", name: "方图", width: 800, height: 800 } }] });
+    expect(await t.json("image_brand_read", {})).toMatchObject({ revision: 1, colors: [{ name: "品牌红", value: "#b5452f" }], specs: [{ id: "tb", width: 800 }] });
   });
 
   it("lets the Agent make a batch of priced variants from table rows, with refused rows explained", async () => {

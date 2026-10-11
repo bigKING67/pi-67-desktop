@@ -1,8 +1,9 @@
 import { imageObjectInEffect, type ImageDocument, type ImageGroup, type ImageSceneObject } from "@pi67/domain";
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Circle, Eye, EyeOff, Folder, Image as ImageIcon, Lock, LockOpen, Square, Type } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Circle, Eye, EyeOff, Folder, Image as ImageIcon, Lock, LockOpen, Square, Stamp, Type } from "lucide-react";
 import { useState } from "react";
-import { Button } from "react-aria-components";
+import { Button, Menu, MenuItem, MenuTrigger, Popover } from "react-aria-components";
 import { addImageObject, type NewObjectKind } from "./image-project-additions.js";
+import { insertBrandLogo, useBrandKit } from "./image-brand.js";
 import {
   editImageProjectWithNotice,
   type ImageProjectState,
@@ -31,7 +32,25 @@ function AddLayer({ busy }: { busy: boolean }) {
           </Button>
         );
       })}
+      <BrandLogoMenu busy={busy} />
     </div>
+  );
+}
+
+/** 插入 Logo from the brand kit, when it has any: placed at the top right and selected. */
+function BrandLogoMenu({ busy }: { busy: boolean }) {
+  const logos = useBrandKit((kit) => kit.logos);
+  if (!logos?.length) return null;
+  return (
+    <MenuTrigger>
+      <Button aria-label="插入 Logo" className={styles.historyAction!} isDisabled={busy}><Stamp aria-hidden="true" size={12} />Logo</Button>
+      {/* The shared file-menu surface, as in the Workspace files toolbar. */}
+      <Popover className="inspector-file-menu-popover" offset={4} placement="bottom end">
+        <Menu aria-label="品牌 Logo" className="inspector-file-menu" onAction={(key) => void insertBrandLogo(String(key))}>
+          {logos.map((logo) => <MenuItem key={logo.id} id={logo.id}><Stamp aria-hidden="true" size={14} />{logo.name}</MenuItem>)}
+        </Menu>
+      </Popover>
+    </MenuTrigger>
   );
 }
 

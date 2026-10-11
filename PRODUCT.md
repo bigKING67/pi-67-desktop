@@ -1618,6 +1618,14 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   every edge pixel white); none are built in. Limits: 32 colours, 8 fonts, 16 logos, 16 specs.
   The kit is kept beside the projects as versions; an edit made on an older version reloads the
   kit and asks again instead of overwriting. Files are staged through Main like any upload.
+  In a project the kit is used directly: brand colours appear as swatches under 颜色 (text,
+  rectangles, ellipses without a gradient) and the canvas 背景, one press setting that colour;
+  the 字体 picker lists brand fonts not yet in the project (`品牌库`) while it has room for
+  another font, and choosing one binds it into the project once (by digest) and sets it; 图层 →
+  `Logo` inserts a brand logo as an image layer at the top right (its longer side 20% of the
+  canvas's short edge, 4% from the edges), selected, reusing the project's copy when inserted
+  again. Each is one undo step; the kit is read again when a project opens. The Agent reads the kit with `image_brand_read` and uses its colours; brand fonts
+  and logos stay the person's to bind, as with fonts.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

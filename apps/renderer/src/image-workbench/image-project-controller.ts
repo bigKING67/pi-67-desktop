@@ -265,7 +265,10 @@ function renderOnce(projectId: string, key: string, cached: (state: ImageProject
     .finally(() => pendingRenders.delete(pending));
 }
 
-async function mutate(action: () => Promise<unknown>, failure: string): Promise<boolean> {
+const rawMessage = (error: unknown): string => error instanceof Error ? error.message : "未知错误";
+
+/** Runs a Host action on the open project, then reloads it; a failure is said in a notice (`explain` gives its words). */
+export async function mutateImageProject(action: () => Promise<unknown>, failure: string, explain: (error: unknown) => string = rawMessage): Promise<boolean> {
   const projectId = useImageProject.getState().projectId;
   if (!projectId || useImageProject.getState().busy) return false;
   useImageProject.setState({ busy: true });
@@ -274,7 +277,7 @@ async function mutate(action: () => Promise<unknown>, failure: string): Promise<
     await loadImageProject(projectId);
     return true;
   } catch (error) {
-    publishNotification({ level: "error", title: failure, message: error instanceof Error ? error.message : "未知错误" });
+    publishNotification({ level: "error", title: failure, message: explain(error) });
     await loadImageProject(projectId);
     return false;
   } finally {
@@ -285,7 +288,7 @@ async function mutate(action: () => Promise<unknown>, failure: string): Promise<
 export function acceptCandidate(candidateId: string): Promise<boolean> {
   const { projectId, revision } = useImageProject.getState();
   if (!projectId || revision === undefined) return Promise.resolve(false);
-  return mutate(async () => {
+  return mutateImageProject(async () => {
     await request("image.candidate.accept", { projectId, candidateId, baseRevision: revision, summary: "接受候选" });
     // The accepted pixels are now the revision; the canvas returns to it.
     useImageProject.setState((state) => ({ back: [...state.back, revision], forward: [], inspecting: undefined, comparing: false }));
@@ -295,7 +298,7 @@ export function acceptCandidate(candidateId: string): Promise<boolean> {
 export function discardCandidate(candidateId: string): Promise<boolean> {
   const { projectId } = useImageProject.getState();
   if (!projectId) return Promise.resolve(false);
-  return mutate(async () => {
+  return mutateImageProject(async () => {
     await request("image.candidate.discard", { projectId, candidateId, summary: "丢弃候选" });
     if (useImageProject.getState().inspecting === candidateId) useImageProject.setState({ inspecting: undefined, comparing: false });
   }, "没能丢弃候选");

@@ -349,6 +349,11 @@ Application-level surfaces use a separate wide-window shell:
   swatch); colours and specs end with an inline add form flush with the section (name wide,
   numbers narrow, the action right; a small accent checkbox for 白底), fonts and logos with an
   `添加字体…` / `添加 Logo…` secondary button. `完成` closes it.
+  In a project, brand colours show as 20px round swatches (`--border-strong` ring; the colour in
+  use ringed in `--accent` over a `--surface` gap) under the colour field; brand fonts list in
+  the 字体 select with `品牌库` as detail; 图层's 添加 row gains a `Logo` text action (stamp glyph)
+  opening the shared file-menu popover with one item per logo. In the narrow inspector the 添加
+  row's caption takes only its text and its labels never wrap (the row may wrap instead).
 - Text fonts (P3, 2026-10-10): 属性 for text adds a `字体` section — the shared Settings
   select at full panel width (`Noto Sans CJK SC · 内置`, then each added font's family with
   `TTF`/`OTF` as detail), a `添加字体…` text action with a plus glyph (disabled at 8 fonts or

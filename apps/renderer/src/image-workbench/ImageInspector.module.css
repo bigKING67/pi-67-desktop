@@ -400,9 +400,20 @@
 /* 图层: add text, rectangle or ellipse above the list. */
 .addLayer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   margin-bottom: 8px;
+}
+
+/* The inspector is narrow: the caption takes only its text and labels never break mid-word. */
+.addLayer .alignCaption {
+  min-width: 0;
+}
+
+.addLayer .historyAction {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* 调整: a label and value over a thin track; the fill grows from the neutral point. */
@@ -494,4 +505,33 @@
   padding: 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
+}
+
+/* 品牌颜色 under a colour field: small round swatches; the one in use is ringed. */
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  grid-column: 1 / -1;
+}
+
+.swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+}
+
+.swatchSelected {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
+}
+
+.swatch[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.swatch[data-disabled] {
+  opacity: 0.55;
 }

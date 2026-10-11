@@ -12,7 +12,7 @@ import { ImageProjectWatcher } from "./image-project-watcher.js";
 import { event, freeProjectId, key, PHOTO_EXTENSIONS, type ImageEngine } from "./image-host-support.js";
 import { listProjects } from "./image-project-list.js";
 import { createBatch, createTemplate, instantiateTemplate, removeBatch, type VariantContext } from "./image-variant-commands.js";
-import { addBrandFont, addBrandLogo, editBrand, readBrand } from "./image-brand-commands.js";
+import { addBrandFont, addBrandLogo, editBrand, insertBrandLogo, readBrand, useBrandFont } from "./image-brand-commands.js";
 
 export interface ImageEngineHostDependencies {
   /** Host-local realpath of a registered, trusted Workspace. */
@@ -45,21 +45,25 @@ export class ImageEngineHost {
   constructor(private readonly dependencies: ImageEngineHostDependencies) {
     this.queue = dependencies.queue ?? new ImageWorkQueue();
     this.watcher = dependencies.watcher ?? new ImageProjectWatcher({ emit: (workspaceId, item) => dependencies.emit(workspaceId, item) });
-    this.variants = { queue: this.queue, announce: (workspaceId, announced) => this.announce(workspaceId, announced), readStagedImage: dependencies.readStagedImage?.bind(dependencies),
+    this.variants = { queue: this.queue, announce: (workspaceId, announced, refresh) => this.announce(workspaceId, announced, refresh), readStagedImage: dependencies.readStagedImage?.bind(dependencies),
       readStagedFile: dependencies.readStagedFile?.bind(dependencies) };
   }
 
   /** Stops watching project folders; image commands after this still run. */
   dispose(): void { this.watcher.dispose(); }
 
-  // Announces a change this Host made and records it so the watcher stays quiet about it.
+  // Announces a change this Host made, once: a write's file events can reach the watcher
+  // before the Host records the revision, and whichever records it first announces it.
   // State the Host returns from list/read is recorded the same way: macOS may replay file
   // events from just before a watch starts, and those must not re-announce known state.
-  private announce(workspaceId: string, announced: AgentEvent): void {
-    if (announced.type === "image.project.changed") this.watcher.noteRevision(workspaceId, announced.payload.projectId, announced.payload.revision);
-    if (announced.type === "image.candidate.changed") this.watcher.noteCandidate(workspaceId, announced.payload.projectId, announced.payload.candidateId, announced.payload.status);
-    this.dependencies.emit(workspaceId, announced);
+  // `refresh` announces known state again, for changes beside a project (a removed batch).
+  private announce(workspaceId: string, announced: AgentEvent, refresh = false): void {
+    let fresh = true;
+    if (announced.type === "image.project.changed") fresh = this.watcher.noteRevision(workspaceId, announced.payload.projectId, announced.payload.revision);
+    if (announced.type === "image.candidate.changed") fresh = this.watcher.noteCandidate(workspaceId, announced.payload.projectId, announced.payload.candidateId, announced.payload.status);
+    if (fresh || refresh) this.dependencies.emit(workspaceId, announced);
   }
+
 
   // The engine (and its native image modules) loads on the first image command,
   // never at Host startup: a missing or broken image runtime must not take
@@ -105,6 +109,10 @@ export class ImageEngineHost {
         return removeBatch(this.variants, engine, workspaceId, cwd, (command as Command<"image.batch.remove">).payload);
       case "image.brand.read":
         return readBrand(engine, cwd);
+      case "image.project.useBrandFont":
+        return useBrandFont(this.variants, engine, workspaceId, cwd, (command as Command<"image.project.useBrandFont">).payload);
+      case "image.project.addBrandLogo":
+        return insertBrandLogo(this.variants, engine, workspaceId, cwd, (command as Command<"image.project.addBrandLogo">).payload);
       case "image.brand.edit":
         return editBrand(this.variants, engine, workspaceId, cwd, (command as Command<"image.brand.edit">).payload);
       case "image.brand.addFont":

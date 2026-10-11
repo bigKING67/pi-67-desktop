@@ -46,13 +46,20 @@ export class ImageProjectWatcher {
     } catch { /* Unsupported or vanished folder: explicit refreshes still work. */ }
   }
 
-  noteRevision(workspaceId: string, projectId: string, revision: number): void {
+  /** Records a known revision; true when it is newer than anything recorded (and so not yet announced). */
+  noteRevision(workspaceId: string, projectId: string, revision: number): boolean {
     const key = projectKey(workspaceId, projectId);
-    if ((this.revisions.get(key) ?? 0) < revision) this.revisions.set(key, revision);
+    if ((this.revisions.get(key) ?? 0) >= revision) return false;
+    this.revisions.set(key, revision);
+    return true;
   }
 
-  noteCandidate(workspaceId: string, projectId: string, candidateId: string, status: ImageCandidateListStatus): void {
-    this.candidates.set(`${projectKey(workspaceId, projectId)}\u0000${candidateId}`, status);
+  /** Records a candidate's status; true when it differs from the recorded one. */
+  noteCandidate(workspaceId: string, projectId: string, candidateId: string, status: ImageCandidateListStatus): boolean {
+    const key = `${projectKey(workspaceId, projectId)}\u0000${candidateId}`;
+    if (this.candidates.get(key) === status) return false;
+    this.candidates.set(key, status);
+    return true;
   }
 
   dispose(): void {
@@ -97,21 +104,18 @@ export class ImageProjectWatcher {
   }
 
   private async announce(workspaceId: string, cwd: string, engine: ImageEngine, projectId: string): Promise<void> {
-    const root = engine.projectRoot(cwd, projectId), key = projectKey(workspaceId, projectId);
+    const root = engine.projectRoot(cwd, projectId);
     try {
       await this.baselines.get(workspaceId);
       const project = await engine.readProject(root);
       if (this.disposed) return;
-      if ((this.revisions.get(key) ?? 0) < project.document.revision) {
-        this.revisions.set(key, project.document.revision);
+      if (this.noteRevision(workspaceId, projectId, project.document.revision)) {
         this.options.emit(workspaceId, event("image.project.changed", { projectId, revision: project.document.revision, sha256: project.sha256, author: project.document.change.author }));
       }
       for (const item of await engine.listCandidates(root)) {
         if (this.disposed) return;
         const candidateId = "candidate" in item ? item.candidate.id : item.candidate_id;
-        const candidateKey = `${key}\u0000${candidateId}`;
-        if (this.candidates.get(candidateKey) === item.status) continue;
-        this.candidates.set(candidateKey, item.status);
+        if (!this.noteCandidate(workspaceId, projectId, candidateId, item.status)) continue;
         this.options.emit(workspaceId, event("image.candidate.changed", { projectId, candidateId, status: item.status }));
       }
     } catch { /* A half-written or damaged project is announced once it reads cleanly. */ }

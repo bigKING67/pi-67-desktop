@@ -11,7 +11,7 @@ import type { ImageWorkQueue } from "./image-work-queue.js";
 
 export interface VariantContext {
   queue: ImageWorkQueue;
-  announce(workspaceId: string, announced: AgentEvent): void;
+  announce(workspaceId: string, announced: AgentEvent, refresh?: boolean): void;
   readStagedImage?: ((id: string) => Promise<{ mimeType: string; bytes: Buffer }>) | undefined;
   readStagedFile?: ((id: string) => Promise<{ name: string; bytes: Buffer }>) | undefined;
 }
@@ -96,7 +96,7 @@ export async function removeBatch(context: VariantContext, engine: ImageEngine, 
   }
   if (source) {
     const project = await engine.readProject(engine.projectRoot(cwd, source)).catch(() => undefined);
-    if (project) context.announce(workspaceId, event("image.project.changed", { projectId: source, revision: project.document.revision, sha256: project.sha256, author: "system" }));
+    if (project) context.announce(workspaceId, event("image.project.changed", { projectId: source, revision: project.document.revision, sha256: project.sha256, author: "system" }), true);
   }
   return { batchId, removed };
 }

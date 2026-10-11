@@ -45,6 +45,10 @@ export interface ImageCommandPayloads {
   "image.brand.edit": { baseRevision: number; operations: ImageBrandOperation[] };
   /** A staged TTF/OTF added to the kit. */
   "image.brand.addFont": { baseRevision: number; attachmentId: string };
+  /** Sets a brand font on a text layer, binding it into the project first when it is not yet there. */
+  "image.project.useBrandFont": { projectId: string; baseRevision: number; fontId: string; objectId: string };
+  /** Adds a brand logo as a new image layer at the top right (its longer side 20% of the canvas's short edge). */
+  "image.project.addBrandLogo": { projectId: string; baseRevision: number; logoId: string };
   /** A staged PNG/JPEG/WebP added to the kit as a logo. */
   "image.brand.addLogo": { baseRevision: number; name: string; attachmentId: string };
   /** Copies the revision as a template beside it, every text and image layer a slot (P5). */
@@ -124,6 +128,8 @@ export interface ImageCommandResults {
   "image.batch.remove": { batchId: string; removed: string[] };
   "image.template.create": { projectId: string; title: string; slots: string[] };
   "image.brand.read": ImageBrandKit;
+  "image.project.useBrandFont": ImageRevisionResult;
+  "image.project.addBrandLogo": ImageRevisionResult & { objectId: string };
   "image.brand.edit": ImageBrandKit;
   "image.brand.addFont": ImageBrandKit;
   "image.brand.addLogo": ImageBrandKit;

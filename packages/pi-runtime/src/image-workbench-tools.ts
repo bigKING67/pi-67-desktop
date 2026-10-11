@@ -174,6 +174,18 @@ export function imageTools(): ToolDefinition[] {
       }
     },
     {
+      name: "image_brand_read", label: "Read brand kit",
+      description: "Read the creative library's brand kit: named colours (#RRGGBB) to use for text and shapes, brand fonts and logos (the person binds those from the image page), and the person's own export specs (size, file-size cap, white background). Empty before the person sets one up.",
+      promptSnippet: "Read the brand colours, fonts, logos and export specs",
+      promptGuidelines: ["Prefer brand colours for text and shapes; when a design needs a brand font or logo, ask the person to add it from 属性 or 图层."],
+      parameters: Type.Object({}),
+      async execute(_id, _raw, _signal, _update, ctx) {
+        const kit = await (await loadEngine()).readBrand(ctx.cwd);
+        return text({ revision: kit.revision, colors: kit.colors.map(({ name, value }) => ({ name, value })), fonts: kit.fonts.map(({ id, family }) => ({ id, family })),
+          logos: kit.logos.map(({ id, name, width, height }) => ({ id, name, width, height })), specs: kit.specs });
+      }
+    },
+    {
       name: "image_render", label: "Render image",
       description: "Render a revision or a candidate. preview returns a 640px image you can inspect; export writes a full-size PNG and SVG with a receipt.",
       promptSnippet: "Render an image project preview or export",

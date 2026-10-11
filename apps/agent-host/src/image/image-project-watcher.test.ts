@@ -78,6 +78,24 @@ describe("image project watcher", { timeout: 60_000 }, () => {
     await vi.waitFor(() => expect(emit).toHaveBeenCalledWith("w1", expect.objectContaining({ type: "image.project.changed", payload: expect.objectContaining({ revision: 2, author: "agent" }) })));
   });
 
+  it("announces a revision once when its file events arrive before the Host records it", async () => {
+    const { cwd, root } = await workspaceWithProject();
+    let listener: ((type: string, name: string | null) => void) | undefined;
+    const emit = vi.fn();
+    const watcher = new ImageProjectWatcher({ emit, debounceMs: 10, watch: (_dir, next) => { listener = next; return { close: vi.fn(), on: vi.fn() }; } });
+    onTestFinished(() => watcher.dispose());
+    watcher.ensure("w1", cwd, engine);
+    // A slow Host write: its file events are read before the Host gets to record the revision.
+    const result = await engine.editBatch(root, { base_revision: 1, author: "human", summary: "人工", operations: [{ type: "update_object", id: "background", patch: { x: 0 } }] });
+    listener?.("rename", "poster/revisions/000002.json");
+    await vi.waitFor(() => expect(emit).toHaveBeenCalledWith("w1", expect.objectContaining({ payload: expect.objectContaining({ revision: 2, author: "human" }) })));
+    expect(watcher.noteRevision("w1", "poster", result.document.revision)).toBe(false);
+    expect(watcher.noteRevision("w1", "poster", 3)).toBe(true);
+    expect(watcher.noteCandidate("w1", "poster", "warm", "ready")).toBe(true);
+    expect(watcher.noteCandidate("w1", "poster", "warm", "ready")).toBe(false);
+    expect(emit).toHaveBeenCalledTimes(1);
+  });
+
   it("debounces bursts, ignores unrelated paths and survives unreadable projects", async () => {
     const empty = await emptyDirectory();
     vi.useFakeTimers(); onTestFinished(() => { vi.useRealTimers(); });

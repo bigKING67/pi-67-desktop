@@ -127,8 +127,8 @@ person's own (name, size, file-size cap, background rule), none built in.
   `image.brand.addFont` / `addLogo` (staged files, like a project's fonts and masks); the
   library's `品牌库` dialog lists and edits all four.
 - 3b: in a project — colour fields offer the brand swatches; the font picker offers brand fonts
-  (bound into the project on use, as a user font); 图层 → `插入 Logo` adds a brand logo as an
-  image layer (top right, 15% of the short edge). The Agent reads the kit (`image_brand_read`)
+  (bound into the project on use, as a user font); 图层 → `Logo` adds a brand logo as an
+  image layer (top right, its longer side 20% of the short edge). The Agent reads the kit (`image_brand_read`)
   and may use its colours, fonts and logos the same way.
 - 3c: 导出 lists the specs; `按规格导出` derives the size when the canvas differs (the derive rule,
   any size), then checks the PNG against the spec (exact size, file size, white background =
@@ -217,3 +217,24 @@ removing the feature leaves every existing project as it was.
   logos by digest, conflicts on a stale version), Host `image.brand.*` (`image-brand-commands.ts`),
   protocol, the library's 品牌库 dialog. The packaged check found the add forms indented and the
   checkbox stretched by the shared modal's form and input rules (outranked in the dialog).
+- 2026-10-11: checkpoint 3b: Host `image.project.useBrandFont` (binds by digest once, then sets)
+  and `image.project.addBrandLogo` (top right, longer side 20% of the short edge, 4% margin —
+  the plan's "15%" read small on wide logos); swatches under colour fields, brand fonts in the
+  font picker, 图层 `Logo` menu; Agent `image_brand_read` (binding brand fonts and logos stays
+  the person's, as with fonts).
+  The packaged check found the 添加 row wrapping its labels once `Logo` joined it in the narrow
+  inspector (the caption now takes only its text, labels stay on one line, the row may wrap).
+  The full `check` exposed a real watcher race: a Host write's file events could be read before
+  the Host recorded its revision, announcing the person's edit twice; the watcher now waits for
+  the project's Host write queue to settle before reading.
+- 2026-10-11: `/code-review high` on checkpoint 3b, all accepted: brand font and logo were not
+  undo steps (now one each, through the controller's shared `mutateImageProject`); their
+  failures read raw (the font and asset wording, conflicts included); unbound brand fonts were
+  offered at the project's font limit (hidden then); the kit was read once per page and could
+  belong to another library (now read when a project opens, once at a time, and offered only
+  for the library it came from); inserting a logo again added another asset (reused by
+  digest); id allocation was written twice (`freeId`). The first watcher fix (waiting on the
+  project's queue) missed derive/batch/template writes, which hold the source's key, and held
+  external changes behind renders; it is replaced by recording first: whichever of the Host and
+  the watcher records a revision or candidate status first announces it, the other stays quiet,
+  and a removed batch announces its source again on purpose.
