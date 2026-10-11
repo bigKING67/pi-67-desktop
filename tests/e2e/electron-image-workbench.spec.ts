@@ -221,6 +221,23 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     await page.getByRole("dialog", { name: "撤销这个批次？" }).getByRole("button", { name: "撤销批次" }).click();
     await expect(inspector.getByRole("list", { name: "批次" })).toHaveCount(0, { timeout: 30_000 });
 
+    // P5: save as a template (it opens), then make a project from it with new words and a new picture;
+    // in the new project the slots are unlocked and the rest locked.
+    await inspector.getByRole("button", { name: "存为模板" }).click();
+    await expect(project.getByText(/· 模板$/u).first()).toBeVisible({ timeout: 30_000 });
+    await tab("导出");
+    await inspector.getByRole("button", { name: "从模板新建…" }).click();
+    const fromTemplate = page.getByRole("dialog", { name: "从模板新建" });
+    await fromTemplate.getByLabel("项目名称").fill("夏日冷萃");
+    await fromTemplate.getByLabel("headline").fill("夏日冷萃 SALE");
+    await fromTemplate.locator("input[type=file]").first().setInputFiles(photo);
+    await fromTemplate.getByRole("button", { name: "创建项目" }).click();
+    await expect(project.getByText("夏日冷萃", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await tab("图层");
+    // The headline slot is unlocked (its action offers 锁定); a layer outside the slots is locked (it offers 解锁).
+    await expect(inspector.getByRole("button", { name: "锁定 夏日冷萃 SALE" })).toBeVisible();
+    await expect(inspector.getByRole("button", { name: /^解锁 /u }).first()).toBeVisible();
+
     // The page at three widths and both themes: nothing overflows the window, and each is kept as evidence.
     await tab("属性");
     for (const scheme of ["light", "dark"] as const) {

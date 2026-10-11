@@ -43,6 +43,8 @@ vi.mock("../connection/AgentConnectionController.js", () => ({
         host.revision += 1;
         return Promise.resolve({ projectId: "p", revision: host.revision, sha256: "s", dryRun: false, fontId: "font-1", family: "Brand Sans" });
       }
+      if (type === "image.template.create") return Promise.resolve({ projectId: "p-template", title: "海报 · 模板", slots: ["t"] });
+      if (type === "image.template.instantiate") return Promise.resolve(payload.title === "放不下" ? { status: "refused", reason: "文字「x」在 100×100 里放不下" } : { status: "created", projectId: payload.projectId });
       if (type === "image.batch.create") return Promise.resolve({ projectId: "p", revision: host.revision, batchId: "b1", results: [
         { row: 1, status: "created", projectId: "p-b1-1", title: "海报 · ¥299", shrunkText: 0 }, { row: 2, status: "refused", reason: "文字「¥1999999」在 100×100 里放不下" }] });
       if (type === "image.batch.remove") return Promise.resolve({ batchId: payload.batchId, removed: ["p-b1-1"] });
@@ -303,6 +305,31 @@ describe("image object selection", () => {
     expect(useImageBatch.getState().last).toBeUndefined();
     await chooseBatchTable(new File(["x"], "prices.xlsx"));
     expect(useImageBatch.getState().draft?.problem).toMatch(/CSV/u);
+  });
+
+  it("saves a template, toggles a slot, and makes a project from it with a staged picture and only changed words", async () => {
+    const { saveAsTemplate, toggleTemplateSlot, createFromTemplate } = await import("./image-project-template.js");
+    const released: string[][] = [];
+    vi.stubGlobal("window", { pi67: { system: { stagePromptAttachments: (files: File[]) => Promise.resolve(files.map((_, index) => ({ id: `img-${index}`, kind: "image" }))),
+      releasePromptAttachments: (ids: string[]) => { released.push(ids); return Promise.resolve(); } } } });
+    host.calls = [];
+    await saveAsTemplate();
+    expect(host.calls.find((call) => call.type === "image.template.create")?.payload).toEqual({ projectId: "p", revision: 1 });
+    expect(useImageWorkbench.getState().view).toEqual({ kind: "project", projectId: "p-template" });
+    const document = useImageProject.getState().document!;
+    const template = { ...document, template: { slots: ["t"] }, objects: [{ ...document.objects[0]!, kind: "text", text: "春日", font_size: 20, color: "#000000", align: "left", line_height: 1.2 } as never, document.objects[1]!] };
+    await toggleTemplateSlot(template, "u");
+    expect(edits().at(-1)?.operations).toEqual([{ type: "set_template", slots: ["t", "u"] }]);
+    useImageProject.setState({ document: template });
+    const made = await createFromTemplate({ title: "夏日", texts: { t: "春日", u: "x" }, images: { u: new File([new Uint8Array(4)], "new.png") } });
+    const call = host.calls.find((item) => item.type === "image.template.instantiate")!.payload;
+    // Unchanged words are not sent; only text layers carry words; pictures go by staged id.
+    expect(call).toMatchObject({ templateId: "p", title: "夏日", texts: [], images: [{ layer: "u", attachmentId: "img-0" }] });
+    expect(made).toBe(call.projectId);
+    expect(released).toEqual([["img-0"]]);
+    expect(await createFromTemplate({ title: "放不下", texts: {}, images: {} })).toBeUndefined();
+    expect(notices.at(-1)).toMatchObject({ level: "warning", title: "没能从模板新建" });
+    vi.unstubAllGlobals();
   });
 
   it("adds text, rectangles and ellipses centred on the canvas with ids that never collide, and selects them", async () => {

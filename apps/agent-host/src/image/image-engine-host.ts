@@ -244,7 +244,7 @@ export class ImageEngineHost {
   // Another writer may claim the free name first (another window, the Agent): take the next one.
   private async deriveOne(engine: ImageEngine, cwd: string, root: string, input: { revision: number; sha256: string; preset: ImageSizePreset; title: string }, base: string) {
     for (let attempt = 0; ; attempt += 1) {
-      const derivedId = await freeProjectId(engine, cwd, base);
+      const derivedId = await freeProjectId(engine, cwd, base, "这个尺寸已经派生过太多次，请先整理创作库。");
       const target = engine.projectRoot(cwd, derivedId);
       await engine.ensureProjectParent(target);
       try { return await engine.deriveProject(root, target, { ...input, project_id: derivedId }); }

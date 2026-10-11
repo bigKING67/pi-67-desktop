@@ -115,7 +115,7 @@ export function ImageProjectPage({ projectId }: { projectId: string }) {
       <header className={styles.header}>
         <Button className={styles.back!} onPress={() => openLibrary()}><ArrowLeft aria-hidden="true" size={15} />创作库</Button>
         <span className={styles.title}>{document?.title ?? projectId}</span>
-        {document ? <span className={styles.meta}>{document.canvas.width}×{document.canvas.height} · 修订 {revision}</span> : null}
+        {document ? <span className={styles.meta}>{document.canvas.width}×{document.canvas.height} · 修订 {revision}{document.template ? " · 模板" : ""}</span> : null}
         <span className={styles.spacer} />
         <Button aria-pressed={marking} className={`${styles.modeToggle} ${marking ? styles.modeToggleOn : ""}`} isDisabled={!document || Boolean(inspecting)}
           onPress={() => setMarking((value) => !value)}>

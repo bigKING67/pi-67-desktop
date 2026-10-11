@@ -83,11 +83,22 @@ export function ImageLibrary() {
       ) : batch ? (
         <BatchView batchId={openBatchId!} libraryId={library.id} members={batch} />
       ) : (
+        <>
+        {projects.some((project) => project.template) ? (
+          <>
+            <h2 className={styles.librarySection}>模板</h2>
+            <ul aria-label="模板" className={styles.grid}>
+              {projects.filter((project) => project.template).map((project) => <ProjectCard key={project.projectId} libraryId={library.id} project={project} />)}
+            </ul>
+            <h2 className={styles.librarySection}>项目</h2>
+          </>
+        ) : null}
         <ul aria-label="图像项目" className={styles.grid}>
-          {libraryEntries(projects).map((entry) => "batchId" in entry
+          {libraryEntries(projects.filter((project) => !project.template)).map((entry) => "batchId" in entry
             ? <BatchCard key={entry.batchId} batchId={entry.batchId} libraryId={library.id} members={entry.members} />
             : <ProjectCard key={entry.projectId} libraryId={library.id} project={entry} />)}
         </ul>
+        </>
       )}
       <ImageBatchRemoveDialog />
       {photo ? <NewImageFromPhotoDialog photo={photo} onDismiss={() => setPhoto(undefined)} /> : null}
@@ -152,6 +163,7 @@ function ProjectCard({ libraryId, project }: { libraryId: string; project: Image
   const source = project.derivedFrom ? projects.find((item) => item.projectId === project.derivedFrom!.projectId) : undefined;
   const meta = [`${width}×${height}`, `修订 ${project.revision}`, ...(project.derivedFrom ? [`派生自 ${source?.title ?? project.derivedFrom.projectId}`] : []),
     ...(project.batch ? [`第 ${project.batch.row} 行`] : []),
+    ...(project.fromTemplate ? [`来自模板 ${projects.find((item) => item.projectId === project.fromTemplate!.projectId)?.title ?? project.fromTemplate.projectId}`] : []),
     ...(project.readyCandidates ? [`${project.readyCandidates} 个候选待选`] : []), updatedLabel(project.updatedAt)];
   return (
     <li>

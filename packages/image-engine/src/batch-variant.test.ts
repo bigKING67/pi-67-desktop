@@ -38,7 +38,7 @@ describe("batch rows", { timeout: 120_000 }, () => {
     expect(await refused({ brand: "x" })).toEqual({ status: "refused", reason: "文字图层「brand」已锁定" });
     expect(await refused({ title: "春日𓀀" })).toEqual({ status: "refused", reason: "有字体里没有的字符" });
     expect(await refused({ price: "¥199 限时特惠 买一送一 再送一" })).toMatchObject({ status: "refused", reason: expect.stringMatching(/放不下/u) });
-    expect(await refused({ title: "  " })).toMatchObject({ status: "refused", reason: expect.stringMatching(/「title」是空的/u) });
+    expect(await refused({ title: "  " })).toMatchObject({ status: "refused", reason: "「title」是空的" });
     await expect(readProject(path.join(directory, "x"))).rejects.toThrow();
   });
 });

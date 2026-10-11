@@ -1,4 +1,4 @@
-import { imageObjectInEffect, IMAGE_ASSET_LIMIT, IMAGE_BLEND_MODES, IMAGE_PROMPT_CONTEXT_LIMITS, IMAGE_REFERENCE_ROLE_LABELS, IMAGE_REFERENCE_ROLES, IMAGE_USER_FONT_LIMIT, type ImageBlendMode, type ImageCanvas, type ImageDocument, type ImageEllipseObject, type ImageGradient, type ImageGroup, type ImageObjectPatch, type ImageRectObject, type ImageSceneObject, type ImageTextObject, type ImageUserFont } from "@pi67/domain";
+import { imageObjectInEffect, IMAGE_ASSET_LIMIT, IMAGE_BLEND_MODES, IMAGE_TEMPLATE_SLOT_LIMIT, IMAGE_PROMPT_CONTEXT_LIMITS, IMAGE_REFERENCE_ROLE_LABELS, IMAGE_REFERENCE_ROLES, IMAGE_USER_FONT_LIMIT, type ImageBlendMode, type ImageCanvas, type ImageDocument, type ImageEllipseObject, type ImageGradient, type ImageGroup, type ImageObjectPatch, type ImageRectObject, type ImageSceneObject, type ImageTextObject, type ImageUserFont } from "@pi67/domain";
 import { Eye, EyeOff, Lock, LockOpen, Plus } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Input, Label, TextField } from "react-aria-components";
@@ -16,6 +16,7 @@ import {
 } from "./image-project-controller.js";
 import { setImageReference } from "./image-project-marks.js";
 import { selectedGroup, ungroupImageGroup, updateImageGroup } from "./image-project-groups.js";
+import { toggleTemplateSlot } from "./image-project-template.js";
 import styles from "./ImageInspector.module.css";
 
 type FieldKind = "int" | "number" | "color" | "name";
@@ -126,6 +127,15 @@ export function ImagePropertiesPanel() {
       ) : null}
       {object.kind === "image" ? <ImageAdjustments busy={busy} object={object} onResult={report} /> : null}
       {object.kind === "image" ? <ReferenceRole objectId={object.id} /> : null}
+      {document.template && (object.kind === "text" || object.kind === "image") ? (
+        <div className={styles.fontRow} role="group" aria-label="模板">
+          <p className={styles.sectionLabel}>模板</p>
+          <Button aria-pressed={document.template.slots.includes(object.id)} className={`${styles.segment} ${document.template.slots.includes(object.id) ? styles.segmentSelected : ""}`}
+            isDisabled={busy || (!document.template.slots.includes(object.id) && document.template.slots.length >= IMAGE_TEMPLATE_SLOT_LIMIT)}
+            onPress={() => void toggleTemplateSlot(document, object.id).then(report)}>可替换</Button>
+          <p className={styles.empty}>可替换的图层在「从模板新建」时可以换文字或图片；其余图层在新项目里会锁定。{document.template.slots.length >= IMAGE_TEMPLATE_SLOT_LIMIT ? `一个模板最多 ${IMAGE_TEMPLATE_SLOT_LIMIT} 个可替换图层。` : ""}</p>
+        </div>
+      ) : null}
       {object.kind === "rect" || object.kind === "ellipse" ? <FillChoice busy={busy} object={object} onResult={report} /> : null}
       {status}
       {object.locked ? null : <ImageAlignToolbar busy={busy} canvas={document.canvas} objects={selected} />}

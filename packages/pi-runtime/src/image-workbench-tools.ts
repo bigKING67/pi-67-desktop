@@ -169,7 +169,7 @@ export function imageTools(): ToolDefinition[] {
         await engine.ensureProjectParent(target);
         const result = await engine.instantiateTemplate(template, target, { project_id: str(params, "project_id"), title: str(params, "title"),
           texts: Object.fromEntries((params.texts as { layer: string; text: string }[]).map((cell) => [cell.layer, cell.text])),
-          images: Object.fromEntries((params.images as { layer: string; source: string }[]).map((cell) => [cell.layer, path.resolve(ctx.cwd, cell.source)])) });
+          images: Object.fromEntries((params.images as { layer: string; source: string }[]).map((cell) => [cell.layer, local(ctx.cwd, cell.source)])) });
         return text(result.status === "refused" ? result : { status: "created", project_id: str(params, "project_id"), shrunk_text: result.shrunk.length });
       }
     },

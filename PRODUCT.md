@@ -1593,6 +1593,16 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   removes the batch's projects; the source and exported files stay. The library shows a batch
   as one card (`批次 · <source>`, count, source revision) that opens to its rows in table order.
   The Agent's `image_batch` makes the same batches from inline rows.
+  导出 → 模板 (P5): `存为模板` copies the revision on screen into a template beside the project
+  (`<title> · 模板`, opened at once) with every text and image layer marked 可替换 (at most 20);
+  in a template, 属性 for a text or image layer toggles 可替换, and the header's meta says 模板.
+  `从模板新建…` asks for the project name, each replaceable text's words (prefilled) and, per
+  replaceable picture, an optional new image (staged like a photo, laid into the layer's box
+  with its fit); the new project changes only those layers, which stay unlocked while every
+  other layer is locked, fits text like a batch row (or is refused with the reason) and opens.
+  A batch run on a template makes such projects. The library lists templates first under
+  `模板`, and a project made from one says `来自模板 …`. The Agent may `set_template` and use
+  `image_from_template` (pictures from local files).
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

@@ -32,7 +32,7 @@ export function createTemplate(context: VariantContext, engine: ImageEngine, wor
     const source = await engine.readProject(engine.projectRoot(cwd, projectId), { revision });
     const title = `${source.document.title.slice(0, 190)} · 模板`;
     for (let attempt = 0; ; attempt += 1) {
-      const templateId = await freeProjectId(engine, cwd, `${projectId.slice(0, 54)}-template`), target = engine.projectRoot(cwd, templateId);
+      const templateId = await freeProjectId(engine, cwd, `${projectId.slice(0, 50)}-template`, "这个项目已经存过太多模板，请先整理创作库。"), target = engine.projectRoot(cwd, templateId);
       await engine.ensureProjectParent(target);
       try {
         const made = await engine.createTemplate(source, target, { project_id: templateId, title });

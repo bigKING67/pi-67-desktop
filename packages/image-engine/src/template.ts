@@ -4,7 +4,7 @@ import { documentSchema, id, isRecord, record, string, validateDocument, type Im
 import type { ProjectState } from "./project.js";
 import { importRaster, type ImportedRaster } from "./raster.js";
 import { writeSibling } from "./sibling-project.js";
-import { writeVariant, type VariantResult } from "./variant.js";
+import { variantRefusal, writeVariant, type VariantResult } from "./variant.js";
 
 // P5 checkpoint 2: a template is a copied project with marked replaceable layers (slots); a
 // project made from it changes only its slots and keeps every other layer locked.
@@ -33,9 +33,13 @@ export async function instantiateTemplate(source: ProjectState, target: string, 
   if (!source.document.template) throw new Error("Not a template");
   const texts = isRecord(input.texts) ? input.texts : {}, images = isRecord(input.images) ? input.images : {};
   for (const [layer, text] of Object.entries(texts)) { id(layer, "text layer"); string(text, "slot text"); }
+  // Refused before any picture is decoded: the layers must be slots of the right kind.
+  for (const layer of Object.keys(images)) id(layer, "image layer");
+  const refused = variantRefusal(source, texts as Record<string, string>, Object.keys(images));
+  if (refused) return { status: "refused", reason: refused };
   const taken = new Set(source.document.assets.map((asset) => asset.id)), imported: Record<string, ImportedRaster> = {};
   for (const [layer, file] of Object.entries(images)) {
-    id(layer, "image layer"); string(file, "image source", 4096);
+    string(file, "image source", 4096);
     let assetId = `${layer.slice(0, 50)}-image`;
     for (let index = 2; taken.has(assetId); index++) assetId = `${layer.slice(0, 50)}-image-${index}`;
     taken.add(assetId);

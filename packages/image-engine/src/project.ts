@@ -329,10 +329,15 @@ async function applyBatch(root: string, batch: EditBatch, { dryRun }: { dryRun: 
         doc.objects = ordered; break;
       }
       case "set_canvas": doc.canvas = validateCanvas(structuredClone(op.canvas)); break;
-      case "set_template":
-        // Validated with the document; `null` turns a template back into a plain project.
-        if (op.slots === null) delete doc.template; else doc.template = { slots: structuredClone(op.slots) as string[] };
+      case "set_template": {
+        // Kinds are validated with the document; a slot must name a layer that exists now, so a
+        // misspelt id is refused rather than pruned away. `null` makes the template a plain project.
+        if (op.slots === null) { delete doc.template; break; }
+        if (!Array.isArray(op.slots)) fail("Invalid template slots");
+        for (const slot of op.slots) if (!doc.objects.some((object) => object.id === slot)) fail(`Unknown template slot: ${String(slot)}`);
+        doc.template = { slots: structuredClone(op.slots) as string[] };
         break;
+      }
       case "revert_to": {
         number(op.revision, "revert revision", 1, current.document.revision - 1, true);
         const previous = (await readProject(root, { revision: op.revision })).document;

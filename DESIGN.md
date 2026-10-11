@@ -330,6 +330,14 @@ Application-level surfaces use a separate wide-window shell:
   library a batch card's cover carries a second sheet edge (a 4px offset `--border` line) and
   the meta `N 个变体 · 基于修订 r · date`; opened, a bar leads with `全部项目`, the batch title
   in medium weight and `撤销批次`, above the same grid of row cards (meta adds `第 n 行`).
+- Templates (P5, 2026-10-11): 导出 ends with `模板`: on a project a `存为模板` secondary button
+  (layout-template glyph) and a tertiary line; on a template a readout `这是一个模板 · N 个可替换图层`,
+  a `从模板新建…` primary button and a tertiary line. 属性 on a template adds a `模板` caption with
+  one `可替换` segment (pressed while a slot) and a tertiary line. The 从模板新建 dialog uses the
+  shared modal: eyebrow `模板`, `项目名称`, one field per text slot labelled by layer id, and per
+  image slot a row with the layer id over the chosen file name (caption secondary, `沿用模板里的图片`
+  until one is chosen) and `换图片…`, a tertiary hint, then `取消` / `创建项目`. The library adds
+  caption-size secondary section headings `模板` and `项目` when templates exist.
 - Text fonts (P3, 2026-10-10): 属性 for text adds a `字体` section — the shared Settings
   select at full panel width (`Noto Sans CJK SC · 内置`, then each added font's family with
   `TTF`/`OTF` as detail), a `添加字体…` text action with a plus glyph (disabled at 8 fonts or

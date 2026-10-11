@@ -139,3 +139,15 @@ removing the feature leaves every existing project as it was.
   `template_slots` in reads and `image_from_template`. The Host file passed the 460-line limit,
   so the listing and lineage (`image-project-list.ts`), batch and template commands
   (`image-variant-commands.ts`) and shared helpers (`image-host-support.ts`) moved out.
+- 2026-10-11: checkpoint 2b (the page): 导出 → 模板 (`存为模板`, `从模板新建…` dialog with text slot
+  fields and image slot pickers), 属性 `可替换`, the header's `模板` mark, the library's `模板` section
+  and `来自模板` meta; renderer tests and e2e (save, make a project with a new picture, slot
+  unlocked and the rest locked); packaged screenshot of the dialog.
+- 2026-10-11: `/code-review high` on checkpoint 2, all fixed: a misspelt slot was pruned into a
+  silent success (`set_template` now refuses unknown layers; pruning is only for layers removed
+  later); a slot in a locked group stayed locked in the new project (its group is unlocked);
+  a staging failure in 从模板新建 had no notice; the template id could pass 64 characters on the
+  second template; the id-exhausted message spoke of sizes; a replaced picture was still carried
+  and copied (dropped when nothing uses it; the asset limit is a refusal); pictures were decoded
+  before the slots were checked (checked first); emptied words were silently kept (refused with
+  the layer named); 可替换 stayed on at 20 slots; the Agent tool resolved paths its own way.
