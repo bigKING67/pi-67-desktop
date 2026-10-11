@@ -22,6 +22,9 @@ export const LIMITS = Object.freeze({
   pixels: 16_777_216, sourceBytes: 20_000_000, renderBytes: 16_777_216 * 5, objects: 100, assets: IMAGE_ASSET_LIMIT, operations: 100, revisions: 1000
 });
 
+/** The longest edge of the text-free background the keyed-text contrast check measures against. */
+export const TEXT_BACKGROUND_EDGE = 1024;
+
 export type JsonRecord = Record<string, unknown>;
 export type RasterFormat = "png" | "jpeg" | "webp";
 export type ChangeAuthor = "human" | "agent" | "system";

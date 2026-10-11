@@ -19,9 +19,10 @@ describe("keyed text check", { timeout: 120_000 }, () => {
     onTestFinished(() => fs.rm(cwd, { recursive: true, force: true }));
     const root = projectRoot(cwd, "poster");
     await fs.mkdir(path.dirname(root), { recursive: true });
-    await createProject(root, { project_id: "poster", title: "核对", canvas: { width: 600, height: 560, background: "#f4efe6" }, assets: [], objects: [
+    await createProject(root, { project_id: "poster", title: "核对", canvas: { width: 600, height: 600, background: "#f4efe6" }, assets: [], objects: [
       text("title", "春日茶礼 · 新品上市", 30, 20, 48), text("price", "¥199 限时 8 折", 30, 110, 40), text("small", "满 299 元包邮，七天无理由退换", 30, 190, 18),
       text("turned", "春日茶礼 · 新品上市", 40, 270, 40), text("mirrored", "SALE", 30, 360, 48), text("covered", "春日茶礼 · 新品上市", 30, 450, 48),
+      { ...text("faint", "春日茶礼 · 新品上市", 30, 535, 40), color: "#e8e2d8" },
       { id: "cover", kind: "rect", locked: false, visible: true, x: 200, y: 440, width: 380, height: 80, opacity: 1, color: "#b5452f", radius: 0 }] });
     await editBatch(root, { base_revision: 1, author: "human", summary: "转", operations: [
       { type: "update_object", id: "turned", patch: { rotation: -12 } }, { type: "update_object", id: "mirrored", patch: { flip_x: true } }] });
@@ -30,7 +31,10 @@ describe("keyed text check", { timeout: 120_000 }, () => {
       watcher: new ImageProjectWatcher({ emit: () => undefined, maxWorkspaces: 0 }), ...(readTexts ? { readTexts } : {}) });
     const result = await engine((images) => readImageTexts(ocrRoot, images)).execute("w1", { type: "image.project.checkText", payload: { projectId: "poster" } });
     expect(result.revision).toBe(2);
-    expect(Object.fromEntries(result.texts.map((check) => [check.objectId, check.passed]))).toEqual({ title: true, price: true, small: true, turned: true, mirrored: true, covered: false });
+    expect(Object.fromEntries(result.texts.map((check) => [check.objectId, check.passed]))).toEqual({ title: true, price: true, small: true, turned: true, mirrored: true, covered: false, faint: expect.any(Boolean) });
+    // Whether or not the OCR manages faint text, the contrast check catches it; covered text is
+    // measured against the layer over it, so it is flagged twice over.
+    expect(result.texts.filter((check) => check.lowContrast).map((check) => check.objectId)).toEqual(["covered", "faint"]);
     await expect(engine().execute("w1", { type: "image.project.checkText", payload: { projectId: "poster" } })).rejects.toThrow(/不能核对/u);
   });
 });

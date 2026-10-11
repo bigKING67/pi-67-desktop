@@ -1573,8 +1573,13 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   digits cannot be read in full — at least 90% in order, every digit run exact — is listed
   (which text, which size, what was read) and the person chooses 仍然导出 or 取消; if the check
   itself cannot run, the export goes ahead with a warning. Each ready candidate is read the
-  same way once, and its card says how many texts it leaves unreadable. Low contrast is not
-  caught by OCR and is a separate, later check.
+  same way once, and its card says how many texts may be hard to read. The same pass measures
+  each text's contrast: the picture is drawn again with every text hidden (at most 1024px on
+  its long edge), and the median WCAG contrast of the text's colour — at its own and its
+  group's opacity — against the background behind its box must reach 3:1 for large text (font
+  size at least 1/30 of the canvas's short edge) and 4.5:1 otherwise, judged on the ratio as
+  shown (one decimal). A blend mode or mask on the text is judged as if drawn normally. Faint
+  text is listed with its ratio in the same dialog, because OCR still reads it.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
   key (the default) or names its own HTTPS/loopback address whose key goes to Pi

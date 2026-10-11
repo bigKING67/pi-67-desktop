@@ -192,7 +192,7 @@ function CandidateTile({ projectId, candidate, previewUrl, inspecting, busy }: {
       <span className={styles.tileMeta}>
         <span className={styles.tileStatus} data-status={candidate.status}>{STATUS_LABELS[candidate.status]}</span>
         {candidate.protectedChangedPixels ? <span className={styles.tileWarning}>保护区有 {candidate.protectedChangedPixels} 个像素变化</span> : null}
-        {unread.length ? <span className={styles.tileWarning} title={unread.map((check) => check.text).join("\n")}>{unread.length} 段文字读不全</span> : null}
+        {unread.length ? <span className={styles.tileWarning} title={unread.map((check) => check.text).join("\n")}>{unread.length} 段文字可能看不清</span> : null}
       </span>
       {actions.accept || actions.discard ? (
         <span className={styles.tileActions}>

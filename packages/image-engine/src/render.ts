@@ -9,7 +9,7 @@ import { readProject, regularPath, encode, candidateDocument } from "./project.j
 import { assertOutsideProject } from "./raster.js";
 import { readCandidateEntry } from "./candidate-store.js";
 import { inspectCandidate } from "./candidates.js";
-import { number, type Canvas, type FontBinding, type JsonRecord } from "./document.js";
+import { number, TEXT_BACKGROUND_EDGE, type Canvas, type FontBinding, type JsonRecord } from "./document.js";
 import type { RenderWorkerData, RenderWorkerReply, RenderWorkerResult } from "./render-worker.js";
 
 export const RENDER_SCHEMA = "newmoney.image-render.v1";
@@ -35,10 +35,15 @@ export interface RenderReceipt extends JsonRecord {
   schema: typeof RENDER_SCHEMA; status: "running" | "completed" | "failed" | "cancelled"; mode: "preview" | "export";
   project_id: string; revision: number; project_sha256: string; document_sha256: string; engines: Record<string, string>; font: FontBinding;
   assets: { id: string; sha256: string; render_sha256: string }[]; canvas: Canvas; visual_quality: "UNVERIFIED"; started_at: string;
-  candidate_preview?: JsonRecord; outputs?: { png: { file: string; sha256: string; width: number; height: number }; svg: { file: string; sha256: string } };
+  candidate_preview?: JsonRecord;
+  outputs?: { png: { file: string; sha256: string; width: number; height: number }; svg: { file: string; sha256: string }; text_background?: { file: string; sha256: string; width: number; height: number } };
   qa?: JsonRecord; error?: string; finished_at?: string;
 }
-export interface RenderOptions { revision?: number | undefined; candidateId?: string | undefined; previewMax?: number; signal?: AbortSignal | undefined; timeoutMs?: number }
+export interface RenderOptions {
+  revision?: number | undefined; candidateId?: string | undefined; previewMax?: number; signal?: AbortSignal | undefined; timeoutMs?: number;
+  /** Full size only: also write `text-background.png`, the picture with every text hidden. */
+  textBackground?: boolean;
+}
 export class RenderError extends Error {
   constructor(message: string, readonly receipt: RenderReceipt, readonly output: string) { super(message); }
 }
@@ -69,7 +74,7 @@ function runWorker(data: RenderWorkerData, { signal, timeoutMs }: { signal?: Abo
   });
 }
 
-export async function renderProject(root: string, outputPath: string, { revision, candidateId, previewMax = 0, signal, timeoutMs = 60000 }: RenderOptions = {}): Promise<{ output: string; receipt: RenderReceipt }> {
+export async function renderProject(root: string, outputPath: string, { revision, candidateId, previewMax = 0, signal, timeoutMs = 60000, textBackground = false }: RenderOptions = {}): Promise<{ output: string; receipt: RenderReceipt }> {
   number(previewMax, "previewMax", 0, 8192, true); number(timeoutMs, "timeoutMs", 1, 60000, true);
   if (previewMax !== 0 && previewMax < 64) throw new Error("Preview must be at least 64 pixels");
   let selectedRevision = revision;
@@ -97,7 +102,8 @@ export async function renderProject(root: string, outputPath: string, { revision
     canvas: project.document.canvas, visual_quality: "UNVERIFIED", started_at: new Date().toISOString() };
   if (candidate) receipt.candidate_preview = { ...candidate };
   try {
-    const data: RenderWorkerData = { root: project.root, revision: project.document.revision, expected: project.sha256, output, previewMax };
+    if (textBackground && previewMax) throw new Error("A text background is rendered at full size only");
+    const data: RenderWorkerData = { root: project.root, revision: project.document.revision, expected: project.sha256, output, previewMax, ...(textBackground ? { textBackground } : {}) };
     if (candidate) { data.candidateId = candidate.id; data.candidateSha = candidate.sha256; }
     const result = await runWorker(data, { signal, timeoutMs });
     if (signal?.aborted) throw new Error("Render cancelled");
@@ -124,17 +130,27 @@ export async function renderProject(root: string, outputPath: string, { revision
     const scale = previewMax ? Math.min(1, previewMax / Math.max(canvas.width, canvas.height)) : 1;
     const expectedWidth = Math.round(canvas.width * scale), expectedHeight = Math.round(canvas.height * scale);
     if (metadata.format !== "png" || metadata.width !== expectedWidth || metadata.height !== expectedHeight || result.width !== expectedWidth || result.height !== expectedHeight) throw new Error("Rendered dimensions mismatch");
+    // The text-free background is checked like the picture: a real PNG of the size it claims.
+    let background: { file: string; sha256: string; width: number; height: number } | undefined;
+    if (textBackground) {
+      const bytes = await fs.readFile(await regularPath(path.join(output, "text-background.png")));
+      const { info } = await sharp(bytes).raw().toBuffer({ resolveWithObject: true });
+      const edge = Math.min(1, TEXT_BACKGROUND_EDGE / Math.max(canvas.width, canvas.height));
+      if (info.width !== Math.round(canvas.width * edge) || info.height !== Math.round(canvas.height * edge)) throw new Error("Rendered dimensions mismatch");
+      background = { file: "text-background.png", sha256: sha256(bytes), width: info.width, height: info.height };
+    }
     if (signal?.aborted) throw new Error("Render cancelled");
     await writeOnce(path.join(output, "document.json"), { bytes: encode(renderDocument) }, { expected: documentSha });
     receipt.status = "completed";
-    receipt.outputs = { png: { file: "image.png", sha256: sha256(png), width: metadata.width, height: metadata.height }, svg: { file: "image.svg", sha256: sha256(svg) } };
+    receipt.outputs = { png: { file: "image.png", sha256: sha256(png), width: metadata.width, height: metadata.height }, svg: { file: "image.svg", sha256: sha256(svg) },
+      ...(background ? { text_background: background } : {}) };
     receipt.qa = { source_bindings: "PASS", png_decode: "PASS", dimensions: "PASS", object_bounds: "PASS", font_glyphs: "PASS", text_fit: "PASS",
       // Width is the declared box: wrapping keeps lines inside it, and a per-glyph advance check rejects glyphs wider than it.
       text_fit_basis: { height: "measured layout height", width: "wrapped to declared box; per-glyph advance checked" }, text_measurements: result.text_measurements };
   } catch (error) {
     const message = errorMessage(error);
     receipt.status = message === "Render cancelled" ? "cancelled" : "failed"; receipt.error = message;
-    for (const name of ["image.png", "image.svg", "document.json"]) await fs.rm(path.join(output, name), { force: true });
+    for (const name of ["image.png", "image.svg", "document.json", "text-background.png"]) await fs.rm(path.join(output, name), { force: true });
     receipt.finished_at = new Date().toISOString();
     await writeOnce(path.join(output, "receipt.json"), { bytes: encodeJson(receipt) });
     throw new RenderError(message, receipt, output);

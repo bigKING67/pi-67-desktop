@@ -220,7 +220,8 @@ export const ImageCommandResultSchemas: Record<keyof ImageCommandResults, TSchem
   "image.project.conversation.set": ProjectRefSchema,
   "image.project.addAsset": strictObject({ projectId: IdSchema, revision: RevisionSchema, sha256: Sha256Schema, dryRun: Type.Boolean(), assetId: IdSchema }),
   "image.project.checkText": strictObject({ projectId: IdSchema, revision: RevisionSchema, candidateId: Type.Optional(IdSchema),
-    texts: Type.Array(strictObject({ objectId: IdSchema, text: TextSchema, read: Type.String({ maxLength: 4000 }), passed: Type.Boolean() }), { maxItems: L.objects }) }),
+    texts: Type.Array(strictObject({ objectId: IdSchema, text: TextSchema, read: Type.String({ maxLength: 4000 }), passed: Type.Boolean(),
+      contrast: Type.Optional(Type.Number({ minimum: 1, maximum: 21 })), lowContrast: Type.Boolean() }), { maxItems: L.objects }) }),
   "image.project.addFont": strictObject({ projectId: IdSchema, revision: RevisionSchema, sha256: Sha256Schema, dryRun: Type.Boolean(),
     fontId: IdSchema, family: Type.String({ minLength: 1, maxLength: 64 }) }),
   "image.project.derive": strictObject({ projectId: IdSchema, revision: RevisionSchema, results: Type.Array(Type.Union([

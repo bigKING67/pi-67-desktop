@@ -103,5 +103,8 @@ export interface ImageEventPayloads {
   "image.job.changed": { projectId: string; jobId: string; kind: ImageJobKind; state: ImageJobState; progress?: number };
 }
 
-/** One text object as read back: `passed` when 90% of its letters and digits and every digit run were read. */
-export interface ImageTextCheck { objectId: string; text: string; read: string; passed: boolean }
+/**
+ * One text object as read back: `passed` when 90% of its letters and digits and exactly its digits
+ * were read; `lowContrast` when its strokes fall below WCAG's minimum for their size (3:1 large, 4.5:1).
+ */
+export interface ImageTextCheck { objectId: string; text: string; read: string; passed: boolean; contrast?: number; lowContrast: boolean }

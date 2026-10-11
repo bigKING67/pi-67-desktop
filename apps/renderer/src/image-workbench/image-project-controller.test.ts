@@ -32,7 +32,8 @@ vi.mock("../connection/AgentConnectionController.js", () => ({
       if (type === "image.candidate.discard") return Promise.resolve({ projectId: "p", candidateId: payload.candidateId, status: "discarded" });
       if (type === "image.project.history") return Promise.resolve({ projectId: "p", revisions: [] });
       if (type === "image.project.checkText") return Promise.resolve({ projectId: payload.projectId, revision: host.revision, texts: host.unreadNext
-        ? [{ objectId: "t", text: "¥199", read: "", passed: false }, { objectId: "u", text: "春日", read: "春日", passed: true }] : [] });
+        ? [{ objectId: "t", text: "¥199", read: "", passed: false, lowContrast: false }, { objectId: "u", text: "春日", read: "春日", passed: true, contrast: 1.4, lowContrast: true },
+          { objectId: "v", text: "新品", read: "新品", passed: true, contrast: 9, lowContrast: false }] : [] });
       if (type === "image.project.addAsset") {
         if (payload.attachmentId === "full") return Promise.reject(new ProtocolRequestError({ code: "INVALID_PAYLOAD", message: "Invalid assets list", recoverable: true }));
         host.revision += 1; return Promise.resolve({ projectId: "p", revision: host.revision, sha256: "s", dryRun: false, assetId: "mask-1" });
@@ -255,7 +256,8 @@ describe("image object selection", () => {
     vi.stubGlobal("window", { pi67: { system: { saveImage } } });
     host.unreadNext = true;
     let exporting = exportImageProject();
-    await vi.waitFor(() => expect(useImageTextChecks.getState().pending?.unread).toEqual([{ label: "海报", text: "¥199", read: "" }]));
+    await vi.waitFor(() => expect(useImageTextChecks.getState().pending?.unread).toEqual([{ label: "海报", text: "¥199", read: "", passed: false },
+      { label: "海报", text: "春日", read: "春日", passed: true, contrast: 1.4 }]));
     useImageTextChecks.getState().pending!.decide(false);
     await exporting;
     expect(saveImage).not.toHaveBeenCalled();

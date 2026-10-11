@@ -6,10 +6,14 @@ import { libraryId, request, useImageProject } from "./image-project-controller.
 import { useImageWorkbench } from "./image-workbench-store.js";
 
 // Export, with the keyed-text check first (P4 checkpoint 8): every shown text is read back
-// from the full-size render by offline OCR in the Host. Text that cannot be read in full is
-// listed and the person decides; a check that cannot run never blocks the export.
+// from the full-size render by offline OCR in the Host, and its strokes' contrast is measured.
+// Text that cannot be read in full or is too faint is listed and the person decides; a check
+// that cannot run never blocks the export.
 
-interface UnreadText { label: string; text: string; read: string }
+/** A text that would ship hard to read: what the OCR saw, and its contrast when that is too low. */
+interface UnreadText { label: string; text: string; read: string; passed: boolean; contrast?: number }
+/** Read in full and with enough contrast for its size. */
+const isClear = (check: ImageTextCheck): boolean => check.passed && !check.lowContrast;
 interface TextCheckState {
   /** Texts the last export check could not read, waiting for 仍然导出 or 取消. */
   pending: { unread: UnreadText[]; decide: (proceed: boolean) => void } | undefined;
@@ -24,7 +28,8 @@ async function textsReadable(targets: readonly { projectId: string; revision?: n
   try {
     for (const target of targets) {
       const { texts } = await request("image.project.checkText", { projectId: target.projectId, ...(target.revision === undefined ? {} : { revision: target.revision }) });
-      unread.push(...texts.filter((check) => !check.passed).map((check) => ({ label: target.label, text: check.text, read: check.read })));
+      unread.push(...texts.filter((check) => !isClear(check)).map((check) => ({ label: target.label, text: check.text, read: check.read, passed: check.passed,
+        ...(check.lowContrast && check.contrast !== undefined ? { contrast: check.contrast } : {}) })));
     }
   } catch {
     publishNotification({ level: "warning", title: "没能核对图中文字", message: "这次导出没有检查文字是否完整可读。" });
@@ -46,7 +51,7 @@ export function checkCandidateTexts(projectId: string, candidateId: string): voi
   if (checking.has(key) || useImageTextChecks.getState().candidates[key]) return;
   checking.add(key);
   void request("image.project.checkText", { projectId, candidateId })
-    .then(({ texts }) => useImageTextChecks.setState((state) => ({ candidates: { ...state.candidates, [key]: texts.filter((check) => !check.passed) } })))
+    .then(({ texts }) => useImageTextChecks.setState((state) => ({ candidates: { ...state.candidates, [key]: texts.filter((check) => !isClear(check)) } })))
     .catch(() => undefined)
     .finally(() => checking.delete(key));
 }

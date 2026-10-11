@@ -250,17 +250,18 @@ export class ImageEngineHost {
     const rendered = await this.queue.serial(key(workspaceId, projectId), () => this.queue.render(async () => {
       const output = await engine.workDirectory(cwd, projectId, "preview");
       try {
-        const { receipt } = await engine.renderProject(engine.projectRoot(cwd, projectId), output, { revision, candidateId, signal });
+        const { receipt } = await engine.renderProject(engine.projectRoot(cwd, projectId), output, { revision, candidateId, signal, textBackground: true });
         // The render's own document (the candidate applied, when previewing one), written beside the PNG.
         const document = JSON.parse(await fs.readFile(path.join(output, "document.json"), "utf8")) as ImageDocument;
-        return { revision: receipt.revision, png: await fs.readFile(path.join(output, "image.png")), document };
+        return { revision: receipt.revision, png: await fs.readFile(path.join(output, "image.png")), background: await fs.readFile(path.join(output, "text-background.png")), document };
       } finally {
         await fs.rm(output, { recursive: true, force: true });
       }
     }, undefined, signal));
-    const checks = await engine.checkKeyedText(rendered.png, rendered.document, (images) => reader(images, signal));
+    const checks = await engine.checkKeyedText(rendered.png, rendered.document, (images) => reader(images, signal), rendered.background);
     return { projectId, revision: rendered.revision, ...(candidateId === undefined ? {} : { candidateId }),
-      texts: checks.map((check) => ({ objectId: check.object_id, text: check.text, read: check.read.slice(0, 4000), passed: check.passed })) };
+      texts: checks.map((check) => ({ objectId: check.object_id, text: check.text, read: check.read.slice(0, 4000), passed: check.passed,
+        ...(check.contrast === undefined ? {} : { contrast: check.contrast }), lowContrast: check.low_contrast === true })) };
   }
 
   // Renders go to a fresh work folder outside the project, then the PNG moves

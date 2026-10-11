@@ -295,3 +295,22 @@ page and earlier releases still open projects that do not use it.
   updated; PRODUCT.md and DESIGN.md were updated with each checkpoint. The Agent's edit schema
   and tool description carry every new operation and field (rotation, flips, ellipses,
   gradients, blend, mask, adjust, group_objects / update_group / ungroup).
+- 2026-10-11 (follow-up after P4): the low-contrast gap OCR leaves open is closed in the same
+  check. A full-size check render also writes `text-background.png` (every text hidden); the
+  strokes are the pixels that differ, their core those within half the strongest difference,
+  and the median WCAG contrast of the core against the background must reach 3:1 for large text
+  (font size ≥ 1/30 of the canvas's short edge) or 4.5:1. Measured on the final pixels, so
+  opacity, blends, masks and photos behind the text count. Tests: dark, faint, faded, small
+  grey, white-on-dark and dark-on-dark text (engine); faint text the real OCR may or may not
+  read is flagged (Host); dialog and tile wording (renderer).
+- 2026-10-11: `/code-review high` on the contrast check, all fixed by changing the measure: it
+  took the drawn strokes (pixels differing from the text-free picture), so overlapping texts
+  lent each other contrast, anti-aliased edges pulled thin text below its true ratio (#767676
+  on white flagged), a render path change when text was hidden skewed it, and it doubled the
+  check's render and memory on large canvases. Now the text's colour, at its own and its
+  group's opacity, is laid over each background pixel behind its box and the median WCAG
+  ratio is judged as shown (one decimal, so 3:1 is never "too faint" beside a 3:1 minimum);
+  the text-free background is rendered at most 1024px on its long edge, validated like the
+  picture and listed in the receipt; luminance comes from a table; the rotated bounds are one
+  helper shared with the OCR crop. Trade-off recorded: a blend mode or mask on the text is
+  judged as if drawn normally (visibility stays with the OCR).
