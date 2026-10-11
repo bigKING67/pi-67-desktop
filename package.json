@@ -21,6 +21,8 @@
     "prepare:image-engine": "corepack pnpm --filter @pi67/image-engine run fetch-font && corepack pnpm --filter @pi67/image-engine run build:worker",
     "eval:openviking-baseline": "vitest run eng/evals/openviking-recall-baseline",
     "eval:openviking-baseline:live": "node eng/evals/openviking-recall-baseline/run-baseline.mjs",
+    "eval:image-vlm": "vitest run eng/evals/image-vlm-review",
+    "eval:image-vlm:live": "node eng/evals/image-vlm-review/run.mjs",
     "probe:openviking:native": "node eng/capabilities/run-openviking-native-probe.mjs",
     "probe:openviking:query-coalescing": "node eng/capabilities/probe-query-embedding-coalescing.mjs",
     "probe:openviking:query-native": "node eng/capabilities/probe-query-embedding-native.mjs",
