@@ -55,8 +55,15 @@ export function TeamChatTimeline({ conversation, directory, entries, target, hea
   }
   firstKey.current = entries[0]?.key;
 
+  // Rows are measured as they render, so a newest row (often taller than the view) can still be
+  // growing after the jump, more so on a slow machine. For a moment after a jump, every change in
+  // the list's height lands on the end again, so its end, not its first line, meets the Composer.
+  const holdLatestUntil = useRef(0);
+  const toLatest = () => virtuoso.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "auto" });
   useEffect(() => {
-    if (scrollRequest > 0) virtuoso.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "auto" });
+    if (scrollRequest <= 0) return;
+    holdLatestUntil.current = performance.now() + HOLD_LATEST_MS;
+    toLatest();
   }, [scrollRequest]);
 
   const [highlighted, setHighlighted] = useState<number>();
@@ -100,11 +107,19 @@ export function TeamChatTimeline({ conversation, directory, entries, target, hea
       )}
       key={`${conversationId}:${windowStart ?? "latest"}`}
       ref={virtuoso}
+      totalListHeightChanged={() => { if (performance.now() < holdLatestUntil.current) toLatest(); }}
+      // Reading on (wheel, touch, keys) ends the hold at once: the person's own scroll wins.
+      onKeyDown={() => { holdLatestUntil.current = 0; }}
+      onPointerDown={() => { holdLatestUntil.current = 0; }}
+      onWheel={() => { holdLatestUntil.current = 0; }}
       endReached={() => { if (hasNewer) void teamChat.loadNewer(conversationId); }}
       startReached={() => { if (hasMore && !loadingOlder) void teamChat.loadOlder(conversationId); }}
     />
   );
 }
+
+/** How long after a jump to the newest message a growing list keeps landing on its end. */
+const HOLD_LATEST_MS = 1_500;
 
 interface TimelineContext {
   header: ReactNode;
