@@ -96,7 +96,7 @@ describe("image library work: batches, templates, hand-off, brand", () => {
     // An export pressed meanwhile waits its turn instead of taking over the check.
     await exportImageProject();
     expect(useImageTextChecks.getState().pending?.purpose).toBe("handoff");
-    useImageTextChecks.getState().pending!.decide(false);
+    useImageTextChecks.getState().pending!.decide("cancel");
     expect(await stopped).toBeUndefined();
     expect(host.calls.some((call) => call.type === "image.project.render")).toBe(false);
     // A picture over Team Chat's 25 MB limit is refused before anything is sent.
@@ -176,21 +176,51 @@ describe("image library work: batches, templates, hand-off, brand", () => {
       await vi.waitFor(() => expect(useImageTextChecks.getState().pending).toBeDefined());
       expect(host.calls.find((call) => call.type === "image.project.deriveSize")?.payload).toEqual({ projectId: "p", revision: 1, width: 300, height: 300, name: "主图" });
       expect(useImageTextChecks.getState().pending?.issues).toEqual(["尺寸是 100×100，规格要求 300×300", "四边不是全白（规格要求白底）"]);
-      useImageTextChecks.getState().pending!.decide(false);
+      useImageTextChecks.getState().pending!.decide("cancel");
       await pending;
       expect(saveImage).toHaveBeenCalledTimes(1);
+
+      // 改为白底后重新导出: the canvas turns white as one undoable edit, then the spec exports again.
+      const fixed = exportImageForSpec({ id: "s4", name: "白底方图", width: 100, height: 100, background: "white" });
+      await vi.waitFor(() => expect(useImageTextChecks.getState().pending?.fix?.label).toBe("改为白底后重新导出"));
+      edge = 255;
+      useImageTextChecks.getState().pending!.decide("fix");
+      await fixed;
+      expect(host.calls.find((call) => call.type === "image.project.edit" && (call.payload as { summary: string }).summary === "按规格改为白底")?.payload)
+        .toMatchObject({ projectId: "p", operations: [{ type: "set_canvas", canvas: expect.objectContaining({ background: "#ffffff" }) }] });
+      expect(useImageProject.getState().back.length).toBeGreaterThan(0);
+      expect(saveImage).toHaveBeenCalledTimes(2);
+
+      // Another size's project changes through the Host; the fix is offered once per export.
+      edge = 254;
+      const derived = exportImageForSpec({ id: "s5", name: "白底主图", width: 300, height: 300, background: "white" });
+      await vi.waitFor(() => expect(useImageTextChecks.getState().pending?.fix).toBeDefined());
+      useImageTextChecks.getState().pending!.decide("fix");
+      await vi.waitFor(() => expect(useImageTextChecks.getState().pending).toBeDefined());
+      expect(host.calls.filter((call) => call.type === "image.project.edit").at(-1)?.payload).toMatchObject({ projectId: "p-300x300", summary: "按规格改为白底" });
+      expect(useImageTextChecks.getState().pending!.fix).toBeUndefined();
+      useImageTextChecks.getState().pending!.decide("cancel");
+      await derived;
+      // A canvas already white is not offered the fix.
+      useImageProject.setState({ document: { ...useImageProject.getState().document!, canvas: { ...useImageProject.getState().document!.canvas, background: "#FFFFFF" } } });
+      const white = exportImageForSpec({ id: "s6", name: "白底方图", width: 100, height: 100, background: "white" });
+      await vi.waitFor(() => expect(useImageTextChecks.getState().pending).toBeDefined());
+      expect(useImageTextChecks.getState().pending!.fix).toBeUndefined();
+      useImageTextChecks.getState().pending!.decide("cancel");
+      await white;
+      expect(saveImage).toHaveBeenCalledTimes(2);
 
       // A size the layout cannot fit is said, and nothing is exported.
       await exportImageForSpec({ id: "s3", name: "放不下", width: 300, height: 10 });
       expect(notices.at(-1)).toMatchObject({ title: "没能生成「放不下」的尺寸" });
-      expect(saveImage).toHaveBeenCalledTimes(1);
+      expect(saveImage).toHaveBeenCalledTimes(2);
       expect(useImageProject.getState().busy).toBe(false);
 
       // A PNG that cannot be read for the spec is said, and the export goes on.
       vi.stubGlobal("createImageBitmap", vi.fn(() => Promise.reject(new Error("decode"))));
       await exportImageForSpec({ id: "s1", name: "方图", width: 100, height: 100, background: "white" });
       expect(notices.some((notice) => notice.title === "没能核对规格")).toBe(true);
-      expect(saveImage).toHaveBeenCalledTimes(2);
+      expect(saveImage).toHaveBeenCalledTimes(3);
     } finally {
       vi.unstubAllGlobals();
     }

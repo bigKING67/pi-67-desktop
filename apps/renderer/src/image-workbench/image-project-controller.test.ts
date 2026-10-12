@@ -210,7 +210,7 @@ describe("image object selection", () => {
     let exporting = exportImageProject();
     await vi.waitFor(() => expect(useImageTextChecks.getState().pending?.unread).toEqual([{ label: "海报", text: "¥199", read: "", passed: false },
       { label: "海报", text: "春日", read: "春日", passed: true, contrast: 1.4 }]));
-    useImageTextChecks.getState().pending!.decide(false);
+    useImageTextChecks.getState().pending!.decide("cancel");
     await exporting;
     expect(saveImage).not.toHaveBeenCalled();
     exporting = exportImageProject();
@@ -219,7 +219,7 @@ describe("image object selection", () => {
     const pending = useImageTextChecks.getState().pending;
     await exportImageProject();
     expect(useImageTextChecks.getState().pending).toBe(pending);
-    useImageTextChecks.getState().pending!.decide(true);
+    useImageTextChecks.getState().pending!.decide("proceed");
     await exporting;
     expect(saveImage).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();

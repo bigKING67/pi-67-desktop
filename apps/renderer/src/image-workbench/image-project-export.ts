@@ -2,7 +2,7 @@ import { IMAGE_SIZE_PRESETS, TEAM_CHAT_ATTACHMENT_LIMITS, teamChatAttachmentReje
 import type { ImageProjectSummary, ImageTextCheck } from "@pi67/protocol";
 import { create } from "zustand";
 import { publishNotification } from "../notifications/notification-store.js";
-import { libraryId, request, useImageProject } from "./image-project-controller.js";
+import { editImageProjectWithNotice, imageEditRefusal, libraryId, request, useImageProject } from "./image-project-controller.js";
 import { useTeamChatDialogStore } from "../team-chat/team-chat-dialog-store.js";
 import type { HandoffPicture } from "../team-chat/team-chat-work-bridge.js";
 import { megabytes } from "./image-brand.js";
@@ -20,19 +20,22 @@ interface UnreadText { label: string; text: string; read: string; passed: boolea
 const isClear = (check: ImageTextCheck): boolean => check.passed && !check.lowContrast;
 /** What the check guards, for its dialog's words: an export to a folder or a send to the team. */
 type TextCheckPurpose = "export" | "handoff";
+/** A repair the check dialog offers for a listed issue: choosing it answers `fix` instead of export or cancel. */
+interface ExportFix { label: string; hint: string }
+type ExportChoice = "proceed" | "cancel" | "fix";
 interface TextCheckState {
   /** Texts the last export check could not read, and what the PNG breaks of a spec, waiting for 仍然导出 or 取消. */
-  pending: { unread: UnreadText[]; issues: string[]; purpose: TextCheckPurpose; decide: (proceed: boolean) => void } | undefined;
+  pending: { unread: UnreadText[]; issues: string[]; purpose: TextCheckPurpose; decide: (choice: ExportChoice) => void; fix?: ExportFix } | undefined;
   /** Per `project/candidate`, the texts its render could not read; checked once when it is ready. */
   candidates: Record<string, ImageTextCheck[]>;
 }
 export const useImageTextChecks = create<TextCheckState>(() => ({ pending: undefined, candidates: {} }));
 
 /**
- * Checks each target; resolves true when everything reads and `issues` (a spec's, found before)
- * is empty, or when the person chooses to export anyway.
+ * Checks each target; resolves `proceed` when everything reads and `issues` (a spec's, found
+ * before) is empty, else what the person chose: export anyway, cancel, or the offered `fix`.
  */
-async function textsReadable(targets: readonly { projectId: string; revision?: number; label: string }[], purpose: TextCheckPurpose = "export", issues: readonly string[] = []): Promise<boolean> {
+async function reviewExport(targets: readonly { projectId: string; revision?: number; label: string }[], purpose: TextCheckPurpose = "export", issues: readonly string[] = [], fix?: ExportFix): Promise<ExportChoice> {
   const unread: UnreadText[] = [];
   try {
     for (const target of targets) {
@@ -44,8 +47,14 @@ async function textsReadable(targets: readonly { projectId: string; revision?: n
     publishNotification({ level: "warning", title: "没能核对图中文字", message: `这次${purpose === "export" ? "导出" : "发送"}没有检查文字是否完整可读。` });
     unread.length = 0;
   }
-  if (!unread.length && !issues.length) return true;
-  return new Promise((resolve) => useImageTextChecks.setState({ pending: { unread, issues: [...issues], purpose, decide: (proceed) => { useImageTextChecks.setState({ pending: undefined }); resolve(proceed); } } }));
+  if (!unread.length && !issues.length) return "proceed";
+  return new Promise((resolve) => useImageTextChecks.setState({ pending: { unread, issues: [...issues], purpose, ...(fix ? { fix } : {}),
+    decide: (choice) => { useImageTextChecks.setState({ pending: undefined }); resolve(choice); } } }));
+}
+
+/** Resolves true when everything reads, or when the person chooses to export anyway. */
+async function textsReadable(targets: readonly { projectId: string; revision?: number; label: string }[], purpose: TextCheckPurpose = "export"): Promise<boolean> {
+  return await reviewExport(targets, purpose) === "proceed";
 }
 
 export const candidateCheckKey = (projectId: string, candidateId: string): string => `${projectId}/${candidateId}`;
@@ -200,12 +209,14 @@ async function handoffPictures(title: string, members: readonly SetMember[]): Pr
   }
 }
 
+const WHITE_EDGES_ISSUE = "四边不是全白（规格要求白底）";
+
 /** What a rendered PNG breaks of a spec, in words; empty when it meets it. `whiteEdges` is read only for a white-background spec. */
 export function specIssues(spec: ImageBrandSpec, png: { width: number; height: number; bytes?: number; whiteEdges?: boolean }): string[] {
   return [
     ...(png.width !== spec.width || png.height !== spec.height ? [`尺寸是 ${png.width}×${png.height}，规格要求 ${spec.width}×${spec.height}`] : []),
     ...(spec.max_bytes !== undefined && png.bytes !== undefined && png.bytes > spec.max_bytes ? [`文件 ${megabytes(png.bytes)}，超过上限 ${megabytes(spec.max_bytes)}`] : []),
-    ...(spec.background === "white" && png.whiteEdges === false ? ["四边不是全白（规格要求白底）"] : [])
+    ...(spec.background === "white" && png.whiteEdges === false ? [WHITE_EDGES_ISSUE] : [])
   ];
 }
 
@@ -276,16 +287,65 @@ export function exportImageForSpec(spec: ImageBrandSpec): Promise<void> {
     if (useImageProject.getState().busy) return;
     useImageProject.setState({ busy: true });
     try {
-      const member = await specMember(spec);
-      if (!member) return;
-      const rendered = await renderFull(member);
-      const issues = specIssues(spec, { width: rendered.width, height: rendered.height, ...await fileFacts(spec, member.projectId, rendered.pngSha256) });
-      if (!await textsReadable([{ projectId: member.projectId, revision: rendered.revision, label: member.label }], "export", issues)) return;
-      await window.pi67.system.saveImage({ workspaceId: libraryId(), projectId: member.projectId, pngSha256: rendered.pngSha256, fileName: member.fileName(`${rendered.width}×${rendered.height}`) });
+      let member = await specMember(spec), whitened = false;
+      // At most two rounds: the white-background fix is offered once, and only on a canvas not white yet.
+      while (member) {
+        const rendered = await renderFull(member);
+        const issues = specIssues(spec, { width: rendered.width, height: rendered.height, ...await fileFacts(spec, member.projectId, rendered.pngSha256) });
+        const offerFix = !whitened && issues.includes(WHITE_EDGES_ISSUE) && !isWhite((await memberCanvas(member)).background);
+        const choice = await reviewExport([{ projectId: member.projectId, revision: rendered.revision, label: member.label }], "export", issues, offerFix ? WHITE_FIX : undefined);
+        if (choice === "fix") {
+          // The same member again, at the revision the fix publishes.
+          if (!await whitenCanvas(member)) return;
+          whitened = true;
+          const next = useImageProject.getState().revision;
+          member = member.revision === undefined || next === undefined ? member : { ...member, revision: next };
+          continue;
+        }
+        if (choice === "proceed") await window.pi67.system.saveImage({ workspaceId: libraryId(), projectId: member.projectId, pngSha256: rendered.pngSha256, fileName: member.fileName(`${rendered.width}×${rendered.height}`) });
+        return;
+      }
     } catch (error) {
       publishNotification({ level: "error", title: "导出失败", message: error instanceof Error ? error.message : "未知错误" });
     } finally {
       useImageProject.setState({ busy: false });
     }
   });
+}
+
+const WHITE_FIX: ExportFix = { label: "改为白底后重新导出", hint: "把这个尺寸的画布背景改成白色（一次修订，可在历史里撤回）；照片铺到边缘时还需要处理照片本身。" };
+const isWhite = (color: string): boolean => /^#f{6}$/iu.test(color);
+
+/** A member's canvas: the open project's from the page, another project's read from the Host. */
+async function memberCanvas(member: SetMember): Promise<ImageCanvas> {
+  const open = useImageProject.getState();
+  if (open.projectId === member.projectId && open.document) return open.document.canvas;
+  return (await request("image.project.read", { projectId: member.projectId })).document.canvas;
+}
+
+/**
+ * The member's canvas background set to white on its latest revision. The open project changes
+ * like any edit there (one undo step, conflicts and refusals said the usual way), and the sizes
+ * derived from its previous revision are said to be older now; another project changes through
+ * the Host and the library reloads.
+ */
+async function whitenCanvas(member: SetMember): Promise<boolean> {
+  const open = useImageProject.getState();
+  if (open.projectId === member.projectId && open.document) {
+    const before = derivedSizes(useImageWorkbench.getState().projects, open.projectId, open.revision).current.length;
+    const result = await editImageProjectWithNotice("按规格改为白底", [{ type: "set_canvas", canvas: { ...open.document.canvas, background: "#ffffff" } }]);
+    if (result.outcome !== "applied") return false;
+    if (before) publishNotification({ level: "info", title: "已改为白底", message: `之前基于上一版生成的 ${before} 个尺寸现在是较旧的版本，需要的话请重新生成。` });
+    return true;
+  }
+  try {
+    const { revision, document } = await request("image.project.read", { projectId: member.projectId });
+    await request("image.project.edit", { projectId: member.projectId, baseRevision: revision, summary: "按规格改为白底",
+      operations: [{ type: "set_canvas", canvas: { ...document.canvas, background: "#ffffff" } }] });
+    await loadImageLibrary();
+    return true;
+  } catch (error) {
+    publishNotification({ level: "warning", title: "没能改为白底", message: imageEditRefusal(error) });
+    return false;
+  }
 }

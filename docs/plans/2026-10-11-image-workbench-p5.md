@@ -255,3 +255,14 @@ removing the feature leaves every existing project as it was.
   (`renderedBlob`). Deferred: a 白底 spec derived from a coloured canvas keeps that colour (the
   check lists it); making the derive turn the background white changes the design for the
   person, so it waits for a product decision.
+- 2026-10-12: the deferred 白底 item, decided by the user: no automatic change on derive; the
+  export check offers `改为白底后重新导出` (the canvas background white as one revision of that
+  size's project — through the open project's edit path when it is open, so it is one undo
+  step — then the spec exports again).
+  `/code-review high`, all accepted: the fix was offered again on a canvas already white
+  (empty revisions on every press; now offered once per export and only on a canvas not
+  white); a conflict on the open project went unsaid (the usual notices); the fix and retry ran
+  outside the export lock and could re-resolve another project (now one locked loop over the
+  same member); the dialog answered through a side effect (it now answers export, cancel or
+  fix); sizes derived from the open project's previous revision silently became older (said);
+  raw protocol text on the other path (product wording) and a stale library (reloaded).

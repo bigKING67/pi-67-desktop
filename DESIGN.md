@@ -359,7 +359,8 @@ Application-level surfaces use a separate wide-window shell:
   candidate-list rows (spec name strong, size · cap · 白底 as meta, a `导出` text action with the
   download glyph) and a tertiary hint. Exact sizes join 已生成的尺寸 as `规格尺寸` with their size. The export check dialog lists spec failures first (the
   failure strong, `规格` as meta) above unreadable texts; its heading counts both, and the text
-  hint shows only when texts are listed.
+  hint shows only when texts are listed. For edges that are not white it adds a tertiary hint
+  and a secondary `改为白底后重新导出` between `取消` and `仍然导出`.
 - Text fonts (P3, 2026-10-10): 属性 for text adds a `字体` section — the shared Settings
   select at full panel width (`Noto Sans CJK SC · 内置`, then each added font's family with
   `TTF`/`OTF` as detail), a `添加字体…` text action with a plus glyph (disabled at 8 fonts or

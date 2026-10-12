@@ -14,7 +14,7 @@ export function ImageTextCheckDialog() {
   const { unread, issues } = pending;
   const heading = !unread.length ? `有 ${issues.length} 处不符合规格` : issues.length ? `有 ${issues.length + unread.length} 处需要确认` : `有 ${unread.length} 段文字可能看不清`;
   return (
-    <ModalOverlay className="modal-overlay" isDismissable isOpen onOpenChange={(open) => { if (!open) pending.decide(false); }}>
+    <ModalOverlay className="modal-overlay" isDismissable isOpen onOpenChange={(open) => { if (!open) pending.decide("cancel"); }}>
       <Modal className={`modal-surface ${styles.dialogModal}`}>
         <Dialog aria-label={sending ? "发送前核对" : "导出前核对"} className={styles.dialog!} role="alertdialog">
           <span className="dialog-eyebrow">{sending ? "发到团队" : "导出"}</span>
@@ -29,9 +29,11 @@ export function ImageTextCheckDialog() {
             ))}
           </ul>
           {unread.length ? <p className={styles.dialogHint}>读不全多半是被别的图层盖住、被蒙版遮住或超出画布；太淡是文字和身后的颜色太接近（大字至少 3:1，小字至少 4.5:1）。核对在本机离线完成，偶尔会误报。</p> : null}
+          {pending.fix ? <p className={styles.dialogHint}>{pending.fix.hint}</p> : null}
           <div className="dialog-actions">
-            <Button autoFocus className="secondary-button" onPress={() => pending.decide(false)}>取消</Button>
-            <Button className="primary-button" onPress={() => pending.decide(true)}>{sending ? "仍然发送" : "仍然导出"}</Button>
+            <Button autoFocus className="secondary-button" onPress={() => pending.decide("cancel")}>取消</Button>
+            {pending.fix ? <Button className="secondary-button" onPress={() => pending.decide("fix")}>{pending.fix.label}</Button> : null}
+            <Button className="primary-button" onPress={() => pending.decide("proceed")}>{sending ? "仍然发送" : "仍然导出"}</Button>
           </div>
         </Dialog>
       </Modal>

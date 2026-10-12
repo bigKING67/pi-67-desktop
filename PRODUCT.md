@@ -1637,7 +1637,11 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   exact size (`<title> · <spec name>`, listed with the other sizes). The full-size PNG is then
   checked against the spec — exact size, file size under the cap, every edge pixel opaque white
   for 白底 — together with the keyed-text check; anything that fails is listed in one dialog
-  and the person exports anyway or cancels. A size the layout cannot fit is said, and nothing
+  and the person exports anyway or cancels. When the edges are not white, the dialog also offers
+  `改为白底后重新导出`: that size's project gets a white canvas background as one ordinary
+  revision (one undo step when it is the open project), and the spec exports again; a photo
+  reaching the edge still needs the photo itself changed, which the dialog says. A derive never
+  changes the background on its own. A size the layout cannot fit is said, and nothing
   is exported. The file is named `<title> <spec name>`.
 - Image generation sources are configured in Settings → `图像生成`, never by editing
   JSON (ADR 0010 decision 14). A source reuses a configured Pi Provider's address and
