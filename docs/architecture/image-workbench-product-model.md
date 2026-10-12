@@ -1,6 +1,6 @@
 # 图像工作台产品模型与实施规划
 
-状态：`accepted — 方向由用户于 2026-10-08 确认；P1–P3 已完成（源码测试、e2e、macOS 打包与 Windows CI 证据），P4 除 VLM 评测外已完成（见 docs/plans/2026-10-10-image-workbench-p4.md）`
+状态：`accepted — 方向由用户于 2026-10-08 确认；P1–P3 已完成（源码测试、e2e、macOS 打包与 Windows CI 证据），P4 已完成（VLM 评测拆为独立计划，2026-10-12 出开发报告，未进产品）；P5 于 2026-10-12 完成（Batch 生成暂缓，见 docs/plans/2026-10-11-image-workbench-p5.md）`
 
 决策记录：`docs/adr/0010-image-workbench.md`。首个执行计划：`docs/plans/2026-10-08-image-workbench-p1.md`。
 

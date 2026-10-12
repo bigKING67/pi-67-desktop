@@ -1,9 +1,9 @@
 # Image workbench P5: scale
 
-Status: active (order and checkpoint 1 shape confirmed 2026-10-11)
+Status: done 2026-10-12 (Batch generation deferred by the user; see the cache plan)
 Owner: Claude
 Started: 2026-10-11
-Last updated: 2026-10-11
+Last updated: 2026-10-12
 
 ## Goal
 
@@ -266,3 +266,10 @@ removing the feature leaves every existing project as it was.
   same member); the dialog answered through a side effect (it now answers export, cancel or
   fix); sizes derived from the open project's previous revision silently became older (said);
   raw protocol text on the other path (product wording) and a stale library (reloaded).
+- 2026-10-12: P5 closed. Acceptance: the 50-SKU price change and its removal were measured (Host
+  3.1 s / 0.9 s; packaged 11.4 s / 7.9 s). The handoff has no end-to-end run: the Electron e2e
+  has no signed-in Team Chat, and the renderer e2e's mock Team Chat has no image engine or
+  `app://` previews, so mocking both would test the mocks. It stays covered by `deliverHandoff`
+  against a scripted port, the image page's renderer tests and the packaged dialog. Generation
+  caching is built; OpenAI Batch is deferred until there is a bulk-generation flow; the VLM
+  review stays a development report.
