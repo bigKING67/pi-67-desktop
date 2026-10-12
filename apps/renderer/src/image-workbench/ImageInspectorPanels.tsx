@@ -6,8 +6,6 @@ import { Button, Checkbox, CheckboxGroup } from "react-aria-components";
 import { acceptCandidate, deriveImageSizes, discardCandidate, editImageProject, inspectCandidate, useImageProject } from "./image-project-controller.js";
 import { useBrandKit, specDetail } from "./image-brand.js";
 import { derivedSizes, exportImageForSpec, exportImageProject, exportImageSizes, handOffImages } from "./image-project-export.js";
-import { ImageBatchPanel } from "./ImageBatchPanel.js";
-import { ImageTemplatePanel } from "./ImageTemplatePanel.js";
 import { useImageWorkbench } from "./image-workbench-store.js";
 import { loadImageLibrary } from "./image-workbench-controller.js";
 import styles from "./ImageInspector.module.css";
@@ -166,8 +164,6 @@ export function ImageExportPanel() {
       <p className={styles.empty}>选择一个位置后，会在那里新建一个文件夹，放入这一版和基于这一版的各尺寸 PNG 以及 receipt.json，不会覆盖已有文件；较旧修订派生的尺寸不会混进来。</p>
       <Button className="secondary-button" isDisabled={busy} onPress={handOffImages}><Send aria-hidden="true" size={14} />发到团队…</Button>
       <p className={styles.empty}>把这一版和它的各尺寸作为任务卡交给同事或频道：先发卡片，再发一条带图片的消息；不会上传图像工程、提示词或对话。</p>
-      <ImageBatchPanel />
-      <ImageTemplatePanel />
     </div>
   );
 }

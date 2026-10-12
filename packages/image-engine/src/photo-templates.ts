@@ -18,7 +18,8 @@ export interface TemplateLayout {
   photo: { x: number; y: number; width: number; height: number; scale: 1; cropped: false };
 }
 export interface PhotoBrief {
-  project_id: string; source: string; headline: string; brand?: string; caption?: string; title?: string; canvas?: { width: number; height: number };
+  /** Required with a template; optional on the starter layout. */
+  project_id: string; source: string; headline?: string; brand?: string; caption?: string; title?: string; canvas?: { width: number; height: number };
   template?: string; background?: string;
 }
 
@@ -49,7 +50,7 @@ export function prepareTemplate(brief: PhotoBrief, canvas: { width: number; heig
   return {
     input: { project_id: brief.project_id, title: brief.title ?? brief.project_id, canvas: { ...canvasInput }, assets: [], objects: [photo,
       text("brand", brief.brand, t.brandY, t.brandSize, t.brandHeight, 1.25, "#39372f"),
-      text("headline", brief.headline, t.headlineY, t.headlineSize, t.headlineHeight, t.leading, "#34362e"),
+      text("headline", brief.headline!, t.headlineY, t.headlineSize, t.headlineHeight, t.leading, "#34362e"),
       line("top-rule", t.ruleY, textWidth, 2, "#c1a568"), line("foot-rule", t.footY, px(t.footWidth), 3, "#b49a60")] },
     imports: [imported],
     layout: { template: brief.template ?? "", template_version: 1, slot: { x: margin, y: top, width: availableWidth, height: availableHeight }, photo: { x: photo.x, y: photo.y, width, height, scale: 1, cropped: false } }

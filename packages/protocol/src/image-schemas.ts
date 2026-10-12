@@ -195,7 +195,7 @@ export const ImageCommandPayloadSchemas: Record<keyof ImageCommandPayloads, TSch
   "image.project.list": strictObject({}),
   "image.project.createFromPhoto": strictObject({
     projectId: IdSchema, attachmentId: Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" }),
-    headline: Type.String({ minLength: 1, maxLength: L.text }), title: Type.Optional(Type.String({ minLength: 1, maxLength: L.title }))
+    headline: Type.Optional(Type.String({ minLength: 1, maxLength: L.text })), title: Type.Optional(Type.String({ minLength: 1, maxLength: L.title }))
   }),
   "image.project.read": strictObject({ projectId: IdSchema, revision: Type.Optional(RevisionSchema) }),
   "image.project.history": ProjectRefSchema,

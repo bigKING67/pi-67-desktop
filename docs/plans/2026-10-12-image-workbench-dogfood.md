@@ -40,3 +40,19 @@ colour → 50-row batch → library), without generation (offline) or a real Tea
   started the wrapped line (it now ends the line); a batch table matched to a layer since
   deleted still ran (refused until chosen again); `查看批次` did nothing from Chat or Settings
   (it turns to Work first); dead name entries; the card meta had no test.
+- 2026-10-12: the user chose all three proposals. 5: every column of a chosen table has a select
+  of text layers (`不使用` first); a choice wins over the automatic match and is remembered per
+  project in local storage (headers and layer ids only). 6: a sixth Inspector tab `批量` holds
+  batches and templates; 导出 keeps exports, specs, sizes and 发到团队. 7: 从图片开始 starts the
+  headline empty (`标题文字（可留空）`); empty makes no headline layer (protocol `headline`
+  optional; the engine requires one only for a template layout).
+- 2026-10-12: `/code-review high` on 5–7, all accepted: six tabs overflowed a grid of five (the
+  tab bar now gives every tab an equal share); the e2e still expected the old summary; a choice
+  could be taken by an earlier column's automatic match (choices now apply first, and a layer in
+  use is not offered); a header used twice shared one choice (keyed `header#2`); a table read
+  while switching projects could land on the other one (read together after the file); the
+  notice pointed below though the selects are above, and a blank header row had no fix; the
+  product model's five-tab contract, PRODUCT and DESIGN lagged (updated); choices were keyed by
+  project id alone and never pruned (now per library and project, the 100 most recent); dead
+  summary code; the Agent's create tool still required a headline (optional, except with a
+  template).

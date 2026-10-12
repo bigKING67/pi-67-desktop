@@ -82,6 +82,9 @@ describe("image engine host", { timeout: 120_000 }, () => {
     expect(read.document.title).toBe("春日海报");
     expect(read.document.objects.some((object) => object.kind === "text" && object.text === "春日新品")).toBe(true);
     expect(await fs.readdir(path.join(cwd, ".newmoney/image-work/spring"))).toEqual([]);
+    // Without a headline, the photo alone: no text layer is made up.
+    await run("image.project.createFromPhoto", { projectId: "plain", attachmentId: "photo-1", title: "只有照片" });
+    expect((await readProject(projectRoot(cwd, "plain"))).document.objects.map((object) => object.kind)).toEqual(["image"]);
     await expect(run("image.project.createFromPhoto", { projectId: "doc", attachmentId: "doc-1", headline: "x" })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
     await expect(run("image.project.createFromPhoto", { projectId: "spring", attachmentId: "photo-1", headline: "x" })).rejects.toThrow();
     await expect(host(cwd).run("image.project.createFromPhoto", { projectId: "other", attachmentId: "photo-1", headline: "x" })).rejects.toMatchObject({ code: "UNSUPPORTED" });

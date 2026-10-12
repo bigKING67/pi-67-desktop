@@ -19,7 +19,9 @@
 
 .context-pane-tabs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  /* One equal column per tab: the Work Inspector's five, the image Inspector's six (2026-10-12). */
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
   min-width: 0;
   height: 43px;
   padding: 5px 4px;
@@ -30,7 +32,7 @@
   min-width: 0;
   align-items: center;
   justify-content: center;
-  /* Five equal tabs share a ~300px Inspector; tight spacing keeps icon and 3-character labels unclipped. */
+  /* Five or six equal tabs share a ~300px Inspector; tight spacing keeps icon and short labels unclipped. */
   gap: 3px;
   padding: 0;
   border: 0;

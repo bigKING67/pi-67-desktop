@@ -1475,7 +1475,9 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   picks once (Windows prefills the first non-system drive) and Desktop registers as a
   trusted Workspace hidden from the folder tree. `从图片开始` stages one PNG/JPEG/WebP photo
   through the attachment pipeline (the renderer never sends a path) and creates a project
-  whose canvas fits the photo plus a 320px title band. On a project page a person moves
+  whose canvas fits the photo plus a 320px title band; the project name starts as the file's
+  name, and the headline (`标题文字（可留空）`) starts empty — left empty, the project has no
+  headline layer. On a project page a person moves
   unlocked objects (drag or arrow keys, one revision each), edits text, undoes and redoes
   (`revert_to`, never rewriting history), previews, accepts or discards candidates (stale
   ones cannot be accepted), and exports the current revision as a full-size PNG that Main
@@ -1590,11 +1592,15 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   size at least 1/30 of the canvas's short edge) and 4.5:1 otherwise, judged on the ratio as
   shown (one decimal). A blend mode or mask on the text is judged as if drawn normally. Faint
   text is listed with its ratio in the same dialog, because OCR still reads it.
-  导出 → 批量 (P5) makes one project per row of a CSV table (comma or tab separated, UTF-8):
-  the first row names text layers by id or by their current words (`¥199`), each later row is
-  one variant, and an empty cell keeps the layer's words. The table is read in the renderer
-  and matched before anything is written (what matched, what was left out, why a table cannot
-  be used: no matching header, no rows, more than 200 rows, 20 layers or 2000 characters per
+  The Inspector's sixth tab, 批量, holds batches and templates (moved out of 导出 on 2026-10-12,
+  since neither exports this revision). 批量 (P5) makes one project per row of a CSV table (comma or tab separated, UTF-8):
+  the first row is the header, each later row is one variant, and an empty cell keeps the
+  layer's words. A header matches a text layer by its current words (`¥199`) or id; every
+  column then shows a select of the text layers (`不使用` for none), so a plain header (`价格`)
+  is given its layer by hand, and the choice is remembered for the project on this computer
+  (headers and layer ids only) so the next table with that header matches. The table is read
+  in the renderer and matched before anything is written (why a table cannot be used: no
+  column with a layer, no rows, more than 200 rows, 20 layers or 2000 characters per
   cell). `生成 N 个变体` writes each row beside the source from the revision on screen, fitted
   like a derived size (text shrinks to 70%, then the row is refused); a row naming a missing
   or locked layer or a character no font has is refused with its reason, and the rest are
@@ -1602,11 +1608,12 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   keyed-text check) and `撤销批次`, which asks first (saying how many were edited since) and
   removes the batch's projects; the source and exported files stay. The library shows a batch
   as one card (`批次 · <source>`, count, source revision) that opens to its rows in table order;
-  the notice that a batch was made offers `查看批次`, which opens that card. Before running, the
-  table's matches read `<column> → 「<layer's words>」`; if a matched layer is gone since, the
-  table is refused until it is chosen again.
+  the notice that a batch was made offers `查看批次`, which opens that card. Before running, a
+  column whose layer is gone since must be given another; a choice wins over another column's
+  automatic match, a layer fills at most one column (a layer in use is not offered), and a
+  header used twice is chosen per column.
   The Agent's `image_batch` makes the same batches from inline rows.
-  导出 → 模板 (P5): `存为模板` copies the revision on screen into a template beside the project
+  批量 → 模板 (P5): `存为模板` copies the revision on screen into a template beside the project
   (`<title> · 模板`, opened at once) with every text and image layer marked 可替换 (at most 20);
   in a template, 属性 for a text or image layer toggles 可替换, and the header's meta says 模板.
   `从模板新建…` asks for the project name, each replaceable text's words (prefilled) and, per

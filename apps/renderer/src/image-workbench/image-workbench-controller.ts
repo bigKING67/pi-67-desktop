@@ -90,7 +90,7 @@ export async function createImageProjectFromPhoto(file: File, title: string, hea
     if (!attachment || staged.length !== 1 || attachment.kind !== "image") throw new Error("请选择 PNG、JPEG 或 WebP 照片。");
     const projectId = newImageProjectId();
     await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
-    await requestImage(workspace.id, "image.project.createFromPhoto", { projectId, attachmentId: attachment.id, headline: headline.trim(), title: title.trim() });
+    await requestImage(workspace.id, "image.project.createFromPhoto", { projectId, attachmentId: attachment.id, ...(headline.trim() ? { headline: headline.trim() } : {}), title: title.trim() });
     await loadImageLibrary();
     return projectId;
   } catch (error) {

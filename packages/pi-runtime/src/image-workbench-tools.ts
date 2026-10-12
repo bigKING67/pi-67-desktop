@@ -73,18 +73,18 @@ export function imageTools(): ToolDefinition[] {
   return [
     {
       name: "image_project_create_from_photo", label: "Create image project",
-      description: "Create an editable image project from one local product photo. The photo stays locked at native size; headline, brand and caption become editable text objects.",
+      description: "Create an editable image project from one local product photo. The photo stays locked at native size; headline, brand and caption, when given, become editable text objects (a template layout needs a headline).",
       promptSnippet: "Create an editable image project from a local photo",
       parameters: Type.Object({
         project_id: projectId, source: Type.String({ description: "Path of an opaque PNG, JPEG or WebP photo, absolute or relative to the Workspace." }),
-        headline: Type.String(), brand: optional(Type.String()), caption: optional(Type.String()), title: optional(Type.String()),
+        headline: optional(Type.String({ description: "Omit for the photo alone (not with template)." })), brand: optional(Type.String()), caption: optional(Type.String()), title: optional(Type.String()),
         template: optional(Type.Union([Type.Literal("brand-detail"), Type.Literal("xiaohongshu-cover")])),
         background: optional(Type.String({ description: "#RRGGBB canvas background." })), dry_run: optional(Type.Boolean())
       }),
       async execute(_id, raw, _signal, _update, ctx) {
         const params = raw as Params, id = str(params, "project_id"), engine = await loadEngine(), root = engine.projectRoot(ctx.cwd, id);
-        const brief: Params = { project_id: id, source: local(ctx.cwd, str(params, "source")), headline: str(params, "headline") };
-        for (const key of ["brand", "caption", "title", "template", "background"]) if (params[key] !== undefined) brief[key] = params[key];
+        const brief: Params = { project_id: id, source: local(ctx.cwd, str(params, "source")) };
+        for (const key of ["headline", "brand", "caption", "title", "template", "background"]) if (params[key] !== undefined) brief[key] = params[key];
         // The engine needs the container folder even for a dry run; only that empty folder is created.
         await engine.ensureProjectParent(root);
         const created = await engine.createPhotoProject(root, brief, { dryRun: params.dry_run === true });

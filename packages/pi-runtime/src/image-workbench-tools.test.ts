@@ -62,6 +62,9 @@ describe("image workbench tools", { timeout: 120_000 }, () => {
     const t = harness(cwd, { available: [imageModel("gpt-image-2.5-sunburst")], image: proposed });
 
     const dry = await t.json("image_project_create_from_photo", { project_id: "poster", source: photo, headline: "春日焕新", dry_run: true });
+    // Without a headline the photo stands alone.
+    const plain = await t.json("image_project_create_from_photo", { project_id: "plain", source: photo, dry_run: true });
+    expect(JSON.stringify(plain)).not.toContain("headline");
     expect(dry.dry_run).toBe(true);
     await expect(fs.stat(path.join(cwd, ".newmoney/images/poster"))).rejects.toMatchObject({ code: "ENOENT" });
     const created = await t.json("image_project_create_from_photo", { project_id: "poster", source: photo, headline: "春日焕新", brand: "GROLAND" });

@@ -57,6 +57,29 @@ describe("image library work: batches, templates, hand-off, brand", () => {
     expect(useImageBatch.getState().draft?.problem).toMatch(/CSV/u);
   });
 
+  it("remembers a column's chosen layer for the project, so the next table with that header matches", async () => {
+    const { chooseBatchColumn, chooseBatchTable, useImageBatch, showBatchesOf } = await import("./image-project-batch.js");
+    const stored = new Map<string, string>();
+    vi.stubGlobal("window", { localStorage: { getItem: (key: string) => stored.get(key) ?? null, setItem: (key: string, value: string) => { stored.set(key, value); } } });
+    try {
+      showBatchesOf("p");
+      const document = useImageProject.getState().document!;
+      useImageProject.setState({ document: { ...document, objects: [{ ...document.objects[0]!, kind: "text", text: "¥199", font_size: 20, color: "#000000", align: "left", line_height: 1.2 } as never] } });
+      await chooseBatchTable(new File(["价格\n¥99\n"], "a.csv"));
+      expect(useImageBatch.getState().draft).toMatchObject({ columns: [{ key: "价格", column: "价格" }], problem: expect.stringContaining("还没有列对上") });
+      chooseBatchColumn("价格", "t");
+      expect(useImageBatch.getState().draft).toMatchObject({ columns: [{ column: "价格", layer: "t" }], rows: [{ row: 1, texts: [{ layer: "t", text: "¥99" }] }] });
+      expect(useImageBatch.getState().draft).not.toHaveProperty("problem");
+      // Only headers and layer ids are kept, never the cells.
+      // Kept per creative library and project, with when it was last used.
+      expect(JSON.parse(stored.get("pi67.image-batch-columns.v2")!)).toEqual({ "lib/p": { at: expect.any(Number), choices: { 价格: "t" } } });
+      await chooseBatchTable(new File(["价格\n¥88\n"], "b.csv"));
+      expect(useImageBatch.getState().draft).toMatchObject({ columns: [{ column: "价格", layer: "t" }] });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("saves a template, toggles a slot, and makes a project from it with a staged picture and only changed words", async () => {
     const { saveAsTemplate, toggleTemplateSlot, createFromTemplate } = await import("./image-project-template.js");
     const released: string[][] = [];

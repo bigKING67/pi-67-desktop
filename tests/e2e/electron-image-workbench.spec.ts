@@ -211,9 +211,13 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
 
     // P5: a CSV with the headline's current words as its header makes a batch of two; one row is
     // too long to fit and is refused with its reason; the batch is listed, then removed after a yes.
+    await tab("批量");
     await inspector.locator("input[type=file][accept*='.csv']").setInputFiles({ name: "prices.csv", mimeType: "text/csv",
       buffer: Buffer.from(`春日上新 SALE,备注\n夏日 SALE,a\n${"很长的标题".repeat(40)},b\n`) });
-    await expect(inspector.getByRole("group", { name: "批量表格" })).toContainText("春日上新 SALE →");
+    // Each column lists its layer: the words header matched the headline; 备注 matched nothing (不使用).
+    const draft = inspector.getByRole("group", { name: "批量表格" });
+    await expect(draft).toContainText("春日上新 SALE");
+    await expect(draft).toContainText("不使用");
     await inspector.getByRole("button", { name: "生成 2 个变体" }).click();
     await expect(inspector.getByRole("list", { name: "没有生成的行" })).toContainText("第 2 行", { timeout: 30_000 });
     await expect(inspector.getByRole("list", { name: "批次" })).toContainText("批次 · 1 个");
@@ -225,7 +229,7 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     // in the new project the slots are unlocked and the rest locked.
     await inspector.getByRole("button", { name: "存为模板" }).click();
     await expect(project.getByText(/· 模板$/u).first()).toBeVisible({ timeout: 30_000 });
-    await tab("导出");
+    await tab("批量");
     await inspector.getByRole("button", { name: "从模板新建…" }).click();
     const fromTemplate = page.getByRole("dialog", { name: "从模板新建" });
     await fromTemplate.getByLabel("项目名称").fill("夏日冷萃");

@@ -1,7 +1,7 @@
 import type { ImageProjectSummary } from "@pi67/protocol";
 import { create } from "zustand";
 
-export type ImageInspectorTab = "layers" | "properties" | "candidates" | "history" | "export";
+export type ImageInspectorTab = "layers" | "properties" | "candidates" | "history" | "export" | "batch";
 /** The library, optionally opened on one batch's projects (P5). */
 type ImageWorkbenchView = { kind: "library"; batchId?: string } | { kind: "project"; projectId: string };
 interface ImageThumbnail { pngSha256: string; width: number; height: number; revision: number }

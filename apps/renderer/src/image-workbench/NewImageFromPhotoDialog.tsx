@@ -8,11 +8,12 @@ import styles from "./ImageWorkbench.module.css";
 export function NewImageFromPhotoDialog({ photo, onDismiss }: { photo: File; onDismiss: () => void }) {
   const initial = photo.name.replace(/\.[^.]+$/u, "").slice(0, 60) || "新图像项目";
   const [title, setTitle] = useState(initial);
-  const [headline, setHeadline] = useState(initial);
+  // Empty unless the person writes one: a file name is not poster copy.
+  const [headline, setHeadline] = useState("");
   const [creating, setCreating] = useState(false);
   const preview = useMemo(() => URL.createObjectURL(photo), [photo]);
   useEffect(() => () => URL.revokeObjectURL(preview), [preview]);
-  const canCreate = title.trim().length > 0 && headline.trim().length > 0 && !creating;
+  const canCreate = title.trim().length > 0 && !creating;
 
   const create = async () => {
     setCreating(true);
@@ -35,11 +36,11 @@ export function NewImageFromPhotoDialog({ photo, onDismiss }: { photo: File; onD
             <Label>项目名称</Label>
             <Input autoFocus />
           </TextField>
-          <TextField className={styles.dialogField!} isRequired maxLength={200} value={headline} onChange={setHeadline}>
-            <Label>标题文字</Label>
+          <TextField className={styles.dialogField!} maxLength={200} value={headline} onChange={setHeadline}>
+            <Label>标题文字（可留空）</Label>
             <Input />
           </TextField>
-          <p className={styles.dialogHint}>照片按原尺寸放在底层并锁定；标题是单独的文字层，之后可以直接改。</p>
+          <p className={styles.dialogHint}>照片按原尺寸放在底层并锁定；写了标题会成为单独的文字层，留空就不加，之后也可以用「添加文字」补上。</p>
           <div className="dialog-actions">
             <Button className="secondary-button" isDisabled={creating} onPress={onDismiss}>取消</Button>
             <Button className="primary-button" isDisabled={!canCreate} onPress={() => void create()}>{creating ? "正在创建…" : "创建项目"}</Button>

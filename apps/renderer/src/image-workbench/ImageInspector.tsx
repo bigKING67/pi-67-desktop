@@ -1,13 +1,15 @@
-import { Clock, Download, Layers, SlidersHorizontal, Sparkles } from "lucide-react";
+import { Clock, Copy, Download, Layers, SlidersHorizontal, Sparkles } from "lucide-react";
 import { Tab, TabList, TabPanel, Tabs } from "react-aria-components";
+import { ImageBatchPanel } from "./ImageBatchPanel.js";
 import { ImageCandidatesPanel, ImageExportPanel, ImageHistoryPanel } from "./ImageInspectorPanels.js";
+import { ImageTemplatePanel } from "./ImageTemplatePanel.js";
 import { ImageLayersPanel } from "./ImageLayersPanel.js";
 import { ImagePropertiesPanel } from "./ImagePropertiesPanel.js";
 import { useImageWorkbench, type ImageInspectorTab } from "./image-workbench-store.js";
 import styles from "./ImageInspector.module.css";
 
 /**
- * The image Inspector (product model §6): five equal-width tabs in the shared
+ * The image Inspector (product model §6): six equal-width tabs in the shared
  * Inspector pane, so docking, the drawer, the TitleBar toggle and ⌘⇧B behave
  * exactly as for the Work Inspector.
  */
@@ -23,12 +25,15 @@ export function ImageInspector() {
           <Tab id="candidates"><Sparkles aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>候选</span></Tab>
           <Tab id="history"><Clock aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>历史</span></Tab>
           <Tab id="export"><Download aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>导出</span></Tab>
+          <Tab id="batch"><Copy aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>批量</span></Tab>
         </TabList>
         <TabPanel className={`context-panel ${styles.panel}`} id="layers"><ImageLayersPanel /></TabPanel>
         <TabPanel className={`context-panel ${styles.panel}`} id="properties"><ImagePropertiesPanel /></TabPanel>
         <TabPanel className={`context-panel ${styles.panel}`} id="candidates"><ImageCandidatesPanel /></TabPanel>
         <TabPanel className={`context-panel ${styles.panel}`} id="history"><ImageHistoryPanel /></TabPanel>
         <TabPanel className={`context-panel ${styles.panel}`} id="export"><ImageExportPanel /></TabPanel>
+        {/* 批量: making many projects from this one (a CSV batch, a template), apart from exporting it. */}
+        <TabPanel className={`context-panel ${styles.panel}`} id="batch"><div className={styles.properties}><ImageBatchPanel /><ImageTemplatePanel /></div></TabPanel>
       </Tabs>
     </aside>
   );

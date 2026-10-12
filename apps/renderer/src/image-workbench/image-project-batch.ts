@@ -5,7 +5,7 @@ import { runAfterLeavingSettings } from "../settings/settings-leave-guard.js";
 import { useShellStore } from "../shell/shell-store.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { batchGroups, type BatchGroup } from "./image-batch-groups.js";
-import { batchTable, parseTable, type BatchTable } from "./image-batch-table.js";
+import { batchTable, parseTable, type BatchColumnChoices, type BatchTable } from "./image-batch-table.js";
 import { request, useImageProject } from "./image-project-controller.js";
 import { exportProjectSet } from "./image-project-export.js";
 import { loadImageLibrary } from "./image-workbench-controller.js";
@@ -21,7 +21,8 @@ interface BatchState {
   /** The project the table and the last run belong to; another project starts with neither. */
   projectId: string | undefined;
   /** The table chosen for this project, matched to its text layers, before it is run. */
-  draft: ({ fileName: string } & BatchTable) | undefined;
+  /** The chosen table, kept as parsed so a column's layer can be chosen again. */
+  draft: ({ fileName: string; table?: string[][] } & BatchTable) | undefined;
   /** The last run from this project: every row, created or refused with its reason. */
   last: { batchId: string; revision: number; results: ImageBatchRowOutcome[] } | undefined;
   /** A removal waiting for the person's yes, with how many of its projects were edited since. */
@@ -42,13 +43,52 @@ export function batchesOf(projects: readonly ImageProjectSummary[], projectId: s
 
 /** Reads the chosen CSV (in the renderer; no path leaves it) and matches it to this project's text layers. */
 export async function chooseBatchTable(file: File): Promise<void> {
-  const { document } = useImageProject.getState();
-  if (!document) return;
+  if (!useImageProject.getState().document) return;
   if (!/\.(csv|tsv|txt)$/iu.test(file.name) || file.size > TABLE_BYTES) {
-    useImageBatch.setState({ draft: { fileName: file.name, matched: [], unmatched: [], rows: [], skipped: [], problem: "请选择 2 MB 以内的 CSV 表格（Excel、Numbers 或飞书表格都可以另存为 CSV）。" } });
+    useImageBatch.setState({ draft: { fileName: file.name, columns: [], matched: [], unmatched: [], rows: [], skipped: [], problem: "请选择 2 MB 以内的 CSV 表格（Excel、Numbers 或飞书表格都可以另存为 CSV）。" } });
     return;
   }
-  useImageBatch.setState({ draft: { fileName: file.name, ...batchTable(document, parseTable(await file.text())) } });
+  const opened = useImageProject.getState().projectId, text = await file.text();
+  // The project, its layers and its remembered choices are read together, after the file: a
+  // person who moved to another project meanwhile gets nothing written there.
+  const { projectId, document } = useImageProject.getState();
+  if (!projectId || !document || projectId !== opened || useImageBatch.getState().projectId !== projectId) return;
+  const table = parseTable(text);
+  useImageBatch.setState({ draft: { fileName: file.name, table, ...batchTable(document, table, readColumnChoices(projectId)) } });
+}
+
+/** The person's layer for a column ("" for not using it), remembered for this project, then the table matched again. */
+export function chooseBatchColumn(key: string, layer: string): void {
+  const { draft } = useImageBatch.getState(), { projectId, document } = useImageProject.getState();
+  if (!draft?.table || !projectId || !document) return;
+  const choices = { ...readColumnChoices(projectId), [key]: layer };
+  writeColumnChoices(projectId, choices);
+  useImageBatch.setState({ draft: { fileName: draft.fileName, table: draft.table, ...batchTable(document, draft.table, choices) } });
+}
+
+// Column choices on this computer, per creative library and project (column keys and layer ids
+// only, never cell contents); the 100 most recently used projects are kept.
+const COLUMN_CHOICES_KEY = "pi67.image-batch-columns.v2";
+const COLUMN_CHOICES_PROJECTS = 100;
+type StoredChoices = Record<string, { at: number; choices: Record<string, string> }>;
+const choicesKey = (projectId: string): string => `${rendererWorkbenchStore.getState().imageLibraryWorkspaceId ?? ""}/${projectId}`;
+function readAllChoices(): StoredChoices {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(COLUMN_CHOICES_KEY) ?? "{}") as unknown;
+    return typeof value === "object" && value !== null ? value as StoredChoices : {};
+  } catch { return {}; }
+}
+function readColumnChoices(projectId: string): BatchColumnChoices {
+  const entry = readAllChoices()[choicesKey(projectId)];
+  const choices = typeof entry === "object" && typeof entry.choices === "object" && entry.choices !== null ? entry.choices : {};
+  return Object.fromEntries(Object.entries(choices).filter(([, layer]) => typeof layer === "string"));
+}
+function writeColumnChoices(projectId: string, choices: BatchColumnChoices): void {
+  try {
+    const all = { ...readAllChoices(), [choicesKey(projectId)]: { at: Date.now(), choices: { ...choices } } };
+    const kept = Object.entries(all).sort(([, x], [, y]) => (y.at ?? 0) - (x.at ?? 0)).slice(0, COLUMN_CHOICES_PROJECTS);
+    window.localStorage.setItem(COLUMN_CHOICES_KEY, JSON.stringify(Object.fromEntries(kept)));
+  } catch { /* Without storage the choice holds for this table only. */ }
 }
 
 export function clearBatchTable(): void { useImageBatch.setState({ draft: undefined }); }
@@ -64,7 +104,7 @@ export async function createImageBatch(): Promise<void> {
     if (useImageBatch.getState().projectId === projectId) useImageBatch.setState({ draft: undefined, last: { batchId, revision, results } });
     const created = results.filter((result) => result.status === "created").length;
     publishNotification({ level: created === results.length ? "success" : "warning", title: `已生成 ${created} 个变体`,
-      message: created === results.length ? "在创作库里作为一个批次列出。" : `${results.length - created} 行没有生成，原因列在导出里。`,
+      message: created === results.length ? "在创作库里作为一个批次列出。" : `${results.length - created} 行没有生成，原因列在「批量」里。`,
       ...(created ? { action: { label: "查看批次", run: () => openBatch(batchId) } } : {}) });
     await loadImageLibrary();
   } catch (error) {

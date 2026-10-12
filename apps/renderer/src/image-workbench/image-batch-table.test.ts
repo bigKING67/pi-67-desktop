@@ -23,8 +23,26 @@ describe("batch tables", () => {
     expect(table.problem).toBeUndefined();
   });
 
+  it("lets the person choose a column's layer, or not to use it, over the automatic match", () => {
+    const table = parseTable("价格,标题,¥199\n¥99,夏日,¥1\n");
+    // Plain headers match nothing on their own; the words header does.
+    expect(batchTable(document, table).columns).toEqual([{ key: "价格", column: "价格" }, { key: "标题", column: "标题" }, { key: "¥199", column: "¥199", layer: "price" }]);
+    const chosen = batchTable(document, table, { 价格: "price", 标题: "title", "¥199": "" });
+    expect(chosen.columns.map((column) => column.layer)).toEqual(["price", "title", undefined]);
+    expect(chosen.rows).toEqual([{ row: 1, texts: [{ layer: "price", text: "¥99" }, { layer: "title", text: "夏日" }] }]);
+    // A choice wins over an automatic match of another column: ¥199 no longer takes the price layer.
+    expect(batchTable(document, table, { 价格: "price" }).columns.map((column) => column.layer)).toEqual(["price", undefined, undefined]);
+    // A choice naming a layer that is gone falls back to the automatic match.
+    expect(batchTable(document, table, { 价格: "gone" }).columns[0]).toEqual({ key: "价格", column: "价格" });
+    // A header used twice gets its own key, so each column is chosen apart.
+    const twice = batchTable(document, parseTable("标题,标题\na,b\n"), { 标题: "title", "标题#2": "price" });
+    expect(twice.columns).toEqual([{ key: "标题", column: "标题", layer: "title" }, { key: "标题#2", column: "标题", layer: "price" }]);
+    // A first row of empty cells is no header.
+    expect(batchTable(document, [["", " "], ["a", "b"]]).problem).toMatch(/第一行要写表头/u);
+  });
+
   it("explains a table it cannot use", () => {
-    expect(batchTable(document, parseTable("名称\n夏日")).problem).toMatch(/表头没有对上/u);
+    expect(batchTable(document, parseTable("名称\n夏日")).problem).toMatch(/还没有列对上文字图层/u);
     expect(batchTable(document, parseTable("price")).problem).toBe("表格里没有可用的行。");
     expect(batchTable(document, [["price"], ...Array.from({ length: 201 }, (_, index) => [String(index)])]).problem).toMatch(/最多 200 行/u);
   });

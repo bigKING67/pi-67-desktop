@@ -322,17 +322,19 @@ Application-level surfaces use a separate wide-window shell:
   medium weight with `尺寸 · 读到「…」` and / or `对比度 N:1，太淡` beneath in caption secondary, a tertiary hint on causes
   and offline false alarms, then `取消` (secondary, focused) and `仍然导出` (primary). Candidate
   tiles add a `N 段文字可能看不清` line in the existing tile warning style.
-- Batches (P5, 2026-10-11): 导出 ends with `批量 · 基于修订 N`, a tertiary how-to line and a
+- Batches (P5, 2026-10-11): the sixth Inspector tab `批量` (copy glyph; 2026-10-12, out of 导出) leads with `批量 · 基于修订 N`, a tertiary how-to line and a
   `选择表格…` secondary button with a table glyph; a chosen table shows in a bordered box (file
-  name and row count, `列 → 图层` pairs in caption secondary, left-out columns in tertiary, any
-  problem in the warning notice style) with `生成 N 个变体` (primary) and `取消`. Refused rows
+  name and row count, then one row per column — see below — and any problem in the warning
+  notice style) with `生成 N 个变体` (primary) and `取消`. Refused rows
   list as warning notices `第 n 行：…`; batches list like derived sizes with `在创作库查看`,
   `导出批次` and `撤销批次` text actions, and removal uses the shared destructive dialog. In the
   library a batch card's cover carries a second sheet edge (a 4px offset `--border` line) and
   the meta `N 个变体 · 基于修订 r · date` (library card meta breaks only between its ` · `
   parts; one part wider than the card ends in an ellipsis); opened, a bar leads with `全部项目`, the batch title
   in medium weight and `撤销批次`, above the same grid of row cards (meta adds `第 n 行`).
-- Templates (P5, 2026-10-11): 导出 ends with `模板`: on a project a `存为模板` secondary button
+  A chosen table lists each column as a row: its header in secondary caption text (ellipsis),
+  then the shared Settings select of text layers (`不使用` first, the trigger fitted to its column), in a 1:2 grid.
+- Templates (P5, 2026-10-11): 批量 ends with `模板`: on a project a `存为模板` secondary button
   (layout-template glyph) and a tertiary line; on a template a readout `这是一个模板 · N 个可替换图层`,
   a `从模板新建…` primary button and a tertiary line. 属性 on a template adds a `模板` caption with
   one `可替换` segment (pressed while a slot) and a tertiary line. The 从模板新建 dialog uses the

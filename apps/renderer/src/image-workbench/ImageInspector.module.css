@@ -535,3 +535,30 @@
 .swatch[data-disabled] {
   opacity: 0.55;
 }
+
+/* 批量: one row per table column, its name then the text layer it fills. */
+.batchColumn {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.batchColumnName {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batchColumnSelect {
+  width: 100%;
+  min-width: 0;
+}
+
+/* The shared Settings trigger keeps a 220px minimum for Settings pages; here it fits its column. */
+.batchColumnSelect button {
+  width: 100%;
+  min-width: 0;
+}

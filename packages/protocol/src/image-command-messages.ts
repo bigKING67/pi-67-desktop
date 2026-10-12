@@ -18,7 +18,8 @@ import type {
 export interface ImageCommandPayloads {
   "image.project.list": Record<string, never>;
   /** A new project from one staged image attachment (the renderer never sends its path). */
-  "image.project.createFromPhoto": { projectId: string; attachmentId: string; headline: string; title?: string };
+  /** Without `headline` the project has no headline layer. */
+  "image.project.createFromPhoto": { projectId: string; attachmentId: string; headline?: string; title?: string };
   "image.project.read": { projectId: string; revision?: number };
   "image.project.history": { projectId: string };
   "image.project.edit": { projectId: string; baseRevision: number; summary: string; operations: ImageEditOperation[]; dryRun?: boolean };

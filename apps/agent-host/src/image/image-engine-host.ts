@@ -195,7 +195,7 @@ export class ImageEngineHost {
     if (!extension) throw new HostCommandError("INVALID_PAYLOAD", "只支持 PNG、JPEG 或 WebP 照片。", false);
     return this.queue.serial(key(workspaceId, projectId), () => withStagedSource(engine, cwd, projectId, `photo.${extension}`, staged.bytes, async (root, source) => {
       await engine.ensureProjectParent(root);
-      const created = await engine.createPhotoProject(root, { project_id: projectId, source, headline, ...(title ? { title } : {}) });
+      const created = await engine.createPhotoProject(root, { project_id: projectId, source, ...(headline ? { headline } : {}), ...(title ? { title } : {}) });
       this.announce(workspaceId, event("image.project.changed", { projectId, revision: created.document.revision, sha256: created.sha256, author: "human" }));
       return { projectId, revision: created.document.revision, sha256: created.sha256, dryRun: false };
     }));

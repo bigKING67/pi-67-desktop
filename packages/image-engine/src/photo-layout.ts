@@ -21,7 +21,8 @@ export async function preparePhotoProject(value: unknown): Promise<PreparedPhoto
   id(value.project_id, "project_id");
   string(value.source, "photo source", 4096);
   if (!path.isAbsolute(value.source)) throw new Error("Photo source must be an absolute local path");
-  string(value.headline, "headline");
+  // A headline is optional on the starter layout (the person may leave it empty); a template lays one out.
+  if (Object.hasOwn(value, "headline") || Object.hasOwn(value, "template")) string(value.headline, "headline");
   for (const key of ["brand", "caption", "title"] as const) {
     if (Object.hasOwn(value, key)) string(value[key], key, key === "title" ? 200 : 2000);
   }
@@ -57,7 +58,7 @@ export async function preparePhotoProject(value: unknown): Promise<PreparedPhoto
     x: left, y, width: canvas.width - left * 2, height: boxHeight, opacity: 1, text: content, font_size, color: textColor, align: "left", line_height: 1.25 });
   const objects: SceneObject[] = [photo];
   if (brief.brand !== undefined) objects.push(text("brand", brief.brand, 67, 34, 22, "#56534d"));
-  objects.push(text("headline", brief.headline, 123, 112, 70, "#30332e"));
+  if (brief.headline !== undefined) objects.push(text("headline", brief.headline, 123, 112, 70, "#30332e"));
   if (brief.caption !== undefined) objects.push(text("caption", brief.caption, 262, 36, 22, "#8e7850"));
   return {
     input: { project_id: brief.project_id, title: brief.title ?? brief.project_id,
