@@ -13,7 +13,7 @@ import {
   useImageProject
 } from "./image-project-controller.js";
 import { canGroup, groupSelectedLayers, layerBlocks, movedOrder, selectedGroup, ungroupImageGroup, updateImageGroup } from "./image-project-groups.js";
-import { IMAGE_OBJECT_KIND_LABELS } from "./image-object-kinds.js";
+import { IMAGE_OBJECT_KIND_LABELS, imageObjectName } from "./image-object-kinds.js";
 import styles from "./ImageInspector.module.css";
 
 const KIND_ICONS = { image: ImageIcon, text: Type, rect: Square, ellipse: Circle } as const;
@@ -157,7 +157,7 @@ function LayerRow({ object, document, selected, busy, ends, inGroup = false, onM
   onMove: (object: ImageSceneObject, direction: 1 | -1) => void;
 }) {
   const Icon = KIND_ICONS[object.kind];
-  const name = object.kind === "text" ? object.text : object.id;
+  const name = imageObjectName(object);
   // A locked or hidden group locks or hides its members; their own toggles stay theirs.
   const effect = imageObjectInEffect(document, object);
   return (

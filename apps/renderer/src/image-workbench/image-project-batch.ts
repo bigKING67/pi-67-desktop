@@ -1,6 +1,9 @@
 import type { ImageBatchRowOutcome, ImageProjectSummary } from "@pi67/protocol";
 import { create } from "zustand";
 import { publishNotification } from "../notifications/notification-store.js";
+import { runAfterLeavingSettings } from "../settings/settings-leave-guard.js";
+import { useShellStore } from "../shell/shell-store.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { batchGroups, type BatchGroup } from "./image-batch-groups.js";
 import { batchTable, parseTable, type BatchTable } from "./image-batch-table.js";
 import { request, useImageProject } from "./image-project-controller.js";
@@ -61,7 +64,8 @@ export async function createImageBatch(): Promise<void> {
     if (useImageBatch.getState().projectId === projectId) useImageBatch.setState({ draft: undefined, last: { batchId, revision, results } });
     const created = results.filter((result) => result.status === "created").length;
     publishNotification({ level: created === results.length ? "success" : "warning", title: `已生成 ${created} 个变体`,
-      message: created === results.length ? "在创作库里作为一个批次列出。" : `${results.length - created} 行没有生成，原因列在导出里。` });
+      message: created === results.length ? "在创作库里作为一个批次列出。" : `${results.length - created} 行没有生成，原因列在导出里。`,
+      ...(created ? { action: { label: "查看批次", run: () => openBatch(batchId) } } : {}) });
     await loadImageLibrary();
   } catch (error) {
     publishNotification({ level: "error", title: "没能生成批次", message: error instanceof Error ? error.message : "未知错误" });
@@ -93,4 +97,13 @@ export function exportImageBatch(batchId: string): Promise<void> {
   const title = useImageProject.getState().document?.title ?? members[0]?.title ?? "批次";
   return exportProjectSet(`${title} 批次`, members.map((member) => ({ projectId: member.projectId, canvas: member.canvas, label: member.title,
     fileName: () => `${String(member.batch!.row).padStart(3, "0")} ${member.title}` })));
+}
+
+/** Opens the library on a batch from wherever the person is: Settings closes (if it may), Chat turns to Work. */
+function openBatch(batchId: string): Promise<void> {
+  return runAfterLeavingSettings(() => {
+    if (rendererWorkbenchStore.getState().selectedSurface?.kind === "settings") rendererWorkbenchStore.getState().closeSettings();
+    useShellStore.getState().setWorkspaceMode("work");
+    useImageWorkbench.getState().openLibrary(batchId);
+  }).then(() => undefined);
 }

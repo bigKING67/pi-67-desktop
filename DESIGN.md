@@ -329,7 +329,8 @@ Application-level surfaces use a separate wide-window shell:
   list as warning notices `第 n 行：…`; batches list like derived sizes with `在创作库查看`,
   `导出批次` and `撤销批次` text actions, and removal uses the shared destructive dialog. In the
   library a batch card's cover carries a second sheet edge (a 4px offset `--border` line) and
-  the meta `N 个变体 · 基于修订 r · date`; opened, a bar leads with `全部项目`, the batch title
+  the meta `N 个变体 · 基于修订 r · date` (library card meta breaks only between its ` · `
+  parts; one part wider than the card ends in an ellipsis); opened, a bar leads with `全部项目`, the batch title
   in medium weight and `撤销批次`, above the same grid of row cards (meta adds `第 n 行`).
 - Templates (P5, 2026-10-11): 导出 ends with `模板`: on a project a `存为模板` secondary button
   (layout-template glyph) and a tertiary line; on a template a readout `这是一个模板 · N 个可替换图层`,

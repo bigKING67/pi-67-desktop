@@ -4,6 +4,7 @@ import { Button } from "react-aria-components";
 import { selectImageObject, useImageProject } from "./image-project-controller.js";
 import { holdImageMarks, sendableImageMarks, setImageReference } from "./image-project-marks.js";
 import styles from "./ImageProjectPage.module.css";
+import { imageObjectName } from "./image-object-kinds.js";
 
 /**
  * What the next message carries besides the words (product model §9.2): worded
@@ -15,6 +16,8 @@ export function ImagePromptAttachments() {
   const held = useImageProject((state) => state.marksHeld);
   const selected = useImageProject((state) => state.selectedObjectIds.length);
   const references = useImageProject((state) => state.references);
+  const objects = useImageProject((state) => state.document?.objects);
+  const nameOf = (id: string): string => { const object = objects?.find((item) => item.id === id); return object ? imageObjectName(object) : id; };
   const sendable = sendableImageMarks(marks).length;
   if (!sendable && !selected && !references.length) return null;
   return (
@@ -23,7 +26,7 @@ export function ImagePromptAttachments() {
       {sendable && !held ? <Attachment label={`${sendable} 个标记`} remove="不附带标记" onRemove={() => holdImageMarks(true)} /> : null}
       {selected ? <Attachment label={`${selected} 个选中图层`} remove="取消选择" onRemove={() => selectImageObject(undefined)} /> : null}
       {references.map((reference) => (
-        <Attachment key={reference.objectId} label={`参考 ${reference.objectId} · ${IMAGE_REFERENCE_ROLE_LABELS[reference.role]}`}
+        <Attachment key={reference.objectId} label={`参考 ${nameOf(reference.objectId)} · ${IMAGE_REFERENCE_ROLE_LABELS[reference.role]}`}
           remove="移除参考" onRemove={() => setImageReference(reference.objectId, undefined)} />
       ))}
       {sendable && held ? (

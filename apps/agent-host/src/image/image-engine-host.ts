@@ -245,14 +245,15 @@ export class ImageEngineHost {
       const root = engine.projectRoot(cwd, projectId);
       const source = await engine.readProject(root, { revision });
       const results: ImageDeriveOutcome[] = [];
-      const title = (preset: ImageSizePreset) => `${source.document.title.slice(0, 190)} · ${imageSizePresetLabel(preset)}`;
+      // Room is left for a repeat's `（n）` (titles hold 200 characters).
+      const title = (preset: ImageSizePreset) => `${source.document.title.slice(0, 185)} · ${imageSizePresetLabel(preset)}`;
       // Each preset stands alone: one that fails is reported, and the ones already written stay listed.
       for (const preset of presets) {
         try {
           const result = await this.deriveOne(engine, cwd, root, { revision, sha256: source.sha256, preset, title: title(preset) }, `${projectId.slice(0, 54)}-${preset}`);
           if (result.status === "refused") { results.push({ preset, status: "refused", reason: result.reason }); continue; }
           this.announce(workspaceId, event("image.project.changed", { projectId: result.project_id, revision: 1, sha256: result.sha256, author: "system" }));
-          results.push({ preset, status: "derived", projectId: result.project_id, title: title(preset), canvas: result.canvas, shrunkText: result.shrunk.length });
+          results.push({ preset, status: "derived", projectId: result.project_id, title: result.title, canvas: result.canvas, shrunkText: result.shrunk.length });
         } catch (error) {
           results.push({ preset, status: "refused", reason: `没能生成：${imageEngineError(error).message}`.slice(0, 500) });
         }
@@ -272,7 +273,7 @@ export class ImageEngineHost {
         const result = await this.deriveOne(engine, cwd, root, { revision, sha256: source.sha256, size: { width, height }, title }, `${projectId.slice(0, 48)}-${width}x${height}`);
         if (result.status === "refused") return { projectId, revision, result: { status: "refused", reason: result.reason } };
         this.announce(workspaceId, event("image.project.changed", { projectId: result.project_id, revision: 1, sha256: result.sha256, author: "system" }));
-        return { projectId, revision, result: { status: "derived", projectId: result.project_id, title, canvas: result.canvas, shrunkText: result.shrunk.length } };
+        return { projectId, revision, result: { status: "derived", projectId: result.project_id, title: result.title, canvas: result.canvas, shrunkText: result.shrunk.length } };
       } catch (error) {
         return { projectId, revision, result: { status: "refused", reason: `没能生成：${imageEngineError(error).message}`.slice(0, 500) } };
       }
@@ -286,9 +287,25 @@ export class ImageEngineHost {
       const derivedId = await freeProjectId(engine, cwd, base, "这个尺寸已经派生过太多次，请先整理创作库。");
       const target = engine.projectRoot(cwd, derivedId);
       await engine.ensureProjectParent(target);
-      try { return await engine.deriveProject(root, target, { ...input, project_id: derivedId }); }
+      // A repeat is numbered by the projects already under this title (`…（2）`), so the library never
+      // lists two sizes under one name, and two specs of one size are not taken for repeats.
+      const earlier = await this.sameTitled(engine, cwd, base, input.title);
+      const title = earlier ? `${input.title}（${earlier + 1}）` : input.title;
+      try { return await engine.deriveProject(root, target, { ...input, title, project_id: derivedId }); }
       catch (error) { if (attempt >= 2 || !(error instanceof Error && error.message === "Derived project already exists")) throw error; }
     }
+  }
+
+  // Sibling projects `<base>`, `<base>-2`… whose title is `title` or a numbered repeat of it.
+  private async sameTitled(engine: ImageEngine, cwd: string, base: string, title: string): Promise<number> {
+    let count = 0;
+    for (let index = 1; index <= 99; index += 1) {
+      const id = index === 1 ? base : `${base}-${index}`;
+      const project = await engine.readProject(engine.projectRoot(cwd, id)).catch(() => undefined);
+      const found = project?.document.title;
+      if (found === title || (found?.startsWith(title) && /^（\d+）$/u.test(found.slice(title.length)))) count += 1;
+    }
+    return count;
   }
 
   // The full-size render, never a preview, is read back: small previews would fail honest text.

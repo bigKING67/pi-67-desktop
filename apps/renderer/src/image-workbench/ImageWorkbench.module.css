@@ -139,6 +139,17 @@
   font-size: var(--font-size-caption);
 }
 
+/* Each fact stays on one line; one longer than the card (a long source title) ends in an ellipsis. */
+.cardMetaPart {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+
 .dialogModal {
   width: min(460px, calc(100vw - 40px));
 }

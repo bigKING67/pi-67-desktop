@@ -1515,7 +1515,9 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   candidate was made from and the candidate, without changing the project.
   `导出` keeps the full-size PNG and adds size presets (1:1, 3:4, 4:5, 9:16, 16:9, each
   showing its pixel size: the source's short edge kept). Generating them derives one
-  project per preset beside the source in the library (`<title> · 4:5`, history
+  project per preset beside the source in the library (`<title> · 4:5`; a size derived again is
+  numbered by the projects already under that title, `<title> · 4:5（2）`, so two specs of one
+  size are not taken for repeats; history
   `派生自 <source> 修订 N · 4:5`), re-laid out rather than scaled: images and shapes
   spanning the width stretch across the new width and scale vertically, images cropping
   with `cover` (fitting whole with `contain` when the canvas turns between portrait and
@@ -1544,6 +1546,10 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   words turned. The Agent may set `rotation` / `flip_x` / `flip_y`. A document is written as
   schema v3 only while an object is turned or flipped, is an ellipse or has a gradient
   (v3 may also bind fonts), so others stay readable by earlier releases.
+  图层, the canvas's layer labels and the composer's reference chips name a text layer by its
+  words and another layer by its id in product words when it is a default id for its kind
+  (`photo` 照片, `background` 背景, `logo` Logo, `shape-2` 矩形 2…); other ids show as they
+  are, and 属性 keeps the id the Agent uses (`图片 · photo`).
   图层 adds text, rectangles and ellipses (`添加 文字 / 矩形 / 椭圆`), centred on the canvas
   and selected. Rectangles and ellipses take a 填充: 纯色, 线性渐变 (start and end colour,
   angle) or 径向渐变 (start and end colour); a gradient of more stops, which only the Agent
@@ -1595,7 +1601,10 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   written. Each batch is listed with `在创作库查看`, `导出批次` (all rows as one set after the
   keyed-text check) and `撤销批次`, which asks first (saying how many were edited since) and
   removes the batch's projects; the source and exported files stay. The library shows a batch
-  as one card (`批次 · <source>`, count, source revision) that opens to its rows in table order.
+  as one card (`批次 · <source>`, count, source revision) that opens to its rows in table order;
+  the notice that a batch was made offers `查看批次`, which opens that card. Before running, the
+  table's matches read `<column> → 「<layer's words>」`; if a matched layer is gone since, the
+  table is refused until it is chosen again.
   The Agent's `image_batch` makes the same batches from inline rows.
   导出 → 模板 (P5): `存为模板` copies the revision on screen into a template beside the project
   (`<title> · 模板`, opened at once) with every text and image layer marked 可替换 (at most 20);

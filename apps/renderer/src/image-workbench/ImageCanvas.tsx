@@ -4,7 +4,7 @@ import { boundsOf, clampInside, normalizeRotation, RESIZE_HANDLES, resizeRect, r
 import { useCanvasFit } from "./image-canvas-fit.js";
 import { ImageInlineTextEditor } from "./ImageInlineTextEditor.js";
 import { selectionFor } from "./image-project-controller.js";
-import { IMAGE_OBJECT_KIND_LABELS } from "./image-object-kinds.js";
+import { IMAGE_OBJECT_KIND_LABELS, imageObjectName } from "./image-object-kinds.js";
 import styles from "./ImageCanvas.module.css";
 
 /** Snap distance in screen pixels, converted to canvas units by the fit scale. */
@@ -265,5 +265,5 @@ export function ImageCanvas({ document, src, alt, selectedIds, editable, onSelec
 }
 
 function objectLabel(object: SceneObject): string {
-  return object.kind === "text" ? `文字：${object.text.slice(0, 24)}` : `${IMAGE_OBJECT_KIND_LABELS[object.kind]}：${object.id}`;
+  return `${IMAGE_OBJECT_KIND_LABELS[object.kind]}：${imageObjectName(object).slice(0, 24)}`;
 }

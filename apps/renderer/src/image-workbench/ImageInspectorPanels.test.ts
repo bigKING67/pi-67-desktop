@@ -7,6 +7,9 @@ vi.mock("../notifications/notification-store.js", () => ({ publishNotification: 
 
 import { candidateReceiptLine, historySummary } from "./ImageInspectorPanels.js";
 import { selectImageObjects } from "./ImageLayersPanel.js";
+import { imageObjectName } from "./image-object-kinds.js";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 describe("candidate receipts", () => {
   it("reads the receipt in words and never claims visual quality or a cost", () => {
@@ -33,5 +36,27 @@ describe("image history summaries", () => {
 describe("image layers selector", () => {
   it("returns one stable empty list before the document loads, so the subscription settles", () => {
     expect(selectImageObjects({ document: undefined })).toBe(selectImageObjects({ document: undefined }));
+  });
+});
+
+describe("layer names", () => {
+  it("names text by its words and default ids in product words, keeping ids the Agent chose", () => {
+    const base = { locked: false, visible: true, x: 0, y: 0, width: 10, height: 10, opacity: 1 };
+    expect(imageObjectName({ ...base, id: "price", kind: "text", text: "¥39", font_size: 20, color: "#000000", align: "left", line_height: 1.2 })).toBe("¥39");
+    expect(imageObjectName({ ...base, id: "photo", kind: "image", asset_id: "a", fit: "cover" })).toBe("照片");
+    expect(imageObjectName({ ...base, id: "shape-2", kind: "rect", color: "#000000", radius: 0 })).toBe("矩形 2");
+    expect(imageObjectName({ ...base, id: "hero_shot", kind: "image", asset_id: "a", fit: "cover" })).toBe("hero_shot");
+    // A default id names only its own kind: an ellipse the Agent called `shape` stays `shape`.
+    expect(imageObjectName({ ...base, id: "shape", kind: "ellipse", color: "#000000" })).toBe("shape");
+  });
+});
+
+describe("library card meta", () => {
+  it("keeps each fact whole and ends a line after its separator", async () => {
+    const { CardMeta } = await import("./ImageLibrary.js");
+    const html = renderToStaticMarkup(createElement(CardMeta, { parts: ["1920×1080", "修订 1", "10月10日"] }));
+    expect(html.match(/<span class="[^"]*cardMetaPart[^"]*">[^<]*<\/span>/gu)?.map((part) => part.replace(/<[^>]+>/gu, ""))).toEqual(["1920×1080 ·", "修订 1 ·", "10月10日"]);
+    // Plain spaces between the parts: visible, and where a line may break.
+    expect(html.replace(/<[^>]+>/gu, "")).toBe("1920×1080 · 修订 1 · 10月10日");
   });
 });

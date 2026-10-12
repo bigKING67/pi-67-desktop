@@ -124,10 +124,10 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
 
     // E. A reference role on the photo layer.
     await tab("图层");
-    await inspector.getByRole("button", { name: "选择图层 photo" }).click();
+    await inspector.getByRole("button", { name: "选择图层 照片" }).click();
     await tab("属性");
     await inspector.getByRole("group", { name: "作为参考" }).getByRole("button", { name: "保留风格" }).click();
-    await expect(attached).toContainText("参考 photo · 保留风格");
+    await expect(attached).toContainText("参考 照片 · 保留风格");
 
     // A user font on the headline: Latin from the font, CJK from the built-in fallback.
     await tab("图层");
@@ -155,7 +155,7 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     await expect(inspector.getByRole("button", { name: "蒙版" }).first()).toContainText("mask-1");
     // P4: unlock the photo and brighten it with the keyboard on the 亮度 slider; 还原调整 drops it again.
     await tab("图层");
-    await inspector.getByRole("button", { name: "选择图层 photo" }).click();
+    await inspector.getByRole("button", { name: "选择图层 照片" }).click();
     await tab("属性");
     await inspector.getByRole("button", { name: "解锁" }).click();
     await expectRevision(page, 15);
@@ -173,7 +173,7 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     await expect(inspector.getByRole("button", { name: "还原调整" })).toHaveCount(0);
     // P4: group the ellipse with the headline in 图层, hide and show the group, make it see-through in 属性, then ungroup.
     await tab("图层");
-    await inspector.getByRole("button", { name: "选择图层 ellipse" }).click();
+    await inspector.getByRole("button", { name: "选择图层 椭圆" }).click();
     await inspector.getByRole("button", { name: "选择图层 春日上新 SALE" }).click({ modifiers: ["Shift"] });
     await inspector.getByRole("group", { name: "编组" }).getByRole("button", { name: "编组" }).click();
     await expectRevision(page, adjusted + 2);

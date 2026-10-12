@@ -222,7 +222,7 @@ describe("image engine host", { timeout: 120_000 }, () => {
       expect.objectContaining({ preset: "16x9", status: "derived", projectId: "poster-16x9", canvas: { width: 455, height: 256, background: "#ffffff" } })
     ]);
     const again = await run("image.project.derive", { projectId: "poster", revision: 1, presets: ["1x1"] });
-    expect(again.results[0]).toMatchObject({ projectId: "poster-1x1-2" });
+    expect(again.results[0]).toMatchObject({ projectId: "poster-1x1-2", title: "春日海报 · 1:1（2）" });
     expect(events.filter((item) => item.type === "image.project.changed").map((item) => (item.payload as { projectId: string; author: string })))
       .toEqual(["poster-1x1", "poster-16x9", "poster-1x1-2"].map((projectId) => expect.objectContaining({ projectId, author: "system" })));
     const listed = (await run("image.project.list", {})).projects;
@@ -238,6 +238,9 @@ describe("image engine host", { timeout: 120_000 }, () => {
     const spec = await run("image.project.deriveSize", { projectId: "poster", revision: 1, width: 300, height: 300, name: "方形主图" });
     expect(spec.result).toEqual({ status: "derived", projectId: "poster-300x300", title: "春日海报 · 方形主图", canvas: { width: 300, height: 300, background: "#ffffff" }, shrunkText: 0 });
     expect((await run("image.project.list", {})).projects.find((item) => item.projectId === "poster-300x300")?.derivedFrom).toEqual({ projectId: "poster", revision: 1 });
+    // Another spec of the same size is not a repeat; the same spec again is.
+    expect((await run("image.project.deriveSize", { projectId: "poster", revision: 1, width: 300, height: 300, name: "另一个方图" })).result).toMatchObject({ projectId: "poster-300x300-2", title: "春日海报 · 另一个方图" });
+    expect((await run("image.project.deriveSize", { projectId: "poster", revision: 1, width: 300, height: 300, name: "方形主图" })).result).toMatchObject({ title: "春日海报 · 方形主图（2）" });
     expect((await run("image.project.deriveSize", { projectId: "poster", revision: 1, width: 8192, height: 8192, name: "超大" })).result)
       .toMatchObject({ status: "refused", reason: expect.stringContaining("超出画布上限") });
   });

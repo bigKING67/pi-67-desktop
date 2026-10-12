@@ -5,6 +5,7 @@ vi.mock("../notifications/notification-store.js", async () => (await import("./i
 
 import { host, notices } from "./image-project-test-support.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import { useShellStore } from "../shell/shell-store.js";
 import { useImageWorkbench } from "./image-workbench-store.js";
 import { loadImageProject, useImageProject } from "./image-project-controller.js";
 import { exportImageProject } from "./image-project-export.js";
@@ -31,7 +32,13 @@ describe("image library work: batches, templates, hand-off, brand", () => {
     await createImageBatch();
     expect(host.calls.find((call) => call.type === "image.batch.create")?.payload).toEqual({ projectId: "p", revision: 1, rows: [{ row: 1, texts: [{ layer: "t", text: "¥299" }] }, { row: 2, texts: [{ layer: "t", text: "¥1999999" }] }] });
     expect(useImageBatch.getState()).toMatchObject({ draft: undefined, last: { batchId: "b1", revision: 1 } });
-    expect(notices.at(-1)).toMatchObject({ level: "warning", title: "已生成 1 个变体" });
+    expect(notices.at(-1)).toMatchObject({ level: "warning", title: "已生成 1 个变体", action: { label: "查看批次" } });
+    // The notice opens the library on that batch.
+    // From Chat, the notice's action turns to Work and opens the library on that batch.
+    useShellStore.getState().setWorkspaceMode("chat");
+    await (notices.at(-1) as unknown as { action: { run: () => Promise<void> } }).action.run();
+    expect(useImageWorkbench.getState().view).toEqual({ kind: "library", batchId: "b1" });
+    expect(useShellStore.getState().workspaceMode).toBe("work");
     const member = { projectId: "p-b1-1", title: "海报 · ¥299", revision: 2, canvas: { width: 100, height: 100, background: "#fff" }, updatedAt: 1, readyCandidates: 0, batch: { batchId: "b1", row: 1, projectId: "p", revision: 1 } };
     useImageWorkbench.setState({ projects: [member] });
     expect(batchesOf([member], "p")).toEqual([{ batchId: "b1", projectId: "p", revision: 1, members: [member] }]);

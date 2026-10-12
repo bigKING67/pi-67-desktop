@@ -1,6 +1,6 @@
 import type { ImageProjectSummary } from "@pi67/protocol";
 import { ArrowLeft, FolderOpen, ImagePlus, Palette } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { chooseImageLibrary, ensureLibraryThumbnails, imagePreviewUrl, loadImageLibrary, subscribeImageLibraryChanges } from "./image-workbench-controller.js";
@@ -136,7 +136,7 @@ function BatchCard({ libraryId, batchId, members }: { libraryId: string; batchId
           {thumbnail ? <img alt="" decoding="async" loading="lazy" src={imagePreviewUrl(libraryId, cover.projectId, thumbnail.pngSha256)} /> : null}
         </span>
         <span className={styles.cardTitle}>{title}</span>
-        <span className={styles.cardMeta}>{[`${members.length} 个变体`, `基于修订 ${cover.batch!.revision}`, updatedLabel(Math.max(...members.map((item) => item.updatedAt)))].join(" · ")}</span>
+        <CardMeta parts={[`${members.length} 个变体`, `基于修订 ${cover.batch!.revision}`, updatedLabel(Math.max(...members.map((item) => item.updatedAt)))]} />
       </Button>
     </li>
   );
@@ -178,7 +178,7 @@ function ProjectCard({ libraryId, project }: { libraryId: string; project: Image
           {thumbnail ? <img alt="" decoding="async" loading="lazy" src={imagePreviewUrl(libraryId, project.projectId, thumbnail.pngSha256)} /> : null}
         </span>
         <span className={styles.cardTitle}>{project.title}</span>
-        <span className={styles.cardMeta}>{meta.join(" · ")}</span>
+        <CardMeta parts={meta} />
       </Button>
     </li>
   );
@@ -190,4 +190,14 @@ function updatedLabel(timestamp: number): string {
   return date.toDateString() === today.toDateString()
     ? `今天 ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
     : `${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
+/** A card's facts, each kept whole: a line breaks after a ` · `, never inside a date or a title. */
+export function CardMeta({ parts }: { parts: readonly string[] }) {
+  return (
+    <span className={styles.cardMeta}>
+      {/* The space between parts is plain text, so it stays visible and is where a line may break. */}
+      {parts.map((part, index) => <Fragment key={index}>{index ? " " : null}<span className={styles.cardMetaPart}>{index < parts.length - 1 ? `${part} ·` : part}</span></Fragment>)}
+    </span>
+  );
 }
