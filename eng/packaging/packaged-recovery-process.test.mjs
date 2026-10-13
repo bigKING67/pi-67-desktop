@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { describe, expect, it, vi } from "vitest";
-import { cleanupRecoveryProcesses, readRecoveryMainProcess, readRecoveryProcess, readWindowsRecoveryExitState, signalRecoveryProcess } from "./packaged-recovery-process.mjs";
+import { cleanupRecoveryProcesses, readRecoveryMainProcess, readRecoveryProcess, readWindowsRecoveryExitState, signalRecoveryProcess, WINDOWS_COLD_QUERY_TIMEOUT_MS } from "./packaged-recovery-process.mjs";
 
 const pid = 123456;
 const win = { pid, parentPid: 123455, startedAt: "639267123456789012", executablePath: "C:\\隔离 测试\\New Money.exe" };
@@ -118,6 +118,14 @@ describe("packaged recovery process ownership", () => {
     expect(args.at(-1)).not.toContain("ConvertTo-Json");
     expect(args.at(-1)).not.toMatch(/CommandLine|Stop-Process|taskkill/u);
     expect(options).toMatchObject({ timeout: 15000, windowsHide: true });
+  });
+  it("gives only an explicit cold-start query the longer budget, and bounds it", async () => {
+    const execute = vi.fn().mockResolvedValue({ stdout: windowsIdentityOutput(win) });
+    await readRecoveryProcess(pid, { platform: "win32", execute, timeoutMs: WINDOWS_COLD_QUERY_TIMEOUT_MS });
+    expect(execute.mock.calls[0][2]).toMatchObject({ timeout: 60_000 });
+    for (const timeoutMs of [0, -1, 1.5, WINDOWS_COLD_QUERY_TIMEOUT_MS + 1]) {
+      await expect(readRecoveryProcess(pid, { platform: "win32", execute, timeoutMs })).rejects.toThrow("Invalid recovery process query timeout.");
+    }
   });
 
   it.each([null, { ...win, pid: 7 }, { ...win, startedAt: "" }, { ...win, executablePath: "" }, { ...win, parentPid: -1 }])(

@@ -5,7 +5,7 @@ import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { cleanupRecoveryProcesses, readRecoveryMainProcess, readRecoveryProcess, readWindowsRecoveryExitState, signalRecoveryProcess } from "./packaged-recovery-process.mjs";
+import { cleanupRecoveryProcesses, readRecoveryMainProcess, readRecoveryProcess, readWindowsRecoveryExitState, signalRecoveryProcess, WINDOWS_COLD_QUERY_TIMEOUT_MS } from "./packaged-recovery-process.mjs";
 import { fileURLToPath } from "node:url";
 import { cleanupPackagedTestDirectories, createPackagedTestDirectories, installWorkspaceDialogResult,
   isolatePackagedAutomationWindow, launchPackagedApplication, resolvePackagedArtifact } from "./packaged-electron-fixture.mjs";
@@ -49,7 +49,8 @@ const mark = value => { stage = value; journal.push({ stage, at: new Date().toIS
 
 try {
   mark("process-query-preflight");
-  assert(await readRecoveryProcess(process.ppid, { onDiagnostic: diagnostic => {
+  // The job's first PowerShell start is cold (up to ~13 s seen on runners): only this warm-up gets the longer budget.
+  assert(await readRecoveryProcess(process.ppid, { timeoutMs: WINDOWS_COLD_QUERY_TIMEOUT_MS, onDiagnostic: diagnostic => {
     processQueryPreflight = diagnostic;
     console.log(`Recovery process-query preflight: ${JSON.stringify(diagnostic)}`);
   } }), "The runner parent process must be observable before launching Electron.");

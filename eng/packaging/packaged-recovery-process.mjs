@@ -33,10 +33,18 @@ export async function readWindowsRecoveryExitState(pid, { execute = executeFile 
   throw new Error("Invalid Windows recovery exit state.");
 }
 
-/** Identity is kept in memory only; never select processes by application name. */
-export async function readRecoveryProcess(pid, { platform = process.platform, execute = executeFile, onDiagnostic } = {}) {
+/** The first Windows query of a job pays PowerShell's cold start (2–13 s on CI runners, warm ones ~0.3 s). */
+export const WINDOWS_COLD_QUERY_TIMEOUT_MS = 60_000;
+
+/**
+ * Identity is kept in memory only; never select processes by application name. `timeoutMs`
+ * overrides the platform default: the readiness preflight passes WINDOWS_COLD_QUERY_TIMEOUT_MS,
+ * since it is the job's first PowerShell start; every later query keeps the tight default.
+ */
+export async function readRecoveryProcess(pid, { platform = process.platform, execute = executeFile, onDiagnostic, timeoutMs } = {}) {
   if (!Number.isSafeInteger(pid) || pid <= 0 || pid === process.pid) throw new Error("Invalid recovery process PID.");
-  const options = { timeout: platform === "win32" ? 15000 : 5000, maxBuffer: 64 * 1024, windowsHide: true };
+  if (timeoutMs !== undefined && (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > WINDOWS_COLD_QUERY_TIMEOUT_MS)) throw new Error("Invalid recovery process query timeout.");
+  const options = { timeout: timeoutMs ?? (platform === "win32" ? 15000 : 5000), maxBuffer: 64 * 1024, windowsHide: true };
   if (platform === "darwin") {
     try {
       const { stdout } = await execute("/bin/ps", ["-p", String(pid), "-o", "ppid=,lstart=,comm="], options);
