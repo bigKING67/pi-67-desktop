@@ -56,3 +56,5 @@ colour → 50-row batch → library), without generation (offline) or a real Tea
   project id alone and never pruned (now per library and project, the 100 most recent); dead
   summary code; the Agent's create tool still required a headline (optional, except with a
   template).
+- 2026-10-13: the same naming slip in `从模板新建`: its fields were labelled by layer id
+  (`headline`). Text fields now read `原文「…」`, pictures as in 图层.

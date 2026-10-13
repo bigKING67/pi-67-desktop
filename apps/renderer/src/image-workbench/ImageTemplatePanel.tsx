@@ -6,6 +6,7 @@ import { useImageProject } from "./image-project-controller.js";
 import { createFromTemplate, saveAsTemplate } from "./image-project-template.js";
 import styles from "./ImageInspector.module.css";
 import dialogStyles from "./ImageWorkbench.module.css";
+import { imageObjectName } from "./image-object-kinds.js";
 
 /**
  * 导出 → 模板 (P5): a project can be saved as a template; a template starts new projects in
@@ -64,13 +65,14 @@ function NewFromTemplateDialog({ document, onDismiss }: { document: ImageDocumen
           </TextField>
           {texts.map((object) => (
             <TextField key={object.id} className={dialogStyles.dialogField!} maxLength={2000} value={words[object.id] ?? ""} onChange={(value) => setWords((current) => ({ ...current, [object.id]: value }))}>
-              <Label>{object.id}</Label>
+              {/* Named by the words it replaces, never by the layer's internal id. */}
+              <Label>原文「{object.kind === "text" ? object.text.slice(0, 24) : object.id}」</Label>
               <Input />
             </TextField>
           ))}
           {images.map((object) => (
             <div key={object.id} className={dialogStyles.dialogSlot}>
-              <span className={dialogStyles.dialogSlotName}>{object.id}<span>{pictures[object.id]?.name ?? "沿用模板里的图片"}</span></span>
+              <span className={dialogStyles.dialogSlotName}>{imageObjectName(object)}<span>{pictures[object.id]?.name ?? "沿用模板里的图片"}</span></span>
               <input ref={(element) => { inputs.current[object.id] = element; }} accept="image/png,image/jpeg,image/webp" className={dialogStyles.fileInput} tabIndex={-1} type="file"
                 onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) setPictures((current) => ({ ...current, [object.id]: file })); }} />
               <Button className="secondary-button" isDisabled={working} onPress={() => inputs.current[object.id]?.click()}><ImagePlus aria-hidden="true" size={14} />换图片…</Button>

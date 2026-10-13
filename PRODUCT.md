@@ -1616,8 +1616,8 @@ Contract: `docs/adr/0003-team-chat.md`. P1 scope:
   批量 → 模板 (P5): `存为模板` copies the revision on screen into a template beside the project
   (`<title> · 模板`, opened at once) with every text and image layer marked 可替换 (at most 20);
   in a template, 属性 for a text or image layer toggles 可替换, and the header's meta says 模板.
-  `从模板新建…` asks for the project name, each replaceable text's words (prefilled) and, per
-  replaceable picture, an optional new image (staged like a photo, laid into the layer's box
+  `从模板新建…` asks for the project name, each replaceable text's words (prefilled, labelled
+  `原文「<the template's words>」`) and, per replaceable picture (named as in 图层), an optional new image (staged like a photo, laid into the layer's box
   with its fit); the new project changes only those layers, which stay unlocked while every
   other layer is locked, fits text like a batch row (or is refused with the reason) and opens.
   A batch run on a template makes such projects. The library lists templates first under

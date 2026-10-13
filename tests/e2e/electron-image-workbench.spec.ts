@@ -233,7 +233,7 @@ test("image workbench: edits, marks, references, fonts, sizes and export through
     await inspector.getByRole("button", { name: "从模板新建…" }).click();
     const fromTemplate = page.getByRole("dialog", { name: "从模板新建" });
     await fromTemplate.getByLabel("项目名称").fill("夏日冷萃");
-    await fromTemplate.getByLabel("headline").fill("夏日冷萃 SALE");
+    await fromTemplate.getByLabel("原文「春日上新 SALE」").fill("夏日冷萃 SALE");
     await fromTemplate.locator("input[type=file]").first().setInputFiles(photo);
     await fromTemplate.getByRole("button", { name: "创建项目" }).click();
     await expect(project.getByText("夏日冷萃", { exact: true })).toBeVisible({ timeout: 30_000 });
